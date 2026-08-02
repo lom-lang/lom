@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom · AI 原生编程语言项目指导文件</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #555;
+    --line: #ddd;
+    --bg-soft: #f7f7f7;
+    --accent: #0a6;
+    --warn: #c33;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 15px/1.7 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--fg);
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    background: #fff;
+  }
+  h1 { font-size: 28px; border-bottom: 2px solid var(--fg); padding-bottom: 8px; margin-top: 48px; }
+  h1:first-of-type { margin-top: 0; }
+  h2 { font-size: 21px; margin-top: 40px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 17px; margin-top: 28px; }
+  h4 { font-size: 15px; margin-top: 20px; }
+  p, li { color: var(--fg); }
+  code { background: var(--bg-soft); padding: 1px 6px; border-radius: 3px; font-size: 13px; font-family: "SF Mono", Consolas, Menlo, monospace; }
+  pre { background: var(--bg-soft); padding: 12px 14px; border-radius: 5px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; }
+  blockquote { border-left: 3px solid var(--accent); margin: 14px 0; padding: 4px 14px; color: var(--muted); background: #fafafa; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .rec { border-left: 3px solid var(--accent); background: #f0faf5; padding: 10px 14px; margin: 14px 0; }
+  .warn { border-left: 3px solid var(--warn); background: #fdf3f3; padding: 10px 14px; margin: 14px 0; }
+  .phase { border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px; margin: 18px 0; background: #fff; }
+  .phase h3 { margin-top: 0; }
+  .tag { display: inline-block; background: var(--accent); color: #fff; font-size: 12px; padding: 1px 8px; border-radius: 10px; margin-left: 6px; }
+  .tag.warn { background: var(--warn); }
+  .tag.muted { background: #888; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 3px 0; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lom — AI 原生编程语言项目指导文件</h1>
+  <p class="meta">
+    Language of Machine · 渐进式融合（LLM 编码原生优先 → 工作负载扩展）<br>
+    宿主语言 Rust · LICENSE Apache 2.0 · 扩展名 <code>.lom</code> · 仓库 <code>lom-lang/lom</code><br>
+    版本 v0.1 · 生成日期 2026-08-02
+  </p>
+  <blockquote>
+    本文件是 Lom 项目的最高指导文件，定义项目定位、设计哲学、7 阶段路线图及全部辅助规划维度。
+    所有后续实现、文档、决策均以本文件为基准。当本文件与现实情况冲突时，更新本文件，而非绕过它。
+  </blockquote>
+</header>
+
+<h1>第一部分 · 项目定位与设计哲学</h1>
+
+<h2>1.1 Lom 是什么</h2>
+<p>
+  Lom（Language of Machine）是一门<strong>渐进式融合</strong>的 AI 原生编程语言。它从"LLM 编码原生"出发——让 LLM 写代码时出错率低、易修复、容错可解析——在工具链与语义稳定后，再渐进引入"AI 工作负载原生"的硬本事（张量、自动微分、异构计算）。
+</p>
+<p>
+  双关含义：既指<strong>"给机器（LLM）写的语言"</strong>，也暗示<strong>"机器时代的语言"</strong>。
+</p>
+
+<h2>1.2 为什么需要 Lom</h2>
+<p>当前 AI 原生语言赛道存在两个被混淆的方向：</p>
+<table>
+  <tr><th>方向</th><th>代表</th><th>设计取向</th><th>问题</th></tr>
+  <tr>
+    <td>AI 工作负载原生</td>
+    <td>Mojo / NEURON / Bend</td>
+    <td>张量、自动微分、GPU 异构计算</td>
+    <td>语法复杂，LLM 写起来更难；赛道红海，Mojo 已有 17.5 万开发者</td>
+  </tr>
+  <tr>
+    <td>LLM 编码原生</td>
+    <td>MoonBit（工具链侧）/ Zero（JSON 诊断）</td>
+    <td>容错解析、结构化错误、线性语法</td>
+    <td>赛道空白，仅 MoonBit 一家有明确意图且仍处意图阶段，缺公开评测</td>
+  </tr>
+</table>
+<p>
+  Lom 选择<strong>先占空白赛道</strong>（LLM 编码原生），用差异化定位站稳脚跟，再向工作负载侧扩展。这与"直接对标 Mojo"的正面竞争路径相反，是一条<strong>侧翼切入</strong>路线。
+</p>
+
+<h2>1.3 与现有项目的差异化定位</h2>
+<table>
+  <tr><th>项目</th><th>定位</th><th>Lom 的差异</th></tr>
+  <tr><td>MoonBit</td><td>工作负载原生 + 工具链 AI 友好</td><td>Lom 先做编码原生，工具链更激进（容错解析器是一等公民）；评测集公开</td></tr>
+  <tr><td>Mojo</td><td>工作负载原生，性能优先</td><td>Lom 不与之正面竞争，工作负载是阶段 4 扩展项而非身份</td></tr>
+  <tr><td>Zero</td><td>JSON 诊断，未规模化</td><td>Lom 吸收其 JSON 诊断思想，但补齐完整语言+评测集+开源生态</td></tr>
+  <tr><td>Unison</td><td>内容寻址，函数式小众</td><td>Lom 不强绑内容寻址，保留为可选优化</td></tr>
+</table>
+
+<h2>1.4 四条设计哲学</h2>
+<ol>
+  <li><strong>局部性 &gt; 全局性</strong>：声明与使用必须在同一视野内闭合，避免"远距离验证"。</li>
+  <li><strong>容错性 &gt; 严谨性</strong>：语法错误不致命，类型错误可降级。LLM 写错也能"跑一部分"，配合工具链逐步修复。</li>
+  <li><strong>线性 &gt; 嵌套</strong>：流式生成天然适合 pipeline、early return、guard clause，不适合深层嵌套。</li>
+  <li><strong>自描述 &gt; 隐式约定</strong>：意图写在代码里（可执行 docstring、schema 即类型），减少 LLM 需要"猜约定"的场景。</li>
+</ol>
+
+<h2>1.5 不做什么（防范围蠕变）</h2>
+<div class="warn">
+  <strong>明确排除项</strong>（阶段 0-3 内不做，阶段 4+ 视情况）：
+  <ul>
+    <li>不做张量一等类型、自动微分、GPU 异构计算（阶段 4 可调整里程碑）</li>
+    <li>不做完全独创语法——采用熟悉语法壳（Rust 系），蹭训练数据先验</li>
+    <li>不做高表达力上限——刻意保持"低表达力上限、高表达力下限"</li>
+    <li>不为追求新颖而造语法——熟悉壳 + 改造内里</li>
+  </ul>
+</div>
+
+<h1>第二部分 · 7 阶段路线图</h1>
+
+<p class="meta">总周期约 47-98 周（1-2 年）。阶段 0-2 为"LLM 编码原生"主线，阶段 3 为可用化拐点，阶段 4 为可调整的工作负载扩展里程碑，阶段 5-6 为生产化。</p>
+
+<h2>2.1 总览表</h2>
+<table>
+  <tr>
+    <th>阶段</th><th>名称</th><th>周期</th><th>大节奏</th><th>技术栈</th><th>场景范围</th><th>核心退出标准</th>
+  </tr>
+  <tr><td>0</td><td>语言设计与规范</td><td>1-2 周</td><td>研究性</td><td>纯文档+Git</td><td>不涉及运行</td><td>LLM 能读懂规范并生成合法代码片段</td></tr>
+  <tr><td>1</td><td>最小解释器</td><td>4-6 周</td><td>研究性</td><td>Rust+树遍历解释器</td><td>LLM 运行环境(最小)</td><td>跑通 LLM 生成的 10+ 测试用例</td></tr>
+  <tr><td>2</td><td>LLM 编码原生核心</td><td>6-10 周</td><td>MVP</td><td>+类型检查器+容错解析</td><td>LLM 运行环境(完整)</td><td>LLM 生成通过率评测集达标</td></tr>
+  <tr><td>3</td><td>可用 MVP</td><td>8-12 周</td><td>MVP</td><td>+Cranelift JIT+LSP+REPL</td><td>+通用脚本+后端雏形</td><td>能写完整 CLI 工具或简单 Web 服务</td></tr>
+  <tr><td>4</td><td>工作负载内核扩展 <span class="tag warn">可调整</span></td><td>12-20 周</td><td>生产级</td><td>+MLIR(CPU/GPU)</td><td>+AI/ML 计算</td><td>能写完整 MNIST 训练脚本</td></tr>
+  <tr><td>5</td><td>生态与自举</td><td>16-24 周</td><td>生产级</td><td>+LLVM AOT+WASM</td><td>全场景</td><td>编译器能自举</td></tr>
+  <tr><td>6</td><td>生产级</td><td>持续</td><td>生产级</td><td>全套</td><td>全场景</td><td>有第三方项目生产部署</td></tr>
+</table>
+
+<h2>2.2 阶段 0：语言设计与规范（1-2 周）</h2>
+<div class="phase">
+  <h3>阶段 0 · 语言设计与规范 <span class="tag">研究性</span></h3>
+  <p><strong>目标</strong>：定语言身份，写规范，搭 repo 骨架。不写一行编译器代码。</p>
+  <h4>产出物</h4>
+  <ul>
+    <li><code>LANGUAGE_SPEC.md</code>：完整语言规范，含 EBNF、类型系统、效应系统、错误模型、模块系统草案</li>
+    <li><code>SPEC_FOR_AI.md</code>：精简规范（&lt;2000 词），专门给 LLM 读，对标 Codong 模式</li>
+    <li><code>DESIGN_RATIONALE.md</code>：设计理念，讲清楚"为什么 Lom 是 AI 原生的"</li>
+    <li><code>README.md</code>、<code>LICENSE</code>（Apache 2.0）、<code>.gitattributes</code>（Linguist 注册）、CI 骨架</li>
+    <li>语言命名 + 文件扩展名（已定：<code>.lom</code>）+ GitHub org/<code>lom-lang/lom</code></li>
+  </ul>
+  <h4>技术栈</h4>
+  <p>纯文档 + Git + GitHub Actions（文档 lint + markdown 链接检查）</p>
+  <h4>目标 LLM 适配（DeepSeek 优先）</h4>
+  <ul>
+    <li>写 SPEC_FOR_AI 时，用 DeepSeek 做"可读性测试"：喂规范让它生成代码，看合法率</li>
+    <li>错误 JSON 字段设计针对 DeepSeek 响应特性优化（中文+JSON 的响应特性需重点测试）</li>
+    <li>评测样本要包含 DeepSeek 易犯的错误模式</li>
+  </ul>
+  <h4>退出标准</h4>
+  <p>把 <code>SPEC_FOR_AI.md</code> 喂给 DeepSeek（及 1-2 个对照 LLM），生成的代码片段语法合法率 &gt; 80%。</p>
+</div>
+
+<h2>2.3 阶段 1：最小解释器（4-6 周）</h2>
+<div class="phase">
+  <h3>阶段 1 · 最小解释器 <span class="tag">研究性</span></h3>
+  <p><strong>目标</strong>：能跑通基本语法子集的树遍历解释器。<strong>不做类型检查、不做张量、不做工作负载特性</strong>。</p>
+  <h4>技术栈</h4>
+  <p>Rust + logos（词法）+ 手写递归下降（语法）+ Pratt（表达式）+ tree-walking（解释）</p>
+  <h4>语法子集</h4>
+  <pre><code>fn let let mut if else while for return
+基本类型：Int Float Bool String Unit
+运算符 + 函数 + 闭包</code></pre>
+  <h4>场景</h4>
+  <p>LLM 生成代码的运行环境（最小版）——LLM 生成简单脚本，解释器能跑。</p>
+  <h4>退出标准</h4>
+  <p>建立 10+ 个测试用例（斐波那契、字符串处理、循环、递归），LLM 基于 SPEC_FOR_AI 生成的代码能跑通其中 70%+。</p>
+</div>
+
+<h2>2.4 阶段 2：LLM 编码原生核心（6-10 周）— 身份阶段</h2>
+<div class="phase">
+  <h3>阶段 2 · LLM 编码原生核心 <span class="tag">MVP</span></h3>
+  <p><strong>目标</strong>：把"LLM 编码原生"做出来。这是与其他语言的区别点，也是 Lom 身份的成立点。</p>
+  <h4>核心特性（按优先级）</h4>
+  <ol>
+    <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈</li>
+    <li><strong>结构化 JSON 错误诊断</strong>：含 <code>error_code</code>（如 <code>NAM003</code> 风格稳定码）、<code>fix</code> 字段、<code>retry</code> 字段，对标 Zero</li>
+    <li><strong>类型信息导出</strong>：<code>lom info &lt;file&gt;</code> 输出 JSON，给 LLM 当上下文</li>
+    <li><strong>AI 可读修复计划</strong>：<code>lom fix --plan --json</code>，对标 <code>zero fix --plan --json</code></li>
+    <li><strong>线性 pipeline 语法</strong>：<code>|&gt;</code> 运算符</li>
+    <li><strong>模式匹配</strong>：<code>match</code>，穷尽性检查</li>
+    <li><strong>结构类型</strong>：对标 TypeScript，LLM 不需要记类名</li>
+    <li><strong>渐进式类型</strong>：默认动态可跑，标注后检查</li>
+    <li><strong>显式效应系统</strong>：副作用在签名中声明</li>
+    <li><strong>错误是值</strong>：<code>Result&lt;T, E&gt;</code>，不用异常</li>
+  </ol>
+  <h4>技术栈</h4>
+  <p>Rust + 解释器 + 基础类型检查器（两遍：签名收集 + 体检查）</p>
+  <h4>场景</h4>
+  <p>LLM 生成代码的运行环境（完整版）。</p>
+  <h4>核心产出 · LLM 生成通过率评测集</h4>
+  <div class="rec">
+    <strong>评测集</strong>：100 个任务，覆盖语法/类型/错误修复，放在主 repo 的 <code>eval/</code> 目录，开源。
+    评测对象优先级：DeepSeek（阶段 0 即适配）→ Claude/GPT（对照）→ 后续 Kimi/GLM/Gemini。
+    主流 LLM 生成通过率 &gt; 基线（基线需先测，预计 60%+）。
+    <br><br>
+    <strong>这是阶段 2 的核心产出，也是 Lom "AI 原生"成色的硬指标</strong>——回应"营销热度远超学术共识"质疑的硬证据。
+  </div>
+  <h4>退出标准</h4>
+  <p>评测集完成 + 主流 LLM 生成通过率达标 + 标志性 demo：<strong>LLM 生成错误代码 → Lom 返回结构化 JSON 修复建议</strong>。</p>
+</div>
+
+<h2>2.5 阶段 3：可用 MVP（8-12 周）</h2>
+<div class="phase">
+  <h3>阶段 3 · 可用 MVP <span class="tag">MVP</span></h3>
+  <p><strong>目标</strong>：语言可用于小规模实际任务。</p>
+  <h4>技术栈升级</h4>
+  <p>+ Cranelift JIT（毫秒级编译，性能可用，docs File 2 推荐的中间层）</p>
+  <h4>新增</h4>
+  <ul>
+    <li>模块系统（显式导入，禁止通配符，避免 LLM 编造符号）</li>
+    <li>标准库（IO、HTTP、JSON、文件、字符串、集合）</li>
+    <li>LSP 服务器（语法高亮、补全、跳转、悬停、错误 squiggle）</li>
+    <li>REPL</li>
+    <li>包管理器雏形</li>
+    <li>基础并发（async/await，I/O 密集型）</li>
+  </ul>
+  <h4>场景扩展</h4>
+  <p>从"LLM 运行环境"扩展到"通用脚本"+"后端服务雏形"。</p>
+  <h4>退出标准</h4>
+  <p>能用 Lom 写一个完整 CLI 工具（如 todo list）或简单 Web 服务（如 JSON API）。</p>
+  <h4>阶段末方向复盘</h4>
+  <div class="warn">
+    阶段 3 完成时做一次方向复盘，根据当时 Mojo/MoonBit/Zero 的现状和 Lom 阶段 2-3 的反馈，决定是否推进阶段 4（工作负载扩展），或调整阶段 4 范围。
+  </div>
+</div>
+
+<h2>2.6 阶段 4：工作负载内核扩展（12-20 周）— 可调整里程碑</h2>
+<div class="phase">
+  <h3>阶段 4 · 工作负载内核扩展 <span class="tag warn">可调整</span></h3>
+  <p><strong>目标</strong>：加入 AI 工作负载原生的硬本事。这是"两者融合"的工作负载侧。</p>
+  <div class="warn">
+    <strong>可调整性说明</strong>：本阶段投入大（12-20 周），且依赖阶段 3 末复盘结论。可能的结果：按计划推进 / 推迟 / 缩小范围 / 砍掉。复盘决策须在阶段 3 退出标准达成后 2 周内做出，并更新本文件。
+  </div>
+  <h4>技术栈升级</h4>
+  <p>+ MLIR（先 CPU 方言，后 GPU 方言）</p>
+  <h4>新增</h4>
+  <ul>
+    <li>张量一等类型（<code>Tensor[3,4]</code>，形状编译时验证，对标 NEURON）</li>
+    <li>自动微分（<code>grad</code> 关键字，反向模式，构建计算图）</li>
+    <li><strong>Python 互操作</strong>（pyo3，导入 numpy/torch）——docs File 2 视为"生存底线"，S4TF 失败教训</li>
+    <li>数据并行原语</li>
+  </ul>
+  <h4>场景扩展</h4>
+  <p>扩展到"AI/ML 计算"。</p>
+  <h4>退出标准</h4>
+  <p>能用 Lom 写完整 MNIST 训练脚本，性能不弱于纯 Python+numpy 的同等实现。</p>
+</div>
+
+<h2>2.7 阶段 5：生态与自举（16-24 周）</h2>
+<div class="phase">
+  <h3>阶段 5 · 生态与自举 <span class="tag">生产级</span></h3>
+  <p><strong>目标</strong>：语言能"养活自己"。</p>
+  <h4>技术栈升级</h4>
+  <p>+ LLVM AOT 全优化 + WASM 后端（对标 MoonBit 分发策略）</p>
+  <h4>新增</h4>
+  <ul>
+    <li>自举（用 Lom 自身重写编译器，参考 pry-lang 三阶段自举流程）</li>
+    <li>包注册中心</li>
+    <li>调试器</li>
+    <li>性能调优（profile-guided optimization）</li>
+    <li>文档生成工具</li>
+    <li>概率类型（<code>Uncertain[T]</code>，对标 NEURON，docs File 2 第 4 层特性，可延后到此）</li>
+  </ul>
+  <h4>场景扩展</h4>
+  <p>全场景覆盖。</p>
+  <h4>退出标准</h4>
+  <p>编译器自身能用 Lom 写并编译通过（自举完成）。</p>
+</div>
+
+<h2>2.8 阶段 6：生产级（持续）</h2>
+<div class="phase">
+  <h3>阶段 6 · 生产级 <span class="tag">生产级</span></h3>
+  <p><strong>目标</strong>：社区化、稳定、可用作生产。</p>
+  <h4>新增</h4>
+  <ul>
+    <li>语义版本管理 + 稳定 API 承诺</li>
+    <li>完整工具链（格式化、lint、性能分析、内存分析）</li>
+    <li>安全审计</li>
+    <li>多平台二进制发布（Linux/macOS/Windows + WASM）</li>
+    <li>社区治理（RFC 流程、贡献指南、行为准则）</li>
+  </ul>
+  <h4>退出标准</h4>
+  <p>有第三方项目用 Lom 写并部署到生产环境。</p>
+</div>
+
+<h1>第三部分 · 目标 LLM 优先级策略</h1>
+
+<h2>3.1 优先级排序与适配方案</h2>
+<table>
+  <tr><th>优先级</th><th>LLM</th><th>引入阶段</th><th>适配重点</th></tr>
+  <tr><td>P0</td><td>DeepSeek</td><td>阶段 0</td><td>SPEC_FOR_AI 可读性、错误 JSON 字段响应特性、易犯错误模式采样</td></tr>
+  <tr><td>P1</td><td>Claude / GPT</td><td>阶段 2</td><td>对照评测、跨模型一致性验证</td></tr>
+  <tr><td>P2</td><td>Kimi / GLM / Gemini</td><td>阶段 3+</td><td>覆盖中文模型与多模态、扩展评测覆盖面</td></tr>
+</table>
+
+<h2>3.2 DeepSeek 优先的具体含义</h2>
+<ul>
+  <li><strong>SPEC_FOR_AI 设计</strong>：用 DeepSeek 做"可读性测试"，规范文档要让 DeepSeek 生成合法代码率 &gt; 80%</li>
+  <li><strong>错误 JSON 字段</strong>：<code>fix</code> 字段格式要让 DeepSeek 能直接消费并正确修复；针对 DeepSeek 对中文+JSON 的响应特性做字段顺序与措辞优化</li>
+  <li><strong>评测集样本</strong>：包含 DeepSeek 易犯的错误模式（如常见语法偏差、命名习惯），让评测更针对性</li>
+  <li><strong>对照基线</strong>：阶段 2 起，Claude/GPT 作为对照基线，确保 Lom 不是"只对 DeepSeek 过拟合"</li>
+</ul>
+
+<h2>3.3 防过拟合策略</h2>
+<div class="warn">
+  过度针对单一 LLM 优化会让 Lom 在其他 LLM 上表现差。缓解：
+  <ul>
+    <li>错误 JSON 字段遵循通用结构化规范（稳定 error_code + fix 字段 + retry 字段），不针对单一 LLM 加私有字段</li>
+    <li>评测集至少覆盖 3 个 LLM 才能宣告"AI 原生"成色</li>
+    <li>每新增一个 LLM 评测对象，重新审视 SPEC_FOR_AI 是否需要调整</li>
+  </ul>
+</div>
+
+<h1>第四部分 · 7 个辅助规划维度</h1>
+
+<h2>4.1 评测体系</h2>
+<ul>
+  <li><strong>LLM 生成通过率评测集</strong>：阶段 2 核心产出，100 任务，开源，放 <code>eval/</code> 目录</li>
+  <li><strong>性能基准</strong>：阶段 3 起，criterion crate，与 Python/Rust/Go 对比</li>
+  <li><strong>横向对比</strong>：与 MoonBit/Mojo/Zero 在 LLM 生成通过率、性能、生态三个维度对比</li>
+  <li><strong>评测频次</strong>：每个阶段退出前必跑，CI 定期跑</li>
+</ul>
+
+<h2>4.2 语言命名与品牌</h2>
+<ul>
+  <li>正式名：<strong>Lom</strong>（Language of Machine）</li>
+  <li>扩展名：<code>.lom</code></li>
+  <li>repo：<code>lom-lang/lom</code>（阶段 0 注册 GitHub org <code>lom-lang</code>）</li>
+  <li>Linguist PR：阶段 0 提交，注册 <code>.lom</code> 扩展名</li>
+  <li>TextMate 语法文件：<code>.tmLanguage</code>，阶段 0 提供，覆盖 VS Code/Atom/Sublime/GitHub 高亮</li>
+  <li>logo：阶段 0-1 之间设计</li>
+</ul>
+
+<h2>4.3 文档体系</h2>
+<ul>
+  <li><code>LANGUAGE_SPEC.md</code>：完整规范，阶段 0 起</li>
+  <li><code>SPEC_FOR_AI.md</code>：精简规范（&lt;2000 词），阶段 0 起，随语言演进同步更新</li>
+  <li><code>DESIGN_RATIONALE.md</code>：设计理念，阶段 0 起</li>
+  <li>教程：阶段 1 起逐步建立</li>
+  <li>示例库：<code>examples/</code>，阶段 1 起</li>
+  <li>RFC 流程：阶段 3 起建立</li>
+</ul>
+
+<h2>4.4 AI 协同开发流程（内化 docs File 2 七步）</h2>
+<ol>
+  <li><strong>环境先行</strong>：先设计测试框架、CI、反馈机制，再写实现</li>
+  <li><strong>上下文窗口管理</strong>：测试运行器只打印摘要，避免 LLM 上下文爆炸</li>
+  <li><strong>快速反馈循环</strong>：采样测试 1%-10%，快速迭代</li>
+  <li><strong>锁文件协调</strong>：多 Agent 任务分配，避免冲突</li>
+  <li><strong>参考预言机</strong>：用 GCC/Rust 作为正确性参考</li>
+  <li><strong>任务分解</strong>：编译器天然可分解（lexer/parser/interp/typeck 分模块）</li>
+  <li><strong>分层使用 AI</strong>：AI 从 0 到 1，人工从 1 到生产级</li>
+</ol>
+
+<h2>4.5 风险缓解策略（针对 docs File 2 的 4 大风险）</h2>
+<table>
+  <tr><th>风险</th><th>影响</th><th>缓解策略</th><th>归属阶段</th></tr>
+  <tr>
+    <td>生态缺口（S4TF 教训）</td>
+    <td>致命</td>
+    <td>Python 互操作作为阶段 4 第一天特性；阶段 3 前编译到主流语言借力生态</td>
+    <td>阶段 4 起</td>
+  </tr>
+  <tr>
+    <td>AI 一致性天花板（10 万行）</td>
+    <td>AI 辅助开发后期效率骤降</td>
+    <td>模块化设计，每模块控制在 5 万行以内；人工接管核心架构</td>
+    <td>阶段 0 起</td>
+  </tr>
+  <tr>
+    <td>MLIR 学习曲线陡峭</td>
+    <td>初期开发速度慢</td>
+    <td>先 Tree-sitter + 解释器验证语义，阶段 4 再引入 MLIR</td>
+    <td>阶段 4</td>
+  </tr>
+  <tr>
+    <td>AI 前范式科学状态</td>
+    <td>技术选型可能快速过时</td>
+    <td>保持架构可扩展（MLIR 方言可热插拔）；避免过早锁定范式；阶段 3 末复盘</td>
+    <td>阶段 0 起</td>
+  </tr>
+</table>
+
+<h2>4.6 GitHub repo 治理结构</h2>
+<ul>
+  <li><code>LICENSE</code>：Apache 2.0</li>
+  <li><code>CODE_OF_CONDUCT.md</code>：Contributor Covenant</li>
+  <li><code>CONTRIBUTING.md</code>：贡献流程、代码规范、提交规范</li>
+  <li>issue/PR 模板：bug report、feature request、RFC</li>
+  <li>CI 矩阵：GitHub Actions（cargo build/test/clippy/fmt + 文档 lint）</li>
+  <li>release 流程：Git tag + GitHub Release + 多平台二进制（Linux x64、macOS arm64、Windows x64）</li>
+  <li><code>.gitattributes</code>：<code>*.lom linguist-language=Lom</code></li>
+</ul>
+
+<h2>4.7 差异化定位（持续维护）</h2>
+<div class="rec">
+  Lom 的差异化三角：
+  <ol>
+    <li><strong>LLM 编码原生优先</strong>（赛道空白，MoonBit 仍在意图阶段）</li>
+    <li><strong>工作负载渐进融合</strong>（不与 Mojo 正面竞争，阶段 4 可调整）</li>
+    <li><strong>开源评测集</strong>（第一个公开 LLM 生成通过率评测集的 AI 原生语言）</li>
+  </ol>
+  每个阶段退出前，重新审视差异化是否仍成立。若 MoonBit/Zero 公开了类似评测集或显著改变了工具链方向，需更新本文件。
+</div>
+
+<h1>第五部分 · 阶段 0 立即可执行启动清单</h1>
+
+<div class="rec">
+  <strong>阶段 0 启动清单</strong>（按顺序执行，预计 1-2 周完成）：
+  <ol>
+    <li>注册 GitHub org <code>lom-lang</code>，创建 repo <code>lom-lang/lom</code></li>
+    <li>初始化 repo：LICENSE（Apache 2.0）、README.md（占位）、.gitattributes（Linguist 注册）、.github/workflows（CI 骨架）</li>
+    <li>写 <code>LANGUAGE_SPEC.md</code>：EBNF 语法、基本类型、函数、控制流、（草案）类型系统/效应系统/错误模型/模块系统</li>
+    <li>写 <code>SPEC_FOR_AI.md</code>：精简 &lt;2000 词，专为 LLM 可读</li>
+    <li>写 <code>DESIGN_RATIONALE.md</code>：设计哲学、与 MoonBit/Mojo/Zero 差异、为何渐进式融合</li>
+    <li>用 DeepSeek 做 SPEC_FOR_AI 可读性测试：喂规范生成代码，统计合法率，迭代规范直到 &gt; 80%</li>
+    <li>提交 GitHub Linguist PR：注册 <code>.lom</code> 扩展名</li>
+    <li>提供 <code>.tmLanguage</code> 文件：覆盖 VS Code/Atom/Sublime/GitHub 高亮</li>
+    <li>阶段 0 退出检查：DeepSeek 生成合法率 &gt; 80%，进入阶段 1</li>
+  </ol>
+</div>
+
+<hr>
+
+<h2>附：技术栈与 crate 选型参考（阶段 1+）</h2>
+<table>
+  <tr><th>用途</th><th>crate / 工具</th><th>引入阶段</th></tr>
+  <tr><td>词法分析</td><td>logos</td><td>阶段 1</td></tr>
+  <tr><td>错误处理</td><td>thiserror + miette</td><td>阶段 1</td></tr>
+  <tr><td>序列化</td><td>serde + serde_json</td><td>阶段 1</td></tr>
+  <tr><td>CLI</td><td>clap</td><td>阶段 1</td></tr>
+  <tr><td>错误兜底</td><td>anyhow</td><td>阶段 1</td></tr>
+  <tr><td>快照测试</td><td>insta</td><td>阶段 1</td></tr>
+  <tr><td>属性测试</td><td>proptest</td><td>阶段 2</td></tr>
+  <tr><td>基准测试</td><td>criterion</td><td>阶段 3</td></tr>
+  <tr><td>JIT 编译</td><td>cranelift</td><td>阶段 3</td></tr>
+  <tr><td>MLIR 绑定</td><td>melior</td><td>阶段 4</td></tr>
+  <tr><td>LLVM 绑定</td><td>inkwell</td><td>阶段 5</td></tr>
+  <tr><td>Python 互操作</td><td>pyo3</td><td>阶段 4</td></tr>
+  <tr><td>解析器增量（LSP 用）</td><td>tree-sitter</td><td>阶段 3</td></tr>
+</table>
+
+<hr>
+
+<p class="meta">
+  本文件为 Lom 项目指导文件 v0.1，生成于 2026-08-02。<br>
+  当项目推进过程中出现方向调整、阶段变更、新技术选型时，<strong>更新本文件</strong>，而非绕过它。<br>
+  下一次预计更新节点：阶段 0 完成时（LANGUAGE_SPEC.md 定稿后同步本文件）。
+</p>
+
+</body>
+</html>
