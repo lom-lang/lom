@@ -647,11 +647,11 @@ The `[enums]` section is omitted when the file declares no enums; same for `[imp
 - **No expression-level types.** Only top-level declarations are exported; local `let` bindings and inferred expression types are not reported.
 - **No positions.** Declaration line/col is not yet reported (Phase 3 AST positions).
 
-### 6.9 AI repair plan (Phase 2.7 — implemented)
+### 6.9 AI repair plan (Phase 2.7 — implemented; Phase 3.1 — `--apply` execution)
 
 `lom fix <file> [--plan] [--json]` generates a **repair plan** for every diagnostic in the file. Each plan contains one or more `fixes` — machine-readable actions an LLM can apply (or use as guidance) to repair the code.
 
-- **`--plan` is the default and only mode in Phase 2.7.** The `--apply` flag (auto-apply fixes to source) is deferred to Phase 3, when AST nodes carry span information enabling safe in-place edits.
+- **`--plan` (default)** generates the repair plan (`lom-fix/v1` schema). `--apply` (Phase 3.1) auto-applies `confidence=High` + `action≠Hint` fixes to the source file (`lom-apply/v1` schema); `--dry-run` previews without writing.
 - **Fixes are generated for all diagnostic codes**: lex, parse, type, name, match, effect, runtime. Even when a precise edit can't be produced, a `hint` action with guidance text is emitted.
 - **Schema: `lom-fix/v1`** — separate from `lom-diag/v1` (errors) and `lom-info/v1` (context), so an LLM can distinguish "repair plan" from "error report" and "context query".
 
@@ -719,10 +719,10 @@ Per-fix fields:
 
 | Action | Semantics | When used |
 |---|---|---|
-| `insert` | Insert `text` at `(line, col)` | LEX001/LEX002 (insert `"` at line end) |
-| `replace` | Replace `(line,col)..(end_line,end_col)` with `text` | Reserved for Phase 3 (needs span) |
+| `insert` | Insert `text` at `(line, col)` | LEX001/LEX002 (insert `"` at line end); EFF001 (insert `! [E]` or `, E`) |
+| `replace` | Replace `(line,col)..(end_line,end_col)` with `text` | Implemented in Phase 3.1 `apply.rs` (no current fix generator uses it, but the executor supports it) |
 | `delete` | Delete `(line,col)..(end_line,end_col)` | LEX005 (delete unexpected char) |
-| `hint` | Text guidance only; `line`/`col` may be `0` | Most type/name/runtime errors; EFF001/MAT001 provide `text` snippet |
+| `hint` | Text guidance only; `line`/`col` may be `0` | Most type/name/runtime errors; MAT001 provides `text` snippet |
 
 #### 6.9.3 Fix strategies by error code
 
@@ -744,18 +744,43 @@ Per-fix fields:
 | `NAM002` | Hint: duplicate definition | low | hint |
 | `NAM003` | Hint: undefined variable | low | hint |
 | `NAM004` | Hint: no such field/variant | low | hint |
-| `EFF001` | Provide effect annotation text (e.g. `! [IO]`) | high | hint (with text) |
+| `EFF001` | Insert effect annotation: `! [E]` at line end (pure fn) or `, E` before `]` (partial effects) | high | insert |
 | `RUNTIME001` | Hint: runtime type mismatch | low | hint |
 | `RUNTIME002` | Hint: undefined at runtime | low | hint |
 | `RUNTIME003` | Hint: hole execution | low | hint |
 | `RUNTIME005` | Hint: module/symbol not found | medium | hint |
 
-#### 6.9.4 What Phase 2.7 does NOT do
+#### 6.9.4 Phase 3.1 `--apply` execution
 
-- **No `--apply`.** Fixes are generated as a plan only; auto-applying edits to source files requires AST span info (Phase 3). The LLM is expected to read the plan and apply fixes itself (LLM-coding-native principle).
-- **No span-based `replace`.** All position-bearing fixes use line/col without end positions (except `delete` which has a 1-char range for LEX005). Precise `replace` arrives with Phase 3 AST positions.
+`lom fix <file> --apply [--dry-run] [--json]` auto-applies high-confidence fixes to the source file.
+
+- **Safety filter**: only `confidence=High` AND `action≠Hint` fixes are applied. Low-confidence fixes are left for the LLM to decide.
+- **Text patching**: fixes are applied via `(line, col)` → byte-offset translation; `insert`/`delete`/`replace` all supported.
+- **Reverse-order application**: multiple fixes are sorted by `(line, col)` descending and applied back-to-front to avoid offset drift.
+- **`--dry-run`**: outputs the apply result (`lom-apply/v1` schema or human-readable) without writing the file.
+- **`--json`**: outputs `lom-apply/v1` schema with `applied`/`skipped`/`changes`/`ok` fields.
+
+`lom-apply/v1` schema:
+
+```json
+{
+  "schema": "lom-apply/v1",
+  "file": "main.lom",
+  "applied": 2,
+  "skipped": 1,
+  "changes": [
+    { "line": 3, "col": 22, "action": "insert", "description": "..." }
+  ],
+  "ok": true
+}
+```
+
+#### 6.9.5 Current limitations
+
 - **No fix prioritization.** When multiple fixes exist for one diagnostic, they are listed in order but not ranked; the LLM chooses.
 - **No cross-file fixes.** A fix in file A referencing a missing import in file B is out of scope (Phase 3 module system).
+- **LEX001 position precision.** When an unclosed string spans multiple lines, the lexer reports the position of the last unclosed `"` rather than the first; `--apply` follows the reported position. This is a lexer diagnostic-precision issue, not an `--apply` issue.
+- **EFF001 multi-effect merge.** When a function already declares `! [IO]` and is missing `Clock`, `--apply` inserts `, Clock` before `]` to produce `! [IO, Clock]`. This handles the common case; deeply nested effect expressions are not parsed.
 
 ---
 
@@ -846,7 +871,7 @@ The parser produces a **"holey AST"** on error:
 
 This lets LLMs get partial feedback on partially-correct code, enabling iterative repair.
 
-### 7.5 CLI (Phase 2.3 — implemented; Phase 2.6 adds `info`; Phase 2.7 adds `fix`)
+### 7.5 CLI (Phase 2.3 — implemented; Phase 2.6 adds `info`; Phase 2.7 adds `fix`; Phase 3.1 adds `--apply`)
 
 ```
 lom <file.lom>                Run the program (default)
@@ -856,11 +881,14 @@ lom info <file.lom>           Export type info (human-readable) — Phase 2.6
 lom info <file.lom> --json    Export type info (lom-info/v1) — Phase 2.6
 lom fix <file.lom>            Generate repair plan (human-readable) — Phase 2.7
 lom fix <file.lom> --json     Generate repair plan (lom-fix/v1) — Phase 2.7
-lom fix <file.lom> --plan     Explicit --plan flag (default in Phase 2.7; --apply deferred to Phase 3)
+lom fix <file.lom> --plan     Explicit --plan flag (default)
+lom fix <file.lom> --apply    Apply high-confidence fixes to source (lom-apply/v1) — Phase 3.1
+lom fix <file.lom> --apply --dry-run   Preview apply without writing file — Phase 3.1
+lom fix <file.lom> --apply --json      Apply with JSON output (lom-apply/v1) — Phase 3.1
 lom --help | -h               Show help
 ```
 
-Exit codes: `0` = success / no diagnostics / info export OK / fix plan generation OK; `1` = read/lex/parse/runtime error (note: `lom fix` exits `0` as long as the plan was generated, even if diagnostics exist — the plan is the product).
+Exit codes: `0` = success / no diagnostics / info export OK / fix plan generation OK / apply OK (even if 0 fixes applied); `1` = read/lex/parse/runtime error / apply write failure (note: `lom fix` exits `0` as long as the plan was generated or apply completed, even if diagnostics exist — the plan/apply result is the product).
 
 Output streams:
 - `--json` / `--check`: diagnostics to **stdout** (the diagnostic report is the program's product).

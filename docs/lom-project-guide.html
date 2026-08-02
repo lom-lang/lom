@@ -458,7 +458,8 @@
       <ul>
         <li><code>lom fix &lt;file&gt;</code> — 人类可读修复计划输出到 stdout</li>
         <li><code>lom fix &lt;file&gt; --json</code> — <code>lom-fix/v1</code> JSON 输出到 stdout（给 LLM 消费）</li>
-        <li><code>lom fix &lt;file&gt; --plan</code> — 显式标志（Phase 2.7 默认即 plan 模式；<code>--apply</code> 留待 Phase 3 有 span 后）</li>
+        <li><code>lom fix &lt;file&gt; --plan</code> — 显式标志（默认即 plan 模式）</li>
+        <li><code>lom fix &lt;file&gt; --apply [--dry-run] [--json]</code> — 应用高置信度修复到源文件（Phase 3.1 实现，见下文）</li>
         <li>退出码 0 = 计划生成成功（<strong>无论是否有诊断/修复</strong>）— 让 LLM 可无障碍消费 JSON，无需区分"有诊断/无诊断"</li>
       </ul>
     </li>
@@ -475,7 +476,7 @@
         <li><code>LEX005</code> — 删除意外字符（<code>delete</code>, high）✅</li>
         <li><code>PARSE002/PARSE003</code> — 提示 <code>Result&lt;T, E&gt;</code> 需 2 个 / <code>Option&lt;T&gt;</code> 需 1 个类型参数（<code>hint</code>, medium）✅</li>
         <li><code>MAT001</code> — 从消息提取变体名，生成缺失分支文本（如 <code>Green =&gt; ()</code>）（<code>hint</code> 带 <code>text</code>, medium）✅</li>
-        <li><code>EFF001</code> — 从消息提取效应名，生成注解文本（如 <code>! [IO]</code>）（<code>hint</code> 带 <code>text</code>, high）✅</li>
+        <li><code>EFF001</code> — 从消息提取效应名，在函数签名行插入注解：纯函数行末加 <code>! [E]</code>，部分效应 <code>]</code> 前加 <code>, E</code>（<code>insert</code>, high）✅ <strong>Phase 3.1 升级：从 hint 改为精确 insert</strong></li>
         <li><code>TYPE002/TYPE020/NAM003</code> 等 — 提供针对性提示文本（<code>hint</code>, low/medium）✅</li>
         <li><code>RUNTIME001-005</code> — 运行时错误仅给提示（位置仍 (0,0)，待 Phase 3）✅</li>
       </ul>
@@ -483,7 +484,7 @@
     <li><strong>retry 标志语义</strong>：<code>retry=true</code> 当至少一个 fix 满足"非 hint 动作"或"hint 带具体 <code>text</code>"（如 EFF001/MAT001 的可粘贴片段）。纯文本提示的 hint 不算可重试 ✅</li>
     <li><strong>零依赖 JSON 序列化</strong>：与 <code>diagnostics</code>/<code>info</code> 模块一致风格，手写 <code>to_json</code> 函数，不引入 serde ✅</li>
     <li><strong>消息解析辅助函数</strong>：<code>extract_quoted_char</code>（提取单引号内字符）/ <code>extract_quoted_string</code>（提取完整字符串，用于 MAT001 多字符变体名）/ <code>extract_second_bracketed</code>（提取第二个方括号内容，用于 EFF001 效应名）✅</li>
-    <li><strong>设计取舍 — fix 不应用修复</strong>：仅生成计划，不修改源文件。LLM 负责读取计划并应用修复（LLM-coding-native 原则：让 LLM 拥有修复决策权）。<code>--apply</code> 留待 Phase 3 AST 携带 span 后实现安全的原地编辑 ✅</li>
+    <li><strong>设计取舍 — fix 默认生成计划，--apply 可选应用</strong>：默认仅生成计划不修改源文件；<code>--apply</code>（Phase 3.1）安全应用高置信度修复（<code>confidence=High</code> + <code>action≠Hint</code>），低置信度修复仍交给 LLM 决策（LLM-coding-native 原则）✅</li>
     <li><strong>设计取舍 — 退出码 0</strong>：fix 的产品是计划本身，无论是否有诊断都视为"计划生成成功"。这与 <code>--json</code>/<code>info</code> 的退出码语义不同（它们以 <code>ok</code> 决定），但符合"计划是产品"语义 ✅</li>
   </ul>
   <h4>测试（2.7 阶段）</h4>
@@ -542,12 +543,46 @@
     <li>评测集自检：<code>./eval/runner/run.ps1 -Verify</code> — 100/100 参考解决方案通过，10 个分类全部 100% ✅</li>
     <li>跨平台验证：PowerShell runner（Windows）已验证；Bash runner（Unix）逻辑对称，需 <code>jq</code> 依赖 ✅</li>
   </ul>
+
+  <h3>2.9 Phase 3.1 已完成 · <code>--apply</code> 修复执行</h3>
+  <ul>
+    <li><strong>核心功能</strong>：<code>lom fix &lt;file&gt; --apply [--dry-run] [--json]</code> 自动应用高置信度修复（<code>confidence=High</code> + <code>action≠Hint</code>）到源文件 ✅</li>
+    <li><strong>新增模块</strong>：<code>src/apply.rs</code> — 文本修补执行器，支持 <code>insert</code>/<code>delete</code>/<code>replace</code> 操作，基于 <code>(line, col)</code> → 字节偏移定位，多修复按位置降序应用（避免偏移漂移）✅</li>
+    <li><strong>CLI 扩展</strong>：<code>main.rs</code> 新增 <code>--apply</code> / <code>--dry-run</code> 参数，<code>run_fix</code> 分支调度修复应用逻辑 ✅</li>
+    <li><strong>lom-apply/v1 schema</strong>：<code>{ schema, file, applied, skipped, changes[], ok }</code>，每个 change 记录 <code>line/col/action/description</code> ✅</li>
+    <li><strong>EFF001 升级</strong>：从 <code>hint</code> 改为精确 <code>insert</code>：
+      <ul>
+        <li>typechecker 新增 <code>find_fn_line</code> 扫描 <code>source_lines</code> 定位函数签名行号，填入 EFF001 诊断的 <code>line</code> 字段</li>
+        <li>纯函数（无 <code>! [</code>）：行末插入 <code>! [E]</code>，如 <code>fn helper(x: Int) -> Int</code> → <code>fn helper(x: Int) -> Int ! [IO]</code></li>
+        <li>部分效应（有 <code>! [IO]</code>）：<code>]</code> 前插入 <code>, E</code>，如 <code>fn bad(x: Int) -> Int ! [IO]</code> → <code>fn bad(x: Int) -> Int ! [IO, Clock]</code></li>
+        <li>新增 <code>find_effect_close_bracket</code> 辅助函数检测签名行是否已有效应注解</li>
+      </ul>
+    </li>
+    <li><strong>安全措施</strong>：应用前验证位置有效性（行列在源码范围内）；<code>--dry-run</code> 只预览不写文件；低置信度修复跳过 ✅</li>
+    <li><strong>已知限制</strong>：
+      <ul>
+        <li>LEX001 位置精度：未闭合字符串跨行时，lexer 报告最后一个 <code>"</code> 位置而非第一个（lexer 诊断精度问题，非 --apply 问题）</li>
+        <li>BOM 处理：lexer 把 UTF-8 BOM 当作 3 个字符，但 <code>line_col_to_offset</code> 按 1 个字符计算，导致删除 BOM 时连带删除后续字符（lexer BOM 处理问题）</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>测试（3.1 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 159/159 通过（<code>apply</code> 模块 9 个：insert/delete/replace/多修复降序/位置验证/JSON 序列化；<code>fix</code> 模块新增 2 个 EFF001 insert 测试：纯函数行末插入 / 部分效应 <code>]</code> 前插入）✅</li>
+    <li>端到端验证：
+      <ul>
+        <li><code>lom fix examples\apply_test.lom --apply --dry-run --json</code> — LEX001 insert + LEX005 delete，JSON 格式正确 ✅</li>
+        <li><code>lom fix examples\apply_test.lom --apply --json</code> — 实际写文件，LEX005 <code>@</code> 删除正确 ✅</li>
+        <li><code>lom fix examples\effects_bad.lom --apply --json</code> — EFF001 两个函数全修复（helper 加 <code>! [IO]</code>，bad_helper 合并为 <code>! [IO, Clock]</code>），修复后 0 诊断 ✅</li>
+      </ul>
+    </li>
+  </ul>
   <h4>核心特性（按优先级，全阶段）</h4>
   <ol>
     <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈 <span class="tag" style="background:#16a34a;color:white;">已完成</span></li>
     <li><strong>结构化 JSON 错误诊断</strong>：含 <code>error_code</code>（如 <code>NAM003</code> 风格稳定码），对标 Zero <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.3，lom-diag/v1）</span></li>
     <li><strong>类型信息导出</strong>：<code>lom info &lt;file&gt;</code> 输出 JSON，给 LLM 当上下文 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.6）</span></li>
-    <li><strong>AI 可读修复计划</strong>：<code>lom fix --plan --json</code>，对标 <code>zero fix --plan --json</code> <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.7，lom-fix/v1）</span></li>
+    <li><strong>AI 可读修复计划 + 自动应用</strong>：<code>lom fix --plan --json</code> 生成计划，<code>--apply</code> 自动应用高置信度修复 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.7 lom-fix/v1 + Phase 3.1 lom-apply/v1）</span></li>
     <li><strong>线性 pipeline 语法</strong>：<code>|&gt;</code> 运算符 <span class="tag" style="background:#16a34a;color:white;">语法已完成</span></li>
     <li><strong>模式匹配</strong>：<code>match</code>，穷尽性检查 <span class="tag" style="background:#16a34a;color:white;">已完成（穷尽性检查 Phase 2.4 已实现）</span></li>
     <li><strong>结构类型</strong>：对标 TypeScript，LLM 不需要记类名</li>

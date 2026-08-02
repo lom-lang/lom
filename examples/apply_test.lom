@@ -1,0 +1,4 @@
+fn main() -> Unit
+    println("hello)
+    println@("world")
+end

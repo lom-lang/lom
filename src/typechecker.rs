@@ -44,6 +44,8 @@ pub struct TypeChecker {
     /// 设计理由：main 是程序入口，调用 println 等副作用是常态；
     /// 强制 main 声明 `! [IO]` 会给 LLM 增加无意义负担，违反 LLM-coding-native 容错原则。
     current_fn_is_main: bool,
+    /// Phase 3.1: 当前函数签名所在行号（1-based），用于 EFF001 诊断定位修复位置
+    current_sig_line: usize,
     /// 已收集的诊断
     diags: Vec<Diagnostic>,
     /// 文件名（用于诊断）
@@ -60,6 +62,9 @@ struct FnSig {
     /// Phase 2.5: 函数声明的效应列表
     /// 空 Vec 表示纯函数（无 `! [...]` 注解）
     effects: Vec<Effect>,
+    /// Phase 3.1: 函数签名所在行号（1-based），用于 EFF001 精确定位修复位置
+    /// 0 表示未定位到（扫描 source_lines 失败）
+    sig_line: usize,
 }
 
 /// 枚举信息
@@ -106,6 +111,7 @@ impl TypeChecker {
             current_ret: None,
             current_effects: Vec::new(),
             current_fn_is_main: false,
+            current_sig_line: 0,
             diags: Vec::new(),
             file: file.to_string(),
             source_lines,
@@ -142,53 +148,53 @@ impl TypeChecker {
         // Phase 2.5: println/print 声明 IO 效应
         self.functions.insert(
             "println".to_string(),
-            FnSig { params: vec![("_".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Unit), effects: vec!["IO".to_string()] },
+            FnSig { params: vec![("_".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Unit), effects: vec!["IO".to_string()], sig_line: 0 },
         );
         self.functions.insert(
             "print".to_string(),
-            FnSig { params: vec![("_".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Unit), effects: vec!["IO".to_string()] },
+            FnSig { params: vec![("_".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Unit), effects: vec!["IO".to_string()], sig_line: 0 },
         );
         // string 模块（纯函数）
         self.functions.insert(
             "len".to_string(),
-            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::Int), effects: vec![] },
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::Int), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "int_to_string".to_string(),
-            FnSig { params: vec![("n".to_string(), Type::Int)], ret: Some(Type::String), effects: vec![] },
+            FnSig { params: vec![("n".to_string(), Type::Int)], ret: Some(Type::String), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "string_to_int".to_string(),
-            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::Named("_Any".to_string())), effects: vec![] },
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::Named("_Any".to_string())), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "trim".to_string(),
-            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![] },
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "upper".to_string(),
-            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![] },
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "lower".to_string(),
-            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![] },
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![], sig_line: 0 },
         );
         // math 模块（纯函数）
         self.functions.insert(
             "sqrt".to_string(),
-            FnSig { params: vec![("x".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Float), effects: vec![] },
+            FnSig { params: vec![("x".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Float), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "abs".to_string(),
-            FnSig { params: vec![("x".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![] },
+            FnSig { params: vec![("x".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "min".to_string(),
-            FnSig { params: vec![("a".to_string(), Type::Named("_Any".to_string())), ("b".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![] },
+            FnSig { params: vec![("a".to_string(), Type::Named("_Any".to_string())), ("b".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![], sig_line: 0 },
         );
         self.functions.insert(
             "max".to_string(),
-            FnSig { params: vec![("a".to_string(), Type::Named("_Any".to_string())), ("b".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![] },
+            FnSig { params: vec![("a".to_string(), Type::Named("_Any".to_string())), ("b".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![], sig_line: 0 },
         );
     }
 
@@ -236,14 +242,38 @@ impl TypeChecker {
             .iter()
             .map(|p| (p.name.clone(), p.ty.clone()))
             .collect();
+        // Phase 3.1: 扫描 source_lines 定位函数签名行（用于 EFF001 精确 insert 修复）
+        let sig_line = self.find_fn_line(&f.name);
         self.functions.insert(
             f.name.clone(),
             FnSig {
                 params,
                 ret: f.ret_type.clone(),
                 effects: f.effects.clone(),
+                sig_line,
             },
         );
+    }
+
+    /// Phase 3.1: 扫描 source_lines 找到 `fn <name>` 所在行号（1-based）
+    ///
+    /// 匹配规则：行去除前导空白后以 `fn ` 开头，且 fn 后的标识符等于 name。
+    /// 返回 0 表示未找到（理论上不应发生，除非源码与 AST 不一致）。
+    fn find_fn_line(&self, name: &str) -> usize {
+        for (i, line) in self.source_lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if let Some(rest) = trimmed.strip_prefix("fn ") {
+                let after_ws = rest.trim_start();
+                let fn_name: String = after_ws
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if fn_name == name {
+                    return i + 1; // 1-based
+                }
+            }
+        }
+        0
     }
 
     fn collect_enum(&mut self, e: &EnumDecl) {
@@ -292,6 +322,8 @@ impl TypeChecker {
         self.current_effects = f.effects.clone();
         // main 函数隐式拥有所有效应（跳过 EFF001 检查）
         self.current_fn_is_main = f.name == "main";
+        // Phase 3.1: 记录函数签名行号（用于 EFF001 诊断定位）
+        self.current_sig_line = self.functions.get(&f.name).map(|s| s.sig_line).unwrap_or(0);
         // 构建初始环境：参数 + 预导入符号
         let mut env = TypeEnv::new();
         for p in &f.params {
@@ -319,6 +351,7 @@ impl TypeChecker {
         self.current_ret = None;
         self.current_effects.clear();
         self.current_fn_is_main = false;
+        self.current_sig_line = 0;
     }
 
     /// 检查块，返回块的类型（尾表达式类型或 Unit）
@@ -839,7 +872,7 @@ impl TypeChecker {
                         eff,
                         callee_name
                     ),
-                    0,
+                    self.current_sig_line,
                     0,
                 );
             }

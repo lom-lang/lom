@@ -1,10 +1,11 @@
-// Lom CLI 入口 — Phase 2.7
+// Lom CLI 入口 — Phase 3.1
 // 用法:
 //   lom <file.lom>                运行 .lom 程序（默认）
 //   lom <file.lom> --json         仅诊断，输出 JSON（不执行）
 //   lom <file.lom> --check        仅诊断，输出人类可读（不执行）
 //   lom info <file.lom> [--json]  导出类型信息（Phase 2.6）
 //   lom fix <file.lom> [--plan] [--json]  生成修复计划（Phase 2.7）
+//   lom fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件（Phase 3.1）
 //   lom --json <file.lom>         等价（选项可前可后）
 //   lom --help | -h               帮助
 
@@ -12,6 +13,7 @@ use std::env;
 use std::fs;
 use std::process;
 
+mod apply;
 mod ast;
 mod diagnostics;
 mod fix;
@@ -31,10 +33,14 @@ struct CliArgs {
     help: bool,
     /// Phase 2.7: --plan 标志（lom fix 专用，表示仅生成计划不应用；当前 --plan 是默认行为，标志仅作显式标记）
     plan: bool,
+    /// Phase 3.1: --apply 标志（lom fix 专用，应用修复到源文件）
+    apply: bool,
+    /// Phase 3.1: --dry-run 标志（与 --apply 配合，只输出预览不写文件）
+    dry_run: bool,
 }
 
 fn print_help(prog: &str) {
-    eprintln!("Lom 解释器 (Phase 2.7) — AI 原生编程语言");
+    eprintln!("Lom 解释器 (Phase 3.1) — AI 原生编程语言");
     eprintln!();
     eprintln!("用法:");
     eprintln!("  {prog} <file.lom>                运行 .lom 程序（默认）");
@@ -42,22 +48,27 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} <file.lom> --check        仅诊断，输出人类可读格式（不执行）");
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
     eprintln!("  {prog} fix <file.lom> [--plan] [--json]  生成 AI 修复计划（lom-fix/v1）");
+    eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!();
     eprintln!("子命令:");
     eprintln!("  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema");
-    eprintln!("  fix         生成修复计划（Phase 2.7）。默认人类可读；--json 输出 lom-fix/v1 schema");
-    eprintln!("              --plan：仅生成计划不应用（当前为默认行为，--apply 留待 Phase 3）");
+    eprintln!("  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema");
+    eprintln!("              --plan：仅生成计划不应用（默认行为）");
+    eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
+    eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
     eprintln!();
     eprintln!("选项:");
-    eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1），便于 LLM 消费");
+    eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
-    eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（当前为默认）");
+    eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
+    eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1）");
+    eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
     eprintln!("  --help, -h 显示本帮助");
     eprintln!();
     eprintln!("退出码:");
-    eprintln!("  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功");
-    eprintln!("  1  读取/词法/语法/运行时错误");
+    eprintln!("  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功 / apply 应用成功");
+    eprintln!("  1  读取/词法/语法/运行时错误 / apply 应用失败");
 }
 
 fn parse_args(args: &[String]) -> CliArgs {
@@ -84,6 +95,8 @@ fn parse_args(args: &[String]) -> CliArgs {
             "--json" => out.json = true,
             "--check" => out.check = true,
             "--plan" => out.plan = true,
+            "--apply" => out.apply = true,
+            "--dry-run" => out.dry_run = true,
             "--help" | "-h" => out.help = true,
             _ => {
                 if a.starts_with('-') {
@@ -153,9 +166,9 @@ fn main() {
         return;
     }
 
-    // ===== 子命令：fix（Phase 2.7 AI 修复计划）=====
+    // ===== 子命令：fix（Phase 2.7 修复计划 / Phase 3.1 应用修复）=====
     if cli.subcommand.as_deref() == Some("fix") {
-        run_fix(&src, path, cli.json);
+        run_fix(&src, path, &cli);
         return;
     }
 
@@ -249,20 +262,23 @@ fn run_info(src: &str, path: &str, json: bool) {
 
 /// Phase 2.7: 执行 `lom fix` 子命令
 ///
-/// 为诊断集合生成修复计划：
-/// - `--json`：输出 lom-fix/v1 schema（给 LLM 消费）
-/// - 默认：人类可读格式（终端浏览）
+/// 为诊断集合生成修复计划，或应用修复到源文件：
+/// - 默认 / `--plan`：生成修复计划（lom-fix/v1）
+/// - `--apply`：应用高置信度修复到源文件（lom-apply/v1）
+///   - `--dry-run`：只预览不写文件
+///   - `--json`：输出 lom-apply/v1 schema
 ///
 /// 流程：
 ///   1. 词法 + 语法诊断（Phase 2.2 容错解析器）
 ///   2. 若解析通过，执行类型检查（Phase 2.4），收集 TYPE/MAT/NAM/EFF 诊断
 ///   3. 调用 fix::generate_plan 生成修复计划
-///   4. 输出计划（不应用修复 — --apply 留待 Phase 3 有 span 后）
+///   4. 若 --apply：调用 apply::apply_plan 应用修复，写回文件（或 --dry-run 只预览）
+///   5. 输出结果
 ///
 /// 退出码：
-///   0 — 计划生成成功（无论是否有诊断/修复）
-///   1 — 文件读取错误（已在 main 上层处理）
-fn run_fix(src: &str, path: &str, json: bool) {
+///   0 — 计划生成成功 / apply 应用成功（含 0 个修复应用）
+///   1 — 文件读取错误 / apply 写文件失败
+fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     // 收集全部诊断：词法 + 语法
     let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
 
@@ -275,13 +291,34 @@ fn run_fix(src: &str, path: &str, json: bool) {
     // 生成修复计划
     let plan = fix::generate_plan(&diags, src);
 
-    if json {
+    // Phase 3.1: --apply 模式 — 应用修复到源文件
+    if cli.apply {
+        let result = apply::apply_plan(&plan, src);
+
+        if cli.json {
+            print!("{}", apply::to_json(&result, path));
+        } else {
+            print!("{}", apply::to_human(&result, path));
+        }
+
+        // --dry-run 不写文件；否则写回源文件
+        if !cli.dry_run && result.applied > 0 {
+            if let Err(e) = fs::write(path, &result.patched_source) {
+                eprintln!("apply 写文件失败: {}", e);
+                process::exit(1);
+            }
+        }
+
+        process::exit(0);
+    }
+
+    // 默认 / --plan 模式：输出修复计划
+    if cli.json {
         print!("{}", fix::to_json(&plan));
     } else {
         print!("{}", fix::to_human(&plan));
     }
 
     // fix 子命令的退出码语义：计划生成成功即 0（无论是否有诊断）
-    // 这样 LLM 可以无障碍消费 JSON 输出，无需区分"有诊断/无诊断"
     process::exit(0);
 }

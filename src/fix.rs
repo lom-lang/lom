@@ -1,15 +1,16 @@
-// Lom Fix — Phase 2.7 AI 修复计划
+// Lom Fix — Phase 2.7 AI 修复计划 / Phase 3.1 应用执行
 //
 // 设计目标：
 //   1. `lom fix <file> --plan --json` 输出 lom-fix/v1 schema，给 LLM 当修复上下文
 //   2. 为每个诊断生成 0..N 个修复动作（fixes），LLM 可按动作应用或自己重写
-//   3. 不自动应用修复（--apply 留待 Phase 3 有 span 后；当前 AST 节点无位置信息）
+//   3. `lom fix <file> --apply` 自动应用高置信度修复（Phase 3.1，见 apply.rs）
 //   4. 零依赖手写 JSON 序列化（与 diagnostics/info 一致风格）
 //
-// 设计取舍 — 为什么只做 --plan 不做 --apply：
-//   - Phase 2.x 阶段 AST 节点尚未携带 span（Phase 3 LSP 改造时补），
-//     精准 replace/delete 难以安全应用（只有行/列，无结束位置）
-//   - LLM-coding-native 理念：让 LLM 读 plan 后自己修复，工具不替 LLM 决定
+// 设计取舍 — --plan 与 --apply 的分工：
+//   - --plan（默认）：生成完整计划，包含所有置信度的修复（hint/insert/delete/replace）
+//     LLM 可读 plan 后自己修复，也可选择性地应用高置信度动作
+//   - --apply（Phase 3.1）：只应用 confidence == High 且 action != Hint 的修复
+//     安全第一：低置信度修复交给 LLM 判断
 //   - hint-only 修复也有价值：LLM 看 hint 知道方向，结合 source_line 自己改
 //
 // lom-fix/v1 schema：
@@ -257,7 +258,7 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
         )],
 
         // ===== 效应系统（Phase 2.5）=====
-        "EFF001" => fix_eff_undeclared(d),
+        "EFF001" => fix_eff_undeclared(d, source_lines),
 
         // ===== 运行时错误 =====
         "RUNTIME001" => vec![hint_only(
@@ -427,31 +428,110 @@ fn fix_nam_undefined(d: &Diagnostic) -> Vec<FixAction> {
     )]
 }
 
-/// EFF001 效应未声明：在函数签名添加效应注解
+/// EFF001 效应未声明：在函数签名行插入效应注解
 ///
-/// 高置信度：EFF001 的修复明确——给函数加 `! [Effect]`。
+/// Phase 3.1 升级：从 Hint 改为精确 Insert。
+/// typechecker 现在把函数签名行号填入诊断的 line 字段（Phase 3.1 改造），
+/// fix 据此在签名行插入效应注解。
+///
+/// 两种情况：
+///   1. 签名行无 `! [`（纯函数）：在行末插入 ` ! [Effect]`
+///      例：`fn helper(x: Int) -> Int` → `fn helper(x: Int) -> Int ! [IO]`
+///   2. 签名行已有 `! [`（部分效应声明）：在 `]` 前插入 `, Effect`
+///      例：`fn bad(x: Int) -> Int ! [IO]` → `fn bad(x: Int) -> Int ! [IO, Clock]`
+///
+/// 高置信度：EFF001 的修复明确——给函数加缺失的效应。
 /// 从 message 提取缺失的效应名（格式："纯函数或未声明效应 [...] 的函数调用了带效应 [IO] 的函数 '...'"）。
-///
-/// 位置限制：Phase 2.x 无法定位函数签名行，因此用 hint + 建议文本。
-fn fix_eff_undeclared(d: &Diagnostic) -> Vec<FixAction> {
-    // 提取缺失的效应名（第二个方括号内的内容）
+fn fix_eff_undeclared(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
     let effect = extract_second_bracketed(&d.message);
     match effect {
-        Some(eff) => vec![FixAction {
-            description: format!("在函数签名返回类型后添加效应注解: ! [{}]", eff),
-            action: ActionKind::Hint,
-            line: 0,
-            col: 0,
-            end_line: None,
-            end_col: None,
-            text: Some(format!("! [{}]", eff)),
-            confidence: Confidence::High,
-        }],
+        Some(eff) => {
+            // d.line == 0 表示 typechecker 未能定位函数签名行（不应发生，但防御性处理）
+            if d.line == 0 {
+                return vec![FixAction {
+                    description: format!("在函数签名返回类型后添加效应注解: ! [{}]", eff),
+                    action: ActionKind::Hint,
+                    line: 0,
+                    col: 0,
+                    end_line: None,
+                    end_col: None,
+                    text: Some(format!("! [{}]", eff)),
+                    confidence: Confidence::High,
+                }];
+            }
+            let line_idx = d.line.saturating_sub(1);
+            let line_str = match source_lines.get(line_idx) {
+                Some(s) => *s,
+                None => {
+                    return vec![hint_only(
+                        "效应未声明：无法定位函数签名行",
+                        Confidence::Medium,
+                    )]
+                }
+            };
+
+            // 检查签名行是否已有 `! [`（即已有效应注解）
+            if let Some(close_col) = find_effect_close_bracket(line_str) {
+                // 已有效应注解：在 `]` 前插入 `, Effect`
+                // close_col 是 `]` 的 0-based 字符位置，col 是 1-based
+                return vec![FixAction {
+                    description: format!("在现有效应列表中添加缺失效应: {}", eff),
+                    action: ActionKind::Insert,
+                    line: d.line,
+                    col: close_col + 1,
+                    end_line: None,
+                    end_col: None,
+                    text: Some(format!(", {}", eff)),
+                    confidence: Confidence::High,
+                }];
+            }
+
+            // 无效应注解：在行末插入 ` ! [Effect]`
+            let line_len = line_str.chars().count();
+            vec![FixAction {
+                description: format!("在函数签名行末添加效应注解: ! [{}]", eff),
+                action: ActionKind::Insert,
+                line: d.line,
+                col: line_len + 1,
+                end_line: None,
+                end_col: None,
+                text: Some(format!(" ! [{}]", eff)),
+                confidence: Confidence::High,
+            }]
+        }
         None => vec![hint_only(
             "效应未声明：在函数返回类型后添加 ! [Effect] 注解",
             Confidence::Medium,
         )],
     }
+}
+
+/// 在签名行中找 `! [` 模式，返回对应 `]` 的 0-based 字符位置
+///
+/// 匹配 `! [`（注意 `!` 和 `[` 之间允许有空格）。
+/// 返回 `]` 的位置；若找不到 `]` 返回 None。
+fn find_effect_close_bracket(line: &str) -> Option<usize> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    while i + 1 < chars.len() {
+        if chars[i] == '!' {
+            // 跳过 `!` 后的空格
+            let mut j = i + 1;
+            while j < chars.len() && chars[j] == ' ' {
+                j += 1;
+            }
+            if j < chars.len() && chars[j] == '[' {
+                // 找到 `! [`，现在找 `]`
+                for k in j + 1..chars.len() {
+                    if chars[k] == ']' {
+                        return Some(k);
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    None
 }
 
 /// RUNTIME002 未定义变量/函数（运行时）：仅 hint
@@ -854,6 +934,60 @@ mod tests {
         };
         let fixes = fix_for_diagnostic(&d, &[]);
         assert_eq!(fixes[0].text.as_deref(), Some("! [Clock]"));
+    }
+
+    /// Phase 3.1: EFF001 纯函数 → 行末 Insert ` ! [IO]`
+    #[test]
+    fn eff001_pure_fn_inserts_at_line_end() {
+        let d = Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: "EFF001".to_string(),
+            message: "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'"
+                .to_string(),
+            file: "test.lom".to_string(),
+            line: 1,
+            col: 0,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        };
+        let lines = vec!["fn helper(x: Int) -> Int"];
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+        assert_eq!(fixes[0].line, 1);
+        // 行长度 = 24，col = 25（行末后一位）
+        assert_eq!(fixes[0].col, 25);
+        assert_eq!(fixes[0].text.as_deref(), Some(" ! [IO]"));
+    }
+
+    /// Phase 3.1: EFF001 部分效应 → `]` 前 Insert `, Clock`
+    #[test]
+    fn eff001_partial_effects_inserts_before_close_bracket() {
+        let d = Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: "EFF001".to_string(),
+            message: "纯函数或未声明效应 [IO] 的函数调用了带效应 [Clock] 的函数 'now'"
+                .to_string(),
+            file: "test.lom".to_string(),
+            line: 1,
+            col: 0,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        };
+        let lines = vec!["fn bad(x: Int) -> Int ! [IO]"];
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+        assert_eq!(fixes[0].line, 1);
+        // `]` 在 0-based col 27，1-based col 28
+        assert_eq!(fixes[0].col, 28);
+        assert_eq!(fixes[0].text.as_deref(), Some(", Clock"));
     }
 
     #[test]

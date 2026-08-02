@@ -24,12 +24,13 @@ LLM-coding-native first, workloads later. Built in Rust.
 - ✅ 2.4 gradual type checker (two-pass: signature collection + body check; TYPE/MAT/NAM error codes; `--check` runs type check, `--json` emits structured type diagnostics; progressive: type errors are warnings, dynamic run still works)
 - ✅ 2.5 explicit effect system (`! [IO, Clock]` annotation; `EFF001` warning when pure functions call effectful functions; `main` implicitly has all effects; closures inherit enclosing effects; stdlib `println`/`print` declare `[IO]`)
 - ✅ 2.6 `lom info --json` type info export (`lom-info/v1` schema — functions/enums/imports; `info` subcommand with `--json`; no type-check, no run; parse failure falls back to `lom-diag/v1`)
-- ✅ 2.7 `lom fix --plan --json` AI repair plan (`lom-fix/v1` schema — per-diagnostic plans with `insert`/`delete`/`hint` actions, `text` snippets for EFF001/MAT001, `retry` flag, `confidence` levels; covers 20+ error codes across LEX/PARSE/TYPE/MAT/NAM/EFF/RUNTIME; `fix` subcommand with `--json`; `--apply` deferred to Phase 3)
+- ✅ 2.7 `lom fix --plan --json` AI repair plan (`lom-fix/v1` schema — per-diagnostic plans with `insert`/`delete`/`hint` actions, `text` snippets for EFF001/MAT001, `retry` flag, `confidence` levels; covers 20+ error codes across LEX/PARSE/TYPE/MAT/NAM/EFF/RUNTIME; `fix` subcommand with `--json`)
 - ✅ 2.8 `eval/` 100-task benchmark suite (10 categories × {arithmetic, control_flow, types, closures, match_enum, pipeline, records_tuples, effects, modules, error_repair}; per-task `{id, prompt, solution, expected, notes}`; PowerShell + Bash runners with `--verify` reference-solution smoke test and `--candidates-dir` LLM evaluation; 100/100 reference solutions pass; **LLM 实测 99/100 (99%)** — error_repair 15/15, 0 syntax/import errors; see [eval/REPORT.md](eval/REPORT.md))
+- ✅ 3.1 `lom fix --apply` repair execution (`lom-apply/v1` schema — applies `confidence=High` + `action≠Hint` fixes to source; `--dry-run` preview, `--json` structured output; text patching via line/col offsets, reverse-order application to avoid drift; EFF001 upgraded from Hint to precise Insert — pure functions get `! [E]` appended, partial-effect functions get `, E` inserted before `]`)
 
-148/148 Rust unit tests pass. 22 `.lom` examples pass (both run and `--check`). `eval/` 100/100 reference solutions pass (`./eval/runner/run.ps1 -Verify`). **LLM generation pass-rate: 99%** (expert model + thinking mode, 2026-08-03).
+159/159 Rust unit tests pass. 22 `.lom` examples pass (both run and `--check`). `eval/` 100/100 reference solutions pass (`./eval/runner/run.ps1 -Verify`). **LLM generation pass-rate: 99%** (expert model + thinking mode, 2026-08-03).
 
-Next: **Phase 3 — Usable MVP** (Cranelift JIT, `--apply` repair execution, standard library expansion, complete CLI tool / simple web service).
+Next: **Phase 3 — Usable MVP** (Cranelift JIT, standard library expansion, complete CLI tool / simple web service). `--apply` repair execution done in 3.1.
 
 See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full project guide (positioning, design philosophy, 7-phase roadmap, target LLM strategy, risk mitigation, repo governance).
 
