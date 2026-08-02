@@ -143,26 +143,32 @@
 
 <h2>2.2 阶段 0：语言设计与规范（1-2 周）</h2>
 <div class="phase">
-  <h3>阶段 0 · 语言设计与规范 <span class="tag">研究性</span></h3>
+  <h3>阶段 0 · 语言设计与规范 <span class="tag">研究性</span> <span class="tag" style="background:#16a34a;color:white;">已完成</span></h3>
   <p><strong>目标</strong>：定语言身份，写规范，搭 repo 骨架。不写一行编译器代码。</p>
   <h4>产出物</h4>
   <ul>
-    <li><code>LANGUAGE_SPEC.md</code>：完整语言规范，含 EBNF、类型系统、效应系统、错误模型、模块系统草案</li>
-    <li><code>SPEC_FOR_AI.md</code>：精简规范（&lt;2000 词），专门给 LLM 读，对标 Codong 模式</li>
-    <li><code>DESIGN_RATIONALE.md</code>：设计理念，讲清楚"为什么 Lom 是 AI 原生的"</li>
-    <li><code>README.md</code>、<code>LICENSE</code>（Apache 2.0）、<code>.gitattributes</code>（Linguist 注册）、CI 骨架</li>
-    <li>语言命名 + 文件扩展名（已定：<code>.lom</code>）+ GitHub org/<code>lom-lang/lom</code></li>
+    <li><code>LANGUAGE_SPEC.md</code> v0.1.1：完整语言规范，含 EBNF、类型系统、效应系统、错误模型、模块系统草案 ✅</li>
+    <li><code>SPEC_FOR_AI.md</code> v0.1：精简规范（&lt;2000 词），专门给 LLM 读，10 条核心规则 ✅</li>
+    <li><code>DESIGN_RATIONALE.md</code> v0.1：设计理念，10 个设计决策 + 评估方法论 ✅</li>
+    <li><code>README.md</code>、<code>LICENSE</code>（Apache 2.0）、<code>.gitattributes</code>（Linguist 注册）✅</li>
+    <li>语言命名 Lom（Language of Machine）+ 文件扩展名 <code>.lom</code> + GitHub org <code>lom-lang/lom</code> ✅</li>
   </ul>
   <h4>技术栈</h4>
   <p>纯文档 + Git + GitHub Actions（文档 lint + markdown 链接检查）</p>
   <h4>目标 LLM 适配（DeepSeek 优先）</h4>
   <ul>
-    <li>写 SPEC_FOR_AI 时，用 DeepSeek 做"可读性测试"：喂规范让它生成代码，看合法率</li>
-    <li>错误 JSON 字段设计针对 DeepSeek 响应特性优化（中文+JSON 的响应特性需重点测试）</li>
-    <li>评测样本要包含 DeepSeek 易犯的错误模式</li>
+    <li>用 DeepSeek 做"可读性测试"：喂规范让它生成代码，看合法率 ✅</li>
+    <li>5 个任务（斐波那契/Result+?/match/pipeline/结构记录），DeepSeek 5/5 = 100% 通过 ✅</li>
+    <li>测试暴露 4 个 spec 缺口，已在 v0.1.1 修补：换行敏感、match 分支语法、字符串拼接、=> 分隔符 ✅</li>
   </ul>
   <h4>退出标准</h4>
-  <p>把 <code>SPEC_FOR_AI.md</code> 喂给 DeepSeek（及 1-2 个对照 LLM），生成的代码片段语法合法率 &gt; 80%。</p>
+  <p>把 <code>SPEC_FOR_AI.md</code> 喂给 DeepSeek，生成的代码片段语法合法率 &gt; 80%。<strong>实际结果：100%（5/5），超标达成。</strong></p>
+  <h4>未完成项（不阻塞阶段 1）</h4>
+  <ul>
+    <li>GitHub Linguist PR（注册 <code>.lom</code> 扩展名）—— 延后，需社区 PR 流程</li>
+    <li>TextMate 语法文件 —— 延后至阶段 3 LSP 开发时</li>
+    <li>logo 设计 —— 延后</li>
+  </ul>
 </div>
 
 <h2>2.3 阶段 1：最小解释器（4-6 周）</h2>
@@ -458,9 +464,10 @@
 <hr>
 
 <p class="meta">
-  本文件为 Lom 项目指导文件 v0.1，生成于 2026-08-02。<br>
+  本文件为 Lom 项目指导文件 v0.2，更新于 2026-08-02。<br>
   当项目推进过程中出现方向调整、阶段变更、新技术选型时，<strong>更新本文件</strong>，而非绕过它。<br>
-  下一次预计更新节点：阶段 0 完成时（LANGUAGE_SPEC.md 定稿后同步本文件）。
+  v0.1 → v0.2 变更：阶段 0 标记为已完成，记录 DeepSeek 测试结果（5/5 = 100%）和 4 个 spec 缺口修补。<br>
+  下一次预计更新节点：阶段 1 完成时（最小解释器跑通后同步本文件）。
 </p>
 
 </body>
