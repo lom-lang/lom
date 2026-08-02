@@ -1,0 +1,7 @@
+fn add(a: Int, b: Int) -> Int
+    a + b
+end
+
+fn main() -> Unit
+    println(add(3, 4))
+end

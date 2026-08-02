@@ -1,0 +1,11 @@
+fn apply(f: Fn, x: Int) -> Int
+    f(x)
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(apply(inc, 5))
+    println(apply(inc, 100))
+end

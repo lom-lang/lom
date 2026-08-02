@@ -1,0 +1,92 @@
+[
+  {
+    "id": "001",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写一个函数 add(a: Int, b: Int) -> Int 返回两数之和。main 调用 println(add(3, 4))。",
+    "solution": "fn add(a: Int, b: Int) -> Int\n    a + b\nend\n\nfn main() -> Unit\n    println(add(3, 4))\nend\n",
+    "expected": "7\n",
+    "notes": "最基础：fn 声明、尾表达式、println。常见错误：用 return a+b 而非尾表达式；忘记 end。"
+  },
+  {
+    "id": "002",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 sub(a: Int, b: Int) -> Int 返回 a-b；mul(a: Int, b: Int) -> Int 返回 a*b。main 中 println(sub(10, 3)) 然后 println(mul(4, 5))。",
+    "solution": "fn sub(a: Int, b: Int) -> Int\n    a - b\nend\n\nfn mul(a: Int, b: Int) -> Int\n    a * b\nend\n\nfn main() -> Unit\n    println(sub(10, 3))\n    println(mul(4, 5))\nend\n",
+    "expected": "7\n20\n",
+    "notes": "多函数声明 + 多 println。考察 fn 顺序与 main 入口。"
+  },
+  {
+    "id": "003",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 div(a: Int, b: Int) -> Int 返回 a/b；mod_(a: Int, b: Int) -> Int 返回 a%b。main 中 println(div(20, 6)) 和 println(mod_(20, 6))。",
+    "solution": "fn div(a: Int, b: Int) -> Int\n    a / b\nend\n\nfn mod_(a: Int, b: Int) -> Int\n    a % b\nend\n\nfn main() -> Unit\n    println(div(20, 6))\n    println(mod_(20, 6))\nend\n",
+    "expected": "3\n2\n",
+    "notes": "整数除法和取模。20/6=3, 20%6=2。"
+  },
+  {
+    "id": "004",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 compute(x: Int) -> Int 按以下顺序计算并返回：先算 x+1，再*2，再-3。即 ((x+1)*2)-3。main 调用 println(compute(5)) 和 println(compute(10))。",
+    "solution": "fn compute(x: Int) -> Int\n    ((x + 1) * 2) - 3\nend\n\nfn main() -> Unit\n    println(compute(5))\n    println(compute(10))\nend\n",
+    "expected": "9\n19\n",
+    "notes": "运算符优先级与括号。compute(5)=((6)*2)-3=9, compute(10)=((11)*2)-3=19。"
+  },
+  {
+    "id": "005",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 avg(a: Int, b: Int, c: Int) -> Float 返回三数平均（Float）。main 调用 println(avg(1, 2, 3)) 和 println(avg(10, 20, 30))。",
+    "solution": "fn avg(a: Int, b: Int, c: Int) -> Float\n    (a + b + c) / 3.0\nend\n\nfn main() -> Unit\n    println(avg(1, 2, 3))\n    println(avg(10, 20, 30))\nend\n",
+    "expected": "2.0\n20.0\n",
+    "notes": "Int 与 Float 混合运算提升为 Float。1+2+3=6, 6/3.0=2.0。Float 整数输出带 .0。"
+  },
+  {
+    "id": "006",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 negate(x: Int) -> Int 返回 -x。写函数 abs_val(x: Int) -> Int 返回 x 的绝对值（用 if 表达式：if x < 0 返回 -x，否则返回 x）。main 调用 println(negate(5))、println(negate(-3))、println(abs_val(-7))、println(abs_val(4))。",
+    "solution": "fn negate(x: Int) -> Int\n    -x\nend\n\nfn abs_val(x: Int) -> Int\n    if x < 0\n        -x\n    else\n        x\n    end\nend\n\nfn main() -> Unit\n    println(negate(5))\n    println(negate(-3))\n    println(abs_val(-7))\n    println(abs_val(4))\nend\n",
+    "expected": "-5\n3\n7\n4\n",
+    "notes": "一元负号 + if 作为表达式（含 end 闭合）。"
+  },
+  {
+    "id": "007",
+    "category": "arithmetic",
+    "difficulty": "easy",
+    "prompt": "写函数 square(x: Int) -> Int 返回 x*x；cube(x: Int) -> Int 返回 x*x*x。main 中先 println(square(4))，再 println(cube(3))。",
+    "solution": "fn square(x: Int) -> Int\n    x * x\nend\n\nfn cube(x: Int) -> Int\n    x * x * x\nend\n\nfn main() -> Unit\n    println(square(4))\n    println(cube(3))\nend\n",
+    "expected": "16\n27\n",
+    "notes": "幂次通过乘法实现。4*4=16, 3*3*3=27。"
+  },
+  {
+    "id": "008",
+    "category": "arithmetic",
+    "difficulty": "medium",
+    "prompt": "写函数 max3(a: Int, b: Int, c: Int) -> Int 返回三数最大值（用嵌套 if：先比较 a 和 b，再与 c 比较）。main 调用 println(max3(3, 7, 5))、println(max3(10, 2, 8))、println(max3(1, 1, 1))。",
+    "solution": "fn max3(a: Int, b: Int, c: Int) -> Int\n    if a >= b\n        if a >= c\n            a\n        else\n            c\n        end\n    else\n        if b >= c\n            b\n        else\n            c\n        end\n    end\nend\n\nfn main() -> Unit\n    println(max3(3, 7, 5))\n    println(max3(10, 2, 8))\n    println(max3(1, 1, 1))\nend\n",
+    "expected": "7\n10\n1\n",
+    "notes": "嵌套 if + 多 end 闭合。考察 LLM 能否正确闭合多层嵌套块（LLM-coding-native 关键测试点）。"
+  },
+  {
+    "id": "009",
+    "category": "arithmetic",
+    "difficulty": "medium",
+    "prompt": "写函数 celsius_to_fahrenheit(c: Float) -> Float 返回 c * 9.0 / 5.0 + 32.0。main 调用 println(celsius_to_fahrenheit(0.0)) 和 println(celsius_to_fahrenheit(100.0))。",
+    "solution": "fn celsius_to_fahrenheit(c: Float) -> Float\n    c * 9.0 / 5.0 + 32.0\nend\n\nfn main() -> Unit\n    println(celsius_to_fahrenheit(0.0))\n    println(celsius_to_fahrenheit(100.0))\nend\n",
+    "expected": "32.0\n212.0\n",
+    "notes": "Float 算术。0C=32F, 100C=212F。Float 整数输出带 .0。"
+  },
+  {
+    "id": "010",
+    "category": "arithmetic",
+    "difficulty": "medium",
+    "prompt": "写函数 circle_area(r: Float) -> Float 返回 3.14159 * r * r。再写函数 circle_perimeter(r: Float) -> Float 返回 2.0 * 3.14159 * r。main 调用 println(circle_area(2.0)) 和 println(circle_perimeter(2.0))。",
+    "solution": "fn circle_area(r: Float) -> Float\n    3.14159 * r * r\nend\n\nfn circle_perimeter(r: Float) -> Float\n    2.0 * 3.14159 * r\nend\n\nfn main() -> Unit\n    println(circle_area(2.0))\n    println(circle_perimeter(2.0))\nend\n",
+    "expected": "12.56636\n12.56636\n",
+    "notes": "Float 字面量 + 表达式。area = 3.14159*2*2 = 12.56636, perimeter = 2*3.14159*2 = 12.56636。"
+  }
+]

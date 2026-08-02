@@ -1,0 +1,20 @@
+from string import { int_to_string }
+
+fn fizzbuzz(n: Int) -> String
+    if n % 15 == 0
+        "FizzBuzz"
+    elif n % 3 == 0
+        "Fizz"
+    elif n % 5 == 0
+        "Buzz"
+    else
+        int_to_string(n)
+    end
+end
+
+fn main() -> Unit
+    println(fizzbuzz(15))
+    println(fizzbuzz(9))
+    println(fizzbuzz(10))
+    println(fizzbuzz(7))
+end

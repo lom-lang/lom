@@ -1,0 +1,42 @@
+# 逻辑运算 — and/or 短路、布尔组合
+fn main() -> Unit
+    # 基本布尔
+    println(True)
+    println(False)
+    println(!True)
+    println(!False)
+
+    # and / or
+    println(True and False)
+    println(True and True)
+    println(False or True)
+    println(False or False)
+
+    # 短路求值
+    let safe_div = fn(a: Int, b: Int) -> Int
+        if b != 0 and a / b > 1
+            1
+        else
+            0
+        end
+    end
+    println(safe_div(10, 2))
+    println(safe_div(10, 0))
+
+    # 布尔组合（复合条件）
+    let classify = fn(n: Int) -> String
+        if n > 0 and n < 10
+            "single"
+        elif n >= 10 and n < 100
+            "double"
+        elif n >= 100 or n < 0
+            "other"
+        else
+            "zero"
+        end
+    end
+    println(classify(5))
+    println(classify(50))
+    println(classify(500))
+    println(classify(-1))
+end

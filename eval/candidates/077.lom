@@ -1,0 +1,12 @@
+fn pure_double(x: Int) -> Int
+    x * 2
+end
+
+fn print_double(x: Int) -> Unit ! [IO]
+    let result = pure_double(x)
+    println(result)
+end
+
+fn main() -> Unit
+    print_double(21)
+end

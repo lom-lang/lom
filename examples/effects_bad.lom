@@ -1,0 +1,29 @@
+# Phase 2.5 EFF001 触发示例（故意含错误，用于演示效应检查）
+#
+# 此文件展示当纯函数调用带效应函数时，--check 会报告 EFF001 警告。
+# 注意：渐进式语义下，EFF001 是 Warning，不阻止默认运行（lom effects_bad.lom 仍可运行）。
+# 仅 --check 或 --json 模式会显示该警告。
+
+# helper 是纯函数（无 ! [...]），但调用了 println（带 IO 效应）
+# --check 会报：[type] warning (0:0): [EFF001] 纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'
+fn helper(x: Int) -> Int
+    println(x)
+    x
+end
+
+# declare_clock 声明 Clock 效应
+fn declare_clock() -> Int ! [Clock]
+    0
+end
+
+# bad_helper 声明了 IO，但调用 declare_clock（Clock）— 会报 EFF001（Clock 未声明）
+fn bad_helper(x: Int) -> Int ! [IO]
+    declare_clock()
+    x
+end
+
+fn main() -> Unit
+    helper(5)
+    bad_helper(7)
+    ()
+end

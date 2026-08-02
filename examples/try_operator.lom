@@ -1,0 +1,76 @@
+# `?` 错误传播运算符 — Result 链式传播、Option 传播、嵌套调用
+from string import { string_to_int, len }
+
+fn parse_int(s: String) -> Result<Int, String>
+    let n = string_to_int(s)
+    if n == ()
+        Err("not a number: " + s)
+    else
+        Ok(n)
+    end
+end
+
+fn double_parsed(s: String) -> Result<Int, String>
+    # `?` 解包 Ok，Err 则提前返回 Err
+    let n = parse_int(s)?
+    Ok(n * 2)
+end
+
+fn chain(a: String, b: String) -> Result<Int, String>
+    # 链式 `?`：任一失败则整体失败
+    let x = parse_int(a)?
+    let y = parse_int(b)?
+    Ok(x + y)
+end
+
+fn find_first(items: String) -> Option<String>
+    # Option 与 `?`：None 提前返回
+    if len(items) == 0
+        None
+    else
+        Some(items)
+    end
+end
+
+fn use_option(s: String) -> String
+    let v = find_first(s)?
+    v
+end
+
+fn main() -> Unit
+    # 成功路径
+    match double_parsed("21")
+        Ok(n) => println(n)
+        Err(e) => println("err: " + e)
+    end
+
+    # 失败路径：parse_int 失败，`?` 提前返回 Err
+    match double_parsed("abc")
+        Ok(n) => println(n)
+        Err(e) => println("err: " + e)
+    end
+
+    # 链式成功
+    match chain("10", "20")
+        Ok(n) => println(n)
+        Err(e) => println("err: " + e)
+    end
+
+    # 链式失败（第二个失败）
+    match chain("10", "xx")
+        Ok(n) => println(n)
+        Err(e) => println("err: " + e)
+    end
+
+    # Option 成功
+    match find_first("hello")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+
+    # Option None
+    match find_first("")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+end

@@ -1,0 +1,18 @@
+fn first_of_three(t: (Int, String, Bool)) -> Int
+    t.0
+end
+
+fn second_of_three(t: (Int, String, Bool)) -> String
+    t.1
+end
+
+fn third_of_three(t: (Int, String, Bool)) -> Bool
+    t.2
+end
+
+fn main() -> Unit
+    let data = (42, "hello", True)
+    println(first_of_three(data))
+    println(second_of_three(data))
+    println(third_of_three(data))
+end

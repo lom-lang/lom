@@ -1,0 +1,13 @@
+from string import { int_to_string }
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn stringify(n: Int) -> String
+    int_to_string(n)
+end
+
+fn main() -> Unit
+    5 |> double |> stringify |> println
+end

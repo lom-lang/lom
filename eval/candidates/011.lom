@@ -1,0 +1,15 @@
+fn classify(n: Int) -> String
+    if n < 0
+        "negative"
+    elif n == 0
+        "zero"
+    else
+        "positive"
+    end
+end
+
+fn main() -> Unit
+    println(classify(-5))
+    println(classify(0))
+    println(classify(42))
+end

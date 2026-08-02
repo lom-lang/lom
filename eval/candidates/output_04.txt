@@ -1,0 +1,141 @@
+=== 031.lom ===
+fn make_adder(n: Int) -> Fn
+    fn(x: Int) -> Int
+        x + n
+    end
+end
+
+fn main() -> Unit
+    let add5 = make_adder(5)
+    println(add5(10))
+    println(add5(20))
+end
+=== 032.lom ===
+fn main() -> Unit
+    let double = fn(x: Int) -> Int
+        x * 2
+    end
+    println(double(5))
+    println(double(21))
+end
+=== 033.lom ===
+fn apply(f: Fn, x: Int) -> Int
+    f(x)
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(apply(inc, 5))
+    println(apply(inc, 100))
+end
+=== 034.lom ===
+fn apply_twice(f: Fn, x: Int) -> Int
+    f(f(x))
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(apply_twice(inc, 5))
+end
+=== 035.lom ===
+fn compose(f: Fn, g: Fn, x: Int) -> Int
+    f(g(x))
+end
+
+fn main() -> Unit
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(compose(double, inc, 5))
+    println(compose(inc, double, 5))
+end
+=== 036.lom ===
+fn sum_of_squares(n: Int) -> Int
+    let mut sum = 0
+    let mut i = 0
+    while i < n
+        sum = sum + i * i
+        i = i + 1
+    end
+    sum
+end
+
+fn main() -> Unit
+    println(sum_of_squares(5))
+    println(sum_of_squares(10))
+end
+=== 037.lom ===
+fn counter(start: Int) -> Fn
+    fn() -> Int
+        start
+    end
+end
+
+fn main() -> Unit
+    let c = counter(10)
+    println(c())
+end
+=== 038.lom ===
+fn map_sum(f: Fn, n: Int) -> Int
+    let mut sum = 0
+    let mut i = 0
+    while i < n
+        sum = sum + f(i)
+        i = i + 1
+    end
+    sum
+end
+
+fn main() -> Unit
+    let square = fn(n: Int) -> Int
+        n * n
+    end
+    println(map_sum(square, 4))
+end
+=== 039.lom ===
+fn filter_sum(f: Fn, n: Int) -> Int
+    let mut sum = 0
+    let mut i = 0
+    while i < n
+        if f(i)
+            sum = sum + i
+        end
+        i = i + 1
+    end
+    sum
+end
+
+fn main() -> Unit
+    let is_even = fn(n: Int) -> Bool
+        if n % 2 == 0
+            True
+        else
+            False
+        end
+    end
+    println(filter_sum(is_even, 10))
+end
+=== 040.lom ===
+fn pipeline3(f: Fn, g: Fn, h: Fn, x: Int) -> Int
+    h(g(f(x)))
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    let negate = fn(n: Int) -> Int
+        -n
+    end
+    println(pipeline3(inc, double, negate, 5))
+end

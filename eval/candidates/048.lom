@@ -1,0 +1,15 @@
+fn parse_status(code: Int) -> String
+    match code
+        200 => "OK"
+        404 => "Not Found"
+        500 => "Server Error"
+        _ => "Unknown"
+    end
+end
+
+fn main() -> Unit
+    println(parse_status(200))
+    println(parse_status(404))
+    println(parse_status(500))
+    println(parse_status(403))
+end

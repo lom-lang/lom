@@ -1,0 +1,145 @@
+=== 086.lom ===
+fn add(a: Int, b: Int) -> Int
+    a + b
+end
+
+fn main() -> Unit
+    println(add(3, 4))
+end
+=== 087.lom ===
+fn main() -> Unit
+    let s = "hello world"
+    println(s)
+end
+=== 088.lom ===
+fn main() -> Unit
+    println(42)
+end
+=== 089.lom ===
+fn main() -> Unit
+    let x = 5
+    println(x)
+end
+=== 090.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = double(5)
+    println(result)
+end
+=== 091.lom ===
+fn main() -> Unit
+    let x = 5
+    let y = 5
+    println(x == y)
+end
+=== 092.lom ===
+fn main() -> Unit
+    let mut total = 0
+    let mut i = 0
+    while i < 5
+        total = total + i * i
+        i = i + 1
+    end
+    println(total)
+end
+=== 093.lom ===
+fn day_name(n: Int) -> String
+    match n
+        1 => "Monday"
+        2 => "Tuesday"
+        _ => "Other"
+    end
+end
+
+fn main() -> Unit
+    println(day_name(1))
+    println(day_name(2))
+    println(day_name(5))
+end
+=== 094.lom ===
+fn greet(name: String) -> Unit ! [IO]
+    println("Hello, " + name)
+end
+
+fn main() -> Unit
+    greet("Lom")
+end
+=== 095.lom ===
+from string import { len }
+
+fn main() -> Unit
+    println(len("hello"))
+end
+=== 096.lom ===
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn main() -> Unit
+    println(add(5, 6))
+end
+=== 097.lom ===
+fn safe_divide(a: Int, b: Int) -> Result<Int, String>
+    if b == 0
+        Err("div by zero")
+    else
+        Ok(a / b)
+    end
+end
+
+fn main() -> Unit
+    match safe_divide(10, 2)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+
+    match safe_divide(10, 0)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+end
+=== 098.lom ===
+fn fib(n: Int) -> Int
+    if n == 0
+        0
+    elif n == 1
+        1
+    else
+        fib(n - 1) + fib(n - 2)
+    end
+end
+
+fn main() -> Unit
+    let mut i = 0
+    while i < 5
+        println(fib(i))
+        i = i + 1
+    end
+end
+=== 099.lom ===
+fn main() -> Unit
+    match 200
+        200 => println("OK")
+        404 => println("Not Found")
+    end
+
+    match 404
+        200 => println("OK")
+        404 => println("Not Found")
+    end
+end
+=== 100.lom ===
+from string import { int_to_string }
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let n = double(21)
+    let s = int_to_string(n)
+    println(s)
+end

@@ -1,0 +1,57 @@
+# 质数判断 — 综合运用函数、递归、循环、条件
+fn is_prime(n: Int) -> Bool
+    if n < 2
+        False
+    elif n == 2
+        True
+    elif n % 2 == 0
+        False
+    else
+        check_odd(n, 3)
+    end
+end
+
+fn check_odd(n: Int, d: Int) -> Bool
+    if d * d > n
+        True
+    elif n % d == 0
+        False
+    else
+        check_odd(n, d + 2)
+    end
+end
+
+fn count_primes(limit: Int) -> Int
+    let mut count = 0
+    let mut i = 2
+    while i < limit
+        if is_prime(i)
+            count = count + 1
+        end
+        i = i + 1
+    end
+    count
+end
+
+fn main() -> Unit
+    # 单个质数判断
+    println(is_prime(2))
+    println(is_prime(3))
+    println(is_prime(4))
+    println(is_prime(17))
+    println(is_prime(18))
+    println(is_prime(1))
+    println(is_prime(0))
+
+    # 打印 20 以内的质数
+    for n in 20
+        if is_prime(n)
+            print(n)
+            print(" ")
+        end
+    end
+    println("")
+
+    # 统计 100 以内的质数个数
+    println(count_primes(100))
+end

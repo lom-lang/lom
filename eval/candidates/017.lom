@@ -1,0 +1,23 @@
+fn is_prime(n: Int) -> Bool
+    if n <= 1
+        False
+    else
+        let mut i = 2
+        let mut prime = True
+        while i < n
+            if n % i == 0
+                prime = False
+            end
+            i = i + 1
+        end
+        prime
+    end
+end
+
+fn main() -> Unit
+    println(is_prime(2))
+    println(is_prime(7))
+    println(is_prime(10))
+    println(is_prime(13))
+    println(is_prime(1))
+end

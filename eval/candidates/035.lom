@@ -1,0 +1,14 @@
+fn compose(f: Fn, g: Fn, x: Int) -> Int
+    f(g(x))
+end
+
+fn main() -> Unit
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(compose(double, inc, 5))
+    println(compose(inc, double, 5))
+end

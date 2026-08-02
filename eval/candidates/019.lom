@@ -1,0 +1,18 @@
+fn collatz_steps(n: Int) -> Int
+    let mut x = n
+    let mut steps = 0
+    while x != 1
+        if x % 2 == 0
+            x = x / 2
+        else
+            x = x * 3 + 1
+        end
+        steps = steps + 1
+    end
+    steps
+end
+
+fn main() -> Unit
+    println(collatz_steps(6))
+    println(collatz_steps(27))
+end

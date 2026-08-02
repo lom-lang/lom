@@ -1,0 +1,8 @@
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = double(5)
+    println(result)
+end

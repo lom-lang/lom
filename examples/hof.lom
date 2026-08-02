@@ -1,0 +1,52 @@
+# 高阶函数 — map / filter / reduce 模式（用闭包实现）
+# Phase 1 不检查类型，用 Fn 作为函数参数的类型占位符
+fn main() -> Unit
+    # apply_twice: 把函数应用两次
+    let apply_twice = fn(f: Fn, x: Int) -> Int
+        f(f(x))
+    end
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(apply_twice(inc, 5))
+
+    # compose: 组合两个函数
+    let compose = fn(f: Fn, g: Fn, x: Int) -> Int
+        f(g(x))
+    end
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    println(compose(inc, double, 10))
+
+    # 简易 map：对 [0, n) 应用函数求和
+    let sum_of = fn(f: Fn, n: Int) -> Int
+        let mut total = 0
+        let mut i = 0
+        while i < n
+            total = total + f(i)
+            i = i + 1
+        end
+        total
+    end
+    let square = fn(n: Int) -> Int
+        n * n
+    end
+    # 0 + 1 + 4 + 9 + 16 = 30
+    println(sum_of(square, 5))
+
+    # 条件求和：只加偶数
+    let sum_even = fn(f: Fn, n: Int) -> Int
+        let mut total = 0
+        let mut i = 0
+        while i < n
+            if i % 2 == 0
+                total = total + f(i)
+            end
+            i = i + 1
+        end
+        total
+    end
+    # 0 + 4 + 16 = 20
+    println(sum_even(square, 5))
+end

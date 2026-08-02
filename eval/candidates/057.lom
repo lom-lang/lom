@@ -1,0 +1,12 @@
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = 5 |> inc |> double
+    println(result)
+end

@@ -1,0 +1,35 @@
+# 阶乘 — 递归与循环两种实现
+fn factorial_rec(n: Int) -> Int
+    if n <= 1
+        1
+    else
+        n * factorial_rec(n - 1)
+    end
+end
+
+fn factorial_loop(n: Int) -> Int
+    let mut result = 1
+    let mut i = 2
+    while i <= n
+        result = result * i
+        i = i + 1
+    end
+    result
+end
+
+fn main() -> Unit
+    # 递归版本
+    println(factorial_rec(0))
+    println(factorial_rec(1))
+    println(factorial_rec(5))
+    println(factorial_rec(10))
+
+    # 循环版本
+    println(factorial_loop(0))
+    println(factorial_loop(1))
+    println(factorial_loop(5))
+    println(factorial_loop(10))
+
+    # 验证两种实现一致
+    println(factorial_rec(7) == factorial_loop(7))
+end

@@ -1,0 +1,180 @@
+=== 011.lom ===
+fn classify(n: Int) -> String
+    if n < 0
+        "negative"
+    elif n == 0
+        "zero"
+    else
+        "positive"
+    end
+end
+
+fn main() -> Unit
+    println(classify(-5))
+    println(classify(0))
+    println(classify(42))
+end
+=== 012.lom ===
+fn sign(n: Int) -> Int
+    if n > 0
+        1
+    elif n < 0
+        -1
+    else
+        0
+    end
+end
+
+fn main() -> Unit
+    println(sign(5))
+    println(sign(-3))
+    println(sign(0))
+end
+=== 013.lom ===
+fn count_down(n: Int) -> Unit
+    let mut i = n
+    while i >= 1
+        println(i)
+        i = i - 1
+    end
+end
+
+fn main() -> Unit
+    count_down(3)
+end
+=== 014.lom ===
+fn sum_to(n: Int) -> Int
+    let mut sum = 0
+    let mut i = 1
+    while i <= n
+        sum = sum + i
+        i = i + 1
+    end
+    sum
+end
+
+fn main() -> Unit
+    println(sum_to(10))
+    println(sum_to(100))
+end
+=== 015.lom ===
+fn factorial(n: Int) -> Int
+    let mut result = 1
+    let mut i = 1
+    while i <= n
+        result = result * i
+        i = i + 1
+    end
+    result
+end
+
+fn main() -> Unit
+    println(factorial(0))
+    println(factorial(5))
+    println(factorial(10))
+end
+=== 016.lom ===
+fn fib(n: Int) -> Int
+    if n == 0
+        0
+    elif n == 1
+        1
+    else
+        let mut a = 0
+        let mut b = 1
+        let mut i = 2
+        while i <= n
+            let tmp = a + b
+            a = b
+            b = tmp
+            i = i + 1
+        end
+        b
+    end
+end
+
+fn main() -> Unit
+    println(fib(0))
+    println(fib(1))
+    println(fib(10))
+    println(fib(20))
+end
+=== 017.lom ===
+fn is_prime(n: Int) -> Bool
+    if n <= 1
+        False
+    else
+        let mut i = 2
+        let mut prime = True
+        while i < n
+            if n % i == 0
+                prime = False
+            end
+            i = i + 1
+        end
+        prime
+    end
+end
+
+fn main() -> Unit
+    println(is_prime(2))
+    println(is_prime(7))
+    println(is_prime(10))
+    println(is_prime(13))
+    println(is_prime(1))
+end
+=== 018.lom ===
+fn gcd(a: Int, b: Int) -> Int
+    let mut x = a
+    let mut y = b
+    while y != 0
+        let tmp = y
+        y = x % y
+        x = tmp
+    end
+    x
+end
+
+fn main() -> Unit
+    println(gcd(48, 18))
+    println(gcd(100, 75))
+    println(gcd(17, 5))
+end
+=== 019.lom ===
+fn collatz_steps(n: Int) -> Int
+    let mut x = n
+    let mut steps = 0
+    while x != 1
+        if x % 2 == 0
+            x = x / 2
+        else
+            x = x * 3 + 1
+        end
+        steps = steps + 1
+    end
+    steps
+end
+
+fn main() -> Unit
+    println(collatz_steps(6))
+    println(collatz_steps(27))
+end
+=== 020.lom ===
+fn early_return_sum_first_even(a: Int, b: Int, c: Int) -> Int
+    if a % 2 == 0
+        return a
+    end
+    if b % 2 == 0
+        return b
+    end
+    if c % 2 == 0
+        return c
+    end
+    -1
+end
+
+fn main() -> Unit
+    println(early_return_sum_first_even(1, 3, 5))
+    println(early_return_sum_first_even(1, 4, 7))
+    println(early_return_sum_first_even(8, 3, 5))
+end

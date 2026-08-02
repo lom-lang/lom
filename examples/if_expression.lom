@@ -1,0 +1,58 @@
+# if 表达式 — 作为值使用、赋值、嵌套
+fn sign(n: Int) -> Int
+    if n > 0
+        1
+    elif n < 0
+        -1
+    else
+        0
+    end
+end
+
+fn describe(n: Int) -> String
+    if n < 0
+        "negative"
+    elif n == 0
+        "zero"
+    elif n < 10
+        "small"
+    elif n < 100
+        "medium"
+    else
+        "large"
+    end
+end
+
+fn main() -> Unit
+    # if 作为函数返回值
+    println(sign(5))
+    println(sign(-3))
+    println(sign(0))
+
+    # if 赋值给变量
+    let label = if sign(7) > 0
+        "positive"
+    else
+        "non-positive"
+    end
+    println(label)
+
+    # 多分支 if 表达式
+    println(describe(-5))
+    println(describe(0))
+    println(describe(7))
+    println(describe(50))
+    println(describe(500))
+
+    # if 表达式嵌套
+    let category = if sign(10) > 0
+        if 10 >= 10
+            "big-positive"
+        else
+            "small-positive"
+        end
+    else
+        "non-positive"
+    end
+    println(category)
+end

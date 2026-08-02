@@ -1,0 +1,19 @@
+fn grade_to_score(grade: String) -> Result<Int, String>
+    match grade
+        "A" => Ok(90)
+        "B" => Ok(80)
+        "C" => Ok(70)
+        _ => Err("unknown grade")
+    end
+end
+
+fn main() -> Unit
+    match grade_to_score("A")
+        Ok(s) => println(s)
+        Err(e) => println("err: " + e)
+    end
+    match grade_to_score("X")
+        Ok(s) => println(s)
+        Err(e) => println("err: " + e)
+    end
+end

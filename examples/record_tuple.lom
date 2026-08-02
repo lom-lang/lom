@@ -1,0 +1,74 @@
+# 结构记录 + 元组 + 字段访问/索引测试 — 阶段 2.1.4
+# 结构记录：{x: 3, y: 4} 字面量，p.x 字段访问
+# 元组：(1, "hello") 字面量，t.0 t.1 索引访问
+# 结构等价：字段相同（顺序不敏感）即相等
+
+fn make_point(x: Float, y: Float) -> {x: Float, y: Float}
+    {x: x, y: y}
+end
+
+fn distance(p1: {x: Float, y: Float}, p2: {x: Float, y: Float}) -> Float
+    let dx = p1.x - p2.x
+    let dy = p1.y - p2.y
+    (dx * dx + dy * dy) * 0.5 + (dx * dx + dy * dy) * 0.5
+end
+
+fn swap(pair: (Int, String)) -> (String, Int)
+    (pair.1, pair.0)
+end
+
+fn main() -> Unit
+    # 1. 记录字面量 + 字段访问
+    let p = {x: 3, y: 4}
+    println(p.x)
+    println(p.y)
+
+    # 2. 记录作为函数参数和返回值
+    let a = make_point(0.0, 0.0)
+    let b = make_point(3.0, 4.0)
+    println(b.x)
+    println(b.y)
+
+    # 3. 跨行记录字面量
+    let q = {
+        x: 10,
+        y: 20,
+        z: 30
+    }
+    println(q.x + q.y + q.z)
+
+    # 4. 记录字段是表达式
+    let r = {sum: 1 + 2, name: "lom"}
+    println(r.sum)
+    println(r.name)
+
+    # 5. 记录结构等价比较（字段顺序不敏感）
+    let s1 = {x: 1, y: 2}
+    let s2 = {y: 2, x: 1}
+    println(s1 == s2)
+
+    # 6. 元组字面量 + 索引访问
+    let t = (10, "hello", True)
+    println(t.0)
+    println(t.1)
+    println(t.2)
+
+    # 7. 元组作为函数参数和返回值（swap）
+    let swapped = swap((42, "world"))
+    println(swapped.0)
+    println(swapped.1)
+
+    # 8. 二元组
+    let pair = (1, 2)
+    println(pair.0 + pair.1)
+
+    # 9. 元组相等比较
+    println((1, 2, 3) == (1, 2, 3))
+    println((1, 2) == (1, 3))
+
+    # 10. 记录嵌套元组
+    let box = {label: "point", coord: (3, 4)}
+    println(box.label)
+    println(box.coord.0)
+    println(box.coord.1)
+end

@@ -1,0 +1,43 @@
+# Phase 2.5 显式效应系统示例
+#
+# 语法：在函数返回类型后加 `! [Effect1, Effect2]` 声明效应
+# 规则：
+#   - 纯函数（无 `! [...]`）不能调用带效应的函数（--check 时报 EFF001 警告）
+#   - main 函数隐式拥有所有效应（入口函数，调用 IO 是常态）
+#   - 标准库 println/print 声明 IO 效应；string/math 模块函数为纯函数
+#   - 效应仅为编译期注解，不影响运行时行为（渐进式：类型错误是 Warning，不阻止运行）
+
+from string import { len, int_to_string }
+
+# 纯函数：无 `! [...]` 注解
+fn double(x: Int) -> Int
+    x * 2
+end
+
+# 带效应函数：声明 IO 效应，可调用 println
+fn print_double(x: Int) -> Unit ! [IO]
+    let result = double(x)
+    println(result)
+end
+
+# 多效应函数：声明 IO 和 Clock
+fn now() -> Int ! [Clock]
+    1234567890
+end
+
+fn log_with_timestamp(msg: String) -> Unit ! [IO, Clock]
+    let t = now()
+    print("[")
+    print(int_to_string(t))
+    print("] ")
+    println(msg)
+end
+
+# 主入口：调用上述函数
+fn main() -> Unit
+    print_double(21)
+    log_with_timestamp("hello effects")
+    # 纯函数调用纯函数 — 无 EFF001
+    let n = len("lom")
+    println(n)
+end

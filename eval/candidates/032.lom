@@ -1,0 +1,7 @@
+fn main() -> Unit
+    let double = fn(x: Int) -> Int
+        x * 2
+    end
+    println(double(5))
+    println(double(21))
+end

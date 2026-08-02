@@ -1,0 +1,38 @@
+=== 081.lom ===
+from string import { len }
+
+fn main() -> Unit
+    println(len("hello"))
+end
+=== 082.lom ===
+from string import { upper, lower }
+
+fn main() -> Unit
+    println(upper("hi"))
+    println(lower("BYE"))
+end
+=== 083.lom ===
+from string import { int_to_string }
+
+fn add_and_format(a: Int, b: Int) -> String
+    int_to_string(a + b)
+end
+
+fn main() -> Unit
+    println(add_and_format(3, 4))
+end
+=== 084.lom ===
+from math import { sqrt, abs as absolute }
+
+fn main() -> Unit
+    println(sqrt(16.0))
+    println(absolute(-7))
+end
+=== 085.lom ===
+from string import { len, int_to_string, upper }
+
+fn main() -> Unit
+    let name = "lom"
+    let msg = upper(name) + " has " + int_to_string(len(name)) + " letters"
+    println(msg)
+end

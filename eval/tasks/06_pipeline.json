@@ -1,0 +1,92 @@
+[
+  {
+    "id": "056",
+    "category": "pipeline",
+    "difficulty": "easy",
+    "prompt": "写函数 double(x: Int) -> Int 返回 x * 2。main 中 let result = 5 |> double，然后 println(result)。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = 5 |> double\n    println(result)\nend\n",
+    "expected": "10\n",
+    "notes": "最简 pipeline：5 |> double => double(5) = 10。"
+  },
+  {
+    "id": "057",
+    "category": "pipeline",
+    "difficulty": "easy",
+    "prompt": "写函数 inc(x: Int) -> Int 返回 x + 1。写函数 double(x: Int) -> Int 返回 x * 2。main 中 let result = 5 |> inc |> double，然后 println(result)（即 double(inc(5))=double(6)=12）。",
+    "solution": "fn inc(x: Int) -> Int\n    x + 1\nend\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = 5 |> inc |> double\n    println(result)\nend\n",
+    "expected": "12\n",
+    "notes": "链式 pipeline：5 |> inc |> double => double(inc(5)) = 12。"
+  },
+  {
+    "id": "058",
+    "category": "pipeline",
+    "difficulty": "easy",
+    "prompt": "写函数 add(x: Int, y: Int) -> Int 返回 x + y。main 中 let result = 10 |> add(3)，然后 println(result)（即 add(10, 3) = 13）。",
+    "solution": "fn add(x: Int, y: Int) -> Int\n    x + y\nend\n\nfn main() -> Unit\n    let result = 10 |> add(3)\n    println(result)\nend\n",
+    "expected": "13\n",
+    "notes": "带额外参数的 pipeline：10 |> add(3) => add(10, 3) = 13。"
+  },
+  {
+    "id": "059",
+    "category": "pipeline",
+    "difficulty": "easy",
+    "prompt": "main 中直接用 pipeline 调用 println：42 |> println。",
+    "solution": "fn main() -> Unit\n    42 |> println\nend\n",
+    "expected": "42\n",
+    "notes": "pipeline 调用内置函数 println。"
+  },
+  {
+    "id": "060",
+    "category": "pipeline",
+    "difficulty": "medium",
+    "prompt": "写函数 double(x: Int) -> Int 返回 x*2。写函数 inc(x: Int) -> Int 返回 x+1。写函数 negate(x: Int) -> Int 返回 -x。main 中 let result = 3 |> negate |> double |> inc，println(result)（即 inc(double(negate(3)))=inc(double(-3))=inc(-6)=-5）。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn inc(x: Int) -> Int\n    x + 1\nend\n\nfn negate(x: Int) -> Int\n    -x\nend\n\nfn main() -> Unit\n    let result = 3 |> negate |> double |> inc\n    println(result)\nend\n",
+    "expected": "-5\n",
+    "notes": "三步链式 pipeline。inc(double(negate(3)))=inc(double(-3))=inc(-6)=-5。"
+  },
+  {
+    "id": "061",
+    "category": "pipeline",
+    "difficulty": "medium",
+    "prompt": "写函数 add(x: Int, y: Int) -> Int 返回 x+y。main 中 let result = 1 |> add(2) |> add(3)，println(result)（即 add(add(1, 2), 3) = add(3, 3) = 6）。",
+    "solution": "fn add(x: Int, y: Int) -> Int\n    x + y\nend\n\nfn main() -> Unit\n    let result = 1 |> add(2) |> add(3)\n    println(result)\nend\n",
+    "expected": "6\n",
+    "notes": "带额外参数的链式 pipeline。add(add(1,2),3)=6。"
+  },
+  {
+    "id": "062",
+    "category": "pipeline",
+    "difficulty": "medium",
+    "prompt": "写函数 double(x: Int) -> Int 返回 x*2。main 中 let result = 1 + 2 |> double，println(result)（即 double(1+2) = double(3) = 6，因 |> 优先级低于算术）。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = 1 + 2 |> double\n    println(result)\nend\n",
+    "expected": "6\n",
+    "notes": "pipeline 优先级低于算术：1+2 |> double => double(3) = 6。"
+  },
+  {
+    "id": "063",
+    "category": "pipeline",
+    "difficulty": "medium",
+    "prompt": "写函数 double(x: Int) -> Int 返回 x*2。main 中 let result = 5 |> double == 10，println(result)（即 (5 |> double) == 10 => 10 == 10 => True，输出 true）。考察 pipeline 优先级高于比较。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = 5 |> double == 10\n    println(result)\nend\n",
+    "expected": "true\n",
+    "notes": "pipeline 优先级高于比较：(5 |> double) == 10 => true。Bool 小写输出。"
+  },
+  {
+    "id": "064",
+    "category": "pipeline",
+    "difficulty": "hard",
+    "prompt": "from string import { int_to_string }。写函数 double(x: Int) -> Int 返回 x*2。写函数 stringify(n: Int) -> String 返回 int_to_string(n)。main 中 5 |> double |> stringify |> println（即 println(stringify(double(5))) = println(\"10\")）。",
+    "solution": "from string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn stringify(n: Int) -> String\n    int_to_string(n)\nend\n\nfn main() -> Unit\n    5 |> double |> stringify |> println\nend\n",
+    "expected": "10\n",
+    "notes": "跨类型 pipeline：Int -> Int -> String -> println。需要 import int_to_string。"
+  },
+  {
+    "id": "065",
+    "category": "pipeline",
+    "difficulty": "hard",
+    "prompt": "写函数 add(x: Int, y: Int) -> Int 返回 x+y。写函数 square(x: Int) -> Int 返回 x*x。写函数 inc(x: Int) -> Int 返回 x+1。main 中 let result = 2 |> add(3) |> square |> inc，println(result)（即 inc(square(add(2, 3))) = inc(square(5)) = inc(25) = 26）。",
+    "solution": "fn add(x: Int, y: Int) -> Int\n    x + y\nend\n\nfn square(x: Int) -> Int\n    x * x\nend\n\nfn inc(x: Int) -> Int\n    x + 1\nend\n\nfn main() -> Unit\n    let result = 2 |> add(3) |> square |> inc\n    println(result)\nend\n",
+    "expected": "26\n",
+    "notes": "混合带参 pipeline 与无参 pipeline。inc(square(add(2,3)))=inc(25)=26。"
+  }
+]

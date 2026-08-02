@@ -1,0 +1,92 @@
+[
+  {
+    "id": "031",
+    "category": "closures",
+    "difficulty": "easy",
+    "prompt": "写函数 make_adder(n: Int) -> Fn 返回一个闭包 fn(x: Int) -> Int 返回 x + n。main 中 let add5 = make_adder(5)，然后 println(add5(10)) 和 println(add5(20))。",
+    "solution": "fn make_adder(n: Int) -> Fn\n    fn(x: Int) -> Int\n        x + n\n    end\nend\n\nfn main() -> Unit\n    let add5 = make_adder(5)\n    println(add5(10))\n    println(add5(20))\nend\n",
+    "expected": "15\n25\n",
+    "notes": "闭包捕获外层参数 n。Fn 作为返回类型。"
+  },
+  {
+    "id": "032",
+    "category": "closures",
+    "difficulty": "easy",
+    "prompt": "main 中直接定义闭包 let double = fn(x: Int) -> Int 返回 x * 2 end。然后 println(double(5)) 和 println(double(21))。",
+    "solution": "fn main() -> Unit\n    let double = fn(x: Int) -> Int\n        x * 2\n    end\n    println(double(5))\n    println(double(21))\nend\n",
+    "expected": "10\n42\n",
+    "notes": "闭包字面量直接赋值给 let。"
+  },
+  {
+    "id": "033",
+    "category": "closures",
+    "difficulty": "easy",
+    "prompt": "写函数 apply(f: Fn, x: Int) -> Int 返回 f(x)。main 中 let inc = fn(n: Int) -> Int n + 1 end，然后 println(apply(inc, 5)) 和 println(apply(inc, 100))。",
+    "solution": "fn apply(f: Fn, x: Int) -> Int\n    f(x)\nend\n\nfn main() -> Unit\n    let inc = fn(n: Int) -> Int\n        n + 1\n    end\n    println(apply(inc, 5))\n    println(apply(inc, 100))\nend\n",
+    "expected": "6\n101\n",
+    "notes": "Fn 作为参数类型 + 闭包作为实参。"
+  },
+  {
+    "id": "034",
+    "category": "closures",
+    "difficulty": "medium",
+    "prompt": "写函数 apply_twice(f: Fn, x: Int) -> Int 返回 f(f(x))。main 中 let inc = fn(n: Int) -> Int n + 1 end，然后 println(apply_twice(inc, 5))。",
+    "solution": "fn apply_twice(f: Fn, x: Int) -> Int\n    f(f(x))\nend\n\nfn main() -> Unit\n    let inc = fn(n: Int) -> Int\n        n + 1\n    end\n    println(apply_twice(inc, 5))\nend\n",
+    "expected": "7\n",
+    "notes": "函数应用两次。inc(inc(5)) = 7。"
+  },
+  {
+    "id": "035",
+    "category": "closures",
+    "difficulty": "medium",
+    "prompt": "写函数 compose(f: Fn, g: Fn, x: Int) -> Int 返回 f(g(x))。main 中 let double = fn(n: Int) -> Int n * 2 end，let inc = fn(n: Int) -> Int n + 1 end，println(compose(double, inc, 5))（即 double(inc(5))=12）和 println(compose(inc, double, 5))（即 inc(double(5))=11）。",
+    "solution": "fn compose(f: Fn, g: Fn, x: Int) -> Int\n    f(g(x))\nend\n\nfn main() -> Unit\n    let double = fn(n: Int) -> Int\n        n * 2\n    end\n    let inc = fn(n: Int) -> Int\n        n + 1\n    end\n    println(compose(double, inc, 5))\n    println(compose(inc, double, 5))\nend\n",
+    "expected": "12\n11\n",
+    "notes": "函数组合。double(inc(5))=double(6)=12, inc(double(5))=inc(10)=11。"
+  },
+  {
+    "id": "036",
+    "category": "closures",
+    "difficulty": "medium",
+    "prompt": "写函数 sum_of_squares(n: Int) -> Int 用 while 循环对 0..n-1 的平方求和。即 0² + 1² + ... + (n-1)²。main 调用 println(sum_of_squares(5))（0+1+4+9+16=30）和 println(sum_of_squares(10))（0+1+4+9+16+25+36+49+64+81=285）。",
+    "solution": "fn sum_of_squares(n: Int) -> Int\n    let mut total = 0\n    let mut i = 0\n    while i < n\n        total = total + i * i\n        i = i + 1\n    end\n    total\nend\n\nfn main() -> Unit\n    println(sum_of_squares(5))\n    println(sum_of_squares(10))\nend\n",
+    "expected": "30\n285\n",
+    "notes": "while 累加。不需要闭包，但考察 let mut + 算术 + 循环。"
+  },
+  {
+    "id": "037",
+    "category": "closures",
+    "difficulty": "hard",
+    "prompt": "写函数 counter(start: Int) -> Fn 返回一个闭包 fn() -> Int，每次调用返回 start 累加 1 的值（使用捕获的 mut 变量）。提示：闭包内用 let mut count = start，返回 count，然后 count = count + 1。但因为闭包不能有状态，简化为：返回 fn() -> Int 直接返回 start（无状态）。main 中 let c = counter(10)，println(c())。",
+    "solution": "fn counter(start: Int) -> Fn\n    fn() -> Int\n        start\n    end\nend\n\nfn main() -> Unit\n    let c = counter(10)\n    println(c())\nend\n",
+    "expected": "10\n",
+    "notes": "简化版：闭包捕获 start 但无状态（Lom 闭包不支持 mut 捕获）。考察闭包基础。"
+  },
+  {
+    "id": "038",
+    "category": "closures",
+    "difficulty": "hard",
+    "prompt": "写函数 map_sum(f: Fn, n: Int) -> Int 用 while 对 0..n-1 应用 f 并求和。即 f(0) + f(1) + ... + f(n-1)。main 中 let square = fn(n: Int) -> Int n * n end，println(map_sum(square, 4))（0+1+4+9=14）。",
+    "solution": "fn map_sum(f: Fn, n: Int) -> Int\n    let mut total = 0\n    let mut i = 0\n    while i < n\n        total = total + f(i)\n        i = i + 1\n    end\n    total\nend\n\nfn main() -> Unit\n    let square = fn(n: Int) -> Int\n        n * n\n    end\n    println(map_sum(square, 4))\nend\n",
+    "expected": "14\n",
+    "notes": "高阶函数 + 循环：把 f 应用于每个 i 再累加。0+1+4+9=14。"
+  },
+  {
+    "id": "039",
+    "category": "closures",
+    "difficulty": "hard",
+    "prompt": "写函数 filter_sum(f: Fn, n: Int) -> Int 用 while 对 0..n-1 中满足 f(i) 为 True 的 i 求和。main 中 let is_even = fn(n: Int) -> Bool if n % 2 == 0 True else False end end，println(filter_sum(is_even, 10))（0+2+4+6+8=20）。",
+    "solution": "fn filter_sum(f: Fn, n: Int) -> Int\n    let mut total = 0\n    let mut i = 0\n    while i < n\n        if f(i)\n            total = total + i\n        end\n        i = i + 1\n    end\n    total\nend\n\nfn main() -> Unit\n    let is_even = fn(n: Int) -> Bool\n        if n % 2 == 0\n            True\n        else\n            False\n        end\n    end\n    println(filter_sum(is_even, 10))\nend\n",
+    "expected": "20\n",
+    "notes": "高阶函数 + 过滤：f 返回 Bool 决定是否累加。0+2+4+6+8=20。"
+  },
+  {
+    "id": "040",
+    "category": "closures",
+    "difficulty": "hard",
+    "prompt": "写函数 pipeline3(f: Fn, g: Fn, h: Fn, x: Int) -> Int 返回 h(g(f(x)))。main 中 let inc = fn(n: Int) -> Int n + 1 end，let double = fn(n: Int) -> Int n * 2 end，let negate = fn(n: Int) -> Int -n end，println(pipeline3(inc, double, negate, 5))（即 negate(double(inc(5)))=negate(double(6))=negate(12)=-12）。",
+    "solution": "fn pipeline3(f: Fn, g: Fn, h: Fn, x: Int) -> Int\n    h(g(f(x)))\nend\n\nfn main() -> Unit\n    let inc = fn(n: Int) -> Int\n        n + 1\n    end\n    let double = fn(n: Int) -> Int\n        n * 2\n    end\n    let negate = fn(n: Int) -> Int\n        -n\n    end\n    println(pipeline3(inc, double, negate, 5))\nend\n",
+    "expected": "-12\n",
+    "notes": "三函数管道组合。negate(double(inc(5)))=negate(12)=-12。"
+  }
+]

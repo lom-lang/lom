@@ -1,0 +1,6 @@
+from string import { upper, lower }
+
+fn main() -> Unit
+    println(upper("hi"))
+    println(lower("BYE"))
+end

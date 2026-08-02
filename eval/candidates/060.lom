@@ -1,0 +1,16 @@
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn negate(x: Int) -> Int
+    -x
+end
+
+fn main() -> Unit
+    let result = 3 |> negate |> double |> inc
+    println(result)
+end

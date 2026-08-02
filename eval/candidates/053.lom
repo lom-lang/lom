@@ -1,0 +1,11 @@
+fn unwrap_or(r: Result<Int, String>, default: Int) -> Int
+    match r
+        Ok(n) => n
+        Err(_) => default
+    end
+end
+
+fn main() -> Unit
+    println(unwrap_or(Ok(42), 0))
+    println(unwrap_or(Err("err"), 99))
+end

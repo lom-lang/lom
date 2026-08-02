@@ -1,0 +1,85 @@
+=== 066.lom ===
+fn main() -> Unit
+    let p = {x: 3, y: 4}
+    println(p.x)
+    println(p.y)
+end
+=== 067.lom ===
+fn main() -> Unit
+    let t = (10, "hello")
+    println(t.0)
+    println(t.1)
+end
+=== 068.lom ===
+fn make_point(x: Int, y: Int) -> {x: Int, y: Int}
+    {x: x, y: y}
+end
+
+fn main() -> Unit
+    let p = make_point(7, 8)
+    println(p.x)
+    println(p.y)
+end
+=== 069.lom ===
+fn swap(pair: (Int, String)) -> (String, Int)
+    (pair.1, pair.0)
+end
+
+fn main() -> Unit
+    let result = swap((42, "world"))
+    println(result.0)
+    println(result.1)
+end
+=== 070.lom ===
+fn main() -> Unit
+    let s1 = {x: 1, y: 2}
+    let s2 = {y: 2, x: 1}
+    println(s1 == s2)
+end
+=== 071.lom ===
+fn main() -> Unit
+    println((1, 2, 3) == (1, 2, 3))
+    println((1, 2) == (1, 3))
+end
+=== 072.lom ===
+fn main() -> Unit
+    let r = {sum: 1 + 2, name: "lom"}
+    println(r.sum)
+    println(r.name)
+end
+=== 073.lom ===
+fn distance_squared(p1: {x: Int, y: Int}, p2: {x: Int, y: Int}) -> Int
+    (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y)
+end
+
+fn main() -> Unit
+    let a = {x: 0, y: 0}
+    let b = {x: 3, y: 4}
+    println(distance_squared(a, b))
+end
+=== 074.lom ===
+fn main() -> Unit
+    let box = {label: "point", coord: (3, 4)}
+    println(box.label)
+    println(box.coord.0)
+    println(box.coord.1)
+end
+=== 075.lom ===
+fn first_of_three(t: (Int, String, Bool)) -> Int
+    t.0
+end
+
+fn second_of_three(t: (Int, String, Bool)) -> String
+    t.1
+end
+
+fn third_of_three(t: (Int, String, Bool)) -> Bool
+    t.2
+end
+
+fn main() -> Unit
+    let data = (42, "hello", True)
+    println(first_of_three(data))
+    println(second_of_three(data))
+    println(third_of_three(data))
+end

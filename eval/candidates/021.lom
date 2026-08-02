@@ -1,0 +1,12 @@
+fn id_int(x: Int) -> Int
+    x
+end
+
+fn id_str(s: String) -> String
+    s
+end
+
+fn main() -> Unit
+    println(id_int(42))
+    println(id_str("hello"))
+end

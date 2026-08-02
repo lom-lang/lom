@@ -1,0 +1,15 @@
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn quadruple(x: Int) -> Int
+    double(double(x))
+end
+
+fn print_result(x: Int) -> Unit ! [IO]
+    println(quadruple(x))
+end
+
+fn main() -> Unit
+    print_result(5)
+end

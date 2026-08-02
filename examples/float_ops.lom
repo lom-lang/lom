@@ -1,0 +1,39 @@
+# 浮点运算 — 数学计算、混合类型提升
+fn circle_area(radius: Float) -> Float
+    3.14159265 * radius * radius
+end
+
+fn celsius_to_fahrenheit(c: Float) -> Float
+    c * 9.0 / 5.0 + 32.0
+end
+
+fn fahrenheit_to_celsius(f: Float) -> Float
+    (f - 32.0) * 5.0 / 9.0
+end
+
+fn main() -> Unit
+    # 基本浮点
+    println(3.14)
+    println(0.5 + 0.5)
+    println(1.0 / 3.0)
+    println(2.0 * 3.0)
+
+    # 混合类型（Int + Float 提升）
+    println(2 + 0.5)
+    println(10 - 0.1)
+    println(3 * 1.5)
+
+    # 函数调用
+    println(circle_area(1.0))
+    println(circle_area(2.5))
+
+    println(celsius_to_fahrenheit(0.0))
+    println(celsius_to_fahrenheit(100.0))
+    println(fahrenheit_to_celsius(32.0))
+    println(fahrenheit_to_celsius(212.0))
+
+    # 浮点比较
+    println(0.1 + 0.2 == 0.3)
+    println(1.0 > 0.5)
+    println(2.5 <= 2.5)
+end

@@ -1,0 +1,8 @@
+fn int_to_float(n: Int) -> Float
+    n + 0.0
+end
+
+fn main() -> Unit
+    println(int_to_float(5))
+    println(int_to_float(-3))
+end

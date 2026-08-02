@@ -1,0 +1,47 @@
+[
+  {
+    "id": "081",
+    "category": "modules",
+    "difficulty": "easy",
+    "prompt": "from string import { len }。main 中 println(len(\"hello\"))。",
+    "solution": "from string import { len }\n\nfn main() -> Unit\n    println(len(\"hello\"))\nend\n",
+    "expected": "5\n",
+    "notes": "最简 import：从 string 模块导入 len 函数。"
+  },
+  {
+    "id": "082",
+    "category": "modules",
+    "difficulty": "easy",
+    "prompt": "from string import { upper, lower }。main 中 println(upper(\"hi\")) 和 println(lower(\"BYE\"))。",
+    "solution": "from string import { upper, lower }\n\nfn main() -> Unit\n    println(upper(\"hi\"))\n    println(lower(\"BYE\"))\nend\n",
+    "expected": "HI\nbye\n",
+    "notes": "多符号导入。"
+  },
+  {
+    "id": "083",
+    "category": "modules",
+    "difficulty": "medium",
+    "prompt": "from string import { int_to_string }。写函数 add_and_format(a: Int, b: Int) -> String 返回 int_to_string(a + b)。main 中 println(add_and_format(3, 4))。",
+    "solution": "from string import { int_to_string }\n\nfn add_and_format(a: Int, b: Int) -> String\n    int_to_string(a + b)\nend\n\nfn main() -> Unit\n    println(add_and_format(3, 4))\nend\n",
+    "expected": "7\n",
+    "notes": "import + 函数定义 + int_to_string 转换。"
+  },
+  {
+    "id": "084",
+    "category": "modules",
+    "difficulty": "medium",
+    "prompt": "from math import { sqrt, abs as absolute }。main 中 println(sqrt(16.0)) 和 println(absolute(-7))。注意 abs 用别名 absolute。sqrt(16.0) 返回 Float 输出为 4.0。",
+    "solution": "from math import { sqrt, abs as absolute }\n\nfn main() -> Unit\n    println(sqrt(16.0))\n    println(absolute(-7))\nend\n",
+    "expected": "4.0\n7\n",
+    "notes": "math 模块 + 别名导入 abs as absolute。sqrt(16.0)=4.0（Float 输出保留 .0）；absolute(-7)=7（Int）。"
+  },
+  {
+    "id": "085",
+    "category": "modules",
+    "difficulty": "hard",
+    "prompt": "from string import { len, int_to_string, upper }。main 中 let name = \"lom\"，let msg = upper(name) + \" has \" + int_to_string(len(name)) + \" letters\"，println(msg)。",
+    "solution": "from string import { len, int_to_string, upper }\n\nfn main() -> Unit\n    let name = \"lom\"\n    let msg = upper(name) + \" has \" + int_to_string(len(name)) + \" letters\"\n    println(msg)\nend\n",
+    "expected": "LOM has 3 letters\n",
+    "notes": "多函数组合：upper + int_to_string + len + 字符串拼接。考察 LLM 是否记得每个 stdlib 函数的语义。"
+  }
+]

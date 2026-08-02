@@ -1,0 +1,12 @@
+fn sub(a: Int, b: Int) -> Int
+    a - b
+end
+
+fn mul(a: Int, b: Int) -> Int
+    a * b
+end
+
+fn main() -> Unit
+    println(sub(10, 3))
+    println(mul(4, 5))
+end

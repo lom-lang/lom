@@ -1,0 +1,26 @@
+# 算术运算 — 运算符优先级、混合类型、取模
+fn main() -> Unit
+    # 整数四则运算
+    println(1 + 2 * 3)
+    println((1 + 2) * 3)
+    println(10 - 3 - 2)
+    println(20 / 4 / 2)
+    println(17 % 5)
+
+    # 浮点运算
+    println(3.14 * 2.0)
+    println(1.5 + 2.5)
+
+    # 整数与浮点混合（提升为 Float）
+    println(3 + 0.14)
+
+    # 一元负号
+    println(-5)
+    println(-(2 + 3))
+
+    # 比较运算
+    println(3 == 3)
+    println(3 != 4)
+    println(2 < 3)
+    println(5 >= 5)
+end

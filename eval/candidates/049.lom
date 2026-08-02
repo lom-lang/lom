@@ -1,0 +1,18 @@
+fn half(n: Int) -> Option<Int>
+    if n % 2 == 0
+        Some(n / 2)
+    else
+        None
+    end
+end
+
+fn main() -> Unit
+    match half(10)
+        Some(v) => println(v)
+        None => println("odd")
+    end
+    match half(7)
+        Some(v) => println(v)
+        None => println("odd")
+    end
+end

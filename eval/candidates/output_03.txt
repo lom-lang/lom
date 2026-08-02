@@ -1,0 +1,125 @@
+=== 021.lom ===
+fn id_int(x: Int) -> Int
+    x
+end
+
+fn id_str(s: String) -> String
+    s
+end
+
+fn main() -> Unit
+    println(id_int(42))
+    println(id_str("hello"))
+end
+=== 022.lom ===
+fn bool_to_str(b: Bool) -> String
+    if b
+        "yes"
+    else
+        "no"
+    end
+end
+
+fn main() -> Unit
+    println(bool_to_str(True))
+    println(bool_to_str(False))
+end
+=== 023.lom ===
+fn int_to_float(n: Int) -> Float
+    n + 0.0
+end
+
+fn main() -> Unit
+    println(int_to_float(5))
+    println(int_to_float(-3))
+end
+=== 024.lom ===
+fn concat(a: String, b: String) -> String
+    a + b
+end
+
+fn main() -> Unit
+    println(concat("hello", " world"))
+    println(concat("foo", "bar"))
+end
+=== 025.lom ===
+fn return_unit() -> Unit
+    ()
+end
+
+fn main() -> Unit
+    println(return_unit())
+end
+=== 026.lom ===
+fn compare(a: Int, b: Int) -> Bool
+    a < b
+end
+
+fn main() -> Unit
+    println(compare(3, 5))
+    println(compare(5, 3))
+    println(compare(5, 5))
+end
+=== 027.lom ===
+fn logical_and(a: Bool, b: Bool) -> Bool
+    a and b
+end
+
+fn logical_or(a: Bool, b: Bool) -> Bool
+    a or b
+end
+
+fn logical_not(a: Bool) -> Bool
+    if a
+        False
+    else
+        True
+    end
+end
+
+fn main() -> Unit
+    println(logical_and(True, False))
+    println(logical_or(True, False))
+    println(logical_not(False))
+end
+=== 028.lom ===
+fn mixed_arith(x: Int, y: Float) -> Float
+    x + y * 2.0
+end
+
+fn main() -> Unit
+    println(mixed_arith(3, 1.5))
+    println(mixed_arith(10, 0.5))
+end
+=== 029.lom ===
+fn string_eq(a: String, b: String) -> Bool
+    a == b
+end
+
+fn main() -> Unit
+    println(string_eq("abc", "abc"))
+    println(string_eq("abc", "abd"))
+    println(string_eq("", ""))
+end
+=== 030.lom ===
+fn grade(score: Int) -> String
+    if score >= 90
+        "A"
+    elif score >= 80
+        "B"
+    elif score >= 70
+        "C"
+    elif score >= 60
+        "D"
+    else
+        "F"
+    end
+end
+
+fn main() -> Unit
+    println(grade(95))
+    println(grade(85))
+    println(grade(75))
+    println(grade(65))
+    println(grade(55))
+end

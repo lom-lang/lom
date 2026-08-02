@@ -1,0 +1,11 @@
+fn main() -> Unit
+    match 200
+        200 => println("OK")
+        404 => println("Not Found")
+    end
+
+    match 404
+        200 => println("OK")
+        404 => println("Not Found")
+    end
+end

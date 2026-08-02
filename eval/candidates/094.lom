@@ -1,0 +1,7 @@
+fn greet(name: String) -> Unit ! [IO]
+    println("Hello, " + name)
+end
+
+fn main() -> Unit
+    greet("Lom")
+end

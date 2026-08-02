@@ -1,0 +1,52 @@
+# 控制流 — if/elif/else、while、for、嵌套循环
+fn grade(score: Int) -> String
+    if score >= 90
+        "A"
+    elif score >= 80
+        "B"
+    elif score >= 70
+        "C"
+    elif score >= 60
+        "D"
+    else
+        "F"
+    end
+end
+
+fn main() -> Unit
+    # if/elif/else 链
+    println(grade(95))
+    println(grade(85))
+    println(grade(75))
+    println(grade(65))
+    println(grade(55))
+
+    # while 循环
+    let mut i = 1
+    let mut product = 1
+    while i <= 5
+        product = product * i
+        i = i + 1
+    end
+    println(product)
+
+    # for 循环（整数迭代 0..n）
+    let mut sum = 0
+    for j in 10
+        sum = sum + j
+    end
+    println(sum)
+
+    # 嵌套循环 — 九九乘法表
+    for a in 3
+        for b in 3
+            print(a + 1)
+            print("*")
+            print(b + 1)
+            print("=")
+            print((a + 1) * (b + 1))
+            print(" ")
+        end
+        println("")
+    end
+end

@@ -1,0 +1,12 @@
+fn bool_to_str(b: Bool) -> String
+    if b
+        "yes"
+    else
+        "no"
+    end
+end
+
+fn main() -> Unit
+    println(bool_to_str(True))
+    println(bool_to_str(False))
+end

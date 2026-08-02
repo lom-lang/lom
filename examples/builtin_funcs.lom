@@ -1,0 +1,46 @@
+# 内置函数 — int_to_string / string_to_int / len / print / println
+# Phase 2.1.5：int_to_string/string_to_int/len 需从 string 模块显式导入
+# println/print 在 prelude 中自动可用
+from string import { int_to_string, string_to_int, len }
+
+fn main() -> Unit
+    # int_to_string
+    let s1 = int_to_string(42)
+    println(s1)
+    println(int_to_string(-7))
+    println(int_to_string(0))
+
+    # string_to_int
+    let n1 = string_to_int("123")
+    println(n1)
+    println(string_to_int("0"))
+    println(string_to_int("-456"))
+
+    # len — 字符串长度
+    println(len("hello"))
+    println(len(""))
+    println(len("Hello World"))
+
+    # 组合使用：构建字符串
+    let build_msg = fn(name: String, count: Int) -> String
+        "User " + name + " has " + int_to_string(count) + " items"
+    end
+    println(build_msg("Alice", 5))
+    println(build_msg("Bob", 0))
+
+    # 用 print 输出不换行
+    print("[")
+    print(int_to_string(1))
+    print(", ")
+    print(int_to_string(2))
+    print(", ")
+    print(int_to_string(3))
+    println("]")
+
+    # 字符串长度 + 数字转换组合
+    let count_digits = fn(s: String) -> Int
+        len(s)
+    end
+    let num_str = int_to_string(12345)
+    println(count_digits(num_str))
+end

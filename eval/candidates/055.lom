@@ -1,0 +1,20 @@
+enum LogLevel = Debug | Info | Warn | Error
+
+fn log_prefix(level: LogLevel) -> String
+    match level
+        Debug => "[DBG]"
+        Info => "[INF]"
+        Warn => "[WRN]"
+        Error => "[ERR]"
+    end
+end
+
+fn log_message(level: LogLevel, msg: String) -> String
+    log_prefix(level) + " " + msg
+end
+
+fn main() -> Unit
+    println(log_message(Info, "started"))
+    println(log_message(Error, "crashed"))
+    println(log_message(Debug, "x=42"))
+end

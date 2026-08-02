@@ -1,0 +1,47 @@
+[
+  {
+    "id": "076",
+    "category": "effects",
+    "difficulty": "easy",
+    "prompt": "写函数 greet(name: String) -> Unit ! [IO] 用 println 打印 \"Hello, \" + name。main 调用 greet(\"Lom\")。注意：greet 需要声明 IO 效应因为调用了 println。",
+    "solution": "fn greet(name: String) -> Unit ! [IO]\n    println(\"Hello, \" + name)\nend\n\nfn main() -> Unit\n    greet(\"Lom\")\nend\n",
+    "expected": "Hello, Lom\n",
+    "notes": "基本效应注解 ! [IO] + println 调用。main 隐式拥有所有效应。"
+  },
+  {
+    "id": "077",
+    "category": "effects",
+    "difficulty": "easy",
+    "prompt": "写函数 pure_double(x: Int) -> Int 返回 x * 2（纯函数，无效应注解）。写函数 print_double(x: Int) -> Unit ! [IO] 调用 pure_double 然后 println 结果。main 调用 print_double(21)。",
+    "solution": "fn pure_double(x: Int) -> Int\n    x * 2\nend\n\nfn print_double(x: Int) -> Unit ! [IO]\n    println(pure_double(x))\nend\n\nfn main() -> Unit\n    print_double(21)\nend\n",
+    "expected": "42\n",
+    "notes": "纯函数 + 效应函数组合。纯函数可被效应函数调用，反之报 EFF001。"
+  },
+  {
+    "id": "078",
+    "category": "effects",
+    "difficulty": "medium",
+    "prompt": "写函数 get_timestamp() -> Int ! [Clock] 返回 1700000000（模拟时间戳）。写函数 log_msg(msg: String) -> Unit ! [IO, Clock] 先获取时间戳再 println。main 调用 log_msg(\"boot\")。",
+    "solution": "from string import { int_to_string }\n\nfn get_timestamp() -> Int ! [Clock]\n    1700000000\nend\n\nfn log_msg(msg: String) -> Unit ! [IO, Clock]\n    let t = get_timestamp()\n    println(int_to_string(t) + \" \" + msg)\nend\n\nfn main() -> Unit\n    log_msg(\"boot\")\nend\n",
+    "expected": "1700000000 boot\n",
+    "notes": "多效应 ! [IO, Clock] + 函数间调用。int_to_string 需从 string 模块显式导入（非 prelude），考察 LLM 是否记得 from string import。"
+  },
+  {
+    "id": "079",
+    "category": "effects",
+    "difficulty": "medium",
+    "prompt": "from string import { int_to_string }。写函数 format_line(label: String, value: Int) -> String 返回 label + \": \" + int_to_string(value)（纯函数，无效应）。写函数 print_line(label: String, value: Int) -> Unit ! [IO] 调用 format_line 然后 println。main 调用 print_line(\"count\", 42)。",
+    "solution": "from string import { int_to_string }\n\nfn format_line(label: String, value: Int) -> String\n    label + \": \" + int_to_string(value)\nend\n\nfn print_line(label: String, value: Int) -> Unit ! [IO]\n    println(format_line(label, value))\nend\n\nfn main() -> Unit\n    print_line(\"count\", 42)\nend\n",
+    "expected": "count: 42\n",
+    "notes": "纯函数返回 String + 效应函数调用纯函数 + println。"
+  },
+  {
+    "id": "080",
+    "category": "effects",
+    "difficulty": "hard",
+    "prompt": "写函数 double(x: Int) -> Int 返回 x*2（纯函数）。写函数 quadruple(x: Int) -> Int 返回 double(double(x))（纯函数调用纯函数）。写函数 print_result(x: Int) -> Unit ! [IO] 调用 println(quadruple(x))。main 调用 print_result(5)。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn quadruple(x: Int) -> Int\n    double(double(x))\nend\n\nfn print_result(x: Int) -> Unit ! [IO]\n    println(quadruple(x))\nend\n\nfn main() -> Unit\n    print_result(5)\nend\n",
+    "expected": "20\n",
+    "notes": "纯函数链式调用 + 效应函数仅在最外层。quadruple(5) = double(double(5)) = double(10) = 20。"
+  }
+]

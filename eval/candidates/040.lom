@@ -1,0 +1,16 @@
+fn pipeline3(f: Fn, g: Fn, h: Fn, x: Int) -> Int
+    h(g(f(x)))
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    let negate = fn(n: Int) -> Int
+        -n
+    end
+    println(pipeline3(inc, double, negate, 5))
+end

@@ -1,0 +1,110 @@
+=== 056.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = 5 |> double
+    println(result)
+end
+=== 057.lom ===
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = 5 |> inc |> double
+    println(result)
+end
+=== 058.lom ===
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn main() -> Unit
+    let result = 10 |> add(3)
+    println(result)
+end
+=== 059.lom ===
+fn main() -> Unit
+    42 |> println
+end
+=== 060.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn negate(x: Int) -> Int
+    -x
+end
+
+fn main() -> Unit
+    let result = 3 |> negate |> double |> inc
+    println(result)
+end
+=== 061.lom ===
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn main() -> Unit
+    let result = 1 |> add(2) |> add(3)
+    println(result)
+end
+=== 062.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = 1 + 2 |> double
+    println(result)
+end
+=== 063.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let result = 5 |> double == 10
+    println(result)
+end
+=== 064.lom ===
+from string import { int_to_string }
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn stringify(n: Int) -> String
+    int_to_string(n)
+end
+
+fn main() -> Unit
+    5 |> double |> stringify |> println
+end
+=== 065.lom ===
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn square(x: Int) -> Int
+    x * x
+end
+
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn main() -> Unit
+    let result = 2 |> add(3) |> square |> inc
+    println(result)
+end

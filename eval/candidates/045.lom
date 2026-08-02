@@ -1,0 +1,20 @@
+from string import { len }
+
+fn first_char(s: String) -> Option<String>
+    if len(s) == 0
+        None
+    else
+        Some(s)
+    end
+end
+
+fn main() -> Unit
+    match first_char("hello")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+    match first_char("")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+end

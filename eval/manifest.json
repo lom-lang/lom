@@ -1,0 +1,78 @@
+{
+  "schema": "lom-eval/v1",
+  "version": "0.1.0",
+  "phase": "2.8",
+  "total_tasks": 100,
+  "categories": [
+    {
+      "id": "01_arithmetic",
+      "name": "Arithmetic & Basic Functions",
+      "task_count": 10,
+      "description": "Basic math operators, let bindings, fn declarations, println. Probes the most common LLM output patterns.",
+      "file": "tasks/01_arithmetic.json"
+    },
+    {
+      "id": "02_control_flow",
+      "name": "Control Flow",
+      "task_count": 10,
+      "description": "if/elif/else, while, for, early return. Probes end-delimited blocks (LLM-coding-native critical feature).",
+      "file": "tasks/02_control_flow.json"
+    },
+    {
+      "id": "03_types",
+      "name": "Types & Inference",
+      "task_count": 10,
+      "description": "Int/Float/Bool/String/Unit literals, annotations, inference, Float promotion, String concat.",
+      "file": "tasks/03_types.json"
+    },
+    {
+      "id": "04_closures",
+      "name": "Closures & Higher-Order Functions",
+      "task_count": 10,
+      "description": "Closure literals, Fn parameter type, capture, apply_twice/compose/map patterns.",
+      "file": "tasks/04_closures.json"
+    },
+    {
+      "id": "05_match_enum",
+      "name": "Match & Enum & Result/Option",
+      "task_count": 15,
+      "description": "match expressions, user enums, Result/Option, exhaustiveness, Form A/B, pattern binding.",
+      "file": "tasks/05_match_enum.json"
+    },
+    {
+      "id": "06_pipeline",
+      "name": "Pipeline |>",
+      "task_count": 10,
+      "description": "Pipeline operator: x |> f, x |> f(y), chained pipelines, priority vs arithmetic/comparison.",
+      "file": "tasks/06_pipeline.json"
+    },
+    {
+      "id": "07_records_tuples",
+      "name": "Records & Tuples",
+      "task_count": 10,
+      "description": "Structural records {x: Int, y: Int}, tuples (Int, String), field access, structural equality.",
+      "file": "tasks/07_records_tuples.json"
+    },
+    {
+      "id": "08_effects",
+      "name": "Explicit Effect System",
+      "task_count": 5,
+      "description": "! [IO, Clock] annotations, pure vs effectful functions, EFF001 avoidance.",
+      "file": "tasks/08_effects.json"
+    },
+    {
+      "id": "09_modules",
+      "name": "Modules & Imports",
+      "task_count": 5,
+      "description": "from mod import {name as alias}, stdlib (io/string/math), no wildcard.",
+      "file": "tasks/09_modules.json"
+    },
+    {
+      "id": "10_error_repair",
+      "name": "Error Repair (lom fix flow)",
+      "task_count": 15,
+      "description": "Given broken .lom code + lom-diag/v1 JSON, produce fixed .lom code. Tests full LLM-coding-native loop.",
+      "file": "tasks/10_error_repair.json"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+fn string_eq(a: String, b: String) -> Bool
+    a == b
+end
+
+fn main() -> Unit
+    println(string_eq("abc", "abc"))
+    println(string_eq("abc", "abd"))
+    println(string_eq("", ""))
+end

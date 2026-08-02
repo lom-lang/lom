@@ -1,0 +1,9 @@
+fn compare(a: Int, b: Int) -> Bool
+    a < b
+end
+
+fn main() -> Unit
+    println(compare(3, 5))
+    println(compare(5, 3))
+    println(compare(5, 5))
+end

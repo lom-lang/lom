@@ -1,0 +1,128 @@
+=== 001.lom ===
+fn add(a: Int, b: Int) -> Int
+    a + b
+end
+
+fn main() -> Unit
+    println(add(3, 4))
+end
+=== 002.lom ===
+fn sub(a: Int, b: Int) -> Int
+    a - b
+end
+
+fn mul(a: Int, b: Int) -> Int
+    a * b
+end
+
+fn main() -> Unit
+    println(sub(10, 3))
+    println(mul(4, 5))
+end
+=== 003.lom ===
+fn div(a: Int, b: Int) -> Int
+    a / b
+end
+
+fn mod_(a: Int, b: Int) -> Int
+    a % b
+end
+
+fn main() -> Unit
+    println(div(20, 6))
+    println(mod_(20, 6))
+end
+=== 004.lom ===
+fn compute(x: Int) -> Int
+    ((x + 1) * 2) - 3
+end
+
+fn main() -> Unit
+    println(compute(5))
+    println(compute(10))
+end
+=== 005.lom ===
+fn avg(a: Int, b: Int, c: Int) -> Float
+    (a + b + c) / 3.0
+end
+
+fn main() -> Unit
+    println(avg(1, 2, 3))
+    println(avg(10, 20, 30))
+end
+=== 006.lom ===
+fn negate(x: Int) -> Int
+    -x
+end
+
+fn abs_val(x: Int) -> Int
+    if x < 0
+        -x
+    else
+        x
+    end
+end
+
+fn main() -> Unit
+    println(negate(5))
+    println(negate(-3))
+    println(abs_val(-7))
+    println(abs_val(4))
+end
+=== 007.lom ===
+fn square(x: Int) -> Int
+    x * x
+end
+
+fn cube(x: Int) -> Int
+    x * x * x
+end
+
+fn main() -> Unit
+    println(square(4))
+    println(cube(3))
+end
+=== 008.lom ===
+fn max3(a: Int, b: Int, c: Int) -> Int
+    if a > b
+        if a > c
+            a
+        else
+            c
+        end
+    else
+        if b > c
+            b
+        else
+            c
+        end
+    end
+end
+
+fn main() -> Unit
+    println(max3(3, 7, 5))
+    println(max3(10, 2, 8))
+    println(max3(1, 1, 1))
+end
+=== 009.lom ===
+fn celsius_to_fahrenheit(c: Float) -> Float
+    c * 9.0 / 5.0 + 32.0
+end
+
+fn main() -> Unit
+    println(celsius_to_fahrenheit(0.0))
+    println(celsius_to_fahrenheit(100.0))
+end
+=== 010.lom ===
+fn circle_area(r: Float) -> Float
+    3.14159 * r * r
+end
+
+fn circle_perimeter(r: Float) -> Float
+    2.0 * 3.14159 * r
+end
+
+fn main() -> Unit
+    println(circle_area(2.0))
+    println(circle_perimeter(2.0))
+end

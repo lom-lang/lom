@@ -1,0 +1,52 @@
+# 显式导入 — Phase 2.1.5
+# 演示 from mod import { ... } 语法、别名、多模块导入
+#
+# 设计哲学：显式导入防止 LLM 编造符号（LLM 编码错误第一大来源）
+# - prelude（println/print）自动可用，无需导入
+# - 非 prelude 函数必须显式导入：string/math 模块
+# - 每项可带别名：name as alias
+# - 通配符 import * 禁止
+
+# 从 string 模块导入多个函数
+from string import { len, upper, lower, trim, int_to_string }
+
+# 从 math 模块导入，其中 abs 使用别名 absolute
+from math import { sqrt, abs as absolute, min, max }
+
+# 从 io 模块导入 println 取别名 log（演示别名机制）
+# 注意：println 已在 prelude 中自动可用，这里仅演示显式导入+别名
+from io import { println as log }
+
+fn main() -> Unit
+    # 1. string 模块函数
+    log(len("hello"))                    # 5
+    log(upper("hi"))                     # HI
+    log(lower("BYE"))                    # bye
+    log(trim("  pad  "))                 # pad
+    log(int_to_string(42))               # 42
+
+    # 2. math 模块函数
+    log(sqrt(16.0))                      # 4
+    log(absolute(-7))                    # 7（用别名 absolute 调用 abs）
+    log(min(3, 8))                       # 3
+    log(max(3, 8))                       # 8
+
+    # 3. 组合使用：字符串处理 pipeline
+    let name = "  Alice  "
+    let cleaned = trim(name)             # "Alice"
+    let upper_name = upper(cleaned)      # "ALICE"
+    log(upper_name + " has " + int_to_string(len(cleaned)) + " letters")
+    # ALICE has 5 letters
+
+    # 4. 组合使用：数学计算
+    let nums_max = max(10, max(20, 30))  # 30
+    let nums_min = min(10, min(20, 30))  # 10
+    log(nums_max - nums_min)             # 20
+
+    # 5. sqrt 接受 Int 或 Float
+    log(sqrt(9))                         # 3
+    log(sqrt(2.0))                       # 1.414...
+
+    # 6. prelude 的 println 仍可直接用（无需导入）
+    println("prelude println still works")
+end

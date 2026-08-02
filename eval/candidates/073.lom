@@ -1,0 +1,9 @@
+fn distance_squared(p1: {x: Int, y: Int}, p2: {x: Int, y: Int}) -> Int
+    (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y)
+end
+
+fn main() -> Unit
+    let a = {x: 0, y: 0}
+    let b = {x: 3, y: 4}
+    println(distance_squared(a, b))
+end

@@ -1,0 +1,12 @@
+fn square(x: Int) -> Int
+    x * x
+end
+
+fn cube(x: Int) -> Int
+    x * x * x
+end
+
+fn main() -> Unit
+    println(square(4))
+    println(cube(3))
+end

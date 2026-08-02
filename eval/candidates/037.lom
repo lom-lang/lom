@@ -1,0 +1,10 @@
+fn counter(start: Int) -> Fn
+    fn() -> Int
+        start
+    end
+end
+
+fn main() -> Unit
+    let c = counter(10)
+    println(c())
+end

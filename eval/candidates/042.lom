@@ -1,0 +1,11 @@
+fn classify_num(n: Int) -> String
+    match n
+        0 => "zero"
+        _ => "nonzero"
+    end
+end
+
+fn main() -> Unit
+    println(classify_num(0))
+    println(classify_num(42))
+end

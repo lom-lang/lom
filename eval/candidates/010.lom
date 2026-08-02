@@ -1,0 +1,12 @@
+fn circle_area(r: Float) -> Float
+    3.14159 * r * r
+end
+
+fn circle_perimeter(r: Float) -> Float
+    2.0 * 3.14159 * r
+end
+
+fn main() -> Unit
+    println(circle_area(2.0))
+    println(circle_perimeter(2.0))
+end

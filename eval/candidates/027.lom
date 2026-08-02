@@ -1,0 +1,21 @@
+fn logical_and(a: Bool, b: Bool) -> Bool
+    a and b
+end
+
+fn logical_or(a: Bool, b: Bool) -> Bool
+    a or b
+end
+
+fn logical_not(a: Bool) -> Bool
+    if a
+        False
+    else
+        True
+    end
+end
+
+fn main() -> Unit
+    println(logical_and(True, False))
+    println(logical_or(True, False))
+    println(logical_not(False))
+end

@@ -1,0 +1,10 @@
+fn apply_twice(f: Fn, x: Int) -> Int
+    f(f(x))
+end
+
+fn main() -> Unit
+    let inc = fn(n: Int) -> Int
+        n + 1
+    end
+    println(apply_twice(inc, 5))
+end

@@ -1,0 +1,9 @@
+fn main() -> Unit
+    let mut total = 0
+    let mut i = 0
+    while i < 5
+        total = total + i * i
+        i = i + 1
+    end
+    println(total)
+end

@@ -46,17 +46,17 @@ pipe  (reserved for |>)
 
 | Level | Operators | Assoc | Notes |
 |---|---|---|---|
-| 1 | `\|>` | left | Pipeline |
-| 2 | `=` | none | Assignment (statement, not expression) |
-| 3 | `or` `and` | left | Short-circuit boolean |
-| 4 | `==` `!=` `<` `>` `<=` `>=` | none | Comparison |
-| 5 | `+` `-` | left | Additive |
-| 6 | `*` `/` `%` | left | Multiplicative |
-| 7 | `!` `-` (prefix) | right | Unary |
-| 8 | `?` (postfix) | left | Error propagation |
-| 9 | `(` `)` `[` `]` `.` `{` `}` | — | Call / index / field / struct |
+| 1 | `or` `and` | left | Short-circuit boolean |
+| 2 | `==` `!=` `<` `>` `<=` `>=` | none | Comparison |
+| 3 | `\|>` | left | Pipeline (left value → first arg of right function) |
+| 4 | `+` `-` | left | Additive |
+| 5 | `*` `/` `%` | left | Multiplicative |
+| 6 | `!` `-` (prefix) | right | Unary |
+| 7 | `?` (postfix) | left | Error propagation |
+| 8 | `(` `)` `[` `]` `.` `{` `}` | — | Call / index / field / struct |
 
-> `|>` is the lowest-precedence binary operator so `a |> f(b) |> g(c)` parses as `(a |> f(b)) |> g(c)` without extra parens.
+> `|>` sits between comparison and arithmetic: `1 + 2 |> f == 3` parses as `((1 + 2) |> f) == 3`.
+> `=` is a statement form (not an expression operator); assignment does not produce a value.
 
 ### 2.4 Comments
 
@@ -153,11 +153,11 @@ for_stmt      = "for" identifier "in" expr block "end" ;
 return_stmt   = "return" [ expr ] ;
 expr_stmt     = expr ;
 
-expr          = pipe_expr ;
-pipe_expr     = or_expr { "|>" or_expr } ;
+expr          = or_expr ;
 or_expr       = and_expr { "or" and_expr } ;
 and_expr      = cmp_expr { "and" cmp_expr } ;
-cmp_expr      = add_expr { ("==" | "!=" | "<" | ">" | "<=" | ">=") add_expr } ;
+cmp_expr      = pipe_expr { ("==" | "!=" | "<" | ">" | "<=" | ">=") pipe_expr } ;
+pipe_expr     = add_expr { "|>" add_expr } ;
 add_expr      = mul_expr { ("+" | "-") mul_expr } ;
 mul_expr      = unary_expr { ("*" | "/" | "%") unary_expr } ;
 unary_expr    = ("!" | "-") unary_expr | postfix_expr ;
@@ -245,6 +245,57 @@ Structural types are chosen for LLM-coding-native reasons:
 - LLM doesn't need to remember "is this `Point` or `Vec2`?" — just the shape `{x: Float, y: Float}`.
 - Records with the same shape are interchangeable. Reduces import-tracking burden.
 - Trade-off: no dispatch-on-name, no nominal identity. Acceptable for Phase 0-3 scope.
+
+### 4.5 Gradual Type Checker (Phase 2.4 — implemented)
+
+Phase 2.4 adds a **gradual** type checker (`src/typechecker.rs`). "Gradual" means: type annotations are optional and type errors are **non-fatal warnings** — the program still runs dynamically. This follows the LLM-coding-native principle *Tolerance > Strictness*.
+
+#### 4.5.1 When type checking runs
+
+| Mode | Type check? | Behavior |
+|---|---|---|
+| `lom <file>` (default run) | No | Dynamic execution; type errors ignored |
+| `lom <file> --check` | Yes | Reports type diagnostics (human-readable); exit 1 only on Error-level, exit 0 on warnings |
+| `lom <file> --json` | Yes | Emits `lom-diag/v1` JSON including `stage: "type"` diagnostics |
+
+#### 4.5.2 Two-pass analysis
+
+1. **Signature collection** — registers all `fn` signatures, `enum` definitions, and `import` aliases (alias inherits the real function's signature).
+2. **Body check** — for each function body, walks statements/expressions, infers types, and reports mismatches.
+
+#### 4.5.3 Error codes
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `NAM002` | Error | Duplicate function/enum definition |
+| `NAM003` | Error | Undefined variable / undefined function call |
+| `NAM004` | Error | Record has no such field / enum has no such variant |
+| `TYPE001` | Warning | Type mismatch (binary op, let annotation, assignment) |
+| `TYPE002` | Warning | `if`/`while` condition is not `Bool` |
+| `TYPE003` | Warning | Function/variant argument count or type mismatch |
+| `TYPE010` | Warning | Function/closure return type mismatch |
+| `TYPE020` | Warning | `?` operator misused (operand not Result/Option, or enclosing function returns incompatible type) |
+| `MAT001` | Warning | `match` non-exhaustive (user enum / Result / Option missing a variant; `_` wildcard makes it exhaustive) |
+
+#### 4.5.4 Type compatibility rules
+
+- **Structural equivalence**: records match by field name+type regardless of field order.
+- **`_Any`** (internal wildcard type): prelude/stdlib function signatures use `Named("_Any")` to accept any type; it is compatible with everything and silences `TYPE001` in arithmetic.
+- **Generic placeholders `T`/`E`**: internal `Result`/`Option` variant fields use `Generic("T"/"E")`; treated as `Unknown` in inference to avoid false positives.
+- **Closures**: closure bodies inherit the enclosing environment (capture outer variables).
+- **match arms**: pattern binders are injected into the arm environment; nullary variants (e.g. `None`, `Red`) parsed as `Binder` are recognized as variant constructors for exhaustiveness.
+
+#### 4.5.5 What Phase 2.4 does NOT check
+
+- Trait resolution (Phase 2.6)
+- ~~Effect system (Phase 2.5)~~ — implemented in Phase 2.5 (see §6.7)
+- Generic instantiation (only placeholder compatibility)
+- Precise tuple index inference (`.0`/`.1`)
+- Cross-function closure call-site type checking (closures as values return `Unknown`)
+
+#### 4.5.6 Registered builtins
+
+Prelude (`println`, `print`) and stdlib modules (`io`, `string`, `math`) function signatures are registered at startup so that calls to them are not flagged `NAM003`.
 
 ---
 
@@ -428,7 +479,7 @@ Traits are **structural** in Phase 2 (duck-typed): if a type has all methods of 
 
 > Rationale: structural traits mean LLMs don't need to track impl blocks to know if a method is available. The shape is enough.
 
-### 6.7 Effect system (drafted, Phase 2)
+### 6.7 Effect system (Phase 2.5 — implemented)
 
 Effects declare side effects in the function signature:
 
@@ -439,85 +490,426 @@ fn now() -> Int ! [Clock]
 ```
 
 - `! [Effect1, Effect2]` after return type declares effects.
-- Pure functions (no `!`) cannot call effectful functions.
-- In Phase 2, effects are a **compile-time annotation only** (no runtime effect tracking). They help LLMs (and humans) see at a glance which functions have side effects.
+- Pure functions (no `!`) cannot call effectful functions — `EFF001` warning.
+- In Phase 2.5, effects are a **compile-time annotation only** (no runtime effect tracking). They help LLMs (and humans) see at a glance which functions have side effects.
 - Phase 5+ may introduce effect handlers (deferred).
+
+#### 6.7.1 Effect checking rules
+
+| Caller declares | Callee declares | Result |
+|---|---|---|
+| (nothing, pure) | (nothing, pure) | OK |
+| (nothing, pure) | `! [IO]` | `EFF001` warning |
+| `! [IO]` | `! [IO]` | OK |
+| `! [IO]` | `! [Clock]` | `EFF001` warning (Clock not declared) |
+| `! [IO, Clock]` | `! [IO]` / `! [Clock]` | OK |
+| `! []` (explicit empty) | `! [IO]` | `EFF001` warning (equivalent to pure) |
+
+#### 6.7.2 `main` is special
+
+The `main` function **implicitly has all effects** — `EFF001` is never reported inside `main`. Rationale: `main` is the entry point; calling `println` and other side-effectful functions is the norm. Forcing `main` to declare `! [IO]` would add LLM burden without value (LLM-coding-native principle: *Tolerance > Strictness*).
+
+#### 6.7.3 Closures
+
+Closures do **not** carry their own effect annotations. Effect checking inside a closure body uses the enclosing function's effect set (i.e. closures inherit the outer function's effects). This avoids forcing LLMs to annotate closure literals.
+
+#### 6.7.4 Standard library effect signatures
+
+| Function | Effects |
+|---|---|
+| `println`, `print` | `[IO]` |
+| `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` | (pure) |
+| `sqrt`, `abs`, `min`, `max` | (pure) |
+
+#### 6.7.5 What Phase 2.5 does NOT do
+
+- **No runtime effect tracking** — effects are compile-time annotations only.
+- **No effect polymorphism** — a function either has a fixed effect set or is pure.
+- **No effect handlers** — deferred to Phase 5+.
+- **No effect inference** — effects must be explicitly declared (except `main`).
+- **Cross-function effect propagation is not transitive** — calling a pure function `b` that internally calls an effectful `c` does not flag `b`'s caller (only `b` itself is flagged at its `c` call site).
+
+### 6.8 Type info export (Phase 2.6 — implemented)
+
+`lom info <file> [--json]` exports **declarations** (not type-check results) so an LLM can quickly learn "what does this file define?" before writing code that calls into it.
+
+- **No type checking is performed.** `info` describes *what was declared*, not *what is wrong*. Type errors are reported by `--check` / `--json` (Phase 2.4).
+- **Parse failures are still diagnostics.** If the source does not parse, `lom info` emits the standard `lom-diag/v1` schema (Phase 2.3) with parse errors and exits with code 1.
+- **Schema: `lom-info/v1`** — a separate schema from `lom-diag/v1`, so LLMs can distinguish "context query" from "error report".
+
+#### 6.8.1 lom-info/v1 schema
+
+```json
+{
+  "schema": "lom-info/v1",
+  "file": "main.lom",
+  "ok": true,
+  "functions": [
+    {
+      "name": "double",
+      "params": [ { "name": "x", "type": "Int" } ],
+      "ret_type": "Int",
+      "effects": [],
+      "is_main": false
+    },
+    {
+      "name": "print_double",
+      "params": [ { "name": "x", "type": "Int" } ],
+      "ret_type": "Unit",
+      "effects": ["IO"],
+      "is_main": false
+    }
+  ],
+  "enums": [
+    {
+      "name": "Result",
+      "type_params": ["T", "E"],
+      "variants": [
+        { "name": "Ok",    "fields": ["T"] },
+        { "name": "Err",   "fields": ["E"] }
+      ]
+    }
+  ],
+  "imports": [
+    {
+      "module": "string",
+      "items": [
+        { "name": "len",           "alias": "len" },
+        { "name": "int_to_string", "alias": "int_to_string" }
+      ]
+    }
+  ]
+}
+```
+
+Top-level fields:
+- `schema`: always `"lom-info/v1"` (stability contract for LLM consumers)
+- `file`: source file path
+- `ok`: `true` iff the file parsed successfully (declarations were collected)
+- `functions[]`: every `fn` declaration in source order
+- `enums[]`: every user `enum` declaration (built-in `Result`/`Option` are not repeated here)
+- `imports[]`: every `from <module> import {...}` declaration
+
+Per-function fields:
+- `name`: function name
+- `params[]`: `{ name, type }` — types are stringified (e.g. `"Int"`, `"Result<Int, String>"`, `"{ x: Int, y: Int }"`, `"(Int, String)"`)
+- `ret_type`: declared return type as a string, or `null` if the function omits the return annotation
+- `effects[]`: declared effect names (empty array = pure / no `! [...]` annotation)
+- `is_main`: `true` for the `main` function (convenience flag; LLMs can locate the entry point without scanning names)
+
+Per-enum fields:
+- `name`: enum name
+- `type_params[]`: type parameter names (e.g. `["T", "E"]` for `Result<T, E>`)
+- `variants[]`: `{ name, fields[] }` — `fields` is a list of stringified types (empty list = nullary variant like `None`)
+
+Per-import fields:
+- `module`: module path (e.g. `"string"`, `"io"`, `"math"`)
+- `items[]`: `{ name, alias }` — `alias` equals `name` when no `as` clause is used
+
+#### 6.8.2 Type stringification rules
+
+The `type` strings in `lom-info/v1` are produced by these rules (mirrors the `Type::to_string` representation):
+
+| Type form | String |
+|---|---|
+| `Int` / `Float` / `Bool` / `String` / `Unit` | `Int` / `Float` / ... |
+| Named (e.g. `MyType`) | `MyType` |
+| `Option<T>` | `Option<T>` |
+| `Result<T, E>` | `Result<T, E>` |
+| Generic app `Name<A, B>` | `Name<A, B>` |
+| Record `{ x: Int, y: Int }` | `{ x: Int, y: Int }` (with a single space after `{` and before `}`) |
+| Tuple `(Int, String)` | `(Int, String)` |
+
+#### 6.8.3 Human-readable format
+
+Without `--json`, `lom info <file>` prints a terminal-friendly summary:
+
+```
+=== examples/effects.lom ===
+
+[functions] (5):
+  fn double(x: Int) -> Int
+  fn print_double(x: Int) -> Unit ! [IO]
+  fn now() -> Int ! [Clock]
+  fn log_with_timestamp(msg: String) -> Unit ! [IO, Clock]
+  fn main() -> Unit (main)
+
+[imports] (1):
+  from string import {len, int_to_string}
+```
+
+The `[enums]` section is omitted when the file declares no enums; same for `[imports]`.
+
+#### 6.8.4 What Phase 2.6 does NOT do
+
+- **No type-check results.** Use `lom --check` or `lom --json` for diagnostics.
+- **No cross-file info.** `info` reads a single file; transitive imports are not expanded (Phase 3 module system).
+- **No expression-level types.** Only top-level declarations are exported; local `let` bindings and inferred expression types are not reported.
+- **No positions.** Declaration line/col is not yet reported (Phase 3 AST positions).
+
+### 6.9 AI repair plan (Phase 2.7 — implemented)
+
+`lom fix <file> [--plan] [--json]` generates a **repair plan** for every diagnostic in the file. Each plan contains one or more `fixes` — machine-readable actions an LLM can apply (or use as guidance) to repair the code.
+
+- **`--plan` is the default and only mode in Phase 2.7.** The `--apply` flag (auto-apply fixes to source) is deferred to Phase 3, when AST nodes carry span information enabling safe in-place edits.
+- **Fixes are generated for all diagnostic codes**: lex, parse, type, name, match, effect, runtime. Even when a precise edit can't be produced, a `hint` action with guidance text is emitted.
+- **Schema: `lom-fix/v1`** — separate from `lom-diag/v1` (errors) and `lom-info/v1` (context), so an LLM can distinguish "repair plan" from "error report" and "context query".
+
+#### 6.9.1 lom-fix/v1 schema
+
+```json
+{
+  "schema": "lom-fix/v1",
+  "file": "main.lom",
+  "ok": false,
+  "summary": {
+    "total": 2,
+    "applicable": 2,
+    "skipped": 0
+  },
+  "plans": [
+    {
+      "diagnostic": {
+        "code": "LEX001",
+        "severity": "error",
+        "stage": "lex",
+        "line": 2,
+        "col": 13,
+        "message": "未闭合的字符串"
+      },
+      "fixes": [
+        {
+          "description": "在字符串末尾添加 \" 闭合",
+          "action": "insert",
+          "line": 2,
+          "col": 19,
+          "end_line": null,
+          "end_col": null,
+          "text": "\"",
+          "confidence": "high"
+        }
+      ],
+      "retry": true
+    }
+  ]
+}
+```
+
+Top-level fields:
+- `schema`: always `"lom-fix/v1"`
+- `file`: source file path
+- `ok`: `true` iff no diagnostics were found (plans is empty)
+- `summary`: `{ total, applicable, skipped }` — `applicable` counts plans with at least one non-hint fix or hint-with-text; `skipped` = `total - applicable`
+- `plans[]`: one plan per diagnostic
+
+Per-plan fields:
+- `diagnostic`: embedded diagnostic reference (`code`, `severity`, `stage`, `line`, `col`, `message`) — redundant with `lom-diag/v1` but self-contained so the LLM doesn't need to cross-reference
+- `fixes[]`: 0..N fix actions (currently always ≥1; every code has at least a hint)
+- `retry`: `true` if at least one fix provides an applicable repair (non-hint action, or hint with concrete `text`); `false` if only pure-text hints
+
+Per-fix fields:
+- `description`: human-readable explanation of the fix
+- `action`: `insert` / `replace` / `delete` / `hint`
+- `line`, `col`: start position (1-based; `0` means "no specific location" — used by `hint`)
+- `end_line`, `end_col`: end position (only `replace`/`delete`; `null` for `insert`/`hint`)
+- `text`: text to insert/replace with (string for `insert`/`replace`; `null` for `delete`; string or `null` for `hint` — when present, it's a suggested snippet the LLM can use directly)
+- `confidence`: `high` / `medium` / `low` — how certain the fix generator is
+
+#### 6.9.2 Action types
+
+| Action | Semantics | When used |
+|---|---|---|
+| `insert` | Insert `text` at `(line, col)` | LEX001/LEX002 (insert `"` at line end) |
+| `replace` | Replace `(line,col)..(end_line,end_col)` with `text` | Reserved for Phase 3 (needs span) |
+| `delete` | Delete `(line,col)..(end_line,end_col)` | LEX005 (delete unexpected char) |
+| `hint` | Text guidance only; `line`/`col` may be `0` | Most type/name/runtime errors; EFF001/MAT001 provide `text` snippet |
+
+#### 6.9.3 Fix strategies by error code
+
+| Code | Strategy | Confidence | Action |
+|---|---|---|---|
+| `LEX001`/`LEX002` | Insert `"` at end of error line | high | insert |
+| `LEX003`/`LEX004` | Hint: check number format | low | hint |
+| `LEX005` | Delete the unexpected char | high | delete |
+| `PARSE001` | Hint: check syntax structure | low | hint |
+| `PARSE002` | Hint: `Result<T, E>` needs 2 type params | medium | hint |
+| `PARSE003` | Hint: `Option<T>` needs 1 type param | medium | hint |
+| `PARSE099` | Hint: hole, complete syntax | low | hint |
+| `TYPE001` | Hint: type mismatch | low | hint |
+| `TYPE002` | Hint: condition must be Bool | medium | hint |
+| `TYPE003` | Hint: arg count mismatch | low | hint |
+| `TYPE010` | Hint: return type mismatch | low | hint |
+| `TYPE020` | Hint: `?` misuse | medium | hint |
+| `MAT001` | Provide missing branch text (e.g. `Green => ()`) | medium | hint (with text) |
+| `NAM002` | Hint: duplicate definition | low | hint |
+| `NAM003` | Hint: undefined variable | low | hint |
+| `NAM004` | Hint: no such field/variant | low | hint |
+| `EFF001` | Provide effect annotation text (e.g. `! [IO]`) | high | hint (with text) |
+| `RUNTIME001` | Hint: runtime type mismatch | low | hint |
+| `RUNTIME002` | Hint: undefined at runtime | low | hint |
+| `RUNTIME003` | Hint: hole execution | low | hint |
+| `RUNTIME005` | Hint: module/symbol not found | medium | hint |
+
+#### 6.9.4 What Phase 2.7 does NOT do
+
+- **No `--apply`.** Fixes are generated as a plan only; auto-applying edits to source files requires AST span info (Phase 3). The LLM is expected to read the plan and apply fixes itself (LLM-coding-native principle).
+- **No span-based `replace`.** All position-bearing fixes use line/col without end positions (except `delete` which has a 1-char range for LEX005). Precise `replace` arrives with Phase 3 AST positions.
+- **No fix prioritization.** When multiple fixes exist for one diagnostic, they are listed in order but not ranked; the LLM chooses.
+- **No cross-file fixes.** A fix in file A referencing a missing import in file B is out of scope (Phase 3 module system).
 
 ---
 
-## 7. Error Model (Phase 2: structured JSON diagnostics)
+## 7. Error Model (Phase 2.3: structured JSON diagnostics — implemented)
 
 ### 7.1 Design goal
 
 Errors are **machine-readable first, human-readable second**. Every diagnostic is emit-able as JSON for LLM consumption.
 
-### 7.2 JSON diagnostic format
+> **Phase 2.3 status**: implemented in `src/diagnostics.rs`. CLI flags `--json` / `--check` control output format.
+> Future fields (`fix`, `retry`) and finer-grained code namespaces (NAM/TYP/EFF/MAT) are reserved for Phase 2.4-2.7.
+
+### 7.2 JSON diagnostic format (lom-diag/v1, implemented)
 
 ```json
 {
-  "error_code": "NAM003",
-  "severity": "error",
-  "message": "Undefined variable: 'fooo'",
+  "schema": "lom-diag/v1",
   "file": "main.lom",
-  "span": { "start": [12, 4], "end": [12, 8] },
-  "fix": {
-    "description": "Did you mean 'foo'?",
-    "suggestion": "foo",
-    "start": [12, 4],
-    "end": [12, 8]
-  },
-  "retry": true,
-  "hint": "Check the spelling. The nearest defined variable is 'foo' at line 10."
+  "ok": false,
+  "summary": { "total": 1, "errors": 1, "warnings": 0, "holes": 0 },
+  "diagnostics": [
+    {
+      "severity": "error",
+      "stage": "runtime",
+      "code": "RUNTIME002",
+      "message": "未定义变量: 'fooo'",
+      "file": "main.lom",
+      "line": 12,
+      "col": 4,
+      "source_line": "    println(fooo)",
+      "is_hole": false,
+      "hint": "确认变量已声明/导入，拼写无误"
+    }
+  ]
 }
 ```
 
-Fields:
-- `error_code`: stable string code (NAM= naming, TYP= type, SYN= syntax, etc.). LLMs can learn these.
-- `severity`: `error` / `warning` / `info`
+Top-level fields:
+- `schema`: always `"lom-diag/v1"` (stability contract for LLM consumers)
+- `file`: source file path
+- `ok`: `true` iff `diagnostics` is empty
+- `summary`: counts (total/errors/warnings/holes)
+- `diagnostics[]`: array of single diagnostics
+
+Per-diagnostic fields (Phase 2.3):
+- `severity`: `error` / `warning` / `info` (warning/info reserved for Phase 2.4 type checker)
+- `stage`: `lex` / `parse` / `type` (Phase 2.4) / `runtime`
+- `code`: stable string code (see §7.3); LLMs can learn these
 - `message`: human-readable
-- `file`, `span`: location
-- `fix`: optional, machine-actionable repair suggestion
-- `retry`: whether LLM should retry generation after applying `fix`
-- `hint`: optional extra context for the LLM
+- `file`, `line`, `col`: location
+- `source_line`: the source line containing the error (or `null` if unavailable)
+- `is_hole`: `true` if this diagnostic corresponds to a `Stmt::Hole` inserted by the tolerant parser
+- `hint`: optional fix suggestion
 
-### 7.3 Error code namespaces (Phase 2 draft)
+Reserved for future phases (not in v1):
+- `span`: `{ "start": [line, col], "end": [line, col] }` — requires AST node positions (Phase 3)
+- ~~`fix`: `{ "description", "suggestion", "start", "end" }` — machine-actionable repair (Phase 2.7)~~ Moved to `lom-fix/v1` (Phase 2.7 implemented; see §6.9). Kept out of `lom-diag/v1` so the diagnostic schema stays a pure error report.
+- ~~`retry`: whether LLM should retry generation after applying `fix` (Phase 2.7)~~ Likewise in `lom-fix/v1` per-plan field (Phase 2.7 implemented; see §6.9).
 
-| Prefix | Category | Example |
-|---|---|---|
-| `SYN` | Syntax | `SYN001` unexpected token |
-| `NAM` | Name resolution | `NAM003` undefined variable |
-| `TYP` | Type mismatch | `TYP002` expected Int, got Float |
-| `EFF` | Effect violation | `EFF001` pure function calls effectful |
-| `MAT` | Match exhaustiveness | `MAT001` non-exhaustive match |
+### 7.3 Error code namespaces
 
-### 7.4 Tolerant parsing (Phase 2 core)
+**Phase 2.3 implemented namespaces**:
+
+| Prefix | Stage | Range | Examples |
+|---|---|---|---|
+| `LEX` | lex | LEX001-099 | `LEX001` unclosed string, `LEX005` unexpected char |
+| `PARSE` | parse | PARSE001-099 | `PARSE001` expected token, `PARSE099` hole (tolerant parser) |
+| `RUNTIME` | runtime | RUNTIME001-099 | `RUNTIME001` type mismatch, `RUNTIME002` undefined, `RUNTIME003` hole execution |
+
+**Reserved for future phases**:
+
+| Prefix | Stage | Phase | Example |
+|---|---|---|---|
+| `TYPE` | type | 2.4 | `TYPE002` expected Int, got Float |
+| `EFF` | type | 2.5 | `EFF001` pure function calls effectful |
+| `MAT` | type | 2.4 | `MAT001` non-exhaustive match |
+| `NAM` | type | 2.4 | `NAM003` undefined variable (compile-time) |
+
+Note: in Phase 2.3 (no static type checker), name resolution errors were caught at runtime and classified as `RUNTIME002`. Phase 2.4 introduces `NAM` codes at compile time (via the gradual type checker); runtime `RUNTIME002` is still emitted when a dynamically-run program hits an undefined name that the type checker flagged as `NAM003`.
+
+### 7.4 Tolerant parsing (Phase 2.2 — implemented)
 
 The parser produces a **"holey AST"** on error:
-- Unparseable regions become `ErrorNode` placeholders, not parse failures.
-- Type checking proceeds on the valid portions of the AST.
-- Diagnostics are collected, not thrown.
+- Unparseable statements become `Stmt::Hole { line, col }` placeholders, not parse failures.
+- All errors are collected (not thrown) into `ParseResult { program, errors }`.
+- Synchronization-point recovery: item-level (`fn`/`enum`/`from`/EOF), statement-level (newline + statement-start keyword), match-arm-level (discard bad arm, continue).
+- The holey AST is **not directly executable** — the interpreter raises `RUNTIME003` on `Hole` — but it can be consumed by `lom --json` / `lom info` (Phase 2.6, implemented) / `lom fix` (Phase 2.7, implemented) to give LLMs full-context feedback.
 
 This lets LLMs get partial feedback on partially-correct code, enabling iterative repair.
 
+### 7.5 CLI (Phase 2.3 — implemented; Phase 2.6 adds `info`; Phase 2.7 adds `fix`)
+
+```
+lom <file.lom>                Run the program (default)
+lom <file.lom> --json         Diagnose only, output JSON (lom-diag/v1), do not run
+lom <file.lom> --check        Diagnose only, output human-readable with source pointer
+lom info <file.lom>           Export type info (human-readable) — Phase 2.6
+lom info <file.lom> --json    Export type info (lom-info/v1) — Phase 2.6
+lom fix <file.lom>            Generate repair plan (human-readable) — Phase 2.7
+lom fix <file.lom> --json     Generate repair plan (lom-fix/v1) — Phase 2.7
+lom fix <file.lom> --plan     Explicit --plan flag (default in Phase 2.7; --apply deferred to Phase 3)
+lom --help | -h               Show help
+```
+
+Exit codes: `0` = success / no diagnostics / info export OK / fix plan generation OK; `1` = read/lex/parse/runtime error (note: `lom fix` exits `0` as long as the plan was generated, even if diagnostics exist — the plan is the product).
+
+Output streams:
+- `--json` / `--check`: diagnostics to **stdout** (the diagnostic report is the program's product).
+- `lom info` (with or without `--json`): type info to **stdout** (the info report is the product).
+- `lom fix` (with or without `--json`): repair plan to **stdout** (the plan is the product).
+- Default run mode runtime errors: diagnostics to **stderr** (program failure).
+
+### 7.6 Limitations in Phase 2.3
+
+- **Runtime error positions**: AST nodes do not yet carry source positions (planned for Phase 3 LSP work). Runtime diagnostics report `line=0, col=0`; the message itself carries enough context to identify the failure. Lex/parse diagnostics are fully positioned.
+- ~~**No `fix` / `retry` fields**: reserved for Phase 2.7 `lom fix --plan --json`.~~ **Implemented in Phase 2.7** — see §6.9. `fix` / `retry` live in the `lom-fix/v1` schema (separate from `lom-diag/v1`), not as fields of individual diagnostics.
+- **Single-file only**: cross-file diagnostics arrive with the module system (Phase 3).
+
 ---
 
-## 8. Module System (Phase 3 draft)
+## 8. Module System
 
-> Phase 1 and 2 are single-file. Modules arrive in Phase 3. Drafted here for forward-compatibility.
+> **Phase 2.1.5 implements explicit imports for standard library modules** (io/string/math).
+> User multi-file modules (`from utils.helpers import {...}`) arrive in Phase 3.
 
 ### 8.1 Syntax
 
 ```
-from math import { sin, cos, PI }
-from io import { println } as log
-from utils.helpers import { format_date }
+from math import { sqrt, abs, min, max }
+from string import { len, upper, lower, trim, int_to_string }
+from io import { println as log }            # per-item alias
 ```
 
 - **Explicit imports only**. Wildcard `import *` is forbidden.
-- **No re-export**. Re-export via explicit `pub` items.
-- Each `.lom` file is a module. The module name is the file path relative to the project root.
+- **Per-item alias**: `name as alias` (Python/Rust-style). The alias becomes the local name.
+- **No re-export**. Re-export via explicit `pub` items (Phase 3).
+- **Dotted module path**: `from utils.helpers import { format_date }` parses, but user modules are Phase 3; Phase 2.1.5 only resolves standard library module names (io/string/math).
 
-### 8.2 Public/private
+### 8.2 Standard library modules (Phase 2.1.5)
+
+| Module | Exports | Notes |
+|---|---|---|
+| `io` | `println`, `print` | Also in prelude (auto-available); explicit import only needed for aliasing |
+| `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` | Must be imported to use |
+| `math` | `sqrt`, `abs`, `min`, `max` | Must be imported to use |
+
+**Prelude** (auto-imported, no `from` needed): `println`, `print`.
+
+Calling an unimported non-prelude builtin produces a structured error:
+```
+符号 'len' 未导入。需在文件顶部声明：from string import {len}
+```
+
+### 8.3 Public/private (Phase 3 draft)
 
 ```
 pub fn greet(name: String) -> String
@@ -529,27 +921,45 @@ fn helper() -> Unit       # private, not importable
 end
 ```
 
-### 8.3 Rationale (LLM-coding-native)
+### 8.4 Rationale (LLM-coding-native)
 
 - Explicit imports prevent LLMs from fabricating symbols (the #1 source of LLM code errors in docs File 1's analysis).
 - No wildcard means the LLM must know exactly what it's importing — it can't rely on "maybe this exists in the namespace".
+- Per-item alias (not whole-import alias) matches Python/Rust convention, reducing LLM confusion.
+- Prelude keeps the common case (`println`) zero-ceremony for examples and tests.
 
 ---
 
-## 9. Standard Library (Phase 1 minimal)
+## 9. Standard Library
 
-Phase 1 ships a minimal prelude (auto-imported):
+### 9.1 Prelude (auto-imported, Phase 1)
+
+Available without `from` declaration:
 
 | Function | Type | Notes |
 |---|---|---|
 | `println(x)` | `Any -> Unit ! [IO]` | Print with newline |
 | `print(x)` | `Any -> Unit ! [IO]` | Print without newline |
-| `int_to_string(n)` | `Int -> String` | |
-| `string_to_int(s)` | `String -> Result<Int, String>` | |
-| `len(s)` | `String -> Int` | String length |
-| `push(s, c)` | `String, Char -> String` | (Phase 1: Char is a single-char String) |
 
-> Phase 2+ adds `Result`, `Option`, `match` to the prelude. Phase 3 adds collections, IO, HTTP.
+### 9.2 Standard library modules (Phase 2.1.5)
+
+Require explicit `from <module> import { ... }`:
+
+| Module | Function | Type | Notes |
+|---|---|---|---|
+| `string` | `len(s)` | `String -> Int` | String length (UTF-8 char count) |
+| `string` | `int_to_string(n)` | `Int -> String` | |
+| `string` | `string_to_int(s)` | `String -> Int \| Unit` | Phase 1 simplification: returns Unit on parse failure; the Phase 2.4 type checker does not enforce Result here (gradual typing — this signature is accepted as-is) |
+| `string` | `trim(s)` | `String -> String` | Strip leading/trailing whitespace |
+| `string` | `upper(s)` | `String -> String` | Uppercase |
+| `string` | `lower(s)` | `String -> String` | Lowercase |
+| `math` | `sqrt(x)` | `Float -> Float` (also accepts `Int`) | Square root |
+| `math` | `abs(x)` | `Int -> Int \| Float -> Float` | Absolute value |
+| `math` | `min(a, b)` | `(Int, Int) -> Int \| (Float, Float) -> Float` | Minimum |
+| `math` | `max(a, b)` | `(Int, Int) -> Int \| (Float, Float) -> Float` | Maximum |
+| `io` | `println`, `print` | same as prelude | Explicit import only needed for aliasing |
+
+> Phase 3 adds collections, IO, HTTP modules. Phase 4 adds tensor/math extensions.
 
 ---
 
@@ -604,15 +1014,23 @@ end
 
 ### 10.3 Pipeline (Phase 2)
 
+`|>` passes the left value as the **first argument** of the right function.
+Left-associative; precedence is higher than comparison, lower than arithmetic.
+
 ```
-from io import { println }
-from string import { trim, split }
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
 
 fn main() -> Unit
-    "  hello,world  "
-        |> trim
-        |> split(",")
-        |> println
+    5 |> double |> println        # 10  (= double(5))
+    10 |> add(3) |> println       # 13  (= add(10, 3))
+    1 + 2 |> double               # 6   (= double(1+2), `+` binds tighter)
+    5 |> double == 10             # True (`|>` binds tighter than `==`)
 end
 ```
 
@@ -629,6 +1047,20 @@ fn main() -> Unit
     let a = {x: 0.0, y: 0.0}
     let b = {x: 3.0, y: 4.0}
     println(distance(a, b))
+end
+```
+
+### 10.5 Explicit imports (Phase 2.1.5)
+
+```
+from string import { len, upper, trim }
+from math import { sqrt, abs as absolute }
+
+fn main() -> Unit
+    println(len("hello"))              # 5
+    println(upper(trim("  hi  ")))     # HI
+    println(sqrt(16.0))                # 4
+    println(absolute(-7))              # 7 (called via alias)
 end
 ```
 
@@ -651,7 +1083,67 @@ These are tracked and will be resolved in Phase 0 spec iterations based on DeepS
 
 ---
 
-## 12. Changelog
+## 12. Evaluation Suite (Phase 2.8 — implemented)
+
+Lom ships a 100-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+
+### 12.1 Layout
+
+```
+eval/
+  README.md              # design goals, format, runner usage
+  manifest.json          # lom-eval/v1: 10 categories × task counts
+  tasks/
+    01_arithmetic.json        # 10 — §3 grammar, §4 types, §5 semantics
+    02_control_flow.json      # 10 — §5 if/while/for/return, short-circuit
+    03_types.json             # 10 — §4 Int/Float/Bool/String/Unit
+    04_closures.json          # 10 — §6.3 first-class closures
+    05_match_enum.json        # 15 — §6.4 match/enum, §6.5 Result/Option
+    06_pipeline.json          # 10 — §6.6 `|>` linear pipeline
+    07_records_tuples.json    # 10 — §6.7 structural records/tuples
+    08_effects.json           #  5 — §6.8 explicit effects `! [IO, Clock]`
+    09_modules.json           #  5 — §8 module system, §9 stdlib
+    10_error_repair.json      # 15 — §7 diagnostics + §6.9 fix plan (AI-native core)
+  runner/
+    run.ps1                   # PowerShell (Windows, zero-dep)
+    run.sh                    # Bash (Unix, needs jq)
+    README.md
+```
+
+### 12.2 Task format
+
+Each task is a JSON object:
+
+```json
+{
+  "id": "001",
+  "category": "arithmetic",
+  "difficulty": "easy",
+  "prompt": "Natural-language requirement for the LLM.",
+  "solution": "Reference .lom source (must pass `lom <file>` and produce `expected`).",
+  "expected": "Expected stdout (case-sensitive, LF-normalized).",
+  "notes": "What the task exercises (spec section / pitfall)."
+}
+```
+
+### 12.3 Runner
+
+- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **100/100 pass.**
+- `./run.ps1 -CandidatesDir <dir>` — evaluate LLM-generated code. Reads `<id>.lom` from `<dir>`, runs each, compares stdout to `expected`. Reports per-category and overall pass-rate. Exit code 1 on any failure (CI-friendly).
+- The runner only runs `lom` + compares stdout; it does **not** call any LLM API. LLM candidates are produced out-of-band (e.g. DeepSeek API batch) into a `candidates/` directory.
+
+### 12.4 AI-native focus
+
+`10_error_repair.json` (15 tasks, 15% of the suite) is Lom's differentiator: instead of "can the LLM write code", it tests "can the LLM repair code given `lom-diag/v1` + `lom-fix/v1`" — directly validating the §7 / §6.9 toolchain that Phases 2.2–2.7 built.
+
+### 12.5 Status
+
+- Reference solutions: 100/100 pass (`./eval/runner/run.ps1 -Verify`).
+- LLM pass-rate: **99/100 (99%)** — measured 2026-08-03 with expert model + thinking mode. 9/10 categories at 100%; sole failure (task 078) was output-format misunderstanding, not a language-feature error. See `eval/REPORT.md` for full analysis. **Phase 2 exit criterion met.**
+
+---
+
+## 13. Changelog
 
 - **v0.1 (2026-08-02)**: Initial draft. Phase 1 EBNF, Phase 2 features drafted, open questions listed.
 - **v0.1.1 (2026-08-02)**: Patch after DeepSeek readability test (5/5 = 100% pass). Resolved 4 spec gaps:
@@ -660,3 +1152,12 @@ These are tracked and will be resolved in Phase 0 spec iterations based on DeepS
   - Resolved open question #2: `+` overloaded for String concatenation.
   - Resolved open question #4: `=>` confirmed for match arms (avoids `->` ambiguity with closure return type).
   - Clarified arm separation: newlines, no semicolons.
+- **v0.1.2 (2026-08-02)**: Phase 2.3 — structured JSON diagnostics implemented.
+  - Rewrote §7 to match `lom-diag/v1` implementation (schema/file/ok/summary/diagnostics).
+  - Added §7.3 implemented vs reserved error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved).
+  - Added §7.4 tolerant parsing implementation notes (Phase 2.2 `Stmt::Hole` + sync-point recovery).
+  - Added §7.5 CLI (`--json` / `--check` / `--help`) and output stream semantics.
+  - Added §7.6 Phase 2.3 limitations (runtime positions, no `fix`/`retry`, single-file).
+- **v0.1.3 (2026-08-03)**: Phase 2.8 — evaluation suite added.
+  - Added §12 Evaluation Suite documenting the `eval/` 100-task benchmark (layout, task format, runner, AI-native focus, status). Renumbered Changelog to §13.
+  - LLM pass-rate measured: 99/100 (99%), expert model + thinking mode. Phase 2 exit criterion met.

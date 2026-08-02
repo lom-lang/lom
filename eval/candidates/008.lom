@@ -1,0 +1,21 @@
+fn max3(a: Int, b: Int, c: Int) -> Int
+    if a > b
+        if a > c
+            a
+        else
+            c
+        end
+    else
+        if b > c
+            b
+        else
+            c
+        end
+    end
+end
+
+fn main() -> Unit
+    println(max3(3, 7, 5))
+    println(max3(10, 2, 8))
+    println(max3(1, 1, 1))
+end

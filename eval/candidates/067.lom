@@ -1,0 +1,5 @@
+fn main() -> Unit
+    let t = (10, "hello")
+    println(t.0)
+    println(t.1)
+end

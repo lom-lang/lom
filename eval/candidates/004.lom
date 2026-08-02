@@ -1,0 +1,8 @@
+fn compute(x: Int) -> Int
+    ((x + 1) * 2) - 3
+end
+
+fn main() -> Unit
+    println(compute(5))
+    println(compute(10))
+end

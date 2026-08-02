@@ -1,0 +1,7 @@
+from string import { len, int_to_string, upper }
+
+fn main() -> Unit
+    let name = "lom"
+    let msg = upper(name) + " has " + int_to_string(len(name)) + " letters"
+    println(msg)
+end

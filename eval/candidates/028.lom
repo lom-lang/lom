@@ -1,0 +1,8 @@
+fn mixed_arith(x: Int, y: Float) -> Float
+    x + y * 2.0
+end
+
+fn main() -> Unit
+    println(mixed_arith(3, 1.5))
+    println(mixed_arith(10, 0.5))
+end

@@ -1,0 +1,20 @@
+enum Direction
+    North
+    South
+    East
+    West
+end
+
+fn opposite(d: Direction) -> Direction
+    match d
+        North => South
+        South => North
+        East => West
+        West => East
+    end
+end
+
+fn main() -> Unit
+    println(opposite(North) == South)
+    println(opposite(East) == West)
+end

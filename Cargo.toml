@@ -1,0 +1,13 @@
+[package]
+name = "lom"
+version = "0.1.0"
+edition = "2024"
+description = "Lom (Language of Machine) — an AI-native programming language. Phase 1: minimal interpreter."
+license = "Apache-2.0"
+
+[dependencies]
+# Phase 1: zero dependencies — hand-written lexer/parser/interpreter for minimalism.
+# Phase 2 will add: logos (lexer), thiserror (errors), miette (diagnostics).
+
+[profile.release]
+debug = true  # keep debug info for easier debugging of the interpreter itself

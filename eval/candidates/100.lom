@@ -1,0 +1,11 @@
+from string import { int_to_string }
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let n = double(21)
+    let s = int_to_string(n)
+    println(s)
+end

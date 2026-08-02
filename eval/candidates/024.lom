@@ -1,0 +1,8 @@
+fn concat(a: String, b: String) -> String
+    a + b
+end
+
+fn main() -> Unit
+    println(concat("hello", " world"))
+    println(concat("foo", "bar"))
+end

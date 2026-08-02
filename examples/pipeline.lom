@@ -1,0 +1,70 @@
+# Pipeline `|>` 测试 — 阶段 2.1.3
+# 语义：左侧值作为右侧函数的第一个参数
+#   x |> f       => f(x)
+#   x |> f(y)    => f(x, y)
+# 优先级：高于比较、低于算术，左结合
+
+from string import { int_to_string }
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn negate(x: Int) -> Int
+    -x
+end
+
+fn stringify(n: Int) -> String
+    int_to_string(n)
+end
+
+fn main() -> Unit
+    # 1. 基础 pipeline：5 |> double => double(5) = 10
+    let a = 5 |> double
+    println(a)
+
+    # 2. 链式 pipeline：5 |> double |> inc => inc(double(5)) = 11
+    let b = 5 |> double |> inc
+    println(b)
+
+    # 3. 带额外参数：10 |> add(3) => add(10, 3) = 13
+    let c = 10 |> add(3)
+    println(c)
+
+    # 4. pipeline 调用内置函数：直接 println
+    42 |> println
+
+    # 5. pipeline 与字符串：5 |> double |> stringify |> println
+    5 |> double |> stringify |> println
+
+    # 6. 算术优先级：1 + 2 |> double => double(1 + 2) = 6
+    let d = 1 + 2 |> double
+    println(d)
+
+    # 7. 比较优先级：5 |> double == 10 => (5 |> double) == 10 => True
+    let e = 5 |> double == 10
+    println(e)
+
+    # 8. pipeline 求值为闭包再调用
+    let transform = fn(x: Int) -> Int
+        x * x + 1
+    end
+    let g = 4 |> transform
+    println(g)
+
+    # 9. 多步带额外参数链：1 |> add(2) |> add(3) => add(add(1, 2), 3) = 6
+    let h = 1 |> add(2) |> add(3)
+    println(h)
+
+    # 10. pipeline 与 negate：3 |> negate |> double => double(negate(3)) = -6
+    let i = 3 |> negate |> double
+    println(i)
+end

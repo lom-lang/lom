@@ -1,0 +1,40 @@
+# 互递归 — is_even / is_odd 互相调用
+fn is_even(n: Int) -> Bool
+    if n == 0
+        True
+    else
+        is_odd(n - 1)
+    end
+end
+
+fn is_odd(n: Int) -> Bool
+    if n == 0
+        False
+    else
+        is_even(n - 1)
+    end
+end
+
+fn main() -> Unit
+    println(is_even(10))
+    println(is_odd(10))
+    println(is_even(7))
+    println(is_odd(7))
+    println(is_even(0))
+    println(is_odd(0))
+
+    # 嵌套函数调用
+    println(is_even(2 + 3))
+    println(is_odd(2 * 3))
+
+    # 在表达式中组合
+    let check = fn(n: Int) -> String
+        if is_even(n)
+            "even"
+        else
+            "odd"
+        end
+    end
+    println(check(4))
+    println(check(5))
+end

@@ -1,0 +1,9 @@
+from string import { int_to_string }
+
+fn add_and_format(a: Int, b: Int) -> String
+    int_to_string(a + b)
+end
+
+fn main() -> Unit
+    println(add_and_format(3, 4))
+end

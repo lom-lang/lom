@@ -1,0 +1,11 @@
+fn count_down(n: Int) -> Unit
+    let mut i = n
+    while i >= 1
+        println(i)
+        i = i - 1
+    end
+end
+
+fn main() -> Unit
+    count_down(3)
+end

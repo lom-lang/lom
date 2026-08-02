@@ -1,0 +1,5 @@
+from string import { len }
+
+fn main() -> Unit
+    println(len("hello"))
+end

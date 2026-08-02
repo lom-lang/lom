@@ -1,0 +1,13 @@
+fn day_name(n: Int) -> String
+    match n
+        1 => "Monday"
+        2 => "Tuesday"
+        _ => "Other"
+    end
+end
+
+fn main() -> Unit
+    println(day_name(1))
+    println(day_name(2))
+    println(day_name(5))
+end

@@ -1,0 +1,137 @@
+[
+  {
+    "id": "041",
+    "category": "match_enum",
+    "difficulty": "easy",
+    "prompt": "写函数 day_name(n: Int) -> String 用 match 返回星期几名称：0 => \"Sun\", 1 => \"Mon\", 2 => \"Tue\", 3 => \"Wed\", 4 => \"Thu\", 5 => \"Fri\", 6 => \"Sat\", _ => \"invalid\"。main 调用 println(day_name(0))、println(day_name(3))、println(day_name(6))、println(day_name(9))。",
+    "solution": "fn day_name(n: Int) -> String\n    match n\n        0 => \"Sun\"\n        1 => \"Mon\"\n        2 => \"Tue\"\n        3 => \"Wed\"\n        4 => \"Thu\"\n        5 => \"Fri\"\n        6 => \"Sat\"\n        _ => \"invalid\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(0))\n    println(day_name(3))\n    println(day_name(6))\n    println(day_name(9))\nend\n",
+    "expected": "Sun\nWed\nSat\ninvalid\n",
+    "notes": "match 字面量模式 + _ 通配符。"
+  },
+  {
+    "id": "042",
+    "category": "match_enum",
+    "difficulty": "easy",
+    "prompt": "写函数 classify_num(n: Int) -> String 用 match：0 => \"zero\", _ => \"nonzero\"。main 调用 println(classify_num(0)) 和 println(classify_num(42))。",
+    "solution": "fn classify_num(n: Int) -> String\n    match n\n        0 => \"zero\"\n        _ => \"nonzero\"\n    end\nend\n\nfn main() -> Unit\n    println(classify_num(0))\n    println(classify_num(42))\nend\n",
+    "expected": "zero\nnonzero\n",
+    "notes": "最简 match：字面量 + 通配符。"
+  },
+  {
+    "id": "043",
+    "category": "match_enum",
+    "difficulty": "easy",
+    "prompt": "声明枚举 enum Color = Red | Green | Blue。写函数 color_name(c: Color) -> String 用 match：Red => \"red\", Green => \"green\", Blue => \"blue\"。main 调用 println(color_name(Red))、println(color_name(Green))、println(color_name(Blue))。",
+    "solution": "enum Color = Red | Green | Blue\n\nfn color_name(c: Color) -> String\n    match c\n        Red => \"red\"\n        Green => \"green\"\n        Blue => \"blue\"\n    end\nend\n\nfn main() -> Unit\n    println(color_name(Red))\n    println(color_name(Green))\n    println(color_name(Blue))\nend\n",
+    "expected": "red\ngreen\nblue\n",
+    "notes": "单行 enum 声明 + match 穷尽（无 _）。"
+  },
+  {
+    "id": "044",
+    "category": "match_enum",
+    "difficulty": "easy",
+    "prompt": "写函数 safe_divide(a: Int, b: Int) -> Result<Int, String>：b == 0 返回 Err(\"div by zero\")，否则返回 Ok(a / b)。main 用 match 处理 safe_divide(10, 2)（打印 5）和 safe_divide(10, 0)（打印 \"Error: div by zero\"）。match 用 Ok(n) => println(n) 和 Err(e) => println(\"Error: \" + e)。",
+    "solution": "fn safe_divide(a: Int, b: Int) -> Result<Int, String>\n    if b == 0\n        Err(\"div by zero\")\n    else\n        Ok(a / b)\n    end\nend\n\nfn main() -> Unit\n    match safe_divide(10, 2)\n        Ok(n) => println(n)\n        Err(e) => println(\"Error: \" + e)\n    end\n\n    match safe_divide(10, 0)\n        Ok(n) => println(n)\n        Err(e) => println(\"Error: \" + e)\n    end\nend\n",
+    "expected": "5\nError: div by zero\n",
+    "notes": "Result 上下文 + match Ok/Err 模式 + 变量绑定。"
+  },
+  {
+    "id": "045",
+    "category": "match_enum",
+    "difficulty": "easy",
+    "prompt": "写函数 first_char(s: String) -> Option<String>：如果 s 为空字符串返回 None，否则返回 Some(s)。提示：用 if len(s) == 0 判空。main 用 match 处理 first_char(\"hello\")（打印 \"got: hello\"）和 first_char(\"\")（打印 \"empty\"）。match 用 Some(s) => println(\"got: \" + s) 和 None => println(\"empty\")。需要 from string import { len }。",
+    "solution": "from string import { len }\n\nfn first_char(s: String) -> Option<String>\n    if len(s) == 0\n        None\n    else\n        Some(s)\n    end\nend\n\nfn main() -> Unit\n    match first_char(\"hello\")\n        Some(s) => println(\"got: \" + s)\n        None => println(\"empty\")\n    end\n\n    match first_char(\"\")\n        Some(s) => println(\"got: \" + s)\n        None => println(\"empty\")\n    end\nend\n",
+    "expected": "got: hello\nempty\n",
+    "notes": "Option + match Some/None + import len。"
+  },
+  {
+    "id": "046",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "声明枚举 enum Shape = Circle(Float) | Rect(Float, Float)。写函数 area(s: Shape) -> Float 用 match：Circle(r) => 3.14159 * r * r，Rect(w, h) => w * h。main 调用 println(area(Circle(2.0)))（≈12.56636）和 println(area(Rect(3.0, 4.0)))（=12.0，Float 输出为 12.0）。",
+    "solution": "enum Shape = Circle(Float) | Rect(Float, Float)\n\nfn area(s: Shape) -> Float\n    match s\n        Circle(r) => 3.14159 * r * r\n        Rect(w, h) => w * h\n    end\nend\n\nfn main() -> Unit\n    println(area(Circle(2.0)))\n    println(area(Rect(3.0, 4.0)))\nend\n",
+    "expected": "12.56636\n12.0\n",
+    "notes": "带参数 enum 变体 + match 解构。Circle(2.0) 面积=12.56636；Rect(3.0,4.0) 面积=12.0，Float 类型输出保留 .0 后缀。"
+  },
+  {
+    "id": "047",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "声明枚举 enum Expr = Num(Int) | Add(Expr, Expr)（注：Expr 递归类型，但 Lom 不支持真正的递归类型，此处仅测试语法声明）。改为简单版：enum Op = Add | Sub | Mul | Div。写函数 apply_op(op: Op, a: Int, b: Int) -> Int 用 match：Add => a + b, Sub => a - b, Mul => a * b, Div => a / b。main 调用 println(apply_op(Add, 3, 4))、println(apply_op(Mul, 3, 4))、println(apply_op(Sub, 10, 3))。",
+    "solution": "enum Op = Add | Sub | Mul | Div\n\nfn apply_op(op: Op, a: Int, b: Int) -> Int\n    match op\n        Add => a + b\n        Sub => a - b\n        Mul => a * b\n        Div => a / b\n    end\nend\n\nfn main() -> Unit\n    println(apply_op(Add, 3, 4))\n    println(apply_op(Mul, 3, 4))\n    println(apply_op(Sub, 10, 3))\nend\n",
+    "expected": "7\n12\n7\n",
+    "notes": "无参数 enum 变体作为标签 + match 分发。Add=7, Mul=12, Sub=7。"
+  },
+  {
+    "id": "048",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "写函数 parse_status(code: Int) -> String 用 match：200 => \"OK\", 404 => \"Not Found\", 500 => \"Server Error\", _ => \"Unknown\"。main 调用 println(parse_status(200))、println(parse_status(404))、println(parse_status(500))、println(parse_status(403))。",
+    "solution": "fn parse_status(code: Int) -> String\n    match code\n        200 => \"OK\"\n        404 => \"Not Found\"\n        500 => \"Server Error\"\n        _ => \"Unknown\"\n    end\nend\n\nfn main() -> Unit\n    println(parse_status(200))\n    println(parse_status(404))\n    println(parse_status(500))\n    println(parse_status(403))\nend\n",
+    "expected": "OK\nNot Found\nServer Error\nUnknown\n",
+    "notes": "match 多字面量分支 + _ 兜底。"
+  },
+  {
+    "id": "049",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "写函数 half(n: Int) -> Option<Int>：n 为偶数返回 Some(n / 2)，奇数返回 None。用 if n % 2 == 0 判偶。main 用 match 处理 half(10)（打印 5）和 half(7)（打印 \"odd\"）。match 用 Some(v) => println(v) 和 None => println(\"odd\")。",
+    "solution": "fn half(n: Int) -> Option<Int>\n    if n % 2 == 0\n        Some(n / 2)\n    else\n        None\n    end\nend\n\nfn main() -> Unit\n    match half(10)\n        Some(v) => println(v)\n        None => println(\"odd\")\n    end\n\n    match half(7)\n        Some(v) => println(v)\n        None => println(\"odd\")\n    end\nend\n",
+    "expected": "5\nodd\n",
+    "notes": "Option + match 解构 Some(v)。"
+  },
+  {
+    "id": "050",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "写函数 grade_to_score(grade: String) -> Result<Int, String>：grade == \"A\" 返回 Ok(90)，grade == \"B\" 返回 Ok(80)，grade == \"C\" 返回 Ok(70)，其他返回 Err(\"unknown grade\")。main 用 match 处理 grade_to_score(\"A\")（打印 90）和 grade_to_score(\"X\")（打印 \"err: unknown grade\"）。match 用 Ok(s) => println(s) 和 Err(e) => println(\"err: \" + e)。",
+    "solution": "fn grade_to_score(grade: String) -> Result<Int, String>\n    if grade == \"A\"\n        Ok(90)\n    elif grade == \"B\"\n        Ok(80)\n    elif grade == \"C\"\n        Ok(70)\n    else\n        Err(\"unknown grade\")\n    end\nend\n\nfn main() -> Unit\n    match grade_to_score(\"A\")\n        Ok(s) => println(s)\n        Err(e) => println(\"err: \" + e)\n    end\n\n    match grade_to_score(\"X\")\n        Ok(s) => println(s)\n        Err(e) => println(\"err: \" + e)\n    end\nend\n",
+    "expected": "90\nerr: unknown grade\n",
+    "notes": "Result + if/elif/else 链构造 + match 处理。"
+  },
+  {
+    "id": "051",
+    "category": "match_enum",
+    "difficulty": "hard",
+    "prompt": "写函数 fizzbuzz(n: Int) -> String 用 match 和 if/elif 组合：n 能被 15 整除返回 \"FizzBuzz\"，能被 3 整除返回 \"Fizz\"，能被 5 整除返回 \"Buzz\"，否则返回 n 转字符串。需要 from string import { int_to_string }。main 调用 println(fizzbuzz(15))、println(fizzbuzz(9))、println(fizzbuzz(10))、println(fizzbuzz(7))。",
+    "solution": "from string import { int_to_string }\n\nfn fizzbuzz(n: Int) -> String\n    if n % 15 == 0\n        \"FizzBuzz\"\n    elif n % 3 == 0\n        \"Fizz\"\n    elif n % 5 == 0\n        \"Buzz\"\n    else\n        int_to_string(n)\n    end\nend\n\nfn main() -> Unit\n    println(fizzbuzz(15))\n    println(fizzbuzz(9))\n    println(fizzbuzz(10))\n    println(fizzbuzz(7))\nend\n",
+    "expected": "FizzBuzz\nFizz\nBuzz\n7\n",
+    "notes": "经典 FizzBuzz + int_to_string 转换。"
+  },
+  {
+    "id": "052",
+    "category": "match_enum",
+    "difficulty": "hard",
+    "prompt": "声明多行枚举 enum Direction\n    North\n    South\n    East\n    West\nend。写函数 opposite(d: Direction) -> Direction 用 match：North => South, South => North, East => West, West => East。main 调用 println(opposite(North) == South)（应为 true）和 println(opposite(East) == West)（应为 true）。",
+    "solution": "enum Direction\n    North\n    South\n    East\n    West\nend\n\nfn opposite(d: Direction) -> Direction\n    match d\n        North => South\n        South => North\n        East => West\n        West => East\n    end\nend\n\nfn main() -> Unit\n    println(opposite(North) == South)\n    println(opposite(East) == West)\nend\n",
+    "expected": "true\ntrue\n",
+    "notes": "多行 enum 声明 + match 返回 enum 变体 + enum 变体相等比较。Bool 小写输出。"
+  },
+  {
+    "id": "053",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "写函数 unwrap_or(r: Result<Int, String>, default: Int) -> Int 用 match：Ok(n) => n, Err(_) => default。main 调用 println(unwrap_or(Ok(42), 0))（打印 42）和 println(unwrap_or(Err(\"err\"), 99))（打印 99）。",
+    "solution": "fn unwrap_or(r: Result<Int, String>, default: Int) -> Int\n    match r\n        Ok(n) => n\n        Err(_) => default\n    end\nend\n\nfn main() -> Unit\n    println(unwrap_or(Ok(42), 0))\n    println(unwrap_or(Err(\"err\"), 99))\nend\n",
+    "expected": "42\n99\n",
+    "notes": "Result + match + Err(_) 忽略错误值。"
+  },
+  {
+    "id": "054",
+    "category": "match_enum",
+    "difficulty": "hard",
+    "prompt": "写函数 classify_age(age: Int) -> String 用 match：0 => \"newborn\", n（若 n < 13）... 提示：match 只能匹配字面量，不能匹配不等式。所以用 if/elif/else 实现：age < 1 返回 \"baby\", age < 13 返回 \"child\", age < 20 返回 \"teen\", age < 65 返回 \"adult\", 否则返回 \"senior\"。main 调用 println(classify_age(0))、println(classify_age(5))、println(classify_age(15))、println(classify_age(30))、println(classify_age(70))。",
+    "solution": "fn classify_age(age: Int) -> String\n    if age < 1\n        \"baby\"\n    elif age < 13\n        \"child\"\n    elif age < 20\n        \"teen\"\n    elif age < 65\n        \"adult\"\n    else\n        \"senior\"\n    end\nend\n\nfn main() -> Unit\n    println(classify_age(0))\n    println(classify_age(5))\n    println(classify_age(15))\n    println(classify_age(30))\n    println(classify_age(70))\nend\n",
+    "expected": "baby\nchild\nteen\nadult\nsenior\n",
+    "notes": "考察 LLM 是否理解 match 只能匹配字面量，不能匹配不等式（需用 if/elif）。"
+  },
+  {
+    "id": "055",
+    "category": "match_enum",
+    "difficulty": "hard",
+    "prompt": "声明 enum LogLevel = Debug | Info | Warn | Error。写函数 log_prefix(level: LogLevel) -> String 用 match：Debug => \"[DBG]\", Info => \"[INF]\", Warn => \"[WRN]\", Error => \"[ERR]\"。写函数 log_message(level: LogLevel, msg: String) -> String 返回 log_prefix(level) + \" \" + msg。main 调用 println(log_message(Info, \"started\"))、println(log_message(Error, \"crashed\"))、println(log_message(Debug, \"x=42\"))。",
+    "solution": "enum LogLevel = Debug | Info | Warn | Error\n\nfn log_prefix(level: LogLevel) -> String\n    match level\n        Debug => \"[DBG]\"\n        Info => \"[INF]\"\n        Warn => \"[WRN]\"\n        Error => \"[ERR]\"\n    end\nend\n\nfn log_message(level: LogLevel, msg: String) -> String\n    log_prefix(level) + \" \" + msg\nend\n\nfn main() -> Unit\n    println(log_message(Info, \"started\"))\n    println(log_message(Error, \"crashed\"))\n    println(log_message(Debug, \"x=42\"))\nend\n",
+    "expected": "[INF] started\n[ERR] crashed\n[DBG] x=42\n",
+    "notes": "enum + match + 函数组合 + 字符串拼接。考察多函数协作。"
+  }
+]

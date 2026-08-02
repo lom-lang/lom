@@ -1,0 +1,53 @@
+# match + Result/Option — 变体模式、Form A 与 Form B 混用
+fn safe_divide(x: Int, y: Int) -> Result<Int, String>
+    if y == 0
+        Err("div by zero")
+    else
+        Ok(x / y)
+    end
+end
+
+# match 作为函数尾表达式
+fn label(n: Int) -> String
+    match n
+        0 => "zero"
+        _ => "nonzero"
+    end
+end
+
+fn main() -> Unit
+    # Form A：单表达式分支
+    match safe_divide(10, 2)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+
+    # Form B：块分支（=> 后跨行，以 end 闭合）
+    match safe_divide(10, 0)
+        Ok(n) =>
+            println("result:")
+            println(n)
+        end
+        Err(e) =>
+            println("failed: " + e)
+        end
+    end
+
+    # Option 模式 — 有值
+    let x = Some(5)
+    match x
+        Some(v) => println(v)
+        None => println("nothing")
+    end
+
+    # Option 模式 — 无值
+    let y = None
+    match y
+        Some(v) => println(v)
+        None => println("nothing")
+    end
+
+    # 调用返回 match 表达式的函数
+    println(label(0))
+    println(label(7))
+end

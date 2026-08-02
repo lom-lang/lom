@@ -1,0 +1,8 @@
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn main() -> Unit
+    let result = 10 |> add(3)
+    println(result)
+end

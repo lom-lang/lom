@@ -1,0 +1,21 @@
+fn grade(score: Int) -> String
+    if score >= 90
+        "A"
+    elif score >= 80
+        "B"
+    elif score >= 70
+        "C"
+    elif score >= 60
+        "D"
+    else
+        "F"
+    end
+end
+
+fn main() -> Unit
+    println(grade(95))
+    println(grade(85))
+    println(grade(75))
+    println(grade(65))
+    println(grade(55))
+end

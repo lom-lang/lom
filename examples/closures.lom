@@ -1,0 +1,36 @@
+# 闭包 — 捕获变量、一等值传递
+fn main() -> Unit
+    # 基本闭包
+    let add = fn(x: Int, y: Int) -> Int
+        x + y
+    end
+    println(add(3, 4))
+
+    # 捕获外部变量
+    let base = 10
+    let add_base = fn(x: Int) -> Int
+        x + base
+    end
+    println(add_base(5))
+
+    # 闭包作为参数（高阶函数）
+    # Phase 1 不检查类型，用 Fn 作为函数参数的类型占位符
+    let apply = fn(f: Fn, x: Int) -> Int
+        f(x)
+    end
+    let double = fn(n: Int) -> Int
+        n * 2
+    end
+    println(apply(double, 7))
+
+    # 闭包返回闭包
+    let make_adder = fn(n: Int) -> Fn
+        fn(x: Int) -> Int
+            x + n
+        end
+    end
+    let add5 = make_adder(5)
+    println(add5(10))
+    let add100 = make_adder(100)
+    println(add100(1))
+end

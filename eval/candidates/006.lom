@@ -1,0 +1,18 @@
+fn negate(x: Int) -> Int
+    -x
+end
+
+fn abs_val(x: Int) -> Int
+    if x < 0
+        -x
+    else
+        x
+    end
+end
+
+fn main() -> Unit
+    println(negate(5))
+    println(negate(-3))
+    println(abs_val(-7))
+    println(abs_val(4))
+end

@@ -1,0 +1,18 @@
+fn early_return_sum_first_even(a: Int, b: Int, c: Int) -> Int
+    if a % 2 == 0
+        return a
+    end
+    if b % 2 == 0
+        return b
+    end
+    if c % 2 == 0
+        return c
+    end
+    -1
+end
+
+fn main() -> Unit
+    println(early_return_sum_first_even(1, 3, 5))
+    println(early_return_sum_first_even(1, 4, 7))
+    println(early_return_sum_first_even(8, 3, 5))
+end

@@ -1,0 +1,271 @@
+=== 041.lom ===
+fn day_name(n: Int) -> String
+    match n
+        0 => "Sun"
+        1 => "Mon"
+        2 => "Tue"
+        3 => "Wed"
+        4 => "Thu"
+        5 => "Fri"
+        6 => "Sat"
+        _ => "invalid"
+    end
+end
+
+fn main() -> Unit
+    println(day_name(0))
+    println(day_name(3))
+    println(day_name(6))
+    println(day_name(9))
+end
+=== 042.lom ===
+fn classify_num(n: Int) -> String
+    match n
+        0 => "zero"
+        _ => "nonzero"
+    end
+end
+
+fn main() -> Unit
+    println(classify_num(0))
+    println(classify_num(42))
+end
+=== 043.lom ===
+enum Color = Red | Green | Blue
+
+fn color_name(c: Color) -> String
+    match c
+        Red => "red"
+        Green => "green"
+        Blue => "blue"
+    end
+end
+
+fn main() -> Unit
+    println(color_name(Red))
+    println(color_name(Green))
+    println(color_name(Blue))
+end
+=== 044.lom ===
+fn safe_divide(a: Int, b: Int) -> Result<Int, String>
+    if b == 0
+        Err("div by zero")
+    else
+        Ok(a / b)
+    end
+end
+
+fn main() -> Unit
+    match safe_divide(10, 2)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+    match safe_divide(10, 0)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+end
+=== 045.lom ===
+from string import { len }
+
+fn first_char(s: String) -> Option<String>
+    if len(s) == 0
+        None
+    else
+        Some(s)
+    end
+end
+
+fn main() -> Unit
+    match first_char("hello")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+    match first_char("")
+        Some(s) => println("got: " + s)
+        None => println("empty")
+    end
+end
+=== 046.lom ===
+enum Shape = Circle(Float) | Rect(Float, Float)
+
+fn area(s: Shape) -> Float
+    match s
+        Circle(r) => 3.14159 * r * r
+        Rect(w, h) => w * h
+    end
+end
+
+fn main() -> Unit
+    println(area(Circle(2.0)))
+    println(area(Rect(3.0, 4.0)))
+end
+=== 047.lom ===
+enum Op = Add | Sub | Mul | Div
+
+fn apply_op(op: Op, a: Int, b: Int) -> Int
+    match op
+        Add => a + b
+        Sub => a - b
+        Mul => a * b
+        Div => a / b
+    end
+end
+
+fn main() -> Unit
+    println(apply_op(Add, 3, 4))
+    println(apply_op(Mul, 3, 4))
+    println(apply_op(Sub, 10, 3))
+end
+=== 048.lom ===
+fn parse_status(code: Int) -> String
+    match code
+        200 => "OK"
+        404 => "Not Found"
+        500 => "Server Error"
+        _ => "Unknown"
+    end
+end
+
+fn main() -> Unit
+    println(parse_status(200))
+    println(parse_status(404))
+    println(parse_status(500))
+    println(parse_status(403))
+end
+=== 049.lom ===
+fn half(n: Int) -> Option<Int>
+    if n % 2 == 0
+        Some(n / 2)
+    else
+        None
+    end
+end
+
+fn main() -> Unit
+    match half(10)
+        Some(v) => println(v)
+        None => println("odd")
+    end
+    match half(7)
+        Some(v) => println(v)
+        None => println("odd")
+    end
+end
+=== 050.lom ===
+fn grade_to_score(grade: String) -> Result<Int, String>
+    match grade
+        "A" => Ok(90)
+        "B" => Ok(80)
+        "C" => Ok(70)
+        _ => Err("unknown grade")
+    end
+end
+
+fn main() -> Unit
+    match grade_to_score("A")
+        Ok(s) => println(s)
+        Err(e) => println("err: " + e)
+    end
+    match grade_to_score("X")
+        Ok(s) => println(s)
+        Err(e) => println("err: " + e)
+    end
+end
+=== 051.lom ===
+from string import { int_to_string }
+
+fn fizzbuzz(n: Int) -> String
+    if n % 15 == 0
+        "FizzBuzz"
+    elif n % 3 == 0
+        "Fizz"
+    elif n % 5 == 0
+        "Buzz"
+    else
+        int_to_string(n)
+    end
+end
+
+fn main() -> Unit
+    println(fizzbuzz(15))
+    println(fizzbuzz(9))
+    println(fizzbuzz(10))
+    println(fizzbuzz(7))
+end
+=== 052.lom ===
+enum Direction
+    North
+    South
+    East
+    West
+end
+
+fn opposite(d: Direction) -> Direction
+    match d
+        North => South
+        South => North
+        East => West
+        West => East
+    end
+end
+
+fn main() -> Unit
+    println(opposite(North) == South)
+    println(opposite(East) == West)
+end
+=== 053.lom ===
+fn unwrap_or(r: Result<Int, String>, default: Int) -> Int
+    match r
+        Ok(n) => n
+        Err(_) => default
+    end
+end
+
+fn main() -> Unit
+    println(unwrap_or(Ok(42), 0))
+    println(unwrap_or(Err("err"), 99))
+end
+=== 054.lom ===
+fn classify_age(age: Int) -> String
+    if age < 1
+        "baby"
+    elif age < 13
+        "child"
+    elif age < 20
+        "teen"
+    elif age < 65
+        "adult"
+    else
+        "senior"
+    end
+end
+
+fn main() -> Unit
+    println(classify_age(0))
+    println(classify_age(5))
+    println(classify_age(15))
+    println(classify_age(30))
+    println(classify_age(70))
+end
+=== 055.lom ===
+enum LogLevel = Debug | Info | Warn | Error
+
+fn log_prefix(level: LogLevel) -> String
+    match level
+        Debug => "[DBG]"
+        Info => "[INF]"
+        Warn => "[WRN]"
+        Error => "[ERR]"
+    end
+end
+
+fn log_message(level: LogLevel, msg: String) -> String
+    log_prefix(level) + " " + msg
+end
+
+fn main() -> Unit
+    println(log_message(Info, "started"))
+    println(log_message(Error, "crashed"))
+    println(log_message(Debug, "x=42"))
+end

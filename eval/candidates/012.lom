@@ -1,0 +1,15 @@
+fn sign(n: Int) -> Int
+    if n > 0
+        1
+    elif n < 0
+        -1
+    else
+        0
+    end
+end
+
+fn main() -> Unit
+    println(sign(5))
+    println(sign(-3))
+    println(sign(0))
+end

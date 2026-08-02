@@ -1,0 +1,19 @@
+fn safe_divide(a: Int, b: Int) -> Result<Int, String>
+    if b == 0
+        Err("div by zero")
+    else
+        Ok(a / b)
+    end
+end
+
+fn main() -> Unit
+    match safe_divide(10, 2)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+
+    match safe_divide(10, 0)
+        Ok(n) => println(n)
+        Err(e) => println("Error: " + e)
+    end
+end

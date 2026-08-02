@@ -1,0 +1,17 @@
+fn fib(n: Int) -> Int
+    if n == 0
+        0
+    elif n == 1
+        1
+    else
+        fib(n - 1) + fib(n - 2)
+    end
+end
+
+fn main() -> Unit
+    let mut i = 0
+    while i < 5
+        println(fib(i))
+        i = i + 1
+    end
+end

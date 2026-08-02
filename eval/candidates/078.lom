@@ -1,0 +1,13 @@
+fn get_timestamp() -> Int ! [Clock]
+    1700000000
+end
+
+fn log_msg(msg: String) -> Unit ! [IO, Clock]
+    let ts = get_timestamp()
+    println(ts)
+    println(msg)
+end
+
+fn main() -> Unit
+    log_msg("boot")
+end

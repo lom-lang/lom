@@ -1,0 +1,66 @@
+=== 076.lom ===
+fn greet(name: String) -> Unit ! [IO]
+    println("Hello, " + name)
+end
+
+fn main() -> Unit
+    greet("Lom")
+end
+=== 077.lom ===
+fn pure_double(x: Int) -> Int
+    x * 2
+end
+
+fn print_double(x: Int) -> Unit ! [IO]
+    let result = pure_double(x)
+    println(result)
+end
+
+fn main() -> Unit
+    print_double(21)
+end
+=== 078.lom ===
+fn get_timestamp() -> Int ! [Clock]
+    1700000000
+end
+
+fn log_msg(msg: String) -> Unit ! [IO, Clock]
+    let ts = get_timestamp()
+    println(ts)
+    println(msg)
+end
+
+fn main() -> Unit
+    log_msg("boot")
+end
+=== 079.lom ===
+from string import { int_to_string }
+
+fn format_line(label: String, value: Int) -> String
+    label + ": " + int_to_string(value)
+end
+
+fn print_line(label: String, value: Int) -> Unit ! [IO]
+    let line = format_line(label, value)
+    println(line)
+end
+
+fn main() -> Unit
+    print_line("count", 42)
+end
+=== 080.lom ===
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn quadruple(x: Int) -> Int
+    double(double(x))
+end
+
+fn print_result(x: Int) -> Unit ! [IO]
+    println(quadruple(x))
+end
+
+fn main() -> Unit
+    print_result(5)
+end

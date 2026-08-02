@@ -1,0 +1,9 @@
+fn make_point(x: Int, y: Int) -> {x: Int, y: Int}
+    {x: x, y: y}
+end
+
+fn main() -> Unit
+    let p = make_point(7, 8)
+    println(p.x)
+    println(p.y)
+end

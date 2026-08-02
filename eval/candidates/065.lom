@@ -1,0 +1,16 @@
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+
+fn square(x: Int) -> Int
+    x * x
+end
+
+fn inc(x: Int) -> Int
+    x + 1
+end
+
+fn main() -> Unit
+    let result = 2 |> add(3) |> square |> inc
+    println(result)
+end

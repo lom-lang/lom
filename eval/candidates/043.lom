@@ -1,0 +1,15 @@
+enum Color = Red | Green | Blue
+
+fn color_name(c: Color) -> String
+    match c
+        Red => "red"
+        Green => "green"
+        Blue => "blue"
+    end
+end
+
+fn main() -> Unit
+    println(color_name(Red))
+    println(color_name(Green))
+    println(color_name(Blue))
+end

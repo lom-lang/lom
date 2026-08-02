@@ -1,0 +1,8 @@
+fn avg(a: Int, b: Int, c: Int) -> Float
+    (a + b + c) / 3.0
+end
+
+fn main() -> Unit
+    println(avg(1, 2, 3))
+    println(avg(10, 20, 30))
+end

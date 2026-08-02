@@ -1,0 +1,5 @@
+fn main() -> Unit
+    let x = 5
+    let y = 5
+    println(x == y)
+end

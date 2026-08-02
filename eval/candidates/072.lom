@@ -1,0 +1,5 @@
+fn main() -> Unit
+    let r = {sum: 1 + 2, name: "lom"}
+    println(r.sum)
+    println(r.name)
+end

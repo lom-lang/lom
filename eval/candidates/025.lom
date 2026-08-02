@@ -1,0 +1,7 @@
+fn return_unit() -> Unit
+    ()
+end
+
+fn main() -> Unit
+    println(return_unit())
+end

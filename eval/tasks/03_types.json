@@ -1,0 +1,92 @@
+[
+  {
+    "id": "021",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 id_int(x: Int) -> Int 直接返回 x。写函数 id_str(s: String) -> String 直接返回 s。main 调用 println(id_int(42)) 和 println(id_str(\"hello\"))。",
+    "solution": "fn id_int(x: Int) -> Int\n    x\nend\n\nfn id_str(s: String) -> String\n    s\nend\n\nfn main() -> Unit\n    println(id_int(42))\n    println(id_str(\"hello\"))\nend\n",
+    "expected": "42\nhello\n",
+    "notes": "类型注解 + 不同类型函数。"
+  },
+  {
+    "id": "022",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 bool_to_str(b: Bool) -> String：b 为 True 返回 \"yes\"，否则 \"no\"。main 调用 println(bool_to_str(True)) 和 println(bool_to_str(False))。",
+    "solution": "fn bool_to_str(b: Bool) -> String\n    if b\n        \"yes\"\n    else\n        \"no\"\n    end\nend\n\nfn main() -> Unit\n    println(bool_to_str(True))\n    println(bool_to_str(False))\nend\n",
+    "expected": "yes\nno\n",
+    "notes": "Bool 字面量 True/False（大写首字母）。"
+  },
+  {
+    "id": "023",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 int_to_float(n: Int) -> Float 返回 n + 0.0（让 Int 提升 Float）。main 调用 println(int_to_float(5)) 和 println(int_to_float(-3))。",
+    "solution": "fn int_to_float(n: Int) -> Float\n    n + 0.0\nend\n\nfn main() -> Unit\n    println(int_to_float(5))\n    println(int_to_float(-3))\nend\n",
+    "expected": "5.0\n-3.0\n",
+    "notes": "Int + Float 提升为 Float，整数输出带 .0。"
+  },
+  {
+    "id": "024",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 concat(a: String, b: String) -> String 返回 a + b。main 调用 println(concat(\"hello\", \" world\")) 和 println(concat(\"foo\", \"bar\"))。",
+    "solution": "fn concat(a: String, b: String) -> String\n    a + b\nend\n\nfn main() -> Unit\n    println(concat(\"hello\", \" world\"))\n    println(concat(\"foo\", \"bar\"))\nend\n",
+    "expected": "hello world\nfoobar\n",
+    "notes": "String 拼接用 +。"
+  },
+  {
+    "id": "025",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 return_unit() -> Unit 直接返回 ()。main 调用 println(return_unit())。",
+    "solution": "fn return_unit() -> Unit\n    ()\nend\n\nfn main() -> Unit\n    println(return_unit())\nend\n",
+    "expected": "()\n",
+    "notes": "Unit 字面量 () 与 println 输出 '()'。"
+  },
+  {
+    "id": "026",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 compare(a: Int, b: Int) -> Bool 返回 a < b。main 调用 println(compare(3, 5))、println(compare(5, 3))、println(compare(5, 5))。",
+    "solution": "fn compare(a: Int, b: Int) -> Bool\n    a < b\nend\n\nfn main() -> Unit\n    println(compare(3, 5))\n    println(compare(5, 3))\n    println(compare(5, 5))\nend\n",
+    "expected": "true\nfalse\nfalse\n",
+    "notes": "比较运算符返回 Bool。Bool 输出为小写 true/false。"
+  },
+  {
+    "id": "027",
+    "category": "types",
+    "difficulty": "medium",
+    "prompt": "写函数 logical_and(a: Bool, b: Bool) -> Bool 返回 a and b；logical_or(a: Bool, b: Bool) -> Bool 返回 a or b；logical_not(a: Bool) -> Bool 用 if/else 返回 a 的否定（a 为 True 返回 False，否则返回 True）。main 调用 println(logical_and(True, False))、println(logical_or(True, False))、println(logical_not(False))。",
+    "solution": "fn logical_and(a: Bool, b: Bool) -> Bool\n    a and b\nend\n\nfn logical_or(a: Bool, b: Bool) -> Bool\n    a or b\nend\n\nfn logical_not(a: Bool) -> Bool\n    if a\n        False\n    else\n        True\n    end\nend\n\nfn main() -> Unit\n    println(logical_and(True, False))\n    println(logical_or(True, False))\n    println(logical_not(False))\nend\n",
+    "expected": "false\ntrue\ntrue\n",
+    "notes": "and/or 逻辑运算符 + if/else 实现 NOT（避免 ! 在函数体首位被解析为效应注解的边角）。Bool 输出小写。"
+  },
+  {
+    "id": "028",
+    "category": "types",
+    "difficulty": "medium",
+    "prompt": "写函数 mixed_arith(x: Int, y: Float) -> Float 返回 x + y * 2.0。main 调用 println(mixed_arith(3, 1.5)) 和 println(mixed_arith(10, 0.5))。",
+    "solution": "fn mixed_arith(x: Int, y: Float) -> Float\n    x + y * 2.0\nend\n\nfn main() -> Unit\n    println(mixed_arith(3, 1.5))\n    println(mixed_arith(10, 0.5))\nend\n",
+    "expected": "6.0\n11.0\n",
+    "notes": "Int+Float 混合提升。3+1.5*2=3+3.0=6.0, 10+0.5*2=10+1.0=11.0。Float 整数输出带 .0。"
+  },
+  {
+    "id": "029",
+    "category": "types",
+    "difficulty": "medium",
+    "prompt": "写函数 string_eq(a: String, b: String) -> Bool 返回 a == b。main 调用 println(string_eq(\"abc\", \"abc\"))、println(string_eq(\"abc\", \"abd\"))、println(string_eq(\"\", \"\"))。",
+    "solution": "fn string_eq(a: String, b: String) -> Bool\n    a == b\nend\n\nfn main() -> Unit\n    println(string_eq(\"abc\", \"abc\"))\n    println(string_eq(\"abc\", \"abd\"))\n    println(string_eq(\"\", \"\"))\nend\n",
+    "expected": "true\nfalse\ntrue\n",
+    "notes": "String 相等比较。Bool 输出小写。"
+  },
+  {
+    "id": "030",
+    "category": "types",
+    "difficulty": "hard",
+    "prompt": "写函数 grade(score: Int) -> String：score >= 90 返回 \"A\"，80-89 返回 \"B\"，70-79 返回 \"C\"，60-69 返回 \"D\"，<60 返回 \"F\"。用 if/elif/else 链。main 调用 println(grade(95))、println(grade(85))、println(grade(75))、println(grade(65))、println(grade(55))。",
+    "solution": "fn grade(score: Int) -> String\n    if score >= 90\n        \"A\"\n    elif score >= 80\n        \"B\"\n    elif score >= 70\n        \"C\"\n    elif score >= 60\n        \"D\"\n    else\n        \"F\"\n    end\nend\n\nfn main() -> Unit\n    println(grade(95))\n    println(grade(85))\n    println(grade(75))\n    println(grade(65))\n    println(grade(55))\nend\n",
+    "expected": "A\nB\nC\nD\nF\n",
+    "notes": "5 分支 elif 链。考察 LLM 对多分支 elif 的处理。"
+  }
+]

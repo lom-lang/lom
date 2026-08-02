@@ -1,0 +1,36 @@
+# 用户自定义枚举 + match — 无参数变体、带参数变体
+enum Color = Red | Green | Blue
+
+enum Shape
+    | Circle(Float)
+    | Square(Float)
+    | Rectangle(Float, Float)
+end
+
+fn color_code(c: Color) -> Int
+    match c
+        Red => 1
+        Green => 2
+        Blue => 3
+    end
+end
+
+fn area(s: Shape) -> Float
+    match s
+        Circle(r) => 3.14 * r * r
+        Square(side) => side * side
+        Rectangle(w, h) => w * h
+    end
+end
+
+fn main() -> Unit
+    # 无参数变体
+    println(color_code(Red))
+    println(color_code(Green))
+    println(color_code(Blue))
+
+    # 带参数变体
+    println(area(Circle(2.0)))
+    println(area(Square(3.0)))
+    println(area(Rectangle(2.0, 4.0)))
+end

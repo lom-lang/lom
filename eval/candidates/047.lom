@@ -1,0 +1,16 @@
+enum Op = Add | Sub | Mul | Div
+
+fn apply_op(op: Op, a: Int, b: Int) -> Int
+    match op
+        Add => a + b
+        Sub => a - b
+        Mul => a * b
+        Div => a / b
+    end
+end
+
+fn main() -> Unit
+    println(apply_op(Add, 3, 4))
+    println(apply_op(Mul, 3, 4))
+    println(apply_op(Sub, 10, 3))
+end

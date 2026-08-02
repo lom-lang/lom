@@ -1,0 +1,6 @@
+fn main() -> Unit
+    let box = {label: "point", coord: (3, 4)}
+    println(box.label)
+    println(box.coord.0)
+    println(box.coord.1)
+end

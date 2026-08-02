@@ -1,0 +1,16 @@
+fn gcd(a: Int, b: Int) -> Int
+    let mut x = a
+    let mut y = b
+    while y != 0
+        let tmp = y
+        y = x % y
+        x = tmp
+    end
+    x
+end
+
+fn main() -> Unit
+    println(gcd(48, 18))
+    println(gcd(100, 75))
+    println(gcd(17, 5))
+end

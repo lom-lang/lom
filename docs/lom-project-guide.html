@@ -173,36 +173,387 @@
 
 <h2>2.3 阶段 1：最小解释器（4-6 周）</h2>
 <div class="phase">
-  <h3>阶段 1 · 最小解释器 <span class="tag">研究性</span></h3>
+  <h3>阶段 1 · 最小解释器 <span class="tag">研究性</span> <span class="tag" style="background:#16a34a;color:white;">已完成</span></h3>
   <p><strong>目标</strong>：能跑通基本语法子集的树遍历解释器。<strong>不做类型检查、不做张量、不做工作负载特性</strong>。</p>
   <h4>技术栈</h4>
-  <p>Rust + logos（词法）+ 手写递归下降（语法）+ Pratt（表达式）+ tree-walking（解释）</p>
+  <p>Rust + 手写词法分析器（零依赖，Phase 2 评估迁移 logos）+ 手写递归下降（语法）+ Pratt（表达式）+ tree-walking（解释）</p>
   <h4>语法子集</h4>
-  <pre><code>fn let let mut if else while for return
+  <pre><code>fn let let mut if elif else while for return
 基本类型：Int Float Bool String Unit
-运算符 + 函数 + 闭包</code></pre>
+运算符 + - * / % == != &lt; &gt; &lt;= &gt;= and or not
+函数 + 闭包 + 高阶函数</code></pre>
+  <h4>实现文件</h4>
+  <ul>
+    <li><code>src/lexer.rs</code> — 手写词法分析器，支持关键字、字面量、运算符、行注释/块注释 ✅</li>
+    <li><code>src/ast.rs</code> — AST 定义（Program/Item/FnDecl/Block/Stmt/Expr）✅</li>
+    <li><code>src/parser.rs</code> — 递归下降 + Pratt 表达式解析，含跨行运算符消歧 ✅</li>
+    <li><code>src/interpreter.rs</code> — 树遍历解释器，支持作用域链、闭包捕获、内置函数 ✅</li>
+    <li><code>src/main.rs</code> — CLI 入口 <code>lom &lt;file.lom&gt;</code> ✅</li>
+  </ul>
+  <h4>内置函数</h4>
+  <p><code>println</code> / <code>print</code> / <code>int_to_string</code> / <code>string_to_int</code> / <code>len</code></p>
+  <h4>测试用例（13 个，全部通过）</h4>
+  <ul>
+    <li><code>examples/fib.lom</code> — 递归斐波那契 + while 循环 ✅</li>
+    <li><code>examples/arithmetic.lom</code> — 四则运算、优先级、取模、混合类型提升 ✅</li>
+    <li><code>examples/closures.lom</code> — 闭包捕获、高阶函数、闭包返回闭包 ✅</li>
+    <li><code>examples/strings.lom</code> — 字符串拼接、长度、字符遍历 ✅</li>
+    <li><code>examples/control_flow.lom</code> — if/elif/else 链、while、for、嵌套循环（九九乘法表）✅</li>
+    <li><code>examples/logical.lom</code> — and/or 短路求值、布尔组合 ✅</li>
+    <li><code>examples/factorial.lom</code> — 递归与循环两种实现对比 ✅</li>
+    <li><code>examples/hof.lom</code> — apply_twice、compose、sum_of、条件求和 ✅</li>
+    <li><code>examples/nested_calls.lom</code> — is_even/is_odd 互递归 ✅</li>
+    <li><code>examples/float_ops.lom</code> — 浮点运算、Int/Float 混合提升、温度转换 ✅</li>
+    <li><code>examples/builtin_funcs.lom</code> — int_to_string/string_to_int/len 组合使用 ✅</li>
+    <li><code>examples/if_expression.lom</code> — if 作为表达式、多分支、嵌套 ✅</li>
+    <li><code>examples/primes.lom</code> — 质数判断（互递归 + 循环 + 条件综合）✅</li>
+  </ul>
+  <h4>Rust 单元测试</h4>
+  <p>20 个单元测试（lexer 5 + parser 8 + interpreter 7），全部通过 ✅</p>
+  <div class="rec">
+    <strong>关键 bug 修复：跨行运算符消歧</strong><br>
+    发现并修复了 LLM 友好性的关键 bug：当一行以数字结尾、下一行以 <code>-</code> 开头时，
+    解析器会将 <code>-</code> 误认为二元减法而非一元取负（如 <code>n &gt; 0\n-1</code> 被解析为 <code>n &gt; (0 - 1)</code>）。
+    同理，跨行的 <code>(</code> 被误认为函数调用。<br><br>
+    <strong>修复方案</strong>：在 <code>parse_addition</code> 和 <code>parse_postfix</code> 中检查 token 行号，
+    跨行的 <code>-</code> 视为一元取负，跨行的 <code>(</code> 不视为函数调用。
+    这是"局部性 &gt; 全局性"设计哲学的体现——同一行的表达式才是一个整体。
+  </div>
+  <h4>已知限制（Phase 2 修复）</h4>
+  <ul>
+    <li>字符串字面量不支持 UTF-8 多字节字符（lexer 按字节处理）</li>
+    <li>函数不能作为一等值传递（仅闭包字面量可以），顶层函数名不能赋值给变量</li>
+    <li>无类型检查（运行时动态类型），<code>Fn</code> 作为函数参数的类型占位符（运行时忽略）</li>
+    <li>无错误恢复（语法错误即停止），无 LSP/REPL</li>
+  </ul>
   <h4>场景</h4>
   <p>LLM 生成代码的运行环境（最小版）——LLM 生成简单脚本，解释器能跑。</p>
   <h4>退出标准</h4>
-  <p>建立 10+ 个测试用例（斐波那契、字符串处理、循环、递归），LLM 基于 SPEC_FOR_AI 生成的代码能跑通其中 70%+。</p>
+  <p>建立 10+ 个测试用例（斐波那契、字符串处理、循环、递归），LLM 基于 SPEC_FOR_AI 生成的代码能跑通其中 70%+。<strong>实际结果：13 个测试用例 100% 通过，20 个单元测试 100% 通过，超标达成。</strong></p>
 </div>
 
 <h2>2.4 阶段 2：LLM 编码原生核心（6-10 周）— 身份阶段</h2>
 <div class="phase">
-  <h3>阶段 2 · LLM 编码原生核心 <span class="tag">MVP</span></h3>
+  <h3>阶段 2 · LLM 编码原生核心 <span class="tag">MVP</span> <span class="tag" style="background:#eab308;color:white;">进行中</span></h3>
   <p><strong>目标</strong>：把"LLM 编码原生"做出来。这是与其他语言的区别点，也是 Lom 身份的成立点。</p>
-  <h4>核心特性（按优先级）</h4>
+  <h4>进度（2.1 语法扩展子阶段）</h4>
+  <ul>
+    <li>2.1.1 <code>match</code> + 枚举 + Result/Option/模式匹配 ✅ <span class="meta">已完成</span></li>
+    <li>2.1.2 <code>?</code> 错误传播运算符 ✅ <span class="meta">已完成</span></li>
+    <li>2.1.3 <code>|&gt;</code> pipeline 运算符 ✅ <span class="meta">已完成</span></li>
+    <li>2.1.4 结构记录 <code>{x: Int, y: Int}</code> + 元组 ✅ <span class="meta">已完成</span></li>
+    <li>2.1.5 显式导入 <code>from mod import {...}</code> ✅ <span class="meta">已完成</span></li>
+    <li>2.2 容错解析器（带洞 AST）✅ <span class="meta">已完成</span></li>
+    <li>2.3 结构化 JSON 错误诊断 ✅ <span class="meta">已完成</span></li>
+    <li>2.4 渐进式类型检查器 ✅ <span class="meta">已完成</span></li>
+    <li>2.5 显式效应系统 ✅ <span class="meta">已完成</span></li>
+    <li>2.6 <code>lom info --json</code> 类型信息导出 ✅ <span class="meta">已完成</span></li>
+    <li>2.7 <code>lom fix --plan --json</code> AI 修复计划 ✅ <span class="meta">已完成</span></li>
+    <li>2.8 <code>eval/</code> 100 任务评测集 ✅ <span class="meta">已完成</span></li>
+  </ul>
+  <h4>2.1.1 已完成内容</h4>
+  <ul>
+    <li><strong>match 表达式</strong>：Form A（<code>=&gt;</code> 后同行单表达式）+ Form B（<code>=&gt;</code> 后跨行 block，以 <code>end</code> 闭合），两种形式可混用 ✅</li>
+    <li><strong>枚举声明</strong>：单行 <code>enum Name = V1 | V2</code> + 多行 <code>enum Name\n V1\n V2\n end</code>（变体前可选 <code>|</code>），支持泛型参数 <code>&lt;T, E&gt;</code> ✅</li>
+    <li><strong>内置变体</strong>：<code>Ok(v)</code> / <code>Err(e)</code> / <code>Some(v)</code> / <code>None</code>，无需声明直接用 ✅</li>
+    <li><strong>类型注解</strong>：<code>Result&lt;T, E&gt;</code> / <code>Option&lt;T&gt;</code> 泛型解析 ✅</li>
+    <li><strong>模式匹配</strong>：字面量模式（<code>0</code>/<code>"hi"</code>/<code>True</code>）、绑定模式（<code>n</code>）、通配符（<code>_</code>）、变体模式（<code>Ok(n)</code>/<code>None</code>），无参数变体自动按变体匹配而非绑定 ✅</li>
+  </ul>
+  <h4>2.1.2 已完成内容</h4>
+  <ul>
+    <li><strong><code>?</code> 错误传播运算符</strong>：<code>expr?</code> 后缀语法，比 postfix 低、比 unary 高 ✅</li>
+    <li><strong>Result 解包</strong>：<code>Ok(v)?</code> 解出 <code>v</code>；<code>Err(e)?</code> 触发提前返回，携带 <code>Err(e)</code> 穿透嵌套 block 到函数边界 ✅</li>
+    <li><strong>Option 解包</strong>：<code>Some(v)?</code> 解出 <code>v</code>；<code>None?</code> 触发提前返回，携带 <code>None</code> ✅</li>
+    <li><strong>穿透机制</strong>：重构 <code>RuntimeError</code> 为枚举，新增 <code>EarlyReturn(Value)</code> 变体；<code>exec_block</code> 捕获 <code>EarlyReturn</code> 转为 <code>ControlFlow::Return</code>，实现跨嵌套 block 的提前返回 ✅</li>
+    <li><strong>类型检查</strong>：对非 Result/Option 值使用 <code>?</code> 报运行时错误（Phase 2.4 后转为编译期检查）✅</li>
+  </ul>
+  <h4>2.1.3 已完成内容</h4>
+  <ul>
+    <li><strong><code>|&gt;</code> pipeline 运算符</strong>：左侧值作为右侧函数的<strong>第一个参数</strong>，左结合 ✅</li>
+    <li><strong>三种形式</strong>：<code>x |&gt; f</code> =&gt; <code>f(x)</code>；<code>x |&gt; f(y)</code> =&gt; <code>f(x, y)</code>（x 前置到参数列表）；<code>x |&gt; f |&gt; g</code> =&gt; <code>g(f(x))</code>（链式）✅</li>
+    <li><strong>优先级</strong>：介于比较和算术之间（高于 <code>==</code>/<code>&lt;</code>/比较，低于 <code>+ -</code>）。<code>1 + 2 |&gt; f</code> =&gt; <code>f(1+2)</code>；<code>x |&gt; f == 3</code> =&gt; <code>(x |&gt; f) == 3</code> ✅</li>
+    <li><strong>右侧 callee 类型</strong>：顶层函数名、闭包值、变体构造器、内置函数、带额外参数的调用，均支持 ✅</li>
+    <li><strong>实现方式</strong>：AST 保留显式 <code>Expr::Pipe</code> 节点（便于将来错误诊断/流式求值）；解释器抽出 <code>eval_call</code> 公共方法复用 Call 求值逻辑 ✅</li>
+  </ul>
+  <h4>2.2 已完成内容 · 容错解析器（带洞 AST）</h4>
+  <ul>
+    <li><strong>容错词法分析</strong>：<code>Lexer::tokenize_recover</code> 遇词法错误不终止，记录错误并跳过坏字节继续，返回 <code>(tokens, errors)</code>；与严格 <code>tokenize()</code> 共存 ✅</li>
+    <li><strong>容错语法分析</strong>：<code>Parser::parse_recover</code> 收集全部词法+语法错误，返回 <code>ParseResult { program, errors }</code>；<code>is_ok()</code> 区分干净/带洞 ✅</li>
+    <li><strong>代码洞（Hole）节点</strong>：<code>Stmt::Hole { line, col }</code> 语句级占位符；解释器遇到时报运行时错误（带位置信息）✅</li>
+    <li><strong>同步点恢复</strong>：item 级（<code>sync_to_top</code>，跳到 fn/enum/from/EOF）、语句级（<code>sync_to_stmt_boundary</code>，跳到 end/elif/else 或新行语句起点）、match 臂级（丢弃错误臂继续）✅</li>
+    <li><strong>进度保证</strong>：<code>ensure_progress</code> 防止同步点不前进导致无限循环 ✅</li>
+    <li><strong>已知限制</strong>：<code>fn</code> 与闭包字面量歧义，缺失 <code>end</code> 时同步可能跨越函数边界；Phase 3 LSP 改造时优化 ✅</li>
+  </ul>
+  <h4>2.3 已完成内容 · 结构化 JSON 错误诊断</h4>
+  <ul>
+    <li><strong>新模块</strong>：<code>src/diagnostics.rs</code>，零依赖手写 JSON 序列化（与 lexer/parser 一致，不引入 serde）✅</li>
+    <li><strong>lom-diag/v1 schema</strong>：稳定版本号 + <code>file</code> + <code>ok</code> + <code>summary</code>（total/errors/warnings/holes）+ <code>diagnostics[]</code> 数组 ✅</li>
+    <li><strong>诊断字段</strong>：<code>severity</code>（error/warning/info，预留 Phase 2.4）+ <code>stage</code>（lex/parse/type/runtime）+ <code>code</code> + <code>message</code> + <code>file/line/col</code> + <code>source_line</code>（源码上下文）+ <code>is_hole</code>（代码洞标记）+ <code>hint</code>（修复提示）✅</li>
+    <li><strong>错误码体系</strong>：LEX001-099（词法）/ PARSE001-099（语法，PARSE099=代码洞）/ TYPE001-099（Phase 2.4 预留）/ RUNTIME001-099（运行时）✅</li>
+    <li><strong>智能阶段分类</strong>：Phase 2.2 把词法错误合并到 <code>ParseResult.errors</code>，<code>from_parse</code> 按消息特征识别真实阶段（"未闭合的字符串"→LEX001/lex 而非 PARSE000/parse）✅</li>
+    <li><strong>CLI 选项</strong>：<code>lom &lt;file&gt; --json</code> 仅诊断输出 JSON（不执行）；<code>lom &lt;file&gt; --check</code> 仅诊断输出人类可读（带源码指示线 <code>^</code>）；<code>lom --help</code> 帮助 ✅</li>
+    <li><strong>运行时错误诊断</strong>：默认运行模式遇运行时错误时输出结构化诊断（错误码 + hint）；位置暂为 (0,0)（Phase 3 AST 携带位置后改进）✅</li>
+    <li><strong>输出流分离</strong>：<code>--json</code>/<code>--check</code> 诊断到 stdout（程序产品）；默认运行时错误到 stderr（程序失败）✅</li>
+  </ul>
+  <h4>测试</h4>
+  <ul>
+    <li>Rust 单元测试 85/85 通过（diagnostics 模块新增 14 个：分类/JSON/人类可读/端到端）✅</li>
+    <li>原 71 个测试无回归 ✅</li>
+    <li>端到端验证：<code>--json</code> 输出合法 JSON；<code>--check</code> 输出带源码指示线；<code>--help</code> 显示帮助；运行时错误带错误码 ✅</li>
+    <li><code>examples/match_basic.lom</code> — 字面量模式、Form A ✅</li>
+    <li><code>examples/match_result.lom</code> — Result/Option 变体、Form A/B 混用、match 作尾表达式 ✅</li>
+    <li><code>examples/match_enum.lom</code> — 用户自定义枚举（无参 + 带参变体）、面积计算 ✅</li>
+    <li><code>examples/try_operator.lom</code> — <code>?</code> 对 Result/Option 的错误传播 ✅</li>
+    <li><code>examples/pipeline.lom</code> — 基础/链式/带参数 pipeline、闭包值、算术与比较优先级（10 个场景）✅</li>
+    <li><code>examples/record_tuple.lom</code> — 结构记录、元组、字段访问/索引 ✅</li>
+    <li><code>examples/import.lom</code> — 显式导入、别名、多模块、标准库（io/string/math）✅</li>
+    <li>原 13 个 Phase 1 测试用例 + 后续新增 = 全部通过，无回归 ✅</li>
+  </ul>
+  <h4>2.4 已完成内容 · 渐进式类型检查器</h4>
+  <ul>
+    <li><strong>新模块</strong>：<code>src/typechecker.rs</code>，零依赖手写（与 diagnostics 一致风格，不引入 serde）✅</li>
+    <li><strong>渐进式语义</strong>：类型注解可选；类型错误以 <code>Warning</code> 报告（程序仍可动态运行）；仅 <code>NAM002/NAM003/NAM004</code> 等名称解析错误为 <code>Error</code> 级别 ✅</li>
+    <li><strong>两遍分析</strong>：
+      <ol>
+        <li><strong>签名收集</strong>：注册所有 <code>fn</code> 签名、<code>enum</code> 定义、<code>import</code> 别名（别名继承原函数签名）✅</li>
+        <li><strong>体检查</strong>：遍历每个函数体，推断类型并报告不匹配 ✅</li>
+      </ol>
+    </li>
+    <li><strong>错误码体系</strong>：
+      <ul>
+        <li><code>NAM002</code>（Error）— 函数/枚举重复定义</li>
+        <li><code>NAM003</code>（Error）— 未定义变量/未定义函数调用</li>
+        <li><code>NAM004</code>（Error）— 记录无此字段/枚举无此变体</li>
+        <li><code>TYPE001</code>（Warning）— 类型不匹配（二元运算、let 注解、赋值）</li>
+        <li><code>TYPE002</code>（Warning）— <code>if</code>/<code>while</code> 条件非 <code>Bool</code></li>
+        <li><code>TYPE003</code>（Warning）— 函数/变体参数个数或类型不匹配</li>
+        <li><code>TYPE010</code>（Warning）— 函数/闭包返回类型不匹配</li>
+        <li><code>TYPE020</code>（Warning）— <code>?</code> 运算符误用（操作数非 Result/Option，或外层函数返回类型不兼容）</li>
+        <li><code>MAT001</code>（Warning）— <code>match</code> 非穷尽（用户枚举/Result/Option 缺少变体；<code>_</code> 通配符使匹配穷尽）</li>
+      </ul>
+    </li>
+    <li><strong>类型兼容性规则</strong>：
+      <ul>
+        <li><strong>结构等价</strong>：记录按字段名+类型匹配，字段顺序无关</li>
+        <li><strong><code>_Any</code> 通配符</strong>：prelude/stdlib 函数签名用 <code>Named("_Any")</code> 接受任意类型；在算术运算中静默 <code>TYPE001</code></li>
+        <li><strong>泛型占位符 <code>T</code>/<code>E</code></strong>：内部 <code>Result</code>/<code>Option</code> 变体字段用 <code>Generic("T"/"E")</code>；在推断中按 <code>Unknown</code> 处理避免误报</li>
+        <li><strong>闭包</strong>：闭包体继承外层环境（捕获外部变量），嵌套作用域支持</li>
+        <li><strong>match 分支</strong>：模式绑定变量注入到分支环境；无参数变体（如 <code>None</code>/<code>Red</code>）解析为 <code>Binder</code> 时被识别为变体构造器用于穷尽性</li>
+      </ul>
+    </li>
+    <li><strong>标准库签名注册</strong>：prelude（<code>println</code>/<code>print</code>）+ stdlib 模块（<code>io</code>/<code>string</code>/<code>math</code>）函数签名在启动时注册，避免 <code>NAM003</code> 误报 ✅</li>
+    <li><strong>CLI 集成</strong>：
+      <ul>
+        <li><code>lom &lt;file&gt;</code> — 默认运行，不执行类型检查（动态执行）</li>
+        <li><code>lom &lt;file&gt; --check</code> — 运行类型检查，输出人类可读诊断；仅有 Error 时退出码 1，仅有 Warning 时退出码 0</li>
+        <li><code>lom &lt;file&gt; --json</code> — 输出 <code>lom-diag/v1</code> JSON，包含 <code>stage: "type"</code> 诊断</li>
+      </ul>
+    </li>
+    <li><strong>当前不检查的内容</strong>（留待后续阶段）：
+      <ul>
+        <li>Trait 解析（推迟至 Phase 3+，Phase 2.6 已重新定义为类型信息导出）</li>
+        <li>泛型实例化（仅占位符兼容性）</li>
+        <li>元组索引精确推断（<code>.0</code>/<code>.1</code>）</li>
+        <li>跨函数闭包调用点类型检查（闭包作为值返回 <code>Unknown</code>）</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>测试（2.4 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 105/105 通过（typechecker 模块新增 20 个：签名收集/体检查/兼容性/穷尽性/闭包/import 别名/标准库注册）✅</li>
+    <li>原 85 个测试无回归 ✅</li>
+    <li>20 个 <code>.lom</code> 示例（运行 + <code>--check</code>）全部通过 ✅</li>
+    <li>端到端验证：<code>--check</code> 输出类型诊断（含 <code>TYPE001/TYPE002/TYPE003/TYPE010/TYPE020/MAT001/NAM003</code> 等码）；<code>--json</code> 输出含 <code>stage: "type"</code> 的合法 JSON；渐进式语义验证（类型错误不阻止默认运行）✅</li>
+  </ul>
+  <h4>2.5 已完成内容 · 显式效应系统</h4>
+  <ul>
+    <li><strong>语法</strong>：函数返回类型后加 <code>! [Effect1, Effect2]</code> 声明效应；<code>! []</code> 等价于纯函数；无 <code>! [...]</code> 也为纯函数 ✅</li>
+    <li><strong>AST 扩展</strong>：<code>FnDecl.effects: Vec&lt;Effect&gt;</code> 字段；<code>Effect = String</code>（标识符）✅</li>
+    <li><strong>Parser 扩展</strong>：<code>parse_effects()</code> 方法，在 <code>ret_type</code> 之后、<code>body</code> 之前解析可选 <code>! [ident {, ident}]</code> ✅</li>
+    <li><strong>效应检查规则</strong>：
+      <ul>
+        <li>纯函数（无 <code>!</code> 或 <code>! []</code>）调用带效应函数 → <code>EFF001</code> Warning</li>
+        <li>声明 <code>! [IO]</code> 的函数调用 <code>! [Clock]</code> 的函数 → <code>EFF001</code> Warning（Clock 未声明）</li>
+        <li>声明 <code>! [IO, Clock]</code> 后调用对应效应函数 → OK</li>
+        <li>纯函数调用纯函数 → OK</li>
+      </ul>
+    </li>
+    <li><strong>main 函数特殊处理</strong>：隐式拥有所有效应（<code>current_fn_is_main</code> 标记），<code>EFF001</code> 在 main 内不触发。设计理由：入口函数调用 IO 是常态，强制声明 <code>! [IO]</code> 增加 LLM 负担，违反 LLM-coding-native 容错原则 ✅</li>
+    <li><strong>闭包处理</strong>：闭包不携带独立效应注解；<code>current_effects</code> 在闭包内不重置，继承外层函数效应集合。避免给闭包字面量加 <code>!</code> 注解 ✅</li>
+    <li><strong>标准库效应签名</strong>：
+      <ul>
+        <li><code>println</code> / <code>print</code> → <code>[IO]</code></li>
+        <li><code>len</code> / <code>int_to_string</code> / <code>string_to_int</code> / <code>trim</code> / <code>upper</code> / <code>lower</code> → 纯函数</li>
+        <li><code>sqrt</code> / <code>abs</code> / <code>min</code> / <code>max</code> → 纯函数</li>
+      </ul>
+    </li>
+    <li><strong>渐进式语义</strong>：<code>EFF001</code> 为 Warning，不阻止默认运行；仅 <code>--check</code>/<code>--json</code> 模式输出 ✅</li>
+    <li><strong>Import 别名继承</strong>：<code>from io import { println as log }</code> 中 <code>log</code> 继承 <code>println</code> 的 <code>[IO]</code> 效应签名 ✅</li>
+    <li><strong>当前不做</strong>（留待后续阶段）：
+      <ul>
+        <li>运行时效应跟踪（仅编译期注解）</li>
+        <li>效应多态（effect polymorphism）</li>
+        <li>效应处理器（effect handlers，留 Phase 5+）</li>
+        <li>效应推断（必须显式声明，main 除外）</li>
+        <li>跨函数效应传递（不传递：纯函数 b 调用带效应 c 时只标记 b 内部调用点，不影响 b 的调用者）</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>测试（2.5 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 115/115 通过（typechecker 模块新增 10 个效应测试：纯函数调 IO / IO 调 IO / main 跳过 / 部分效应覆盖 / 多效应 / 空效应列表 / 纯调纯 / 解析验证 / 跨函数链不传递）✅</li>
+    <li>原 105 个测试无回归 ✅</li>
+    <li>22 个 <code>.lom</code> 示例（运行 + <code>--check</code>）全部通过 ✅</li>
+    <li>新增 <code>examples/effects.lom</code> — 正面示例：纯函数 / <code>! [IO]</code> / <code>! [IO, Clock]</code> / main 调用 ✅</li>
+    <li>新增 <code>examples/effects_bad.lom</code> — 反例：纯函数调 println（EFF001）/ 声明 [IO] 调 [Clock]（EFF001）✅</li>
+    <li>端到端验证：<code>--check</code> 输出 <code>EFF001</code> 警告（退出码 0，渐进式）；<code>--json</code> 输出含 <code>stage: "type"</code> + <code>code: "EFF001"</code> 的合法 JSON ✅</li>
+  </ul>
+  <h4>2.6 已完成内容 · 类型信息导出（<code>lom info</code>）</h4>
+  <ul>
+    <li><strong>子命令设计</strong>：新增 <code>info</code> 子命令，与默认运行/<code>--json</code>/<code>--check</code> 模式互斥。<code>parse_args</code> 先 peek 第一个参数判断是否为子命令，再解析剩余选项 ✅</li>
+    <li><strong>CLI 用法</strong>：
+      <ul>
+        <li><code>lom info &lt;file&gt;</code> — 人类可读格式输出到 stdout</li>
+        <li><code>lom info &lt;file&gt; --json</code> — <code>lom-info/v1</code> JSON 输出到 stdout（给 LLM 消费）</li>
+        <li>解析失败时输出 <code>lom-diag/v1</code>（复用 Phase 2.3 诊断模块），退出码 1；不输出 <code>lom-info/v1</code></li>
+      </ul>
+    </li>
+    <li><strong>lom-info/v1 schema</strong>（独立于 <code>lom-diag/v1</code>，让 LLM 区分"上下文查询"与"错误报告"）：
+      <ul>
+        <li>顶层：<code>schema</code> / <code>file</code> / <code>ok</code> / <code>functions[]</code> / <code>enums[]</code> / <code>imports[]</code></li>
+        <li>函数：<code>name</code> / <code>params[{name,type}]</code> / <code>ret_type</code>（字符串或 <code>null</code>）/ <code>effects[]</code> / <code>is_main</code></li>
+        <li>枚举：<code>name</code> / <code>type_params[]</code> / <code>variants[{name,fields[]}]</code></li>
+        <li>导入：<code>module</code> / <code>items[{name,alias}]</code></li>
+      </ul>
+    </li>
+    <li><strong>类型字符串化</strong>：<code>type_to_string</code> 覆盖全部类型形式 — 基础类型 / 命名类型 / <code>Option&lt;T&gt;</code> / <code>Result&lt;T, E&gt;</code> / 泛型应用 <code>Name&lt;A, B&gt;</code> / 记录 <code>{ x: Int, y: Int }</code>（花括号内侧带空格）/ 元组 <code>(Int, String)</code> ✅</li>
+    <li><strong>人类可读格式</strong>：分 <code>[functions]</code> / <code>[enums]</code> / <code>[imports]</code> 三段；空段省略；<code>main</code> 函数标注 <code>(main)</code>；效应以 <code>! [IO, Clock]</code> 形式展示 ✅</li>
+    <li><strong>零依赖 JSON 序列化</strong>：手写 <code>to_json</code>，与 <code>diagnostics</code> 模块风格一致（不引入 serde）；字符串字段经 <code>json_escape</code> 转义 ✅</li>
+    <li><strong>设计取舍 — info 不做类型检查</strong>：仅描述"声明了什么"，不报告"检查出什么错误"。类型错误由 <code>--check</code>/<code>--json</code>（Phase 2.4）负责。这让 LLM 在写代码前能廉价获取上下文，无需触发完整类型检查流水线 ✅</li>
+    <li><strong>当前不做</strong>（留待后续阶段）：
+      <ul>
+        <li>跨文件信息（<code>info</code> 只读单文件；传递依赖不展开，留 Phase 3 模块系统）</li>
+        <li>表达式级类型（仅导出顶层声明；局部 <code>let</code> 绑定和推断类型不报告）</li>
+        <li>声明位置（行/列尚未报告，留 Phase 3 AST 位置改造）</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>测试（2.6 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 128/128 通过（<code>info</code> 模块新增 13 个：函数签名收集 / 效应收集 / 枚举收集 / 泛型枚举 / 导入收集 / 导入别名 / JSON 结构 / 空程序 / null 返回类型 / 人类可读格式 / 复杂类型字符串 / 记录元组字符串 / 解析错误降级）✅</li>
+    <li>原 115 个测试无回归 ✅</li>
+    <li>22 个 <code>.lom</code> 示例无回归（运行 + <code>--check</code>）✅</li>
+    <li>端到端验证：
+      <ul>
+        <li><code>lom info examples/effects.lom</code> — 人类可读输出 5 个函数（含 <code>! [IO]</code> / <code>! [Clock]</code> / <code>! [IO, Clock]</code> / <code>(main)</code> 标注）+ 1 个 import ✅</li>
+        <li><code>lom info examples/effects.lom --json</code> — 输出合法 <code>lom-info/v1</code> JSON，字段完整、嵌套结构正确 ✅</li>
+        <li>解析错误文件 — 输出 <code>lom-diag/v1</code>（含 <code>LEX005</code> + <code>PARSE001</code>），退出码 1，不输出 <code>lom-info/v1</code> ✅</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>2.7 已完成内容 · AI 修复计划（<code>lom fix</code>）</h4>
+  <ul>
+    <li><strong>子命令设计</strong>：新增 <code>fix</code> 子命令，与 <code>info</code>（Phase 2.6）对称。<code>parse_args</code> 在已有 <code>info</code> 分支后追加 <code>fix</code> 分支，复用 <code>--json</code>/<code>--plan</code> 选项解析 ✅</li>
+    <li><strong>CLI 行为</strong>：
+      <ul>
+        <li><code>lom fix &lt;file&gt;</code> — 人类可读修复计划输出到 stdout</li>
+        <li><code>lom fix &lt;file&gt; --json</code> — <code>lom-fix/v1</code> JSON 输出到 stdout（给 LLM 消费）</li>
+        <li><code>lom fix &lt;file&gt; --plan</code> — 显式标志（Phase 2.7 默认即 plan 模式；<code>--apply</code> 留待 Phase 3 有 span 后）</li>
+        <li>退出码 0 = 计划生成成功（<strong>无论是否有诊断/修复</strong>）— 让 LLM 可无障碍消费 JSON，无需区分"有诊断/无诊断"</li>
+      </ul>
+    </li>
+    <li><strong>lom-fix/v1 schema</strong>（独立于 <code>lom-diag/v1</code>/<code>lom-info/v1</code>，让 LLM 区分"修复计划"/"错误报告"/"上下文查询"）：
+      <ul>
+        <li>顶层：<code>schema</code> / <code>file</code> / <code>ok</code> / <code>summary { total, applicable, skipped }</code> / <code>plans[]</code></li>
+        <li>每条 plan：<code>diagnostic</code>（嵌入诊断引用，含 <code>code/severity/stage/line/col/message</code>，自包含无需交叉引用）+ <code>fixes[]</code> + <code>retry</code></li>
+        <li>每个 fix：<code>description</code> / <code>action</code>（insert/replace/delete/hint）/ <code>line</code> / <code>col</code> / <code>end_line</code> / <code>end_col</code> / <code>text</code> / <code>confidence</code>（high/medium/low）</li>
+      </ul>
+    </li>
+    <li><strong>修复策略表</strong>（覆盖 20+ 错误码，每个错误码至少有一个 hint）：
+      <ul>
+        <li><code>LEX001/LEX002</code> — 在错误行末尾插入 <code>"</code> 闭合字符串（<code>insert</code>, high）✅</li>
+        <li><code>LEX005</code> — 删除意外字符（<code>delete</code>, high）✅</li>
+        <li><code>PARSE002/PARSE003</code> — 提示 <code>Result&lt;T, E&gt;</code> 需 2 个 / <code>Option&lt;T&gt;</code> 需 1 个类型参数（<code>hint</code>, medium）✅</li>
+        <li><code>MAT001</code> — 从消息提取变体名，生成缺失分支文本（如 <code>Green =&gt; ()</code>）（<code>hint</code> 带 <code>text</code>, medium）✅</li>
+        <li><code>EFF001</code> — 从消息提取效应名，生成注解文本（如 <code>! [IO]</code>）（<code>hint</code> 带 <code>text</code>, high）✅</li>
+        <li><code>TYPE002/TYPE020/NAM003</code> 等 — 提供针对性提示文本（<code>hint</code>, low/medium）✅</li>
+        <li><code>RUNTIME001-005</code> — 运行时错误仅给提示（位置仍 (0,0)，待 Phase 3）✅</li>
+      </ul>
+    </li>
+    <li><strong>retry 标志语义</strong>：<code>retry=true</code> 当至少一个 fix 满足"非 hint 动作"或"hint 带具体 <code>text</code>"（如 EFF001/MAT001 的可粘贴片段）。纯文本提示的 hint 不算可重试 ✅</li>
+    <li><strong>零依赖 JSON 序列化</strong>：与 <code>diagnostics</code>/<code>info</code> 模块一致风格，手写 <code>to_json</code> 函数，不引入 serde ✅</li>
+    <li><strong>消息解析辅助函数</strong>：<code>extract_quoted_char</code>（提取单引号内字符）/ <code>extract_quoted_string</code>（提取完整字符串，用于 MAT001 多字符变体名）/ <code>extract_second_bracketed</code>（提取第二个方括号内容，用于 EFF001 效应名）✅</li>
+    <li><strong>设计取舍 — fix 不应用修复</strong>：仅生成计划，不修改源文件。LLM 负责读取计划并应用修复（LLM-coding-native 原则：让 LLM 拥有修复决策权）。<code>--apply</code> 留待 Phase 3 AST 携带 span 后实现安全的原地编辑 ✅</li>
+    <li><strong>设计取舍 — 退出码 0</strong>：fix 的产品是计划本身，无论是否有诊断都视为"计划生成成功"。这与 <code>--json</code>/<code>info</code> 的退出码语义不同（它们以 <code>ok</code> 决定），但符合"计划是产品"语义 ✅</li>
+  </ul>
+  <h4>测试（2.7 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 148/148 通过（<code>fix</code> 模块新增 20 个：LEX001 列号计算 / LEX005 删除 / PARSE002-003 类型参数提示 / MAT001 单字符与多字符变体 / EFF001 效应名提取 / TYPE002 条件 Bool / retry 标志三种情形 / JSON 结构合法性 / 空诊断空计划 / hint-only 不重试 / hint+text 重试 / 多 fix 优先级 / 消息解析辅助函数）✅</li>
+    <li>端到端验证：
+      <ul>
+        <li><code>lom fix examples/unclosed_string.lom --json</code> — 词法错误生成 <code>insert</code> 修复，JSON 合法 ✅</li>
+        <li><code>lom fix examples/effects_bad.lom --json</code> — EFF001 生成 <code>hint</code> 带 <code>! [IO]</code> 文本，<code>retry=true</code> ✅</li>
+        <li><code>lom fix examples/effects_bad.lom</code> — 人类可读格式，含源码指示线、修复建议、置信度标注 ✅</li>
+        <li><code>lom fix examples/correct.lom --json</code> — 无诊断时 <code>ok=true</code>，<code>plans=[]</code>，退出码 0 ✅</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>2.8 已完成内容 · <code>eval/</code> 100 任务评测集</h4>
+  <ul>
+    <li><strong>目录结构</strong>：
+      <ul>
+        <li><code>eval/README.md</code> — 评测集设计目标、目录结构、任务格式、runner 用法</li>
+        <li><code>eval/manifest.json</code> — 分类元数据（10 类 × 任务数 + 描述），<code>schema: lom-eval/v1</code></li>
+        <li><code>eval/tasks/01_arithmetic.json … 10_error_repair.json</code> — 10 个分类任务文件</li>
+        <li><code>eval/runner/run.ps1</code>（Windows）+ <code>eval/runner/run.sh</code>（Unix）+ <code>eval/runner/README.md</code></li>
+      </ul>
+    </li>
+    <li><strong>10 个分类（100 任务分布）</strong>：
+      <ul>
+        <li><code>01_arithmetic</code>（10）— 基础算术、<code>let</code>、<code>fn</code>、<code>println</code>、运算符优先级</li>
+        <li><code>02_control_flow</code>（10）— <code>if/elif/else</code>、<code>while</code>、<code>for</code>、<code>return</code>、布尔短路</li>
+        <li><code>03_types</code>（10）— Int/Float/Bool/String/Unit、类型转换、字面量边界</li>
+        <li><code>04_closures</code>（10）— 一等公民闭包、捕获、高阶函数、<code>map/filter</code> 模式</li>
+        <li><code>05_match_enum</code>（15）— <code>match</code> 模式匹配、<code>enum</code> 变体、Result/Option 解构</li>
+        <li><code>06_pipeline</code>（10）— <code>|&gt;</code> 线性管道、多步链式、与闭包组合</li>
+        <li><code>07_records_tuples</code>（10）— 结构记录 <code>{x: Int, y: Int}</code>、元组索引、结构等价</li>
+        <li><code>08_effects</code>（5）— <code>! [IO, Clock]</code> 效应注解、纯函数/效应函数组合</li>
+        <li><code>09_modules</code>（5）— <code>from mod import {name as alias}</code>、别名、string/math/io 标准库</li>
+        <li><code>10_error_repair</code>（15）— <strong>Lom "AI 原生"核心验证</strong>：给含错误代码 + <code>lom-diag/v1</code> 诊断，要求 LLM 修复后正确运行（覆盖 PARSE/TYPE/MAT/EFF/NAM/RUNTIME 错误码）</li>
+      </ul>
+    </li>
+    <li><strong>任务格式</strong>（每任务 JSON 对象）：<code>id</code>（001-100）/ <code>category</code> / <code>difficulty</code>（easy/medium/hard）/ <code>prompt</code>（自然语言需求）/ <code>solution</code>（参考 <code>.lom</code> 代码）/ <code>expected</code>（预期 stdout）/ <code>notes</code>（考察点说明）。分类 JSON 文件组织，便于人工审阅与版本控制 ✅</li>
+    <li><strong>Runner 脚本</strong>（PowerShell + Bash 双平台）：
+      <ul>
+        <li><code>./run.ps1 -Verify</code> / <code>./run.sh --verify</code> — 验证参考解决方案（评测集自检），100/100 通过 ✅</li>
+        <li><code>./run.ps1 -CandidatesDir &lt;dir&gt;</code> / <code>./run.sh --candidates-dir &lt;dir&gt;</code> — 评估 LLM 生成代码（读 <code>&lt;id&gt;.lom</code>，逐任务比对 stdout）</li>
+        <li><code>-Verbose</code> / <code>--verbose</code> — 每任务 PASS/FAIL 明细 + expected/actual 对比</li>
+        <li>PowerShell 版零依赖（Windows 原生）；Bash 版需 <code>jq</code>（Unix 通用）</li>
+        <li>大小写敏感比较（<code>-ceq</code> / <code>==</code>），行尾归一化（CRLF→LF），输出按分类统计通过率 + 总通过率，CI 友好（失败退出码 1）✅</li>
+      </ul>
+    </li>
+    <li><strong>参考解决方案验证</strong>：100/100 任务通过 <code>./eval/runner/run.ps1 -Verify</code>。修复了 3 个参考方案问题：任务 046/084 的 Float 输出格式（<code>12.0</code>/<code>4.0</code> 而非 <code>12</code>/<code>4</code>）、任务 078 缺 <code>from string import { int_to_string }</code> ✅</li>
+    <li><strong>设计取舍 — 错误修复任务占比 15%</strong>：<code>10_error_repair.json</code> 是 Lom 区别于普通语言评测集的核心——它不测"能否写出代码"，而测"LLM 能否基于 <code>lom-diag/v1</code> + <code>lom-fix/v1</code> 修复错误代码"，直接验证 Phase 2.3-2.7 的 AI 原生工具链价值 ✅</li>
+    <li><strong>设计取舍 — runner 不依赖 LLM</strong>：runner 只做"运行 + stdout 比对"，LLM 生成代码由外部流程（如 DeepSeek API 批量生成）产出到 <code>candidates/</code> 目录，runner 消费。这让评测集可在 CI 中无 API key 运行参考方案自检 ✅</li>
+  </ul>
+  <h4>测试（2.8 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 148/148 通过（本阶段不新增 Rust 测试，评测集为独立 <code>eval/</code> 目录）✅</li>
+    <li>评测集自检：<code>./eval/runner/run.ps1 -Verify</code> — 100/100 参考解决方案通过，10 个分类全部 100% ✅</li>
+    <li>跨平台验证：PowerShell runner（Windows）已验证；Bash runner（Unix）逻辑对称，需 <code>jq</code> 依赖 ✅</li>
+  </ul>
+  <h4>核心特性（按优先级，全阶段）</h4>
   <ol>
-    <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈</li>
-    <li><strong>结构化 JSON 错误诊断</strong>：含 <code>error_code</code>（如 <code>NAM003</code> 风格稳定码）、<code>fix</code> 字段、<code>retry</code> 字段，对标 Zero</li>
-    <li><strong>类型信息导出</strong>：<code>lom info &lt;file&gt;</code> 输出 JSON，给 LLM 当上下文</li>
-    <li><strong>AI 可读修复计划</strong>：<code>lom fix --plan --json</code>，对标 <code>zero fix --plan --json</code></li>
-    <li><strong>线性 pipeline 语法</strong>：<code>|&gt;</code> 运算符</li>
-    <li><strong>模式匹配</strong>：<code>match</code>，穷尽性检查</li>
+    <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈 <span class="tag" style="background:#16a34a;color:white;">已完成</span></li>
+    <li><strong>结构化 JSON 错误诊断</strong>：含 <code>error_code</code>（如 <code>NAM003</code> 风格稳定码），对标 Zero <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.3，lom-diag/v1）</span></li>
+    <li><strong>类型信息导出</strong>：<code>lom info &lt;file&gt;</code> 输出 JSON，给 LLM 当上下文 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.6）</span></li>
+    <li><strong>AI 可读修复计划</strong>：<code>lom fix --plan --json</code>，对标 <code>zero fix --plan --json</code> <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.7，lom-fix/v1）</span></li>
+    <li><strong>线性 pipeline 语法</strong>：<code>|&gt;</code> 运算符 <span class="tag" style="background:#16a34a;color:white;">语法已完成</span></li>
+    <li><strong>模式匹配</strong>：<code>match</code>，穷尽性检查 <span class="tag" style="background:#16a34a;color:white;">已完成（穷尽性检查 Phase 2.4 已实现）</span></li>
     <li><strong>结构类型</strong>：对标 TypeScript，LLM 不需要记类名</li>
-    <li><strong>渐进式类型</strong>：默认动态可跑，标注后检查</li>
-    <li><strong>显式效应系统</strong>：副作用在签名中声明</li>
-    <li><strong>错误是值</strong>：<code>Result&lt;T, E&gt;</code>，不用异常</li>
+    <li><strong>渐进式类型</strong>：默认动态可跑，标注后检查 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.4）</span></li>
+    <li><strong>显式效应系统</strong>：副作用在签名中声明 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.5）</span></li>
+    <li><strong>错误是值</strong>：<code>Result&lt;T, E&gt;</code>，不用异常 <span class="tag" style="background:#16a34a;color:white;">语法已完成</span></li>
   </ol>
   <h4>技术栈</h4>
   <p>Rust + 解释器 + 基础类型检查器（两遍：签名收集 + 体检查）</p>
@@ -215,9 +566,19 @@
     主流 LLM 生成通过率 &gt; 基线（基线需先测，预计 60%+）。
     <br><br>
     <strong>这是阶段 2 的核心产出，也是 Lom "AI 原生"成色的硬指标</strong>——回应"营销热度远超学术共识"质疑的硬证据。
+    <br><br>
+    <span class="tag" style="background:#16a34a;color:white;">评测集已完成（Phase 2.8）</span> 100 任务 + 双平台 runner 已落地，100/100 参考解决方案通过自检。
+    <br><br>
+    <span class="tag" style="background:#16a34a;color:white;">LLM 实测完成 ✅ 99/100 (99%)</span> 2026-08-03 使用网页版专家模型 + 思考模式实测，100 任务 99 通过，远超 60% 基线预期。关键指标：
+    <ul>
+      <li><strong>error_repair 15/15 (100%)</strong> — LLM 完美基于 <code>lom-diag/v1</code> 修复错误代码，验证 AI 原生核心价值</li>
+      <li><strong>0 语法错误 / 0 导入缺失</strong> — <code>end</code> 闭合块、显式导入、线性管道等设计有效降低 LLM 犯错率</li>
+      <li><strong>9/10 分类 100%</strong> — 仅 effects 4/5（唯一失败是输出格式理解偏差，非效应系统错误）</li>
+      <li>完整报告见 <code>eval/REPORT.md</code></li>
+    </ul>
   </div>
   <h4>退出标准</h4>
-  <p>评测集完成 + 主流 LLM 生成通过率达标 + 标志性 demo：<strong>LLM 生成错误代码 → Lom 返回结构化 JSON 修复建议</strong>。</p>
+  <p><span class="tag" style="background:#16a34a;color:white;">评测集完成 ✅</span> + <span class="tag" style="background:#16a34a;color:white;">LLM 通过率达标 ✅ 99%</span> + 标志性 demo：<strong>LLM 生成错误代码 → Lom 返回结构化 JSON 修复建议</strong>（<code>lom fix --json</code> 已在 Phase 2.7 实现并端到端验证）。<strong>Phase 2 退出标准全部达成。</strong></p>
 </div>
 
 <h2>2.5 阶段 3：可用 MVP（8-12 周）</h2>

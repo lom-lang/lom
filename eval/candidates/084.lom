@@ -1,0 +1,6 @@
+from math import { sqrt, abs as absolute }
+
+fn main() -> Unit
+    println(sqrt(16.0))
+    println(absolute(-7))
+end

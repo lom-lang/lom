@@ -1,0 +1,12 @@
+fn div(a: Int, b: Int) -> Int
+    a / b
+end
+
+fn mod_(a: Int, b: Int) -> Int
+    a % b
+end
+
+fn main() -> Unit
+    println(div(20, 6))
+    println(mod_(20, 6))
+end

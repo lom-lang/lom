@@ -1,0 +1,137 @@
+[
+  {
+    "id": "086",
+    "category": "error_repair",
+    "difficulty": "easy",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 7。\n\n错误代码：\nfn add(a: Int, b: Int) -> Int\n    a + b\nend\n\nfn main() -> Unit\n    println(add(3, 4)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 ')' 或参数，得到 'end'\",\"line\":7,\"col\":5,\"hint\":\"检查括号是否匹配\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn add(a: Int, b: Int) -> Int\n    a + b\nend\n\nfn main() -> Unit\n    println(add(3, 4))\nend\n",
+    "expected": "7\n",
+    "notes": "PARSE001: println 调用缺少右括号 )。修复：add(3, 4) 后补 )。"
+  },
+  {
+    "id": "087",
+    "category": "error_repair",
+    "difficulty": "easy",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 hello world。\n\n错误代码：\nfn main() -> Unit\n    let s = \"hello world\n    println(s)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"lex\",\"code\":\"LEX001\",\"message\":\"未闭合的字符串\",\"line\":2,\"col\":12,\"hint\":\"字符串需要在同行用 \\\" 闭合\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    let s = \"hello world\"\n    println(s)\nend\n",
+    "expected": "hello world\n",
+    "notes": "LEX001: 字符串未闭合。修复：在 world 后加 \"。"
+  },
+  {
+    "id": "088",
+    "category": "error_repair",
+    "difficulty": "easy",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 42。\n\n错误代码：\nfn main() -> Unit\n    println(42\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 ')' 或参数，得到 'end'\",\"line\":3,\"col\":1,\"hint\":\"检查括号是否匹配\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    println(42)\nend\n",
+    "expected": "42\n",
+    "notes": "PARSE001: println 缺少右括号。修复：42 后补 )。"
+  },
+  {
+    "id": "089",
+    "category": "error_repair",
+    "difficulty": "easy",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfn main() -> Unit\n    let x = 5\n    println(x)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 结束函数体，得到 EOF\",\"line\":3,\"col\":1,\"hint\":\"函数体需要以 end 闭合\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    let x = 5\n    println(x)\nend\n",
+    "expected": "5\n",
+    "notes": "PARSE001: 函数体缺少 end。修复：末尾加 end。"
+  },
+  {
+    "id": "090",
+    "category": "error_repair",
+    "difficulty": "easy",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 10。\n\n错误代码：\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = double(5)\n    println(result)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 结束函数体，得到 EOF\",\"line\":7,\"col\":1,\"hint\":\"函数体需要以 end 闭合\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = double(5)\n    println(result)\nend\n",
+    "expected": "10\n",
+    "notes": "PARSE001: main 函数缺少 end。修复：末尾加 end。"
+  },
+  {
+    "id": "091",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 true。\n\n错误代码：\nfn main() -> Unit\n    let x = 5\n    let y = 5\n    println(x == y)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n注意：此代码实际上没有错误（诊断 ok=true）。但若运行时输出不对，请检查逻辑。正确输出应为 true。",
+    "solution": "fn main() -> Unit\n    let x = 5\n    let y = 5\n    println(x == y)\nend\n",
+    "expected": "true\n",
+    "notes": "陷阱题：诊断 ok=true，代码本身正确。考察 LLM 是否过度修改正确代码。"
+  },
+  {
+    "id": "092",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 30。\n\n错误代码：\nfn main() -> Unit\n    let mut total = 0\n    let mut i = 0\n    while i < 5\n        total = total + i\n        i = i + 1\n    end\n    println(total)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n注意：代码无语法错误，但逻辑可能有误。期望输出 30（0+1+2+3+4=10... 不对，应是 0+1+2+3+4=10）。等等，请确认：i 从 0 加到 4，总和是 10。但题目要求输出 30。请修改逻辑使其输出 30（提示：0²+1²+2²+3²+4²=0+1+4+9+16=30，即 total = total + i * i）。",
+    "solution": "fn main() -> Unit\n    let mut total = 0\n    let mut i = 0\n    while i < 5\n        total = total + i * i\n        i = i + 1\n    end\n    println(total)\nend\n",
+    "expected": "30\n",
+    "notes": "逻辑修复题：原代码求和得 10，需改为求平方和得 30。考察 LLM 理解自然语言需求并修改算法。"
+  },
+  {
+    "id": "093",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其正确输出 Monday / Tuesday / Other。\n\n错误代码：\nfn day_name(n: Int) -> String\n    match n\n        1 => \"Monday\"\n        2 => \"Tuesday\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(1))\n    println(day_name(2))\n    println(day_name(5))\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"MAT001\",\"message\":\"match 不穷尽：缺少 _ 通配符或所有分支\",\"line\":2,\"col\":5,\"hint\":\"添加 _ => ... 分支处理剩余情况\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn day_name(n: Int) -> String\n    match n\n        1 => \"Monday\"\n        2 => \"Tuesday\"\n        _ => \"Other\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(1))\n    println(day_name(2))\n    println(day_name(5))\nend\n",
+    "expected": "Monday\nTuesday\nOther\n",
+    "notes": "MAT001: match 不穷尽。修复：添加 _ => \"Other\" 分支。"
+  },
+  {
+    "id": "094",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其正确输出 IO 效应函数的结果。\n\n错误代码：\nfn greet(name: String) -> Unit\n    println(\"Hello, \" + name)\nend\n\nfn main() -> Unit\n    greet(\"Lom\")\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"EFF001\",\"message\":\"纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'\",\"line\":2,\"col\":5,\"hint\":\"在函数签名返回类型后添加效应注解: ! [IO]\"}]}\n\n请输出修复后的完整代码（消除 EFF001 警告）。",
+    "solution": "fn greet(name: String) -> Unit ! [IO]\n    println(\"Hello, \" + name)\nend\n\nfn main() -> Unit\n    greet(\"Lom\")\nend\n",
+    "expected": "Hello, Lom\n",
+    "notes": "EFF001: 纯函数调用 println。修复：greet 添加 ! [IO] 效应注解。"
+  },
+  {
+    "id": "095",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfrom string import { len }\n\nfn main() -> Unit\n    println(lenght(\"hello\"))\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n运行时错误（实际运行时）：\n未定义变量: 'lenght'（拼写错误，应为 len）\n\n请输出修复后的完整代码。",
+    "solution": "from string import { len }\n\nfn main() -> Unit\n    println(len(\"hello\"))\nend\n",
+    "expected": "5\n",
+    "notes": "NAM003/RUNTIME002: 变量名拼写错误 lenght -> len。"
+  },
+  {
+    "id": "096",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 11。\n\n错误代码：\nfn add(x: Int, y: Int) -> Int\n    x + y\nend\n\nfn main() -> Unit\n    println(add(5))\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"TYPE003\",\"message\":\"函数 'add' 期望 2 个参数，得到 1 个\",\"line\":6,\"col\":5,\"hint\":\"检查函数调用参数数量\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn add(x: Int, y: Int) -> Int\n    x + y\nend\n\nfn main() -> Unit\n    println(add(5, 6))\nend\n",
+    "expected": "11\n",
+    "notes": "TYPE003: 参数数量不匹配。add(5) -> add(5, 6)。"
+  },
+  {
+    "id": "097",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码有错误。请修复使其正确处理 Result 并输出 5 和 Error: div by zero。\n\n错误代码：\nfn safe_divide(a: Int, b: Int) -> Result<Int, String>\n    if b == 0\n        Err(\"div by zero\")\n    else\n        Ok(a / b)\n    end\nend\n\nfn main() -> Unit\n    match safe_divide(10, 2)\n        Ok(n) => println(n)\n    end\n\n    match safe_divide(10, 0)\n        Err(e) => println(\"Error: \" + e)\n    end\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"MAT001\",\"message\":\"match 不穷尽：Result 缺少 Err 分支\",\"line\":10,\"col\":5},{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"MAT001\",\"message\":\"match 不穷尽：Result 缺少 Ok 分支\",\"line\":14,\"col\":5}]}\n\n请输出修复后的完整代码（两个 match 都需穷尽 Ok 和 Err）。",
+    "solution": "fn safe_divide(a: Int, b: Int) -> Result<Int, String>\n    if b == 0\n        Err(\"div by zero\")\n    else\n        Ok(a / b)\n    end\nend\n\nfn main() -> Unit\n    match safe_divide(10, 2)\n        Ok(n) => println(n)\n        Err(e) => println(\"Error: \" + e)\n    end\n\n    match safe_divide(10, 0)\n        Ok(n) => println(n)\n        Err(e) => println(\"Error: \" + e)\n    end\nend\n",
+    "expected": "5\nError: div by zero\n",
+    "notes": "MAT001 ×2: 两个 match 各缺一个分支。修复：每个 match 都补上 Ok 和 Err。"
+  },
+  {
+    "id": "098",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出正确的斐波那契数列前 5 项：0 1 1 2 3。\n\n错误代码：\nfn fib(n: Int) -> Int\n    if n == 0\n        0\n    elif n == 1\n        1\n    else\n        fib(n - 1) + fib(n - 2)\n    end\nend\n\nfn main() -> Unit\n    let mut i = 0\n    while i < 5\n        println(fib(i))\n        i = i + 1\n    end\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n注意：代码无语法/类型错误，但请确认输出是否为 0 1 1 2 3。若是则无需修改；若不是请修复。期望输出每行一个数字：0 1 1 2 3。",
+    "solution": "fn fib(n: Int) -> Int\n    if n == 0\n        0\n    elif n == 1\n        1\n    else\n        fib(n - 1) + fib(n - 2)\n    end\nend\n\nfn main() -> Unit\n    let mut i = 0\n    while i < 5\n        println(fib(i))\n        i = i + 1\n    end\nend\n",
+    "expected": "0\n1\n1\n2\n3\n",
+    "notes": "陷阱题：代码本身正确，输出 0 1 1 2 3。考察 LLM 是否能识别正确代码不修改。"
+  },
+  {
+    "id": "099",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码有多个错误。请修复使其正确输出 OK 和 Not Found。\n\n错误代码：\nfn main() -> Unit\n    match 200\n        200 => println(\"OK\")\n        404 => println(\"Not Found\")\n    end\n\n    match 404\n        200 => println(\"OK\")\n        404 => println(\"Not Found\")\n    end\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n注意：代码无语法错误且能运行。但若需要处理未知状态码（如 500），应加 _ 分支。当前代码对 200 和 404 的输出应为 OK 和 Not Found。请确认并输出代码。",
+    "solution": "fn main() -> Unit\n    match 200\n        200 => println(\"OK\")\n        404 => println(\"Not Found\")\n    end\n\n    match 404\n        200 => println(\"OK\")\n        404 => println(\"Not Found\")\n    end\nend\n",
+    "expected": "OK\nNot Found\n",
+    "notes": "陷阱题：代码本身正确。考察 LLM 是否过度修改正确代码。"
+  },
+  {
+    "id": "100",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码有错误。请修复使其正确输出结果。\n\n错误代码：\nfrom string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_tostring(n)\n    println(s)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n运行时错误（实际运行时）：\n未定义变量: 'int_tostring'（应为 int_to_string，下划线缺失）\n\n请输出修复后的完整代码。期望输出 42。",
+    "solution": "from string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_to_string(n)\n    println(s)\nend\n",
+    "expected": "42\n",
+    "notes": "NAM003/RUNTIME002: 函数名拼写错误 int_tostring -> int_to_string。考察 LLM 对标识符精确性的把握。"
+  }
+]

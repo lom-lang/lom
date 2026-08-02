@@ -1,0 +1,31 @@
+# 字符串操作 — 拼接、长度、字符遍历
+# Phase 2.1.5：len 需从 string 模块显式导入
+from string import { len }
+
+fn main() -> Unit
+    # 字符串拼接
+    let greeting = "Hello" + ", " + "World"
+    println(greeting)
+
+    # 字符串长度
+    println(len("hello"))
+    println(len(""))
+
+    # 字符遍历
+    for c in "abc"
+        println(c)
+    end
+
+    # 字符串作为函数参数和返回值
+    let repeat_str = fn(s: String, n: Int) -> String
+        let mut result = ""
+        let mut i = 0
+        while i < n
+            result = result + s
+            i = i + 1
+        end
+        result
+    end
+    println(repeat_str("ab", 3))
+    println(repeat_str("x", 5))
+end
