@@ -1,0 +1,60 @@
+# Phase 3.3 JSON 模块示例
+#
+# 展示 json_parse 和 json_stringify 的用法：
+#   - 解析 JSON 字符串为 Lom 值（Record/List/Int/Float/Bool/Str/Unit）
+#   - 序列化 Lom 值为 JSON 字符串
+#   - 访问解析后的 Record 字段和 List 元素
+
+from json import { json_parse, json_stringify }
+from list import { list_length, list_get }
+from io import { println }
+
+fn main() -> Unit
+    # 1. 解析 JSON 对象为 Record
+    let data = json_parse("{\"name\": \"Alice\", \"age\": 30, \"scores\": [90, 85, 92]}")
+    println(data)
+
+    # 2. 访问 Record 字段（json_parse 返回动态值，字段访问在运行时解析）
+    #    注意：json_parse 返回 _Any 类型，字段访问需要先赋值再访问
+    let name = data.name
+    println(name)
+
+    let age = data.age
+    println(age)
+
+    # 3. 访问嵌套 List
+    let scores = data.scores
+    println(scores)
+    println(list_length(scores))
+    println(list_get(scores, 0))
+    println(list_get(scores, 2))
+
+    # 4. 序列化回 JSON 字符串
+    let json_str = json_stringify(data)
+    println(json_str)
+
+    # 5. 解析 JSON 数组为 List
+    let arr = json_parse("[1, 2, 3, 4, 5]")
+    println(arr)
+    println(list_length(arr))
+    println(list_get(arr, 4))
+
+    # 6. 解析基本类型
+    let n = json_parse("42")
+    println(n)
+
+    let s = json_parse("\"hello\"")
+    println(s)
+
+    let b = json_parse("true")
+    println(b)
+
+    let nil = json_parse("null")
+    println(nil)
+
+    # 7. 序列化 Record（Lom 原生构造）
+    let person = { name: "Bob", age: 25 }
+    println(json_stringify(person))
+
+    ()
+end

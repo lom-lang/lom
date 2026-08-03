@@ -252,6 +252,7 @@
     <li>2.8 <code>eval/</code> 100 任务评测集 ✅ <span class="meta">已完成</span></li>
     <li>2.9 Phase 3.1 <code>--apply</code> 修复执行 ✅ <span class="meta">已完成</span></li>
     <li>2.10 Phase 3.2 AST span 诊断定位 ✅ <span class="meta">已完成</span></li>
+    <li>2.11 Phase 3.3 <code>list</code> + <code>json</code> 标准库模块 ✅ <span class="meta">已完成</span></li>
   </ul>
   <h4>2.1.1 已完成内容</h4>
   <ul>
@@ -605,6 +606,62 @@
     <li><strong>已知范围限制</strong>：仅 <code>FnDecl</code>/<code>EnumDecl</code> 携带 span；语句/表达式级诊断（TYPE001、NAM003 等）仍报告 <code>(0,0)</code>；运行时错误仍报告 <code>(0,0)</code>。完整表达式级 span 推迟到 Phase 3 LSP 工作</li>
   </ul>
 
+  <h3>2.11 Phase 3.3 已完成 · <code>list</code> + <code>json</code> 标准库模块</h3>
+  <ul>
+    <li><strong>核心目标</strong>：扩展标准库，提供不可变 List 数据结构和 JSON 解析/序列化能力，支撑 CLI 工具和简单 Web 服务开发 ✅</li>
+    <li><strong>新增 <code>Value::List</code> 变体</strong>（<code>src/interpreter.rs</code>）：<code>Value::List { elems: Vec&lt;Value&gt; }</code>，不可变语义（所有操作返回新 List 而非修改原列表）。实现 <code>Debug</code>（<code>[1, 2, 3]</code> 格式）、<code>type_name</code>（<code>"List"</code>）、<code>to_display</code>、<code>values_eq</code> 方法</li>
+    <li><strong><code>list</code> 模块</strong>（7 个纯函数，<code>STDL_MODULES</code> 注册）：
+      <ul>
+        <li><code>list_empty() -&gt; List&lt;_Any&gt;</code> — 构造空列表</li>
+        <li><code>list_cons(head, list) -&gt; List&lt;_Any&gt;</code> — 头部添加元素，返回新 List（原列表不变）</li>
+        <li><code>list_length(list) -&gt; Int</code> — 列表长度</li>
+        <li><code>list_get(list, idx) -&gt; _Any</code> — 按索引访问；越界（<code>idx &lt; 0</code> 或 <code>idx &gt;= length</code>）触发运行时错误</li>
+        <li><code>list_is_empty(list) -&gt; Bool</code> — 判空</li>
+        <li><code>list_head(list) -&gt; _Any</code> — 首元素；空列表触发运行时错误</li>
+        <li><code>list_tail(list) -&gt; List&lt;_Any&gt;</code> — 尾列表；空列表触发运行时错误</li>
+      </ul>
+    </li>
+    <li><strong><code>json</code> 模块</strong>（2 个纯函数，零依赖手写解析器/序列化器，<code>src/json.rs</code>）：
+      <ul>
+        <li><code>json_parse(s: String) -&gt; _Any</code> — 解析 JSON 字符串为 Lom Value；JSON object→Record（保留键顺序）、array→List、string→Str、number→Int（无小数）/Float、true/false→Bool、null→Unit；支持 <code>\uXXXX</code> Unicode 转义和代理对（如 <code>\uD83D\uDE00</code> → 😀）；解析失败返回带位置的错误</li>
+        <li><code>json_stringify(v: _Any) -&gt; String</code> — 序列化 Lom Value 为紧凑 JSON 字符串；Record→object、List/Tuple→array、Str→带转义的字符串、Int/Float→数字、Bool→true/false、Unit→null、闭包/枚举回退为最佳努力字符串形式</li>
+      </ul>
+    </li>
+    <li><strong>类型检查器签名注册</strong>（<code>src/typechecker.rs</code>）：<code>List&lt;T&gt;</code> 用 <code>Type::Generic("List", [T])</code> 表示，签名用 <code>List&lt;_Any&gt;</code> 接受任何元素类型；<code>list_*</code> 函数全部声明为纯函数（无 <code>! [...]</code> 效应）</li>
+    <li><strong>示例文件</strong>：
+      <ul>
+        <li><code>examples/list_demo.lom</code> — 展示 <code>list_cons</code> 构造、<code>list_length</code>/<code>list_get</code> 访问、<code>list_head</code>/<code>list_tail</code>、不可变性验证</li>
+        <li><code>examples/json_demo.lom</code> — 展示 JSON 对象解析、Record 字段访问、嵌套 List 访问、序列化回 JSON、JSON 数组解析、基本类型解析（42/"hello"/true/null）、原生 Record 序列化</li>
+      </ul>
+    </li>
+    <li><strong>设计取舍</strong>：
+      <ul>
+        <li><strong>不可变 List</strong>：<code>list_cons</code> 返回新列表而非修改原列表，符合函数式编程风格和线程安全语义</li>
+        <li><strong>零依赖 JSON</strong>：手写解析器和序列化器（不引入 serde 等依赖），保持编译器轻量</li>
+        <li><strong>暂无列表字面量语法</strong>：<code>[1, 2, 3]</code> 语法推迟到后续阶段；当前通过 <code>list_empty</code> + <code>list_cons</code> 或 <code>json_parse("[1,2,3]")</code> 构造</li>
+        <li><strong>JSON 类型映射平衡</strong>：object→Record、array→List、null→Unit，平衡 Lom 类型系统简洁性和 JSON 兼容性</li>
+      </ul>
+    </li>
+    <li><strong>已知限制</strong>：
+      <ul>
+        <li><code>json_stringify</code> 不支持 pretty-printing（紧凑输出）</li>
+        <li>枚举和闭包值无法通过 JSON 往返（round-trip）</li>
+        <li>列表元素类型追踪推迟到后续阶段（签名用 <code>List&lt;_Any&gt;</code> 兼容任何元素）</li>
+      </ul>
+    </li>
+  </ul>
+  <h4>测试（3.3 阶段）</h4>
+  <ul>
+    <li>Rust 单元测试 <strong>188/188 通过</strong>（新增 29 个测试：List 模块 7 个 + JSON 模块 12 个 + 错误处理/边界情况 10 个）✅</li>
+    <li>端到端验证：
+      <ul>
+        <li><code>lom examples\list_demo.lom</code> — list_cons 构造 <code>[1, 2, 3]</code>、长度 3、索引访问 1/3、head 1、tail <code>[2, 3]</code>、不可变性验证全部通过 ✅</li>
+        <li><code>lom examples\json_demo.lom</code> — JSON 对象解析、字段访问、嵌套 List、序列化回 JSON、数组解析、基本类型解析（42/"hello"/true/()）、原生 Record 序列化全部通过 ✅</li>
+        <li>错误处理：<code>list_get</code> 越界、<code>list_head</code>/<code>list_tail</code> 空列表、<code>json_parse</code> 畸形 JSON 全部返回带位置的错误信息 ✅</li>
+      </ul>
+    </li>
+  </ul>
+
   <h4>核心特性（按优先级，全阶段）</h4>
   <ol>
     <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈 <span class="tag" style="background:#16a34a;color:white;">已完成</span></li>
@@ -617,6 +674,7 @@
     <li><strong>渐进式类型</strong>：默认动态可跑，标注后检查 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.4）</span></li>
     <li><strong>显式效应系统</strong>：副作用在签名中声明 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.5）</span></li>
     <li><strong>错误是值</strong>：<code>Result&lt;T, E&gt;</code>，不用异常 <span class="tag" style="background:#16a34a;color:white;">语法已完成</span></li>
+    <li><strong>标准库扩展（List + JSON）</strong>：不可变 List 数据结构和零依赖 JSON 解析/序列化 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 3.3）</span></li>
   </ol>
   <h4>技术栈</h4>
   <p>Rust + 解释器 + 基础类型检查器（两遍：签名收集 + 体检查）</p>
@@ -652,12 +710,18 @@
   <p>+ Cranelift JIT（毫秒级编译，性能可用，docs File 2 推荐的中间层）</p>
   <h4>新增</h4>
   <ul>
-    <li>模块系统（显式导入，禁止通配符，避免 LLM 编造符号）</li>
-    <li>标准库（IO、HTTP、JSON、文件、字符串、集合）</li>
+    <li>模块系统（显式导入，禁止通配符，避免 LLM 编造符号）<span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.1.5）</span></li>
+    <li>标准库（IO、HTTP、JSON、文件、字符串、集合）<span class="tag" style="background:#16a34a;color:white;">list/json 已完成（Phase 3.3）</span></li>
     <li>LSP 服务器（语法高亮、补全、跳转、悬停、错误 squiggle）</li>
     <li>REPL</li>
     <li>包管理器雏形</li>
     <li>基础并发（async/await，I/O 密集型）</li>
+  </ul>
+  <h4>已完成的 Phase 3 子阶段</h4>
+  <ul>
+    <li><strong>Phase 3.1</strong>：<code>lom fix --apply</code> 修复执行（<code>lom-apply/v1</code> schema，<code>--dry-run</code>/<code>--json</code>，EFF001 从 hint 升级为精确 insert）✅</li>
+    <li><strong>Phase 3.2</strong>：AST span 诊断定位（<code>Span</code> 类型，移除 <code>find_fn_line</code> hack，EFF001/TYPE010/NAM002 精确定位到签名行）✅</li>
+    <li><strong>Phase 3.3</strong>：<code>list</code> + <code>json</code> 标准库模块（<code>Value::List</code> 不可变列表，7 个 list 函数 + 2 个 json 函数，零依赖 JSON 解析器/序列化器，188/188 测试通过）✅</li>
   </ul>
   <h4>场景扩展</h4>
   <p>从"LLM 运行环境"扩展到"通用脚本"+"后端服务雏形"。</p>

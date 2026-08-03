@@ -238,6 +238,9 @@ end
 | Tuples | `(Int, String)` | §6.3 |
 | Type aliases | `type UserId = Int` | §6.5 |
 | Traits | `trait Show { fn show(self) -> String }` | §6.6 |
+| `List<T>` (immutable, Phase 3.3) | `List<Int>` via `Type::Generic("List", [T])` | §9.3 |
+
+> **Phase 3.3 `List<T>`**: a runtime `Value::List { elems: Vec<Value> }` variant exposed through the `list` stdlib module (§9.3). No list literal syntax yet — construct via `list_cons` or `json_parse`. Type-checker signatures use `List<_Any>` to accept any element type; element type tracking is deferred.
 
 ### 4.4 Why structural types (not nominal)
 
@@ -933,13 +936,15 @@ from io import { println as log }            # per-item alias
 - **No re-export**. Re-export via explicit `pub` items (Phase 3).
 - **Dotted module path**: `from utils.helpers import { format_date }` parses, but user modules are Phase 3; Phase 2.1.5 only resolves standard library module names (io/string/math).
 
-### 8.2 Standard library modules (Phase 2.1.5)
+### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`)
 
 | Module | Exports | Notes |
 |---|---|---|
 | `io` | `println`, `print` | Also in prelude (auto-available); explicit import only needed for aliasing |
 | `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` | Must be imported to use |
 | `math` | `sqrt`, `abs`, `min`, `max` | Must be imported to use |
+| `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons` | Phase 3.3 — immutable list ops (§9.3) |
+| `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
 
 **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 
@@ -980,7 +985,7 @@ Available without `from` declaration:
 | `println(x)` | `Any -> Unit ! [IO]` | Print with newline |
 | `print(x)` | `Any -> Unit ! [IO]` | Print without newline |
 
-### 9.2 Standard library modules (Phase 2.1.5)
+### 9.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`)
 
 Require explicit `from <module> import { ... }`:
 
@@ -999,6 +1004,49 @@ Require explicit `from <module> import { ... }`:
 | `io` | `println`, `print` | same as prelude | Explicit import only needed for aliasing |
 
 > Phase 3 adds collections, IO, HTTP modules. Phase 4 adds tensor/math extensions.
+
+### 9.3 `list` module (Phase 3.3 — implemented)
+
+A pure, immutable list type exposed through the `list` standard library module. Internally backed by `Value::List { elems: Vec<Value> }`; all operations return new `List` values without mutating the input (immutable semantics, in the spirit of functional data structures).
+
+**Type representation**: `List<T>` is encoded as `Type::Generic("List", [T])`. The type checker signatures use `List<_Any>` to accept any element type; element-type tracking is deferred to a later phase.
+
+**Construction**: there is no list literal syntax `[1, 2, 3]` yet. Build a list by chaining `list_cons` on `list_empty()`, or obtain one from `json_parse("[1,2,3]")` (which maps JSON arrays to `List`).
+
+| Function | Type | Notes |
+|---|---|---|
+| `list_empty()` | `() -> List<_Any>` | Return the empty list |
+| `list_cons(head, list)` | `(_Any, List<_Any>) -> List<_Any>` | Return a new list with `head` prepended; original list unchanged |
+| `list_length(list)` | `List<_Any> -> Int` | Number of elements |
+| `list_get(list, idx)` | `(List<_Any>, Int) -> _Any` | Element at 0-based index; runtime error on out-of-bounds (`idx < 0` or `idx >= length`) |
+| `list_is_empty(list)` | `List<_Any> -> Bool` | True iff length is 0 |
+| `list_head(list)` | `List<_Any> -> _Any` | First element; runtime error on empty list |
+| `list_tail(list)` | `List<_Any> -> List<_Any>` | All elements but the first; runtime error on empty list |
+
+All functions are pure (no `! [...]` effect). Examples: [examples/list_demo.lom](examples/list_demo.lom).
+
+### 9.4 `json` module (Phase 3.3 — implemented)
+
+A hand-written, zero-dependency JSON parser and serializer (`src/json.rs`). Maps JSON values to Lom `Value` and back:
+
+| JSON | Lom `Value` |
+|---|---|
+| object `{"k": v}` | `Record { fields: [("k", v'), ...] }` (key order preserved) |
+| array `[a, b]` | `List { elems: [a', b'] }` |
+| string `"..."` | `Str(...)` |
+| number `42` | `Int(42)` when the fractional part is zero, otherwise `Float` |
+| number `3.14` | `Float(3.14)` |
+| `true` / `false` | `Bool(true)` / `Bool(false)` |
+| `null` | `Unit` |
+
+| Function | Type | Notes |
+|---|---|---|
+| `json_parse(s)` | `String -> _Any` | Parse a JSON string into a Lom value; runtime error on malformed JSON (carries the parser's position) |
+| `json_stringify(v)` | `_Any -> String` | Serialize a Lom value to JSON; `Record` → object, `List`/`Tuple` → array, `Str` → string (with `"` escaping), `Int`/`Float` → number, `Bool` → `true`/`false`, `Unit` → `null`, closures/enums fall back to a best-effort string form |
+
+The parser supports `\uXXXX` Unicode escapes, including surrogate pairs (e.g. `\uD83D\uDE00` → 😀). Both functions are pure (no `! [...]` effect). Examples: [examples/json_demo.lom](examples/json_demo.lom).
+
+> **Known limitation**: `json_stringify` of nested `Record`/`List` produces compact output (no pretty-printing); enum and closure values are not round-trippable through JSON. These are acceptable for the Phase 3 MVP scope.
 
 ---
 
@@ -1200,3 +1248,9 @@ Each task is a JSON object:
 - **v0.1.3 (2026-08-03)**: Phase 2.8 — evaluation suite added.
   - Added §12 Evaluation Suite documenting the `eval/` 100-task benchmark (layout, task format, runner, AI-native focus, status). Renumbered Changelog to §13.
   - LLM pass-rate measured: 99/100 (99%), expert model + thinking mode. Phase 2 exit criterion met.
+- **v0.2.1 (2026-08-03)**: Phase 3.2 — AST span-based diagnostic positioning.
+  - Added §6.9.6 documenting `Span` on `FnDecl`/`EnumDecl`, parser `prev_token_pos()`, and typechecker `current_fn_span`. Removed Phase 3.1 `find_fn_line` hack. EFF001/TYPE010/NAM002 now report signature positions instead of `(0,0)`.
+- **v0.2.2 (2026-08-03)**: Phase 3.3 — `list` + `json` standard library modules.
+  - Added §4.3 `List<T>` type entry; §8.2/§9.2 stdlib module tables extended with `list` and `json`.
+  - Added §9.3 `list` module (immutable list API: `list_empty`/`list_cons`/`list_length`/`list_get`/`list_is_empty`/`list_head`/`list_tail`) and §9.4 `json` module (`json_parse`/`json_stringify` with JSON↔Lom Value mapping table, surrogate pair support, compact serialization).
+  - Added `Value::List { elems: Vec<Value> }` runtime variant (immutable semantics). Type-checker signatures use `List<_Any>`.

@@ -19,6 +19,7 @@ mod diagnostics;
 mod fix;
 mod info;
 mod interpreter;
+mod json;
 mod lexer;
 mod parser;
 mod typechecker;

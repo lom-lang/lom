@@ -1,0 +1,48 @@
+# Phase 3.3 List 模块示例
+#
+# 展示 list 模块的不可变列表操作：
+#   - list_empty: 构造空列表
+#   - list_length: 获取列表长度
+#   - list_get: 按索引访问元素
+#   - list_is_empty: 判断是否为空
+#   - list_head: 获取首元素
+#   - list_tail: 获取尾列表（去掉首元素）
+#   - list_cons: 在列表头部添加元素（返回新列表）
+#
+# 注意：Lom 的 List 是不可变的，所有操作返回新 List 而非修改原列表。
+# Phase 3.3 暂无列表字面量语法 [1,2,3]，需通过 list_empty + list_cons 构造，
+# 或用 json_parse("[1,2,3]") 从 JSON 数组获得。
+
+from list import { list_empty, list_length, list_get, list_is_empty, list_head, list_tail, list_cons }
+from io import { println }
+
+fn main() -> Unit
+    # 1. list_cons 构造列表：cons(1, cons(2, cons(3, empty)))
+    let empty = list_empty()
+    let l1 = list_cons(3, empty)
+    let l2 = list_cons(2, l1)
+    let l3 = list_cons(1, l2)
+    println(l3)
+
+    # 2. list_length
+    println(list_length(l3))
+
+    # 3. list_get
+    println(list_get(l3, 0))
+    println(list_get(l3, 2))
+
+    # 4. list_is_empty
+    println(list_is_empty(l3))
+    println(list_is_empty(empty))
+
+    # 5. list_head / list_tail
+    println(list_head(l3))
+    println(list_tail(l3))
+    println(list_tail(list_tail(l3)))
+
+    # 6. 不可变性：原列表不变
+    println(l3)
+    println(list_length(l3))
+
+    ()
+end

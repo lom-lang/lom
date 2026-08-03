@@ -36,6 +36,11 @@ pub enum Value {
     Tuple {
         elems: Vec<Value>,
     },
+    /// Phase 3.3: 列表值（不可变语义，函数返回新 List）
+    /// 用于 JSON 数组映射和未来集合模块的基础
+    List {
+        elems: Vec<Value>,
+    },
 }
 
 impl fmt::Debug for Value {
@@ -85,6 +90,16 @@ impl fmt::Debug for Value {
                 }
                 write!(f, ")")
             }
+            Value::List { elems } => {
+                write!(f, "[")?;
+                for (i, e) in elems.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}", e)?;
+                }
+                write!(f, "]")
+            }
         }
     }
 }
@@ -102,6 +117,7 @@ impl Value {
             Value::Enum { .. } => "枚举变体",
             Value::Record { .. } => "记录",
             Value::Tuple { .. } => "元组",
+            Value::List { .. } => "List",
         }
     }
 
@@ -155,6 +171,10 @@ impl Value {
                 } else {
                     format!("({})", parts.join(", "))
                 }
+            }
+            Value::List { elems } => {
+                let parts: Vec<String> = elems.iter().map(|e| e.to_display()).collect();
+                format!("[{}]", parts.join(", "))
             }
         }
     }
@@ -265,6 +285,7 @@ const PRELUDE: &[&str] = &["println", "print"];
 
 /// 标准库模块定义：模块名 → 导出符号
 /// Phase 2.1.5：io / string / math 三个模块
+/// Phase 3.3：新增 list / json 模块
 const STDL_MODULES: &[(&str, &[&str])] = &[
     ("io", &["println", "print"]),
     (
@@ -272,6 +293,19 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
         &["len", "int_to_string", "string_to_int", "trim", "upper", "lower"],
     ),
     ("math", &["sqrt", "abs", "min", "max"]),
+    (
+        "list",
+        &[
+            "list_empty",
+            "list_length",
+            "list_get",
+            "list_is_empty",
+            "list_head",
+            "list_tail",
+            "list_cons",
+        ],
+    ),
+    ("json", &["json_parse", "json_stringify"]),
 ];
 
 impl Interpreter {
@@ -992,6 +1026,10 @@ impl Interpreter {
                         .any(|(k2, v2)| k == k2 && self.values_eq(v, v2))
                 })
             }
+            (Value::List { elems: a1 }, Value::List { elems: a2 }) => {
+                a1.len() == a2.len()
+                    && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
+            }
             _ => false,
         }
     }
@@ -1171,6 +1209,106 @@ impl Interpreter {
                     )),
                 }
             }
+            // Phase 3.3: list 模块（不可变语义，函数返回新 List）
+            "list_empty" => {
+                expect_arity("list_empty", 0, args)?;
+                Ok(Some(Value::List { elems: Vec::new() }))
+            }
+            "list_length" => {
+                expect_arity("list_length", 1, args)?;
+                match &args[0] {
+                    Value::List { elems } => Ok(Some(Value::Int(elems.len() as i64))),
+                    _ => Err(RuntimeError::Msg("list_length 期望 List".to_string())),
+                }
+            }
+            "list_get" => {
+                expect_arity("list_get", 2, args)?;
+                let idx = match &args[1] {
+                    Value::Int(n) => *n,
+                    _ => {
+                        return Err(RuntimeError::Msg(
+                            "list_get 第二个参数期望 Int (索引)".to_string(),
+                        ));
+                    }
+                };
+                match &args[0] {
+                    Value::List { elems } => {
+                        if idx < 0 || (idx as usize) >= elems.len() {
+                            Err(RuntimeError::Msg(format!(
+                                "list_get 索引 {} 越界（列表长度 {}）",
+                                idx,
+                                elems.len()
+                            )))
+                        } else {
+                            Ok(Some(elems[idx as usize].clone()))
+                        }
+                    }
+                    _ => Err(RuntimeError::Msg("list_get 期望 List".to_string())),
+                }
+            }
+            "list_is_empty" => {
+                expect_arity("list_is_empty", 1, args)?;
+                match &args[0] {
+                    Value::List { elems } => Ok(Some(Value::Bool(elems.is_empty()))),
+                    _ => Err(RuntimeError::Msg("list_is_empty 期望 List".to_string())),
+                }
+            }
+            "list_head" => {
+                expect_arity("list_head", 1, args)?;
+                match &args[0] {
+                    Value::List { elems } => {
+                        if elems.is_empty() {
+                            Err(RuntimeError::Msg("list_head 空列表无首元素".to_string()))
+                        } else {
+                            Ok(Some(elems[0].clone()))
+                        }
+                    }
+                    _ => Err(RuntimeError::Msg("list_head 期望 List".to_string())),
+                }
+            }
+            "list_tail" => {
+                expect_arity("list_tail", 1, args)?;
+                match &args[0] {
+                    Value::List { elems } => {
+                        if elems.is_empty() {
+                            Err(RuntimeError::Msg("list_tail 空列表无尾".to_string()))
+                        } else {
+                            Ok(Some(Value::List {
+                                elems: elems[1..].to_vec(),
+                            }))
+                        }
+                    }
+                    _ => Err(RuntimeError::Msg("list_tail 期望 List".to_string())),
+                }
+            }
+            "list_cons" => {
+                // list_cons(head, list) → 新 List：[head, ...list]
+                expect_arity("list_cons", 2, args)?;
+                match &args[1] {
+                    Value::List { elems } => {
+                        let mut new_elems = Vec::with_capacity(elems.len() + 1);
+                        new_elems.push(args[0].clone());
+                        new_elems.extend(elems.iter().cloned());
+                        Ok(Some(Value::List { elems: new_elems }))
+                    }
+                    _ => Err(RuntimeError::Msg("list_cons 第二个参数期望 List".to_string())),
+                }
+            }
+            // Phase 3.3: json 模块
+            "json_parse" => {
+                expect_arity("json_parse", 1, args)?;
+                match &args[0] {
+                    Value::Str(s) => match crate::json::parse(s) {
+                        Ok(v) => Ok(Some(v)),
+                        Err(e) => Err(RuntimeError::Msg(format!("json_parse 失败: {}", e))),
+                    },
+                    _ => Err(RuntimeError::Msg("json_parse 期望 String".to_string())),
+                }
+            }
+            "json_stringify" => {
+                expect_arity("json_stringify", 1, args)?;
+                Ok(Some(Value::Str(crate::json::stringify(&args[0]))))
+            }
             _ => Ok(None), // 不是内置函数
         }
     }
@@ -1192,6 +1330,15 @@ fn is_known_builtin(name: &str) -> bool {
             | "abs"
             | "min"
             | "max"
+            | "list_empty"
+            | "list_length"
+            | "list_get"
+            | "list_is_empty"
+            | "list_head"
+            | "list_tail"
+            | "list_cons"
+            | "json_parse"
+            | "json_stringify"
     )
 }
 
@@ -1201,6 +1348,10 @@ fn module_of(name: &str) -> Option<&'static str> {
         "println" | "print" => Some("io"),
         "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" => Some("string"),
         "sqrt" | "abs" | "min" | "max" => Some("math"),
+        "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" => {
+            Some("list")
+        }
+        "json_parse" | "json_stringify" => Some("json"),
         _ => None,
     }
 }
@@ -1723,5 +1874,169 @@ end
             "期望错误信息提及 hole/洞，得到: {}",
             msg
         );
+    }
+
+    // ===== Phase 3.3: list / json 模块集成测试 =====
+
+    #[test]
+    fn test_list_empty_and_cons() {
+        let src = r#"
+from list import { list_empty, list_cons, list_length }
+fn main() -> Unit
+    let l = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    println(list_length(l))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_get_head_tail() {
+        let src = r#"
+from list import { list_empty, list_cons, list_get, list_head, list_tail }
+fn main() -> Unit
+    let l = list_cons(10, list_cons(20, list_cons(30, list_empty())))
+    println(list_get(l, 0))
+    println(list_get(l, 2))
+    println(list_head(l))
+    println(list_head(list_tail(l)))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_is_empty() {
+        let src = r#"
+from list import { list_empty, list_is_empty, list_cons }
+fn main() -> Unit
+    println(list_is_empty(list_empty()))
+    let l = list_cons(1, list_empty())
+    println(list_is_empty(l))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_get_out_of_bounds_errors() {
+        let src = r#"
+from list import { list_empty, list_cons, list_get }
+fn main() -> Unit
+    let l = list_cons(1, list_empty())
+    list_get(l, 5)
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "越界访问应报错");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("越界"), "期望提及越界，得到: {}", msg);
+    }
+
+    #[test]
+    fn test_list_immutable() {
+        // 不可变性：list_cons 返回新列表，原列表不变
+        let src = r#"
+from list import { list_empty, list_cons, list_length }
+fn main() -> Unit
+    let l1 = list_cons(2, list_cons(3, list_empty()))
+    let l2 = list_cons(1, l1)
+    println(list_length(l1))
+    println(list_length(l2))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_parse_object() {
+        let src = r#"
+from json import { json_parse }
+fn main() -> Unit
+    let data = json_parse("{\"name\": \"Alice\", \"age\": 30}")
+    println(data.name)
+    println(data.age)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_parse_array_to_list() {
+        let src = r#"
+from json import { json_parse }
+from list import { list_length, list_get }
+fn main() -> Unit
+    let arr = json_parse("[10, 20, 30]")
+    println(list_length(arr))
+    println(list_get(arr, 1))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_stringify_roundtrip() {
+        let src = r#"
+from json import { json_parse, json_stringify }
+fn main() -> Unit
+    let data = json_parse("{\"x\": 1, \"y\": 2}")
+    let s = json_stringify(data)
+    println(s)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_parse_primitives() {
+        let src = r#"
+from json import { json_parse }
+fn main() -> Unit
+    println(json_parse("42"))
+    println(json_parse("true"))
+    println(json_parse("\"hello\""))
+    println(json_parse("null"))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_stringify_record() {
+        let src = r#"
+from json import { json_stringify }
+fn main() -> Unit
+    let person = { name: "Bob", age: 25 }
+    println(json_stringify(person))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_json_parse_invalid_errors() {
+        let src = r#"
+from json import { json_parse }
+fn main() -> Unit
+    json_parse("{invalid}")
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "无效 JSON 应报错");
+    }
+
+    #[test]
+    fn test_list_unimported_errors() {
+        let src = r#"
+fn main() -> Unit
+    let l = list_empty()
+    println(l)
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "未导入的 list_empty 应报错");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("未导入"), "期望提及未导入，得到: {}", msg);
     }
 }

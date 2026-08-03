@@ -196,6 +196,48 @@ impl TypeChecker {
             "max".to_string(),
             FnSig { params: vec![("a".to_string(), Type::Named("_Any".to_string())), ("b".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Named("_Any".to_string())), effects: vec![], span: Span::default() },
         );
+        // Phase 3.3: list 模块（纯函数，不可变语义）
+        // List<T> 用 Type::Generic("List", [T]) 表示；签名用 List<_Any> 接受任何元素类型
+        let list_any = || Type::Generic("List".to_string(), vec![Type::Named("_Any".to_string())]);
+        self.functions.insert(
+            "list_empty".to_string(),
+            FnSig { params: vec![], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_length".to_string(),
+            FnSig { params: vec![("list".to_string(), list_any())], ret: Some(Type::Int), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_get".to_string(),
+            FnSig { params: vec![("list".to_string(), list_any()), ("idx".to_string(), Type::Int)], ret: Some(Type::Named("_Any".to_string())), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_is_empty".to_string(),
+            FnSig { params: vec![("list".to_string(), list_any())], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_head".to_string(),
+            FnSig { params: vec![("list".to_string(), list_any())], ret: Some(Type::Named("_Any".to_string())), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_tail".to_string(),
+            FnSig { params: vec![("list".to_string(), list_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_cons".to_string(),
+            FnSig { params: vec![("head".to_string(), Type::Named("_Any".to_string())), ("list".to_string(), list_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        // Phase 3.3: json 模块（纯函数）
+        // json_parse 返回 _Any（可能是 Record/List/Int/Float/Bool/Str/Unit）
+        // json_stringify 接受任何值，返回 String
+        self.functions.insert(
+            "json_parse".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::Named("_Any".to_string())), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "json_stringify".to_string(),
+            FnSig { params: vec![("v".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::String), effects: vec![], span: Span::default() },
+        );
     }
 
     /// 入口：检查整个程序，返回填充了类型诊断的 Diagnostics
