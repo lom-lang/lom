@@ -1,7 +1,27 @@
 // Lom AST — Phase 2 抽象语法树定义
 // Phase 2 新增：match, enum, Result/Option, 模式匹配, ?, |>, 结构记录, 元组, 显式导入
 // Phase 2.2 新增：Hole 节点（容错解析器在错误处插入的占位符）
-// Phase 2 仍不含：多文件模块（Phase 3）
+// Phase 3.2 新增：Span 类型 + FnDecl/EnumDecl span 字段（函数/枚举级诊断精确定位）
+// Phase 2 仍不含：多文件模块（Phase 3）、表达式级 span（Phase 3.2b）
+
+/// 源码位置跨度（1-based，与 lexer 的 SpannedToken 一致）
+///
+/// Phase 3.2a：仅 FnDecl/EnumDecl 携带 span（函数/枚举级诊断定位）。
+/// Phase 3.2b：Expr 各变体将携带 span（表达式级诊断 + LSP）。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Span {
+    pub line: usize,
+    pub col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl Span {
+    /// 构造一个起始位置 span（end = start，用于单点定位）
+    pub fn at(line: usize, col: usize) -> Self {
+        Span { line, col, end_line: line, end_col: col }
+    }
+}
 
 /// 程序：顶层声明列表
 #[derive(Debug, Clone)]
@@ -40,6 +60,7 @@ pub struct ImportItem {
 
 /// 函数声明：fn name(params) -> ret_type ! [effects] body
 /// Phase 2.5 新增 effects 字段（显式效应系统）
+/// Phase 3.2 新增 span 字段（函数签名位置，用于 EFF001/TYPE010/NAM002 诊断定位）
 #[derive(Debug, Clone)]
 pub struct FnDecl {
     pub name: String,
@@ -49,6 +70,9 @@ pub struct FnDecl {
     /// 空 Vec 表示纯函数（无 `! [...]` 注解）
     pub effects: Vec<Effect>,
     pub body: Block,
+    /// Phase 3.2: 函数签名 span（`fn` 关键字到签名行末）
+    /// 用于 EFF001（效应注解插入位置）、TYPE010（返回类型不符）、NAM002（重复定义）诊断
+    pub span: Span,
 }
 
 /// 效应名：标识符（如 IO、Clock、State、Network）
@@ -63,11 +87,14 @@ pub struct Param {
 }
 
 /// 枚举声明：enum Name<T, E> = Variant1(T) | Variant2(E) | Variant3
+/// Phase 3.2 新增 span 字段（枚举名位置，用于 NAM002 重复定义诊断）
 #[derive(Debug, Clone)]
 pub struct EnumDecl {
     pub name: String,
     pub type_params: Vec<String>,
     pub variants: Vec<EnumVariantDecl>,
+    /// Phase 3.2: 枚举签名 span（`enum` 关键字到 `=` 前）
+    pub span: Span,
 }
 
 /// 枚举变体：Name 或 Name(types)

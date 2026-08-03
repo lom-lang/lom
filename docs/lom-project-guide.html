@@ -250,6 +250,8 @@
     <li>2.6 <code>lom info --json</code> 类型信息导出 ✅ <span class="meta">已完成</span></li>
     <li>2.7 <code>lom fix --plan --json</code> AI 修复计划 ✅ <span class="meta">已完成</span></li>
     <li>2.8 <code>eval/</code> 100 任务评测集 ✅ <span class="meta">已完成</span></li>
+    <li>2.9 Phase 3.1 <code>--apply</code> 修复执行 ✅ <span class="meta">已完成</span></li>
+    <li>2.10 Phase 3.2 AST span 诊断定位 ✅ <span class="meta">已完成</span></li>
   </ul>
   <h4>2.1.1 已完成内容</h4>
   <ul>
@@ -552,7 +554,7 @@
     <li><strong>lom-apply/v1 schema</strong>：<code>{ schema, file, applied, skipped, changes[], ok }</code>，每个 change 记录 <code>line/col/action/description</code> ✅</li>
     <li><strong>EFF001 升级</strong>：从 <code>hint</code> 改为精确 <code>insert</code>：
       <ul>
-        <li>typechecker 新增 <code>find_fn_line</code> 扫描 <code>source_lines</code> 定位函数签名行号，填入 EFF001 诊断的 <code>line</code> 字段</li>
+        <li>typechecker 新增 <code>find_fn_line</code> 扫描 <code>source_lines</code> 定位函数签名行号，填入 EFF001 诊断的 <code>line</code> 字段<strong>（Phase 3.2 已用 <code>FnDecl.span</code> 替代此 hack，见 §2.10）</strong></li>
         <li>纯函数（无 <code>! [</code>）：行末插入 <code>! [E]</code>，如 <code>fn helper(x: Int) -> Int</code> → <code>fn helper(x: Int) -> Int ! [IO]</code></li>
         <li>部分效应（有 <code>! [IO]</code>）：<code>]</code> 前插入 <code>, E</code>，如 <code>fn bad(x: Int) -> Int ! [IO]</code> → <code>fn bad(x: Int) -> Int ! [IO, Clock]</code></li>
         <li>新增 <code>find_effect_close_bracket</code> 辅助函数检测签名行是否已有效应注解</li>
@@ -577,6 +579,32 @@
       </ul>
     </li>
   </ul>
+
+  <h3>2.10 Phase 3.2 已完成 · AST span 诊断定位</h3>
+  <ul>
+    <li><strong>核心目标</strong>：为 AST 节点添加源码位置信息（<code>Span</code>），让诊断精确定位到函数签名行，移除 Phase 3.1 的 <code>find_fn_line</code> 源码扫描 hack ✅</li>
+    <li><strong>Span 类型</strong>（<code>src/ast.rs</code>）：<code>{ line, col, end_line, end_col }</code>（1-based，与 lexer 的 <code>SpannedToken</code> 一致），为 <code>FnDecl</code> 和 <code>EnumDecl</code> 添加 <code>span</code> 字段</li>
+    <li><strong>Parser 填充 span</strong>：<code>parse_fn_decl</code>/<code>parse_enum_decl</code> 记录 <code>fn</code>/<code>enum</code> 关键字位置为 start，新增 <code>prev_token_pos()</code> 辅助方法获取 body 前一个 token 位置为签名 end</li>
+    <li><strong>Typechecker 消费 span</strong>：
+      <ul>
+        <li><code>FnSig</code> 结构体：<code>sig_line: usize</code> → <code>span: Span</code>（移除 <code>sig_line</code> 字段）</li>
+        <li><code>TypeChecker</code>：<code>current_sig_line: usize</code> → <code>current_fn_span: Span</code></li>
+        <li><code>check_fn_body</code>：设置 <code>current_fn_span = f.span</code>；EFF001/TYPE010 诊断用 <code>current_fn_span.line/col</code> 替换 <code>(0,0)</code></li>
+        <li><code>collect_fn_sig</code>：NAM002（重复函数定义）用 <code>f.span.line/col</code> 替换 <code>(0,0)</code></li>
+        <li>移除 <code>find_fn_line</code> 源码扫描方法（Phase 3.1 hack）</li>
+      </ul>
+    </li>
+    <li><strong>端到端验证</strong>：
+      <ul>
+        <li><code>lom examples/effects_bad.lom --check</code> — EFF001 现在报告 <code>(9:1)</code> 和 <code>(20:1)</code>（helper 和 bad_helper 的 <code>fn</code> 关键字位置），之前为 <code>(0:0)</code> ✅</li>
+        <li><code>lom examples/effects_bad.lom --json</code> — JSON 中 <code>"line": 9, "col": 1</code> 和 <code>"line": 20, "col": 1</code> ✅</li>
+        <li><code>lom fix examples/effects_bad.lom --apply --dry-run</code> — 修复位置正确（<code>[9:25]</code> 插入 <code>! [IO]</code>，<code>[20:35]</code> 插入 <code>, Clock</code>）✅</li>
+      </ul>
+    </li>
+    <li><strong>测试增强</strong>：3 个现有测试增加位置断言（EFF001 line=1/col=1、TYPE010 line=1/col=1、NAM002 line=4/col=1），159/159 通过 ✅</li>
+    <li><strong>已知范围限制</strong>：仅 <code>FnDecl</code>/<code>EnumDecl</code> 携带 span；语句/表达式级诊断（TYPE001、NAM003 等）仍报告 <code>(0,0)</code>；运行时错误仍报告 <code>(0,0)</code>。完整表达式级 span 推迟到 Phase 3 LSP 工作</li>
+  </ul>
+
   <h4>核心特性（按优先级，全阶段）</h4>
   <ol>
     <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈 <span class="tag" style="background:#16a34a;color:white;">已完成</span></li>

@@ -5,7 +5,8 @@
 # 仅 --check 或 --json 模式会显示该警告。
 
 # helper 是纯函数（无 ! [...]），但调用了 println（带 IO 效应）
-# --check 会报：[type] warning (0:0): [EFF001] 纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'
+# --check 会报：[type] warning (9:1): [EFF001] 纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'
+# Phase 3.2: 诊断定位到函数签名行（fn 关键字位置），而非 (0:0)
 fn helper(x: Int) -> Int
     println(x)
     x

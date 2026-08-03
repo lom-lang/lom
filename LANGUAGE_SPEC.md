@@ -645,7 +645,7 @@ The `[enums]` section is omitted when the file declares no enums; same for `[imp
 - **No type-check results.** Use `lom --check` or `lom --json` for diagnostics.
 - **No cross-file info.** `info` reads a single file; transitive imports are not expanded (Phase 3 module system).
 - **No expression-level types.** Only top-level declarations are exported; local `let` bindings and inferred expression types are not reported.
-- **No positions.** Declaration line/col is not yet reported (Phase 3 AST positions).
+- **No positions.** Declaration line/col is not yet reported in `lom info` output. (Phase 3.2 adds `Span` to `FnDecl`/`EnumDecl` for diagnostic positioning, but `lom info` does not yet surface them.)
 
 ### 6.9 AI repair plan (Phase 2.7 — implemented; Phase 3.1 — `--apply` execution)
 
@@ -782,6 +782,17 @@ Per-fix fields:
 - **LEX001 position precision.** When an unclosed string spans multiple lines, the lexer reports the position of the last unclosed `"` rather than the first; `--apply` follows the reported position. This is a lexer diagnostic-precision issue, not an `--apply` issue.
 - **EFF001 multi-effect merge.** When a function already declares `! [IO]` and is missing `Clock`, `--apply` inserts `, Clock` before `]` to produce `! [IO, Clock]`. This handles the common case; deeply nested effect expressions are not parsed.
 
+#### 6.9.6 Phase 3.2 AST span-based diagnostic positioning
+
+Phase 3.1 used `find_fn_line` (a source-line scanner in the typechecker) to locate the function signature line for EFF001. Phase 3.2 replaces this hack with proper AST `Span` metadata:
+
+- **`Span` type** (`src/ast.rs`): `{ line, col, end_line, end_col }` (1-based, matching `SpannedToken`). Added to `FnDecl` and `EnumDecl`.
+- **Parser fills spans**: `parse_fn_decl`/`parse_enum_decl` record the `fn`/`enum` keyword position as the start and use `prev_token_pos()` (the token before the body) as the signature end.
+- **Typechecker consumes spans**: `FnSig` now stores `span: Span` (replacing `sig_line: usize`). `check_fn_body` sets `current_fn_span = f.span`; EFF001/TYPE010 diagnostics use `current_fn_span.line/col` instead of `(0,0)`. `collect_fn_sig` uses `f.span` for NAM002 (duplicate function). The `find_fn_line` source-scanning hack is removed.
+- **End-to-end verified**: `lom examples/effects_bad.lom --check` now reports `EFF001` at `(9:1)` and `(20:1)` (the `fn` keyword positions of `helper` and `bad_helper`), previously `(0:0)`. `lom fix --apply --dry-run` still produces correct inserts at `[9:25]` and `[20:35]`.
+
+> **Scope**: Only `FnDecl`/`EnumDecl` carry spans. Statement/expression-level diagnostics (TYPE001, NAM003, etc.) still report `(0,0)`; runtime errors still report `(0,0)`. Full expression-level spans are deferred to Phase 3 LSP work.
+
 ---
 
 ## 7. Error Model (Phase 2.3: structured JSON diagnostics — implemented)
@@ -836,7 +847,7 @@ Per-diagnostic fields (Phase 2.3):
 - `hint`: optional fix suggestion
 
 Reserved for future phases (not in v1):
-- `span`: `{ "start": [line, col], "end": [line, col] }` — requires AST node positions (Phase 3)
+- `span`: `{ "start": [line, col], "end": [line, col] }` — partially implemented (Phase 3.2: `FnDecl`/`EnumDecl` carry `Span`; expression-level spans deferred to Phase 3 LSP work)
 - ~~`fix`: `{ "description", "suggestion", "start", "end" }` — machine-actionable repair (Phase 2.7)~~ Moved to `lom-fix/v1` (Phase 2.7 implemented; see §6.9). Kept out of `lom-diag/v1` so the diagnostic schema stays a pure error report.
 - ~~`retry`: whether LLM should retry generation after applying `fix` (Phase 2.7)~~ Likewise in `lom-fix/v1` per-plan field (Phase 2.7 implemented; see §6.9).
 
@@ -898,7 +909,7 @@ Output streams:
 
 ### 7.6 Limitations in Phase 2.3
 
-- **Runtime error positions**: AST nodes do not yet carry source positions (planned for Phase 3 LSP work). Runtime diagnostics report `line=0, col=0`; the message itself carries enough context to identify the failure. Lex/parse diagnostics are fully positioned.
+- **Runtime error positions**: AST nodes do not yet carry source positions at the expression level (planned for Phase 3 LSP work). Runtime diagnostics report `line=0, col=0`; the message itself carries enough context to identify the failure. Lex/parse diagnostics are fully positioned; typecheck diagnostics for EFF001/TYPE010/NAM002 are positioned via `FnDecl.span` (Phase 3.2). Statement/expression-level typecheck diagnostics (TYPE001, NAM003, etc.) still report `(0,0)`.
 - ~~**No `fix` / `retry` fields**: reserved for Phase 2.7 `lom fix --plan --json`.~~ **Implemented in Phase 2.7** — see §6.9. `fix` / `retry` live in the `lom-fix/v1` schema (separate from `lom-diag/v1`), not as fields of individual diagnostics.
 - **Single-file only**: cross-file diagnostics arrive with the module system (Phase 3).
 

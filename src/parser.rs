@@ -178,6 +178,16 @@ impl Parser {
         cur_line != prev_line
     }
 
+    /// Phase 3.2: 获取前一个已消费 token 的 (line, col)
+    /// 用于构造 span 的 end 位置（签名行末 = body 前一个 token）
+    fn prev_token_pos(&self) -> (usize, usize) {
+        if self.pos == 0 {
+            return (0, 0);
+        }
+        let prev = &self.tokens[self.pos - 1];
+        (prev.line, prev.col)
+    }
+
     // ===== 容错恢复辅助（Phase 2.2）=====
 
     /// 同步到下一个顶层 item 起点：跳过 token 直到 fn/enum/from/EOF
@@ -318,7 +328,7 @@ impl Parser {
     }
 
     fn parse_fn_decl(&mut self) -> Result<FnDecl, ParseError> {
-        self.advance(); // fn
+        let fn_tok = self.advance(); // fn（记录位置用于 span）
         let name = self.parse_ident()?;
         self.expect(&Token::LParen, "'('")?;
         let params = self.parse_params()?;
@@ -329,6 +339,10 @@ impl Parser {
         };
         // Phase 2.5: 可选效应注解 `! [Effect1, Effect2]`
         let effects = self.parse_effects()?;
+        // Phase 3.2: 签名 span = fn 关键字位置 .. body 前一个 token 位置
+        // body 前一个 token 是 effects 的 `]` 或 ret_type 或 `)`（无 ret/effects 时）
+        // 简化：用 prev_token 的 line/col 作为 end
+        let (end_line, end_col) = self.prev_token_pos();
         let body = self.parse_block()?;
         Ok(FnDecl {
             name,
@@ -336,6 +350,12 @@ impl Parser {
             ret_type,
             effects,
             body,
+            span: Span {
+                line: fn_tok.line,
+                col: fn_tok.col,
+                end_line,
+                end_col,
+            },
         })
     }
 
@@ -475,7 +495,7 @@ impl Parser {
     /// 形式 1（单行）：enum Name<T, E> = V1(T) | V2(E) | V3
     /// 形式 2（多行）：enum Name<T, E>\n V1(T)\n V2(E)\n end（变体前可选 |）
     fn parse_enum_decl(&mut self) -> Result<EnumDecl, ParseError> {
-        self.advance(); // enum
+        let enum_tok = self.advance(); // enum（记录位置用于 span）
         let name = self.parse_ident()?;
         // 可选类型参数：<T, E>
         let mut type_params = Vec::new();
@@ -489,6 +509,9 @@ impl Parser {
             }
             self.expect(&Token::Gt, "'>' (闭合类型参数)")?;
         }
+        // Phase 3.2: enum 签名 span = enum 关键字 .. `=` 前一个 token（name 或 `>`）
+        // 多行形式（无 `=`）时，用 name 或 `>` 位置作为 end
+        let (end_line, end_col) = self.prev_token_pos();
         let mut variants = Vec::new();
         if self.matches(&Token::Assign) {
             // 单行形式：V1 | V2 | V3（无 end）
@@ -512,6 +535,12 @@ impl Parser {
             name,
             type_params,
             variants,
+            span: Span {
+                line: enum_tok.line,
+                col: enum_tok.col,
+                end_line,
+                end_col,
+            },
         })
     }
 
