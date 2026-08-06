@@ -6,6 +6,9 @@ use crate::ast::*;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fs;
+use std::io::Write;
+use std::path::Path;
 use std::rc::Rc;
 
 /// 运行时值
@@ -286,11 +289,24 @@ const PRELUDE: &[&str] = &["println", "print"];
 /// 标准库模块定义：模块名 → 导出符号
 /// Phase 2.1.5：io / string / math 三个模块
 /// Phase 3.3：新增 list / json 模块
+/// Phase 3.4：string 扩展（split/contains/replace/starts_with/ends_with），新增 file 模块
 const STDL_MODULES: &[(&str, &[&str])] = &[
     ("io", &["println", "print"]),
     (
         "string",
-        &["len", "int_to_string", "string_to_int", "trim", "upper", "lower"],
+        &[
+            "len",
+            "int_to_string",
+            "string_to_int",
+            "trim",
+            "upper",
+            "lower",
+            "split",
+            "contains",
+            "replace",
+            "starts_with",
+            "ends_with",
+        ],
     ),
     ("math", &["sqrt", "abs", "min", "max"]),
     (
@@ -306,6 +322,10 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
         ],
     ),
     ("json", &["json_parse", "json_stringify"]),
+    (
+        "file",
+        &["file_read", "file_write", "file_append", "file_exists"],
+    ),
 ];
 
 impl Interpreter {
@@ -383,7 +403,7 @@ impl Interpreter {
             Some(e) => e,
             None => {
                 return Err(RuntimeError::Msg(format!(
-                    "未知模块 '{}'（Phase 2.1.5 仅支持标准库模块：io/string/math；用户模块留 Phase 3）",
+                    "未知模块 '{}'（标准库模块：io/string/math/list/json/file；用户模块留待后续阶段）",
                     imp.module
                 )));
             }
@@ -1309,6 +1329,143 @@ impl Interpreter {
                 expect_arity("json_stringify", 1, args)?;
                 Ok(Some(Value::Str(crate::json::stringify(&args[0]))))
             }
+            // Phase 3.4: string 扩展（纯函数）
+            "split" => {
+                // split(s, sep) -> List<String>；sep 为空字符串时按字符分割
+                expect_arity("split", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(s), Value::Str(sep)) => {
+                        let elems: Vec<Value> = if sep.is_empty() {
+                            // 按字符分割
+                            s.chars().map(|c| Value::Str(c.to_string())).collect()
+                        } else {
+                            s.split(sep.as_str())
+                                .map(|piece| Value::Str(piece.to_string()))
+                                .collect()
+                        };
+                        Ok(Some(Value::List { elems }))
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "split 期望两个 String 参数 (s, sep)".to_string(),
+                    )),
+                }
+            }
+            "contains" => {
+                expect_arity("contains", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(s), Value::Str(sub)) => {
+                        Ok(Some(Value::Bool(s.contains(sub.as_str()))))
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "contains 期望两个 String 参数 (s, sub)".to_string(),
+                    )),
+                }
+            }
+            "replace" => {
+                // replace(s, from, to) -> String；替换所有匹配
+                expect_arity("replace", 3, args)?;
+                match (&args[0], &args[1], &args[2]) {
+                    (Value::Str(s), Value::Str(from), Value::Str(to)) => {
+                        Ok(Some(Value::Str(s.replace(from.as_str(), to.as_str()))))
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "replace 期望三个 String 参数 (s, from, to)".to_string(),
+                    )),
+                }
+            }
+            "starts_with" => {
+                expect_arity("starts_with", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(s), Value::Str(prefix)) => {
+                        Ok(Some(Value::Bool(s.starts_with(prefix.as_str()))))
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "starts_with 期望两个 String 参数 (s, prefix)".to_string(),
+                    )),
+                }
+            }
+            "ends_with" => {
+                expect_arity("ends_with", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(s), Value::Str(suffix)) => {
+                        Ok(Some(Value::Bool(s.ends_with(suffix.as_str()))))
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "ends_with 期望两个 String 参数 (s, suffix)".to_string(),
+                    )),
+                }
+            }
+            // Phase 3.4: file 模块（均有 [IO] 效应）
+            "file_read" => {
+                // file_read(path) -> String；失败返回运行时错误
+                expect_arity("file_read", 1, args)?;
+                match &args[0] {
+                    Value::Str(path) => match fs::read_to_string(path) {
+                        Ok(content) => Ok(Some(Value::Str(content))),
+                        Err(e) => Err(RuntimeError::Msg(format!(
+                            "file_read 无法读取 '{}': {}",
+                            path, e
+                        ))),
+                    },
+                    _ => Err(RuntimeError::Msg("file_read 期望 String".to_string())),
+                }
+            }
+            "file_write" => {
+                // file_write(path, content) -> Unit；覆盖写入
+                expect_arity("file_write", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(path), Value::Str(content)) => {
+                        match fs::write(path, content.as_bytes()) {
+                            Ok(()) => Ok(Some(Value::Unit)),
+                            Err(e) => Err(RuntimeError::Msg(format!(
+                                "file_write 无法写入 '{}': {}",
+                                path, e
+                            ))),
+                        }
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "file_write 期望 (String, String)".to_string(),
+                    )),
+                }
+            }
+            "file_append" => {
+                // file_append(path, content) -> Unit；追加写入
+                expect_arity("file_append", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Str(path), Value::Str(content)) => {
+                        let mut file = match fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path)
+                        {
+                            Ok(f) => f,
+                            Err(e) => {
+                                return Err(RuntimeError::Msg(format!(
+                                    "file_append 无法打开 '{}': {}",
+                                    path, e
+                                )))
+                            }
+                        };
+                        match file.write_all(content.as_bytes()) {
+                            Ok(()) => Ok(Some(Value::Unit)),
+                            Err(e) => Err(RuntimeError::Msg(format!(
+                                "file_append 写入失败 '{}': {}",
+                                path, e
+                            ))),
+                        }
+                    }
+                    _ => Err(RuntimeError::Msg(
+                        "file_append 期望 (String, String)".to_string(),
+                    )),
+                }
+            }
+            "file_exists" => {
+                expect_arity("file_exists", 1, args)?;
+                match &args[0] {
+                    Value::Str(path) => Ok(Some(Value::Bool(Path::new(path).exists()))),
+                    _ => Err(RuntimeError::Msg("file_exists 期望 String".to_string())),
+                }
+            }
             _ => Ok(None), // 不是内置函数
         }
     }
@@ -1326,6 +1483,11 @@ fn is_known_builtin(name: &str) -> bool {
             | "trim"
             | "upper"
             | "lower"
+            | "split"
+            | "contains"
+            | "replace"
+            | "starts_with"
+            | "ends_with"
             | "sqrt"
             | "abs"
             | "min"
@@ -1339,6 +1501,10 @@ fn is_known_builtin(name: &str) -> bool {
             | "list_cons"
             | "json_parse"
             | "json_stringify"
+            | "file_read"
+            | "file_write"
+            | "file_append"
+            | "file_exists"
     )
 }
 
@@ -1346,12 +1512,14 @@ fn is_known_builtin(name: &str) -> bool {
 fn module_of(name: &str) -> Option<&'static str> {
     match name {
         "println" | "print" => Some("io"),
-        "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" => Some("string"),
+        "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" | "split"
+        | "contains" | "replace" | "starts_with" | "ends_with" => Some("string"),
         "sqrt" | "abs" | "min" | "max" => Some("math"),
         "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" => {
             Some("list")
         }
         "json_parse" | "json_stringify" => Some("json"),
+        "file_read" | "file_write" | "file_append" | "file_exists" => Some("file"),
         _ => None,
     }
 }
@@ -2036,6 +2204,178 @@ end
 "#;
         let result = run_src(src);
         assert!(result.is_err(), "未导入的 list_empty 应报错");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("未导入"), "期望提及未导入，得到: {}", msg);
+    }
+
+    // ===== Phase 3.4: string 扩展测试 =====
+
+    #[test]
+    fn test_string_split_by_comma() {
+        let src = r#"
+from string import { split }
+from list import { list_length, list_get }
+from io import { println }
+fn main() -> Unit
+    let parts = split("a,b,c", ",")
+    println(list_length(parts))
+    println(list_get(parts, 0))
+    println(list_get(parts, 2))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_split_empty_sep() {
+        // 空分隔符按字符分割
+        let src = r#"
+from string import { split }
+from list import { list_length }
+from io import { println }
+fn main() -> Unit
+    let chars = split("hi", "")
+    println(list_length(chars))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_contains() {
+        let src = r#"
+from string import { contains }
+from io import { println }
+fn main() -> Unit
+    println(contains("hello world", "world"))
+    println(contains("hello", "xyz"))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_replace_all() {
+        let src = r#"
+from string import { replace }
+from io import { println }
+fn main() -> Unit
+    println(replace("a-b-c", "-", "+"))
+    println(replace("hello", "xyz", "abc"))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_starts_ends_with() {
+        let src = r#"
+from string import { starts_with, ends_with }
+from io import { println }
+fn main() -> Unit
+    println(starts_with("hello", "he"))
+    println(starts_with("hello", "lo"))
+    println(ends_with("hello", "lo"))
+    println(ends_with("hello", "he"))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_split_wrong_type_errors() {
+        let src = r#"
+from string import { split }
+fn main() -> Unit
+    split(123, ",")
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "split 非 String 参数应报错");
+    }
+
+    // ===== Phase 3.4: file 模块测试 =====
+
+    #[test]
+    fn test_file_write_read_roundtrip() {
+        let path = "examples/_test_file_roundtrip.txt";
+        // 先确保文件不存在
+        let _ = std::fs::remove_file(path);
+        let src = format!(
+            r#"
+from file import {{ file_write, file_read, file_exists }}
+from io import {{ println }}
+fn main() -> Unit
+    println(file_exists("{path}"))
+    file_write("{path}", "hello\nworld\n")
+    println(file_exists("{path}"))
+    let content = file_read("{path}")
+    println(content)
+end
+"#,
+            path = path
+        );
+        run_src(&src).unwrap();
+        // 清理
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_file_append() {
+        let path = "examples/_test_file_append.txt";
+        let _ = std::fs::remove_file(path);
+        let src = format!(
+            r#"
+from file import {{ file_write, file_append, file_read }}
+from io import {{ println }}
+fn main() -> Unit
+    file_write("{path}", "line1\n")
+    file_append("{path}", "line2\n")
+    let content = file_read("{path}")
+    println(content)
+end
+"#,
+            path = path
+        );
+        run_src(&src).unwrap();
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_file_read_nonexistent_errors() {
+        let src = r#"
+from file import { file_read }
+fn main() -> Unit
+    file_read("examples/__nonexistent_file__.txt")
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "读取不存在的文件应报错");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("file_read"), "期望提及 file_read，得到: {}", msg);
+    }
+
+    #[test]
+    fn test_file_wrong_type_errors() {
+        let src = r#"
+from file import { file_exists }
+fn main() -> Unit
+    file_exists(123)
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "file_exists 非 String 参数应报错");
+    }
+
+    #[test]
+    fn test_file_unimported_errors() {
+        let src = r#"
+fn main() -> Unit
+    file_exists("test.txt")
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "未导入的 file_exists 应报错");
         let msg = format!("{}", result.unwrap_err());
         assert!(msg.contains("未导入"), "期望提及未导入，得到: {}", msg);
     }

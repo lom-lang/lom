@@ -1,0 +1,44 @@
+# Phase 3.4 file 模块示例
+#
+# 展示 file 模块的 4 个函数：
+#   - file_read(path): 读取文件内容为 String
+#   - file_write(path, content): 覆盖写入文件
+#   - file_append(path, content): 追加写入文件
+#   - file_exists(path): 判断文件是否存在
+#
+# 注意：file 函数都有 [IO] 效应。main 函数隐式拥有所有效应可直接调用；
+# 若在辅助函数中调用 file_*，需声明 ! [IO] 效应（见 read_file 函数）。
+
+from file import { file_read, file_write, file_append, file_exists }
+from string import { contains }
+from io import { println }
+
+# 辅助函数：读取文件（声明 [IO] 效应）
+fn read_file(path: String) -> String ! [IO]
+    file_read(path)
+end
+
+fn main() -> Unit
+    let path = "examples/_file_demo_tmp.txt"
+
+    # 1. file_exists：检查文件是否存在
+    println(file_exists(path))    # False（尚未创建）
+
+    # 2. file_write：写入文件（覆盖）
+    file_write(path, "line 1\nline 2\nline 3\n")
+    println(file_exists(path))    # True
+
+    # 3. file_read：读取文件内容
+    let content = file_read(path)
+    println(content)
+
+    # 4. file_append：追加写入
+    file_append(path, "line 4\n")
+    let content2 = read_file(path)
+    println(content2)
+
+    # 5. 结合 string.contains 检查内容
+    println(contains(content2, "line 4"))    # True
+
+    ()
+end

@@ -936,15 +936,16 @@ from io import { println as log }            # per-item alias
 - **No re-export**. Re-export via explicit `pub` items (Phase 3).
 - **Dotted module path**: `from utils.helpers import { format_date }` parses, but user modules are Phase 3; Phase 2.1.5 only resolves standard library module names (io/string/math).
 
-### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`)
+### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions)
 
 | Module | Exports | Notes |
 |---|---|---|
 | `io` | `println`, `print` | Also in prelude (auto-available); explicit import only needed for aliasing |
-| `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` | Must be imported to use |
+| `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with` | Phase 3.4 adds `split`/`contains`/`replace`/`starts_with`/`ends_with` (§9.2) |
 | `math` | `sqrt`, `abs`, `min`, `max` | Must be imported to use |
 | `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons` | Phase 3.3 — immutable list ops (§9.3) |
 | `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
+| `file` | `file_read`, `file_write`, `file_append`, `file_exists` | Phase 3.4 — file system I/O, all declare `[IO]` effect (§9.5) |
 
 **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 
@@ -985,7 +986,7 @@ Available without `from` declaration:
 | `println(x)` | `Any -> Unit ! [IO]` | Print with newline |
 | `print(x)` | `Any -> Unit ! [IO]` | Print without newline |
 
-### 9.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`)
+### 9.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions)
 
 Require explicit `from <module> import { ... }`:
 
@@ -997,13 +998,18 @@ Require explicit `from <module> import { ... }`:
 | `string` | `trim(s)` | `String -> String` | Strip leading/trailing whitespace |
 | `string` | `upper(s)` | `String -> String` | Uppercase |
 | `string` | `lower(s)` | `String -> String` | Lowercase |
+| `string` | `split(s, sep)` | `(String, String) -> List<_Any>` | Phase 3.4 — split by separator; empty `sep` splits into UTF-8 characters |
+| `string` | `contains(s, sub)` | `(String, String) -> Bool` | Phase 3.4 — substring test |
+| `string` | `replace(s, from, to)` | `(String, String, String) -> String` | Phase 3.4 — replace all occurrences |
+| `string` | `starts_with(s, prefix)` | `(String, String) -> Bool` | Phase 3.4 — prefix test |
+| `string` | `ends_with(s, suffix)` | `(String, String) -> Bool` | Phase 3.4 — suffix test |
 | `math` | `sqrt(x)` | `Float -> Float` (also accepts `Int`) | Square root |
 | `math` | `abs(x)` | `Int -> Int \| Float -> Float` | Absolute value |
 | `math` | `min(a, b)` | `(Int, Int) -> Int \| (Float, Float) -> Float` | Minimum |
 | `math` | `max(a, b)` | `(Int, Int) -> Int \| (Float, Float) -> Float` | Maximum |
 | `io` | `println`, `print` | same as prelude | Explicit import only needed for aliasing |
 
-> Phase 3 adds collections, IO, HTTP modules. Phase 4 adds tensor/math extensions.
+> All `string` functions are pure (no effect). `split` returns `List<_Any>`; element-type tracking is deferred.
 
 ### 9.3 `list` module (Phase 3.3 — implemented)
 
@@ -1047,6 +1053,21 @@ A hand-written, zero-dependency JSON parser and serializer (`src/json.rs`). Maps
 The parser supports `\uXXXX` Unicode escapes, including surrogate pairs (e.g. `\uD83D\uDE00` → 😀). Both functions are pure (no `! [...]` effect). Examples: [examples/json_demo.lom](examples/json_demo.lom).
 
 > **Known limitation**: `json_stringify` of nested `Record`/`List` produces compact output (no pretty-printing); enum and closure values are not round-trippable through JSON. These are acceptable for the Phase 3 MVP scope.
+
+### 9.5 `file` module (Phase 3.4 — implemented)
+
+File system I/O exposed through the `file` standard library module. All four functions declare the `[IO]` effect — calling them from a user function requires that function to declare `! [IO]` (EFF001 enforces this); `main` implicitly has all effects.
+
+| Function | Type | Notes |
+|---|---|---|
+| `file_read(path)` | `String -> String ! [IO]` | Read entire file as UTF-8 string; runtime error if the file cannot be read (missing, permission, non-UTF-8) |
+| `file_write(path, content)` | `(String, String) -> Unit ! [IO]` | Overwrite (create or truncate) the file with `content` |
+| `file_append(path, content)` | `(String, String) -> Unit ! [IO]` | Append `content` to the file (creates if missing) |
+| `file_exists(path)` | `String -> Bool ! [IO]` | True iff a file/directory exists at `path` |
+
+> **Effect discipline**: because every `file_*` function carries `[IO]`, a helper that reads a config file must be declared `fn read_config(p: String) -> String ! [IO]`. The type checker emits `EFF001` if the `! [IO]` annotation is missing. This keeps file I/O explicit and LLM-debuggable — a core LLM-coding-native goal.
+
+Examples: [examples/file_demo.lom](examples/file_demo.lom).
 
 ---
 
@@ -1254,3 +1275,7 @@ Each task is a JSON object:
   - Added §4.3 `List<T>` type entry; §8.2/§9.2 stdlib module tables extended with `list` and `json`.
   - Added §9.3 `list` module (immutable list API: `list_empty`/`list_cons`/`list_length`/`list_get`/`list_is_empty`/`list_head`/`list_tail`) and §9.4 `json` module (`json_parse`/`json_stringify` with JSON↔Lom Value mapping table, surrogate pair support, compact serialization).
   - Added `Value::List { elems: Vec<Value> }` runtime variant (immutable semantics). Type-checker signatures use `List<_Any>`.
+- **v0.2.3 (2026-08-03)**: Phase 3.4 — `file` module + `string` extensions.
+  - §8.2/§9.2 stdlib tables extended: `string` adds `split`/`contains`/`replace`/`starts_with`/`ends_with`; new `file` module with `file_read`/`file_write`/`file_append`/`file_exists`.
+  - Added §9.5 `file` module (all functions declare `[IO]` effect; EFF001 enforces that callers declare `! [IO]`; `main` is exempt).
+  - `split` returns `List<_Any>` (empty separator splits by UTF-8 char); all `string` extensions are pure.

@@ -1,0 +1,53 @@
+# Phase 3.4 string 扩展示例
+#
+# 展示 string 模块新增的 5 个函数：
+#   - split(s, sep): 按分隔符分割字符串为 List<String>
+#   - contains(s, sub): 判断是否包含子串
+#   - replace(s, from, to): 替换所有匹配子串
+#   - starts_with(s, prefix): 判断前缀
+#   - ends_with(s, suffix): 判断后缀
+#
+# 这些函数都是纯函数（无副作用），适合在管线中组合使用。
+
+from string import { split, contains, replace, starts_with, ends_with }
+from list import { list_length, list_get }
+from io import { println }
+
+fn main() -> Unit
+    # 1. split：按分隔符分割
+    let parts = split("a,b,c,d", ",")
+    println(parts)                    # [a, b, c, d]
+    println(list_length(parts))       # 4
+    println(list_get(parts, 0))       # a
+    println(list_get(parts, 3))       # d
+
+    # 2. split：空分隔符按字符分割
+    let chars = split("hello", "")
+    println(chars)                    # [h, e, l, l, o]
+    println(list_length(chars))       # 5
+
+    # 3. contains：子串包含判断
+    println(contains("hello world", "world"))   # True
+    println(contains("hello world", "xyz"))     # False
+    println(contains("hello", ""))              # True（空串总是包含）
+
+    # 4. replace：替换所有匹配
+    println(replace("hello world", "o", "0"))   # hell0 w0rld
+    println(replace("a-b-c-d", "-", "+"))       # a+b+c+d
+    println(replace("hello", "xyz", "abc"))     # hello（无匹配则不变）
+
+    # 5. starts_with / ends_with：前缀后缀判断
+    println(starts_with("hello world", "hello"))   # True
+    println(starts_with("hello world", "world"))   # False
+    println(ends_with("hello world", "world"))     # True
+    println(ends_with("hello world", "hello"))     # False
+
+    # 6. 管线组合：处理 CSV 行
+    let csv_line = "Alice,30,Beijing"
+    let fields = split(csv_line, ",")
+    println(list_get(fields, 0))       # Alice
+    println(list_get(fields, 1))       # 30
+    println(list_get(fields, 2))       # Beijing
+
+    ()
+end

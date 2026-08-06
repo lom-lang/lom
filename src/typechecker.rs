@@ -238,6 +238,48 @@ impl TypeChecker {
             "json_stringify".to_string(),
             FnSig { params: vec![("v".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::String), effects: vec![], span: Span::default() },
         );
+        // Phase 3.4: string 扩展（纯函数）
+        // split(s, sep) -> List<String>；返回 List<_Any>（元素类型追踪推迟）
+        let list_string = || Type::Generic("List".to_string(), vec![Type::Named("_Any".to_string())]);
+        self.functions.insert(
+            "split".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String), ("sep".to_string(), Type::String)], ret: Some(list_string()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "contains".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String), ("sub".to_string(), Type::String)], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "replace".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String), ("from".to_string(), Type::String), ("to".to_string(), Type::String)], ret: Some(Type::String), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "starts_with".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String), ("prefix".to_string(), Type::String)], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "ends_with".to_string(),
+            FnSig { params: vec![("s".to_string(), Type::String), ("suffix".to_string(), Type::String)], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        // Phase 3.4: file 模块（均声明 [IO] 效应）
+        // file_read/file_write/file_append/file_exists 都涉及文件系统副作用
+        let io_effect = vec!["IO".to_string()];
+        self.functions.insert(
+            "file_read".to_string(),
+            FnSig { params: vec![("path".to_string(), Type::String)], ret: Some(Type::String), effects: io_effect.clone(), span: Span::default() },
+        );
+        self.functions.insert(
+            "file_write".to_string(),
+            FnSig { params: vec![("path".to_string(), Type::String), ("content".to_string(), Type::String)], ret: Some(Type::Unit), effects: io_effect.clone(), span: Span::default() },
+        );
+        self.functions.insert(
+            "file_append".to_string(),
+            FnSig { params: vec![("path".to_string(), Type::String), ("content".to_string(), Type::String)], ret: Some(Type::Unit), effects: io_effect.clone(), span: Span::default() },
+        );
+        self.functions.insert(
+            "file_exists".to_string(),
+            FnSig { params: vec![("path".to_string(), Type::String)], ret: Some(Type::Bool), effects: io_effect, span: Span::default() },
+        );
     }
 
     /// 入口：检查整个程序，返回填充了类型诊断的 Diagnostics
