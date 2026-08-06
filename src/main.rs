@@ -38,13 +38,16 @@ struct CliArgs {
     apply: bool,
     /// Phase 3.1: --dry-run 标志（与 --apply 配合，只输出预览不写文件）
     dry_run: bool,
+    /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
+    program_args: Vec<String>,
 }
 
 fn print_help(prog: &str) {
-    eprintln!("Lom 解释器 (Phase 3.1) — AI 原生编程语言");
+    eprintln!("Lom 解释器 (Phase 3.5) — AI 原生编程语言");
     eprintln!();
     eprintln!("用法:");
     eprintln!("  {prog} <file.lom>                运行 .lom 程序（默认）");
+    eprintln!("  {prog} <file.lom> -- <args...>   运行 .lom 程序，传递参数（通过 env::args() 读取）");
     eprintln!("  {prog} <file.lom> --json         仅诊断，输出结构化 JSON（不执行）");
     eprintln!("  {prog} <file.lom> --check        仅诊断，输出人类可读格式（不执行）");
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
@@ -60,6 +63,7 @@ fn print_help(prog: &str) {
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
     eprintln!();
     eprintln!("选项:");
+    eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
     eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
@@ -91,7 +95,12 @@ fn parse_args(args: &[String]) -> CliArgs {
         }
     }
 
-    for a in iter {
+    while let Some(a) = iter.next() {
+        // Phase 3.5: 遇到 `--` 后，剩余所有参数传递给 Lom 程序
+        if a == "--" {
+            out.program_args = iter.by_ref().cloned().collect();
+            break;
+        }
         match a.as_str() {
             "--json" => out.json = true,
             "--check" => out.check = true,
@@ -219,6 +228,11 @@ fn main() {
     // ===== 执行阶段 =====
     let program = parser::Parser::parse_recover(&src).program;
     let mut interp = interpreter::Interpreter::new();
+    // Phase 3.5: 传递程序参数（-- 之后的参数），供 env::args() 读取
+    // 第一个参数约定为 .lom 文件路径（与大多数 CLI 约定一致：argv[0] = 程序名）
+    let mut full_args = vec![path.to_string()];
+    full_args.extend(cli.program_args.iter().cloned());
+    interp.set_program_args(full_args);
     if let Err(e) = interp.run(&program) {
         // 运行时错误：构造诊断输出
         // 注：Phase 2.3 阶段 AST 节点尚未携带位置信息（Phase 3 改造），

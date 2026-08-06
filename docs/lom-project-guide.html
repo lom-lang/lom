@@ -254,6 +254,7 @@
     <li>2.10 Phase 3.2 AST span 诊断定位 ✅ <span class="meta">已完成</span></li>
     <li>2.11 Phase 3.3 <code>list</code> + <code>json</code> 标准库模块 ✅ <span class="meta">已完成</span></li>
     <li>2.12 Phase 3.4 <code>file</code> + <code>string</code> 扩展标准库 ✅ <span class="meta">已完成</span></li>
+    <li>2.13 Phase 3.5 <code>env</code> 模块 + todo list CLI demo ✅ <span class="meta">已完成 — Phase 3 退出标准达成</span></li>
   </ul>
   <h4>2.1.1 已完成内容</h4>
   <ul>
@@ -719,6 +720,46 @@
     </li>
   </ul>
 
+  <h3>2.13 Phase 3.5 已完成 · <code>env</code> 模块 + todo list CLI demo — Phase 3 退出标准达成</h3>
+  <ul>
+    <li><strong>核心目标</strong>：添加命令行参数读取能力，并用 Lom 语言编写完整的 todo list CLI 工具，验证 Phase 3 退出标准："能用 Lom 写一个完整 CLI 工具"✅</li>
+    <li><strong><code>env</code> 模块</strong>（1 个纯函数）：
+      <ul>
+        <li><code>args() -&gt; List&lt;_Any&gt;</code> — 返回命令行参数列表；<code>argv[0]</code> = .lom 文件路径，<code>argv[1..]</code> = <code>--</code> 之后的用户参数</li>
+      </ul>
+    </li>
+    <li><strong>CLI <code>--</code> 参数分隔符</strong>（<code>src/main.rs</code>）：
+      <ul>
+        <li><code>lom &lt;file.lom&gt; -- &lt;arg1&gt; &lt;arg2&gt; ...</code> — <code>--</code> 之后的所有参数传递给 Lom 程序</li>
+        <li><code>parse_args</code> 函数支持 <code>--</code> 分隔符；<code>Interpreter::set_program_args()</code> 设置参数</li>
+        <li>约定 <code>argv[0]</code> = .lom 文件路径（与 C/Rust/Python 惯例一致）</li>
+      </ul>
+    </li>
+    <li><strong>todo list CLI demo</strong>（<code>examples/todo.lom</code>，185 行）：
+      <ul>
+        <li><strong>命令</strong>：<code>add "&lt;text&gt;"</code> 添加 / <code>list</code> 列出 / <code>done &lt;id&gt;</code> 标记完成 / <code>remove &lt;id&gt;</code> 删除 / <code>help</code> 显示用法</li>
+        <li><strong>数据持久化</strong>：JSON 文件（<code>examples/_todo_data.json</code>），用 <code>json_parse</code>/<code>json_stringify</code> + <code>file_read</code>/<code>file_write</code></li>
+        <li><strong>递归列表遍历</strong>：因 Lom 暂无 <code>for</code> 循环遍历 List，用递归函数 <code>print_todos_helper</code> 遍历打印；<code>list_reverse</code>/<code>list_append</code> 辅助函数实现末尾添加</li>
+        <li><strong>效应正确</strong>：<code>load_todos</code>/<code>save_todos</code>/<code>print_todos</code>/<code>print_usage</code> 均声明 <code>! [IO]</code>；<code>--check</code> 类型检查 0 诊断（0 error, 0 warning）</li>
+        <li><strong>Record 字面量构造</strong>：<code>{id: new_id, text: text, done: False}</code> 构造新 todo 项</li>
+        <li><strong>字段访问</strong>：<code>item.id</code>/<code>item.text</code>/<code>item.done</code> 访问 JSON 解析返回的 Record 字段</li>
+      </ul>
+    </li>
+    <li><strong>端到端验证</strong>：
+      <ul>
+        <li><code>lom todo.lom -- help</code> — 显示用法 ✅</li>
+        <li><code>lom todo.lom -- add "buy milk"</code> + <code>add "write code"</code> — 添加两项 ✅</li>
+        <li><code>lom todo.lom -- list</code> — 列出 <code>1. [ ] buy milk</code> + <code>2. [ ] write code</code> ✅</li>
+        <li><code>lom todo.lom -- done 1</code> — 标记完成，<code>list</code> 显示 <code>1. [x] buy milk</code> ✅</li>
+        <li><code>lom todo.lom -- remove 2</code> — 删除，<code>list</code> 只剩 <code>1. [x] buy milk</code> ✅</li>
+        <li><code>lom todo.lom --check --json</code> — 0 诊断（效应系统正确处理所有 <code>! [IO]</code> 声明）✅</li>
+        <li>JSON 持久化文件 <code>_todo_data.json</code> 内容正确：<code>[{"id":1,"text":"buy milk","done":true}]</code> ✅</li>
+      </ul>
+    </li>
+    <li><strong>用到的标准库模块</strong>：<code>env</code>（args）、<code>file</code>（file_read/file_write/file_exists）、<code>json</code>（json_parse/json_stringify）、<code>list</code>（全部 7 个函数）、<code>string</code>（int_to_string/string_to_int）、<code>io</code>（println）— 6 个标准库模块协同工作</li>
+    <li><strong>意义</strong>：todo list CLI 是 Phase 3 退出标准的标志性验证。它证明 Lom 语言已具备写完整 CLI 工具的能力：命令行参数读取、文件 I/O、JSON 数据持久化、递归数据处理、效应系统约束。这是从"LLM 运行环境"扩展到"通用脚本工具"的关键里程碑。</li>
+  </ul>
+
   <h4>核心特性（按优先级，全阶段）</h4>
   <ol>
     <li><strong>容错解析器</strong>：半截代码产出"带洞 AST"，对标 Zero，让 LLM 边写边得反馈 <span class="tag" style="background:#16a34a;color:white;">已完成</span></li>
@@ -731,7 +772,7 @@
     <li><strong>渐进式类型</strong>：默认动态可跑，标注后检查 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.4）</span></li>
     <li><strong>显式效应系统</strong>：副作用在签名中声明 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 2.5）</span></li>
     <li><strong>错误是值</strong>：<code>Result&lt;T, E&gt;</code>，不用异常 <span class="tag" style="background:#16a34a;color:white;">语法已完成</span></li>
-    <li><strong>标准库扩展（List + JSON + File + String）</strong>：不可变 List、零依赖 JSON 解析/序列化、文件 I/O（带效应）、字符串处理扩展 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 3.3 list/json + Phase 3.4 file/string）</span></li>
+    <li><strong>标准库扩展（List + JSON + File + String + Env）</strong>：不可变 List、零依赖 JSON 解析/序列化、文件 I/O（带效应）、字符串处理扩展、命令行参数读取 <span class="tag" style="background:#16a34a;color:white;">已完成（Phase 3.3-3.5）</span></li>
   </ol>
   <h4>技术栈</h4>
   <p>Rust + 解释器 + 基础类型检查器（两遍：签名收集 + 体检查）</p>
@@ -780,7 +821,11 @@
     <li><strong>Phase 3.2</strong>：AST span 诊断定位（<code>Span</code> 类型，移除 <code>find_fn_line</code> hack，EFF001/TYPE010/NAM002 精确定位到签名行）✅</li>
     <li><strong>Phase 3.3</strong>：<code>list</code> + <code>json</code> 标准库模块（<code>Value::List</code> 不可变列表，7 个 list 函数 + 2 个 json 函数，零依赖 JSON 解析器/序列化器，188/188 测试通过）✅</li>
     <li><strong>Phase 3.4</strong>：<code>file</code> + <code>string</code> 扩展标准库（4 个 file 函数带 <code>[IO]</code> 效应 + 5 个 string 纯函数扩展，199/199 测试通过）✅</li>
+    <li><strong>Phase 3.5</strong>：<code>env</code> 模块 + todo list CLI demo（<code>args()</code> 函数 + CLI <code>--</code> 参数传递 + 185 行 todo CLI 端到端验证全部命令，Phase 3 退出标准达成）✅</li>
   </ul>
+  <div class="warn" style="background:#d1fae5;border-color:#16a34a;">
+    <strong>Phase 3 退出标准已达成</strong>：能用 Lom 写一个完整 CLI 工具（todo list）。6 个标准库模块协同工作（env/file/json/list/string/io），效应系统正确约束副作用，JSON 持久化 + 递归数据处理。下一步可推进 Cranelift JIT、LSP 服务器、REPL 或 http 模块扩展。
+  </div>
   <h4>场景扩展</h4>
   <p>从"LLM 运行环境"扩展到"通用脚本"+"后端服务雏形"。</p>
   <h4>退出标准</h4>

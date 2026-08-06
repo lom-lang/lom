@@ -936,7 +936,7 @@ from io import { println as log }            # per-item alias
 - **No re-export**. Re-export via explicit `pub` items (Phase 3).
 - **Dotted module path**: `from utils.helpers import { format_date }` parses, but user modules are Phase 3; Phase 2.1.5 only resolves standard library module names (io/string/math).
 
-### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions)
+### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions; Phase 3.5 adds `env`)
 
 | Module | Exports | Notes |
 |---|---|---|
@@ -946,6 +946,7 @@ from io import { println as log }            # per-item alias
 | `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons` | Phase 3.3 — immutable list ops (§9.3) |
 | `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
 | `file` | `file_read`, `file_write`, `file_append`, `file_exists` | Phase 3.4 — file system I/O, all declare `[IO]` effect (§9.5) |
+| `env` | `args` | Phase 3.5 — command-line arguments (§9.6) |
 
 **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 
@@ -1068,6 +1069,20 @@ File system I/O exposed through the `file` standard library module. All four fun
 > **Effect discipline**: because every `file_*` function carries `[IO]`, a helper that reads a config file must be declared `fn read_config(p: String) -> String ! [IO]`. The type checker emits `EFF001` if the `! [IO]` annotation is missing. This keeps file I/O explicit and LLM-debuggable — a core LLM-coding-native goal.
 
 Examples: [examples/file_demo.lom](examples/file_demo.lom).
+
+### 9.6 `env` module (Phase 3.5 — implemented)
+
+Command-line argument access. Pure function (reads interpreter-internal state, no side effect).
+
+| Function | Type | Notes |
+|---|---|---|
+| `args()` | `() -> List<_Any>` | Return the program argument list. `argv[0]` is the `.lom` file path; `argv[1..]` are user arguments passed via the CLI `--` separator |
+
+**CLI usage**: `lom <file.lom> -- <arg1> <arg2> ...` — everything after `--` is passed to the Lom program via `env::args()`.
+
+> **Convention**: like C/Rust/Python, `argv[0]` is the program path. User arguments start at index 1. See [examples/todo.lom](examples/todo.lom) for a complete CLI tool that dispatches on `args()`.
+
+Examples: [examples/todo.lom](examples/todo.lom) — a complete todo list CLI (add/list/done/remove/help) with JSON persistence.
 
 ---
 
@@ -1279,3 +1294,7 @@ Each task is a JSON object:
   - §8.2/§9.2 stdlib tables extended: `string` adds `split`/`contains`/`replace`/`starts_with`/`ends_with`; new `file` module with `file_read`/`file_write`/`file_append`/`file_exists`.
   - Added §9.5 `file` module (all functions declare `[IO]` effect; EFF001 enforces that callers declare `! [IO]`; `main` is exempt).
   - `split` returns `List<_Any>` (empty separator splits by UTF-8 char); all `string` extensions are pure.
+- **v0.2.4 (2026-08-03)**: Phase 3.5 — `env` module + todo list CLI demo. **Phase 3 exit criterion met.**
+  - §8.2 stdlib table extended with `env` module (`args`); added §9.6 `env` module (pure function, returns `List<_Any>`, `argv[0]` = .lom path).
+  - CLI `--` separator: `lom <file.lom> -- <args...>` passes trailing args to the Lom program via `env::args()`.
+  - Added [examples/todo.lom](examples/todo.lom) — complete todo list CLI (add/list/done/remove/help) with JSON persistence, recursive list traversal, effect-correct `! [IO]` annotations. End-to-end verified all commands.

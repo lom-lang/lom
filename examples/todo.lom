@@ -1,0 +1,184 @@
+# Todo List CLI — Phase 3 退出标准验证
+#
+# 这是一个用 Lom 语言编写的完整 CLI 工具，验证 Phase 3 退出标准：
+# "能用 Lom 写一个完整 CLI 工具（如 todo list）或简单 Web 服务"
+#
+# 功能：add / list / done / remove / help，数据 JSON 持久化
+#
+# 用法:
+#   lom examples/todo.lom -- add "买牛奶"
+#   lom examples/todo.lom -- list
+#   lom examples/todo.lom -- done 1
+#   lom examples/todo.lom -- remove 1
+#   lom examples/todo.lom -- help
+
+from env import { args }
+from file import { file_read, file_write, file_exists }
+from json import { json_parse, json_stringify }
+from list import { list_empty, list_length, list_get, list_is_empty, list_head, list_tail, list_cons }
+from string import { int_to_string, string_to_int }
+from io import { println }
+
+# 数据文件路径
+fn data_path() -> String
+    "examples/_todo_data.json"
+end
+
+# 加载 todo 列表；文件不存在返回空列表
+fn load_todos() -> List<_Any> ! [IO]
+    let path = data_path()
+    if file_exists(path)
+        json_parse(file_read(path))
+    else
+        list_empty()
+    end
+end
+
+# 保存 todo 列表
+fn save_todos(todos: List<_Any>) -> Unit ! [IO]
+    file_write(data_path(), json_stringify(todos))
+end
+
+# 反转列表（辅助函数）
+fn list_reverse_helper(l: List<_Any>, acc: List<_Any>) -> List<_Any>
+    if list_is_empty(l)
+        acc
+    else
+        list_reverse_helper(list_tail(l), list_cons(list_head(l), acc))
+    end
+end
+
+fn list_reverse(l: List<_Any>) -> List<_Any>
+    list_reverse_helper(l, list_empty())
+end
+
+# 在末尾添加元素
+fn list_append(l: List<_Any>, item: _Any) -> List<_Any>
+    let reversed = list_reverse(l)
+    list_reverse(list_cons(item, reversed))
+end
+
+# 打印 todo 列表（递归遍历）
+fn print_todos_helper(l: List<_Any>) -> Unit ! [IO]
+    if list_is_empty(l)
+        ()
+    else
+        let item = list_head(l)
+        let id = item.id
+        let text = item.text
+        let done = item.done
+        if done
+            println(int_to_string(id) + ". [x] " + text)
+        else
+            println(int_to_string(id) + ". [ ] " + text)
+        end
+        print_todos_helper(list_tail(l))
+    end
+end
+
+fn print_todos(todos: List<_Any>) -> Unit ! [IO]
+    if list_is_empty(todos)
+        println("（空）")
+    else
+        print_todos_helper(todos)
+    end
+end
+
+# 标记某个 id 为 done（递归遍历，构造新列表）
+fn mark_done_helper(l: List<_Any>, id: Int) -> List<_Any>
+    if list_is_empty(l)
+        list_empty()
+    else
+        let item = list_head(l)
+        let rest = list_tail(l)
+        if item.id == id
+            list_cons({id: item.id, text: item.text, done: True}, mark_done_helper(rest, id))
+        else
+            list_cons(item, mark_done_helper(rest, id))
+        end
+    end
+end
+
+# 过滤掉某个 id（递归遍历）
+fn remove_id_helper(l: List<_Any>, id: Int) -> List<_Any>
+    if list_is_empty(l)
+        list_empty()
+    else
+        let item = list_head(l)
+        let rest = list_tail(l)
+        if item.id == id
+            remove_id_helper(rest, id)
+        else
+            list_cons(item, remove_id_helper(rest, id))
+        end
+    end
+end
+
+fn print_usage() -> Unit ! [IO]
+    println("Todo List CLI — Lom Phase 3 退出标准验证")
+    println("")
+    println("用法:")
+    println("  lom examples/todo.lom -- add \"<text>\"   添加 todo 项")
+    println("  lom examples/todo.lom -- list           列出所有 todo 项")
+    println("  lom examples/todo.lom -- done <id>      标记完成")
+    println("  lom examples/todo.lom -- remove <id>    删除 todo 项")
+    println("  lom examples/todo.lom -- help           显示用法")
+end
+
+fn main() -> Unit ! [IO]
+    let argv = args()
+    # argv[0] = todo.lom 路径，argv[1] = 子命令
+    if list_length(argv) < 2
+        print_usage()
+    else
+        let cmd = list_get(argv, 1)
+        if cmd == "add"
+            if list_length(argv) < 3
+                println("错误: 缺少 todo 文本")
+                println("用法: lom examples/todo.lom -- add \"<text>\"")
+            else
+                let text = list_get(argv, 2)
+                let todos = load_todos()
+                let new_id = list_length(todos) + 1
+                let new_item = {id: new_id, text: text, done: False}
+                let new_todos = list_append(todos, new_item)
+                save_todos(new_todos)
+                println("已添加: " + int_to_string(new_id) + ". " + text)
+            end
+        elif cmd == "list"
+            let todos = load_todos()
+            println("=== Todo List ===")
+            print_todos(todos)
+        elif cmd == "done"
+            if list_length(argv) < 3
+                println("错误: 缺少 id")
+                println("用法: lom examples/todo.lom -- done <id>")
+            else
+                let id_str = list_get(argv, 2)
+                let id = string_to_int(id_str)
+                let todos = load_todos()
+                let new_todos = mark_done_helper(todos, id)
+                save_todos(new_todos)
+                println("已标记完成: " + int_to_string(id))
+            end
+        elif cmd == "remove"
+            if list_length(argv) < 3
+                println("错误: 缺少 id")
+                println("用法: lom examples/todo.lom -- remove <id>")
+            else
+                let id_str = list_get(argv, 2)
+                let id = string_to_int(id_str)
+                let todos = load_todos()
+                let new_todos = remove_id_helper(todos, id)
+                save_todos(new_todos)
+                println("已删除: " + int_to_string(id))
+            end
+        elif cmd == "help"
+            print_usage()
+        else
+            println("未知命令: " + cmd)
+            print_usage()
+        end
+    end
+    ()
+end

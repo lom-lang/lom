@@ -280,6 +280,14 @@ impl TypeChecker {
             "file_exists".to_string(),
             FnSig { params: vec![("path".to_string(), Type::String)], ret: Some(Type::Bool), effects: io_effect, span: Span::default() },
         );
+        // Phase 3.5: env 模块
+        // args() -> List<String>；返回命令行参数（argv[0] = .lom 文件路径）
+        // 纯函数（读取解释器内部状态，无副作用）
+        let list_string = || Type::Generic("List".to_string(), vec![Type::Named("_Any".to_string())]);
+        self.functions.insert(
+            "args".to_string(),
+            FnSig { params: vec![], ret: Some(list_string()), effects: vec![], span: Span::default() },
+        );
     }
 
     /// 入口：检查整个程序，返回填充了类型诊断的 Diagnostics

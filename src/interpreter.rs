@@ -272,6 +272,9 @@ pub struct Interpreter {
     /// 导入别名 → 真实内置函数名
     /// 例：导入 `println as log` 后，import_aliases["log"] = "println"
     import_aliases: HashMap<String, String>,
+    /// Phase 3.5: 程序参数（argv），供 env::args() 读取
+    /// argv[0] = .lom 文件路径，argv[1..] = -- 之后的用户参数
+    program_args: Vec<String>,
 }
 
 /// 内置变体
@@ -290,6 +293,7 @@ const PRELUDE: &[&str] = &["println", "print"];
 /// Phase 2.1.5：io / string / math 三个模块
 /// Phase 3.3：新增 list / json 模块
 /// Phase 3.4：string 扩展（split/contains/replace/starts_with/ends_with），新增 file 模块
+/// Phase 3.5：新增 env 模块（args 函数读取命令行参数）
 const STDL_MODULES: &[(&str, &[&str])] = &[
     ("io", &["println", "print"]),
     (
@@ -326,6 +330,7 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
         "file",
         &["file_read", "file_write", "file_append", "file_exists"],
     ),
+    ("env", &["args"]),
 ];
 
 impl Interpreter {
@@ -357,7 +362,14 @@ impl Interpreter {
             modules,
             available_builtins,
             import_aliases: HashMap::new(),
+            program_args: Vec::new(),
         }
+    }
+
+    /// Phase 3.5: 设置程序参数（供 env::args() 读取）
+    /// argv[0] 约定为 .lom 文件路径，argv[1..] 为用户参数
+    pub fn set_program_args(&mut self, args: Vec<String>) {
+        self.program_args = args;
     }
 
     /// 运行程序
@@ -1466,6 +1478,17 @@ impl Interpreter {
                     _ => Err(RuntimeError::Msg("file_exists 期望 String".to_string())),
                 }
             }
+            // Phase 3.5: env 模块
+            "args" => {
+                // args() -> List<String>；返回程序参数（argv[0] = .lom 文件路径）
+                expect_arity("args", 0, args)?;
+                let elems: Vec<Value> = self
+                    .program_args
+                    .iter()
+                    .map(|s| Value::Str(s.clone()))
+                    .collect();
+                Ok(Some(Value::List { elems }))
+            }
             _ => Ok(None), // 不是内置函数
         }
     }
@@ -1505,6 +1528,7 @@ fn is_known_builtin(name: &str) -> bool {
             | "file_write"
             | "file_append"
             | "file_exists"
+            | "args"
     )
 }
 
@@ -1520,6 +1544,7 @@ fn module_of(name: &str) -> Option<&'static str> {
         }
         "json_parse" | "json_stringify" => Some("json"),
         "file_read" | "file_write" | "file_append" | "file_exists" => Some("file"),
+        "args" => Some("env"),
         _ => None,
     }
 }
