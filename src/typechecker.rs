@@ -591,6 +591,7 @@ impl TypeChecker {
                         0,
                         0,
                     );
+                    self.patch_nam003_hint(name, &*env);
                     TypeOrUnknown::unknown()
                 }
             }
@@ -910,6 +911,7 @@ impl TypeChecker {
                         0,
                         0,
                     );
+                    self.patch_nam003_hint(name, &*env);
                     TypeOrUnknown::unknown()
                 }
             }
@@ -1381,6 +1383,54 @@ impl TypeChecker {
         }
     }
 
+    /// Phase 4.1.1: 为未定义名找拼写建议
+    ///
+    /// 候选集 = 作用域变量名 + 顶层函数名（含标准库）+ 枚举变体名。
+    /// 返回编辑距离最小且 ≤ 2 的候选；无则 None。
+    fn suggest_spelling(&self, name: &str, env: &TypeEnv) -> Option<String> {
+        let mut candidates: Vec<String> = Vec::new();
+        env.collect_names(&mut candidates);
+        for k in self.functions.keys() {
+            candidates.push(k.clone());
+        }
+        for info in self.enums.values() {
+            for (vn, _) in &info.variants {
+                candidates.push(vn.clone());
+            }
+        }
+        let mut best: Option<(usize, String)> = None;
+        for c in candidates {
+            if c == name {
+                continue;
+            }
+            let d = levenshtein(name, &c);
+            if d <= 2 {
+                // 距离更小必更新；距离相同则偏好更长的候选名
+                // （用户更可能漏字符，如 printl→println 而非 print）
+                let should_update = match &best {
+                    None => true,
+                    Some((bd, bs)) => d < *bd || (d == *bd && c.len() > bs.len()),
+                };
+                if should_update {
+                    best = Some((d, c));
+                }
+            }
+        }
+        best.map(|(_, c)| c)
+    }
+
+    /// Phase 4.1.1: 为最后一条 NAM003 诊断附加拼写建议 hint
+    ///
+    /// 在 push_diag(NAM003) 之后调用：若有建议，覆盖默认通用 hint 为
+    /// "是否想用 'X'？"，让 LLM/fix 拿到具体修复方向。
+    fn patch_nam003_hint(&mut self, name: &str, env: &TypeEnv) {
+        if let Some(suggestion) = self.suggest_spelling(name, env) {
+            if let Some(last) = self.diags.last_mut() {
+                last.hint = Some(format!("是否想用 '{}'？", suggestion));
+            }
+        }
+    }
+
     fn push_diag(&mut self, severity: Severity, code: String, message: String, line: usize, col: usize) {
         let hint = type_hint(&code);
         let source_line = if line > 0 {
@@ -1438,6 +1488,16 @@ impl TypeEnv {
             None
         }
     }
+
+    /// Phase 4.1.1: 收集作用域内所有变量名（含父作用域），供 NAM003 拼写建议
+    fn collect_names(&self, out: &mut Vec<String>) {
+        for k in self.vars.keys() {
+            out.push(k.clone());
+        }
+        if let Some(p) = &self.parent {
+            p.collect_names(out);
+        }
+    }
 }
 
 /// 修复提示
@@ -1454,6 +1514,36 @@ fn type_hint(code: &str) -> Option<String> {
         "MAT001" => Some("添加缺失的 match 分支，或用 `_` 通配符".into()),
         _ => None,
     }
+}
+
+/// Phase 4.1.1: Levenshtein 编辑距离
+///
+/// 用于 NAM003 拼写建议：未定义名与候选名的距离 ≤ 2 视为可能的拼写错误。
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (m, n) = (a.len(), b.len());
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+    // 长度差 > 2 时编辑距离必然 > 2，直接返回（快速剪枝）
+    if m.abs_diff(n) > 2 {
+        return m.max(n);
+    }
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr: Vec<usize> = vec![0; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
 }
 
 // 辅助函数：把 args 转回表达式切片（用于管道场景的递归调用）
@@ -1517,6 +1607,67 @@ mod tests {
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
         assert!(!type_diags.is_empty());
         assert!(type_diags.iter().any(|d| d.code == "NAM003"));
+    }
+
+    /// Phase 4.1.1: NAM003 拼写建议 — 函数名拼错时应建议正确名
+    #[test]
+    fn nam003_suggests_similar_function_name() {
+        // printl 拼错，应为 println（prelude 自动可用）
+        let src = "fn main() -> Unit\n    printl(\"hi\")\nend\n";
+        let diags = check_src(src);
+        let nam003: Vec<_> = diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .collect();
+        assert!(!nam003.is_empty(), "应报 NAM003");
+        let hint = nam003[0].hint.as_ref().expect("应有 hint");
+        assert!(
+            hint.contains("println"),
+            "hint 应建议 println，实际: {}",
+            hint
+        );
+    }
+
+    /// Phase 4.1.1: NAM003 拼写建议 — 变量名拼错时应建议正确名
+    #[test]
+    fn nam003_suggests_similar_variable_name() {
+        // cont 拼错，应为 count
+        let src = "fn main() -> Unit\n    let count = 5\n    println(cont)\nend\n";
+        let diags = check_src(src);
+        let nam003: Vec<_> = diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .collect();
+        assert!(!nam003.is_empty(), "应报 NAM003");
+        let hint = nam003[0].hint.as_ref().expect("应有 hint");
+        assert!(
+            hint.contains("count"),
+            "hint 应建议 count，实际: {}",
+            hint
+        );
+    }
+
+    /// Phase 4.1.1: NAM003 拼写建议 — 无相似名时保持通用 hint（不误报）
+    #[test]
+    fn nam003_no_suggestion_when_no_similar() {
+        // xyzqwerty 与任何已知名都不相近
+        let src = "fn main() -> Unit\n    xyzqwerty\nend\n";
+        let diags = check_src(src);
+        let nam003: Vec<_> = diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .collect();
+        assert!(!nam003.is_empty(), "应报 NAM003");
+        // 无建议时 hint 应是通用文本，不含"是否想用"
+        let hint = nam003[0].hint.as_ref().expect("应有 hint");
+        assert!(
+            !hint.contains("是否想用"),
+            "无相似名不应给建议，实际: {}",
+            hint
+        );
     }
 
     #[test]
