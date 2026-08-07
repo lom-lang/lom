@@ -2,7 +2,7 @@
 
 > **Status**: Phase 0 Draft · 2026-08-02
 > **Stability**: Unstable — syntax and semantics may change before Phase 1 freeze.
-> **Scope**: This spec covers the Phase 1 minimal subset (interpreter-runnable) and drafts the Phase 2 LLM-coding-native features. Workload-native features (tensor, autodiff, MLIR) are out of scope and will be specified in Phase 4.
+> **Scope**: This spec covers the Phase 1 minimal subset (interpreter-runnable) and drafts the Phase 2 LLM-coding-native features. ~~Workload-native features (tensor, autodiff, MLIR) are out of scope and will be specified in Phase 4.~~ **Update (2026-08-07 retrospective)**: Phase 4 direction changed from "workload-native" to "LLM-repair-native + toolchain" — `lom fix` auto-repair expansion, REPL, LSP, package manager. Workload-native (tensor/autodiff/MLIR) is dropped (Mojo acquired by Qualcomm saturates the AI-compute lane). See [§2.5 retrospective](docs/lom-project-guide.html).
 
 ---
 

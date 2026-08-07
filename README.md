@@ -34,7 +34,7 @@ LLM-coding-native first, workloads later. Built in Rust.
 
 199/199 Rust unit tests pass. 28 `.lom` examples (27 run + 1 `--check` diagnostic sample). `eval/` 100/100 reference solutions pass (`./eval/runner/run.ps1 -Verify`). **LLM generation pass-rate: 99%** (expert model + thinking mode, 2026-08-03).
 
-Next: **Phase 3 — Usable MVP** (Cranelift JIT, standard library expansion, complete CLI tool / simple web service). `--apply` repair execution done in 3.1; AST span positioning done in 3.2; `list`/`json` standard library modules done in 3.3; `file`/`string` extensions done in 3.4; **CLI demo (todo list) + `env` module done in 3.5 — Phase 3 exit criterion met**.
+Next: **Phase 4 — LLM-repair-native + toolchain** (expand `lom fix` auto-repair coverage + confidence model; add REPL, simple LSP, package manager prototype). **Phase 3 exit criterion met** in 3.5 (todo list CLI). Direction adjusted per 2026-08-07 retrospective — original "workload-native" (tensor/autodiff/MLIR) dropped: Mojo acquired by Qualcomm makes the AI-compute lane crowded; Lom focuses on `lom fix` differentiation (in-place repair, which MoonBit doesn't do). See [§2.5 retrospective](docs/lom-project-guide.html).
 
 See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full project guide (positioning, design philosophy, 7-phase roadmap, target LLM strategy, risk mitigation, repo governance).
 
@@ -42,19 +42,20 @@ See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full pr
 
 Lom is a **progressively fused** AI-native programming language:
 
-1. **Phase 0-3 — LLM-coding-native**: tolerant parser, structured JSON diagnostics, linear pipeline syntax, structural types, gradual typing, explicit effect system. Target: LLMs write Lom with low error rate and easy recovery.
-2. **Phase 4+ — Workload-native (adjustable milestone)**: tensor as first-class type, automatic differentiation, MLIR heterogeneous compute, Python interop. Target: AI/ML workloads.
+1. **Phase 0-3 — LLM-coding-native**: tolerant parser, structured JSON diagnostics, linear pipeline syntax, structural types, gradual typing, explicit effect system. Target: LLMs write Lom with low error rate and easy recovery. (Done — 99% LLM pass-rate)
+2. **Phase 4 — LLM-repair-native + toolchain** (direction adjusted 2026-08-07): expand `lom fix` in-place auto-repair (differentiation — MoonBit doesn't do in-place repair), add REPL / LSP / package manager. Original "workload-native" (tensor/autodiff/MLIR) dropped — Mojo (acquired by Qualcomm) saturates the AI-compute lane.
 
 ## Why Lom
 
-The "AI-native language" space is currently split in two directions, both with gaps:
+The "AI-native language" space (2026-08 retrospective):
 
-| Direction | Leaders | Gap |
+| Direction | Leaders | Status |
 |---|---|---|
-| Workload-native (tensor / autodiff / GPU) | Mojo, NEURON, Bend | Crowded. Mojo has 175k devs. Red ocean. |
-| LLM-coding-native (tolerant parse / JSON diagnostics / linear syntax) | MoonBit (tooling side), Zero (JSON diagnostics) | Empty. Only MoonBit has intent, still in early stage. No public eval. |
+| Workload-native (tensor / autodiff / GPU) | Mojo (acquired by Qualcomm $3.9B), Bend | Saturated. Mojo binds to Qualcomm hardware strategy. Not Lom's lane. |
+| LLM-coding-native (write-it-right) | MoonBit (IEEE TSE 2026 paper: 1/7 corpus but 2x AI gen rate vs Gleam; ~400k users; 1.0 imminent Sep 2026) | MoonBit leads. Lom's 99% eval validates the same thesis. |
+| **LLM-repair-native (fix-it-fast)** — Lom's lane | Lom (`lom fix --apply` in-place repair, tolerant parse, gradual typing) | **Empty.** MoonBit regenerates on error; Lom patches in-place. Complementary, not competitive. |
 
-Lom takes the **flanking route**: occupy the empty LLM-coding-native lane first with a differentiated position, then extend to workloads later.
+Lom takes the **differentiated route**: occupy the empty LLM-repair-native lane — in-place auto-repair (`lom fix --apply`), tolerant parsing, confidence-graded fixes — complementary to MoonBit's write-it-right approach.
 
 ## Design Philosophy
 
@@ -70,8 +71,8 @@ Lom takes the **flanking route**: occupy the empty LLM-coding-native lane first 
 | 0 | Language Design & Spec | 1-2 w | LLM reads spec, generates valid code >80% |
 | 1 | Minimal Interpreter | 4-6 w | 10+ test cases pass with LLM-generated code |
 | 2 | LLM-coding-native Core | 6-10 w | LLM generation pass-rate eval set meets baseline |
-| 3 | Usable MVP | 8-12 w | Write a complete CLI tool or simple web service |
-| 4 | Workload Extension (adjustable) | 12-20 w | Write a complete MNIST training script |
+| 3 | Usable MVP | 8-12 w | Write a complete CLI tool or simple web service | ✅ Done (3.5 todo CLI) |
+| 4 | LLM-repair-native + toolchain (adjusted 2026-08) | — | `lom fix` covers main diagnostic auto-repair + confidence model + REPL + LSP + package manager |
 | 5 | Ecosystem & Bootstrapping | 16-24 w | Compiler self-hosts |
 | 6 | Production | ongoing | Third-party projects deployed in production |
 
@@ -89,9 +90,7 @@ See the [project guide](docs/lom-project-guide.html) for details.
 
 - **Host language**: Rust
 - **Phase 1**: logos (lexer) + hand-written recursive descent (parser) + tree-walking (interp)
-- **Phase 3**: + Cranelift JIT
-- **Phase 4**: + MLIR (melior) + pyo3
-- **Phase 5**: + LLVM AOT (inkwell) + WASM
+- **Phase 4**: reuse existing interpreter/typechecker/diagnostics — no new low-level deps (no Cranelift/MLIR). Adds `lom fix` rule expansion, REPL, LSP server, package manager.
 
 ## License
 

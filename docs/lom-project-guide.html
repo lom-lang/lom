@@ -830,32 +830,57 @@
   <p>从"LLM 运行环境"扩展到"通用脚本"+"后端服务雏形"。</p>
   <h4>退出标准</h4>
   <p>能用 Lom 写一个完整 CLI 工具（如 todo list）或简单 Web 服务（如 JSON API）。</p>
-  <h4>阶段末方向复盘</h4>
-  <div class="warn">
-    阶段 3 完成时做一次方向复盘，根据当时 Mojo/MoonBit/Zero 的现状和 Lom 阶段 2-3 的反馈，决定是否推进阶段 4（工作负载扩展），或调整阶段 4 范围。
+  <h4>阶段末方向复盘 ✅（2026-08-07 完成）</h4>
+  <div class="warn" style="background:#dbeafe;border-color:#2563eb;">
+    <p><strong>复盘结论：Phase 4 调整为"LLM 修复原生 + 基础工具链"，放弃原"AI 工作负载内核扩展"方向。</strong></p>
+
+    <h5>一、行业格局变化（2026-08）</h5>
+    <p><strong>1. Mojo — 被高通 39 亿美元收购，绑定硬件战略</strong>：2026-06-25 高通宣布以 39 亿美元股票收购 Modular（Mojo 母公司），Chris Lattner 出任高通高级 AI 软件与平台执行副总裁。Mojo + MAX 平台并入高通，计划开源 Mojo，意在对抗 NVIDIA CUDA 护城河。Mojo 属"AI 工作负载原生"，收购后绑定硬件生态，<strong>不会转向 LLM 编码友好方向</strong>——Lom 的"LLM 输出原生"赛道因 Mojo 转向而更清晰。</p>
+
+    <p><strong>2. MoonBit — AI 原生旗号最成功的实践者，即将 1.0</strong>：预计 2026-09 发布 1.0；用户数 2024 几千 → 2025 10 万 → 2026-08 近 40 万；Mooncakes 1.6 万包，进北大研究生课堂。<strong>AI 原生有论文证据</strong>（IEEE TSE 2026 收录）：MoonBit GitHub 语料仅为 Gleam 的 1/7，但 AI 代码生成率是 Gleam 的 2 倍——强力验证"语言设计本身能让 AI 少犯错"（Lom 核心理念）。新增 Lom 尚未具备的 AI 原生特性：形式化证明（Hoare 三元组/函数合约）、安全沙箱（Wasm + 策略文件）、moon-agent 智能体框架。MoonBit 是 Lom 最直接的对标对象，且已大幅领先。</p>
+
+    <p><strong>3. 其他项目</strong>：Unison（内容寻址）、Bend（HVM2 自动并行）、Gleam（强静态类型）均进展缓慢，非主流。</p>
+
+    <h5>二、Lom 当前位置评估</h5>
+    <p><strong>差异化优势</strong>（相对 MoonBit）：① AI 修复闭环更完整——<code>lom fix --apply</code> 自动应用高置信度修复，MoonBit 无此能力；② 效应系统更纯粹（<code>! [IO]</code> 强制 I/O 显式化）；③ LLM 实测数据扎实（99/100，error_repair 100%）；④ 渐进式类型（动态可跑 + 检查可选，LLM 试错友好）。</p>
+    <p><strong>劣势</strong>：① 生态空白（无包管理/LSP/REPL/多后端）；② 性能路径缺失（树遍历解释器，MoonBit 有 LLVM+Wasm+Native）；③ AI 原生特性单薄（缺形式化证明、安全沙箱）；④ 工具链不完整。</p>
+
+    <h5>三、差异化定位</h5>
+    <p>MoonBit 已占据"AI 原生语言"主赛道且资源充足，Lom 不应正面对标全栈路线，聚焦 MoonBit 尚未做透的细分：<strong>Lom = "LLM 代码修复原生"（LLM-repair-native）</strong>。MoonBit 追求"让 LLM 一次写对"（生成→检查→验证→重生成），Lom 追求"LLM 写错后高效修复"（生成→诊断→原地补丁修复，不重生成）。<strong>互补而非竞争</strong>。</p>
+
+    <h5>四、Phase 4 方向决策</h5>
+    <p>三档方案对比后选择<strong>方案 A</strong>：聚焦"LLM 修复原生"差异化 + 补齐基础工具链。理由：保持语言主线、聚焦 <code>lom fix</code> 差异化（MoonBit 未做）、补齐必要基础（REPL/LSP/包管理是语言标配）、投入产出比合理（不做 JIT/形式化证明等高投入项）。</p>
+    <p><strong>放弃原 Phase 4"AI 工作负载内核扩展"</strong>（张量/自动微分/Python 互操作/MLIR）：Mojo 被高通收购后 AI 计算赛道资源充足，Lom 无需进入；工作负载扩展投入大（12-20 周），投入产出比不如修复工具链。</p>
   </div>
 </div>
 
-<h2>2.6 阶段 4：工作负载内核扩展（12-20 周）— 可调整里程碑</h2>
+<h2>2.6 阶段 4：LLM 修复原生 + 基础工具链（调整后）</h2>
 <div class="phase">
-  <h3>阶段 4 · 工作负载内核扩展 <span class="tag warn">可调整</span></h3>
-  <p><strong>目标</strong>：加入 AI 工作负载原生的硬本事。这是"两者融合"的工作负载侧。</p>
-  <div class="warn">
-    <strong>可调整性说明</strong>：本阶段投入大（12-20 周），且依赖阶段 3 末复盘结论。可能的结果：按计划推进 / 推迟 / 缩小范围 / 砍掉。复盘决策须在阶段 3 退出标准达成后 2 周内做出，并更新本文件。
+  <h3>阶段 4 · LLM 修复原生 + 基础工具链 <span class="tag" style="background:#2563eb;color:white;">方向已调整</span></h3>
+  <p><strong>目标</strong>：把 <code>lom fix</code> 做成最强 LLM 代码修复工具（差异化），补齐语言基础工具链（REPL/LSP/包管理）。</p>
+  <div class="warn" style="background:#dbeafe;border-color:#2563eb;">
+    <strong>方向调整说明（2026-08-07 复盘决策）</strong>：原 Phase 4 为"AI 工作负载内核扩展"（张量/自动微分/Python 互操作/MLIR）。复盘后调整为"LLM 修复原生 + 基础工具链"，理由：① Mojo 被高通收购后 AI 计算赛道资源充足，Lom 无需进入；② MoonBit 已占据 AI 原生语言主赛道，Lom 应聚焦 <code>lom fix</code> 差异化（MoonBit 未做"原地修复"）；③ 工作负载扩展投入大（12-20 周），投入产出比不如修复工具链。详见 §2.5 阶段末复盘。
   </div>
-  <h4>技术栈升级</h4>
-  <p>+ MLIR（先 CPU 方言，后 GPU 方言）</p>
-  <h4>新增</h4>
+  <h4>技术栈</h4>
+  <p>复用现有 Rust 解释器 + 类型检查器 + 诊断系统，无新底层依赖（不上 MLIR/Cranelift）。</p>
+  <h4>新增子阶段</h4>
   <ul>
-    <li>张量一等类型（<code>Tensor[3,4]</code>，形状编译时验证，对标 NEURON）</li>
-    <li>自动微分（<code>grad</code> 关键字，反向模式，构建计算图）</li>
-    <li><strong>Python 互操作</strong>（pyo3，导入 numpy/torch）——docs File 2 视为"生存底线"，S4TF 失败教训</li>
-    <li>数据并行原语</li>
+    <li><strong>Phase 4.1 · lom fix 修复规则扩展</strong>：扩展可自动修复的诊断类别（LEX 类词法修复、TYPE 类类型转换、NAM 类自动导入建议、MAT 类模式补全）；引入修复置信度模型（High=安全自动应用 / Medium=需确认 / Low=仅建议）；修复历史记录（供 LLM 学习过往修复模式）。<span class="meta">差异化核心</span></li>
+    <li><strong>Phase 4.2 · REPL</strong>：交互式 read-eval-print loop，支持多行输入、前文定义的函数/变量保持、逐步构建程序。对 LLM 试错友好。<span class="meta">语言标配</span></li>
+    <li><strong>Phase 4.3 · 简单 LSP</strong>：LSP 协议基础实现，hover 显示类型信息、诊断推送（实时词法/语法/类型错误）、基础代码补全（作用域可见名称）。<span class="meta">语言标配</span></li>
+    <li><strong>Phase 4.4 · 包管理雏形</strong>：<code>lom.toml</code> 项目结构标准化、依赖管理（<code>from xxx import</code> 解析外部包）、包注册表雏形。<span class="meta">语言标配</span></li>
   </ul>
-  <h4>场景扩展</h4>
-  <p>扩展到"AI/ML 计算"。</p>
+  <h4>不做的项（明确排除）</h4>
+  <ul>
+    <li>Cranelift JIT / MLIR / 性能优化（性能非 LLM 修复核心）</li>
+    <li>形式化证明（投入产出比低，留待远期）</li>
+    <li>张量/自动微分/Python 互操作（原 Phase 4 内容，已放弃）</li>
+    <li>Web 服务 / http 模块（非本阶段重点）</li>
+  </ul>
+  <h4>场景</h4>
+  <p>从"LLM 运行环境 + 通用脚本"深化到"LLM 代码修复原生工具链"。</p>
   <h4>退出标准</h4>
-  <p>能用 Lom 写完整 MNIST 训练脚本，性能不弱于纯 Python+numpy 的同等实现。</p>
+  <p><code>lom fix</code> 覆盖主要诊断类别的自动修复 + 置信度模型可用 + REPL 可交互运行 + LSP 基础 hover/诊断推送 + 包管理雏形可创建项目并解析依赖。</p>
 </div>
 
 <h2>2.7 阶段 5：生态与自举（16-24 周）</h2>
