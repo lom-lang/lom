@@ -1091,18 +1091,21 @@ impl Parser {
                 }
             }
         }
-        // 消费 end（容错模式下缺失也记录错误而非终止）
-        if self.check(&Token::End) {
-            self.advance();
+        // 消费 end，记录其行号（Phase 4.1.2：用于 MAT001 fix 在 end 前插入缺失变体分支）
+        let end_line = if self.check(&Token::End) {
+            let end_tok = self.advance();
+            end_tok.line
         } else if self.recover {
             self.errors
                 .push(self.err("期望 'end' 闭合 match".to_string()));
+            0 // 缺失 end，无定位
         } else {
             return Err(self.err("期望 'end' 闭合 match".to_string()));
-        }
+        };
         Ok(Expr::Match(Box::new(MatchExpr {
             scrutinee: Box::new(scrutinee),
             arms,
+            end_line,
         })))
     }
 

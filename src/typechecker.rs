@@ -980,6 +980,7 @@ impl TypeChecker {
                 if let Some(info) = self.enums.get(name).cloned() {
                     if !info.is_builtin {
                         // 用户枚举：必须覆盖所有变体
+                        // Phase 4.1.2: line 填 match 的 end 行，供 fix 精确定位插入点
                         for (vn, _) in &info.variants {
                             if !matched_variants.contains(vn) {
                                 self.push_diag(
@@ -989,8 +990,8 @@ impl TypeChecker {
                                         "match 非穷尽：未覆盖变体 '{}'（枚举 {}）",
                                         vn, name
                                     ),
-                                    0,
-                                    0,
+                                    m.end_line,
+                                    1,
                                 );
                             }
                         }
@@ -1000,20 +1001,20 @@ impl TypeChecker {
                 // Result 必须覆盖 Ok 和 Err
                 if !matched_variants.contains("Ok") {
                     self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Ok".into(), 0, 0);
+                        "match 非穷尽：未覆盖 Ok".into(), m.end_line, 1);
                 }
                 if !matched_variants.contains("Err") {
                     self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Err".into(), 0, 0);
+                        "match 非穷尽：未覆盖 Err".into(), m.end_line, 1);
                 }
             } else if let TypeOrUnknown::Known(Type::Option(_)) = &scrut_ty {
                 if !matched_variants.contains("Some") {
                     self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Some".into(), 0, 0);
+                        "match 非穷尽：未覆盖 Some".into(), m.end_line, 1);
                 }
                 if !matched_variants.contains("None") {
                     self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 None".into(), 0, 0);
+                        "match 非穷尽：未覆盖 None".into(), m.end_line, 1);
                 }
             }
         }
@@ -1754,6 +1755,90 @@ mod tests {
         let diags = check_src(src);
         let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
         assert_eq!(mat_diags.len(), 0);
+    }
+
+    /// Phase 4.1.2: MAT001 Result 非穷尽 — fix --apply 应自动补全缺失的 Err 分支
+    #[test]
+    fn mat001_fix_apply_inserts_missing_err_branch() {
+        // 缺少 Err 分支的 Result match（LLM 常见遗漏）
+        let src = "fn f() -> Unit\n    let x = Ok(5)\n    match x\n        Ok(n) => println(n)\n    end\nend\n";
+        let diags = check_src(src);
+        // 确实报 MAT001 未覆盖 Err
+        assert!(
+            diags
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "MAT001" && d.message.contains("Err")),
+            "应报 MAT001 未覆盖 Err"
+        );
+        // 生成修复计划并应用（端到端：typechecker → fix → apply）
+        let plan = crate::fix::generate_plan(&diags, src);
+        let result = crate::apply::apply_plan(&plan, src);
+        assert!(
+            result.applied >= 1,
+            "应自动应用至少 1 个修复，实际 {}，patched: {:?}",
+            result.applied,
+            result.patched_source
+        );
+        // 修复后源码应含 Err(_) => () 分支
+        assert!(
+            result.patched_source.contains("Err(_) => ()"),
+            "patched 应含 Err(_) => ()，实际: {:?}",
+            result.patched_source
+        );
+    }
+
+    /// Phase 4.1.2: MAT001 Option 非穷尽 — fix --apply 应自动补全缺失的 None 分支
+    #[test]
+    fn mat001_fix_apply_inserts_missing_none_branch() {
+        let src = "fn f() -> Unit\n    let x = Some(5)\n    match x\n        Some(n) => println(n)\n    end\nend\n";
+        let diags = check_src(src);
+        assert!(
+            diags
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "MAT001" && d.message.contains("None")),
+            "应报 MAT001 未覆盖 None"
+        );
+        let plan = crate::fix::generate_plan(&diags, src);
+        let result = crate::apply::apply_plan(&plan, src);
+        assert!(
+            result.applied >= 1,
+            "应自动应用至少 1 个修复，实际 {}，patched: {:?}",
+            result.applied,
+            result.patched_source
+        );
+        assert!(
+            result.patched_source.contains("None => ()"),
+            "patched 应含 None => ()，实际: {:?}",
+            result.patched_source
+        );
+    }
+
+    /// Phase 4.1.2: MAT001 用户枚举非穷尽 — 不应自动 apply（参数未知，安全边界）
+    ///
+    /// 用户枚举变体可能带参数（如 Point(x, y)），`Name => ()` 会引入语法错误，
+    /// 故保持 Hint + Medium，不自动应用。锁定此安全边界防止未来回归。
+    #[test]
+    fn mat001_user_enum_not_auto_applied() {
+        // 用无副作用 body（Red => 0，fn 返回 Int）避免触发 EFF001 干扰 apply 计数
+        let src = "enum Color = Red | Green | Blue\nfn f() -> Int\n    let c = Red\n    match c\n        Red => 0\n    end\nend\n";
+        let diags = check_src(src);
+        assert!(
+            diags
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "MAT001" && d.message.contains("Green")),
+            "应报 MAT001 未覆盖 Green"
+        );
+        let plan = crate::fix::generate_plan(&diags, src);
+        let result = crate::apply::apply_plan(&plan, src);
+        // 用户枚举变体是 Hint + Medium，不应被 --apply 自动应用
+        assert_eq!(
+            result.applied, 0,
+            "用户枚举变体不应自动 apply，实际 {}，patched: {:?}",
+            result.applied, result.patched_source
+        );
     }
 
     #[test]

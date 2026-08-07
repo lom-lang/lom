@@ -372,45 +372,69 @@ fn fix_type_arg_count(d: &Diagnostic) -> Vec<FixAction> {
     )]
 }
 
-/// MAT001 非穷尽 match：插入 `_ => ()` 通配符分支
+/// MAT001 非穷尽 match：补全缺失的变体分支
 ///
-/// 高置信度：match 非穷尽时，加 `_ => ()` 分支是最安全的兜底
-/// （虽然不一定是最佳修复，但能让程序通过编译，LLM 可后续优化）。
+/// Phase 4.1.2 升级：从 Hint 改为分级修复。
+///   - Result/Option 内置变体（参数已知）+ 已定位 end 行 → 精确 Insert（High，可 --apply）
+///   - 用户枚举变体（参数未知）或缺失 end → 保持 Hint（Medium，让 LLM 确认参数）
 ///
-/// 位置：match 块的 end 之前。但 Phase 2.x 无 AST span，无法定位 end，
-/// 因此降级为 hint + 建议文本。
+/// 安全边界：仅内置变体（Ok(_)/Err(_)/Some(_)/None 参数明确）允许自动 apply；
+/// 用户枚举变体可能带参数（如 Point(x, y)），`Name => ()` 会引入语法错误，故不自动 apply。
 fn fix_mat_non_exhaustive(d: &Diagnostic) -> Vec<FixAction> {
-    // 从 message 提取缺失的变体名（格式："match 非穷尽：未覆盖变体 'X'（枚举 Y）"
-    // 或 "match 非穷尽：未覆盖 Ok"）
-    let missing = if d.message.contains("未覆盖变体 '") {
-        extract_quoted_string(&d.message)
+    // 区分内置变体（参数已知）vs 用户枚举变体（参数未知）
+    let is_builtin = !d.message.contains("未覆盖变体 '");
+    let pattern = if d.message.contains("未覆盖变体 '") {
+        match extract_quoted_string(&d.message) {
+            Some(p) => p,
+            None => {
+                return vec![hint_only(
+                    "match 非穷尽：添加缺失的变体分支或 _ 通配符",
+                    Confidence::Medium,
+                )]
+            }
+        }
     } else if d.message.contains("未覆盖 Ok") {
-        Some("Ok(_)".to_string())
+        "Ok(_)".to_string()
     } else if d.message.contains("未覆盖 Err") {
-        Some("Err(_)".to_string())
+        "Err(_)".to_string()
     } else if d.message.contains("未覆盖 Some") {
-        Some("Some(_)".to_string())
+        "Some(_)".to_string()
     } else if d.message.contains("未覆盖 None") {
-        Some("None".to_string())
+        "None".to_string()
     } else {
-        None
+        return vec![hint_only(
+            "match 非穷尽：添加缺失的变体分支或 _ 通配符",
+            Confidence::Medium,
+        )];
     };
 
-    match missing {
-        Some(m) => vec![FixAction {
-            description: format!("在 match 中添加缺失的分支: {} => ...", m),
+    let branch_text = format!("    {} => ()\n", pattern);
+
+    // Result/Option 内置变体 + 已定位 end 行：精确 Insert 到 end 行行首
+    // 高置信度：内置变体参数明确，自动补全安全，插入位置在 end 前（新分支独立成行）
+    if is_builtin && d.line != 0 {
+        vec![FixAction {
+            description: format!("在 match 的 end 前插入缺失分支: {} => ()", pattern),
+            action: ActionKind::Insert,
+            line: d.line,
+            col: 1,
+            end_line: None,
+            end_col: None,
+            text: Some(branch_text),
+            confidence: Confidence::High,
+        }]
+    } else {
+        // 用户枚举变体（参数未知）或缺失 end 定位：保持 Hint + 建议文本（Medium）
+        vec![FixAction {
+            description: format!("在 match 中添加缺失分支: {} => ...", pattern),
             action: ActionKind::Hint,
             line: 0,
             col: 0,
             end_line: None,
             end_col: None,
-            text: Some(format!("    {} => ()\n", m)),
+            text: Some(branch_text),
             confidence: Confidence::Medium,
-        }],
-        None => vec![hint_only(
-            "match 非穷尽：添加缺失的变体分支或 _ 通配符",
-            Confidence::Medium,
-        )],
+        }]
     }
 }
 

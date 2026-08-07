@@ -234,6 +234,10 @@ pub enum Expr {
 pub struct MatchExpr {
     pub scrutinee: Box<Expr>,
     pub arms: Vec<MatchArm>,
+    /// Phase 4.1.2: match 的 `end` 关键字所在行（1-based）
+    /// 用于 MAT001 自动补全：fix 在 end 行行首插入缺失的变体分支。
+    /// 0 表示缺失 end（容错模式下），fix 降级为 hint。
+    pub end_line: usize,
 }
 
 /// match 分支：pattern => body
