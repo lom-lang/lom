@@ -17,6 +17,7 @@ mod apply;
 mod ast;
 mod diagnostics;
 mod fix;
+mod fix_history;
 mod info;
 mod interpreter;
 mod json;
@@ -38,6 +39,8 @@ struct CliArgs {
     apply: bool,
     /// Phase 3.1: --dry-run 标志（与 --apply 配合，只输出预览不写文件）
     dry_run: bool,
+    /// Phase 4.1.3: --history 标志（lom fix 专用，查看修复历史记录）
+    history: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     program_args: Vec<String>,
 }
@@ -53,6 +56,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
     eprintln!("  {prog} fix <file.lom> [--plan] [--json]  生成 AI 修复计划（lom-fix/v1）");
     eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
+    eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!();
     eprintln!("子命令:");
@@ -61,6 +65,7 @@ fn print_help(prog: &str) {
     eprintln!("              --plan：仅生成计划不应用（默认行为）");
     eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
+    eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
     eprintln!();
     eprintln!("选项:");
     eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
@@ -69,6 +74,7 @@ fn print_help(prog: &str) {
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
+    eprintln!("  --history  lom fix 子命令专用：查看修复历史记录（Phase 4.1.3）");
     eprintln!("  --help, -h 显示本帮助");
     eprintln!();
     eprintln!("退出码:");
@@ -107,6 +113,7 @@ fn parse_args(args: &[String]) -> CliArgs {
             "--plan" => out.plan = true,
             "--apply" => out.apply = true,
             "--dry-run" => out.dry_run = true,
+            "--history" => out.history = true,
             "--help" | "-h" => out.help = true,
             _ => {
                 if a.starts_with('-') {
@@ -132,6 +139,25 @@ fn main() {
 
     if cli.help {
         print_help(&args[0]);
+        return;
+    }
+
+    // Phase 4.1.3: lom fix --history 不需要文件参数，提前处理
+    if cli.subcommand.as_deref() == Some("fix") && cli.history {
+        let history_path = std::path::Path::new(".lom/fix-history.jsonl");
+        match fix_history::read_history(history_path) {
+            Ok(entries) => {
+                if cli.json {
+                    print!("{}", fix_history::to_json(&entries));
+                } else {
+                    print!("{}", fix_history::to_human(&entries));
+                }
+            }
+            Err(e) => {
+                eprintln!("读取修复历史失败: {}", e);
+                process::exit(1);
+            }
+        }
         return;
     }
 
@@ -321,6 +347,32 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
             if let Err(e) = fs::write(path, &result.patched_source) {
                 eprintln!("apply 写文件失败: {}", e);
                 process::exit(1);
+            }
+
+            // Phase 4.1.3: 追加修复历史记录到 .lom/fix-history.jsonl
+            // 供 LLM 学习"过去修了什么"，辅助后续修复决策
+            let changes: Vec<fix_history::HistoryChange> = result
+                .changes
+                .iter()
+                .map(|c| fix_history::HistoryChange {
+                    line: c.line,
+                    col: c.col,
+                    action: apply::action_str(c.action).to_string(),
+                    description: c.description.clone(),
+                    diagnostic_code: c.diagnostic_code.clone(),
+                })
+                .collect();
+            let entry = fix_history::FixHistoryEntry {
+                timestamp: fix_history::current_timestamp(),
+                file: path.to_string(),
+                applied: result.applied,
+                skipped: result.skipped,
+                changes,
+            };
+            let history_path = std::path::Path::new(".lom/fix-history.jsonl");
+            if let Err(e) = fix_history::append_history(&entry, history_path) {
+                eprintln!("警告：修复历史记录写入失败: {}", e);
+                // 历史记录失败不阻止 apply 成功
             }
         }
 

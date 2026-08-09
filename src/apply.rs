@@ -49,6 +49,8 @@ pub struct AppliedChange {
     pub col: usize,
     pub action: ActionKind,
     pub description: String,
+    /// 关联的诊断码（Phase 4.1.3：供修复历史记录追踪）
+    pub diagnostic_code: String,
 }
 
 /// 应用结果 JSON 输出
@@ -73,6 +75,7 @@ pub fn to_json(result: &ApplyResult, file: &str) -> String {
                 action_str(c.action)
             ));
             s.push_str(&format!("      \"description\": {}\n", json_str(&c.description)));
+            s.push_str(&format!("      \"code\": {}\n", json_str(&c.diagnostic_code)));
             s.push_str("    }");
             if i + 1 < result.changes.len() {
                 s.push(',');
@@ -96,10 +99,11 @@ pub fn to_human(result: &ApplyResult, file: &str) -> String {
         s.push_str("  changes:\n");
         for c in &result.changes {
             s.push_str(&format!(
-                "    [{}:{}] {} — {}\n",
+                "    [{}:{}] {} ({}) — {}\n",
                 c.line,
                 c.col,
                 action_str(c.action),
+                c.diagnostic_code,
                 c.description
             ));
         }
@@ -113,15 +117,17 @@ pub fn to_human(result: &ApplyResult, file: &str) -> String {
 /// 多个修复按位置降序应用（从后往前），避免位置漂移。
 pub fn apply_plan(plan: &FixPlan, source: &str) -> ApplyResult {
     // 收集所有可应用的修复动作（High 置信度 + 非 Hint）
-    let mut applicable: Vec<&FixAction> = Vec::new();
+    // Phase 4.1.3：同时记录诊断码，供修复历史使用
+    let mut applicable: Vec<(&FixAction, &str)> = Vec::new();
     let mut skipped = 0;
 
     for p in &plan.plans {
+        let code = p.diagnostic.code.as_str();
         for fix in &p.fixes {
             if fix.action != ActionKind::Hint && fix.confidence == Confidence::High {
                 // 验证位置有效性
                 if is_valid_position(fix, source) {
-                    applicable.push(fix);
+                    applicable.push((fix, code));
                 } else {
                     skipped += 1;
                 }
@@ -142,16 +148,16 @@ pub fn apply_plan(plan: &FixPlan, source: &str) -> ApplyResult {
 
     // 按位置降序排序（从后往前应用）
     applicable.sort_by(|a, b| {
-        b.line
-            .cmp(&a.line)
-            .then_with(|| b.col.cmp(&a.col))
+        b.0.line
+            .cmp(&a.0.line)
+            .then_with(|| b.0.col.cmp(&a.0.col))
     });
 
     // 计算字节偏移并应用
     let mut patched = source.to_string();
     let mut changes = Vec::new();
 
-    for fix in &applicable {
+    for (fix, code) in &applicable {
         match apply_one(fix, &mut patched) {
             Ok(()) => {
                 changes.push(AppliedChange {
@@ -159,6 +165,7 @@ pub fn apply_plan(plan: &FixPlan, source: &str) -> ApplyResult {
                     col: fix.col,
                     action: fix.action,
                     description: fix.description.clone(),
+                    diagnostic_code: code.to_string(),
                 });
             }
             Err(_) => {
@@ -317,7 +324,7 @@ fn line_col_to_offset(source: &str, line: usize, col: usize) -> Result<usize, St
     Err(format!("line {} 超出源码范围 (max {})", line, current_line))
 }
 
-fn action_str(a: ActionKind) -> &'static str {
+pub fn action_str(a: ActionKind) -> &'static str {
     match a {
         ActionKind::Insert => "insert",
         ActionKind::Delete => "delete",
@@ -518,12 +525,14 @@ mod tests {
                     col: 12,
                     action: ActionKind::Delete,
                     description: "删除意外字符".to_string(),
+                    diagnostic_code: "LEX005".to_string(),
                 },
                 AppliedChange {
                     line: 3,
                     col: 18,
                     action: ActionKind::Insert,
                     description: "添加闭引号".to_string(),
+                    diagnostic_code: "LEX001".to_string(),
                 },
             ],
             patched_source: "fixed\n".to_string(),
@@ -548,4 +557,100 @@ mod tests {
         assert_eq!(result.skipped, 0);
         assert_eq!(result.patched_source, "source\n");
     }
+
+    /// Phase 4.1.3 端到端：apply_plan 的 AppliedChange 现在携带 diagnostic_code
+    /// 验证诊断码正确传递到变更记录，供修复历史追踪
+    #[test]
+    fn test_applied_change_carries_diagnostic_code() {
+        let plan = FixPlan {
+            file: "test.lom".to_string(),
+            ok: true,
+            plans: vec![crate::fix::Plan {
+                diagnostic: crate::fix::DiagRef {
+                    code: "LEX001".to_string(),
+                    severity: crate::diagnostics::Severity::Error,
+                    stage: crate::diagnostics::Stage::Lex,
+                    line: 1,
+                    col: 1,
+                    message: "未闭合字符串".to_string(),
+                },
+                fixes: vec![make_insert(1, 10, "\"")],
+                retry: true,
+            }],
+        };
+        let result = apply_plan(&plan, "println(\"hi\n");
+        assert_eq!(result.applied, 1);
+        assert_eq!(result.changes[0].diagnostic_code, "LEX001");
+    }
+
+    /// Phase 4.1.3 端到端：apply → 构造历史记录 → append → read 完整流程
+    /// 模拟 main.rs 中 run_fix --apply 后追加历史的逻辑
+    #[test]
+    fn test_apply_to_history_e2e() {
+        use crate::fix_history::{self, FixHistoryEntry, HistoryChange};
+        use std::path::PathBuf;
+
+        let history_path = PathBuf::from(std::env::temp_dir()).join(format!(
+            "lom_apply_history_e2e_{}.jsonl",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&history_path);
+
+        // 1. 源码含 LEX001 未闭合字符串
+        let src = "fn main() -> Unit\n    println(\"hello)\nend\n";
+        let mut diags = crate::diagnostics::Diagnostics::new("test.lom");
+        diags.diagnostics.push(crate::diagnostics::Diagnostic {
+            severity: crate::diagnostics::Severity::Error,
+            stage: crate::diagnostics::Stage::Lex,
+            code: "LEX001".into(),
+            message: "未闭合字符串".into(),
+            file: "test.lom".into(),
+            line: 2,
+            col: 13,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        });
+        diags.ok = false;
+
+        // 2. 生成修复计划并应用
+        let plan = crate::fix::generate_plan(&diags, src);
+        let result = apply_plan(&plan, src);
+        assert!(result.applied >= 1, "应至少应用 1 个修复");
+
+        // 3. 模拟 main.rs 的历史记录构造逻辑
+        let changes: Vec<HistoryChange> = result
+            .changes
+            .iter()
+            .map(|c| HistoryChange {
+                line: c.line,
+                col: c.col,
+                action: action_str(c.action).to_string(),
+                description: c.description.clone(),
+                diagnostic_code: c.diagnostic_code.clone(),
+            })
+            .collect();
+        let entry = FixHistoryEntry {
+            timestamp: fix_history::current_timestamp(),
+            file: "test.lom".to_string(),
+            applied: result.applied,
+            skipped: result.skipped,
+            changes,
+        };
+
+        // 4. 追加到历史文件
+        fix_history::append_history(&entry, &history_path).expect("追加历史失败");
+
+        // 5. 读回验证
+        let entries = fix_history::read_history(&history_path).expect("读取历史失败");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].file, "test.lom");
+        assert_eq!(entries[0].applied, result.applied);
+        assert!(!entries[0].changes.is_empty());
+        // 每个变更都应携带诊断码 LEX001
+        assert!(entries[0].changes.iter().all(|c| c.diagnostic_code == "LEX001"));
+
+        let _ = std::fs::remove_file(&history_path);
+    }
 }
+
