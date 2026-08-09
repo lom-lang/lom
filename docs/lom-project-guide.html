@@ -872,7 +872,11 @@
         <li><span class="tag" style="background:#16a34a;">✅ Done 4.1.3</span> 修复历史记录：<code>.lom/fix-history.jsonl</code> NDJSON 格式，<code>lom fix --apply</code> 后自动追加（时间戳/文件/应用数/跳过数/变更含诊断码），<code>lom fix --history [--json]</code> 查看过往修复（<code>lom-fix-history/v1</code> schema）（v0.2.8，2026-08-08）</li>
       </ul>
     </li>
-    <li><strong>Phase 4.2 · REPL</strong>：交互式 read-eval-print loop，支持多行输入、前文定义的函数/变量保持、逐步构建程序。对 LLM 试错友好。<span class="meta">语言标配</span></li>
+    <li><strong>Phase 4.2 · REPL</strong>：交互式 read-eval-print loop，支持多行输入、前文定义的函数/变量保持、逐步构建程序。对 LLM 试错友好。<span class="meta">语言标配</span>
+      <ul>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.2</span> <code>lom repl</code> 子命令；<code>is_input_complete()</code> 多行完整性判定（括号深度 + 字符串状态 + 块关键字/end 配对；enum 单行声明无需 end）；<code>ReplSession</code> 上下文保持增量执行（<code>exec_item()</code> 注册 fn/enum/import，<code>exec_repl_block()</code> 在 globals 作用域执行 let/expr 使绑定持久）；特殊命令 <code>:q</code>/<code>:help</code>/<code>:reset</code>/<code>:show</code>；错误转为输出文本不崩溃；26 测试（v0.2.9，2026-08-08）</li>
+      </ul>
+    </li>
     <li><strong>Phase 4.3 · 简单 LSP</strong>：LSP 协议基础实现，hover 显示类型信息、诊断推送（实时词法/语法/类型错误）、基础代码补全（作用域可见名称）。<span class="meta">语言标配</span></li>
     <li><strong>Phase 4.4 · 包管理雏形</strong>：<code>lom.toml</code> 项目结构标准化、依赖管理（<code>from xxx import</code> 解析外部包）、包注册表雏形。<span class="meta">语言标配</span></li>
   </ul>
