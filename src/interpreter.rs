@@ -405,6 +405,51 @@ impl Interpreter {
         Ok(())
     }
 
+    /// Phase 4.2: REPL 增量执行单个 item
+    ///
+    /// 注册 fn/enum/import 到 interpreter，不立即执行。
+    /// 返回 Unit（顶层声明无求值结果）。
+    /// 后续 REPL 调用 exec_repl_block 执行语句/表达式时，已注册的函数/枚举可见。
+    pub fn exec_item(&mut self, item: &Item) -> Result<Value, RuntimeError> {
+        match item {
+            Item::Import(imp) => {
+                self.process_import(imp)?;
+                Ok(Value::Unit)
+            }
+            Item::Fn(f) => {
+                self.functions.insert(f.name.clone(), f.clone());
+                Ok(Value::Unit)
+            }
+            Item::Enum(e) => {
+                for v in &e.variants {
+                    self.variants.insert(v.name.clone());
+                    if v.fields.is_empty() {
+                        self.nullary_variants.insert(v.name.clone());
+                    }
+                }
+                Ok(Value::Unit)
+            }
+        }
+    }
+
+    /// Phase 4.2: REPL 在全局环境执行块（语句 + 尾表达式）
+    ///
+    /// 用于 REPL 模式执行 let 语句或表达式：
+    ///   - let x = 5 → 绑定 x 到全局环境，返回绑定的值
+    ///   - 1 + 2 → 求值返回 3
+    ///   - println("hi") → 执行副作用返回 Unit
+    ///
+    /// 与 exec_block 的区别：在 globals 作用域直接执行，let 绑定持久保留。
+    pub fn exec_repl_block(&mut self, block: &Block) -> Result<Value, RuntimeError> {
+        // 在全局环境上创建子作用域执行，let 绑定通过 define 写入 globals
+        // 但子作用域的 let 会在子作用域，不持久 — 需要直接在 globals 上执行
+        let env = self.globals.clone();
+        match self.exec_block(block, env)? {
+            ControlFlow::Normal(v) => Ok(v),
+            ControlFlow::Return(v) => Ok(v),
+        }
+    }
+
     /// 处理一条导入声明：把导入符号（含别名）注入可用集合
     /// - 模块不存在 → 报错
     /// - 符号不在模块导出列表 → 报错

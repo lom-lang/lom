@@ -23,6 +23,7 @@ mod interpreter;
 mod json;
 mod lexer;
 mod parser;
+mod repl;
 mod typechecker;
 
 #[derive(Debug, Default)]
@@ -57,6 +58,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} fix <file.lom> [--plan] [--json]  生成 AI 修复计划（lom-fix/v1）");
     eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
+    eprintln!("  {prog} repl                       启动交互式 REPL（Phase 4.2）");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!();
     eprintln!("子命令:");
@@ -66,6 +68,7 @@ fn print_help(prog: &str) {
     eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
     eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
+    eprintln!("  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令");
     eprintln!();
     eprintln!("选项:");
     eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
@@ -95,6 +98,10 @@ fn parse_args(args: &[String]) -> CliArgs {
             }
             "fix" => {
                 out.subcommand = Some("fix".to_string());
+                iter.next();
+            }
+            "repl" => {
+                out.subcommand = Some("repl".to_string());
                 iter.next();
             }
             _ => {}
@@ -158,6 +165,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        return;
+    }
+
+    // Phase 4.2: lom repl 启动交互式 REPL，不需要文件参数
+    if cli.subcommand.as_deref() == Some("repl") {
+        run_repl();
         return;
     }
 
@@ -388,4 +401,79 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
 
     // fix 子命令的退出码语义：计划生成成功即 0（无论是否有诊断）
     process::exit(0);
+}
+
+/// Phase 4.2: 启动交互式 REPL
+///
+/// 读入一行 → 判断完整性（多行模式累积）→ 执行 → 打印结果 → 循环
+/// 特殊命令：:q/:quit/:exit 退出，:help 显示帮助，:reset 重置会话，:show 显示源码
+fn run_repl() {
+    use std::io::{self, BufRead, Write};
+
+    let mut session = repl::ReplSession::new();
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    println!("Lom REPL (Phase 4.2) — 输入 :help 查看帮助，:q 退出");
+
+    let mut buffer = String::new(); // 多行输入累积缓冲
+
+    loop {
+        // 提示符：缓冲为空时用 "lom> "，多行累积时用 "  ..> "
+        let prompt = if buffer.is_empty() { "lom> " } else { "  ..> " };
+        print!("{}", prompt);
+        let _ = stdout.flush();
+
+        let mut line = String::new();
+        match stdin.lock().read_line(&mut line) {
+            Ok(0) => {
+                // EOF (Ctrl+D)
+                println!();
+                break;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("读取输入失败: {}", e);
+                break;
+            }
+        }
+
+        // 去掉行尾换行
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
+
+        // 空行处理：缓冲为空时跳过，累积中时追加（保留空行上下文）
+        if line.is_empty() && buffer.is_empty() {
+            continue;
+        }
+
+        // 累积到缓冲
+        if !buffer.is_empty() {
+            buffer.push('\n');
+        }
+        buffer.push_str(line);
+
+        // 检查输入完整性
+        if !repl::is_input_complete(&buffer) {
+            // 不完整：继续等待下一行
+            continue;
+        }
+
+        // 完整：取出缓冲执行，然后清空
+        let input = std::mem::take(&mut buffer);
+
+        match session.exec_line(&input) {
+            Ok(result) => {
+                if !result.output.is_empty() {
+                    println!("{}", result.output);
+                }
+                if !result.should_continue {
+                    break;
+                }
+            }
+            Err(e) => {
+                // exec_line 内部已捕获大部分错误，这里防御性处理
+                eprintln!("错误: {}", e);
+            }
+        }
+    }
 }
