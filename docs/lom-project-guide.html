@@ -865,7 +865,13 @@
   <p>复用现有 Rust 解释器 + 类型检查器 + 诊断系统，无新底层依赖（不上 MLIR/Cranelift）。</p>
   <h4>新增子阶段</h4>
   <ul>
-    <li><strong>Phase 4.1 · lom fix 修复规则扩展</strong>：扩展可自动修复的诊断类别（LEX 类词法修复、TYPE 类类型转换、NAM 类自动导入建议、MAT 类模式补全）；引入修复置信度模型（High=安全自动应用 / Medium=需确认 / Low=仅建议）；修复历史记录（供 LLM 学习过往修复模式）。<span class="meta">差异化核心</span></li>
+    <li><strong>Phase 4.1 · lom fix 修复规则扩展</strong>：扩展可自动修复的诊断类别（LEX 类词法修复、TYPE 类类型转换、NAM 类自动导入建议、MAT 类模式补全）；引入修复置信度模型（High=安全自动应用 / Medium=需确认 / Low=仅建议）；修复历史记录（供 LLM 学习过往修复模式）。<span class="meta">差异化核心</span>
+      <ul>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.1.1</span> NAM003 拼写建议：Levenshtein 距离 ≤2，候选集 = 作用域变量 + 顶层函数 + 标准库 + 枚举变体，并列时偏好更长候选名（v0.2.6，2026-08-08）</li>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.1.2</span> MAT001 Result/Option 自动补全：<code>MatchExpr::end_line</code> 记录 <code>end</code> 关键字行号，内置变体（Ok/Err/Some/None）High 置信度精确 Insert，用户枚举变体保持 Medium Hint（参数未知安全边界）（v0.2.7，2026-08-08）</li>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.1.3</span> 修复历史记录：<code>.lom/fix-history.jsonl</code> NDJSON 格式，<code>lom fix --apply</code> 后自动追加（时间戳/文件/应用数/跳过数/变更含诊断码），<code>lom fix --history [--json]</code> 查看过往修复（<code>lom-fix-history/v1</code> schema）（v0.2.8，2026-08-08）</li>
+      </ul>
+    </li>
     <li><strong>Phase 4.2 · REPL</strong>：交互式 read-eval-print loop，支持多行输入、前文定义的函数/变量保持、逐步构建程序。对 LLM 试错友好。<span class="meta">语言标配</span></li>
     <li><strong>Phase 4.3 · 简单 LSP</strong>：LSP 协议基础实现，hover 显示类型信息、诊断推送（实时词法/语法/类型错误）、基础代码补全（作用域可见名称）。<span class="meta">语言标配</span></li>
     <li><strong>Phase 4.4 · 包管理雏形</strong>：<code>lom.toml</code> 项目结构标准化、依赖管理（<code>from xxx import</code> 解析外部包）、包注册表雏形。<span class="meta">语言标配</span></li>
