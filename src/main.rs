@@ -22,6 +22,7 @@ mod info;
 mod interpreter;
 mod json;
 mod lexer;
+mod lsp;
 mod parser;
 mod repl;
 mod typechecker;
@@ -59,6 +60,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
     eprintln!("  {prog} repl                       启动交互式 REPL（Phase 4.2）");
+    eprintln!("  {prog} lsp                        启动 LSP 服务器（Phase 4.3，stdio JSON-RPC）");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!();
     eprintln!("子命令:");
@@ -69,6 +71,7 @@ fn print_help(prog: &str) {
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
     eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
     eprintln!("  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令");
+    eprintln!("  lsp         启动 LSP 服务器（Phase 4.3）。stdio JSON-RPC 2.0，支持 hover/completion/diagnostics");
     eprintln!();
     eprintln!("选项:");
     eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
@@ -102,6 +105,10 @@ fn parse_args(args: &[String]) -> CliArgs {
             }
             "repl" => {
                 out.subcommand = Some("repl".to_string());
+                iter.next();
+            }
+            "lsp" => {
+                out.subcommand = Some("lsp".to_string());
                 iter.next();
             }
             _ => {}
@@ -171,6 +178,12 @@ fn main() {
     // Phase 4.2: lom repl 启动交互式 REPL，不需要文件参数
     if cli.subcommand.as_deref() == Some("repl") {
         run_repl();
+        return;
+    }
+
+    // Phase 4.3: lom lsp 启动 LSP 服务器（stdio JSON-RPC），不需要文件参数
+    if cli.subcommand.as_deref() == Some("lsp") {
+        run_lsp();
         return;
     }
 
@@ -476,4 +489,273 @@ fn run_repl() {
             }
         }
     }
+}
+
+/// Phase 4.3: 启动 LSP 服务器（stdio JSON-RPC 2.0）
+///
+/// 支持的 LSP 方法：
+///   - initialize / initialized：握手
+///   - shutdown / exit：退出
+///   - textDocument/didOpen：打开文件，推送诊断
+///   - textDocument/didChange：修改文件，重新解析推送诊断
+///   - textDocument/hover：悬停显示类型信息
+///   - textDocument/completion：代码补全
+///
+/// 消息格式：Content-Length: N\r\n\r\n + JSON payload
+fn run_lsp() {
+    use std::io::{self, BufRead, Read, Write};
+
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+    let mut buffer = String::new();
+
+    // 文档状态：uri -> 源码文本
+    let mut docs: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
+    loop {
+        // 1. 读取 Content-Length header
+        let mut content_len: Option<usize> = None;
+        loop {
+            buffer.clear();
+            match stdin.lock().read_line(&mut buffer) {
+                Ok(0) => return, // EOF
+                Ok(_) => {}
+                Err(_) => return,
+            }
+            let line = buffer.trim_end();
+            if line.is_empty() {
+                // header 结束，空行分隔符
+                break;
+            }
+            if let Some(pos) = line.find("Content-Length: ") {
+                let len_str = &line[pos + 16..];
+                if let Ok(n) = len_str.trim().parse::<usize>() {
+                    content_len = Some(n);
+                }
+            }
+        }
+
+        let len = match content_len {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // 2. 读取 JSON payload
+        let mut payload = vec![0u8; len];
+        if stdin.lock().read_exact(&mut payload).is_err() {
+            return;
+        }
+        let json = match String::from_utf8(payload) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        // 3. 解析 JSON-RPC 消息
+        let (id, method, params) = match lsp::parse_rpc_message(&json) {
+            Some(m) => m,
+            None => continue,
+        };
+
+        // 4. 处理请求
+        let response = handle_lsp_method(&method, id, &params, &mut docs);
+
+        // 5. 输出响应（如果有 id 才发响应，通知无响应）
+        if let Some(resp) = response {
+            let msg = lsp::make_lsp_message(&resp);
+            let _ = stdout.write_all(msg.as_bytes());
+            let _ = stdout.flush();
+        }
+    }
+}
+
+/// 处理单个 LSP 方法，返回可选的响应 JSON
+fn handle_lsp_method(
+    method: &str,
+    id: Option<u64>,
+    params: &str,
+    docs: &mut std::collections::HashMap<String, String>,
+) -> Option<String> {
+    match method {
+        "initialize" => {
+            let id = id?;
+            // 返回服务器能力声明
+            let result = "{\"capabilities\":{\
+                \"textDocumentSync\":1,\
+                \"hoverProvider\":true,\
+                \"completionProvider\":{\"triggerCharacters\":[\".\",\" \"]},\
+                \"definitionProvider\":false\
+            }}";
+            Some(lsp::make_response(id, result))
+        }
+        "initialized" => {
+            // 通知，无响应
+            None
+        }
+        "shutdown" => {
+            let id = id?;
+            Some(lsp::make_response(id, "null"))
+        }
+        "exit" => {
+            process::exit(0);
+        }
+        "textDocument/didOpen" => {
+            // 提取 uri 和 text
+            if let Some((uri, text)) = extract_did_open_params(params) {
+                docs.insert(uri.clone(), text.clone());
+                // 推送诊断
+                let diags = lsp::compute_diagnostics(&text, &uri);
+                Some(lsp::make_publish_diagnostics(&uri, &diags))
+            } else {
+                None
+            }
+        }
+        "textDocument/didChange" => {
+            // 提取 uri 和新文本（简化：取全量变更）
+            if let Some((uri, text)) = extract_did_change_params(params) {
+                docs.insert(uri.clone(), text.clone());
+                let diags = lsp::compute_diagnostics(&text, &uri);
+                Some(lsp::make_publish_diagnostics(&uri, &diags))
+            } else {
+                None
+            }
+        }
+        "textDocument/hover" => {
+            let id = id?;
+            if let Some((uri, line, col)) = extract_hover_params(params) {
+                if let Some(src) = docs.get(&uri) {
+                    if let Some(hover) = lsp::handle_hover(src, line, col) {
+                        let result = format!(
+                            "{{\"contents\":{{\"kind\":\"markdown\",\"value\":\"{}\"}}}}",
+                            hover.content.replace('"', "\\\"").replace('\n', "\\n")
+                        );
+                        return Some(lsp::make_response(id, &result));
+                    }
+                }
+            }
+            // 无 hover 结果
+            Some(lsp::make_response(id, "null"))
+        }
+        "textDocument/completion" => {
+            let id = id?;
+            // 补全不需要位置（简化：返回全局可见符号）
+            let uri = extract_completion_uri(params).unwrap_or_default();
+            let src = docs.get(&uri).map(|s| s.as_str()).unwrap_or("");
+            let items = lsp::handle_completion(src);
+            let items_json: Vec<String> = items
+                .iter()
+                .map(|item| {
+                    let detail = item
+                        .detail
+                        .as_ref()
+                        .map(|d| format!(",\"detail\":\"{}\"", d.replace('"', "\\\"")))
+                        .unwrap_or_default();
+                    format!(
+                        "{{\"label\":\"{}\",\"kind\":{}{}}}",
+                        item.label,
+                        item.kind.as_lsp_number(),
+                        detail
+                    )
+                })
+                .collect();
+            let result = format!("[{}]", items_json.join(","));
+            Some(lsp::make_response(id, &result))
+        }
+        _ => {
+            // 未知方法：返回 method not found 错误
+            let id = id?;
+            Some(lsp::make_error_response(id, -32601, &format!("方法未实现: {}", method)))
+        }
+    }
+}
+
+/// 从 didOpen params 提取 uri 和 text
+fn extract_did_open_params(params: &str) -> Option<(String, String)> {
+    let uri = extract_json_string_field(params, "uri")?;
+    let text = extract_json_string_field(params, "text")?;
+    Some((uri, text))
+}
+
+/// 从 didChange params 提取 uri 和新文本（简化：取最后一个全量变更）
+fn extract_did_change_params(params: &str) -> Option<(String, String)> {
+    let uri = extract_json_string_field(params, "uri")?;
+    // didChange 的 text 在 changes[].text 中，简化提取最后一个 "text":"..." 的值
+    let text = extract_last_text_field(params)?;
+    Some((uri, text))
+}
+
+/// 从 hover params 提取 uri, line, col
+fn extract_hover_params(params: &str) -> Option<(String, usize, usize)> {
+    let uri = extract_json_string_field(params, "uri")?;
+    let line = extract_json_number_field(params, "line")?;
+    let col = extract_json_number_field(params, "character")?;
+    Some((uri, line, col))
+}
+
+/// 从 completion params 提取 uri
+fn extract_completion_uri(params: &str) -> Option<String> {
+    extract_json_string_field(params, "uri")
+}
+
+/// 简单提取 JSON 字符串字段
+fn extract_json_string_field(json: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{}\":\"", key);
+    let start = json.find(&needle)? + needle.len();
+    let bytes = json.as_bytes();
+    let mut end = start;
+    let mut i = start;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i] == b'"' {
+            end = i;
+            break;
+        }
+        i += 1;
+    }
+    Some(json[start..end].to_string())
+}
+
+/// 简单提取 JSON 数字字段
+fn extract_json_number_field(json: &str, key: &str) -> Option<usize> {
+    let needle = format!("\"{}\":", key);
+    let start = json.find(&needle)? + needle.len();
+    let bytes = json.as_bytes();
+    let mut end = start;
+    while end < bytes.len() && bytes[end].is_ascii_whitespace() {
+        end += 1;
+    }
+    let num_start = end;
+    while end < bytes.len() && bytes[end].is_ascii_digit() {
+        end += 1;
+    }
+    json[num_start..end].parse().ok()
+}
+
+/// 提取最后一个 "text":"..." 字段的值（用于 didChange 的 changes 数组）
+fn extract_last_text_field(json: &str) -> Option<String> {
+    let needle = "\"text\":\"";
+    let mut last_text = None;
+    let mut search_from = 0;
+    while let Some(pos) = json[search_from..].find(needle) {
+        let start = search_from + pos + needle.len();
+        let bytes = json.as_bytes();
+        let mut end = start;
+        let mut i = start;
+        while i < bytes.len() {
+            if bytes[i] == b'\\' {
+                i += 2;
+                continue;
+            }
+            if bytes[i] == b'"' {
+                end = i;
+                break;
+            }
+            i += 1;
+        }
+        last_text = Some(json[start..end].to_string());
+        search_from = end + 1;
+    }
+    last_text
 }
