@@ -1,0 +1,7 @@
+# Phase 4.4 包管理示例 — 依赖包 mathlib
+#
+# 这个包提供数学工具函数，被主项目 app 依赖
+# 包内所有顶层 fn/enum 自动公开，无需 export 声明
+
+name = "mathlib"
+version = "0.1.0"

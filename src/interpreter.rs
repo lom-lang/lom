@@ -3,6 +3,7 @@
 // Phase 2 新增：match, enum, Result/Option, 模式匹配
 
 use crate::ast::*;
+use crate::parser::Parser;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -272,6 +273,9 @@ pub struct Interpreter {
     /// 导入别名 → 真实内置函数名
     /// 例：导入 `println as log` 后，import_aliases["log"] = "println"
     import_aliases: HashMap<String, String>,
+    /// Phase 4.4: 外部包表（已加载）
+    /// key = 包名（lom.toml dependencies 中的键名）
+    packages: HashMap<String, crate::package::ResolvedPackage>,
     /// Phase 3.5: 程序参数（argv），供 env::args() 读取
     /// argv[0] = .lom 文件路径，argv[1..] = -- 之后的用户参数
     program_args: Vec<String>,
@@ -362,6 +366,7 @@ impl Interpreter {
             modules,
             available_builtins,
             import_aliases: HashMap::new(),
+            packages: HashMap::new(),
             program_args: Vec::new(),
         }
     }
@@ -370,6 +375,45 @@ impl Interpreter {
     /// argv[0] 约定为 .lom 文件路径，argv[1..] 为用户参数
     pub fn set_program_args(&mut self, args: Vec<String>) {
         self.program_args = args;
+    }
+
+    /// Phase 4.4: 加载依赖图中的所有外部包
+    ///
+    /// 对每个依赖包：
+    ///   1. 解析包内所有 .lom 源码文件
+    ///   2. 把顶层 fn 注册到 self.functions
+    ///   3. 把枚举变体注册到 self.variants / self.nullary_variants
+    ///   4. 把包名 + public_symbols 存入 self.packages，供 process_import 查找
+    ///
+    /// 符号冲突策略：外部包符号直接注册，与本地符号同命名空间。
+    /// 冲突时后注册者覆盖（与本地重复定义行为一致）。LLM 责任保证不同包不重名。
+    pub fn load_packages(&mut self, graph: &crate::package::DependencyGraph) {
+        for (name, pkg) in &graph.packages {
+            // 解析并注册包内每个 .lom 文件的 fn/enum
+            for file in &pkg.source_files {
+                if let Ok(src) = std::fs::read_to_string(file) {
+                    let result = Parser::parse_recover(&src);
+                    for item in &result.program.items {
+                        match item {
+                            Item::Fn(f) => {
+                                self.functions.insert(f.name.clone(), f.clone());
+                            }
+                            Item::Enum(e) => {
+                                for v in &e.variants {
+                                    self.variants.insert(v.name.clone());
+                                    if v.fields.is_empty() {
+                                        self.nullary_variants.insert(v.name.clone());
+                                    }
+                                }
+                            }
+                            Item::Import(_) => {} // 包内 import 暂不传递
+                        }
+                    }
+                }
+            }
+            // 注册包元数据（供 process_import 查找符号）
+            self.packages.insert(name.clone(), pkg.clone());
+        }
     }
 
     /// 运行程序
@@ -455,33 +499,53 @@ impl Interpreter {
     /// - 符号不在模块导出列表 → 报错
     /// - 重复导入（同别名） → 静默覆盖（与显式重新声明一致，简化处理）
     fn process_import(&mut self, imp: &ImportDecl) -> Result<(), RuntimeError> {
-        // 查模块（Phase 2.1.5 仅标准库模块，不支持点分用户模块路径）
-        let exports = match self.modules.get(imp.module.as_str()) {
-            Some(e) => e,
-            None => {
-                return Err(RuntimeError::Msg(format!(
-                    "未知模块 '{}'（标准库模块：io/string/math/list/json/file；用户模块留待后续阶段）",
-                    imp.module
-                )));
+        // 优先查标准库模块
+        if let Some(exports) = self.modules.get(imp.module.as_str()) {
+            for item in &imp.items {
+                // 检查符号是否在该模块导出
+                if !exports.iter().any(|e| *e == item.name) {
+                    return Err(RuntimeError::Msg(format!(
+                        "模块 '{}' 不导出符号 '{}'",
+                        imp.module, item.name
+                    )));
+                }
+                // 注册别名映射（alias → 真实名）
+                if item.alias != item.name {
+                    self.import_aliases
+                        .insert(item.alias.clone(), item.name.clone());
+                }
+                // 标记别名/本名为可用
+                self.available_builtins.insert(item.alias.clone());
             }
-        };
-        for item in &imp.items {
-            // 检查符号是否在该模块导出
-            if !exports.iter().any(|e| *e == item.name) {
-                return Err(RuntimeError::Msg(format!(
-                    "模块 '{}' 不导出符号 '{}'",
-                    imp.module, item.name
-                )));
-            }
-            // 注册别名映射（alias → 真实名）
-            if item.alias != item.name {
-                self.import_aliases
-                    .insert(item.alias.clone(), item.name.clone());
-            }
-            // 标记别名/本名为可用
-            self.available_builtins.insert(item.alias.clone());
+            return Ok(());
         }
-        Ok(())
+
+        // Phase 4.4: 查外部包
+        if let Some(pkg) = self.packages.get(imp.module.as_str()) {
+            for item in &imp.items {
+                // 检查符号是否在包的公开符号中
+                if !pkg.public_symbols.contains(&item.name) {
+                    return Err(RuntimeError::Msg(format!(
+                        "包 '{}' 不导出符号 '{}'（PKG006）",
+                        imp.module, item.name
+                    )));
+                }
+                // 外部包符号已在 load_packages 注册到 functions/variants
+                // 这里只需标记为可用（alias → 本名映射）
+                if item.alias != item.name {
+                    self.import_aliases
+                        .insert(item.alias.clone(), item.name.clone());
+                }
+                self.available_builtins.insert(item.alias.clone());
+            }
+            return Ok(());
+        }
+
+        // 既不是标准库也不是外部包
+        Err(RuntimeError::Msg(format!(
+            "未知模块/包 '{}'（标准库：io/string/math/list/json/file；外部包需在 lom.toml dependencies 声明，PKG005）",
+            imp.module
+        )))
     }
 
     /// 执行块，返回块的值

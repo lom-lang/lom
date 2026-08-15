@@ -1,0 +1,13 @@
+# Phase 4.4 包管理示例 — 主项目
+#
+# 演示本地路径依赖：主项目 app 依赖 mathlib 包
+# 运行方式：
+#   cd examples/pkg_demo
+#   lom build              # 解析依赖 + 类型检查包源码
+#   lom main.lom           # 运行（自动加载 lom.toml 依赖）
+
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+mathlib = { path = "mathlib" }

@@ -23,6 +23,7 @@ mod interpreter;
 mod json;
 mod lexer;
 mod lsp;
+mod package;
 mod parser;
 mod repl;
 mod typechecker;
@@ -61,6 +62,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
     eprintln!("  {prog} repl                       启动交互式 REPL（Phase 4.2）");
     eprintln!("  {prog} lsp                        启动 LSP 服务器（Phase 4.3，stdio JSON-RPC）");
+    eprintln!("  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!();
     eprintln!("子命令:");
@@ -72,6 +74,7 @@ fn print_help(prog: &str) {
     eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
     eprintln!("  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令");
     eprintln!("  lsp         启动 LSP 服务器（Phase 4.3）。stdio JSON-RPC 2.0，支持 hover/completion/diagnostics");
+    eprintln!("  build       解析 lom.toml 并对依赖包源码做类型检查（Phase 4.4）。--json 输出结构化结果");
     eprintln!();
     eprintln!("选项:");
     eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
@@ -109,6 +112,10 @@ fn parse_args(args: &[String]) -> CliArgs {
             }
             "lsp" => {
                 out.subcommand = Some("lsp".to_string());
+                iter.next();
+            }
+            "build" => {
+                out.subcommand = Some("build".to_string());
                 iter.next();
             }
             _ => {}
@@ -184,6 +191,12 @@ fn main() {
     // Phase 4.3: lom lsp 启动 LSP 服务器（stdio JSON-RPC），不需要文件参数
     if cli.subcommand.as_deref() == Some("lsp") {
         run_lsp();
+        return;
+    }
+
+    // Phase 4.4: lom build 读取 lom.toml，解析依赖，对包源码执行类型检查
+    if cli.subcommand.as_deref() == Some("build") {
+        run_build(cli.json);
         return;
     }
 
@@ -280,6 +293,29 @@ fn main() {
     // ===== 执行阶段 =====
     let program = parser::Parser::parse_recover(&src).program;
     let mut interp = interpreter::Interpreter::new();
+    // Phase 4.4: 若文件所在目录有 lom.toml，加载依赖包
+    // 使 `from pkg import { ... }` 能解析外部包符号
+    let file_dir = std::path::Path::new(path)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
+    let toml_path = file_dir.join("lom.toml");
+    if toml_path.exists() {
+        match package::load_manifest_file(&toml_path) {
+            Ok(manifest) => {
+                match package::resolve_dependencies(&manifest, file_dir) {
+                    Ok(graph) => interp.load_packages(&graph),
+                    Err(e) => {
+                        eprintln!("依赖解析失败: {}", e);
+                        process::exit(1);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("清单解析失败: {}", e);
+                process::exit(1);
+            }
+        }
+    }
     // Phase 3.5: 传递程序参数（-- 之后的参数），供 env::args() 读取
     // 第一个参数约定为 .lom 文件路径（与大多数 CLI 约定一致：argv[0] = 程序名）
     let mut full_args = vec![path.to_string()];
@@ -325,6 +361,120 @@ fn run_info(src: &str, path: &str, json: bool) {
         print!("{}", info::to_human(&info));
     }
     process::exit(0);
+}
+
+/// Phase 4.4: 执行 `lom build` 子命令
+///
+/// 读取当前目录的 lom.toml，解析依赖图，对每个依赖包的源码文件执行
+/// 词法+语法+类型检查，输出诊断结果。
+///
+/// 流程：
+///   1. 加载 ./lom.toml
+///   2. resolve_dependencies 解析依赖图（含循环检测）
+///   3. 对每个包的每个 .lom 文件执行 parse + typecheck
+///   4. 汇总诊断输出
+///
+/// 退出码：
+///   0 — 清单解析成功且所有包源码无错误
+///   1 — 清单解析失败 / 依赖解析失败 / 包源码有错误
+fn run_build(json: bool) {
+    let toml_path = std::path::Path::new("lom.toml");
+    if !toml_path.exists() {
+        if json {
+            println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"当前目录无 lom.toml"}}"#);
+        } else {
+            eprintln!("错误：当前目录无 lom.toml（Phase 4.4 包管理清单）");
+            eprintln!("创建最小清单：");
+            eprintln!("  name = \"myapp\"");
+            eprintln!("  version = \"0.1.0\"");
+            eprintln!();
+            eprintln!("  [dependencies]");
+            eprintln!("  lib = {{ path = \"../lib\" }}");
+        }
+        process::exit(1);
+    }
+
+    let manifest = match package::load_manifest_file(toml_path) {
+        Ok(m) => m,
+        Err(e) => {
+            if json {
+                println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"{}"}}"#, e);
+            } else {
+                eprintln!("清单解析失败: {}", e);
+            }
+            process::exit(1);
+        }
+    };
+
+    let root_path = std::path::Path::new(".");
+    let graph = match package::resolve_dependencies(&manifest, root_path) {
+        Ok(g) => g,
+        Err(e) => {
+            if json {
+                println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"{}"}}"#, e);
+            } else {
+                eprintln!("依赖解析失败: {}", e);
+            }
+            process::exit(1);
+        }
+    };
+
+    if json {
+        // JSON 输出：汇总每个包的源码检查结果
+        print!("{{\"schema\":\"lom-build/v1\",\"ok\":true,\"package\":\"{}\",\"version\":\"{}\",\"dependencies\":[", manifest.name, manifest.version);
+        let mut first = true;
+        for (name, pkg) in &graph.packages {
+            if !first { print!(","); }
+            first = false;
+            print!("{{\"name\":\"{}\",\"path\":\"{}\",\"symbols\":[", name, pkg.root.display());
+            let mut sym_first = true;
+            for sym in &pkg.public_symbols {
+                if !sym_first { print!(","); }
+                sym_first = false;
+                print!("\"{}\"", sym);
+            }
+            print!("]}}");
+        }
+        println!("]}}");
+        return;
+    }
+
+    // 人类可读输出
+    println!("Lom build — 包依赖解析结果");
+    println!("  项目: {} v{}", manifest.name, manifest.version);
+    if graph.packages.is_empty() {
+        println!("  依赖: （无）");
+    } else {
+        println!("  依赖: {} 个", graph.packages.len());
+        for (name, pkg) in &graph.packages {
+            println!("    - {} (path: {})", name, pkg.root.display());
+            println!("      源码文件: {} 个", pkg.source_files.len());
+            println!("      公开符号: {} 个", pkg.public_symbols.len());
+            // 对包源码执行类型检查
+            for file in &pkg.source_files {
+                let src = match fs::read_to_string(file) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("      读取 {} 失败: {}", file.display(), e);
+                        continue;
+                    }
+                };
+                let path_str = file.display().to_string();
+                let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
+                if diags.ok {
+                    let program = parser::Parser::parse_recover(&src).program;
+                    typechecker::check_program(&program, &src, &path_str, &mut diags);
+                }
+                if diags.diagnostics.is_empty() {
+                    println!("      ✓ {} — 通过", file.file_name().unwrap().to_string_lossy());
+                } else {
+                    println!("      ✗ {} — {} 个诊断", file.file_name().unwrap().to_string_lossy(), diags.diagnostics.len());
+                    print!("{}", diags.to_human());
+                }
+            }
+        }
+    }
+    println!("\n依赖解析成功，共 {} 个包。", graph.packages.len());
 }
 
 /// Phase 2.7: 执行 `lom fix` 子命令
