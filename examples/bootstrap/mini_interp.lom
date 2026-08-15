@@ -1,73 +1,125 @@
-# 自举可行性验证 3：极简解释器（lexer + parser + evaluator）
-# 用 Lom 自身实现一个能解析求值 "3+4*2" = 11 的算术表达式解释器
-# 验证 Lom 能否表达编译器核心三阶段：词法→语法→求值
+# 自举可行性验证 3：扩展版极简解释器
+# lexer + 递归下降 parser + evaluator，支持：多字符数字、+ - * / ( )
+# 用 Lom 自身实现编译器核心三阶段
 
-from string import { split, string_to_int }
+from string import { split, string_to_int, contains, len }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty }
 
 # ===== Token =====
 enum Token
     | TInt(Int)
     | TPlus
+    | TMinus
     | TStar
+    | TSlash
+    | TLParen
+    | TRParen
 end
 
 # ===== AST =====
 enum Expr
     | Num(Int)
     | Add(Expr, Expr)
+    | Sub(Expr, Expr)
     | Mul(Expr, Expr)
+    | Div(Expr, Expr)
 end
 
-# 解析结果（用 record 替代元组，因为 Lom 不支持 let 解构）
-# {expr: Expr, rest: List<Token>}
+# 解析结果 record: {expr: Expr, rest: List<Token>}
 
 # ===== Lexer: String -> List<Token> =====
-# 递归遍历字符列表，先递归后 cons 保持顺序
-fn lex(chars: List<String>) -> List<Token>
+# 支持多字符数字（如 "123"），用字符串累积
+
+fn is_digit(c: String) -> Bool
+    contains("0123456789", c)
+end
+
+# flush 累积的数字字符串到 token 列表前部
+fn flush_num(acc: String, rest: List<Token>) -> List<Token>
+    if len(acc) == 0
+        rest
+    else
+        list_cons(TInt(string_to_int(acc)), rest)
+    end
+end
+
+# 处理非数字字符
+fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
+    if c == " "
+        lex_rec(rest_chars, "")
+    elif c == "+"
+        list_cons(TPlus, lex_rec(rest_chars, ""))
+    elif c == "-"
+        list_cons(TMinus, lex_rec(rest_chars, ""))
+    elif c == "*"
+        list_cons(TStar, lex_rec(rest_chars, ""))
+    elif c == "/"
+        list_cons(TSlash, lex_rec(rest_chars, ""))
+    elif c == "("
+        list_cons(TLParen, lex_rec(rest_chars, ""))
+    elif c == ")"
+        list_cons(TRParen, lex_rec(rest_chars, ""))
+    else
+        lex_rec(rest_chars, "")
+    end
+end
+
+# 递归 lex，num_acc 累积当前数字字符串
+fn lex_rec(chars: List<String>, num_acc: String) -> List<Token>
     if list_is_empty(chars)
-        list_empty()
+        flush_num(num_acc, list_empty())
     else
         let c = list_head(chars)
-        let rest = lex(list_tail(chars))
-        if c == " "
-            rest
-        elif c == "+"
-            list_cons(TPlus, rest)
-        elif c == "*"
-            list_cons(TStar, rest)
+        if is_digit(c)
+            lex_rec(list_tail(chars), num_acc + c)
         else
-            list_cons(TInt(string_to_int(c)), rest)
+            flush_num(num_acc, lex_char(c, list_tail(chars)))
         end
     end
 end
 
-# ===== Parser: List<Token> -> Expr =====
-# 文法: Expr = Term ("+" Term)*   Term = Factor ("*" Factor)*   Factor = Int
-# 左结合递归下降，用 record 返回 {expr, rest}
+fn lex(src: String) -> List<Token>
+    let chars = split(src, "")
+    lex_rec(chars, "")
+end
 
-# 解析单个 Int token
+# ===== Parser: List<Token> -> Expr =====
+# 文法: Expr = Term (("+"|"-") Term)*   Term = Factor (("*"|"/") Factor)*
+#        Factor = Int | "(" Expr ")"
+
 fn parse_factor(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     match list_head(tokens)
         TInt(n) => {expr: Num(n), rest: list_tail(tokens)}
+        TLParen => parse_factor_paren(tokens)
     end
 end
 
-# parse_term 的 * 递归辅助
+# 括号: ( Expr ) —— 辅助函数避免 match arm 多行块
+fn parse_factor_paren(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
+    let r = parse_expr(list_tail(tokens))
+    {expr: r.expr, rest: list_tail(r.rest)}
+end
+
+# === Term: Factor (("*"|"/") Factor)* ===
+
 fn parse_term_star(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     let r = parse_factor(list_tail(tokens))
     parse_term_rest(Mul(left, r.expr), r.rest)
 end
 
-# 解析乘法余部: Factor ("*" Factor)*
+fn parse_term_slash(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
+    let r = parse_factor(list_tail(tokens))
+    parse_term_rest(Div(left, r.expr), r.rest)
+end
+
 fn parse_term_rest(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     if list_is_empty(tokens)
         {expr: left, rest: tokens}
     else
         match list_head(tokens)
             TStar => parse_term_star(left, tokens)
-            TPlus => {expr: left, rest: tokens}
-            TInt(_) => {expr: left, rest: tokens}
+            TSlash => parse_term_slash(left, tokens)
+            _ => {expr: left, rest: tokens}
         end
     end
 end
@@ -77,21 +129,26 @@ fn parse_term(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     parse_term_rest(r.expr, r.rest)
 end
 
-# parse_expr 的 + 递归辅助
+# === Expr: Term (("+"|"-") Term)* ===
+
 fn parse_expr_plus(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     let r = parse_term(list_tail(tokens))
     parse_expr_rest(Add(left, r.expr), r.rest)
 end
 
-# 解析加法余部: Term ("+" Term)*
+fn parse_expr_minus(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
+    let r = parse_term(list_tail(tokens))
+    parse_expr_rest(Sub(left, r.expr), r.rest)
+end
+
 fn parse_expr_rest(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     if list_is_empty(tokens)
         {expr: left, rest: tokens}
     else
         match list_head(tokens)
             TPlus => parse_expr_plus(left, tokens)
-            TStar => {expr: left, rest: tokens}
-            TInt(_) => {expr: left, rest: tokens}
+            TMinus => parse_expr_minus(left, tokens)
+            _ => {expr: left, rest: tokens}
         end
     end
 end
@@ -106,22 +163,25 @@ fn eval(e: Expr) -> Int
     match e
         Num(n) => n
         Add(a, b) => eval(a) + eval(b)
+        Sub(a, b) => eval(a) - eval(b)
         Mul(a, b) => eval(a) * eval(b)
+        Div(a, b) => eval(a) / eval(b)
     end
 end
 
 # ===== 主入口 =====
 fn run(src: String) -> Int
-    let chars = split(src, "")
-    let tokens = lex(chars)
+    let tokens = lex(src)
     let r = parse_expr(tokens)
     eval(r.expr)
 end
 
 fn main() -> Unit
-    println(run("3+4*2"))   # 11 (3 + 4*2 = 3 + 8)
-    println(run("2*3+4"))   # 10 (2*3 + 4 = 6 + 4)
-    println(run("2+3+4"))   # 9  (左结合加法)
-    println(run("5*3*2"))   # 30 (左结合乘法)
-    println(run("1+2*3+4")) # 11 (1 + 2*3 + 4 = 1 + 6 + 4)
+    println(run("3+4*2"))      # 11
+    println(run("10-3-2"))     # 5  (左结合)
+    println(run("20/4/2"))     # 2  (左结合除法)
+    println(run("100"))        # 100 (多字符数字)
+    println(run("(1+2)*3"))    # 9  (括号)
+    println(run("(10-3)*2"))   # 14
+    println(run("2*(3+4)-5"))  # 9
 end
