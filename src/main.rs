@@ -155,6 +155,17 @@ fn parse_args(args: &[String]) -> CliArgs {
 }
 
 fn main() {
+    // Phase 5.0: 用大栈线程运行解释器，缓解树遍历解释器递归深度限制
+    // （自举验证发现：非尾递归的 Lom 程序在长输入时栈溢出 Rust 默认 1MB 栈）
+    let child = std::thread::Builder::new()
+        .stack_size(256 * 1024 * 1024) // 256MB
+        .spawn(main_inner)
+        .expect("failed to spawn interpreter thread");
+    // process::exit 在线程内会直接终止进程，join 仅作同步点
+    let _ = child.join();
+}
+
+fn main_inner() {
     let args: Vec<String> = env::args().collect();
     let cli = parse_args(&args);
 

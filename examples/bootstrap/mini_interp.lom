@@ -218,8 +218,9 @@ end
 fn main() -> Unit
     # 预定义环境: x=10, y=3
     let env = list_cons(("x", 10), list_cons(("y", 3), list_empty()))
-    println(run("x+y", env))      # 13
-    println(run("x*y", env))      # 30
-    println(run("x-y", env))      # 7
-    println(run("x", env))         # 10
+    println(run("x + y", env))        # 13
+    println(run("x * y + 2", env))    # 32
+    println(run("x - y", env))        # 7
+    println(run("(x + y) * 2", env))  # 26
+    println(run("x", env))            # 10
 end
