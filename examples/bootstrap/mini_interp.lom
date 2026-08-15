@@ -1,6 +1,6 @@
-# 自举可行性验证 3：扩展版极简解释器
-# lexer + 递归下降 parser + evaluator，支持：多字符数字、+ - * / ( )
-# 用 Lom 自身实现编译器核心三阶段
+# 自举可行性验证 4：变量引用 + 环境查找
+# 在算术表达式基础上加标识符识别和环境查找
+# 验证 Lom 能否实现符号表（用 List 替代缺失的 HashMap）
 
 from string import { split, string_to_int, contains, len }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty }
@@ -8,6 +8,7 @@ from list import { list_empty, list_cons, list_head, list_tail, list_is_empty }
 # ===== Token =====
 enum Token
     | TInt(Int)
+    | TIdent(String)
     | TPlus
     | TMinus
     | TStar
@@ -19,22 +20,35 @@ end
 # ===== AST =====
 enum Expr
     | Num(Int)
+    | Var(String)
     | Add(Expr, Expr)
     | Sub(Expr, Expr)
     | Mul(Expr, Expr)
     | Div(Expr, Expr)
 end
 
-# 解析结果 record: {expr: Expr, rest: List<Token>}
+# 环境: List<(String, Int)> —— 变量名→值映射（用 List 线性查找，因 Lom 无 HashMap）
 
-# ===== Lexer: String -> List<Token> =====
-# 支持多字符数字（如 "123"），用字符串累积
+# ===== Lexer =====
 
 fn is_digit(c: String) -> Bool
     contains("0123456789", c)
 end
 
-# flush 累积的数字字符串到 token 列表前部
+fn is_alpha(c: String) -> Bool
+    contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", c)
+end
+
+fn is_alnum(c: String) -> Bool
+    if is_alpha(c)
+        True
+    elif is_digit(c)
+        True
+    else
+        False
+    end
+end
+
 fn flush_num(acc: String, rest: List<Token>) -> List<Token>
     if len(acc) == 0
         rest
@@ -43,7 +57,6 @@ fn flush_num(acc: String, rest: List<Token>) -> List<Token>
     end
 end
 
-# 处理非数字字符
 fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
     if c == " "
         lex_rec(rest_chars, "")
@@ -64,7 +77,20 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
     end
 end
 
-# 递归 lex，num_acc 累积当前数字字符串
+# 累积标识符字符
+fn lex_ident(chars: List<String>, acc: String) -> List<Token>
+    if list_is_empty(chars)
+        list_cons(TIdent(acc), list_empty())
+    else
+        let c = list_head(chars)
+        if is_alnum(c)
+            lex_ident(list_tail(chars), acc + c)
+        else
+            list_cons(TIdent(acc), lex_char(c, list_tail(chars)))
+        end
+    end
+end
+
 fn lex_rec(chars: List<String>, num_acc: String) -> List<Token>
     if list_is_empty(chars)
         flush_num(num_acc, list_empty())
@@ -72,6 +98,8 @@ fn lex_rec(chars: List<String>, num_acc: String) -> List<Token>
         let c = list_head(chars)
         if is_digit(c)
             lex_rec(list_tail(chars), num_acc + c)
+        elif is_alpha(c)
+            flush_num(num_acc, lex_ident(list_tail(chars), c))
         else
             flush_num(num_acc, lex_char(c, list_tail(chars)))
         end
@@ -83,24 +111,20 @@ fn lex(src: String) -> List<Token>
     lex_rec(chars, "")
 end
 
-# ===== Parser: List<Token> -> Expr =====
-# 文法: Expr = Term (("+"|"-") Term)*   Term = Factor (("*"|"/") Factor)*
-#        Factor = Int | "(" Expr ")"
+# ===== Parser =====
 
 fn parse_factor(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     match list_head(tokens)
         TInt(n) => {expr: Num(n), rest: list_tail(tokens)}
+        TIdent(name) => {expr: Var(name), rest: list_tail(tokens)}
         TLParen => parse_factor_paren(tokens)
     end
 end
 
-# 括号: ( Expr ) —— 辅助函数避免 match arm 多行块
 fn parse_factor_paren(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     let r = parse_expr(list_tail(tokens))
     {expr: r.expr, rest: list_tail(r.rest)}
 end
-
-# === Term: Factor (("*"|"/") Factor)* ===
 
 fn parse_term_star(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     let r = parse_factor(list_tail(tokens))
@@ -129,8 +153,6 @@ fn parse_term(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     parse_term_rest(r.expr, r.rest)
 end
 
-# === Expr: Term (("+"|"-") Term)* ===
-
 fn parse_expr_plus(left: Expr, tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     let r = parse_term(list_tail(tokens))
     parse_expr_rest(Add(left, r.expr), r.rest)
@@ -158,30 +180,46 @@ fn parse_expr(tokens: List<Token>) -> {expr: Expr, rest: List<Token>}
     parse_expr_rest(r.expr, r.rest)
 end
 
-# ===== Evaluator: Expr -> Int =====
-fn eval(e: Expr) -> Int
+# ===== 环境查找 =====
+# env: List<(String, Int)>，线性查找（Lom 无 HashMap）
+
+fn env_lookup(env: List<(String, Int)>, name: String) -> Int
+    if list_is_empty(env)
+        0
+    else
+        let pair = list_head(env)
+        if pair.0 == name
+            pair.1
+        else
+            env_lookup(list_tail(env), name)
+        end
+    end
+end
+
+# ===== Evaluator =====
+fn eval(e: Expr, env: List<(String, Int)>) -> Int
     match e
         Num(n) => n
-        Add(a, b) => eval(a) + eval(b)
-        Sub(a, b) => eval(a) - eval(b)
-        Mul(a, b) => eval(a) * eval(b)
-        Div(a, b) => eval(a) / eval(b)
+        Var(name) => env_lookup(env, name)
+        Add(a, b) => eval(a, env) + eval(b, env)
+        Sub(a, b) => eval(a, env) - eval(b, env)
+        Mul(a, b) => eval(a, env) * eval(b, env)
+        Div(a, b) => eval(a, env) / eval(b, env)
     end
 end
 
 # ===== 主入口 =====
-fn run(src: String) -> Int
+fn run(src: String, env: List<(String, Int)>) -> Int
     let tokens = lex(src)
     let r = parse_expr(tokens)
-    eval(r.expr)
+    eval(r.expr, env)
 end
 
 fn main() -> Unit
-    println(run("3+4*2"))      # 11
-    println(run("10-3-2"))     # 5  (左结合)
-    println(run("20/4/2"))     # 2  (左结合除法)
-    println(run("100"))        # 100 (多字符数字)
-    println(run("(1+2)*3"))    # 9  (括号)
-    println(run("(10-3)*2"))   # 14
-    println(run("2*(3+4)-5"))  # 9
+    # 预定义环境: x=10, y=3
+    let env = list_cons(("x", 10), list_cons(("y", 3), list_empty()))
+    println(run("x+y", env))      # 13
+    println(run("x*y", env))      # 30
+    println(run("x-y", env))      # 7
+    println(run("x", env))         # 10
 end
