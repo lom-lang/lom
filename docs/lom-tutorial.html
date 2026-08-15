@@ -116,7 +116,7 @@
   <strong>目录</strong>
   <ol>
     <li><a href="#part1">第一部分:先建立心智模型</a>(编译器 vs 解释器 · 整体架构图)</li>
-    <li><a href="#part2">第二部分:逐模块拆解</a>(Lexer · AST · Parser · Interpreter · Typechecker · AI 工具链 · REPL · LSP)</li>
+    <li><a href="#part2">第二部分:逐模块拆解</a>(Lexer · AST · Parser · Interpreter · Typechecker · AI 工具链 · REPL · LSP · 包管理)</li>
     <li><a href="#part3">第三部分:为什么这样设计</a>(AI-native 论证线)</li>
     <li><a href="#part4">第四部分:面试攻防模拟</a>(高频问答)</li>
     <li><a href="#part5">第五部分:三个"防露馅"提示</a>(README 与代码的出入)</li>
@@ -189,7 +189,8 @@ Program (AST, src/ast.rs 定义结构)
         --apply   (apply.rs)  → lom-apply/v1  把高置信度修复真正写回源文件
         --history (fix_history.rs) → NDJSON 修复历史
         lom repl  (repl.rs)   → 交互式会话(Phase 4.2)
-        lom lsp   (lsp.rs)    → 编辑器集成(Phase 4.3,stdio JSON-RPC 2.0)</code></pre>
+        lom lsp   (lsp.rs)    → 编辑器集成(Phase 4.3,stdio JSON-RPC 2.0)
+        lom build (package.rs)→ 项目依赖解析(Phase 4.4,lom.toml + 本地路径依赖)</code></pre>
 
 <aside class="sn"><b>schema(模式)</b>:一份 JSON 数据的"格式合同",规定有哪些字段、各是什么类型。<code>lom-diag/v1</code> 里的 <code>/v1</code> 是版本号——将来格式升级成 v2 时,老消费者不会被 breaking change 打死。这是给 AI 工具对接用的工程惯例。</aside>
 
@@ -569,6 +570,55 @@ end</code></pre>
 <p>LSP 是让"编辑器变聪明"的通用协议。没有 LSP,你写 <code>.lom</code> 文件就像在记事本里写——没有提示、没有报错、没有跳转。有了 LSP,VS Code(或任何支持 LSP 的编辑器)启动 <code>lom lsp</code> 当后台服务,你在编辑器里看到的红色波浪线、悬停提示、自动补全,全是这个后台服务算出来推给编辑器的。</p>
 <p>有趣的是,LSP 复用的全是前面造好的轮子:诊断推送就是 <code>Diagnostics::from_parse_result</code> + <code>typechecker::check_program</code>,悬停就是读 <code>FnDecl.span</code> 定位再格式化签名。LSP 本身不引入新的语言分析能力,只做"协议翻译"——把 Lom 内部的诊断/签名翻译成编辑器能听懂的 JSON-RPC。</p></div>
 
+<h2 id="pkg-2-9">2.9 包管理:让 Lom 长出项目骨架(Phase 4.4,已完成)</h2>
+
+<aside class="sn"><b>清单文件(manifest)</b>:描述一个项目的元数据文件——项目叫什么、什么版本、依赖哪些其他包。Rust 用 <code>Cargo.toml</code>,Node 用 <code>package.json</code>,Lom 用 <code>lom.toml</code>。它放在项目根目录,是整个项目的"身份证"。</aside>
+
+<p>前面的章节讲的都是"单文件 Lom 程序"——一个 <code>.lom</code> 文件里写完所有函数。但真实项目会拆成多个文件、多个包,这时候就需要包管理:声明依赖、解析依赖、让 <code>from mathlib import { square }</code> 能找到 <code>mathlib</code> 包里的 <code>square</code> 函数。</p>
+
+<h3>lom.toml 清单格式</h3>
+
+<p>Lom 的清单文件用手写 TOML 解析器读(零依赖,不引入 toml crate),格式极简:</p>
+
+<pre><code># 项目根目录的 lom.toml
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+mathlib = { path = "mathlib" }</code></pre>
+
+<p>三个字段:<code>name</code>/<code>version</code> 是项目身份;<code>[dependencies]</code> 表里每行是一个依赖,键名是包名(必须和依赖包 <code>lom.toml</code> 里的 <code>name</code> 一致),值目前只支持 <code>{ path = "相对路径" }</code>(本地路径依赖,不联网拉包)。</p>
+
+<h3>依赖解析:DFS + 循环检测</h3>
+
+<p><code>resolve_dependencies()</code> 用深度优先搜索(DFS)递归遍历依赖树:读根项目的 <code>lom.toml</code> → 对每个依赖,跳进它的目录读它的 <code>lom.toml</code> → 再递归它的依赖……直到所有依赖都加载完。</p>
+
+<p>循环依赖(A 依赖 B,B 依赖 A)会让 DFS 无限递归,所以要用 <code>visiting</code> 集合记录"当前递归链上正在访问的包"——如果再次遇到,说明出现环,立即报 <code>CircularDep</code> 错误并给出环路径。</p>
+
+<h3>符号收集:顶层自动公开</h3>
+
+<p>Lom 的包管理做了一个简化决策:<strong>顶层 <code>fn</code> 和 <code>enum</code> 自动公开,不需要 <code>pub</code> 关键字</strong>。<code>collect_public_symbols()</code> 扫描包里所有 <code>.lom</code> 文件,把顶层 <code>FnDecl</code> 的函数名和顶层 <code>EnumDecl</code> 的枚举名收进 <code>public_symbols</code> 列表。</p>
+
+<p>这和 Rust 的 <code>pub fn</code> 显式公开不同——Rust 追求精确控制可见性,Lom 追求"零负担复用"。对 LLM 来说,少一个 <code>pub</code> 关键字就少一个遗忘点(LLM 写 Rust 常忘 <code>pub</code> 导致符号不可见)。</p>
+
+<h3>导入解析:process_import 的三级查找</h3>
+
+<p>当你写 <code>from mathlib import { square }</code>,解释器的 <code>process_import()</code> 按顺序查三个地方:</p>
+
+<ol>
+  <li><strong>标准库模块</strong>(<code>io</code>/<code>string</code>/<code>math</code>/<code>list</code>/<code>json</code>/<code>file</code>)——内置,无需声明依赖</li>
+  <li><strong>外部包</strong>——查 <code>self.packages</code> 里有没有这个包,有则校验 <code>square</code> 在它的 <code>public_symbols</code> 里(不在则 PKG006 "符号未导出")</li>
+  <li>都没有 → PKG005 "未知模块/包",错误信息列出所有标准库名提醒你</li>
+</ol>
+
+<h3>lom build 子命令</h3>
+
+<p><code>lom build</code> 不编译(树遍历解释器没有编译步骤),它做的是"依赖体检":读 <code>lom.toml</code> → 解析依赖图 → 对每个包的源码跑解析+类型检查,报告哪个文件通过、哪个文件有诊断。这是 CI 友好的:依赖坏了能立刻发现,不用等运行时才报错。</p>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>包管理就是给 Lom 长出"项目骨架"。之前你只能写单文件程序,现在可以拆成多个包、多个文件,像 Rust 的 cargo workspace 一样组织代码。<code>lom build</code> 相当于 <code>cargo check</code>——不跑代码,只检查依赖和类型对不对。</p>
+<p>设计上做了两个简化:① 只支持本地路径依赖(<code>path = "mathlib"</code>),不联网拉包(避免引入注册表/网络/版本锁的复杂度,留待将来);② 顶层符号自动公开(无 <code>pub</code> 关键字,降低 LLM 遗忘负担)。这两个简化让包管理在 16 个单测内完整跑通,零新依赖。</p></div>
+
 <hr>
 <!-- ============================================================ -->
 <h1 id="part3">第三部分:为什么这样设计(论证线)</h1>
@@ -635,14 +685,14 @@ end</code></pre>
 
 <ol>
   <li><strong>NAM003 拼写建议</strong>(README 说 <code>lom fix</code> 会给出 "Did you mean X?"):实际建议(Levenshtein ≤2,typechecker.rs:1391-1421)只写进诊断的 <code>hint</code> 字段,fix.rs 的 NAM003 分支没消费它(fix.rs:445-453)。</li>
-  <li><strong>REPL / LSP 均已合入</strong>:<code>lom repl</code>(Phase 4.2)和 <code>lom lsp</code>(Phase 4.3)都已在 main.rs 分派子命令并提交,可正常启动。</li>
-  <li><strong>版本号</strong>:Cargo.toml 停在 0.1.0,版本只活在提交信息里(v0.3.0)。</li>
+  <li><strong>Phase 4 工具链均已合入</strong>:<code>lom repl</code>(4.2)、<code>lom lsp</code>(4.3)、<code>lom build</code>(4.4 包管理)都已在 main.rs 分派子命令并提交,可正常启动。</li>
+  <li><strong>版本号</strong>:Cargo.toml 停在 0.1.0,版本只活在提交信息里(v0.3.1)。</li>
 </ol>
 
 <aside class="sn"><b>Levenshtein 距离(编辑距离)</b>:衡量两个字符串差几步的经典算法——每插入、删除、替换一个字符算一步。<code>printl</code> → <code>println</code> 距离是 1(插一个 n)。≤2 说明"很像",据此猜用户本来想写哪个名字。</aside>
 <aside class="sn"><b>WIP(Work In Progress)</b>:半成品、进行中。说"这是 WIP"是工程圈标准说法,表示功能在开发路上、尚未合入,不是 bug。</aside>
 
-<p>被问到这些,诚实回答"这是当前中间状态,下一步就是把 REPL 接线"完全没问题——项目当前就处在这样的未完成中间状态。</p>
+<p>被问到这些,诚实回答"这是当前中间状态,Phase 4 工具链已全部合入,下一步是 Phase 5 编译器自举"完全没问题——项目当前就处在这样的推进节点。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>这部分存在的意义:任何真实项目里,文档永远是"追赶代码"的,README 写着"已完成"的功能可能只完成了一半。面试中最大的失分点不是"不知道",而是<strong>把 README 当事实背诵、被追问时才发现与代码对不上</strong>。</p>
@@ -680,7 +730,9 @@ end</code></pre>
   <tr><td>REPL</td><td>读入-求值-打印循环,交互式试错环境</td><td>2.7</td></tr>
   <tr><td>退出码</td><td>进程结束状态码,0 成功非 0 失败</td><td>2.5</td></tr>
   <tr><td>prelude</td><td>免 import 直接可用的最小内置符号集</td><td>2.4</td></tr>
-  <tr><td>LSP</td><td>编辑器智能提示的标准协议,Phase 4.3 已用声明级 Span 实现基础版</td><td>2.2</td></tr>
+  <tr><td>LSP</td><td>编辑器智能提示的标准协议,Phase 4.3 已用声明级 Span 实现基础版</td><td>2.8</td></tr>
+  <tr><td>lom.toml</td><td>Lom 的项目清单文件,声明 name/version/dependencies,Phase 4.4 引入</td><td>2.9</td></tr>
+  <tr><td>manifest(清单)</td><td>描述项目元数据的文件,Rust 用 Cargo.toml,Lom 用 lom.toml</td><td>2.9</td></tr>
   <tr><td>JIT / MLIR</td><td>高性能编译路线的代表技术,Lom 明确不做</td><td>1.1</td></tr>
 </table>
 
@@ -694,6 +746,7 @@ end</code></pre>
   <li><code>src/interpreter.rs</code> 只看:Value 枚举、Scope、闭包两行核心代码、eval_call 分发;</li>
   <li><code>src/typechecker.rs</code> 只看:check 两遍主流程、check_call_effects;</li>
   <li><code>src/fix.rs</code> + <code>src/apply.rs</code>——差异化核心,重点读置信度分级和逆序应用;</li>
+  <li><code>src/repl.rs</code> + <code>src/lsp.rs</code> + <code>src/package.rs</code>——Phase 4 工具链,看多行判定/JSON-RPC/依赖图;</li>
   <li><code>DESIGN_RATIONALE.md</code>——最后读,把"为什么"串起来。</li>
 </ol>
 

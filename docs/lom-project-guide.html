@@ -877,8 +877,16 @@
         <li><span class="tag" style="background:#16a34a;">✅ Done 4.2</span> <code>lom repl</code> 子命令；<code>is_input_complete()</code> 多行完整性判定（括号深度 + 字符串状态 + 块关键字/end 配对；enum 单行声明无需 end）；<code>ReplSession</code> 上下文保持增量执行（<code>exec_item()</code> 注册 fn/enum/import，<code>exec_repl_block()</code> 在 globals 作用域执行 let/expr 使绑定持久）；特殊命令 <code>:q</code>/<code>:help</code>/<code>:reset</code>/<code>:show</code>；错误转为输出文本不崩溃；26 测试（v0.2.9，2026-08-08）</li>
       </ul>
     </li>
-    <li><strong>Phase 4.3 · 简单 LSP</strong>：LSP 协议基础实现，hover 显示类型信息、诊断推送（实时词法/语法/类型错误）、基础代码补全（作用域可见名称）。<span class="meta">语言标配</span></li>
-    <li><strong>Phase 4.4 · 包管理雏形</strong>：<code>lom.toml</code> 项目结构标准化、依赖管理（<code>from xxx import</code> 解析外部包）、包注册表雏形。<span class="meta">语言标配</span></li>
+    <li><strong>Phase 4.3 · 简单 LSP</strong>：LSP 协议基础实现，hover 显示类型信息、诊断推送（实时词法/语法/类型错误）、基础代码补全（作用域可见名称）。<span class="meta">语言标配</span>
+      <ul>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.3</span> <code>lom lsp</code> 子命令；stdio JSON-RPC 2.0（<code>Content-Length</code> 头 + JSON payload）；<code>handle_hover()</code> 基于 <code>FnDecl.span</code>/<code>EnumDecl.span</code> 定位返回函数/枚举签名；<code>handle_completion()</code> 返回函数+枚举变体+导入+内置变体（Ok/Err/Some/None）+关键字；<code>compute_diagnostics()</code> 复用 <code>Diagnostics::from_parse_result</code> + <code>typechecker::check_program</code>；处理 <code>initialize</code>/<code>initialized</code>/<code>shutdown</code>/<code>exit</code>/<code>didOpen</code>/<code>didChange</code>/<code>hover</code>/<code>completion</code>；19 测试（hover 4 + completion 5 + diagnostics 3 + JSON-RPC 7）（v0.3.0，2026-08-13）</li>
+      </ul>
+    </li>
+    <li><strong>Phase 4.4 · 包管理雏形</strong>：<code>lom.toml</code> 项目结构标准化、依赖管理（<code>from xxx import</code> 解析外部包）、包注册表雏形。<span class="meta">语言标配</span>
+      <ul>
+        <li><span class="tag" style="background:#16a34a;">✅ Done 4.4</span> <code>lom build</code> 子命令 + <code>lom.toml</code> 清单（<code>name</code>/<code>version</code>/<code>[dependencies]</code>）；本地路径依赖（<code>Dependency::Path</code>）；<code>resolve_dependencies()</code> DFS 递归解析 + 循环检测（<code>CircularDep</code>）；<code>collect_public_symbols()</code> 自动公开顶层 <code>fn</code>/<code>enum</code>；<code>process_import()</code> 解析外部包（PKG005 未知包 / PKG006 符号未导出）；运行时 <code>load_packages()</code> 注册包符号到解释器；16 单测（清单解析、循环检测、符号收集、路径解析）；示例 [examples/pkg_demo/](../examples/pkg_demo/) — <code>mathlib</code> 本地依赖（<code>square</code>/<code>cube</code>/<code>factorial</code>）（v0.3.1，2026-08-13）</li>
+      </ul>
+    </li>
   </ul>
   <h4>不做的项（明确排除）</h4>
   <ul>
