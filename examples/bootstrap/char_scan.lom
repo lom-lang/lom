@@ -1,0 +1,17 @@
+# 自举可行性验证 2：字符串逐字符扫描（lexer 基础）
+# split(s, "") 按字符分割成 List<String>，验证能否逐字符遍历
+
+from string import { split, contains }
+from list import { list_length, list_head, list_tail, list_is_empty }
+
+fn main() -> Unit
+    let chars = split("1+2*3", "")
+    println(list_length(chars))  # 期望 5（5 个字符）
+
+    # 遍历 List<String>，逐个打印
+    let mut cur = chars
+    while list_is_empty(cur) == False
+        println(list_head(cur))
+        cur = list_tail(cur)
+    end
+end

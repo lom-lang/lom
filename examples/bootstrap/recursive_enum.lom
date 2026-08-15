@@ -1,0 +1,24 @@
+# 自举可行性验证 1：递归 enum（AST 节点定义）
+# enum Expr = Num(Int) | Add(Expr, Expr) —— Add 字段引用 Expr 自身
+# 如果这个能跑通，说明 Lom 可以定义 AST 节点
+
+enum Expr
+    | Num(Int)
+    | Add(Expr, Expr)
+    | Mul(Expr, Expr)
+end
+
+# 递归求值：match 带字段的变体，递归调用自身
+fn eval(e: Expr) -> Int
+    match e
+        Num(n) => n
+        Add(a, b) => eval(a) + eval(b)
+        Mul(a, b) => eval(a) * eval(b)
+    end
+end
+
+fn main() -> Unit
+    # 构造 AST: (1 + 2) * (3 + 4) = 3 * 7 = 21
+    let ast = Mul(Add(Num(1), Num(2)), Add(Num(3), Num(4)))
+    println(eval(ast))
+end

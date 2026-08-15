@@ -905,11 +905,23 @@
 <div class="phase">
   <h3>阶段 5 · 生态与自举 <span class="tag">生产级</span></h3>
   <p><strong>目标</strong>：语言能"养活自己"。</p>
+  <div class="warn" style="background:#fef3c7;border-color:#f59e0b;">
+    <strong>自举可行性验证（2026-08-13）</strong>：已完成极简自举验证——用 Lom 自身实现了一个完整的算术表达式解释器（lexer + 递归下降 parser + evaluator），正确处理运算符优先级和左结合性（<code>"3+4*2"→11</code>、<code>"1+2*3+4"→11</code>）。验证结论：<strong>Lom 可以"养活自己"，递归 enum + match + split("") 逐字符扫描足够表达编译器核心三阶段</strong>。代码见 [examples/bootstrap/](../examples/bootstrap/)。
+    <br><br>
+    <strong>发现的语言缺口</strong>（自举扩展需解决）：
+    <ul>
+      <li>❌ <code>let (a,b) = ...</code> 元组解构不支持 → 当前用 record <code>{expr:..., rest:...}</code> 替代</li>
+      <li>❌ <code>not()</code> 布尔运算符缺失 → 当前用 <code>== False</code> 替代</li>
+      <li>⚠️ 无 char 类型 → <code>split(s,"")</code> 返回 <code>List&lt;String&gt;</code>，性能差但可行</li>
+      <li>⚠️ 无 HashMap/Set → 扩展到变量/函数定义时需补</li>
+      <li>⚠️ match arm 多行块语法不明 → 当前用辅助函数提取逻辑保持单表达式</li>
+    </ul>
+  </div>
   <h4>技术栈升级</h4>
-  <p>+ LLVM AOT 全优化 + WASM 后端（对标 MoonBit 分发策略）</p>
+  <p>+ LLVM AOT 全优化 + WASM 后端（对标 MoonBit 分发策略）<span class="meta">注：Phase 4 已放弃 MLIR/JIT 性能路径，LLVM/WASM 是否纳入待方向决策</span></p>
   <h4>新增</h4>
   <ul>
-    <li>自举（用 Lom 自身重写编译器，参考 pry-lang 三阶段自举流程）</li>
+    <li>自举（用 Lom 自身重写编译器，参考 pry-lang 三阶段自举流程）<span class="tag" style="background:#16a34a;color:white;">✅ 可行性已验证</span></li>
     <li>包注册中心</li>
     <li>调试器</li>
     <li>性能调优（profile-guided optimization）</li>

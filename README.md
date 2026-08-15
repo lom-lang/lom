@@ -46,7 +46,11 @@ LLM-coding-native first, workloads later. Built in Rust.
 
 282/282 Rust unit tests pass (266 prior + 16 new in Phase 4.4). 30 `.lom` examples (29 run + 1 `--check` diagnostic sample). `eval/` 100/100 reference solutions pass (`./eval/runner/run.ps1 -Verify`). **LLM generation pass-rate: 99%** (expert model + thinking mode, 2026-08-03).
 
-Phase 4 complete. All four sub-phases implemented: `lom fix` rule expansion + fix history (differentiation core) + REPL (interactive toolchain) + LSP (IDE integration) + package manager prototype (project structure + dependency resolution). Direction adjusted per 2026-08-07 retrospective — original "workload-native" (tensor/autodiff/MLIR) dropped: Mojo acquired by Qualcomm makes the AI-compute lane crowded; Lom focuses on `lom fix` differentiation (in-place repair, which MoonBit doesn't do). See [§2.5 retrospective](docs/lom-project-guide.html). Next: Phase 5 ecosystem & bootstrapping (compiler self-hosts).
+Phase 4 complete. All four sub-phases implemented: `lom fix` rule expansion + fix history (differentiation core) + REPL (interactive toolchain) + LSP (IDE integration) + package manager prototype (project structure + dependency resolution). Direction adjusted per 2026-08-07 retrospective — original "workload-native" (tensor/autodiff/MLIR) dropped: Mojo acquired by Qualcomm makes the AI-compute lane crowded; Lom focuses on `lom fix` differentiation (in-place repair, which MoonBit doesn't do). See [§2.5 retrospective](docs/lom-project-guide.html).
+
+**Phase 5 — Ecosystem & Bootstrapping** (in progress):
+
+- ✅ 5.0 Self-host feasibility verified ([examples/bootstrap/](examples/bootstrap/)) — mini interpreter written in Lom itself: `String → split("") → lex → List<Token> → recursive descent parse → AST → eval`. Correct operator precedence & left-associativity (`"3+4*2"→11`, `"1+2*3+4"→11`). Recursive enum (AST nodes) + match + `split(s,"")` char scan sufficient for compiler core 3 stages. Language gaps found: no tuple destructure (`let (a,b)=...`), no `not()`, no char type, no HashMap — see [Phase 5 notes](docs/lom-project-guide.html#2.7).
 
 See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full project guide (positioning, design philosophy, 7-phase roadmap, target LLM strategy, risk mitigation, repo governance).
 
