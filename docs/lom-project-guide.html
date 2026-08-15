@@ -913,8 +913,9 @@
       <li>❌ <code>let (a,b) = ...</code> 元组解构不支持 → 当前用 record <code>{expr:..., rest:...}</code> 替代</li>
       <li>❌ <code>not()</code> 布尔运算符缺失 → 当前用 <code>== False</code> 替代</li>
       <li>⚠️ 无 char 类型 → <code>split(s,"")</code> 返回 <code>List&lt;String&gt;</code>，性能差但可行</li>
-      <li>⚠️ 无 HashMap/Set → 扩展到变量/函数定义时需补</li>
+      <li>⚠️ 无 HashMap/Set → 环境查找用 <code>List&lt;(String,Int)&gt;</code> 线性查找替代，已验证可行</li>
       <li>⚠️ match arm 多行块语法不明 → 当前用辅助函数提取逻辑保持单表达式</li>
+      <li>🔴 <strong>树遍历解释器栈深度限制</strong>：非尾递归的 lexer/parser 在长字符串（~9+ 字符）时栈溢出（Rust 默认 1MB 栈被 <code>eval_expr</code> 深层递归耗尽）。这是自举的实际障碍——需要尾递归优化、迭代式 lexer、或增大线程栈。已验证短字符串（≤5 字符）逻辑完全正确。</li>
     </ul>
   </div>
   <h4>技术栈升级</h4>
