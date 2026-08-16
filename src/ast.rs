@@ -154,6 +154,12 @@ pub enum Stmt {
         ty: Option<Type>,
         value: Expr,
     },
+    /// Phase 5.1: 元组解构绑定 let (a, b, ...) = expr
+    /// value 必须求值为元组，数量须与 names 一致；不支持 mut 与类型注解
+    LetDestruct {
+        names: Vec<String>,
+        value: Expr,
+    },
     /// 赋值：name = expr（name 必须是已声明的 mut 变量）
     Assign { target: String, value: Expr },
     /// if/elif/else 块（作为语句；也可是表达式）

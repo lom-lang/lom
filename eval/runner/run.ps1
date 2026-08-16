@@ -93,7 +93,7 @@ Write-Host "Lom Eval Runner — mode: $mode"
 Write-Host ""
 
 foreach ($file in $taskFiles) {
-    $tasks = Get-Content $file.FullName -Raw | ConvertFrom-Json
+    $tasks = Get-Content $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
     $category = $file.BaseName -replace '^\d+_', ''
     if (-not $stats.byCategory.ContainsKey($category)) {
         $stats.byCategory[$category] = [ordered]@{ total = 0; passed = 0; failed = 0 }

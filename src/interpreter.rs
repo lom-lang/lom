@@ -581,6 +581,30 @@ impl Interpreter {
                 env.borrow_mut().define(name.clone(), v);
                 Ok(ControlFlow::Normal(Value::Unit))
             }
+            Stmt::LetDestruct { names, value } => {
+                // Phase 5.1: 元组解构绑定 let (a, b) = expr
+                let v = self.eval_expr(value, env.clone())?;
+                let elems = match v {
+                    Value::Tuple { elems } => elems,
+                    other => {
+                        return Err(RuntimeError::Msg(format!(
+                            "元组解构要求右侧是元组，得到 {:?}",
+                            other.type_name()
+                        )))
+                    }
+                };
+                if elems.len() != names.len() {
+                    return Err(RuntimeError::Msg(format!(
+                        "元组解构数量不匹配：模式含 {} 个名字，值含 {} 个元素",
+                        names.len(),
+                        elems.len()
+                    )));
+                }
+                for (name, elem) in names.iter().zip(elems.into_iter()) {
+                    env.borrow_mut().define(name.clone(), elem);
+                }
+                Ok(ControlFlow::Normal(Value::Unit))
+            }
             Stmt::Assign { target, value } => {
                 let v = self.eval_expr(value, env.clone())?;
                 if !env.borrow_mut().set_existing(target, v) {
@@ -2426,6 +2450,75 @@ end
 "#;
         let result = run_src(src);
         assert!(result.is_err(), "split 非 String 参数应报错");
+    }
+
+    // ===== Phase 5.1: let 元组解构测试 =====
+
+    #[test]
+    fn test_let_destructure_two() {
+        let src = r#"
+fn pair() -> (Int, Int)
+    (1, 2)
+end
+fn main() -> Unit
+    let (a, b) = (10, 20)
+    println(a + b)
+    let (x, y) = pair()
+    println(x * y)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_let_destructure_three() {
+        let src = r#"
+fn main() -> Unit
+    let (a, b, c) = (1, 2, 3)
+    println(a + b + c)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_let_destructure_nested_call() {
+        // 自举场景：解析函数返回 (结果, 剩余输入)
+        let src = r#"
+fn divmod(a: Int, b: Int) -> (Int, Int)
+    (a / b, a - a / b * b)
+end
+fn main() -> Unit
+    let (q, r) = divmod(17, 5)
+    println(q)
+    println(r)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_let_destructure_count_mismatch_errors() {
+        let src = r#"
+fn main() -> Unit
+    let (a, b) = (1, 2, 3)
+    println(a)
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "解构数量不匹配应报错");
+    }
+
+    #[test]
+    fn test_let_destructure_non_tuple_errors() {
+        let src = r#"
+fn main() -> Unit
+    let (a, b) = 42
+    println(a)
+end
+"#;
+        let result = run_src(src);
+        assert!(result.is_err(), "解构非元组值应报错");
     }
 
     // ===== Phase 3.4: file 模块测试 =====

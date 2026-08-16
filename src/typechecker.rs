@@ -461,6 +461,36 @@ impl TypeChecker {
                 };
                 env.define(name.clone(), final_ty);
             }
+            Stmt::LetDestruct { names, value } => {
+                // Phase 5.1: 元组解构绑定 let (a, b) = expr
+                let val_ty = self.check_expr(value, env);
+                match val_ty {
+                    TypeOrUnknown::Known(Type::Tuple(elem_tys)) => {
+                        if elem_tys.len() != names.len() {
+                            self.push_diag(
+                                Severity::Warning,
+                                "TYPE001".into(),
+                                format!(
+                                    "元组解构数量不匹配：模式含 {} 个名字，值含 {} 个元素",
+                                    names.len(),
+                                    elem_tys.len()
+                                ),
+                                0,
+                                0,
+                            );
+                        }
+                        for (name, ety) in names.iter().zip(elem_tys.iter()) {
+                            env.define(name.clone(), TypeOrUnknown::Known(ety.clone()));
+                        }
+                    }
+                    // 未知类型（动态值/函数调用返回）：绑 Unknown，运行时检查兜底
+                    _ => {
+                        for name in names {
+                            env.define(name.clone(), TypeOrUnknown::Unknown);
+                        }
+                    }
+                }
+            }
             Stmt::Assign { target, value } => {
                 let val_ty = self.check_expr(value, env);
                 if let Some(expected) = env.get(target) {

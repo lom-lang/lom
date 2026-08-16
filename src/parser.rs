@@ -670,6 +670,13 @@ impl Parser {
     fn parse_let(&mut self) -> Result<Stmt, ParseError> {
         self.advance(); // let
         let mutable = self.matches(&Token::Mut);
+        // Phase 5.1: let (a, b, ...) = expr 元组解构（不支持 mut 组合）
+        if self.check(&Token::LParen) {
+            if mutable {
+                return Err(self.err("元组解构不支持 mut（解构绑定不可变）".to_string()));
+            }
+            return self.parse_let_destruct();
+        }
         let name = self.parse_ident()?;
         let ty = if self.matches(&Token::Colon) {
             Some(self.parse_type()?)
@@ -684,6 +691,27 @@ impl Parser {
             ty,
             value,
         })
+    }
+
+    /// Phase 5.1: 解析 let (a, b, ...) = expr
+    /// 当前已消耗 let，下一个 token 是 LParen
+    fn parse_let_destruct(&mut self) -> Result<Stmt, ParseError> {
+        self.advance(); // (
+        let mut names = Vec::new();
+        loop {
+            names.push(self.parse_ident()?);
+            if !self.matches(&Token::Comma) {
+                break;
+            }
+            // 尾逗号容错: let (a, b,) = ...
+            if self.check(&Token::RParen) {
+                break;
+            }
+        }
+        self.expect(&Token::RParen, "')'")?;
+        self.expect(&Token::Assign, "'='")?;
+        let value = self.parse_expr()?;
+        Ok(Stmt::LetDestruct { names, value })
     }
 
     fn parse_if(&mut self) -> Result<IfStmt, ParseError> {
