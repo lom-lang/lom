@@ -1244,7 +1244,9 @@ impl TypeChecker {
     ) -> TypeOrUnknown {
         match op {
             BinOp::Add => {
-                // + 支持 Int+Int, Float+Float, String+String
+                // + 支持 Int+Int, Float+Float
+                // v0.4.1 P0-2: 任一侧是 String 即字符串拼接(另一侧运行时 to_display() 提升),
+                // 与解释器 eval_binary 的提升语义一致
                 match (lt, rt) {
                     (TypeOrUnknown::Known(Type::Int), TypeOrUnknown::Known(Type::Int)) => {
                         TypeOrUnknown::known(Type::Int)
@@ -1252,7 +1254,8 @@ impl TypeChecker {
                     (TypeOrUnknown::Known(Type::Float), TypeOrUnknown::Known(Type::Float)) => {
                         TypeOrUnknown::known(Type::Float)
                     }
-                    (TypeOrUnknown::Known(Type::String), TypeOrUnknown::Known(Type::String)) => {
+                    (TypeOrUnknown::Known(Type::String), TypeOrUnknown::Known(_))
+                    | (TypeOrUnknown::Known(_), TypeOrUnknown::Known(Type::String)) => {
                         TypeOrUnknown::known(Type::String)
                     }
                     (TypeOrUnknown::Known(a), TypeOrUnknown::Known(b)) => {
@@ -1903,8 +1906,18 @@ mod tests {
     }
 
     #[test]
-    fn int_plus_string_warns() {
+    fn int_plus_string_concat_no_warn() {
+        // v0.4.1 P0-2: 字符串拼接提升 —— 1 + "hello" 合法,结果为 String,不报 TYPE001
         let src = "fn f() -> Unit\n    let x = 1 + \"hello\"\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert_eq!(type_diags.len(), 0);
+    }
+
+    #[test]
+    fn int_plus_bool_still_warns() {
+        // 非 String 的不兼容组合仍然报警(1 + True 没有提升规则)
+        let src = "fn f() -> Unit\n    let x = 1 + True\nend\n";
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert!(!type_diags.is_empty());
@@ -1912,8 +1925,9 @@ mod tests {
 
     #[test]
     fn for_list_element_type_checked() {
-        // Phase 5.3 (v0.4.1): for x in List<Int> → x 按 Int 检查,x + "s" 应报 TYPE001
-        let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    for x in xs\n        let y = x + \"s\"\n    end\nend\n";
+        // Phase 5.3 (v0.4.1): for x in List<Int> → x 按 Int 检查,x - "s" 应报 TYPE001
+        // (注:不能用 x + "s" 当反面案例 —— v0.4.1 P0-2 字符串拼接提升使其合法)
+        let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    for x in xs\n        let y = x - \"s\"\n    end\nend\n";
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert!(!type_diags.is_empty());

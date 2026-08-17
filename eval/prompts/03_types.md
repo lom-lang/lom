@@ -277,6 +277,10 @@ end
 
 写函数 grade(score: Int) -> String：score >= 90 返回 "A"，80-89 返回 "B"，70-79 返回 "C"，60-69 返回 "D"，<60 返回 "F"。用 if/elif/else 链。main 调用 println(grade(95))、println(grade(85))、println(grade(75))、println(grade(65))、println(grade(55))。
 
+### Task 102
+
+写函数 describe(name: String, score: Int) -> String 返回 name + " scored " + score(直接用 + 拼接字符串和整数)。main 调用 println(describe("Alice", 95)) 和 println("1 + 1 = " + (1 + 1))。
+
 
 ---
 

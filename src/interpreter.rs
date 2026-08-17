@@ -1070,9 +1070,18 @@ impl Interpreter {
     /// 二元运算
     fn eval_binary(&self, op: &BinOp, l: Value, r: Value) -> Result<Value, RuntimeError> {
         // 字符串拼接：+ 重载
+        // v0.4.1 P0-2：任一侧是 String 即可拼接，另一侧用 to_display() 提升
+        // （消除 "n = " + 42 这类 LLM 自然写法被拒的缺口，对齐 Python/JS 习惯）
         if matches!(op, BinOp::Add) {
-            if let (Value::Str(a), Value::Str(b)) = (&l, &r) {
+            if let Value::Str(a) = &l {
+                let b = match &r {
+                    Value::Str(b) => b.clone(),
+                    other => other.to_display(),
+                };
                 return Ok(Value::Str(format!("{}{}", a, b)));
+            }
+            if let Value::Str(b) = &r {
+                return Ok(Value::Str(format!("{}{}", l.to_display(), b)));
             }
         }
         match op {
@@ -1748,6 +1757,33 @@ end
         let src = r#"fn main() -> Unit
     let s = "Hello" + ", " + "World"
     println(s)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_concat_promotion() {
+        // v0.4.1 P0-2: String + 非 String → 另一侧 to_display() 提升
+        let src = r#"fn main() -> Unit
+    println("n = " + 42)
+    println("pi ≈ " + 3.14)
+    println("flag = " + True)
+    println(42 + " is the answer")
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_string_concat_promotion_list_record() {
+        // 复合类型也能提升:List/Record 走 to_display 的调试格式
+        let src = r#"from list import {list_cons, list_empty}
+
+fn main() -> Unit
+    let xs = list_cons(1, list_cons(2, list_empty()))
+    println("xs = " + xs)
+    println("p = " + {x: 3, y: 4})
 end
 "#;
         run_src(src).unwrap();
