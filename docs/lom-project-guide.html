@@ -910,9 +910,12 @@
     <br><br>
     <strong>Phase 5.2 语句层自举（2026-08-17）</strong>：<a href="../examples/bootstrap/stmt_interp.lom">stmt_interp.lom</a> 在表达式解释器之上新增 Stmt 层（<code>SLet</code>/<code>SExpr</code>/<code>SIf</code>），支持 let 绑定、if/else 语句、块与比较运算；环境用函数式风格管理（<code>List&lt;(String,Int)&gt;</code> + cons 头插实现遮蔽）。两段测试程序输出正确（<code>11</code>、<code>10</code>），全程使用 Phase 5.1 元组解构（parser 状态传递 <code>(Expr, List&lt;Token&gt;)</code>、环境解包 <code>let (name, v) = ...</code>）。
     <br><br>
+    <strong>Phase 5.3 for 遍历 List（2026-08-18，v0.4.1 P0-1）</strong>：<code>for x in xs</code> 支持迭代 <code>List&lt;T&gt;</code>（此前仅 String/Int，迭代 List 报 <code>RUNTIME000</code>）。interpreter 增加 <code>Value::List</code> 迭代分支（逐元素绑定、<code>return</code> 穿透循环），typechecker 同步推导元素类型（<code>List&lt;T&gt;</code> → x: T）。4 个新测试（291/291 通过），eval 新增任务 101（101/101 通过，control_flow 类 11/11）。动机：P0 刚需缺口三件套之一——自举代码与 LLM 自然写法均高频需要列表迭代，此前只能用 <code>list_get(xs, i)</code> 绕。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
-      <li>✅ <code>let (a,b) = ...</code> 元组解构 → <strong>Phase 5.1 已补</strong>（<code>Stmt::LetDestruct</code> + parser/interpreter/typechecker 全链路 + 5 测试）。动机：这是自举时发现的头号"LLM 自然会写但语言拒绝"模式（PARSE001 期望标识符，得到 LParen），补掉后 mini_interp 用自然的 <code>(Expr, List<Token>)</code> 元组返回重写，无需 record workaround。</li>
+      <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
+      <li>✅ <code>let (a,b) = ...</code> 元组解构 → <strong>Phase 5.1 已补</strong>（<code>Stmt::LetDestruct</code> + parser/interpreter/typechecker 全链路 + 5 测试）。动机：这是自举时发现的头号"LLM 自然会写但语言拒绝"模式（PARSE001 期望标识符，得到 LParen），补掉后 mini_interp 用自然的 <code>(Expr, List&lt;Token&gt;)</code> 元组返回重写，无需 record workaround。</li>
       <li>✅ <code>not()</code> 布尔非 → <strong>误判，非缺口</strong>：<code>!expr</code> 前缀运算符（<code>UnaryOp::Not</code>）本来就支持，只是函数式写法 <code>not(...)</code> 不存在</li>
       <li>✅ match arm 多行块 → <strong>误判，非缺口</strong>：Form B（<code>=&gt;</code> 后换行块）本来就支持，每个 arm 块需自己的 <code>end</code> + match 整体一个 <code>end</code></li>
       <li>✅ 树遍历解释器栈深度限制 → <strong>已缓解</strong>：main 在 256MB 栈线程中运行解释器（Rust 默认 1MB 被深层递归耗尽）</li>

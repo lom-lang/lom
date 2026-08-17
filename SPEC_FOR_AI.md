@@ -104,6 +104,12 @@ for i in 10
     println(i)      # prints 0 through 9
 end
 ```
+- Phase 5.3 (v0.4.1): also iterates `List<T>` (element binding, in order):
+```
+for x in xs
+    println(x)      # x is each element of xs
+end
+```
 
 ---
 

@@ -334,7 +334,7 @@ end
 
 - `if`/`elif`/`else` are expressions (each branch is a block with a value).
 - `while` and `for` evaluate to `Unit`.
-- `for x in collection` iterates. In Phase 1, `collection` must be a `String` (char iteration) or a range `a..b` (TODO: range syntax).
+- `for x in collection` iterates. In Phase 1, `collection` must be a `String` (char iteration) or a range `a..b` (TODO: range syntax). Since Phase 5.3 (v0.4.1), `collection` may also be a `List<T>`, binding each element in order.
 
 ### 5.4 Scope
 

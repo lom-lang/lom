@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-17（Phase 5.2 完成，commit `72cf256`）
+> 最后更新：2026-08-18（Phase 5.3 完成，for 遍历 List，v0.4.1 P0-1）
 
 ---
 
@@ -31,12 +31,12 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **287/287 通过** |
-| eval 评测集 | **100/100 参考解通过** |
+| Rust 测试 | **291/291 通过** |
+| eval 评测集 | **101/101 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp） |
-| 当前进度 | Phase 5.2 完成（语句层自举解释器） |
-| 下一步 | P0 缺口三件套（见 §6） |
+| 当前进度 | Phase 5.3 完成（for 遍历 List，v0.4.1 P0-1） |
+| 下一步 | P0 缺口剩余两件（见 §6） |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -150,9 +150,9 @@ end
 
 `List<Stmt>` ✅，`List[Stmt]` ❌。报错信息是"期望 '>' (闭合泛型参数)，得到 RBracket"。
 
-### 4.4 for 循环当前只支持迭代 String 和 Int
+### 4.4 for 循环支持迭代 String / Int / List
 
-`for x in xs`（xs 是 List）会报 `RUNTIME000 for 循环不支持迭代 List` —— 这是已确认的 P0 缺口（见 §6），不是 bug。当前 workaround：`for i in list_length(xs)` + `list_get(xs, i)`。
+`for x in xs`（xs 是 List）自 v0.4.1（Phase 5.3）起支持，逐元素绑定、`return` 可穿透循环；typechecker 会把 `List<T>` 的元素类型推导给循环变量。String 逐字符、Int 迭代 `0..n` 的语义不变。
 
 ### 4.5 其他已实测确认的缺口（LLM 自然写法会被拒）
 
@@ -188,11 +188,11 @@ end
 
 ---
 
-## 6. 已排期的下一步：P0 刚需缺口三件套（v0.4.1 计划）
+## 6. 已排期的下一步：P0 刚需缺口（v0.4.1 计划）
 
 2026-08-17 实测确认的缺口清单，按优先级（完整版含 P1/P2 见对话记录，核心是这三个）：
 
-1. **for 遍历 List**：interpreter.rs `Stmt::For` 加 `Value::List` 分支（现在只有 Str/Int）。成本最低收益最高。
+1. ✅ **for 遍历 List**（2026-08-18 完成）：interpreter.rs `Stmt::For` 已加 `Value::List` 分支；typechecker 推导元素类型；4 个新测试 + eval 任务 101。
 2. **字符串拼接提升**：`Add` 的 String 分支对非 String 操作数做 `to_display()` 提升（typechecker.rs 同步放宽）。
 3. **复合赋值 `+=` `-=` `*=` `/=`**：lexer 加 token + parser + interpreter + typechecker 四处。注意现在 `+=` 被切成 `+` `=` 导致报错信息误导。
 
@@ -233,7 +233,7 @@ P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举�
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 287/287
+2. `cargo build --release && cargo test --release` 确认 291/291
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

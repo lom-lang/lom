@@ -619,6 +619,23 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>包管理就是给 Lom 长出"项目骨架"。之前你只能写单文件程序,现在可以拆成多个包、多个文件,像 Rust 的 cargo workspace 一样组织代码。<code>lom build</code> 相当于 <code>cargo check</code>——不跑代码,只检查依赖和类型对不对。</p>
 <p>设计上做了两个简化:① 只支持本地路径依赖(<code>path = "mathlib"</code>),不联网拉包(避免引入注册表/网络/版本锁的复杂度,留待将来);② 顶层符号自动公开(无 <code>pub</code> 关键字,降低 LLM 遗忘负担)。这两个简化让包管理在 16 个单测内完整跑通,零新依赖。</p></div>
 
+<h2 id="selfhost-2-10">2.10 自举与新语法缺口(Phase 5,进行中)</h2>
+
+<aside class="sn"><b>自举(self-hosting / bootstrapping)</b>:语言的"成年礼"——用 Lom 语言本身写出 Lom 的解释器/编译器,并且它能正确处理 Lom 代码。鸡生蛋、蛋生鸡:第一版解释器用 Rust 写(种子),之后语言就可以"养活自己"。</aside>
+
+<p>Phase 5 的目标是<strong>自举</strong>:证明 Lom 强大到能写出自己的解释器。目前的进展(<code>examples/bootstrap/</code>):</p>
+
+<ul>
+  <li><strong>5.0 可行性验证</strong>:用 Lom 写了一个迷你解释器(<code>mini_interp.lom</code>)——逐字符扫描切 token、递归下降解析、求值,正确处理运算符优先级。结论:递归 enum + match + 字符串逐字符扫描,足够表达编译器核心三阶段;</li>
+  <li><strong>5.1 元组解构</strong>:自举时发现的"头号缺口"——LLM 自然写 <code>let (a, b) = ...</code> 但语言拒绝,于是补上了(AST/parser/解释器/类型检查全链路);</li>
+  <li><strong>5.2 语句层自举</strong>:<code>stmt_interp.lom</code> 在表达式之上加了 let/if/块,环境用函数式链表管理;</li>
+  <li><strong>5.3 for 遍历 List(v0.4.1)</strong>:<code>for x in xs</code> 支持列表——此前只能遍历 String(逐字符)和 Int(0..n),遍历 List 会报 RUNTIME000。解释器加了 <code>Value::List</code> 分支,类型检查器同步推导元素类型(<code>List&lt;Int&gt;</code> 的元素就是 Int)。</li>
+</ul>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>Phase 5 的玩法像"让刚学会做饭的人给自己做一顿饭"——不是为了吃饱,是为了证明厨艺真的学会了。用 Lom 写 Lom 解释器的过程中,每发现一个"写不了"的地方,就是语言的一个真实缺口;补掉它(5.1 元组解构、5.3 for 遍历 List 都是这样来的),语言就长大一点。</p>
+<p>这叫<strong>狗食法(dogfooding)</strong>:自己用自己的产品,需求全来自真实踩坑,而不是坐在屋里想。5.3 的修法本身很简单——for 循环原来只认两种可迭代的东西(字符串、整数),现在多认一种(列表),像检票口原来只认身份证和护照,现在加认学生证。</p></div>
+
 <hr>
 <!-- ============================================================ -->
 <h1 id="part3">第三部分:为什么这样设计(论证线)</h1>
@@ -686,7 +703,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <ol>
   <li><strong>NAM003 拼写建议</strong>(README 说 <code>lom fix</code> 会给出 "Did you mean X?"):实际建议(Levenshtein ≤2,typechecker.rs:1391-1421)只写进诊断的 <code>hint</code> 字段,fix.rs 的 NAM003 分支没消费它(fix.rs:445-453)。</li>
   <li><strong>Phase 4 工具链均已合入</strong>:<code>lom repl</code>(4.2)、<code>lom lsp</code>(4.3)、<code>lom build</code>(4.4 包管理)都已在 main.rs 分派子命令并提交,可正常启动。</li>
-  <li><strong>版本号</strong>:Cargo.toml 停在 0.1.0,版本只活在提交信息里(v0.3.1)。</li>
+  <li><strong>版本号</strong>:Cargo.toml 停在 0.1.0,版本只活在提交信息里(v0.4.1)。</li>
 </ol>
 
 <aside class="sn"><b>Levenshtein 距离(编辑距离)</b>:衡量两个字符串差几步的经典算法——每插入、删除、替换一个字符算一步。<code>printl</code> → <code>println</code> 距离是 1(插一个 n)。≤2 说明"很像",据此猜用户本来想写哪个名字。</aside>
