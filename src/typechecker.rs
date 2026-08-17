@@ -557,9 +557,15 @@ impl TypeChecker {
             Stmt::For { var, iter, body } => {
                 let iter_ty = self.check_expr(iter, env);
                 // for x in String -> x: String; for x in Int -> x: Int (0..n)
+                // for x in List<T> -> x: T（Phase 5.3 / v0.4.1 P0 缺口）
                 let elem_ty = match &iter_ty {
                     TypeOrUnknown::Known(Type::String) => TypeOrUnknown::known(Type::String),
                     TypeOrUnknown::Known(Type::Int) => TypeOrUnknown::known(Type::Int),
+                    TypeOrUnknown::Known(Type::Generic(name, args))
+                        if name == "List" && args.len() == 1 =>
+                    {
+                        TypeOrUnknown::known(args[0].clone())
+                    }
                     _ => TypeOrUnknown::unknown(),
                 };
                 env.define(var.clone(), elem_ty);
@@ -1902,6 +1908,24 @@ mod tests {
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert!(!type_diags.is_empty());
+    }
+
+    #[test]
+    fn for_list_element_type_checked() {
+        // Phase 5.3 (v0.4.1): for x in List<Int> → x 按 Int 检查,x + "s" 应报 TYPE001
+        let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    for x in xs\n        let y = x + \"s\"\n    end\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert!(!type_diags.is_empty());
+    }
+
+    #[test]
+    fn for_list_element_type_ok() {
+        // for x in List<Int> → x + 1 合法,不应报 TYPE001
+        let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    let mut sum = 0\n    for x in xs\n        sum = sum + x\n    end\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert_eq!(type_diags.len(), 0);
     }
 
     #[test]

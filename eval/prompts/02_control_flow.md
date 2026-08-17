@@ -277,6 +277,10 @@ end
 
 写函数 early_return_sum_first_even(a: Int, b: Int, c: Int) -> Int 遍历 [a, b, c]，用 return 提前返回第一个偶数；若全为奇数返回 -1。提示：用 if n % 2 == 0 判偶数。main 调用 println(early_return_sum_first_even(1, 3, 5))、println(early_return_sum_first_even(1, 4, 7))、println(early_return_sum_first_even(8, 3, 5))。
 
+### Task 101
+
+写函数 sum_list(xs: List<Int>) -> Int：用 for x in xs 遍历列表求和。main 用 list_cons(1, list_cons(2, list_cons(3, list_cons(4, list_empty())))) 构造列表 [1,2,3,4] 并 println(sum_list(xs))。需要 from list import {list_cons, list_empty}。
+
 
 ---
 

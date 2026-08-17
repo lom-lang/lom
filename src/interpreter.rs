@@ -667,6 +667,18 @@ impl Interpreter {
                             }
                         }
                     }
+                    Value::List { elems } => {
+                        // 列表迭代：逐个元素绑定（Phase 5.3 / v0.4.1 P0 缺口）
+                        // Value::List 不可变，迭代期间元素不会被修改，直接按序取出即可
+                        for elem in elems {
+                            let block_env = Scope::new(Some(env.clone()));
+                            block_env.borrow_mut().define(var.clone(), elem);
+                            match self.exec_block(body, block_env)? {
+                                ControlFlow::Return(v) => return Ok(ControlFlow::Return(v)),
+                                ControlFlow::Normal(_) => {}
+                            }
+                        }
+                    }
                     _ => {
                         return Err(RuntimeError::Msg(format!(
                             "for 循环不支持迭代 {}",
@@ -1777,6 +1789,47 @@ fn main() -> Unit
     for c in "abc"
         println(c)
     end
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_for_list() {
+        // Phase 5.3 (v0.4.1): for 遍历 List —— 元素按序绑定求和 1+2+3=6
+        let src = r#"
+from list import {list_cons, list_empty}
+
+fn main() -> Unit
+    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    let mut sum = 0
+    for x in xs
+        sum = sum + x
+    end
+    println(sum)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_for_list_return_propagates() {
+        // for 遍历 List 时 return 正确穿透循环提前返回
+        let src = r#"
+from list import {list_cons, list_empty}
+
+fn find_first_gt2() -> Int
+    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    for x in xs
+        if x > 2
+            return x
+        end
+    end
+    0
+end
+
+fn main() -> Unit
+    println(find_first_gt2())
 end
 "#;
         run_src(src).unwrap();
