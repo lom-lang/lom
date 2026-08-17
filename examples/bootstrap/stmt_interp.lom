@@ -1,0 +1,370 @@
+# 自举验证 5：带语句层的解释器（Phase 5.2）
+# 源语言支持：let 绑定、if/else 语句、块、比较运算、四则运算、变量
+# 在表达式解释器（mini_interp.lom）之上加 Stmt 层：
+#   SLet(name, expr)      let name = expr
+#   SExpr(expr)           裸表达式（求值并打印）
+#   SIf(cond, then, else) if cond ... else ... end
+# 环境扩展用函数式风格：exec_stmt 返回新环境（cons 头插，新绑定遮蔽旧绑定）
+# 全程使用 Phase 5.1 的 let 元组解构
+
+from string import { split, string_to_int, contains, len }
+from list import { list_empty, list_cons, list_head, list_tail, list_is_empty }
+
+# ===== Token =====
+enum Token
+    | TInt(Int)
+    | TIdent(String)
+    | TPlus
+    | TMinus
+    | TStar
+    | TSlash
+    | TLParen
+    | TRParen
+    | TLet
+    | TIf
+    | TElse
+    | TEnd
+    | TGt
+end
+
+# ===== AST =====
+enum Expr
+    | Num(Int)
+    | Var(String)
+    | Add(Expr, Expr)
+    | Sub(Expr, Expr)
+    | Mul(Expr, Expr)
+    | Div(Expr, Expr)
+    | Gt(Expr, Expr)
+end
+
+enum Stmt
+    | SLet(String, Expr)
+    | SExpr(Expr)
+    | SIf(Expr, List<Stmt>, List<Stmt>)
+end
+
+# ===== Lexer =====
+
+fn is_digit(c: String) -> Bool
+    contains("0123456789", c)
+end
+
+fn is_alpha(c: String) -> Bool
+    contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", c)
+end
+
+fn is_alnum(c: String) -> Bool
+    if is_alpha(c)
+        True
+    elif is_digit(c)
+        True
+    else
+        False
+    end
+end
+
+# 关键字识别：let/if/else/end 是保留字，其余为标识符
+fn keyword_or_ident(s: String) -> Token
+    if s == "let"
+        TLet
+    elif s == "if"
+        TIf
+    elif s == "else"
+        TElse
+    elif s == "end"
+        TEnd
+    else
+        TIdent(s)
+    end
+end
+
+fn flush_num(acc: String, rest: List<Token>) -> List<Token>
+    if len(acc) == 0
+        rest
+    else
+        list_cons(TInt(string_to_int(acc)), rest)
+    end
+end
+
+fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
+    if c == " "
+        lex_rec(rest_chars, "")
+    elif c == "\n"
+        lex_rec(rest_chars, "")
+    elif c == "+"
+        list_cons(TPlus, lex_rec(rest_chars, ""))
+    elif c == "-"
+        list_cons(TMinus, lex_rec(rest_chars, ""))
+    elif c == "*"
+        list_cons(TStar, lex_rec(rest_chars, ""))
+    elif c == "/"
+        list_cons(TSlash, lex_rec(rest_chars, ""))
+    elif c == ">"
+        list_cons(TGt, lex_rec(rest_chars, ""))
+    elif c == "("
+        list_cons(TLParen, lex_rec(rest_chars, ""))
+    elif c == ")"
+        list_cons(TRParen, lex_rec(rest_chars, ""))
+    else
+        lex_rec(rest_chars, "")
+    end
+end
+
+fn lex_ident(chars: List<String>, acc: String) -> List<Token>
+    if list_is_empty(chars)
+        list_cons(keyword_or_ident(acc), list_empty())
+    else
+        let c = list_head(chars)
+        if is_alnum(c)
+            lex_ident(list_tail(chars), acc + c)
+        else
+            list_cons(keyword_or_ident(acc), lex_char(c, list_tail(chars)))
+        end
+    end
+end
+
+fn lex_rec(chars: List<String>, num_acc: String) -> List<Token>
+    if list_is_empty(chars)
+        flush_num(num_acc, list_empty())
+    else
+        let c = list_head(chars)
+        if is_digit(c)
+            lex_rec(list_tail(chars), num_acc + c)
+        elif is_alpha(c)
+            flush_num(num_acc, lex_ident(list_tail(chars), c))
+        else
+            flush_num(num_acc, lex_char(c, list_tail(chars)))
+        end
+    end
+end
+
+fn lex(src: String) -> List<Token>
+    let chars = split(src, "")
+    lex_rec(chars, "")
+end
+
+# ===== Expr Parser =====
+# 文法: Expr = Term (("+"|"-"|">") Term)*   Term = Factor (("*"|"/") Factor)*
+#        Factor = Int | Ident | "(" Expr ")"
+# （比较运算与加减同级左结合——测试程序不混用，够用）
+
+fn parse_factor(tokens: List<Token>) -> (Expr, List<Token>)
+    match list_head(tokens)
+        TInt(n) => (Num(n), list_tail(tokens))
+        TIdent(name) => (Var(name), list_tail(tokens))
+        TLParen =>
+            let (e, rest) = parse_expr(list_tail(tokens))
+            (e, list_tail(rest))
+        end
+    end
+end
+
+fn parse_term_star(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    let (r, rest) = parse_factor(list_tail(tokens))
+    parse_term_rest(Mul(left, r), rest)
+end
+
+fn parse_term_slash(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    let (r, rest) = parse_factor(list_tail(tokens))
+    parse_term_rest(Div(left, r), rest)
+end
+
+fn parse_term_rest(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    if list_is_empty(tokens)
+        (left, tokens)
+    else
+        match list_head(tokens)
+            TStar => parse_term_star(left, tokens)
+            TSlash => parse_term_slash(left, tokens)
+            _ => (left, tokens)
+        end
+    end
+end
+
+fn parse_term(tokens: List<Token>) -> (Expr, List<Token>)
+    let (left, rest) = parse_factor(tokens)
+    parse_term_rest(left, rest)
+end
+
+fn parse_expr_plus(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(Add(left, r), rest)
+end
+
+fn parse_expr_minus(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(Sub(left, r), rest)
+end
+
+fn parse_expr_gt(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(Gt(left, r), rest)
+end
+
+fn parse_expr_rest(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    if list_is_empty(tokens)
+        (left, tokens)
+    else
+        match list_head(tokens)
+            TPlus => parse_expr_plus(left, tokens)
+            TMinus => parse_expr_minus(left, tokens)
+            TGt => parse_expr_gt(left, tokens)
+            _ => (left, tokens)
+        end
+    end
+end
+
+fn parse_expr(tokens: List<Token>) -> (Expr, List<Token>)
+    let (left, rest) = parse_term(tokens)
+    parse_expr_rest(left, rest)
+end
+
+# ===== Stmt Parser =====
+
+# 从 TIdent token 提取名字（防御性：非 TIdent 返回空串）
+fn ident_of(t: Token) -> String
+    match t
+        TIdent(s) => s
+        _ => ""
+    end
+end
+
+# let name = expr
+fn parse_stmt_let(tokens: List<Token>) -> (Stmt, List<Token>)
+    # tokens: TLet TIdent(name) = expr ...
+    let name = ident_of(list_head(list_tail(tokens)))
+    let (e, rest) = parse_expr(list_tail(list_tail(tokens)))
+    (SLet(name, e), rest)
+end
+
+# 块: 语句序列直到 TEnd（消耗之）或 TElse（不消耗，留给上层处理）
+fn parse_block(tokens: List<Token>) -> (List<Stmt>, List<Token>)
+    match list_head(tokens)
+        TEnd => (list_empty(), list_tail(tokens))
+        TElse => (list_empty(), tokens)
+        _ =>
+            let (stmt, rest) = parse_stmt(tokens)
+            let (block, rest2) = parse_block(rest)
+            (list_cons(stmt, block), rest2)
+        end
+    end
+end
+
+# if cond
+#     then-block
+# else
+#     else-block
+# end
+fn parse_if(tokens: List<Token>) -> (Stmt, List<Token>)
+    # tokens: TIf cond ...
+    let (cond, rest) = parse_expr(list_tail(tokens))
+    let (then_block, rest2) = parse_block(rest)
+    match list_head(rest2)
+        TElse =>
+            let (else_block, rest3) = parse_block(list_tail(rest2))
+            (SIf(cond, then_block, else_block), rest3)
+        end
+        TEnd => (SIf(cond, then_block, list_empty()), list_tail(rest2))
+    end
+end
+
+fn parse_stmt(tokens: List<Token>) -> (Stmt, List<Token>)
+    match list_head(tokens)
+        TLet => parse_stmt_let(tokens)
+        TIf => parse_if(tokens)
+        _ =>
+            let (e, rest) = parse_expr(tokens)
+            (SExpr(e), rest)
+        end
+    end
+end
+
+fn parse_program(tokens: List<Token>) -> List<Stmt>
+    if list_is_empty(tokens)
+        list_empty()
+    else
+        let (stmt, rest) = parse_stmt(tokens)
+        list_cons(stmt, parse_program(rest))
+    end
+end
+
+# ===== Evaluator =====
+
+fn env_lookup(env: List<(String, Int)>, name: String) -> Int
+    if list_is_empty(env)
+        0
+    else
+        let pair = list_head(env)
+        if pair.0 == name
+            pair.1
+        else
+            env_lookup(list_tail(env), name)
+        end
+    end
+end
+
+fn eval(e: Expr, env: List<(String, Int)>) -> Int
+    match e
+        Num(n) => n
+        Var(name) => env_lookup(env, name)
+        Add(a, b) => eval(a, env) + eval(b, env)
+        Sub(a, b) => eval(a, env) - eval(b, env)
+        Mul(a, b) => eval(a, env) * eval(b, env)
+        Div(a, b) => eval(a, env) / eval(b, env)
+        Gt(a, b) =>
+            if eval(a, env) > eval(b, env)
+                1
+            else
+                0
+            end
+        end
+    end
+end
+
+# 执行语句，返回扩展后的环境（let 绑定 cons 头插——新绑定遮蔽旧绑定）
+fn exec_stmt(s: Stmt, env: List<(String, Int)>) -> List<(String, Int)>
+    match s
+        SLet(name, e) =>
+            let v = eval(e, env)
+            list_cons((name, v), env)
+        end
+        SExpr(e) =>
+            println(eval(e, env))
+            env
+        end
+        SIf(c, then_block, else_block) =>
+            if eval(c, env) == 1
+                exec_stmts(then_block, env)
+            else
+                exec_stmts(else_block, env)
+            end
+        end
+    end
+end
+
+fn exec_stmts(stmts: List<Stmt>, env: List<(String, Int)>) -> List<(String, Int)>
+    if list_is_empty(stmts)
+        env
+    else
+        exec_stmts(list_tail(stmts), exec_stmt(list_head(stmts), env))
+    end
+end
+
+# ===== 主入口 =====
+
+fn run_program(src: String) -> Unit
+    let tokens = lex(src)
+    let program = parse_program(tokens)
+    exec_stmts(program, list_empty())
+end
+
+fn main() -> Unit
+    # 程序 1：let 绑定 + 表达式求值
+    # let x = 3 / let y = 4 / x + y * 2   ->  11
+    run_program("let x = 3\nlet y = 4\nx + y * 2")
+
+    # 程序 2：if/else 语句 + 块 + 比较运算
+    # let a = 5 / if a > 3 / let b = a * 2 / b / else / 0 / end   ->  10
+    run_program("let a = 5\nif a > 3\nlet b = a * 2\nb\nelse\n0\nend")
+end

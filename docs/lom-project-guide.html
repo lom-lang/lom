@@ -908,6 +908,8 @@
   <div class="warn" style="background:#fef3c7;border-color:#f59e0b;">
     <strong>自举可行性验证（2026-08-13）</strong>：已完成极简自举验证——用 Lom 自身实现了一个完整的算术表达式解释器（lexer + 递归下降 parser + evaluator），正确处理运算符优先级和左结合性（<code>"3+4*2"→11</code>、<code>"1+2*3+4"→11</code>）。验证结论：<strong>Lom 可以"养活自己"，递归 enum + match + split("") 逐字符扫描足够表达编译器核心三阶段</strong>。代码见 [examples/bootstrap/](../examples/bootstrap/)。
     <br><br>
+    <strong>Phase 5.2 语句层自举（2026-08-17）</strong>：<a href="../examples/bootstrap/stmt_interp.lom">stmt_interp.lom</a> 在表达式解释器之上新增 Stmt 层（<code>SLet</code>/<code>SExpr</code>/<code>SIf</code>），支持 let 绑定、if/else 语句、块与比较运算；环境用函数式风格管理（<code>List&lt;(String,Int)&gt;</code> + cons 头插实现遮蔽）。两段测试程序输出正确（<code>11</code>、<code>10</code>），全程使用 Phase 5.1 元组解构（parser 状态传递 <code>(Expr, List&lt;Token&gt;)</code>、环境解包 <code>let (name, v) = ...</code>）。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>let (a,b) = ...</code> 元组解构 → <strong>Phase 5.1 已补</strong>（<code>Stmt::LetDestruct</code> + parser/interpreter/typechecker 全链路 + 5 测试）。动机：这是自举时发现的头号"LLM 自然会写但语言拒绝"模式（PARSE001 期望标识符，得到 LParen），补掉后 mini_interp 用自然的 <code>(Expr, List<Token>)</code> 元组返回重写，无需 record workaround。</li>
