@@ -97,5 +97,14 @@
     "solution": "from list import {list_cons, list_empty}\n\nfn sum_list(xs: List<Int>) -> Int\n    let mut total = 0\n    for x in xs\n        total = total + x\n    end\n    total\nend\n\nfn main() -> Unit\n    let xs = list_cons(1, list_cons(2, list_cons(3, list_cons(4, list_empty()))))\n    println(sum_list(xs))\nend\n",
     "expected": "10\n",
     "notes": "for 遍历 List(v0.4.1 新增,P0 缺口修复)。1+2+3+4=10。考察 for-in-List 与 list_cons 构造。"
+  },
+  {
+    "id": "103",
+    "category": "control_flow",
+    "difficulty": "easy",
+    "prompt": "在 main 里写:let mut n = 10,然后依次 n += 5、println(n)、n -= 3、println(n)、n *= 4、println(n)、n /= 2、println(n)。使用复合赋值运算符。",
+    "solution": "fn main() -> Unit\n    let mut n = 10\n    n += 5\n    println(n)\n    n -= 3\n    println(n)\n    n *= 4\n    println(n)\n    n /= 2\n    println(n)\nend\n",
+    "expected": "15\n12\n48\n24\n",
+    "notes": "复合赋值 += -= *= /=(v0.4.1 新增,P0 缺口修复)。10+5=15, 15-3=12, 12*4=48, 48/2=24(整数除法)。考察 LLM 最自然的累加写法。"
   }
 ]

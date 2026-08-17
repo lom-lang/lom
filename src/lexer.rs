@@ -44,6 +44,10 @@ pub enum Token {
     Star,      // *
     Slash,     // /
     Percent,   // %
+    PlusEq,    // += (v0.4.1 P0-3 复合赋值)
+    MinusEq,   // -=
+    StarEq,    // *=
+    SlashEq,   // /=
     Eq,        // ==
     NotEq,     // !=
     Lt,        // <
@@ -262,7 +266,22 @@ impl<'a> Lexer<'a> {
 
         // 运算符和标点
         let tok = match c {
-            b'+' => Token::Plus,
+            b'+' => {
+                self.advance();
+                if self.peek() == Some(b'=') {
+                    self.advance();
+                    return Ok(SpannedToken {
+                        token: Token::PlusEq,
+                        line,
+                        col,
+                    });
+                }
+                return Ok(SpannedToken {
+                    token: Token::Plus,
+                    line,
+                    col,
+                });
+            }
             b'-' => {
                 self.advance();
                 if self.peek() == Some(b'>') {
@@ -273,14 +292,52 @@ impl<'a> Lexer<'a> {
                         col,
                     });
                 }
+                if self.peek() == Some(b'=') {
+                    self.advance();
+                    return Ok(SpannedToken {
+                        token: Token::MinusEq,
+                        line,
+                        col,
+                    });
+                }
                 return Ok(SpannedToken {
                     token: Token::Minus,
                     line,
                     col,
                 });
             }
-            b'*' => Token::Star,
-            b'/' => Token::Slash,
+            b'*' => {
+                self.advance();
+                if self.peek() == Some(b'=') {
+                    self.advance();
+                    return Ok(SpannedToken {
+                        token: Token::StarEq,
+                        line,
+                        col,
+                    });
+                }
+                return Ok(SpannedToken {
+                    token: Token::Star,
+                    line,
+                    col,
+                });
+            }
+            b'/' => {
+                self.advance();
+                if self.peek() == Some(b'=') {
+                    self.advance();
+                    return Ok(SpannedToken {
+                        token: Token::SlashEq,
+                        line,
+                        col,
+                    });
+                }
+                return Ok(SpannedToken {
+                    token: Token::Slash,
+                    line,
+                    col,
+                });
+            }
             b'%' => Token::Percent,
             b'!' => {
                 self.advance();
@@ -552,6 +609,27 @@ mod tests {
         assert_eq!(tokens[2].token, Token::Int(2));
         assert_eq!(tokens[3].token, Token::Eq);
         assert_eq!(tokens[4].token, Token::Int(3));
+    }
+
+    #[test]
+    fn test_compound_assign_tokens() {
+        // v0.4.1 P0-3: += -= *= /= 是独立 token(最长匹配)
+        let src = "x += 1\nx -= 2\nx *= 3\nx /= 4";
+        let tokens = Lexer::new(src).tokenize().unwrap();
+        assert_eq!(tokens[1].token, Token::PlusEq);
+        assert_eq!(tokens[4].token, Token::MinusEq);
+        assert_eq!(tokens[7].token, Token::StarEq);
+        assert_eq!(tokens[10].token, Token::SlashEq);
+    }
+
+    #[test]
+    fn test_arrow_minus_eq_distinct() {
+        // -> 与 -= 不混淆;单独 - 仍是 Minus
+        // token 序列:fn f ( ) -> Int(标识符) 1 - 2 end
+        let src = "fn f() -> Int\n    1 - 2\nend";
+        let tokens = Lexer::new(src).tokenize().unwrap();
+        assert_eq!(tokens[4].token, Token::Arrow);
+        assert_eq!(tokens[7].token, Token::Minus);
     }
 
     #[test]

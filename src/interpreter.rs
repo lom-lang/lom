@@ -1872,6 +1872,50 @@ end
     }
 
     #[test]
+    fn test_compound_assign() {
+        // v0.4.1 P0-3: += -= *= /= 四种复合赋值
+        let src = r#"
+fn main() -> Unit
+    let mut sum = 0
+    sum += 5
+    println(sum)
+    sum *= 2
+    println(sum)
+    sum -= 3
+    println(sum)
+    sum /= 2
+    println(sum)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_compound_assign_string() {
+        // += 与字符串拼接提升组合:s += 非 String 自动 to_display()
+        let src = r#"
+fn main() -> Unit
+    let mut s = "a"
+    s += "b"
+    s += 1
+    println(s)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_compound_assign_undefined_errors() {
+        // 复合赋值目标是未定义变量 → 与 = 一样报"赋值给未定义变量"
+        let src = r#"
+fn main() -> Unit
+    x += 1
+end
+"#;
+        assert!(run_src(src).is_err());
+    }
+
+    #[test]
     fn test_if_expression() {
         let src = r#"
 fn sign(n: Int) -> Int

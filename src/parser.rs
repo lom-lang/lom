@@ -188,6 +188,24 @@ impl Parser {
         (prev.line, prev.col)
     }
 
+    /// v0.4.1 P0-3: 若当前 token 是复合赋值运算符（+= -= *= /=），消费并返回对应的二元运算符
+    /// 换行守卫：复合赋值必须与左侧标识符同行（与跨行 `-` 不当二元减法的规则一致，
+    /// 防止 `x\n+= 1` 被静默合并成一条语句）
+    fn match_compound_assign(&mut self) -> Option<BinOp> {
+        if self.is_newline_before() {
+            return None;
+        }
+        let op = match self.peek() {
+            Token::PlusEq => BinOp::Add,
+            Token::MinusEq => BinOp::Sub,
+            Token::StarEq => BinOp::Mul,
+            Token::SlashEq => BinOp::Div,
+            _ => return None,
+        };
+        self.advance();
+        Some(op)
+    }
+
     // ===== 容错恢复辅助（Phase 2.2）=====
 
     /// 同步到下一个顶层 item 起点：跳过 token 直到 fn/enum/from/EOF
@@ -603,6 +621,21 @@ impl Parser {
                     value,
                 })),
                 _ => Err(self.err("赋值目标必须是变量".to_string())),
+            }
+        } else if let Some(op) = self.match_compound_assign() {
+            // v0.4.1 P0-3：复合赋值 ident += expr —— 去糖为 ident = ident op expr
+            // 解释器/类型检查器复用 Assign + Binary 的现有检查(可变性、NAM003、TYPE001),无需改动
+            let rhs = self.parse_expr()?;
+            match e {
+                Expr::Ident(name) => Ok(BlockEl::Stmt(Stmt::Assign {
+                    value: Expr::Binary {
+                        op,
+                        left: Box::new(Expr::Ident(name.clone())),
+                        right: Box::new(rhs),
+                    },
+                    target: name,
+                })),
+                _ => Err(self.err("复合赋值目标必须是变量".to_string())),
             }
         } else if matches!(
             self.peek(),

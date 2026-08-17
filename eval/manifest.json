@@ -2,7 +2,7 @@
   "schema": "lom-eval/v1",
   "version": "0.1.0",
   "phase": "2.8",
-  "total_tasks": 102,
+  "total_tasks": 103,
   "categories": [
     {
       "id": "01_arithmetic",
@@ -14,7 +14,7 @@
     {
       "id": "02_control_flow",
       "name": "Control Flow",
-      "task_count": 11,
+      "task_count": 12,
       "description": "if/elif/else, while, for, early return. Probes end-delimited blocks (LLM-coding-native critical feature).",
       "file": "tasks/02_control_flow.json"
     },

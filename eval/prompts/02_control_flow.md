@@ -281,6 +281,10 @@ end
 
 写函数 sum_list(xs: List<Int>) -> Int：用 for x in xs 遍历列表求和。main 用 list_cons(1, list_cons(2, list_cons(3, list_cons(4, list_empty())))) 构造列表 [1,2,3,4] 并 println(sum_list(xs))。需要 from list import {list_cons, list_empty}。
 
+### Task 103
+
+在 main 里写:let mut n = 10,然后依次 n += 5、println(n)、n -= 3、println(n)、n *= 4、println(n)、n /= 2、println(n)。使用复合赋值运算符。
+
 
 ---
 
