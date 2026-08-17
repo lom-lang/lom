@@ -1194,6 +1194,7 @@ end
 1. **Range syntax**: `a..b` (Rust) vs `range(a, b)` (function) vs `a..=b` (inclusive)? Affects `for` loops.
 2. **String concatenation**: `+` (overloaded) vs `++` (dedicated) vs `concat(a, b)` (function)?
    - **Resolved (v0.1.1)**: `+` is overloaded for `String + String`. Rationale: LLMs already expect `+` for string concat (Python/JS behavior), and Lom has no custom operator overloading for user types in Phase 0-3, so `+` on String is a built-in special case. `++` would be unfamiliar; `concat(a, b)` is verbose for a common operation.
+   - **Extended (v0.4.1, Phase 5.4)**: if either operand of `+` is a `String`, the other operand is promoted via `to_display()` — `"n = " + 42` works without `int_to_string`. Rationale: `"x = " + n` was the most common LLM-natural pattern rejected by the language; promotion matches Python `f-string`/JS template-literal habits. Typechecker result type is `String`.
 3. **Char type**: separate `Char` type, or treat single-char strings as Char (Phase 1 simplicity)?
 4. **Match arm separator**: `=>` (chosen) vs `->` (conflicts with closure return type)?
    - **Resolved (v0.1.1)**: `=>` confirmed. `->` is used for closure return type (`fn(x: Int) -> Int`), so `=>` for match arms avoids ambiguity.

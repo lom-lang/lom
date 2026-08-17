@@ -16,7 +16,7 @@
 7. **Structural types** — records are shapes: `{x: Int, y: Int}`. No class names needed.
 8. **Last expression = return value** — blocks evaluate to their last expression. Use `return` only for early exit.
 9. **One statement per line** — Lom is newline-sensitive (statements separated by newlines) but NOT indentation-sensitive (blocks delimited by `end`, not by indentation level). Like Go/Swift/Kotlin, not Python. A `-` or `(` at the start of a new line is NOT a binary operator or function call — it starts a new expression.
-10. **`+` works on String** — `"a" + "b"` yields `"ab"`. No special concat operator.
+10. **`+` works on String** — `"a" + "b"` yields `"ab"`. No special concat operator. Since v0.4.1, if either side is a String, the other side is auto-promoted (`"n = " + 42` yields `"n = 42"`) — no `int_to_string` needed for concatenation.
 
 ---
 

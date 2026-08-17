@@ -630,6 +630,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>5.1 元组解构</strong>:自举时发现的"头号缺口"——LLM 自然写 <code>let (a, b) = ...</code> 但语言拒绝,于是补上了(AST/parser/解释器/类型检查全链路);</li>
   <li><strong>5.2 语句层自举</strong>:<code>stmt_interp.lom</code> 在表达式之上加了 let/if/块,环境用函数式链表管理;</li>
   <li><strong>5.3 for 遍历 List(v0.4.1)</strong>:<code>for x in xs</code> 支持列表——此前只能遍历 String(逐字符)和 Int(0..n),遍历 List 会报 RUNTIME000。解释器加了 <code>Value::List</code> 分支,类型检查器同步推导元素类型(<code>List&lt;Int&gt;</code> 的元素就是 Int)。</li>
+  <li><strong>5.4 字符串拼接提升(v0.4.1)</strong>:<code>"n = " + 42</code> 合法了——<code>+</code> 的任一侧是字符串时,另一侧自动转成显示文本再拼接(此前必须手动 <code>int_to_string</code>,LLM 几乎必踩)。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>

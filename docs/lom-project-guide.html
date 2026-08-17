@@ -912,9 +912,12 @@
     <br><br>
     <strong>Phase 5.3 for 遍历 List（2026-08-18，v0.4.1 P0-1）</strong>：<code>for x in xs</code> 支持迭代 <code>List&lt;T&gt;</code>（此前仅 String/Int，迭代 List 报 <code>RUNTIME000</code>）。interpreter 增加 <code>Value::List</code> 迭代分支（逐元素绑定、<code>return</code> 穿透循环），typechecker 同步推导元素类型（<code>List&lt;T&gt;</code> → x: T）。4 个新测试（291/291 通过），eval 新增任务 101（101/101 通过，control_flow 类 11/11）。动机：P0 刚需缺口三件套之一——自举代码与 LLM 自然写法均高频需要列表迭代，此前只能用 <code>list_get(xs, i)</code> 绕。
     <br><br>
+    <strong>Phase 5.4 字符串拼接提升（2026-08-18，v0.4.1 P0-2）</strong>：<code>+</code> 的任一侧是 String 时，另一侧自动 <code>to_display()</code> 提升——<code>"n = " + 42</code> 合法（此前报 <code>运算 Add 不支持 String 和 Int</code>，必须 <code>int_to_string</code>）。interpreter <code>eval_binary</code> 提升 + typechecker 结果类型记 String；Int+Bool 等无提升组合仍报 TYPE001。3 个新测试（294/294 通过），eval 新增任务 102（102/102 通过，types 类 11/11）。动机：P0 三件套之二——<code>"x = " + n</code> 是 LLM 最自然的拼接写法（对齐 Python f-string / JS 模板串习惯）。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
+      <li>✅ <code>"n = " + 42</code> 字符串拼接提升 → <strong>Phase 5.4 已补</strong>（此前报 <code>运算 Add 不支持 String 和 Int</code>，必须 <code>int_to_string</code> 显式转换）</li>
       <li>✅ <code>let (a,b) = ...</code> 元组解构 → <strong>Phase 5.1 已补</strong>（<code>Stmt::LetDestruct</code> + parser/interpreter/typechecker 全链路 + 5 测试）。动机：这是自举时发现的头号"LLM 自然会写但语言拒绝"模式（PARSE001 期望标识符，得到 LParen），补掉后 mini_interp 用自然的 <code>(Expr, List&lt;Token&gt;)</code> 元组返回重写，无需 record workaround。</li>
       <li>✅ <code>not()</code> 布尔非 → <strong>误判，非缺口</strong>：<code>!expr</code> 前缀运算符（<code>UnaryOp::Not</code>）本来就支持，只是函数式写法 <code>not(...)</code> 不存在</li>
       <li>✅ match arm 多行块 → <strong>误判，非缺口</strong>：Form B（<code>=&gt;</code> 后换行块）本来就支持，每个 arm 块需自己的 <code>end</code> + match 整体一个 <code>end</code></li>
