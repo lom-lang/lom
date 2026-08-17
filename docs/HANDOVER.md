@@ -68,7 +68,11 @@ cargo test --release                                    # 期望 287/287
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 10 类全 100%
 ```
 
-### 2.3 git 提交
+### 2.3 git 提交与推送（不依赖任何 GitHub 插件）
+
+**认证方式**：remote 是 SSH（`git@github.com:lom-lang/lom.git`），SSH key 在本机 `~/.ssh/id_ed25519`。提交推送就是普通 `git` CLI 命令，**不需要 GitHub 插件/MCP/connector**。即使你的环境没有任何 GitHub 插件，只要能执行终端命令就能 `git push`。
+
+唯一例外：push 报 `Permission denied (publickey)` 时说明 SSH key 失效或换机器了，把报错发给用户处理认证，不要自己折腾凭据。
 
 **坑 3：PowerShell 不支持 heredoc（`<<'EOF'`）**。多行 commit message 用多个 `-m` 参数 + 反引号 `` `n `` 换行：
 
