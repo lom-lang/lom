@@ -308,6 +308,7 @@ Prelude (`println`, `print`) and stdlib modules (`io`, `string`, `math`) functio
 
 - `let x = 3` — `x` is immutable. Reassignment is a compile error.
 - `let mut x = 3` — `x` is mutable. `x = 4` is allowed.
+- Compound assignment (v0.4.1, Phase 5.5): `x += e` / `x -= e` / `x *= e` / `x /= e` desugar to `x = x + e` etc. Target must be mutable. `+=` composes with string concat promotion.
 - Function parameters are always immutable (no `mut` param in Phase 1).
 
 ### 5.2 Block return value

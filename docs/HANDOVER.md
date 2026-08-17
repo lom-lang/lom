@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.4 完成，字符串拼接提升，v0.4.1 P0-2）
+> 最后更新：2026-08-18（Phase 5.5 完成，复合赋值，v0.4.1 P0 三件套全部完成）
 
 ---
 
@@ -31,12 +31,12 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **294/294 通过** |
-| eval 评测集 | **102/102 参考解通过** |
+| Rust 测试 | **299/299 通过** |
+| eval 评测集 | **103/103 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp） |
-| 当前进度 | Phase 5.4 完成（字符串拼接提升，v0.4.1 P0-2） |
-| 下一步 | P0 缺口最后一件：复合赋值（见 §6） |
+| 当前进度 | Phase 5.5 完成（复合赋值，v0.4.1 P0 三件套全部完成） |
+| 下一步 | P1 候选（见 §6）：range 表达式 / match guard / 具名函数作为值 |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -157,7 +157,7 @@ end
 ### 4.5 其他已实测确认的缺口（LLM 自然写法会被拒）
 
 - ✅ ~~`"n = " + 42`~~ → v0.4.1 起合法（字符串拼接提升，另一侧自动 `to_display()`）
-- `n += 1` → 报 PARSE001（复合赋值不存在）
+- ✅ ~~`n += 1`~~ → v0.4.1 起合法（复合赋值，去糖为 `n = n + 1`，带换行守卫）
 - `for i in 1..10` → lexer 无 `..` token，解析失败
 - `m if m > 0 => ...` → match guard 不支持，报"期望 '=>'，得到 If"
 - `let f = double`（具名函数当值）→ 报"不能将函数作为值使用"（闭包字面量可以，具名 fn 不行）
@@ -194,9 +194,9 @@ end
 
 1. ✅ **for 遍历 List**（2026-08-18 完成）：interpreter.rs `Stmt::For` 已加 `Value::List` 分支；typechecker 推导元素类型；4 个新测试 + eval 任务 101。
 2. ✅ **字符串拼接提升**（2026-08-18 完成）：`eval_binary` 任一侧 String 即拼接（`to_display()` 提升）；typechecker 结果记 String；旧测试 `int_plus_string_warns` 改为 `int_plus_string_concat_no_warn` + 新增 `int_plus_bool_still_warns`；3 个新测试 + eval 任务 102。
-3. **复合赋值 `+=` `-=` `*=` `/=`**：lexer 加 token + parser + interpreter + typechecker 四处。注意现在 `+=` 被切成 `+` `=` 导致报错信息误导。
+3. ✅ **复合赋值 `+=` `-=` `*=` `/=`**（2026-08-18 完成）：lexer 4 个新 token + parser 去糖（`x = x op e`，带换行守卫）+ 解释器/类型检查零改动复用 Assign 链路；5 个新测试 + eval 任务 103。注意：`=` 普通赋值目前**没有**换行守卫（`x\n= 1` 会静默合并），是历史行为，未动。
 
-P1 候选（做完 P0 再说）：range 表达式 `1..10`、match guard、**具名函数作为值**（这个是 `list_map/list_filter` 标准库的前提）。
+**v0.4.1 P0 三件套已全部完成。** P1 候选（做完 P0 再说）：range 表达式 `1..10`、match guard、**具名函数作为值**（这个是 `list_map/list_filter` 标准库的前提）。
 
 P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）。
 
@@ -233,7 +233,7 @@ P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举�
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 294/294
+2. `cargo build --release && cargo test --release` 确认 299/299
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

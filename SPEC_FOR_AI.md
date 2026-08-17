@@ -92,6 +92,14 @@ while i < 5
 end
 ```
 
+### Compound assignment (v0.4.1)
+`x += e` / `x -= e` / `x *= e` / `x /= e` — shorthand for `x = x + e` etc. Target must be a `let mut` variable. `+=` also works with string promotion: `s += 1` appends `"1"`.
+```
+let mut n = 10
+n += 5       # n = 15
+n *= 2       # n = 30
+```
+
 ### for (iterate)
 ```
 for c in "hello"
