@@ -327,6 +327,9 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
             "list_head",
             "list_tail",
             "list_cons",
+            "list_map",
+            "list_filter",
+            "list_fold",
         ],
     ),
     ("json", &["json_parse", "json_stringify"]),
@@ -1293,7 +1296,7 @@ impl Interpreter {
     /// 返回 Ok(Some(v)) 表示是内置函数并成功调用
     /// 返回 Ok(None) 表示不是内置函数（让上层当用户函数/闭包处理）
     /// 返回 Err 表示是内置函数但调用错误（参数数量/类型错）或未导入
-    fn call_builtin(&self, name: &str, args: &[Value]) -> Result<Option<Value>, RuntimeError> {
+    fn call_builtin(&mut self, name: &str, args: &[Value]) -> Result<Option<Value>, RuntimeError> {
         // 1. 解析别名：name 可能是别名（如 log → println），也可能是本名
         let real_name = self
             .import_aliases
@@ -1506,6 +1509,82 @@ impl Interpreter {
                     _ => Err(RuntimeError::Msg("list_cons 第二个参数期望 List".to_string())),
                 }
             }
+            // v0.4.3 Phase 5.9: 高阶 list 函数（语言前提 Phase 5.8：闭包/具名函数作为值）
+            "list_map" => {
+                // list_map(f, xs) → [f(x) for x in xs]
+                expect_arity("list_map", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (
+                        Value::Closure { params, body, env },
+                        Value::List { elems },
+                    ) => {
+                        let mut out = Vec::with_capacity(elems.len());
+                        for e in elems {
+                            out.push(self.call_closure(params, body, env.clone(), &[e.clone()])?);
+                        }
+                        Ok(Some(Value::List { elems: out }))
+                    }
+                    (Value::Closure { .. }, other) => Err(RuntimeError::Msg(format!(
+                        "list_map 第二个参数期望 List，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "list_map 第一个参数期望函数（闭包或具名函数），得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "list_filter" => {
+                // list_filter(f, xs) → 保留 f(x) 为 True 的元素
+                expect_arity("list_filter", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (
+                        Value::Closure { params, body, env },
+                        Value::List { elems },
+                    ) => {
+                        let mut out = Vec::new();
+                        for e in elems {
+                            let keep = self.call_closure(params, body, env.clone(), &[e.clone()])?;
+                            if keep.is_truthy()? {
+                                out.push(e.clone());
+                            }
+                        }
+                        Ok(Some(Value::List { elems: out }))
+                    }
+                    (Value::Closure { .. }, other) => Err(RuntimeError::Msg(format!(
+                        "list_filter 第二个参数期望 List，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "list_filter 第一个参数期望函数（闭包或具名函数），得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "list_fold" => {
+                // list_fold(f, init, xs) → 左折叠：acc = f(acc, x)
+                expect_arity("list_fold", 3, args)?;
+                match (&args[0], &args[2]) {
+                    (
+                        Value::Closure { params, body, env },
+                        Value::List { elems },
+                    ) => {
+                        let mut acc = args[1].clone();
+                        for e in elems {
+                            acc = self.call_closure(params, body, env.clone(), &[acc, e.clone()])?;
+                        }
+                        Ok(Some(acc))
+                    }
+                    (Value::Closure { .. }, other) => Err(RuntimeError::Msg(format!(
+                        "list_fold 第三个参数期望 List，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "list_fold 第一个参数期望函数（闭包或具名函数），得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
             // Phase 3.3: json 模块
             "json_parse" => {
                 expect_arity("json_parse", 1, args)?;
@@ -1702,6 +1781,9 @@ fn is_known_builtin(name: &str) -> bool {
             | "list_head"
             | "list_tail"
             | "list_cons"
+            | "list_map"
+            | "list_filter"
+            | "list_fold"
             | "json_parse"
             | "json_stringify"
             | "file_read"
@@ -1719,7 +1801,7 @@ fn module_of(name: &str) -> Option<&'static str> {
         "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" | "split"
         | "contains" | "replace" | "starts_with" | "ends_with" => Some("string"),
         "sqrt" | "abs" | "min" | "max" => Some("math"),
-        "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" => {
+        "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" | "list_map" | "list_filter" | "list_fold" => {
             Some("list")
         }
         "json_parse" | "json_stringify" => Some("json"),
@@ -2092,6 +2174,71 @@ fn main() -> Unit
 end
 "#;
         run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_map() {
+        // v0.4.3 Phase 5.9: list_map 接受具名函数与闭包字面量
+        let src = r#"
+from list import {list_map}
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    println(list_map(double, 1..4))
+    println(list_map(fn(x: Int) -> Int
+        x * x
+    end, 1..4))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_filter() {
+        let src = r#"
+from list import {list_filter}
+
+fn main() -> Unit
+    println(list_filter(fn(x: Int) -> Bool
+        x % 2 == 0
+    end, 1..6))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_fold() {
+        // Int 折叠求和 + String 折叠拼接(复用 v0.4.1 拼接提升)
+        let src = r#"
+from list import {list_fold}
+
+fn main() -> Unit
+    println(list_fold(fn(acc: Int, x: Int) -> Int
+        acc + x
+    end, 0, 1..6))
+    println(list_fold(fn(acc: String, x: Int) -> String
+        acc + x
+    end, "", 1..4))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_list_map_wrong_type_errors() {
+        // 第一个参数不是函数 → 明确报错
+        let src = r#"
+from list import {list_map}
+
+fn main() -> Unit
+    println(list_map(42, 1..4))
+end
+"#;
+        assert!(run_src(src).is_err());
     }
 
     #[test]

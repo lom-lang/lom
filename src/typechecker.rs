@@ -227,6 +227,19 @@ impl TypeChecker {
             "list_cons".to_string(),
             FnSig { params: vec![("head".to_string(), Type::Named("_Any".to_string())), ("list".to_string(), list_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
         );
+        // v0.4.3 Phase 5.9: 高阶 list 函数（f 用 Fn 标注,与闭包参数注解一致;实参为闭包/具名函数时是 Unknown,不触发 TYPE003）
+        self.functions.insert(
+            "list_map".to_string(),
+            FnSig { params: vec![("f".to_string(), Type::Named("Fn".to_string())), ("list".to_string(), list_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_filter".to_string(),
+            FnSig { params: vec![("f".to_string(), Type::Named("Fn".to_string())), ("list".to_string(), list_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "list_fold".to_string(),
+            FnSig { params: vec![("f".to_string(), Type::Named("Fn".to_string())), ("init".to_string(), Type::Named("_Any".to_string())), ("list".to_string(), list_any())], ret: Some(Type::Named("_Any".to_string())), effects: vec![], span: Span::default() },
+        );
         // Phase 3.3: json 模块（纯函数）
         // json_parse 返回 _Any（可能是 Record/List/Int/Float/Bool/Str/Unit）
         // json_stringify 接受任何值，返回 String

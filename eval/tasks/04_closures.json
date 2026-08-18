@@ -97,5 +97,14 @@
     "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn apply_twice(f: Fn, x: Int) -> Int\n    f(f(x))\nend\n\nfn main() -> Unit\n    println(apply_twice(double, 3))\n    let inc = fn(x: Int) -> Int\n        x + 1\n    end\n    println(apply_twice(inc, 10))\nend\n",
     "expected": "12\n12\n",
     "notes": "具名函数作为值(v0.4.2 新增,P1 缺口修复):double 直接当参数传,与闭包字面量地位相同。double(double(3))=12, inc(inc(10))=12。"
+  },
+  {
+    "id": "107",
+    "category": "closures",
+    "difficulty": "medium",
+    "prompt": "用 list 模块的高阶函数(需 from list import {list_map, list_filter, list_fold}):写具名函数 double(x: Int) -> Int 返回 x * 2;main 里 let xs = 1..6,然后 println(list_map(double, xs))、println(list_filter(fn(x: Int) -> Bool x % 2 == 0 end, xs))、println(list_fold(fn(acc: Int, x: Int) -> Int acc + x end, 0, xs))。",
+    "solution": "from list import {list_map, list_filter, list_fold}\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let xs = 1..6\n    println(list_map(double, xs))\n    println(list_filter(fn(x: Int) -> Bool\n        x % 2 == 0\n    end, xs))\n    println(list_fold(fn(acc: Int, x: Int) -> Int\n        acc + x\n    end, 0, xs))\nend\n",
+    "expected": "[2, 4, 6, 8, 10]\n[2, 4]\n15\n",
+    "notes": "高阶标准库(v0.4.3 新增):list_map/list_filter/list_fold。组合 range(1..6)与具名函数值。1+2+3+4+5=15。考察 LLM 对函数式三件套的自然写法。"
   }
 ]
