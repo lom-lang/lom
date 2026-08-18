@@ -798,7 +798,21 @@ impl Parser {
     // ===== 表达式（Pratt 解析）=====
 
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
-        self.parse_or()
+        self.parse_range()
+    }
+
+    /// v0.4.2 P1-1: range 表达式 a..b —— 最低优先级（低于 or），非结合
+    /// 带换行守卫：.. 必须与左操作数同行（与跨行 `-` 不当二元减法的规则一致）
+    fn parse_range(&mut self) -> Result<Expr, ParseError> {
+        let start = self.parse_or()?;
+        if !self.is_newline_before() && self.matches(&Token::DotDot) {
+            let end = self.parse_or()?;
+            return Ok(Expr::Range {
+                start: Box::new(start),
+                end: Box::new(end),
+            });
+        }
+        Ok(start)
     }
 
     fn parse_or(&mut self) -> Result<Expr, ParseError> {

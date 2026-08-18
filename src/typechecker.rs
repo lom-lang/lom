@@ -865,6 +865,23 @@ impl TypeChecker {
                     TypeOrUnknown::unknown()
                 }
             }
+            Expr::Range { start, end } => {
+                // v0.4.2 P1-1: a..b → List<Int>;两端已知且非 Int 报 TYPE001
+                for e in [start, end] {
+                    if let TypeOrUnknown::Known(t) = self.check_expr(e, env) {
+                        if !matches!(t, Type::Int) && !self.is_any_type(&t) {
+                            self.push_diag(
+                                Severity::Warning,
+                                "TYPE001".into(),
+                                format!("range 两端应为 Int，得到 {:?}", t),
+                                0,
+                                0,
+                            );
+                        }
+                    }
+                }
+                TypeOrUnknown::known(Type::Generic("List".to_string(), vec![Type::Int]))
+            }
         }
     }
 
@@ -1921,6 +1938,33 @@ mod tests {
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert!(!type_diags.is_empty());
+    }
+
+    #[test]
+    fn range_result_is_int_list() {
+        // v0.4.2 P1-1: 1..5 → List<Int>,for i in 1..5 的 i 按 Int 检查(i - "s" 报 TYPE001)
+        let src = "fn f() -> Unit\n    for i in 1..5\n        let y = i - \"s\"\n    end\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert!(!type_diags.is_empty());
+    }
+
+    #[test]
+    fn range_float_end_warns() {
+        // range 两端应为 Int:1.5..3 报 TYPE001
+        let src = "fn f() -> Unit\n    let xs = 1.5..3\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert!(!type_diags.is_empty());
+    }
+
+    #[test]
+    fn range_int_ok_no_warn() {
+        // 正常 range 不应有 TYPE001
+        let src = "fn f() -> Unit\n    let mut total = 0\n    for i in 1..10\n        total += i\n    end\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert_eq!(type_diags.len(), 0);
     }
 
     #[test]

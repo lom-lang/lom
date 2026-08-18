@@ -935,6 +935,22 @@ impl Interpreter {
                 }
                 Ok(Value::Tuple { elems: vals })
             }
+            Expr::Range { start, end } => {
+                // v0.4.2 P1-1: a..b → List<Int>（左闭右开，与 for i in n 的 0..n 语义一致）
+                // 求值为 List 使得 range 可以直接复用 for-in-List（Phase 5.3）与 list 模块
+                let sv = self.eval_expr(start, env.clone())?;
+                let ev = self.eval_expr(end, env)?;
+                match (sv, ev) {
+                    (Value::Int(a), Value::Int(b)) => Ok(Value::List {
+                        elems: (a..b).map(Value::Int).collect(),
+                    }),
+                    (s, e) => Err(RuntimeError::Msg(format!(
+                        "range 表达式 a..b 的两端必须是 Int，得到 {} 和 {}",
+                        s.type_name(),
+                        e.type_name()
+                    ))),
+                }
+            }
         }
     }
 
@@ -1910,6 +1926,50 @@ end
         let src = r#"
 fn main() -> Unit
     x += 1
+end
+"#;
+        assert!(run_src(src).is_err());
+    }
+
+    #[test]
+    fn test_range_for_loop() {
+        // v0.4.2 P1-1: for i in 1..5 → 1+2+3+4=10(左闭右开)
+        let src = r#"
+fn main() -> Unit
+    let mut total = 0
+    for i in 1..5
+        total += i
+    end
+    println(total)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_range_produces_list() {
+        // range 求值为 List<Int>,可直接复用 list 模块与打印
+        let src = r#"
+from list import {list_length}
+
+fn main() -> Unit
+    let xs = 1..4
+    println(xs)
+    println(list_length(xs))
+    let empty = 5..1
+    println(empty)
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_range_non_int_errors() {
+        // 两端必须是 Int:1.5..3 运行时报错
+        let src = r#"
+fn main() -> Unit
+    let xs = 1.5..3
+    println(xs)
 end
 "#;
         assert!(run_src(src).is_err());

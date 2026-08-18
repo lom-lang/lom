@@ -106,5 +106,14 @@
     "solution": "fn main() -> Unit\n    let mut n = 10\n    n += 5\n    println(n)\n    n -= 3\n    println(n)\n    n *= 4\n    println(n)\n    n /= 2\n    println(n)\nend\n",
     "expected": "15\n12\n48\n24\n",
     "notes": "复合赋值 += -= *= /=(v0.4.1 新增,P0 缺口修复)。10+5=15, 15-3=12, 12*4=48, 48/2=24(整数除法)。考察 LLM 最自然的累加写法。"
+  },
+  {
+    "id": "104",
+    "category": "control_flow",
+    "difficulty": "easy",
+    "prompt": "写函数 sum_range(n: Int) -> Int:用 for i in 1..(n + 1) 遍历求和(1 到 n,range 是左闭右开)。main 调用 println(sum_range(10)) 和 println(sum_range(100))。",
+    "solution": "fn sum_range(n: Int) -> Int\n    let mut total = 0\n    for i in 1..(n + 1)\n        total += i\n    end\n    total\nend\n\nfn main() -> Unit\n    println(sum_range(10))\n    println(sum_range(100))\nend\n",
+    "expected": "55\n5050\n",
+    "notes": "range 表达式 a..b(v0.4.2 新增,P1 缺口修复):左闭右开,求值为 List<Int>,for 直接迭代。1+..+10=55, 1+..+100=5050。可与复合赋值组合。"
   }
 ]

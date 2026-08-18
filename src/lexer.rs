@@ -72,6 +72,7 @@ pub enum Token {
     Comma,     // ,
     Colon,     // :
     Dot,       // .
+    DotDot,    // .. (v0.4.2 P1-1 range 表达式)
     Semi,      // ; (保留，Phase 1 不使用但 lexer 识别)
 
     // 结束
@@ -436,7 +437,22 @@ impl<'a> Lexer<'a> {
             b']' => Token::RBracket,
             b',' => Token::Comma,
             b':' => Token::Colon,
-            b'.' => Token::Dot,
+            b'.' => {
+                self.advance();
+                if self.peek() == Some(b'.') {
+                    self.advance();
+                    return Ok(SpannedToken {
+                        token: Token::DotDot,
+                        line,
+                        col,
+                    });
+                }
+                return Ok(SpannedToken {
+                    token: Token::Dot,
+                    line,
+                    col,
+                });
+            }
             b';' => Token::Semi,
             _ => {
                 return Err(LexError {
@@ -630,6 +646,25 @@ mod tests {
         let tokens = Lexer::new(src).tokenize().unwrap();
         assert_eq!(tokens[4].token, Token::Arrow);
         assert_eq!(tokens[7].token, Token::Minus);
+    }
+
+    #[test]
+    fn test_dotdot_token() {
+        // v0.4.2 P1-1: .. 是独立 token;. 仍是 Dot(元组索引)
+        let src = "1..10";
+        let tokens = Lexer::new(src).tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Int(1));
+        assert_eq!(tokens[1].token, Token::DotDot);
+        assert_eq!(tokens[2].token, Token::Int(10));
+    }
+
+    #[test]
+    fn test_dotdot_vs_float_and_dot() {
+        // 3.14 是 Float 不被 .. 干扰;t.0 的 . 仍是 Dot
+        let tokens = Lexer::new("3.14").tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Float(3.14));
+        let tokens = Lexer::new("t.0").tokenize().unwrap();
+        assert_eq!(tokens[1].token, Token::Dot);
     }
 
     #[test]

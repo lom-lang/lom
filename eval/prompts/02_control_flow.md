@@ -285,6 +285,10 @@ end
 
 在 main 里写:let mut n = 10,然后依次 n += 5、println(n)、n -= 3、println(n)、n *= 4、println(n)、n /= 2、println(n)。使用复合赋值运算符。
 
+### Task 104
+
+写函数 sum_range(n: Int) -> Int:用 for i in 1..(n + 1) 遍历求和(1 到 n,range 是左闭右开)。main 调用 println(sum_range(10)) 和 println(sum_range(100))。
+
 
 ---
 

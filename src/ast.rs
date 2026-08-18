@@ -227,6 +227,10 @@ pub enum Expr {
     /// - left |> f(args) => f(left, args...)
     /// 左结合，优先级介于比较和算术之间（高于比较、低于 + -）
     Pipe { left: Box<Expr>, right: Box<Expr> },
+    /// `..` range 表达式：start..end（v0.4.2 P1-1）
+    /// 语义：左闭右开 [start, end)，求值为 List<Int>（与 for i in n 的 0..n 语义一致）
+    /// 优先级最低（低于 or），非结合
+    Range { start: Box<Expr>, end: Box<Expr> },
     /// 结构记录字面量：{x: 3, y: 4}
     /// 字段顺序保留（用 Vec 而非 HashMap），便于显示和结构等价比较
     Record { fields: Vec<(String, Expr)> },
