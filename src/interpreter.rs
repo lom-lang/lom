@@ -41,10 +41,95 @@ pub enum Value {
         elems: Vec<Value>,
     },
     /// Phase 3.3: 列表值（不可变语义，函数返回新 List）
-    /// 用于 JSON 数组映射和未来集合模块的基础
-    List {
-        elems: Vec<Value>,
-    },
+    /// Phase 5.19 (v0.5.0): 内部表示从 Vec 改为 Rc cons 单元(ListVal)——
+    /// head/tail/cons 全 O(1) 且结构共享;动机是 5.18 实测 Vec 表示下
+    /// list_tail 每次 O(n) 复制,函数式列表处理退化到 O(n²)(lookup 基准近立方)
+    List(ListVal),
+}
+
+/// 列表的内部表示:Rc cons 单元(持久化/函数式列表)
+/// Nil 是空表;Cons 是 Rc 共享的节点——tail() 只是克隆 Rc(O(1)),不复制元素
+#[derive(Clone, Debug)]
+pub enum ListVal {
+    Nil,
+    Cons(Rc<ConsNode>),
+}
+
+#[derive(Debug)]
+pub struct ConsNode {
+    pub head: Value,
+    pub tail: ListVal,
+}
+
+impl ListVal {
+    pub fn cons(head: Value, tail: ListVal) -> ListVal {
+        ListVal::Cons(Rc::new(ConsNode { head, tail }))
+    }
+    pub fn head(&self) -> Option<&Value> {
+        match self {
+            ListVal::Nil => None,
+            ListVal::Cons(node) => Some(&node.head),
+        }
+    }
+    pub fn tail(&self) -> ListVal {
+        match self {
+            ListVal::Nil => ListVal::Nil,
+            ListVal::Cons(node) => node.tail.clone(),
+        }
+    }
+    pub fn len(&self) -> usize {
+        let mut n = 0;
+        let mut cur = self;
+        while let ListVal::Cons(node) = cur {
+            n += 1;
+            cur = &node.tail;
+        }
+        n
+    }
+    pub fn get(&self, i: usize) -> Option<&Value> {
+        let mut cur = self;
+        let mut k = i;
+        while let ListVal::Cons(node) = cur {
+            if k == 0 {
+                return Some(&node.head);
+            }
+            k -= 1;
+            cur = &node.tail;
+        }
+        None
+    }
+    pub fn is_empty(&self) -> bool {
+        matches!(self, ListVal::Nil)
+    }
+    pub fn from_vec(v: Vec<Value>) -> ListVal {
+        let mut out = ListVal::Nil;
+        for x in v.into_iter().rev() {
+            out = ListVal::cons(x, out);
+        }
+        out
+    }
+    pub fn iter(&self) -> ListValIter<'_> {
+        ListValIter { cur: self }
+    }
+}
+
+/// ListVal 的只读迭代器(按 cons 链走,不复制)
+pub struct ListValIter<'a> {
+    cur: &'a ListVal,
+}
+
+impl<'a> Iterator for ListValIter<'a> {
+    type Item = &'a Value;
+    fn next(&mut self) -> Option<&'a Value> {
+        match self.cur {
+            ListVal::Nil => None,
+            ListVal::Cons(node) => {
+                let v = &node.head;
+                self.cur = &node.tail;
+                Some(v)
+            }
+        }
+    }
 }
 
 impl fmt::Debug for Value {
@@ -94,9 +179,9 @@ impl fmt::Debug for Value {
                 }
                 write!(f, ")")
             }
-            Value::List { elems } => {
+            Value::List(l) => {
                 write!(f, "[")?;
-                for (i, e) in elems.iter().enumerate() {
+                for (i, e) in l.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
@@ -121,7 +206,7 @@ impl Value {
             Value::Enum { .. } => "枚举变体",
             Value::Record { .. } => "记录",
             Value::Tuple { .. } => "元组",
-            Value::List { .. } => "List",
+            Value::List(_) => "List",
         }
     }
 
@@ -176,8 +261,8 @@ impl Value {
                     format!("({})", parts.join(", "))
                 }
             }
-            Value::List { elems } => {
-                let parts: Vec<String> = elems.iter().map(|e| e.to_display()).collect();
+            Value::List(l) => {
+                let parts: Vec<String> = l.iter().map(|e| e.to_display()).collect();
                 format!("[{}]", parts.join(", "))
             }
         }
@@ -670,12 +755,11 @@ impl Interpreter {
                             }
                         }
                     }
-                    Value::List { elems } => {
-                        // 列表迭代：逐个元素绑定（Phase 5.3 / v0.4.1 P0 缺口）
-                        // Value::List 不可变，迭代期间元素不会被修改，直接按序取出即可
-                        for elem in elems {
+                    Value::List(l) => {
+                        // cons 链按序遍历;Value::List 不可变,迭代期间结构不会被修改
+                        for elem in l.iter() {
                             let block_env = Scope::new(Some(env.clone()));
-                            block_env.borrow_mut().define(var.clone(), elem);
+                            block_env.borrow_mut().define(var.clone(), elem.clone());
                             match self.exec_block(body, block_env)? {
                                 ControlFlow::Return(v) => return Ok(ControlFlow::Return(v)),
                                 ControlFlow::Normal(_) => {}
@@ -954,9 +1038,9 @@ impl Interpreter {
                 let sv = self.eval_expr(start, env.clone())?;
                 let ev = self.eval_expr(end, env)?;
                 match (sv, ev) {
-                    (Value::Int(a), Value::Int(b)) => Ok(Value::List {
-                        elems: (a..b).map(Value::Int).collect(),
-                    }),
+                    (Value::Int(a), Value::Int(b)) => Ok(Value::List(ListVal::from_vec(
+                        (a..b).map(Value::Int).collect(),
+                    ))),
                     (s, e) => Err(RuntimeError::Msg(format!(
                         "range 表达式 a..b 的两端必须是 Int，得到 {} 和 {}",
                         s.type_name(),
@@ -1241,7 +1325,7 @@ impl Interpreter {
                         .any(|(k2, v2)| k == k2 && self.values_eq(v, v2))
                 })
             }
-            (Value::List { elems: a1 }, Value::List { elems: a2 }) => {
+            (Value::List(a1), Value::List(a2)) => {
                 a1.len() == a2.len()
                     && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
             }
@@ -1425,14 +1509,15 @@ impl Interpreter {
                 }
             }
             // Phase 3.3: list 模块（不可变语义，函数返回新 List）
+            // Phase 5.19 (v0.5.0): ListVal cons 单元——cons/tail O(1),map/filter/fold 走迭代器零复制
             "list_empty" => {
                 expect_arity("list_empty", 0, args)?;
-                Ok(Some(Value::List { elems: Vec::new() }))
+                Ok(Some(Value::List(ListVal::Nil)))
             }
             "list_length" => {
                 expect_arity("list_length", 1, args)?;
                 match &args[0] {
-                    Value::List { elems } => Ok(Some(Value::Int(elems.len() as i64))),
+                    Value::List(l) => Ok(Some(Value::Int(l.len() as i64))),
                     _ => Err(RuntimeError::Msg("list_length 期望 List".to_string())),
                 }
             }
@@ -1447,15 +1532,16 @@ impl Interpreter {
                     }
                 };
                 match &args[0] {
-                    Value::List { elems } => {
-                        if idx < 0 || (idx as usize) >= elems.len() {
+                    Value::List(l) => {
+                        if idx < 0 || (idx as usize) >= l.len() {
                             Err(RuntimeError::Msg(format!(
                                 "list_get 索引 {} 越界（列表长度 {}）",
                                 idx,
-                                elems.len()
+                                l.len()
                             )))
                         } else {
-                            Ok(Some(elems[idx as usize].clone()))
+                            // cons 链随机访问 O(n) 走查（表示换 O(1) cons/tail 的代价）
+                            Ok(Some(l.get(idx as usize).unwrap().clone()))
                         }
                     }
                     _ => Err(RuntimeError::Msg("list_get 期望 List".to_string())),
@@ -1464,18 +1550,17 @@ impl Interpreter {
             "list_is_empty" => {
                 expect_arity("list_is_empty", 1, args)?;
                 match &args[0] {
-                    Value::List { elems } => Ok(Some(Value::Bool(elems.is_empty()))),
+                    Value::List(l) => Ok(Some(Value::Bool(l.is_empty()))),
                     _ => Err(RuntimeError::Msg("list_is_empty 期望 List".to_string())),
                 }
             }
             "list_head" => {
                 expect_arity("list_head", 1, args)?;
                 match &args[0] {
-                    Value::List { elems } => {
-                        if elems.is_empty() {
-                            Err(RuntimeError::Msg("list_head 空列表无首元素".to_string()))
-                        } else {
-                            Ok(Some(elems[0].clone()))
+                    Value::List(l) => {
+                        match l.head() {
+                            Some(v) => Ok(Some(v.clone())),
+                            None => Err(RuntimeError::Msg("list_head 空列表无首元素".to_string())),
                         }
                     }
                     _ => Err(RuntimeError::Msg("list_head 期望 List".to_string())),
@@ -1484,27 +1569,23 @@ impl Interpreter {
             "list_tail" => {
                 expect_arity("list_tail", 1, args)?;
                 match &args[0] {
-                    Value::List { elems } => {
-                        if elems.is_empty() {
+                    Value::List(l) => {
+                        if l.is_empty() {
                             Err(RuntimeError::Msg("list_tail 空列表无尾".to_string()))
                         } else {
-                            Ok(Some(Value::List {
-                                elems: elems[1..].to_vec(),
-                            }))
+                            // O(1):克隆尾部 Rc,结构共享,不复制元素
+                            Ok(Some(Value::List(l.tail())))
                         }
                     }
                     _ => Err(RuntimeError::Msg("list_tail 期望 List".to_string())),
                 }
             }
             "list_cons" => {
-                // list_cons(head, list) → 新 List：[head, ...list]
+                // list_cons(head, list) → 新 List：[head, ...list];O(1) 新建一个 cons 节点
                 expect_arity("list_cons", 2, args)?;
                 match &args[1] {
-                    Value::List { elems } => {
-                        let mut new_elems = Vec::with_capacity(elems.len() + 1);
-                        new_elems.push(args[0].clone());
-                        new_elems.extend(elems.iter().cloned());
-                        Ok(Some(Value::List { elems: new_elems }))
+                    Value::List(l) => {
+                        Ok(Some(Value::List(ListVal::cons(args[0].clone(), l.clone()))))
                     }
                     _ => Err(RuntimeError::Msg("list_cons 第二个参数期望 List".to_string())),
                 }
@@ -1516,13 +1597,13 @@ impl Interpreter {
                 match (&args[0], &args[1]) {
                     (
                         Value::Closure { params, body, env },
-                        Value::List { elems },
+                        Value::List(l),
                     ) => {
-                        let mut out = Vec::with_capacity(elems.len());
-                        for e in elems {
+                        let mut out = Vec::new();
+                        for e in l.iter() {
                             out.push(self.call_closure(params, body, env.clone(), &[e.clone()])?);
                         }
-                        Ok(Some(Value::List { elems: out }))
+                        Ok(Some(Value::List(ListVal::from_vec(out))))
                     }
                     (Value::Closure { .. }, other) => Err(RuntimeError::Msg(format!(
                         "list_map 第二个参数期望 List，得到 {}",
@@ -1540,16 +1621,16 @@ impl Interpreter {
                 match (&args[0], &args[1]) {
                     (
                         Value::Closure { params, body, env },
-                        Value::List { elems },
+                        Value::List(l),
                     ) => {
                         let mut out = Vec::new();
-                        for e in elems {
+                        for e in l.iter() {
                             let keep = self.call_closure(params, body, env.clone(), &[e.clone()])?;
                             if keep.is_truthy()? {
                                 out.push(e.clone());
                             }
                         }
-                        Ok(Some(Value::List { elems: out }))
+                        Ok(Some(Value::List(ListVal::from_vec(out))))
                     }
                     (Value::Closure { .. }, other) => Err(RuntimeError::Msg(format!(
                         "list_filter 第二个参数期望 List，得到 {}",
@@ -1567,10 +1648,10 @@ impl Interpreter {
                 match (&args[0], &args[2]) {
                     (
                         Value::Closure { params, body, env },
-                        Value::List { elems },
+                        Value::List(l),
                     ) => {
                         let mut acc = args[1].clone();
-                        for e in elems {
+                        for e in l.iter() {
                             acc = self.call_closure(params, body, env.clone(), &[acc, e.clone()])?;
                         }
                         Ok(Some(acc))
@@ -1614,7 +1695,7 @@ impl Interpreter {
                                 .map(|piece| Value::Str(piece.to_string()))
                                 .collect()
                         };
-                        Ok(Some(Value::List { elems }))
+                        Ok(Some(Value::List(ListVal::from_vec(elems))))
                     }
                     _ => Err(RuntimeError::Msg(
                         "split 期望两个 String 参数 (s, sep)".to_string(),
@@ -1746,7 +1827,7 @@ impl Interpreter {
                     .iter()
                     .map(|s| Value::Str(s.clone()))
                     .collect();
-                Ok(Some(Value::List { elems }))
+                Ok(Some(Value::List(ListVal::from_vec(elems))))
             }
             _ => Ok(None), // 不是内置函数
         }

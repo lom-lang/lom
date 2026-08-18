@@ -3,7 +3,7 @@
 // 手写 JSON 解析器 + 序列化器（零依赖，与 lexer 风格一致）。
 // 将 JSON 值映射到 Lom Value：
 //   JSON object  → Value::Record { fields: Vec<(String, Value)> }
-//   JSON array   → Value::List { elems: Vec<Value> }
+//   JSON array   → Value::List(ListVal)（v0.5.0 起 cons 单元表示）
 //   JSON string  → Value::Str
 //   JSON number  → Value::Int（整数）或 Value::Float（含小数/指数）
 //   JSON true/false → Value::Bool
@@ -15,7 +15,7 @@
 //   - 解析失败返回 Err(String)，由 interpreter 包成 RuntimeError
 //   - 不支持注释（严格 JSON）
 
-use crate::interpreter::Value;
+use crate::interpreter::{ListVal, Value};
 
 /// JSON 解析错误
 #[derive(Debug)]
@@ -132,7 +132,7 @@ impl<'a> JsonParser<'a> {
         self.skip_ws();
         if self.peek() == Some(b']') {
             self.advance();
-            return Ok(Value::List { elems });
+            return Ok(Value::List(ListVal::from_vec(elems)));
         }
         loop {
             self.skip_ws();
@@ -145,7 +145,7 @@ impl<'a> JsonParser<'a> {
                 }
                 Some(b']') => {
                     self.advance();
-                    return Ok(Value::List { elems });
+                    return Ok(Value::List(ListVal::from_vec(elems)));
                 }
                 _ => {
                     return Err(JsonError {
@@ -544,9 +544,9 @@ fn stringify_into(v: &Value, out: &mut String) {
             }
             out.push('}');
         }
-        Value::List { elems } => {
+        Value::List(l) => {
             out.push('[');
-            for (i, e) in elems.iter().enumerate() {
+            for (i, e) in l.iter().enumerate() {
                 if i > 0 {
                     out.push(',');
                 }
@@ -640,10 +640,10 @@ mod tests {
     fn parse_array() {
         let v = parse(r#"[1, 2, 3]"#).unwrap();
         match v {
-            Value::List { elems } => {
-                assert_eq!(elems.len(), 3);
-                match &elems[0] {
-                    Value::Int(n) => assert_eq!(*n, 1),
+            Value::List(l) => {
+                assert_eq!(l.len(), 3);
+                match l.head() {
+                    Some(Value::Int(n)) => assert_eq!(*n, 1),
                     _ => panic!(),
                 }
             }
@@ -658,8 +658,8 @@ mod tests {
             Value::Record { fields } => {
                 assert_eq!(fields.len(), 2);
                 match &fields[0].1 {
-                    Value::List { elems } => {
-                        assert_eq!(elems.len(), 1);
+                    Value::List(l) => {
+                        assert_eq!(l.len(), 1);
                     }
                     _ => panic!(),
                 }
