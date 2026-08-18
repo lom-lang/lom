@@ -445,6 +445,16 @@ match result
 end
 ```
 
+**Guards** (v0.4.2, Phase 5.7): `pattern if cond => body`. The arm wins only when the pattern matches AND `cond` evaluates to `True`; otherwise matching continues with the next arm. Guards may reference variables bound by the pattern. A guarded arm does NOT count toward exhaustiveness (MAT001 still requires an unguarded covering arm or `_`), mirroring Rust semantics — the guard's truth is only known at runtime.
+```
+match n
+    m if m < 0 => "negative"
+    0 => "zero"
+    m if m > 100 => "big"
+    _ => "normal"
+end
+```
+
 Patterns (Phase 2 subset):
 - literals: `0`, `"hi"`, `True`
 - binders: `x` (binds any value to `x`)

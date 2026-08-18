@@ -265,6 +265,16 @@ end
 - Arms are separated by newlines. No semicolons.
 - You can mix Form A and Form B in the same match.
 
+**Guards (v0.4.2)** — `pattern if cond => body`: the arm wins only when the pattern matches AND `cond` (Bool) is true; otherwise the next arm is tried. Guards can use variables bound by the pattern. A guarded arm does NOT count toward exhaustiveness (its condition is only known at runtime), so add a `_` fallback:
+```
+match n
+    m if m < 0 => "negative"
+    0 => "zero"
+    m if m > 100 => "big"
+    _ => "normal"
+end
+```
+
 ---
 
 ## 7. Pipeline `|>`
