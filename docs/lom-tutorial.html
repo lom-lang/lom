@@ -632,6 +632,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>5.3 for 遍历 List(v0.4.1)</strong>:<code>for x in xs</code> 支持列表——此前只能遍历 String(逐字符)和 Int(0..n),遍历 List 会报 RUNTIME000。解释器加了 <code>Value::List</code> 分支,类型检查器同步推导元素类型(<code>List&lt;Int&gt;</code> 的元素就是 Int)。</li>
   <li><strong>5.4 字符串拼接提升(v0.4.1)</strong>:<code>"n = " + 42</code> 合法了——<code>+</code> 的任一侧是字符串时,另一侧自动转成显示文本再拼接(此前必须手动 <code>int_to_string</code>,LLM 几乎必踩)。</li>
   <li><strong>5.5 复合赋值(v0.4.1)</strong>:<code>n += 1</code> 这种写法合法了(<code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code>)。实现上用了一个偷懒但正确的技巧:<strong>去糖</strong>——parser 把 <code>n += 1</code> 直接翻译成 <code>n = n + 1</code> 的语法树,后面的解释器和类型检查器一行都不用改,所有现有检查(变量是否存在、类型对不对)自动生效。</li>
+  <li><strong>5.6 range 表达式(v0.4.2)</strong>:<code>for i in 1..10</code> 合法了。设计很省:<code>1..10</code> 不求值为新类型,而是直接变成整数列表 <code>[1,2,...,9]</code>(左闭右开)——于是 5.3 刚做好的 for-in-List 和整个 list 模块自动全部适用,一行新的运行时机制都不用写。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>

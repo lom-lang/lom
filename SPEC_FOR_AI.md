@@ -118,6 +118,13 @@ for x in xs
     println(x)      # x is each element of xs
 end
 ```
+- Phase 5.6 (v0.4.2): range expression `a..b` — evaluates to `List<Int>`, left-inclusive right-exclusive `[a, b)`:
+```
+for i in 1..10
+    println(i)      # prints 1 through 9
+end
+let xs = 1..4        # xs is List<Int> [1, 2, 3]
+```
 
 ---
 

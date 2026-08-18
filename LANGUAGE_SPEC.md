@@ -335,7 +335,7 @@ end
 
 - `if`/`elif`/`else` are expressions (each branch is a block with a value).
 - `while` and `for` evaluate to `Unit`.
-- `for x in collection` iterates. In Phase 1, `collection` must be a `String` (char iteration) or a range `a..b` (TODO: range syntax). Since Phase 5.3 (v0.4.1), `collection` may also be a `List<T>`, binding each element in order.
+- `for x in collection` iterates. In Phase 1, `collection` must be a `String` (char iteration) or a range `a..b` (TODO: range syntax). Since Phase 5.3 (v0.4.1), `collection` may also be a `List<T>`, binding each element in order. Since Phase 5.6 (v0.4.2), the range expression `a..b` evaluates to a `List<Int>` over `[a, b)` and can be iterated or used anywhere a list is accepted.
 
 ### 5.4 Scope
 
@@ -1193,6 +1193,7 @@ end
 ## 11. Open Questions (to resolve before Phase 1 freeze)
 
 1. **Range syntax**: `a..b` (Rust) vs `range(a, b)` (function) vs `a..=b` (inclusive)? Affects `for` loops.
+   - **Resolved (v0.4.2, Phase 5.6)**: `a..b` (Rust-style, left-inclusive right-exclusive). It evaluates to `List<Int>`, so it reuses the for-in-List semantics (Phase 5.3) and the whole list module with zero new runtime machinery. `a..=b` rejected: two range operators are a known LLM confusion source; `1..(n+1)` is the explicit inclusive idiom.
 2. **String concatenation**: `+` (overloaded) vs `++` (dedicated) vs `concat(a, b)` (function)?
    - **Resolved (v0.1.1)**: `+` is overloaded for `String + String`. Rationale: LLMs already expect `+` for string concat (Python/JS behavior), and Lom has no custom operator overloading for user types in Phase 0-3, so `+` on String is a built-in special case. `++` would be unfamiliar; `concat(a, b)` is verbose for a common operation.
    - **Extended (v0.4.1, Phase 5.4)**: if either operand of `+` is a `String`, the other operand is promoted via `to_display()` — `"n = " + 42` works without `int_to_string`. Rationale: `"x = " + n` was the most common LLM-natural pattern rejected by the language; promotion matches Python `f-string`/JS template-literal habits. Typechecker result type is `String`.

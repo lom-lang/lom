@@ -916,6 +916,8 @@
     <br><br>
     <strong>Phase 5.5 复合赋值（2026-08-18，v0.4.1 P0-3）</strong>：<code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> 四个运算符。lexer 新增 4 个 token（最长匹配，与 <code>-&gt;</code> 不混淆）；parser 去糖为 <code>x = x op e</code>（带换行守卫，<code>x\n+= 1</code> 不静默合并），解释器/类型检查器因此零改动复用 Assign 全链路检查（未定义变量 NAM003、类型兼容 TYPE001）；<code>+=</code> 与 5.4 拼接提升天然组合（<code>s += 1</code> 合法）。5 个新测试（299/299 通过），eval 新增任务 103（103/103 通过，control_flow 类 12/12）。动机：P0 三件套之三——此前 <code>n += 1</code> 被切成 <code>+</code> <code>=</code> 报误导性 PARSE001。<strong>至此 v0.4.1 P0 刚需缺口三件套全部完成。</strong>
     <br><br>
+    <strong>Phase 5.6 range 表达式（2026-08-18，v0.4.2 P1-1）</strong>：<code>a..b</code> 左闭右开，<strong>求值为 <code>List&lt;Int&gt;</code></strong>——因此零新运行时机制，直接复用 5.3 的 for-in-List 和整个 list 模块（<code>list_length(1..4)</code> 合法）。lexer 新增 <code>DotDot</code> token（与 Float <code>3.14</code>、元组索引 <code>t.0</code> 的 <code>.</code> 区分）；parser 新增最低优先级 <code>parse_range</code>（低于 or，非结合，带换行守卫）；typechecker 记 <code>List&lt;Int&gt;</code>，两端已知非 Int 报 TYPE001。8 个新测试（307/307 通过），eval 新增任务 104（104/104 通过，control_flow 类 13/13）。解决了 LANGUAGE_SPEC 悬而未决 16 天的开放问题 #1（选 Rust 式 <code>a..b</code>，拒绝 <code>a..=b</code>——双 range 运算符是 LLM 已知混淆源）。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
