@@ -325,7 +325,7 @@ from io import { println as log }    # per-item alias: name as alias
 - **Non-prelude builtins must be imported** or you get an error:
   - `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` → `from string import {...}`
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
-- Standard library modules: `io`, `string`, `math`.
+- Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
 - User multi-file modules (`from utils.helpers import {...}`) arrive in Phase 3.
 - `pub` marks exportable items (Phase 3):
 ```
@@ -455,6 +455,19 @@ end
 | `list_fold(f, init, xs)` (v0.4.3) | `(Fn, U, List<T>) -> U` | Left fold: `acc = f(acc, x)` |
 
 `f` can be a closure literal or a named function (v0.4.2+): `list_map(double, 1..6)` → `[2, 4, 6, 8, 10]`.
+
+**`map` module** (requires `from map import {...}`; v0.5.1; string-keyed dictionary with **reference semantics** — `map_set` mutates in place, `let` aliases share the same Map):
+
+| Function | Signature | Description |
+|---|---|---|
+| `map_empty()` | `() -> Map<T>` | Empty map |
+| `map_set(m, k, v)` | `(Map<T>, String, T) -> Unit` | Insert/overwrite key in place |
+| `map_get(m, k)` | `(Map<T>, String) -> Option<T>` | `Some(v)` or `None` |
+| `map_has(m, k)` | `(Map<T>, String) -> Bool` | Key existence |
+| `map_remove(m, k)` | `(Map<T>, String) -> Bool` | Remove key; `True` if it existed |
+| `map_keys(m)` | `Map<T> -> List<String>` | All keys, **sorted** (deterministic) |
+| `map_values(m)` | `Map<T> -> List<T>` | Values in the same sorted-key order |
+| `map_size(m)` | `Map<T> -> Int` | Entry count |
 
 ---
 

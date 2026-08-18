@@ -947,7 +947,7 @@ from io import { println as log }            # per-item alias
 - **No re-export**. Re-export via explicit `pub` items (Phase 3).
 - **Dotted module path**: `from utils.helpers import { format_date }` parses, but user modules are Phase 3; Phase 2.1.5 only resolves standard library module names (io/string/math).
 
-### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions; Phase 3.5 adds `env`)
+### 8.2 Standard library modules (Phase 2.1.5; Phase 3.3 adds `list`/`json`; Phase 3.4 adds `file` + `string` extensions; Phase 3.5 adds `env`; Phase 5.20 adds `map`)
 
 | Module | Exports | Notes |
 |---|---|---|
@@ -958,6 +958,7 @@ from io import { println as log }            # per-item alias
 | `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
 | `file` | `file_read`, `file_write`, `file_append`, `file_exists` | Phase 3.4 — file system I/O, all declare `[IO]` effect (§9.5) |
 | `env` | `args` | Phase 3.5 — command-line arguments (§9.6) |
+| `map` | `map_empty`, `map_set`, `map_get`, `map_has`, `map_remove`, `map_keys`, `map_values`, `map_size` | Phase 5.20 (v0.5.1) — string-keyed dictionary, reference semantics (§9.7) |
 
 **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 
@@ -1097,6 +1098,23 @@ Command-line argument access. Pure function (reads interpreter-internal state, n
 > **Convention**: like C/Rust/Python, `argv[0]` is the program path. User arguments start at index 1. See [examples/todo.lom](examples/todo.lom) for a complete CLI tool that dispatches on `args()`.
 
 Examples: [examples/todo.lom](examples/todo.lom) — a complete todo list CLI (add/list/done/remove/help) with JSON persistence.
+
+### 9.7 `map` module (Phase 5.20, v0.5.1 — implemented)
+
+A string-keyed dictionary backed by `Value::Map(Rc<RefCell<HashMap<String, Value>>>)`. **Reference semantics with interior mutability**: `map_set`/`map_remove` mutate the map in place (O(1)); `let` aliases share the same underlying map. This is deliberately unlike `List`'s immutable persistence (§9.3) — Map is the mutable shared-structure type; for immutable structured data use records.
+
+| Function | Type | Notes |
+|---|---|---|
+| `map_empty()` | `() -> Map<_Any>` | Empty map |
+| `map_set(m, k, v)` | `(Map<_Any>, String, _Any) -> Unit` | Insert or overwrite in place |
+| `map_get(m, k)` | `(Map<_Any>, String) -> Option<_Any>` | `Some(v)` if present, else `None` |
+| `map_has(m, k)` | `(Map<_Any>, String) -> Bool` | Key existence test |
+| `map_remove(m, k)` | `(Map<_Any>, String) -> Bool` | Remove; `True` iff the key existed |
+| `map_keys(m)` | `Map<_Any> -> List<_Any>` | All keys, **sorted** for deterministic output |
+| `map_values(m)` | `Map<_Any> -> List<_Any>` | Values in the same sorted-key order as `map_keys` |
+| `map_size(m)` | `Map<_Any> -> Int` | Entry count |
+
+> `json_stringify` serializes a Map as a JSON object with sorted keys. Design note: copy-on-write was considered and rejected — the builtin argument slice always holds an `Rc`, so `Rc::get_mut` would never succeed and every write would clone.
 
 ---
 

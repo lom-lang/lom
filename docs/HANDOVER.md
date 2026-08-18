@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-19（Phase 5.19 完成，List 改 Rc cons 单元 v0.5.0——lookup 基准提速 13-46×）
+> 最后更新：2026-08-19（Phase 5.20 完成，map 模块 v0.5.1——`Value::Map` + 8 个内建，n=2000 查找基准 18136ms → 55ms）
 
 ---
 
@@ -31,12 +31,14 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **320/320 通过** |
-| eval 评测集 | **107/107 参考解通过** |
+| Rust 测试 | **325/325 通过** |
+| eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 12 程序 31 条输出全对，--check 0 诊断） |
-| 当前进度 | Phase 5.19 完成（v0.5.0：List 的 Rc cons 表示，lookup 提速 13-46×） |
-| 下一步 | P2 剩余：HashMap/Set（关联查找的平方项）、char；或教程收尾 |
+| 当前进度 | Phase 5.20 完成（v0.5.1：map 模块——字符串键字典，引用语义；lookup 场景提速 ~330×） |
+| 下一步 | P2 剩余：char；或教程收尾 |
+
+**Phase 5.20 已执行 P2-②**（数据见 §10）。`Value::Map(Rc<RefCell<HashMap<String, Value>>>)` + `map` 模块 8 个内建（map_empty/map_set/map_get→Option/map_has/map_remove/map_keys/map_values/map_size）。**引用语义**（map_set 就地改，let 别名共享）——与 List 不可变持久化刻意不同；写时复制被否决（args 切片永远持有 Rc，Rc::get_mut 永远失败）。map_keys/map_values/json_stringify 的 Map 输出都按键排序（确定性）。改动面：interpreter（variant+5 处匹配分支+8 内建+3 处注册）、typechecker（8 个签名）、json.rs（stringify Map 分支）。
 
 **Phase 5.19 已执行 P2-①**（数据见 §10 下方对比）。`Value::List` 现在是 `ListVal`（`Nil | Cons(Rc<ConsNode>)`），公开 API：cons/head/tail/len/get/is_empty/from_vec/iter。注意：list_get 随机访问现在是 O(n) 走查（原来 O(1)）——遍历式代码无感，频繁随机访问的代码会退化；这是将来 HashMap/数组类型的位置。lookup 残余的平方增长是算法固有（线性扫描），不是表示问题。
 
@@ -50,6 +52,8 @@
 | lookup（自举式线性环境查找） | n=200/400/800 → 2.4/10.8/86.9 **秒** | **近立方**：`list_tail` 每次 `elems[1..].to_vec()` O(n) 复制 → 扫描 O(n²)，n 次扫描 O(n³)。这是自举最大的性能瓶颈 |
 
 **v0.5.0 修复后（Phase 5.19，同机同基准）**：lookup n=200/400/800/1600 → **184/559/1893/7328 ms**（n=800 提速 46×，n=1600 从不可行变可行）；list_build n=8000：494→39 ms（12×+）。残余平方增长是算法固有的线性扫描，留给将来的 HashMap。
+
+**v0.5.1 map 模块（Phase 5.20，同机同基准，2026-08-19）**：lookup(List 关联表) n=500/1000/2000 → **898/3043/18136 ms**（每次翻倍 ×3.4-6，平方增长）；map_lookup n=500/1000/2000 → **64/66/55 ms**（平线；其中 ~48ms 是解释器启动开销，实测 `map_lookup 1` 三次为 47-49ms）。n=2000 墙钟提速 **~330×**，扣除启动开销后纯计算提速 ~2500×。lookup 的 O(n²) 算法瓶颈就此闭合。
 | recurse | n=10000 → 82ms OK；n=100000 → **256MB 栈溢出** | 每个 Lom 递归帧约耗 2.6KB Rust 栈；安全深度 ~10⁴。根治要显式堆栈/trampoline，留待编译器阶段 |
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
@@ -228,7 +232,8 @@ end
 - ✅ **自举容错解析**（2026-08-18 完成，Phase 5.15）：错误即节点（EError/SError）+ peek_tok 全函数化 + TUnknown。**坑三个**：① Form B 臂里嵌套 match 要数三个 end（臂的 + 内 match 的 + 外 match 的），报错位置会漂移到下一个无辜函数；② **Form A 臂（=> 同行单表达式）不需要 end，只有 Form B 需要**——纠偏时别看错形态；③ 写完跑一遍 --check，TYPE003 会抓到 list_cons 参数顺序这类潜伏 bug（list_cons(head, list)，别写反）。
 - ✅ **自举内建函数**（2026-08-18 完成，Phase 5.16）：`try_intrinsic` 返回 `Option<Result<Val, String>>`（None 交用户函数）；内建优先于同名用户函数。新增 split/contains/trim/to_string/push（push 是尾插，append_val 手写递归——宿主只有头插 cons）。
 - ✅ **自举位置信息**（2026-08-18 完成，Phase 5.17）：token 包记录 `{t: Token, ln: Int}`；`peek_kind`/`peek_line` 隔离变化（match 结构不动）。**铁律第三次应验**：Form B 臂嵌套内层 match 漏 end → "期望表达式，得到 FatArrow"——这个报错指纹以后看到就先数 end。
-- P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
+- ✅ **map 模块（HashMap）**（2026-08-19 完成，Phase 5.20 / v0.5.1）：`Value::Map(Rc<RefCell<HashMap<String, Value>>>)` + 8 个内建。**设计取舍**：引用语义（Rc<RefCell>）而非 List 式不可变持久化——写时复制方案被否决，因为 call_builtin 的 args 切片永远持有 Rc，Rc::get_mut 永远失败，克隆路径 100% 命中等于白做。Map=可变共享结构，不可变结构化数据用 Record。map_keys/map_values/json_stringify 按键排序输出（HashMap 遍历序不稳定，必须排序保确定性）。实测：lookup(List) n=2000 → 18136ms vs map_lookup n=2000 → 55ms（~330×）。
+- P2（缓做）：char 类型（动类型系统根基，等自举更深按需再做）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
 
@@ -263,7 +268,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 320/320
+2. `cargo build --release && cargo test --release` 确认 325/325
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

@@ -951,6 +951,8 @@
     <br><br>
     <strong>Phase 5.19 List 的 Rc cons 单元表示（2026-08-19，v0.5.0，P2-①）</strong>：<code>Value::List { elems: Vec&lt;Value&gt; }</code> 改为 <code>Value::List(ListVal)</code>——<code>ListVal = Nil | Cons(Rc&lt;ConsNode&gt;)</code> 持久化链表。cons/tail 从 O(n) 复制降为 O(1)（克隆 Rc），head O(1)；代价是随机访问 list_get 变 O(n) 走查（遍历语义下可接受）。全部 31 处使用点改造（interpreter 24 + json 7），公开 API：cons/head/tail/len/get/is_empty/from_vec/iter。<strong>前后实测对比</strong>（同机同基准）：lookup n=200：2383→184 ms（13×）；n=400：10784→559 ms（19×）；n=800：86875→1893 ms（<strong>46×</strong>）；n=1600 从不可行（~10 分钟）变 7.3s。list_build n=8000：494→39 ms（12×+，贴平启动开销）。lookup 残余的平方增长是算法固有的线性扫描（关联列表查表 n 次 × 每次 O(n)），表示层已无能为力——这是将来 HashMap 的位置。320/320 测试 + eval 107/107 + 自举 31 条输出全部回归通过。
     <br><br>
+    <strong>Phase 5.20 map 模块（2026-08-19，v0.5.1，P2-②）</strong>：<code>Value::Map(Rc&lt;RefCell&lt;HashMap&lt;String, Value&gt;&gt;)</code> + <code>map</code> 标准库模块（map_empty / map_set / map_get→Option / map_has / map_remove / map_keys / map_values / map_size，共 8 个）。<strong>引用语义 + 内部可变性</strong>：map_set 就地修改 O(1)，let 别名共享同一份数据——与 List 的不可变持久化刻意不同（List=函数式结构，Map=可变引用结构；不可变结构化数据用 Record）。写时复制方案被否决：args 切片永远持有 Rc 导致 Rc::get_mut 永远失败，克隆路径 100% 命中等于白做。map_keys/map_values/json_stringify 的 Map 分支都按键排序输出，保证确定性（HashMap 遍历序不稳定）。<strong>实测对比</strong>（同机同基准）：lookup(List) n=2000 → 18136 ms vs map_lookup n=2000 → 55 ms（墙钟 ~330×；其中 ~48ms 是解释器启动开销，纯计算 ~2500×）；map_lookup 在 n=500/1000/2000 全程 ~55-66ms 平线（总量 O(n)）。5 个新测试（325/325），eval 任务 086（modules 类，108/108）。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
