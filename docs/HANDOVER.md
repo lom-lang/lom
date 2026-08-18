@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.11 完成，自举函数定义与调用 + 语句值语义重构）
+> 最后更新：2026-08-18（Phase 5.12 完成，自举值系统 VInt/VStr/VBool + 显式 =/== token）
 
 ---
 
@@ -34,9 +34,9 @@
 | Rust 测试 | **320/320 通过** |
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 输出 11/10/6/49/8 且 --check 0 诊断） |
-| 当前进度 | Phase 5.11 完成（自举函数定义与调用，词法作用域 + 尾表达式返回） |
-| 下一步 | 候选：自举继续（字符串/列表值类型？错误诊断层？）、P2：char 类型、HashMap/Set |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 输出 11/10/6/49/8/hello, lom/true/ababab/true 且 --check 0 诊断） |
+| 当前进度 | Phase 5.12 完成（自举值系统 Int/String/Bool + 显式 =/== token） |
+| 下一步 | 候选：自举诊断层（未定义函数/参数不匹配显式报错）、VList 值、P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -206,6 +206,7 @@ end
 - ✅ **list_map / list_filter / list_fold 高阶标准库**（2026-08-18 完成，Phase 5.9 / v0.4.3）：call_builtin 改 &mut self 以回调闭包；typechecker 注册签名（f: Fn）；4 个新测试 + eval 任务 107。注意：filter 的 f 返回非 Bool 会走 is_truthy 报运行时错（与 if 条件同规则）。
 - ✅ **自举深化**（2026-08-18 完成，Phase 5.10）：stmt_interp.lom 加 SWhile（let mut + Lom while 做函数式环境 threading）；exec_stmts 改 list_fold + 闭包；新测试程序 3 输出 6；补效应标注链后 --check 0 诊断。注意 fold 回调是 f(acc, x) 而 exec_stmt 是 (stmt, env)，参数顺序要用闭包适配，不能直接 list_fold(exec_stmt, ...)。
 - ✅ **自举函数定义与调用**（2026-08-18 完成，Phase 5.11）：Decl 层（DFn/DStmt）+ Call 表达式；词法作用域（全新参数环境）；collect_fns 先收集 → 前向引用/互递归。**关键教训两条**：① 自举源语言没有 `==`（lexer 把 `=` 当未知字符静默丢弃，`n == 1` 变 `n 1` 导致无限递归+栈溢出）——给自举源语言写程序时先核对它的 token 集，平等判断用 `n - (n/2)*2` 这类算术表达；② "最后一条 SExpr 即返回值"在 if 分支处失效，正解是**语句值语义**（exec_stmt 返回 (env, 值)，SIf 的值=被执行分支的值，in_fn 标志区分顶层打印与函数内求值）。
+- ✅ **自举值系统**（2026-08-18 完成，Phase 5.12）：`Val = VInt | VStr | VBool`；字符串字面量 + `==` + Bool 打印；Add 混合镜像 v0.4.1 提升；truthy() 统一条件判断。**5.11 的 `=` 陷阱已根治**：`=`/`==` 现在是显式 token（TAssign/TEq），parse_stmt_let 跳过 TAssign 而非依赖丢弃。嵌套 match Form B 的双 end 写法在 values_eq/eval Add 等臂中大量出现，§4.1 的坑在这里全部踩过一遍，写法照抄现有臂即可。
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。

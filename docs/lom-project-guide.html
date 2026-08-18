@@ -928,6 +928,8 @@
     <br><br>
     <strong>Phase 5.11 自举：函数定义与调用（2026-08-18）</strong>：<a href="../examples/bootstrap/stmt_interp.lom">stmt_interp.lom</a> 新增 <code>Decl</code> 层（<code>DFn</code>/<code>DStmt</code>）与 <code>Call</code> 表达式——源语言支持 <code>fn name(p1, p2) ... end</code> 定义与调用，<strong>词法作用域</strong>（函数在全新环境绑定参数，看不到调用者局部变量）。run_program 先 collect_fns 再执行语句，前向引用/互递归天然支持（测试程序 5：collatz_len 调用后定义的 is_odd，递归 8 步正确）。<strong>关键重构——语句值语义</strong>：初版"最后一条 SExpr 即返回值"在 if 分支处失效（值无法穿透分支、函数体内 SExpr 误打印）；重构为 <code>exec_stmt → (新环境, 语句值)</code>，SIf 的值=被执行分支块的值（if 即表达式），块的值=尾语句的值，<code>in_fn</code> 标志区分顶层打印与函数体内求值。调试中发现并记录：自举源语言无 <code>==</code>（lexer 静默丢弃 <code>=</code> 导致无限递归+栈溢出，平等判断改用算术表达）。输出 <code>11/10/6/49/8</code> 全对，<code>--check</code> 0 诊断。
     <br><br>
+    <strong>Phase 5.12 自举：值系统扩展（2026-08-18）</strong>：值从只有 Int 扩展为 <code>Val = VInt | VStr | VBool</code>（递归 enum 承载，Phase 5.0 已验证可行性）。源语言新增：字符串字面量（lexer 扫描 <code>"..."</code>）、<code>==</code> 相等比较、Bool 打印小写 true/false；<code>Add</code> 混合规则镜像 Lom v0.4.1（任一侧 String 则另一侧 show() 提升拼接）；条件判断统一走 <code>truthy()</code>（VBool 直取 / VInt 非零 / VStr 非空）。<strong>根治 Phase 5.11 的坑</strong>：<code>=</code>/<code>==</code> 从"静默丢弃"改为显式 token（TAssign/TEq），同类陷阱在迷你语言层面被消除。9 个测试程序输出全对（含 <code>hello, lom</code>、<code>true</code>、<code>ababab</code>），<code>--check</code> 0 诊断。这是自举诊断层（错误报告而非静默得 0）和更真实源语言的值系统前提。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
