@@ -949,6 +949,8 @@
     </table>
     <strong>P2 决策依据（数据驱动修订）</strong>：自举的真实瓶颈不是缺 HashMap——是 <code>Value::List</code> 的 Vec 表示让函数式列表处理(head/tail/cons)沦为 O(n²)。P2 应优先做 <strong>List 的 Rc cons 单元或持久化结构</strong>（head/tail/cons O(1)），其次才是 HashMap；递归深度限制（~10⁴）记入已知限制，根治需要显式堆栈或 trampoline，留待真正的编译器阶段。
     <br><br>
+    <strong>Phase 5.19 List 的 Rc cons 单元表示（2026-08-19，v0.5.0，P2-①）</strong>：<code>Value::List { elems: Vec&lt;Value&gt; }</code> 改为 <code>Value::List(ListVal)</code>——<code>ListVal = Nil | Cons(Rc&lt;ConsNode&gt;)</code> 持久化链表。cons/tail 从 O(n) 复制降为 O(1)（克隆 Rc），head O(1)；代价是随机访问 list_get 变 O(n) 走查（遍历语义下可接受）。全部 31 处使用点改造（interpreter 24 + json 7），公开 API：cons/head/tail/len/get/is_empty/from_vec/iter。<strong>前后实测对比</strong>（同机同基准）：lookup n=200：2383→184 ms（13×）；n=400：10784→559 ms（19×）；n=800：86875→1893 ms（<strong>46×</strong>）；n=1600 从不可行（~10 分钟）变 7.3s。list_build n=8000：494→39 ms（12×+，贴平启动开销）。lookup 残余的平方增长是算法固有的线性扫描（关联列表查表 n 次 × 每次 O(n)），表示层已无能为力——这是将来 HashMap 的位置。320/320 测试 + eval 107/107 + 自举 31 条输出全部回归通过。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

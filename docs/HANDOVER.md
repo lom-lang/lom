@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.18 完成，性能摸底——P2 优先级被数据修订：先 List 表示后 HashMap）
+> 最后更新：2026-08-19（Phase 5.19 完成，List 改 Rc cons 单元 v0.5.0——lookup 基准提速 13-46×）
 
 ---
 
@@ -35,8 +35,10 @@
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 12 程序 31 条输出全对，--check 0 诊断） |
-| 当前进度 | Phase 5.18 完成（性能摸底，见下） |
-| 下一步 | **P2 已修订**：先做 Value::List 的 Rc cons 表示（证据在 §10），HashMap 其次；或教程收尾 |
+| 当前进度 | Phase 5.19 完成（v0.5.0：List 的 Rc cons 表示，lookup 提速 13-46×） |
+| 下一步 | P2 剩余：HashMap/Set（关联查找的平方项）、char；或教程收尾 |
+
+**Phase 5.19 已执行 P2-①**（数据见 §10 下方对比）。`Value::List` 现在是 `ListVal`（`Nil | Cons(Rc<ConsNode>)`），公开 API：cons/head/tail/len/get/is_empty/from_vec/iter。注意：list_get 随机访问现在是 O(n) 走查（原来 O(1)）——遍历式代码无感，频繁随机访问的代码会退化；这是将来 HashMap/数组类型的位置。lookup 残余的平方增长是算法固有（线性扫描），不是表示问题。
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
 
@@ -46,6 +48,8 @@
 |---|---|---|
 | list_build | n=1000/2000/4000/8000 → 55/104/181/494 ms | 含 ~35ms 进程启动；净耗时超线性——list_cons 每次 O(n) 复制，建表总 O(n²)，常数小尚可忍 |
 | lookup（自举式线性环境查找） | n=200/400/800 → 2.4/10.8/86.9 **秒** | **近立方**：`list_tail` 每次 `elems[1..].to_vec()` O(n) 复制 → 扫描 O(n²)，n 次扫描 O(n³)。这是自举最大的性能瓶颈 |
+
+**v0.5.0 修复后（Phase 5.19，同机同基准）**：lookup n=200/400/800/1600 → **184/559/1893/7328 ms**（n=800 提速 46×，n=1600 从不可行变可行）；list_build n=8000：494→39 ms（12×+）。残余平方增长是算法固有的线性扫描，留给将来的 HashMap。
 | recurse | n=10000 → 82ms OK；n=100000 → **256MB 栈溢出** | 每个 Lom 递归帧约耗 2.6KB Rust 栈；安全深度 ~10⁴。根治要显式堆栈/trampoline，留待编译器阶段 |
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
