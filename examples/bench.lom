@@ -3,11 +3,13 @@
 #   bench list_build  : cons 头插建 n 元素列表,再 for-in 求和(测 List 不可变语义的 cons 成本)
 #   bench lookup      : 建 n 条目的关联列表(模拟自举环境),查最后一个条目 n 次(最坏情况线性扫描)
 #   bench recurse     : 深度为 n 的线性递归 countdown(测 256MB 栈 + 调用开销)
+#   bench map_lookup  : 建 n 条目 Map,查同一键 n 次(Phase 5.20;对比 lookup 的 O(n²) 线性扫描)
 # 注意:Lom 无内置时钟,计时在外部做(wall-clock);本文件只负责负载
 
 from env import { args }
-from string import { string_to_int }
+from string import { string_to_int, int_to_string }
 from list import { list_cons, list_empty, list_get, list_head, list_tail, list_is_empty }
+from map import { map_empty, map_set, map_get }
 
 # n 次 cons 建列表,再 for-in 求和(返回总和防优化)
 fn bench_list_build(n: Int) -> Int
@@ -63,6 +65,26 @@ fn bench_recurse(n: Int) -> Int
     countdown(n)
 end
 
+# n 条目 Map × 查同一键 n 次(每次 O(1),总量 O(n);对照 bench_lookup 的 O(n²))
+fn bench_map_lookup(n: Int) -> Int
+    let m = map_empty()
+    for i in 1..(n + 1)
+        map_set(m, int_to_string(i), i * 2)
+    end
+    let mut total = 0
+    for i in 1..(n + 1)
+        match map_get(m, "1")
+            Some(v) =>
+                total += v
+            end
+            None =>
+                total += 0
+            end
+        end
+    end
+    total
+end
+
 fn main() -> Unit
     let argv = args()
     let bench = list_get(argv, 1)
@@ -73,7 +95,9 @@ fn main() -> Unit
         println(bench_lookup(n))
     elif bench == "recurse"
         println(bench_recurse(n))
+    elif bench == "map_lookup"
+        println(bench_map_lookup(n))
     else
-        println("usage: lom bench.lom -- <list_build|lookup|recurse> <n>")
+        println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup> <n>")
     end
 end

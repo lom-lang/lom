@@ -515,6 +515,7 @@ pub fn parse(src: &str) -> Result<Value, JsonError> {
 ///
 /// 映射规则（与 parse 对称）：
 ///   Value::Record → JSON object
+///   Value::Map    → JSON object（键排序后输出，保证确定性；Phase 5.20）
 ///   Value::List   → JSON array
 ///   Value::Tuple  → JSON array（元组也序列化为数组，便于数据交换）
 ///   Value::Str    → JSON string
@@ -566,6 +567,22 @@ fn stringify_into(v: &Value, out: &mut String) {
             out.push(']');
         }
         Value::Str(s) => stringify_string(s, out),
+        Value::Map(m) => {
+            // Map → JSON object；键排序后输出，保证确定性（HashMap 遍历顺序不稳定）
+            out.push('{');
+            let m = m.borrow();
+            let mut ks: Vec<&String> = m.keys().collect();
+            ks.sort();
+            for (i, k) in ks.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                stringify_string(k, out);
+                out.push(':');
+                stringify_into(&m[*k], out);
+            }
+            out.push('}');
+        }
         Value::Int(n) => out.push_str(&n.to_string()),
         Value::Float(n) => {
             // JSON 不支持 NaN/Infinity，序列化为 null

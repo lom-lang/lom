@@ -45,6 +45,11 @@ pub enum Value {
     /// head/tail/cons 全 O(1) 且结构共享;动机是 5.18 实测 Vec 表示下
     /// list_tail 每次 O(n) 复制,函数式列表处理退化到 O(n²)(lookup 基准近立方)
     List(ListVal),
+    /// Phase 5.20 (v0.5.1): 字符串键字典(map 模块)
+    /// 引用语义 + 内部可变(Rc<RefCell<HashMap>>):map_set 就地修改(O(1)),let 别名共享同一字典。
+    /// 与 List 的不可变持久化语义刻意不同:List 是函数式结构(cons 链),Map 是可变引用结构——
+    /// 不可变结构化数据请用 Record。查找 O(1)——承接 lookup 基准的线性扫描残余项
+    Map(Rc<RefCell<HashMap<String, Value>>>),
 }
 
 /// 列表的内部表示:Rc cons 单元(持久化/函数式列表)
@@ -189,6 +194,20 @@ impl fmt::Debug for Value {
                 }
                 write!(f, "]")
             }
+            Value::Map(m) => {
+                // 排序后显示，保证输出确定性（HashMap 遍历无序）
+                let m = m.borrow();
+                let mut keys: Vec<&String> = m.keys().collect();
+                keys.sort();
+                write!(f, "{{")?;
+                for (i, k) in keys.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {:?}", k, m.get(*k).unwrap())?;
+                }
+                write!(f, "}}")
+            }
         }
     }
 }
@@ -207,6 +226,7 @@ impl Value {
             Value::Record { .. } => "记录",
             Value::Tuple { .. } => "元组",
             Value::List(_) => "List",
+            Value::Map(_) => "Map",
         }
     }
 
@@ -264,6 +284,17 @@ impl Value {
             Value::List(l) => {
                 let parts: Vec<String> = l.iter().map(|e| e.to_display()).collect();
                 format!("[{}]", parts.join(", "))
+            }
+            Value::Map(m) => {
+                // 排序后显示，保证输出确定性
+                let m = m.borrow();
+                let mut keys: Vec<&String> = m.keys().collect();
+                keys.sort();
+                let parts: Vec<String> = keys
+                    .iter()
+                    .map(|k| format!("{}: {}", k, m.get(*k).unwrap().to_display()))
+                    .collect();
+                format!("{{{}}}", parts.join(", "))
             }
         }
     }
@@ -418,6 +449,19 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
         ],
     ),
     ("json", &["json_parse", "json_stringify"]),
+    (
+        "map",
+        &[
+            "map_empty",
+            "map_set",
+            "map_get",
+            "map_has",
+            "map_remove",
+            "map_keys",
+            "map_values",
+            "map_size",
+        ],
+    ),
     (
         "file",
         &["file_read", "file_write", "file_append", "file_exists"],
@@ -631,7 +675,7 @@ impl Interpreter {
 
         // 既不是标准库也不是外部包
         Err(RuntimeError::Msg(format!(
-            "未知模块/包 '{}'（标准库：io/string/math/list/json/file；外部包需在 lom.toml dependencies 声明，PKG005）",
+            "未知模块/包 '{}'（标准库：io/string/math/list/json/map/file/env；外部包需在 lom.toml dependencies 声明，PKG005）",
             imp.module
         )))
     }
@@ -1329,6 +1373,15 @@ impl Interpreter {
                 a1.len() == a2.len()
                     && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
             }
+            (Value::Map(m1), Value::Map(m2)) => {
+                // 键集相同 + 对应值递归相等
+                let m1 = m1.borrow();
+                let m2 = m2.borrow();
+                m1.len() == m2.len()
+                    && m1
+                        .iter()
+                        .all(|(k, v)| m2.get(k).map_or(false, |v2| self.values_eq(v, v2)))
+            }
             _ => false,
         }
     }
@@ -1666,6 +1719,139 @@ impl Interpreter {
                     ))),
                 }
             }
+            // Phase 5.20: map 模块 —— 字符串键字典，O(1) 查找
+            // Map 为引用语义（Rc<RefCell<HashMap>>）：map_set 就地修改，let 别名共享同一份数据。
+            "map_empty" => {
+                expect_arity("map_empty", 0, args)?;
+                Ok(Some(Value::Map(Rc::new(RefCell::new(HashMap::new())))))
+            }
+            "map_set" => {
+                expect_arity("map_set", 3, args)?;
+                match &args[0] {
+                    Value::Map(m) => {
+                        let key = match &args[1] {
+                            Value::Str(s) => s.clone(),
+                            other => {
+                                return Err(RuntimeError::Msg(format!(
+                                    "map_set 第二个参数期望 String 键，得到 {}",
+                                    other.type_name()
+                                )))
+                            }
+                        };
+                        m.borrow_mut().insert(key, args[2].clone());
+                        Ok(Some(Value::Unit))
+                    }
+                    other => Err(RuntimeError::Msg(format!(
+                        "map_set 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_get" => {
+                expect_arity("map_get", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Map(m), Value::Str(k)) => {
+                        let v = m.borrow().get(k).cloned();
+                        match v {
+                            Some(x) => Ok(Some(Value::Enum {
+                                variant: "Some".to_string(),
+                                args: vec![x],
+                            })),
+                            None => Ok(Some(Value::Enum {
+                                variant: "None".to_string(),
+                                args: Vec::new(),
+                            })),
+                        }
+                    }
+                    (Value::Map(_), other) => Err(RuntimeError::Msg(format!(
+                        "map_get 第二个参数期望 String 键，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "map_get 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_has" => {
+                expect_arity("map_has", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Map(m), Value::Str(k)) => Ok(Some(Value::Bool(m.borrow().contains_key(k)))),
+                    (Value::Map(_), other) => Err(RuntimeError::Msg(format!(
+                        "map_has 第二个参数期望 String 键，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "map_has 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_remove" => {
+                expect_arity("map_remove", 2, args)?;
+                match (&args[0], &args[1]) {
+                    (Value::Map(m), Value::Str(k)) => {
+                        Ok(Some(Value::Bool(m.borrow_mut().remove(k).is_some())))
+                    }
+                    (Value::Map(_), other) => Err(RuntimeError::Msg(format!(
+                        "map_remove 第二个参数期望 String 键，得到 {}",
+                        other.type_name()
+                    ))),
+                    (other, _) => Err(RuntimeError::Msg(format!(
+                        "map_remove 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_keys" => {
+                // 键排序后返回，保证输出确定性（HashMap 遍历顺序不稳定）
+                expect_arity("map_keys", 1, args)?;
+                match &args[0] {
+                    Value::Map(m) => {
+                        let mut ks: Vec<Value> = m
+                            .borrow()
+                            .keys()
+                            .map(|k| Value::Str(k.clone()))
+                            .collect();
+                        ks.sort_by(|a, b| match (a, b) {
+                            (Value::Str(x), Value::Str(y)) => x.cmp(y),
+                            _ => std::cmp::Ordering::Equal,
+                        });
+                        Ok(Some(Value::List(ListVal::from_vec(ks))))
+                    }
+                    other => Err(RuntimeError::Msg(format!(
+                        "map_keys 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_values" => {
+                // 按排序后的键取值，与 map_keys 顺序一一对应
+                expect_arity("map_values", 1, args)?;
+                match &args[0] {
+                    Value::Map(m) => {
+                        let m = m.borrow();
+                        let mut ks: Vec<&String> = m.keys().collect();
+                        ks.sort();
+                        let vs: Vec<Value> = ks.into_iter().map(|k| m[k].clone()).collect();
+                        Ok(Some(Value::List(ListVal::from_vec(vs))))
+                    }
+                    other => Err(RuntimeError::Msg(format!(
+                        "map_values 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
+            "map_size" => {
+                expect_arity("map_size", 1, args)?;
+                match &args[0] {
+                    Value::Map(m) => Ok(Some(Value::Int(m.borrow().len() as i64))),
+                    other => Err(RuntimeError::Msg(format!(
+                        "map_size 第一个参数期望 Map，得到 {}",
+                        other.type_name()
+                    ))),
+                }
+            }
             // Phase 3.3: json 模块
             "json_parse" => {
                 expect_arity("json_parse", 1, args)?;
@@ -1867,6 +2053,14 @@ fn is_known_builtin(name: &str) -> bool {
             | "list_fold"
             | "json_parse"
             | "json_stringify"
+            | "map_empty"
+            | "map_set"
+            | "map_get"
+            | "map_has"
+            | "map_remove"
+            | "map_keys"
+            | "map_values"
+            | "map_size"
             | "file_read"
             | "file_write"
             | "file_append"
@@ -1886,6 +2080,9 @@ fn module_of(name: &str) -> Option<&'static str> {
             Some("list")
         }
         "json_parse" | "json_stringify" => Some("json"),
+        "map_empty" | "map_set" | "map_get" | "map_has" | "map_remove" | "map_keys" | "map_values" | "map_size" => {
+            Some("map")
+        }
         "file_read" | "file_write" | "file_append" | "file_exists" => Some("file"),
         "args" => Some("env"),
         _ => None,
@@ -2890,6 +3087,119 @@ end
 "#;
         let result = run_src(src);
         assert!(result.is_err(), "无效 JSON 应报错");
+    }
+
+    #[test]
+    fn test_map_basic() {
+        // Phase 5.20: set/get/has/remove/size/keys/values 全流程
+        let src = r#"
+from map import { map_empty, map_set, map_get, map_has, map_remove, map_keys, map_values, map_size }
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "b", 2)
+    map_set(m, "a", 1)
+    map_set(m, "c", 3)
+    println(map_size(m))
+    println(map_has(m, "a"))
+    println(map_has(m, "z"))
+    # 覆盖已有键
+    map_set(m, "a", 10)
+    println(map_get(m, "a"))
+    println(map_get(m, "z"))
+    # keys/values 按排序键序输出
+    println(map_keys(m))
+    println(map_values(m))
+    println(map_remove(m, "b"))
+    println(map_remove(m, "b"))
+    println(map_size(m))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_map_get_some_none() {
+        // map_get 返回 Option：Some(v) / None，可模式匹配
+        let src = r#"
+from map import { map_empty, map_set, map_get }
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "x", 42)
+    match map_get(m, "x")
+        Some(v) => println("got " + v)
+        None => println("missing")
+    end
+    match map_get(m, "y")
+        Some(v) => println("got " + v)
+        None => println("missing")
+    end
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_map_alias_sharing() {
+        // 引用语义：let 别名共享同一份 Map，一处修改处处可见；
+        // 用"断言失败则除以零"的方式验证（绕过 stdout 捕获限制）
+        let src = r#"
+from map import { map_empty, map_set, map_get }
+fn main() -> Unit
+    let a = map_empty()
+    let b = a
+    map_set(b, "k", 7)
+    match map_get(a, "k")
+        Some(v) =>
+            if v == 7
+                println("shared")
+            else
+                let _bad = 1 / 0
+            end
+        end
+        None =>
+            let _bad2 = 1 / 0
+        end
+    end
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_map_type_errors() {
+        // 非 Map 参数应报运行时错误
+        let src = r#"
+from map import { map_set }
+fn main() -> Unit
+    map_set(42, "k", 1)
+end
+"#;
+        assert!(run_src(src).is_err(), "map_set 非 Map 参数应报错");
+
+        let src2 = r#"
+from map import { map_empty, map_get }
+fn main() -> Unit
+    let m = map_empty()
+    map_get(m, 42)
+end
+"#;
+        assert!(run_src(src2).is_err(), "map_get 非 String 键应报错");
+    }
+
+    #[test]
+    fn test_map_json_stringify() {
+        // Map 序列化为 JSON object，键排序输出
+        let src = r#"
+from map import { map_empty, map_set }
+from json import { json_stringify }
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "b", 2)
+    map_set(m, "a", 1)
+    println(json_stringify(m))
+end
+"#;
+        run_src(src).unwrap();
     }
 
     #[test]

@@ -2,7 +2,7 @@
   "schema": "lom-eval/v1",
   "version": "0.1.0",
   "phase": "2.8",
-  "total_tasks": 107,
+  "total_tasks": 108,
   "categories": [
     {
       "id": "01_arithmetic",
@@ -63,8 +63,8 @@
     {
       "id": "09_modules",
       "name": "Modules & Imports",
-      "task_count": 5,
-      "description": "from mod import {name as alias}, stdlib (io/string/math), no wildcard.",
+      "task_count": 6,
+      "description": "from mod import {name as alias}, stdlib (io/string/math/map), no wildcard.",
       "file": "tasks/09_modules.json"
     },
     {

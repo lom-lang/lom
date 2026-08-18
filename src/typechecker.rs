@@ -251,6 +251,42 @@ impl TypeChecker {
             "json_stringify".to_string(),
             FnSig { params: vec![("v".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::String), effects: vec![], span: Span::default() },
         );
+        // Phase 5.20: map 模块（map_set/map_remove 为引用语义就地修改，其余为只读查询）
+        // Map 用 Type::Generic("Map", [_Any]) 表示；map_get 返回 Option<_Any>
+        let map_any = || Type::Generic("Map".to_string(), vec![Type::Named("_Any".to_string())]);
+        self.functions.insert(
+            "map_empty".to_string(),
+            FnSig { params: vec![], ret: Some(map_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_set".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any()), ("key".to_string(), Type::String), ("value".to_string(), Type::Named("_Any".to_string()))], ret: Some(Type::Unit), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_get".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any()), ("key".to_string(), Type::String)], ret: Some(Type::Option(Box::new(Type::Named("_Any".to_string())))), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_has".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any()), ("key".to_string(), Type::String)], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_remove".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any()), ("key".to_string(), Type::String)], ret: Some(Type::Bool), effects: vec![], span: Span::default() },
+        );
+        let list_any = || Type::Generic("List".to_string(), vec![Type::Named("_Any".to_string())]);
+        self.functions.insert(
+            "map_keys".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_values".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any())], ret: Some(list_any()), effects: vec![], span: Span::default() },
+        );
+        self.functions.insert(
+            "map_size".to_string(),
+            FnSig { params: vec![("map".to_string(), map_any())], ret: Some(Type::Int), effects: vec![], span: Span::default() },
+        );
         // Phase 3.4: string 扩展（纯函数）
         // split(s, sep) -> List<String>；返回 List<_Any>（元素类型追踪推迟）
         let list_string = || Type::Generic("List".to_string(), vec![Type::Named("_Any".to_string())]);
