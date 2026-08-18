@@ -934,6 +934,8 @@
     <br><br>
     <strong>Phase 5.14 自举：VList 递归值类型（2026-08-18）</strong>：<code>Val</code> 加入 <code>VList(List&lt;Val&gt;)</code>——自举运行时首次拥有递归值类型（值里套值）。源语言新增：列表字面量 <code>[1, 2]</code>、索引 <code>xs[i]</code>（可链式）、<code>len()</code> 内建（List/String 通用，首个内建函数机制）。列表元素求值复用 eval_args；show/values_eq/truthy 递归扩展到 List（嵌套列表打印 <code>[[1, 2], [3]]</code> 正确）；越界/负索引/类型错误走 5.13 诊断通道（含原始下标保留——初版递归递减导致报错消息显示递减值，已修）。9 个测试程序共 18 条输出逐字验证，<code>--check</code> 0 诊断。
     <br><br>
+    <strong>Phase 5.15 自举：容错解析（2026-08-18）</strong>：对齐主语言的 holey AST 哲学——<strong>解析错误成为 AST 节点</strong>（<code>EError</code>/<code>SError</code>），执行时经 5.13 诊断通道报告；lexer 未知字符产出 <code>TUnknown</code> token（"静默丢弃"陷阱在 lexer 层根治）；解析器全函数化（<code>peek_tok</code> Option 守卫取代所有裸 <code>list_head</code>，空输入/残缺输入/未知字符都不崩溃）。测试程序 10：错误前的语句照常执行（打印 7），随后报错 <code>unexpected unknown character '@'</code>；残缺输入 <code>1 +</code> 与空输入均安全。调试记录：① Form B 臂内嵌 match 漏 end（parse_call_args，报错位置在下一个无辜函数——§4.1 陷阱再次应验）；② 纠偏时对 Form A 臂误加 end（Form A 同行结束不需要 end，与 Form B 的规则差异是本次的根因混淆点）；③ typechecker 的 TYPE003 抓到两个兜底臂里 list_cons 参数顺序的潜伏 bug（EError 被当成 list 传入）。10 个程序 21 条输出逐字验证，<code>--check</code> 0 诊断。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

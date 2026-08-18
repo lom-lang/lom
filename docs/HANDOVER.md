@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.14 完成，自举 VList 递归值 + 索引 + len 内建）
+> 最后更新：2026-08-18（Phase 5.15 完成，自举容错解析 EError/SError + TUnknown）
 
 ---
 
@@ -34,9 +34,9 @@
 | Rust 测试 | **320/320 通过** |
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 18 条输出全对，--check 0 诊断） |
-| 当前进度 | Phase 5.14 完成（VList 递归值 + 列表字面量 + 索引 + len 内建） |
-| 下一步 | 候选：解析层诊断（lexer/parser 静默吞 token 仍未根治）、字符串方法内建（split/contains 进迷你语言）、P2：char 类型、HashMap/Set |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 10 程序 21 条输出全对，--check 0 诊断；空/残缺/乱码输入均不崩溃） |
+| 当前进度 | Phase 5.15 完成（自举容错解析：错误即节点 + 全函数 parser + TUnknown） |
+| 下一步 | 候选：自举字符串内建（split/contains 进迷你语言）、自举 tokenizer 位置信息（诊断带行号）、P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -209,6 +209,7 @@ end
 - ✅ **自举值系统**（2026-08-18 完成，Phase 5.12）：`Val = VInt | VStr | VBool`；字符串字面量 + `==` + Bool 打印；Add 混合镜像 v0.4.1 提升；truthy() 统一条件判断。**5.11 的 `=` 陷阱已根治**：`=`/`==` 现在是显式 token（TAssign/TEq），parse_stmt_let 跳过 TAssign 而非依赖丢弃。嵌套 match Form B 的双 end 写法在 values_eq/eval Add 等臂中大量出现，§4.1 的坑在这里全部踩过一遍，写法照抄现有臂即可。
 - ✅ **自举诊断层**（2026-08-18 完成，Phase 5.13）：全链路 `Result<_, String>` + `?` 传播（未定义变量/函数、arity、类型错误、除零显式报错）。**注意**：`?` 要求宿主函数返回 `Result<_, String>`（TYPE020 只查"是 Result"不细究 E）；exec_stmts 的 list_fold 累积 Result 元组——Err 短路、Ok 继续；eval_args 从 list_map 退回手写递归（list_map 无法穿透 Result）。已知残留限制：parser 层遇未知 token 仍静默（lex/parse 诊断未做）。
 - ✅ **自举 VList 递归值**（2026-08-18 完成，Phase 5.14）：列表字面量 `[1, 2]` + 索引 `xs[i]` + `len()` 内建。**坑**：list_at 递归递减 i 时错误消息会显示递减后的值而非原始下标——带 orig 参数保留。列表元素求值直接复用 eval_args（顺序 + ? 传播都对）。
+- ✅ **自举容错解析**（2026-08-18 完成，Phase 5.15）：错误即节点（EError/SError）+ peek_tok 全函数化 + TUnknown。**坑三个**：① Form B 臂里嵌套 match 要数三个 end（臂的 + 内 match 的 + 外 match 的），报错位置会漂移到下一个无辜函数；② **Form A 臂（=> 同行单表达式）不需要 end，只有 Form B 需要**——纠偏时别看错形态；③ 写完跑一遍 --check，TYPE003 会抓到 list_cons 参数顺序这类潜伏 bug（list_cons(head, list)，别写反）。
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
