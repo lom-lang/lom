@@ -953,6 +953,8 @@
     <br><br>
     <strong>Phase 5.20 map 模块（2026-08-19，v0.5.1，P2-②）</strong>：<code>Value::Map(Rc&lt;RefCell&lt;HashMap&lt;String, Value&gt;&gt;)</code> + <code>map</code> 标准库模块（map_empty / map_set / map_get→Option / map_has / map_remove / map_keys / map_values / map_size，共 8 个）。<strong>引用语义 + 内部可变性</strong>：map_set 就地修改 O(1)，let 别名共享同一份数据——与 List 的不可变持久化刻意不同（List=函数式结构，Map=可变引用结构；不可变结构化数据用 Record）。写时复制方案被否决：args 切片永远持有 Rc 导致 Rc::get_mut 永远失败，克隆路径 100% 命中等于白做。map_keys/map_values/json_stringify 的 Map 分支都按键排序输出，保证确定性（HashMap 遍历序不稳定）。<strong>实测对比</strong>（同机同基准）：lookup(List) n=2000 → 18136 ms vs map_lookup n=2000 → 55 ms（墙钟 ~330×；其中 ~48ms 是解释器启动开销，纯计算 ~2500×）；map_lookup 在 n=500/1000/2000 全程 ~55-66ms 平线（总量 O(n)）。5 个新测试（325/325），eval 任务 086（modules 类，108/108）。
     <br><br>
+    <strong>Phase 5.21 自举环境换 Map（2026-08-19，v0.5.1 dogfooding）</strong>：stmt_interp.lom 的变量环境从 <code>List&lt;(String, Val)&gt;</code> 关联表（线性扫描 + 函数式 threading）换为宿主 Map（O(1) 查找 + 就地突变）。env_lookup 从 10 行递归缩成 4 行 map_get match；bind_params 变 while + map_set 循环；exec_stmt/exec_stmts 不再返回环境（突变取代 threading），签名从 <code>Result&lt;(Env, Val), String&gt;</code> 降为 <code>Result&lt;Val, String&gt;</code>；词法作用域不变（callee 用全新 map_empty()）。31 条输出逐字不变，--check 0 诊断。<strong>实测</strong>（压测程序：100 个 let + N 轮循环反复查表）：N=200 → 842→226 ms（3.7×）；N=400 → 2436→292 ms（8.3×）；旧实现每翻倍 ×2.9（平方增长），新实现 ×1.3（近线性）——与复杂度预测一致。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
@@ -963,7 +965,7 @@
       <li>✅ match arm 多行块 → <strong>误判，非缺口</strong>：Form B（<code>=&gt;</code> 后换行块）本来就支持，每个 arm 块需自己的 <code>end</code> + match 整体一个 <code>end</code></li>
       <li>✅ 树遍历解释器栈深度限制 → <strong>已缓解</strong>：main 在 256MB 栈线程中运行解释器（Rust 默认 1MB 被深层递归耗尽）</li>
       <li>⚠️ 无 char 类型 → <code>split(s,"")</code> 返回 <code>List&lt;String&gt;</code>，性能差但可行</li>
-      <li>⚠️ 无 HashMap/Set → 环境查找用 <code>List&lt;(String,Int)&gt;</code> 线性查找替代，已验证可行</li>
+      <li>✅ 无 HashMap/Set → <strong>Phase 5.20/5.21 已补</strong>：<code>map</code> 模块（<code>Value::Map</code> 包装 HashMap）落地并回喂自举——stmt_interp 环境从关联表换 Map，env_lookup O(n)→O(1)，压测 N=400 提速 8.3×。Set 不单列：<code>map_set(m,k,0)</code> + <code>map_has</code> 即集合语义</li>
     </ul>
   </div>
   <h4>技术栈升级</h4>
