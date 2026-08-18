@@ -7,15 +7,16 @@
 #   SWhile(cond, body)    while cond ... end
 #   DFn(name, params, body)  fn name(p1, p2) ... end
 #   Call(name, args)         name(e1, e2)
-#   Val = VInt | VStr | VBool
+#   Val = VInt | VStr | VBool | VList(List<Val>)         （Phase 5.14 递归值类型）
 # 设计要点：
 #   - 环境函数式：exec_stmt 返回 Result<(新环境, 语句值), String>；函数调用在全新环境绑定参数（词法作用域）
 #   - 语句值语义：SIf 的值=被执行分支块的值（if 即表达式）；块的值=尾语句的值（尾表达式返回）
 #   - in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值
 #   - collect_fns 先收集全部函数再执行 → 前向引用/互递归天然支持
 #   - Phase 5.12：= / == 显式成 token（TAssign/TEq）
-#   - Phase 5.13 诊断层：全链路 Result<_, String> + ? 传播（dogfood Lom 的"错误即值"哲学）——
-#     未定义变量/函数、参数个数不符、类型错误、除以零全部显式报错，不再静默得 0
+#   - Phase 5.13 诊断层：全链路 Result<_, String> + ? 传播（dogfood Lom 的"错误即值"哲学）
+#   - Phase 5.14：VList 递归值 + 列表字面量 [1, 2] + 索引 xs[i] + len() 内建（List/String 通用）；
+#     列表元素求值复用 eval_args；越界/类型错误走 5.13 诊断通道
 #   - Add 混合规则镜像 Lom v0.4.1：任一侧是 String 时另一侧 show() 提升拼接
 
 from string import { split, string_to_int, int_to_string, contains, len }
@@ -35,6 +36,8 @@ enum Token
     | TComma
     | TAssign
     | TEq
+    | TLBracket
+    | TRBracket
     | TLet
     | TIf
     | TElse
@@ -56,6 +59,8 @@ enum Expr
     | Gt(Expr, Expr)
     | Eq(Expr, Expr)
     | Call(String, List<Expr>)
+    | ListLit(List<Expr>)
+    | Index(Expr, Expr)
 end
 
 enum Stmt
@@ -76,6 +81,7 @@ enum Val
     | VInt(Int)
     | VStr(String)
     | VBool(Bool)
+    | VList(List<Val>)
 end
 
 # ===== Lexer =====
@@ -160,6 +166,10 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
         list_cons(TRParen, lex_rec(rest_chars, ""))
     elif c == ","
         list_cons(TComma, lex_rec(rest_chars, ""))
+    elif c == "["
+        list_cons(TLBracket, lex_rec(rest_chars, ""))
+    elif c == "]"
+        list_cons(TRBracket, lex_rec(rest_chars, ""))
     elif c == "\""
         lex_str(rest_chars, "")
     elif c == "="
@@ -232,10 +242,32 @@ fn parse_call_args(tokens: List<Token>) -> (List<Expr>, List<Token>)
     end
 end
 
-fn parse_factor(tokens: List<Token>) -> (Expr, List<Token>)
+# 列表字面量元素：[e1, e2, ...] —— tokens 从 TLBracket 之后开始
+fn parse_list_elems(tokens: List<Token>) -> (List<Expr>, List<Token>)
+    match list_head(tokens)
+        TRBracket => (list_empty(), list_tail(tokens))
+        _ =>
+            let (e, rest) = parse_expr(tokens)
+            match list_head(rest)
+                TComma =>
+                    let (more, rest2) = parse_list_elems(list_tail(rest))
+                    (list_cons(e, more), rest2)
+                end
+                TRBracket => (list_cons(e, list_empty()), list_tail(rest))
+            end
+        end
+    end
+end
+
+# 原子表达式：字面量 / 变量 / 调用 / 列表字面量 / 括号
+fn parse_atom(tokens: List<Token>) -> (Expr, List<Token>)
     match list_head(tokens)
         TInt(n) => (Num(n), list_tail(tokens))
         TStr(s) => (StrLit(s), list_tail(tokens))
+        TLBracket =>
+            let (elems, rest) = parse_list_elems(list_tail(tokens))
+            (ListLit(elems), rest)
+        end
         TIdent(name) =>
             # 前瞻：Ident 后跟 TLParen 是函数调用，否则是变量引用
             if list_is_empty(list_tail(tokens))
@@ -255,6 +287,33 @@ fn parse_factor(tokens: List<Token>) -> (Expr, List<Token>)
             (e, list_tail(rest))
         end
     end
+end
+
+# 后缀索引：base[i]（可链式 xs[i][j]；宽容处理缺失的 ]）
+fn parse_postfix(base: Expr, tokens: List<Token>) -> (Expr, List<Token>)
+    if list_is_empty(tokens)
+        (base, tokens)
+    else
+        match list_head(tokens)
+            TLBracket =>
+                let (idx, rest) = parse_expr(list_tail(tokens))
+                if list_is_empty(rest)
+                    (Index(base, idx), rest)
+                else
+                    match list_head(rest)
+                        TRBracket => parse_postfix(Index(base, idx), list_tail(rest))
+                        _ => parse_postfix(Index(base, idx), rest)
+                    end
+                end
+            end
+            _ => (base, tokens)
+        end
+    end
+end
+
+fn parse_factor(tokens: List<Token>) -> (Expr, List<Token>)
+    let (base, rest) = parse_atom(tokens)
+    parse_postfix(base, rest)
 end
 
 fn parse_term_star(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
@@ -443,7 +502,20 @@ end
 
 # ===== Val 辅助 =====
 
-# 值的显示形式（println 用）：Bool 小写 true/false，与 Lom 一致
+# 列表显示：[a, b, c]（递归 show 每个元素）
+fn show_list(elems: List<Val>, acc: String) -> String
+    if list_is_empty(elems)
+        acc
+    else
+        if len(acc) == 0
+            show_list(list_tail(elems), show(list_head(elems)))
+        else
+            show_list(list_tail(elems), acc + ", " + show(list_head(elems)))
+        end
+    end
+end
+
+# 值的显示形式（println 用）：Bool 小写 true/false，与 Lom 一致；List 递归显示
 fn show(v: Val) -> String
     match v
         VInt(n) => int_to_string(n)
@@ -455,6 +527,7 @@ fn show(v: Val) -> String
                 "false"
             end
         end
+        VList(elems) => "[" + show_list(elems, "") + "]"
     end
 end
 
@@ -464,6 +537,7 @@ fn type_name(v: Val) -> String
         VInt(n) => "Int"
         VStr(s) => "String"
         VBool(b) => "Bool"
+        VList(elems) => "List"
     end
 end
 
@@ -487,6 +561,22 @@ fn truthy(v: Val) -> Bool
                 False
             end
         end
+        VList(elems) => !list_is_empty(elems)
+    end
+end
+
+# 列表结构相等：逐元素递归比较
+fn list_vals_eq(a: List<Val>, b: List<Val>) -> Bool
+    if list_is_empty(a)
+        list_is_empty(b)
+    elif list_is_empty(b)
+        False
+    else
+        if truthy(values_eq(list_head(a), list_head(b)))
+            list_vals_eq(list_tail(a), list_tail(b))
+        else
+            False
+        end
     end
 end
 
@@ -508,6 +598,12 @@ fn values_eq(a: Val, b: Val) -> Val
         VBool(x) =>
             match b
                 VBool(y) => VBool(x == y)
+                _ => VBool(False)
+            end
+        end
+        VList(xs) =>
+            match b
+                VList(ys) => VBool(list_vals_eq(xs, ys))
                 _ => VBool(False)
             end
         end
@@ -613,11 +709,55 @@ fn eval(e: Expr, env: List<(String, Val)>, fns: List<Decl>) -> Result<Val, Strin
             let vb = eval(b, env, fns)?
             Ok(values_eq(va, vb))
         end
+        ListLit(elems) =>
+            # 元素按序求值（复用 eval_args：顺序保持 + ? 传播）
+            let vals = eval_args(elems, env, fns)?
+            Ok(VList(vals))
+        end
+        Index(target, idx) =>
+            let tv = eval(target, env, fns)?
+            let iv = eval(idx, env, fns)?
+            match tv
+                VList(elems) =>
+                    match iv
+                        VInt(i) => list_at(elems, i, i)
+                        _ => Err("type error: index must be Int, got " + type_name(iv))
+                    end
+                end
+                _ => Err("type error: indexing expects List, got " + type_name(tv))
+            end
+        end
         Call(name, arg_exprs) =>
             let args = eval_args(arg_exprs, env, fns)?
-            let decl = find_fn(fns, name)?
-            call_fn(decl, args, fns)
+            # len 是内建（List/String 通用）；其余按用户函数解析
+            if name == "len"
+                if list_length(args) == 1
+                    match list_head(args)
+                        VList(elems) => Ok(VInt(list_length(elems)))
+                        VStr(s) => Ok(VInt(len(s)))
+                        other => Err("type error: len expects List or String, got " + type_name(other))
+                    end
+                else
+                    Err("arity error: len expects 1 arg, got " + list_length(args))
+                end
+            else
+                let decl = find_fn(fns, name)?
+                call_fn(decl, args, fns)
+            end
         end
+    end
+end
+
+# 索引取值（0 起；负索引/越界走诊断通道；orig 保留原始下标用于错误消息）
+fn list_at(elems: List<Val>, i: Int, orig: Int) -> Result<Val, String>
+    if 0 > i
+        Err("index out of bounds: " + orig + " (negative)")
+    elif list_is_empty(elems)
+        Err("index out of bounds: " + orig + " (list too short)")
+    elif i == 0
+        Ok(list_head(elems))
+    else
+        list_at(list_tail(elems), i - 1, orig)
     end
 end
 
@@ -807,4 +947,12 @@ fn main() -> Unit
     run_program("fn f(a)\na\nend\nf(1, 2)")
     run_program("1 / 0")
     run_program("let n = 5\nn - \"abc\"")
+
+    # 程序 9（Phase 5.14）：VList 递归值——字面量 / 索引 / len 内建 / 结构相等 / 越界诊断
+    # ->  20 / true / 3 / [[1, 2], [3]] / error: index out of bounds: 5 (list too short)
+    run_program("let xs = [10, 20, 30]\nxs[1]")
+    run_program("[1, 2] == [1, 2]")
+    run_program("len([1, 2, 3])")
+    run_program("let m = [[1, 2], [3]]\nm")
+    run_program("let xs = [1, 2, 3]\nxs[5]")
 end
