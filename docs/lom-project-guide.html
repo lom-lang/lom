@@ -955,6 +955,8 @@
     <br><br>
     <strong>Phase 5.21 自举环境换 Map（2026-08-19，v0.5.1 dogfooding）</strong>：stmt_interp.lom 的变量环境从 <code>List&lt;(String, Val)&gt;</code> 关联表（线性扫描 + 函数式 threading）换为宿主 Map（O(1) 查找 + 就地突变）。env_lookup 从 10 行递归缩成 4 行 map_get match；bind_params 变 while + map_set 循环；exec_stmt/exec_stmts 不再返回环境（突变取代 threading），签名从 <code>Result&lt;(Env, Val), String&gt;</code> 降为 <code>Result&lt;Val, String&gt;</code>；词法作用域不变（callee 用全新 map_empty()）。31 条输出逐字不变，--check 0 诊断。<strong>实测</strong>（压测程序：100 个 let + N 轮循环反复查表）：N=200 → 842→226 ms（3.7×）；N=400 → 2436→292 ms（8.3×）；旧实现每翻倍 ×2.9（平方增长），新实现 ×1.3（近线性）——与复杂度预测一致。
     <br><br>
+    <strong>Phase 5.22 自举静态检查层（2026-08-19）</strong>：迷你语言在 parse 和 eval 之间长出 <strong>check 阶段</strong>，对齐宿主三段架构。check_program 把未定义变量/函数、arity 错误收集为 <code>List&lt;String&gt;</code> 诊断（迷你版 NAM003），run_program 有诊断则不执行。作用域继续复用宿主 Map（5.20/5.21 二次 dogfooding）；函数体只见参数（词法作用域与运行期一致）；SLet 先查 RHS 再绑定（<code>let x = x</code> 正确报错）。调用检查拆成 check_call/check_call_fn 两个辅助函数，绕开 §4.1 的嵌套 match 数 end 陷阱。程序 8 的未定义变量与 arity 错误从运行期升级为检查期（<code>check error:</code> 前缀）；新程序 13 覆盖 RHS 先查、内建 arity、检查通过才执行。34 条输出逐字验证，--check 0 诊断。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
