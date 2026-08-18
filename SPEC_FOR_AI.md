@@ -59,6 +59,7 @@ end
 ```
 - Closures use `fn (...)` (no name). Named functions use `fn name(...)`.
 - Closures are first-class values: can be passed as arguments, returned, stored in variables.
+- **Named functions are also first-class (v0.4.2)**: `let f = double` wraps a named function as a value — pass it directly to higher-order functions like `apply_twice(double, 3)`. Recursion inside the wrapped function is unaffected.
 - **Phase 1**: Use `Fn` as the type annotation for closure parameters (types are not checked at runtime):
 ```
 let apply = fn(f: Fn, x: Int) -> Int

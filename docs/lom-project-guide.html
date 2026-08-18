@@ -920,6 +920,8 @@
     <br><br>
     <strong>Phase 5.7 match guard（2026-08-18，v0.4.2 P1-2）</strong>：<code>pattern if cond =&gt; body</code>——模式匹配成功后再求值 guard（Bool），为 False 穿透到下一臂；guard 可引用模式绑定的变量。ast <code>MatchArm</code> 加 <code>guard: Option&lt;Expr&gt;</code>；parser 在 pattern 后识别 <code>if</code>；interpreter 在 match_pattern 成功后、执行臂体前求值 guard（复用 is_truthy 的 Bool 强制）；typechecker 检查 guard 为 Bool（TYPE002），且<strong>带 guard 的臂不计入穷尽性</strong>（Rust 语义：guard 真假运行时才知道，不能证明覆盖；此前任务 054 的 workaround 笔记"match 不能匹配不等式"从此过时）。6 个新测试（313/313 通过），eval 新增任务 105（105/105 通过，match_enum 类 16/16）。
     <br><br>
+    <strong>Phase 5.8 具名函数作为值（2026-08-18，v0.4.2 P1-3）</strong>：<code>let f = double</code> 合法——interpreter 把具名函数包装为闭包值（环境取 globals，与 <code>call_function</code> 父环境一致，行为与直接调用完全等价；函数体内按名递归仍走 functions 表，不受影响）。此前报"不能将函数作为值使用（仅支持闭包字面量）"。typechecker 本就放行函数引用（Unknown，渐进式），零改动；3 个新测试（316/316 通过），eval 新增任务 106（106/106 通过，closures 类 11/11）。<strong>这是 list_map/list_filter 等高阶标准库函数的语言前提。</strong>
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

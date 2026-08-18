@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.7 完成，match guard，v0.4.2 P1-2）
+> 最后更新：2026-08-18（Phase 5.8 完成，具名函数作为值，v0.4.2 P1 三件套全部完成）
 
 ---
 
@@ -31,12 +31,12 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **313/313 通过** |
-| eval 评测集 | **105/105 参考解通过** |
+| Rust 测试 | **316/316 通过** |
+| eval 评测集 | **106/106 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp） |
-| 当前进度 | Phase 5.7 完成（match guard，v0.4.2 P1-2） |
-| 下一步 | P1-3：具名函数作为值（list_map/list_filter 的前提） |
+| 当前进度 | Phase 5.8 完成（具名函数作为值，v0.4.2 P1 三件套全部完成） |
+| 下一步 | 候选：list_map/list_filter 高阶标准库（P1-3 已解锁）；P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -160,7 +160,7 @@ end
 - ✅ ~~`n += 1`~~ → v0.4.1 起合法（复合赋值，去糖为 `n = n + 1`，带换行守卫）
 - ✅ ~~`for i in 1..10`~~ → v0.4.2 起合法（`..` 求值为 `List<Int>`，左闭右开，直接复用 for-in-List）
 - ✅ ~~`m if m > 0 => ...`~~ → v0.4.2 起合法（match guard；带 guard 的臂不计入穷尽性，记得 `_` 兜底）
-- `let f = double`（具名函数当值）→ 报"不能将函数作为值使用"（闭包字面量可以，具名 fn 不行）
+- ✅ ~~`let f = double`（具名函数当值）~~ → v0.4.2 起合法（包装为闭包值，环境=globals，递归不受影响）
 
 ### 4.6 深递归与 256MB 栈
 
@@ -200,9 +200,11 @@ end
 
 1. ✅ **range 表达式 `1..10`**（2026-08-18 完成，Phase 5.6 / v0.4.2）：lexer `DotDot` + parser 最低优先级 `parse_range`（非结合、换行守卫）+ 求值为 `List<Int>`（零新运行时机制，复用 for-in-List）；typechecker 记 `List<Int>`、两端非 Int 报 TYPE001；8 个新测试 + eval 任务 104。注意：`a..=b`（闭区间）刻意不支持，`1..(n+1)` 是显式写法。
 2. ✅ **match guard**（2026-08-18 完成，Phase 5.7 / v0.4.2）：`pattern if cond => body`；guard 可用绑定变量，为 False 穿透下一臂；typechecker 检查 Bool（TYPE002）且带 guard 臂不计入穷尽性（Rust 语义）；6 个新测试 + eval 任务 105。注意：eval 任务 054 的旧 notes（"match 不能匹配不等式"）已过时但保留了原始任务作对照。
-3. **具名函数作为值**（这个是 `list_map/list_filter` 标准库的前提）：`let f = double` 目前报"不能将函数作为值使用"。
+3. ✅ **具名函数作为值**（2026-08-18 完成，Phase 5.8 / v0.4.2）：interpreter 把具名函数包装为闭包值（env=globals，与 call_function 父环境一致）；typechecker 本就放行（Unknown）零改动；3 个新测试 + eval 任务 106。注意：**内置函数（println 等）仍不能当值**（没有 NativeFn 值变体），只有用户具名函数可以。
 
-P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）。
+**v0.4.2 P1 三件套已全部完成。** 下一步候选：
+- **list_map / list_filter / list_fold 高阶标准库**（P1-3 已解锁语言前提，注意需要参数是 Fn 类型 + 调用闭包，参考 apply 模式）
+- P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
 
@@ -237,7 +239,7 @@ P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举�
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 313/313
+2. `cargo build --release && cargo test --release` 确认 316/316
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

@@ -634,6 +634,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>5.5 复合赋值(v0.4.1)</strong>:<code>n += 1</code> 这种写法合法了(<code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code>)。实现上用了一个偷懒但正确的技巧:<strong>去糖</strong>——parser 把 <code>n += 1</code> 直接翻译成 <code>n = n + 1</code> 的语法树,后面的解释器和类型检查器一行都不用改,所有现有检查(变量是否存在、类型对不对)自动生效。</li>
   <li><strong>5.6 range 表达式(v0.4.2)</strong>:<code>for i in 1..10</code> 合法了。设计很省:<code>1..10</code> 不求值为新类型,而是直接变成整数列表 <code>[1,2,...,9]</code>(左闭右开)——于是 5.3 刚做好的 for-in-List 和整个 list 模块自动全部适用,一行新的运行时机制都不用写。</li>
   <li><strong>5.7 match guard(v0.4.2)</strong>:match 分支可以带条件了——<code>m if m &gt; 0 =&gt; ...</code>,模式先匹配、条件再过滤,条件不成立就继续试下一分支。一个细节:带条件的分支不算"必然覆盖",类型检查器仍会要求你写 <code>_</code> 兜底(和 Rust 一样)。</li>
+  <li><strong>5.8 具名函数作为值(v0.4.2)</strong>:<code>let f = double</code> 合法了——具名函数和闭包字面量地位平等,可以直接传给高阶函数。实现只有几行:把函数的参数表和函数体连同全局环境打包成一个闭包值,之后走现成的闭包调用路径。这为将来的 <code>list_map</code>/<code>list_filter</code> 铺平了路。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
