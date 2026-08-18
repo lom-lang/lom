@@ -1,14 +1,17 @@
-# 自举验证 5：带语句层的解释器（Phase 5.2）
-# 源语言支持：let 绑定、if/else 语句、块、比较运算、四则运算、变量
+# 自举验证 5：带语句层的解释器（Phase 5.2，Phase 5.10 扩展）
+# 源语言支持：let 绑定、if/else 语句、while 循环、块、比较运算、四则运算、变量
 # 在表达式解释器（mini_interp.lom）之上加 Stmt 层：
 #   SLet(name, expr)      let name = expr
 #   SExpr(expr)           裸表达式（求值并打印）
 #   SIf(cond, then, else) if cond ... else ... end
+#   SWhile(cond, body)    while cond ... end          （Phase 5.10 新增）
 # 环境扩展用函数式风格：exec_stmt 返回新环境（cons 头插，新绑定遮蔽旧绑定）
 # 全程使用 Phase 5.1 的 let 元组解构
+# Phase 5.10：exec_stmts 改用 list_fold + 闭包（dogfood v0.4.3 高阶标准库 + v0.4.2 闭包作参数）；
+#             SWhile 执行用 let mut + Lom while（dogfood 可变绑定与循环）
 
 from string import { split, string_to_int, contains, len }
-from list import { list_empty, list_cons, list_head, list_tail, list_is_empty }
+from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_fold }
 
 # ===== Token =====
 enum Token
@@ -24,6 +27,7 @@ enum Token
     | TIf
     | TElse
     | TEnd
+    | TWhile
     | TGt
 end
 
@@ -42,6 +46,7 @@ enum Stmt
     | SLet(String, Expr)
     | SExpr(Expr)
     | SIf(Expr, List<Stmt>, List<Stmt>)
+    | SWhile(Expr, List<Stmt>)
 end
 
 # ===== Lexer =====
@@ -64,7 +69,7 @@ fn is_alnum(c: String) -> Bool
     end
 end
 
-# 关键字识别：let/if/else/end 是保留字，其余为标识符
+# 关键字识别：let/if/else/end/while 是保留字，其余为标识符
 fn keyword_or_ident(s: String) -> Token
     if s == "let"
         TLet
@@ -74,6 +79,8 @@ fn keyword_or_ident(s: String) -> Token
         TElse
     elif s == "end"
         TEnd
+    elif s == "while"
+        TWhile
     else
         TIdent(s)
     end
@@ -269,10 +276,21 @@ fn parse_if(tokens: List<Token>) -> (Stmt, List<Token>)
     end
 end
 
+# while cond
+#     body-block
+# end
+fn parse_while(tokens: List<Token>) -> (Stmt, List<Token>)
+    # tokens: TWhile cond ...
+    let (cond, rest) = parse_expr(list_tail(tokens))
+    let (body, rest2) = parse_block(rest)
+    (SWhile(cond, body), rest2)
+end
+
 fn parse_stmt(tokens: List<Token>) -> (Stmt, List<Token>)
     match list_head(tokens)
         TLet => parse_stmt_let(tokens)
         TIf => parse_if(tokens)
+        TWhile => parse_while(tokens)
         _ =>
             let (e, rest) = parse_expr(tokens)
             (SExpr(e), rest)
@@ -323,7 +341,8 @@ fn eval(e: Expr, env: List<(String, Int)>) -> Int
 end
 
 # 执行语句，返回扩展后的环境（let 绑定 cons 头插——新绑定遮蔽旧绑定）
-fn exec_stmt(s: Stmt, env: List<(String, Int)>) -> List<(String, Int)>
+# ! [IO]：SExpr 臂会 println（Phase 5.10 效应标注补齐）
+fn exec_stmt(s: Stmt, env: List<(String, Int)>) -> List<(String, Int)> ! [IO]
     match s
         SLet(name, e) =>
             let v = eval(e, env)
@@ -340,23 +359,33 @@ fn exec_stmt(s: Stmt, env: List<(String, Int)>) -> List<(String, Int)>
                 exec_stmts(else_block, env)
             end
         end
+        SWhile(c, body) =>
+            # Phase 5.10：函数式环境的循环 threading —— 每轮把 body 执行后的新环境带入下一轮
+            # （cons 头插遮蔽使 let 重新绑定生效；环境单调增长，查找永远命中最新绑定）
+            let mut cur = env
+            while eval(c, cur) == 1
+                cur = exec_stmts(body, cur)
+            end
+            cur
+        end
     end
 end
 
-fn exec_stmts(stmts: List<Stmt>, env: List<(String, Int)>) -> List<(String, Int)>
-    if list_is_empty(stmts)
-        env
-    else
-        exec_stmts(list_tail(stmts), exec_stmt(list_head(stmts), env))
-    end
+# 顺序执行语句序列（Phase 5.10 改为 list_fold + 闭包：
+# fold 的回调签名是 f(acc, x)，exec_stmt 是 (stmt, env)，用闭包适配参数顺序）
+fn exec_stmts(stmts: List<Stmt>, env: List<(String, Int)>) -> List<(String, Int)> ! [IO]
+    list_fold(fn(acc: List<(String, Int)>, s: Stmt) -> List<(String, Int)>
+        exec_stmt(s, acc)
+    end, env, stmts)
 end
 
 # ===== 主入口 =====
 
-fn run_program(src: String) -> Unit
+fn run_program(src: String) -> Unit ! [IO]
     let tokens = lex(src)
     let program = parse_program(tokens)
-    exec_stmts(program, list_empty())
+    # 绑定最终环境使块尾是语句而非表达式（返回 Unit，消除 TYPE010）
+    let final_env = exec_stmts(program, list_empty())
 end
 
 fn main() -> Unit
@@ -367,4 +396,8 @@ fn main() -> Unit
     # 程序 2：if/else 语句 + 块 + 比较运算
     # let a = 5 / if a > 3 / let b = a * 2 / b / else / 0 / end   ->  10
     run_program("let a = 5\nif a > 3\nlet b = a * 2\nb\nelse\n0\nend")
+
+    # 程序 3（Phase 5.10）：while 循环 + 环境遮蔽
+    # let i = 3 / let s = 0 / while i > 0 / let s = s + i / let i = i - 1 / end / s   ->  6
+    run_program("let i = 3\nlet s = 0\nwhile i > 0\nlet s = s + i\nlet i = i - 1\nend\ns")
 end
