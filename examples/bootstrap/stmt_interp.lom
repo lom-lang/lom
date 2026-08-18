@@ -1,7 +1,8 @@
-# 自举验证 5：带语句层、函数、多类型值、诊断、容错解析与位置信息的解释器（Phase 5.2 → 5.17）
+# 自举验证 5：带语句层、函数、多类型值、诊断、容错解析、位置信息与静态检查的解释器（Phase 5.2 → 5.22）
 # 源语言支持：let 绑定、if/else、while、块、比较/四则运算、变量、函数定义与调用、
 #             Int/String/Bool/List 值、字符串字面量、列表字面量、索引、== 比较、
-#             显式错误诊断（5.13）、容错解析（5.15）、内建函数（5.16）、诊断带行号（5.17）
+#             显式错误诊断（5.13）、容错解析（5.15）、内建函数（5.16）、诊断带行号（5.17）、
+#             执行前静态检查：未定义变量/函数 + arity（5.22）
 #   SLet / SExpr / SIf / SWhile / SError(msg)     语句（SError = 解析失败占位）
 #   DFn(name, params, body) / DStmt(stmt)         顶层声明
 #   Num/StrLit/Var/Add/Sub/Mul/Div/Gt/Eq/Call/ListLit/Index/EError(msg)   表达式
@@ -21,10 +22,13 @@
 #     （引用语义，map_set 就地修改），env_lookup 从 O(n) 线性扫描降为 O(1)；
 #     函数调用仍词法作用域——callee 用全新 map_empty() 环境，参数 map_set 进去；
 #     exec_stmt/exec_stmts 不再返回环境（就地突变，无需 threading），只返回语句值
+#   - Phase 5.22 静态检查：对齐宿主 parse → check → eval 三段架构；执行前用
+#     check_program 收集未定义变量/函数与 arity 诊断（List<String>），有诊断则不执行；
+#     作用域复用宿主 Map，函数体只见参数（词法作用域与运行期一致）
 
 from string import { split, string_to_int, int_to_string, contains, len, trim }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_fold, list_map }
-from map import { map_empty, map_set, map_get }
+from map import { map_empty, map_set, map_get, map_has }
 
 # ===== Token =====
 # 词法单元本身（不带位置）；位置由外层记录 Tok 承载
@@ -1090,16 +1094,177 @@ fn collect_stmts(decls: List<Decl>) -> List<Stmt>
     end
 end
 
+# ===== 静态检查（Phase 5.22）：执行前抓未定义变量/函数与 arity 错误 =====
+# 对齐宿主 parse → check → eval 三段架构；检查产物是 List<String> 诊断（迷你版 NAM003）。
+# 作用域用宿主 Map（dogfooding 5.20/5.21）；函数体只见参数（词法作用域与运行期一致）；
+# SLet 先查 RHS 再绑定（let x = x 的 x 未绑定照样报错）；内建函数查名单对 arity。
+
+# 列表拼接（宿主无 list_append 内建，手写递归）
+fn cat(a: List<String>, b: List<String>) -> List<String>
+    if list_is_empty(a)
+        b
+    else
+        list_cons(list_head(a), cat(list_tail(a), b))
+    end
+end
+
+fn one_err(msg: String) -> List<String>
+    list_cons(msg, list_empty())
+end
+
+fn is_intrinsic(name: String) -> Bool
+    name == "len" or name == "split" or name == "contains" or name == "trim" or name == "to_string" or name == "push"
+end
+
+fn intrinsic_arity(name: String) -> Int
+    if name == "len" or name == "trim" or name == "to_string"
+        1
+    else
+        2
+    end
+end
+
+fn check_exprs(es: List<Expr>, scope: Map<Int>, fns: List<Decl>) -> List<String>
+    if list_is_empty(es)
+        list_empty()
+    else
+        cat(check_expr(list_head(es), scope, fns), check_exprs(list_tail(es), scope, fns))
+    end
+end
+
+# 调用检查拆成独立函数，避免 match 臂里再嵌套 match（§4.1 三 end 陷阱）
+fn check_call_fn(d: Decl, name: String, nargs: Int, arg_errs: List<String>) -> List<String>
+    match d
+        DFn(n, ps, body) =>
+            if list_length(ps) == nargs
+                arg_errs
+            else
+                cat(arg_errs, one_err("arity error: function '" + name + "' expects " + list_length(ps) + " args, got " + nargs))
+            end
+        end
+        DStmt(s) => cat(arg_errs, one_err("undefined function '" + name + "'"))
+    end
+end
+
+fn check_call(name: String, nargs: Int, arg_errs: List<String>, fns: List<Decl>) -> List<String>
+    if is_intrinsic(name)
+        if intrinsic_arity(name) == nargs
+            arg_errs
+        else
+            cat(arg_errs, one_err("arity error: intrinsic '" + name + "' expects " + intrinsic_arity(name) + " args, got " + nargs))
+        end
+    else
+        match find_fn(fns, name)
+            Ok(d) => check_call_fn(d, name, nargs, arg_errs)
+            Err(m) => cat(arg_errs, one_err("undefined function '" + name + "'"))
+        end
+    end
+end
+
+fn check_expr(e: Expr, scope: Map<Int>, fns: List<Decl>) -> List<String>
+    match e
+        Num(n) => list_empty()
+        StrLit(s) => list_empty()
+        EError(msg) => list_empty()
+        Var(name) =>
+            if map_has(scope, name)
+                list_empty()
+            else
+                one_err("undefined variable '" + name + "'")
+            end
+        end
+        Add(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Sub(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Mul(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Div(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Gt(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Eq(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        ListLit(elems) => check_exprs(elems, scope, fns)
+        Index(t, i) => cat(check_expr(t, scope, fns), check_expr(i, scope, fns))
+        Call(name, arg_exprs) =>
+            let arg_errs = check_exprs(arg_exprs, scope, fns)
+            check_call(name, list_length(arg_exprs), arg_errs, fns)
+        end
+    end
+end
+
+fn check_stmt(s: Stmt, scope: Map<Int>, fns: List<Decl>) -> List<String>
+    match s
+        SError(msg) => list_empty()
+        SLet(name, e) =>
+            let errs = check_expr(e, scope, fns)
+            map_set(scope, name, 1)
+            errs
+        end
+        SExpr(e) => check_expr(e, scope, fns)
+        SIf(c, then_block, else_block) =>
+            cat(check_expr(c, scope, fns), cat(check_stmts(then_block, scope, fns), check_stmts(else_block, scope, fns)))
+        end
+        SWhile(c, body) =>
+            cat(check_expr(c, scope, fns), check_stmts(body, scope, fns))
+        end
+    end
+end
+
+fn check_stmts(stmts: List<Stmt>, scope: Map<Int>, fns: List<Decl>) -> List<String>
+    if list_is_empty(stmts)
+        list_empty()
+    else
+        cat(check_stmt(list_head(stmts), scope, fns), check_stmts(list_tail(stmts), scope, fns))
+    end
+end
+
+# 函数体用全新作用域（只有参数可见）——与 call_fn 的 map_empty() 语义一致
+fn check_fn_bodies(decls: List<Decl>, fns: List<Decl>) -> List<String>
+    if list_is_empty(decls)
+        list_empty()
+    else
+        match list_head(decls)
+            DFn(n, ps, body) =>
+                let scope = map_empty()
+                let mut rest = ps
+                while !(list_is_empty(rest))
+                    map_set(scope, list_head(rest), 1)
+                    rest = list_tail(rest)
+                end
+                cat(check_stmts(body, scope, fns), check_fn_bodies(list_tail(decls), fns))
+            end
+            DStmt(s) => check_fn_bodies(list_tail(decls), fns)
+        end
+    end
+end
+
+fn check_program(decls: List<Decl>, fns: List<Decl>) -> List<String>
+    let fn_errs = check_fn_bodies(decls, fns)
+    let scope = map_empty()
+    cat(fn_errs, check_stmts(collect_stmts(decls), scope, fns))
+end
+
+fn print_errs(errs: List<String>) -> Int ! [IO]
+    if list_is_empty(errs)
+        0
+    else
+        println("check error: " + list_head(errs))
+        print_errs(list_tail(errs))
+    end
+end
+
 fn run_program(src: String) -> Unit ! [IO]
     let tokens = lex(src)
     let decls = parse_program(tokens)
     # 先收集函数表再执行语句 → 前向引用/互递归天然支持
     let fns = collect_fns(decls, list_empty())
     let stmts = collect_stmts(decls)
-    # 顶层捕获 Result，错误显式打印（诊断层的最终出口）
-    match exec_stmts(stmts, map_empty(), fns, False)
-        Ok(v) => 0
-        Err(msg) => println("error: " + msg)
+    # Phase 5.22：先静态检查再执行——有检查诊断则不执行（对齐宿主 check 拦截语义）
+    let errs = check_program(decls, fns)
+    if list_is_empty(errs)
+        # 顶层捕获 Result，错误显式打印（诊断层的最终出口）
+        match exec_stmts(stmts, map_empty(), fns, False)
+            Ok(v) => 0
+            Err(msg) => println("error: " + msg)
+        end
+    else
+        print_errs(errs)
     end
 end
 
@@ -1134,9 +1299,9 @@ fn main() -> Unit
     run_program("fn shout(s, n)\nlet r = \"\"\nlet i = n\nwhile i > 0\nlet r = r + s\nlet i = i - 1\nend\nr\nend\nshout(\"ab\", 3)")
     run_program("fn eq1(a, b)\na == b\nend\neq1(2 + 2, 4)")
 
-    # 程序 8（Phase 5.13）：诊断层——运行时错误显式报告
-    # ->  error: undefined variable 'x'
-    # ->  error: arity error: function 'f' expects 1 args, got 2
+    # 程序 8（Phase 5.13；5.22 起前两条升级为检查期诊断）：错误显式报告
+    # ->  check error: undefined variable 'x'
+    # ->  check error: arity error: function 'f' expects 1 args, got 2
     # ->  error: division by zero
     # ->  error: type error: Sub expects Int, got Int and String
     run_program("x + 1")
@@ -1176,4 +1341,12 @@ fn main() -> Unit
     run_program("let x = 3\nlet y = 4\nx + y\n@")
     run_program("let = 3")
     run_program("fn 5\nend")
+
+    # 程序 13（Phase 5.22）：静态检查——let 先查 RHS 再绑定；内建 arity 检查
+    # ->  check error: undefined variable 'x'
+    # ->  check error: arity error: intrinsic 'len' expects 1 args, got 2
+    # ->  7（检查通过才执行）
+    run_program("let x = x")
+    run_program("len(1, 2)")
+    run_program("let x = 7\nx")
 end
