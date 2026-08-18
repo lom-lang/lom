@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.13 完成，自举诊断层 Result + ? 全链路）
+> 最后更新：2026-08-18（Phase 5.14 完成，自举 VList 递归值 + 索引 + len 内建）
 
 ---
 
@@ -34,9 +34,9 @@
 | Rust 测试 | **320/320 通过** |
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 13 个输出含 4 条显式诊断，--check 0 诊断） |
-| 当前进度 | Phase 5.13 完成（自举诊断层：全链路 Result<_, String> + ? 传播） |
-| 下一步 | 候选：VList 值（递归值类型）、解析层诊断（当前 parser 遇未知 token 仍静默）、P2：char 类型、HashMap/Set |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 18 条输出全对，--check 0 诊断） |
+| 当前进度 | Phase 5.14 完成（VList 递归值 + 列表字面量 + 索引 + len 内建） |
+| 下一步 | 候选：解析层诊断（lexer/parser 静默吞 token 仍未根治）、字符串方法内建（split/contains 进迷你语言）、P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -208,6 +208,7 @@ end
 - ✅ **自举函数定义与调用**（2026-08-18 完成，Phase 5.11）：Decl 层（DFn/DStmt）+ Call 表达式；词法作用域（全新参数环境）；collect_fns 先收集 → 前向引用/互递归。**关键教训两条**：① 自举源语言没有 `==`（lexer 把 `=` 当未知字符静默丢弃，`n == 1` 变 `n 1` 导致无限递归+栈溢出）——给自举源语言写程序时先核对它的 token 集，平等判断用 `n - (n/2)*2` 这类算术表达；② "最后一条 SExpr 即返回值"在 if 分支处失效，正解是**语句值语义**（exec_stmt 返回 (env, 值)，SIf 的值=被执行分支的值，in_fn 标志区分顶层打印与函数内求值）。
 - ✅ **自举值系统**（2026-08-18 完成，Phase 5.12）：`Val = VInt | VStr | VBool`；字符串字面量 + `==` + Bool 打印；Add 混合镜像 v0.4.1 提升；truthy() 统一条件判断。**5.11 的 `=` 陷阱已根治**：`=`/`==` 现在是显式 token（TAssign/TEq），parse_stmt_let 跳过 TAssign 而非依赖丢弃。嵌套 match Form B 的双 end 写法在 values_eq/eval Add 等臂中大量出现，§4.1 的坑在这里全部踩过一遍，写法照抄现有臂即可。
 - ✅ **自举诊断层**（2026-08-18 完成，Phase 5.13）：全链路 `Result<_, String>` + `?` 传播（未定义变量/函数、arity、类型错误、除零显式报错）。**注意**：`?` 要求宿主函数返回 `Result<_, String>`（TYPE020 只查"是 Result"不细究 E）；exec_stmts 的 list_fold 累积 Result 元组——Err 短路、Ok 继续；eval_args 从 list_map 退回手写递归（list_map 无法穿透 Result）。已知残留限制：parser 层遇未知 token 仍静默（lex/parse 诊断未做）。
+- ✅ **自举 VList 递归值**（2026-08-18 完成，Phase 5.14）：列表字面量 `[1, 2]` + 索引 `xs[i]` + `len()` 内建。**坑**：list_at 递归递减 i 时错误消息会显示递减后的值而非原始下标——带 orig 参数保留。列表元素求值直接复用 eval_args（顺序 + ? 传播都对）。
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。

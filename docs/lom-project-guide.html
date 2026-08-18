@@ -932,6 +932,8 @@
     <br><br>
     <strong>Phase 5.13 自举：诊断层（2026-08-18）</strong>：求值全链路从"出错静默得 0"改为 <code>Result&lt;_, String&gt;</code> + <code>?</code> 传播——<strong>把 Lom 的"错误即值"哲学在 Lom 里实现了一遍</strong>。未定义变量/函数、参数个数不符、类型错误、除以零全部显式报错（测试程序 8 的四条诊断逐字验证）。实现要点：eval/exec_stmt/exec_stmts 全部返回 Result；<code>?</code> 在 while 条件与循环体内直接穿透（任一轮出错整体返回 Err）；exec_stmts 的 list_fold 累积 Result（Err 短路）；错误消息里的 Int 靠 v0.4.1 拼接提升直接拼接。类型检查器对 <code>?</code> 的 TYPE020 兼容性检查在此过程中得到真实压力测试。<code>--check</code> 0 诊断。
     <br><br>
+    <strong>Phase 5.14 自举：VList 递归值类型（2026-08-18）</strong>：<code>Val</code> 加入 <code>VList(List&lt;Val&gt;)</code>——自举运行时首次拥有递归值类型（值里套值）。源语言新增：列表字面量 <code>[1, 2]</code>、索引 <code>xs[i]</code>（可链式）、<code>len()</code> 内建（List/String 通用，首个内建函数机制）。列表元素求值复用 eval_args；show/values_eq/truthy 递归扩展到 List（嵌套列表打印 <code>[[1, 2], [3]]</code> 正确）；越界/负索引/类型错误走 5.13 诊断通道（含原始下标保留——初版递归递减导致报错消息显示递减值，已修）。9 个测试程序共 18 条输出逐字验证，<code>--check</code> 0 诊断。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
