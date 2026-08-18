@@ -1,22 +1,21 @@
-# 自举验证 5：带语句层、函数、多类型值与诊断的解释器（Phase 5.2 → 5.13）
+# 自举验证 5：带语句层、函数、多类型值、诊断与容错解析的解释器（Phase 5.2 → 5.15）
 # 源语言支持：let 绑定、if/else、while、块、比较/四则运算、变量、函数定义与调用、
-#             Int/String/Bool 三类值、字符串字面量、== 相等比较、显式错误诊断（Phase 5.13）
-#   SLet(name, expr)      let name = expr
-#   SExpr(expr)           裸表达式（顶层打印；函数体内产出值）
-#   SIf(cond, then, else) if cond ... else ... end
-#   SWhile(cond, body)    while cond ... end
-#   DFn(name, params, body)  fn name(p1, p2) ... end
-#   Call(name, args)         name(e1, e2)
-#   Val = VInt | VStr | VBool | VList(List<Val>)         （Phase 5.14 递归值类型）
+#             Int/String/Bool/List 值、字符串字面量、列表字面量、索引、== 比较、
+#             显式错误诊断（5.13）、容错解析（5.15）
+#   SLet / SExpr / SIf / SWhile / SError(msg)     语句（SError = 解析失败占位,见 5.15）
+#   DFn(name, params, body) / DStmt(stmt)         顶层声明
+#   Num/StrLit/Var/Add/Sub/Mul/Div/Gt/Eq/Call/ListLit/Index/EError(msg)   表达式
+#   Val = VInt | VStr | VBool | VList(List<Val>)
 # 设计要点：
-#   - 环境函数式：exec_stmt 返回 Result<(新环境, 语句值), String>；函数调用在全新环境绑定参数（词法作用域）
-#   - 语句值语义：SIf 的值=被执行分支块的值（if 即表达式）；块的值=尾语句的值（尾表达式返回）
+#   - 环境函数式：exec_stmt 返回 Result<(新环境, 语句值), String>；词法作用域（全新参数环境）
+#   - 语句值语义：SIf 的值=被执行分支块的值（if 即表达式）；块的值=尾语句的值
 #   - in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值
 #   - collect_fns 先收集全部函数再执行 → 前向引用/互递归天然支持
-#   - Phase 5.12：= / == 显式成 token（TAssign/TEq）
-#   - Phase 5.13 诊断层：全链路 Result<_, String> + ? 传播（dogfood Lom 的"错误即值"哲学）
-#   - Phase 5.14：VList 递归值 + 列表字面量 [1, 2] + 索引 xs[i] + len() 内建（List/String 通用）；
-#     列表元素求值复用 eval_args；越界/类型错误走 5.13 诊断通道
+#   - Phase 5.13 诊断层：全链路 Result<_, String> + ? 传播
+#   - Phase 5.15 容错解析（对齐主语言的 holey AST 哲学）：
+#       * 解析错误成为 AST 节点（EError/SError），执行时经诊断通道报错
+#       * lexer 未知字符产出 TUnknown token（不再静默丢弃——5.11 陷阱的根治）
+#       * 解析器是全函数：任何输入（含空输入/残缺输入）都不崩溃
 #   - Add 混合规则镜像 Lom v0.4.1：任一侧是 String 时另一侧 show() 提升拼接
 
 from string import { split, string_to_int, int_to_string, contains, len }
@@ -33,11 +32,11 @@ enum Token
     | TSlash
     | TLParen
     | TRParen
+    | TLBracket
+    | TRBracket
     | TComma
     | TAssign
     | TEq
-    | TLBracket
-    | TRBracket
     | TLet
     | TIf
     | TElse
@@ -45,6 +44,7 @@ enum Token
     | TWhile
     | TFn
     | TGt
+    | TUnknown(String)
 end
 
 # ===== AST =====
@@ -61,6 +61,7 @@ enum Expr
     | Call(String, List<Expr>)
     | ListLit(List<Expr>)
     | Index(Expr, Expr)
+    | EError(String)
 end
 
 enum Stmt
@@ -68,6 +69,7 @@ enum Stmt
     | SExpr(Expr)
     | SIf(Expr, List<Stmt>, List<Stmt>)
     | SWhile(Expr, List<Stmt>)
+    | SError(String)
 end
 
 # 顶层声明：函数定义 or 语句
@@ -150,6 +152,10 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
         lex_rec(rest_chars, "")
     elif c == "\n"
         lex_rec(rest_chars, "")
+    elif c == "\r"
+        lex_rec(rest_chars, "")
+    elif c == "\t"
+        lex_rec(rest_chars, "")
     elif c == "+"
         list_cons(TPlus, lex_rec(rest_chars, ""))
     elif c == "-"
@@ -164,12 +170,12 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
         list_cons(TLParen, lex_rec(rest_chars, ""))
     elif c == ")"
         list_cons(TRParen, lex_rec(rest_chars, ""))
-    elif c == ","
-        list_cons(TComma, lex_rec(rest_chars, ""))
     elif c == "["
         list_cons(TLBracket, lex_rec(rest_chars, ""))
     elif c == "]"
         list_cons(TRBracket, lex_rec(rest_chars, ""))
+    elif c == ","
+        list_cons(TComma, lex_rec(rest_chars, ""))
     elif c == "\""
         lex_str(rest_chars, "")
     elif c == "="
@@ -184,7 +190,8 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
             end
         end
     else
-        lex_rec(rest_chars, "")
+        # Phase 5.15：未知字符产出 TUnknown（由 parser 报错），不再静默丢弃
+        list_cons(TUnknown(c), lex_rec(rest_chars, ""))
     end
 end
 
@@ -221,93 +228,134 @@ fn lex(src: String) -> List<Token>
     lex_rec(chars, "")
 end
 
+# ===== Parser 辅助（Phase 5.15：全函数化）=====
+
+# 安全取头：空表返回 None（所有解析函数不再裸调 list_head）
+fn peek_tok(tokens: List<Token>) -> Option<Token>
+    if list_is_empty(tokens)
+        None
+    else
+        Some(list_head(tokens))
+    end
+end
+
+# token 名字（诊断消息用）
+fn token_name(t: Token) -> String
+    match t
+        TInt(n) => "number(" + n + ")"
+        TStr(s) => "string"
+        TIdent(s) => "identifier '" + s + "'"
+        TPlus => "'+'"
+        TMinus => "'-'"
+        TStar => "'*'"
+        TSlash => "'/'"
+        TLParen => "'('"
+        TRParen => "')'"
+        TLBracket => "'['"
+        TRBracket => "']'"
+        TComma => "','"
+        TAssign => "'='"
+        TEq => "'=='"
+        TLet => "'let'"
+        TIf => "'if'"
+        TElse => "'else'"
+        TEnd => "'end'"
+        TWhile => "'while'"
+        TFn => "'fn'"
+        TGt => "'>'"
+        TUnknown(c) => "unknown character '" + c + "'"
+    end
+end
+
 # ===== Expr Parser =====
 # 文法: Expr = Term (("+"|"-"|">"|"==") Term)*   Term = Factor (("*"|"/") Factor)*
-#        Factor = Int | Str | Ident | Ident "(" Args ")" | "(" Expr ")"
+#        Factor = Int | Str | Ident | Ident "(" Args ")" | "[" Elems "]" | "(" Expr ")"
+# 容错：任何意外输入产出 EError 节点而不是崩溃（Phase 5.15）
 
 # 调用参数：expr, expr, ... 直到 TRParen（消耗之）
 fn parse_call_args(tokens: List<Token>) -> (List<Expr>, List<Token>)
-    match list_head(tokens)
-        TRParen => (list_empty(), list_tail(tokens))
-        _ =>
+    match peek_tok(tokens)
+        Some(TRParen) => (list_empty(), list_tail(tokens))
+        Some(_) =>
             let (e, rest) = parse_expr(tokens)
-            match list_head(rest)
-                TComma =>
+            match peek_tok(rest)
+                Some(TComma) =>
                     let (more, rest2) = parse_call_args(list_tail(rest))
                     (list_cons(e, more), rest2)
                 end
-                TRParen => (list_cons(e, list_empty()), list_tail(rest))
+                Some(TRParen) => (list_cons(e, list_empty()), list_tail(rest))
+                _ =>
+                    # 缺失 ) —— 宽容收尾,已有参数保留;末尾追加错误节点(执行时经诊断通道报告)
+                    (list_cons(e, list_cons(EError("expected ',' or ')' in argument list"), list_empty())), rest)
+                end
             end
         end
+        None => (list_cons(EError("unexpected end of input in argument list"), list_empty()), tokens)
     end
 end
 
 # 列表字面量元素：[e1, e2, ...] —— tokens 从 TLBracket 之后开始
 fn parse_list_elems(tokens: List<Token>) -> (List<Expr>, List<Token>)
-    match list_head(tokens)
-        TRBracket => (list_empty(), list_tail(tokens))
-        _ =>
+    match peek_tok(tokens)
+        Some(TRBracket) => (list_empty(), list_tail(tokens))
+        Some(_) =>
             let (e, rest) = parse_expr(tokens)
-            match list_head(rest)
-                TComma =>
+            match peek_tok(rest)
+                Some(TComma) =>
                     let (more, rest2) = parse_list_elems(list_tail(rest))
                     (list_cons(e, more), rest2)
                 end
-                TRBracket => (list_cons(e, list_empty()), list_tail(rest))
+                Some(TRBracket) => (list_cons(e, list_empty()), list_tail(rest))
+                _ => (list_cons(e, list_cons(EError("expected ',' or ']' in list literal"), list_empty())), rest)
             end
         end
+        None => (list_cons(EError("unexpected end of input in list literal"), list_empty()), tokens)
     end
 end
 
-# 原子表达式：字面量 / 变量 / 调用 / 列表字面量 / 括号
+# 原子表达式：字面量 / 变量 / 调用 / 列表字面量 / 括号 / 错误节点
 fn parse_atom(tokens: List<Token>) -> (Expr, List<Token>)
-    match list_head(tokens)
-        TInt(n) => (Num(n), list_tail(tokens))
-        TStr(s) => (StrLit(s), list_tail(tokens))
-        TLBracket =>
+    match peek_tok(tokens)
+        None => (EError("unexpected end of input"), tokens)
+        Some(TInt(n)) => (Num(n), list_tail(tokens))
+        Some(TStr(s)) => (StrLit(s), list_tail(tokens))
+        Some(TUnknown(c)) => (EError("unexpected " + token_name(TUnknown(c))), list_tail(tokens))
+        Some(TLBracket) =>
             let (elems, rest) = parse_list_elems(list_tail(tokens))
             (ListLit(elems), rest)
         end
-        TIdent(name) =>
+        Some(TIdent(name)) =>
             # 前瞻：Ident 后跟 TLParen 是函数调用，否则是变量引用
-            if list_is_empty(list_tail(tokens))
-                (Var(name), list_tail(tokens))
-            else
-                match list_head(list_tail(tokens))
-                    TLParen =>
-                        let (args, rest) = parse_call_args(list_tail(list_tail(tokens)))
-                        (Call(name, args), rest)
-                    end
-                    _ => (Var(name), list_tail(tokens))
+            match peek_tok(list_tail(tokens))
+                Some(TLParen) =>
+                    let (args, rest) = parse_call_args(list_tail(list_tail(tokens)))
+                    (Call(name, args), rest)
                 end
+                _ => (Var(name), list_tail(tokens))
             end
         end
-        TLParen =>
+        Some(TLParen) =>
             let (e, rest) = parse_expr(list_tail(tokens))
-            (e, list_tail(rest))
+            match peek_tok(rest)
+                Some(TRParen) => (e, list_tail(rest))
+                _ => (e, rest)   # 缺失 ) —— 宽容继续
+            end
         end
+        Some(other) => (EError("unexpected " + token_name(other)), list_tail(tokens))
     end
 end
 
 # 后缀索引：base[i]（可链式 xs[i][j]；宽容处理缺失的 ]）
 fn parse_postfix(base: Expr, tokens: List<Token>) -> (Expr, List<Token>)
-    if list_is_empty(tokens)
-        (base, tokens)
-    else
-        match list_head(tokens)
-            TLBracket =>
-                let (idx, rest) = parse_expr(list_tail(tokens))
-                if list_is_empty(rest)
-                    (Index(base, idx), rest)
-                else
-                    match list_head(rest)
-                        TRBracket => parse_postfix(Index(base, idx), list_tail(rest))
-                        _ => parse_postfix(Index(base, idx), rest)
-                    end
-                end
+    match peek_tok(tokens)
+        Some(TLBracket) =>
+            let (idx, rest) = parse_expr(list_tail(tokens))
+            match peek_tok(rest)
+                Some(TRBracket) => parse_postfix(Index(base, idx), list_tail(rest))
+                _ => parse_postfix(Index(base, idx), rest)
             end
-            _ => (base, tokens)
         end
+        _ => (base, tokens)
     end
 end
 
@@ -327,14 +375,10 @@ fn parse_term_slash(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
 end
 
 fn parse_term_rest(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
-    if list_is_empty(tokens)
-        (left, tokens)
-    else
-        match list_head(tokens)
-            TStar => parse_term_star(left, tokens)
-            TSlash => parse_term_slash(left, tokens)
-            _ => (left, tokens)
-        end
+    match peek_tok(tokens)
+        Some(TStar) => parse_term_star(left, tokens)
+        Some(TSlash) => parse_term_slash(left, tokens)
+        _ => (left, tokens)
     end
 end
 
@@ -364,16 +408,12 @@ fn parse_expr_eq(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
 end
 
 fn parse_expr_rest(left: Expr, tokens: List<Token>) -> (Expr, List<Token>)
-    if list_is_empty(tokens)
-        (left, tokens)
-    else
-        match list_head(tokens)
-            TPlus => parse_expr_plus(left, tokens)
-            TMinus => parse_expr_minus(left, tokens)
-            TGt => parse_expr_gt(left, tokens)
-            TEq => parse_expr_eq(left, tokens)
-            _ => (left, tokens)
-        end
+    match peek_tok(tokens)
+        Some(TPlus) => parse_expr_plus(left, tokens)
+        Some(TMinus) => parse_expr_minus(left, tokens)
+        Some(TGt) => parse_expr_gt(left, tokens)
+        Some(TEq) => parse_expr_eq(left, tokens)
+        _ => (left, tokens)
     end
 end
 
@@ -382,9 +422,9 @@ fn parse_expr(tokens: List<Token>) -> (Expr, List<Token>)
     parse_expr_rest(left, rest)
 end
 
-# ===== Stmt / Decl Parser =====
+# ===== Stmt / Decl Parser（Phase 5.15：错误成为 SError 节点）=====
 
-# 从 TIdent token 提取名字（防御性：非 TIdent 返回空串）
+# 从 TIdent token 提取名字
 fn ident_of(t: Token) -> String
     match t
         TIdent(s) => s
@@ -392,20 +432,32 @@ fn ident_of(t: Token) -> String
     end
 end
 
-# let name = expr（TAssign 是显式 token，跳过之）
+# let name = expr（TAssign 是显式 token；结构不符时产出 SError）
 fn parse_stmt_let(tokens: List<Token>) -> (Stmt, List<Token>)
-    # tokens: TLet TIdent(name) TAssign expr ...
-    let name = ident_of(list_head(list_tail(tokens)))
-    let (e, rest) = parse_expr(list_tail(list_tail(list_tail(tokens))))
-    (SLet(name, e), rest)
+    # 期望 tokens: TLet TIdent(name) TAssign expr ...
+    match peek_tok(list_tail(tokens))
+        Some(TIdent(name)) =>
+            match peek_tok(list_tail(list_tail(tokens)))
+                Some(TAssign) =>
+                    let (e, rest) = parse_expr(list_tail(list_tail(list_tail(tokens))))
+                    (SLet(name, e), rest)
+                end
+                Some(other) => (SError("let: expected '=' after name, got " + token_name(other)), list_tail(list_tail(tokens)))
+                None => (SError("let: unexpected end of input after name"), list_tail(tokens))
+            end
+        end
+        Some(other) => (SError("let: expected variable name, got " + token_name(other)), list_tail(tokens))
+        None => (SError("let: unexpected end of input"), list_tail(tokens))
+    end
 end
 
 # 块: 语句序列直到 TEnd（消耗之）或 TElse（不消耗，留给上层处理）
 fn parse_block(tokens: List<Token>) -> (List<Stmt>, List<Token>)
-    match list_head(tokens)
-        TEnd => (list_empty(), list_tail(tokens))
-        TElse => (list_empty(), tokens)
-        _ =>
+    match peek_tok(tokens)
+        Some(TEnd) => (list_empty(), list_tail(tokens))
+        Some(TElse) => (list_empty(), tokens)
+        None => (list_empty(), tokens)   # 缺失 end —— 宽容收尾
+        Some(_) =>
             let (stmt, rest) = parse_stmt(tokens)
             let (block, rest2) = parse_block(rest)
             (list_cons(stmt, block), rest2)
@@ -422,12 +474,13 @@ fn parse_if(tokens: List<Token>) -> (Stmt, List<Token>)
     # tokens: TIf cond ...
     let (cond, rest) = parse_expr(list_tail(tokens))
     let (then_block, rest2) = parse_block(rest)
-    match list_head(rest2)
-        TElse =>
+    match peek_tok(rest2)
+        Some(TElse) =>
             let (else_block, rest3) = parse_block(list_tail(rest2))
             (SIf(cond, then_block, else_block), rest3)
         end
-        TEnd => (SIf(cond, then_block, list_empty()), list_tail(rest2))
+        Some(TEnd) => (SIf(cond, then_block, list_empty()), list_tail(rest2))
+        _ => (SIf(cond, then_block, list_empty()), rest2)   # 缺失 end —— 宽容收尾
     end
 end
 
@@ -442,11 +495,15 @@ fn parse_while(tokens: List<Token>) -> (Stmt, List<Token>)
 end
 
 fn parse_stmt(tokens: List<Token>) -> (Stmt, List<Token>)
-    match list_head(tokens)
-        TLet => parse_stmt_let(tokens)
-        TIf => parse_if(tokens)
-        TWhile => parse_while(tokens)
-        _ =>
+    match peek_tok(tokens)
+        Some(TLet) => parse_stmt_let(tokens)
+        Some(TIf) => parse_if(tokens)
+        Some(TWhile) => parse_while(tokens)
+        Some(TUnknown(c)) => (SError("unexpected " + token_name(TUnknown(c))), list_tail(tokens))
+        Some(TEnd) => (SError("unexpected 'end'"), list_tail(tokens))
+        Some(TElse) => (SError("unexpected 'else'"), list_tail(tokens))
+        None => (SError("unexpected end of input"), tokens)
+        Some(_) =>
             let (e, rest) = parse_expr(tokens)
             (SExpr(e), rest)
         end
@@ -455,20 +512,22 @@ end
 
 # fn 参数名列表：(p1, p2, ...) —— tokens 从 TLParen 开始
 fn parse_params(tokens: List<Token>) -> (List<String>, List<Token>)
-    match list_head(list_tail(tokens))
-        TRParen => (list_empty(), list_tail(list_tail(tokens)))
-        _ => parse_params_rec(list_tail(tokens))
+    match peek_tok(list_tail(tokens))
+        Some(TRParen) => (list_empty(), list_tail(list_tail(tokens)))
+        Some(TIdent(_)) => parse_params_rec(list_tail(tokens))
+        _ => (list_empty(), list_tail(tokens))   # 畸形参数表 —— 宽容跳过
     end
 end
 
 fn parse_params_rec(tokens: List<Token>) -> (List<String>, List<Token>)
     let name = ident_of(list_head(tokens))
-    match list_head(list_tail(tokens))
-        TComma =>
+    match peek_tok(list_tail(tokens))
+        Some(TComma) =>
             let (more, rest) = parse_params_rec(list_tail(list_tail(tokens)))
             (list_cons(name, more), rest)
         end
-        TRParen => (list_cons(name, list_empty()), list_tail(list_tail(tokens)))
+        Some(TRParen) => (list_cons(name, list_empty()), list_tail(list_tail(tokens)))
+        _ => (list_cons(name, list_empty()), list_tail(tokens))   # 缺失 ) —— 宽容收尾
     end
 end
 
@@ -477,18 +536,22 @@ end
 # end
 fn parse_fn(tokens: List<Token>) -> (Decl, List<Token>)
     # tokens: TFn TIdent(name) TLParen ...
-    let name = ident_of(list_head(list_tail(tokens)))
-    let (params, rest) = parse_params(list_tail(list_tail(tokens)))
-    let (body, rest2) = parse_block(rest)
-    (DFn(name, params, body), rest2)
+    match peek_tok(list_tail(tokens))
+        Some(TIdent(name)) =>
+            let (params, rest) = parse_params(list_tail(list_tail(tokens)))
+            let (body, rest2) = parse_block(rest)
+            (DFn(name, params, body), rest2)
+        end
+        _ => (DStmt(SError("fn: expected function name")), list_tail(tokens))
+    end
 end
 
 fn parse_program(tokens: List<Token>) -> List<Decl>
     if list_is_empty(tokens)
         list_empty()
     else
-        match list_head(tokens)
-            TFn =>
+        match peek_tok(tokens)
+            Some(TFn) =>
                 let (d, rest) = parse_fn(tokens)
                 list_cons(d, parse_program(rest))
             end
@@ -541,7 +604,7 @@ fn type_name(v: Val) -> String
     end
 end
 
-# 条件真值判断：VBool 直取；VInt 非零为真；VStr 非空为真
+# 条件真值判断：VBool 直取；VInt 非零为真；VStr 非空为真；VList 非空为真
 fn truthy(v: Val) -> Bool
     match v
         VBool(b) => b
@@ -610,7 +673,7 @@ fn values_eq(a: Val, b: Val) -> Val
     end
 end
 
-# ===== Evaluator（Phase 5.13：全链路 Result + ? 传播）=====
+# ===== Evaluator（全链路 Result + ? 传播，Phase 5.13）=====
 
 fn env_lookup(env: List<(String, Val)>, name: String) -> Result<Val, String>
     if list_is_empty(env)
@@ -629,6 +692,7 @@ fn eval(e: Expr, env: List<(String, Val)>, fns: List<Decl>) -> Result<Val, Strin
     match e
         Num(n) => Ok(VInt(n))
         StrLit(s) => Ok(VStr(s))
+        EError(msg) => Err("parse error: " + msg)
         Var(name) => env_lookup(env, name)
         Add(a, b) =>
             let va = eval(a, env, fns)?
@@ -772,7 +836,7 @@ fn eval_args(args: List<Expr>, env: List<(String, Val)>, fns: List<Decl>) -> Res
     end
 end
 
-# 按名查找函数（线性；未找到显式 Err —— Phase 5.13，不再静默占位）
+# 按名查找函数（线性；未找到显式 Err）
 fn find_fn(fns: List<Decl>, name: String) -> Result<Decl, String>
     if list_is_empty(fns)
         Err("undefined function '" + name + "'")
@@ -815,12 +879,13 @@ fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Result<Val, String> 
 end
 
 # 执行语句，返回 Result<(新环境, 语句值), String>：
-#   SExpr  → 值是表达式求值结果（in_fn=True 时不打印——函数体内的表达式是"求值"不是"输出"）
-#   SIf    → 值是被执行分支块的值（递归）——if 即表达式，函数体尾部的 if 能带出返回值
+#   SError → 解析错误经诊断通道显式报告（Phase 5.15：错误是节点，不是崩溃）
+#   SExpr  → 值是表达式求值结果（in_fn=True 时不打印）
+#   SIf    → 值是被执行分支块的值（if 即表达式）
 #   SLet / SWhile → 值为 VInt(0)
-# 条件用 truthy() 判断（VBool 直取 / VInt 非零 / VStr 非空）
 fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> Result<(List<(String, Val)>, Val), String> ! [IO]
     match s
+        SError(msg) => Err("parse error: " + msg)
         SLet(name, e) =>
             let v = eval(e, env, fns)?
             Ok((list_cons((name, v), env), VInt(0)))
@@ -900,7 +965,7 @@ fn run_program(src: String) -> Unit ! [IO]
     # 先收集函数表再执行语句 → 前向引用/互递归天然支持
     let fns = collect_fns(decls, list_empty())
     let stmts = collect_stmts(decls)
-    # Phase 5.13：顶层捕获 Result，错误显式打印（诊断层的最终出口）
+    # 顶层捕获 Result，错误显式打印（诊断层的最终出口）
     match exec_stmts(stmts, list_empty(), fns, False)
         Ok(pair) => 0
         Err(msg) => println("error: " + msg)
@@ -917,14 +982,14 @@ fn main() -> Unit
     run_program("let a = 5\nif a > 3\nlet b = a * 2\nb\nelse\n0\nend")
 
     # 程序 3（Phase 5.10）：while 循环 + 环境遮蔽
-    # let i = 3 / let s = 0 / while i > 0 / let s = s + i / let i = i - 1 / end / s   ->  6
+    # ->  6
     run_program("let i = 3\nlet s = 0\nwhile i > 0\nlet s = s + i\nlet i = i - 1\nend\ns")
 
     # 程序 4（Phase 5.11）：函数定义与调用 + 词法作用域
-    # fn add(a, b) a + b end / fn square(n) n * n end / let x = add(3, 4) / let y = square(x) / y   ->  49
+    # ->  49
     run_program("fn add(a, b)\na + b\nend\nfn square(n)\nn * n\nend\nlet x = add(3, 4)\nlet y = square(x)\ny")
 
-    # 程序 5（Phase 5.11/5.12）：递归 + 前向引用 + == 比较（is_odd 在 collatz_len 之后定义）
+    # 程序 5（Phase 5.11/5.12）：递归 + 前向引用 + == 比较
     # collatz_len(6): 6→3→10→5→16→8→4→2→1   ->  8
     run_program("fn collatz_len(n)\nif 2 > n\n0\nelse\nif is_odd(n) > 0\n1 + collatz_len(n * 3 + 1)\nelse\n1 + collatz_len(n / 2)\nend\nend\nend\nfn is_odd(n)\nn - (n / 2) * 2\nend\ncollatz_len(6)")
 
@@ -938,7 +1003,7 @@ fn main() -> Unit
     run_program("fn shout(s, n)\nlet r = \"\"\nlet i = n\nwhile i > 0\nlet r = r + s\nlet i = i - 1\nend\nr\nend\nshout(\"ab\", 3)")
     run_program("fn eq1(a, b)\na == b\nend\neq1(2 + 2, 4)")
 
-    # 程序 8（Phase 5.13）：诊断层——错误显式报告而非静默得 0
+    # 程序 8（Phase 5.13）：诊断层——运行时错误显式报告
     # ->  error: undefined variable 'x'
     # ->  error: arity error: function 'f' expects 1 args, got 2
     # ->  error: division by zero
@@ -955,4 +1020,15 @@ fn main() -> Unit
     run_program("len([1, 2, 3])")
     run_program("let m = [[1, 2], [3]]\nm")
     run_program("let xs = [1, 2, 3]\nxs[5]")
+
+    # 程序 10（Phase 5.15）：容错解析——坏输入不崩溃，错误经诊断通道报告
+    # @ 是未知字符（TUnknown）；正常部分不受影响（错误前的语句已执行）
+    # ->  7 / error: parse error: unexpected unknown character '@'
+    run_program("let x = 3\nlet y = 4\nx + y\n@")
+    # 残缺输入（未闭合的表达式）不崩溃
+    # ->  error: parse error: unexpected end of input
+    run_program("1 +")
+    # 空输入安全
+    # ->  （无输出,不崩溃）
+    run_program("")
 end
