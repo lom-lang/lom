@@ -1,0 +1,79 @@
+# 性能基准（Phase 5.18）——为 P2(char/HashMap/Set)决策提供真实数据
+# 用法: lom examples/bench.lom -- <bench名> <规模n>
+#   bench list_build  : cons 头插建 n 元素列表,再 for-in 求和(测 List 不可变语义的 cons 成本)
+#   bench lookup      : 建 n 条目的关联列表(模拟自举环境),查最后一个条目 n 次(最坏情况线性扫描)
+#   bench recurse     : 深度为 n 的线性递归 countdown(测 256MB 栈 + 调用开销)
+# 注意:Lom 无内置时钟,计时在外部做(wall-clock);本文件只负责负载
+
+from env import { args }
+from string import { string_to_int }
+from list import { list_cons, list_empty, list_get, list_head, list_tail, list_is_empty }
+
+# n 次 cons 建列表,再 for-in 求和(返回总和防优化)
+fn bench_list_build(n: Int) -> Int
+    let mut xs = list_empty()
+    for i in 1..(n + 1)
+        xs = list_cons(i, xs)
+    end
+    let mut total = 0
+    for x in xs
+        total += x
+    end
+    total
+end
+
+# 关联列表线性查找(模拟自举解释器的 env_lookup)
+fn lookup(env: List<(Int, Int)>, key: Int) -> Int
+    if list_is_empty(env)
+        0
+    else
+        let pair = list_head(env)
+        if pair.0 == key
+            pair.1
+        else
+            lookup(list_tail(env), key)
+        end
+    end
+end
+
+# n 条目环境 × 查最后一个条目 n 次(每次全表扫描)
+fn bench_lookup(n: Int) -> Int
+    let mut env = list_empty()
+    for i in 1..(n + 1)
+        env = list_cons((i, i * 2), env)
+    end
+    # 头插 => 条目 1 在表尾,查它是最坏情况(扫全表)
+    let mut total = 0
+    for i in 1..(n + 1)
+        total += lookup(env, 1)
+    end
+    total
+end
+
+# 深度 n 的线性递归
+fn countdown(n: Int) -> Int
+    if n > 0
+        countdown(n - 1)
+    else
+        0
+    end
+end
+
+fn bench_recurse(n: Int) -> Int
+    countdown(n)
+end
+
+fn main() -> Unit
+    let argv = args()
+    let bench = list_get(argv, 1)
+    let n = string_to_int(list_get(argv, 2))
+    if bench == "list_build"
+        println(bench_list_build(n))
+    elif bench == "lookup"
+        println(bench_lookup(n))
+    elif bench == "recurse"
+        println(bench_recurse(n))
+    else
+        println("usage: lom bench.lom -- <list_build|lookup|recurse> <n>")
+    end
+end
