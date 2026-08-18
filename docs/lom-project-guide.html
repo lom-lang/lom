@@ -930,6 +930,8 @@
     <br><br>
     <strong>Phase 5.12 自举：值系统扩展（2026-08-18）</strong>：值从只有 Int 扩展为 <code>Val = VInt | VStr | VBool</code>（递归 enum 承载，Phase 5.0 已验证可行性）。源语言新增：字符串字面量（lexer 扫描 <code>"..."</code>）、<code>==</code> 相等比较、Bool 打印小写 true/false；<code>Add</code> 混合规则镜像 Lom v0.4.1（任一侧 String 则另一侧 show() 提升拼接）；条件判断统一走 <code>truthy()</code>（VBool 直取 / VInt 非零 / VStr 非空）。<strong>根治 Phase 5.11 的坑</strong>：<code>=</code>/<code>==</code> 从"静默丢弃"改为显式 token（TAssign/TEq），同类陷阱在迷你语言层面被消除。9 个测试程序输出全对（含 <code>hello, lom</code>、<code>true</code>、<code>ababab</code>），<code>--check</code> 0 诊断。这是自举诊断层（错误报告而非静默得 0）和更真实源语言的值系统前提。
     <br><br>
+    <strong>Phase 5.13 自举：诊断层（2026-08-18）</strong>：求值全链路从"出错静默得 0"改为 <code>Result&lt;_, String&gt;</code> + <code>?</code> 传播——<strong>把 Lom 的"错误即值"哲学在 Lom 里实现了一遍</strong>。未定义变量/函数、参数个数不符、类型错误、除以零全部显式报错（测试程序 8 的四条诊断逐字验证）。实现要点：eval/exec_stmt/exec_stmts 全部返回 Result；<code>?</code> 在 while 条件与循环体内直接穿透（任一轮出错整体返回 Err）；exec_stmts 的 list_fold 累积 Result（Err 短路）；错误消息里的 Int 靠 v0.4.1 拼接提升直接拼接。类型检查器对 <code>?</code> 的 TYPE020 兼容性检查在此过程中得到真实压力测试。<code>--check</code> 0 诊断。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
