@@ -25,6 +25,9 @@
 #   - Phase 5.22 静态检查：对齐宿主 parse → check → eval 三段架构；执行前用
 #     check_program 收集未定义变量/函数与 arity 诊断（List<String>），有诊断则不执行；
 #     作用域复用宿主 Map，函数体只见参数（词法作用域与运行期一致）
+#   - Phase 5.23 收尾：函数表从 List 换 Map（collect_fns 直接建表，find_fn O(1)）；
+#     比较运算符补全 < <= >= !=（lexer 前瞻区分 >/>=、</<=、!=/未知!；求值统一走
+#     eval_cmp_int 骨架；!= 对任意值类型取 values_eq 反）
 
 from string import { split, string_to_int, int_to_string, contains, len, trim }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_fold, list_map }
@@ -54,6 +57,10 @@ enum Token
     | TWhile
     | TFn
     | TGt
+    | TLt
+    | TGtEq
+    | TLtEq
+    | TNEq
     | TUnknown(String)
 end
 
@@ -67,6 +74,10 @@ enum Expr
     | Mul(Expr, Expr)
     | Div(Expr, Expr)
     | Gt(Expr, Expr)
+    | Lt(Expr, Expr)
+    | GtEq(Expr, Expr)
+    | LtEq(Expr, Expr)
+    | NEq(Expr, Expr)
     | Eq(Expr, Expr)
     | Call(String, List<Expr>)
     | ListLit(List<Expr>)
@@ -180,7 +191,37 @@ fn lex_char(c: String, rest_chars: List<String>, ln: Int) -> List<{t: Token, ln:
     elif c == "/"
         list_cons(mk_tok(TSlash, ln), lex_rec(rest_chars, "", ln))
     elif c == ">"
-        list_cons(mk_tok(TGt, ln), lex_rec(rest_chars, "", ln))
+        # Phase 5.23：> 与 >= 前瞻区分（对齐 = / == 的显式双 token 模式）
+        if list_is_empty(rest_chars)
+            list_cons(mk_tok(TGt, ln), lex_rec(rest_chars, "", ln))
+        else
+            if list_head(rest_chars) == "="
+                list_cons(mk_tok(TGtEq, ln), lex_rec(list_tail(rest_chars), "", ln))
+            else
+                list_cons(mk_tok(TGt, ln), lex_rec(rest_chars, "", ln))
+            end
+        end
+    elif c == "<"
+        if list_is_empty(rest_chars)
+            list_cons(mk_tok(TLt, ln), lex_rec(rest_chars, "", ln))
+        else
+            if list_head(rest_chars) == "="
+                list_cons(mk_tok(TLtEq, ln), lex_rec(list_tail(rest_chars), "", ln))
+            else
+                list_cons(mk_tok(TLt, ln), lex_rec(rest_chars, "", ln))
+            end
+        end
+    elif c == "!"
+        # != 显式支持；裸 ! 仍是未知字符（迷你语言无一元 not）
+        if list_is_empty(rest_chars)
+            list_cons(mk_tok(TUnknown("!"), ln), lex_rec(rest_chars, "", ln))
+        else
+            if list_head(rest_chars) == "="
+                list_cons(mk_tok(TNEq, ln), lex_rec(list_tail(rest_chars), "", ln))
+            else
+                list_cons(mk_tok(TUnknown("!"), ln), lex_rec(rest_chars, "", ln))
+            end
+        end
     elif c == "("
         list_cons(mk_tok(TLParen, ln), lex_rec(rest_chars, "", ln))
     elif c == ")"
@@ -294,12 +335,16 @@ fn token_name(t: Token) -> String
         TWhile => "'while'"
         TFn => "'fn'"
         TGt => "'>'"
+        TLt => "'<'"
+        TGtEq => "'>='"
+        TLtEq => "'<='"
+        TNEq => "'!='"
         TUnknown(c) => "unknown character '" + c + "'"
     end
 end
 
 # ===== Expr Parser =====
-# 文法: Expr = Term (("+"|"-"|">"|"==") Term)*   Term = Factor (("*"|"/") Factor)*
+# 文法: Expr = Term (("+"|"-"|">"|"<"|">="|"<="|"=="|"!=") Term)*   Term = Factor (("*"|"/") Factor)*
 #        Factor = Int | Str | Ident | Ident "(" Args ")" | "[" Elems "]" | "(" Expr ")"
 # 容错：任何意外输入产出 EError 节点而不是崩溃；错误消息带行号（Phase 5.17）
 
@@ -438,6 +483,26 @@ fn parse_expr_gt(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{
     parse_expr_rest(Gt(left, r), rest)
 end
 
+fn parse_expr_lt(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{t: Token, ln: Int}>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(Lt(left, r), rest)
+end
+
+fn parse_expr_gteq(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{t: Token, ln: Int}>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(GtEq(left, r), rest)
+end
+
+fn parse_expr_lteq(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{t: Token, ln: Int}>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(LtEq(left, r), rest)
+end
+
+fn parse_expr_neq(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{t: Token, ln: Int}>)
+    let (r, rest) = parse_term(list_tail(tokens))
+    parse_expr_rest(NEq(left, r), rest)
+end
+
 fn parse_expr_eq(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List<{t: Token, ln: Int}>)
     let (r, rest) = parse_term(list_tail(tokens))
     parse_expr_rest(Eq(left, r), rest)
@@ -448,6 +513,10 @@ fn parse_expr_rest(left: Expr, tokens: List<{t: Token, ln: Int}>) -> (Expr, List
         Some(TPlus) => parse_expr_plus(left, tokens)
         Some(TMinus) => parse_expr_minus(left, tokens)
         Some(TGt) => parse_expr_gt(left, tokens)
+        Some(TLt) => parse_expr_lt(left, tokens)
+        Some(TGtEq) => parse_expr_gteq(left, tokens)
+        Some(TLtEq) => parse_expr_lteq(left, tokens)
+        Some(TNEq) => parse_expr_neq(left, tokens)
         Some(TEq) => parse_expr_eq(left, tokens)
         _ => (left, tokens)
     end
@@ -722,7 +791,32 @@ fn env_lookup(env: Map<Val>, name: String) -> Result<Val, String>
     end
 end
 
-fn eval(e: Expr, env: Map<Val>, fns: List<Decl>) -> Result<Val, String> ! [IO]
+# 整数比较的统一骨架（Phase 5.23：Gt/Lt/GtEq/LtEq 共用；错误消息与逐臂版逐字一致）
+fn eval_cmp_int(op: String, a: Expr, b: Expr, env: Map<Val>, fns: Map<Decl>) -> Result<Val, String> ! [IO]
+    let va = eval(a, env, fns)?
+    let vb = eval(b, env, fns)?
+    match va
+        VInt(x) =>
+            match vb
+                VInt(y) =>
+                    if op == "Gt"
+                        Ok(VBool(x > y))
+                    elif op == "Lt"
+                        Ok(VBool(x < y))
+                    elif op == "GtEq"
+                        Ok(VBool(x >= y))
+                    else
+                        Ok(VBool(x <= y))
+                    end
+                end
+                _ => Err("type error: " + op + " expects Int, got Int and " + type_name(vb))
+            end
+        end
+        _ => Err("type error: " + op + " expects Int, got " + type_name(va) + " and " + type_name(vb))
+    end
+end
+
+fn eval(e: Expr, env: Map<Val>, fns: Map<Decl>) -> Result<Val, String> ! [IO]
     match e
         Num(n) => Ok(VInt(n))
         StrLit(s) => Ok(VStr(s))
@@ -789,17 +883,16 @@ fn eval(e: Expr, env: Map<Val>, fns: List<Decl>) -> Result<Val, String> ! [IO]
                 _ => Err("type error: Div expects Int, got " + type_name(va) + " and " + type_name(vb))
             end
         end
-        Gt(a, b) =>
+        Gt(a, b) => eval_cmp_int("Gt", a, b, env, fns)
+        Lt(a, b) => eval_cmp_int("Lt", a, b, env, fns)
+        GtEq(a, b) => eval_cmp_int("GtEq", a, b, env, fns)
+        LtEq(a, b) => eval_cmp_int("LtEq", a, b, env, fns)
+        NEq(a, b) =>
             let va = eval(a, env, fns)?
             let vb = eval(b, env, fns)?
-            match va
-                VInt(x) =>
-                    match vb
-                        VInt(y) => Ok(VBool(x > y))
-                        _ => Err("type error: Gt expects Int, got Int and " + type_name(vb))
-                    end
-                end
-                _ => Err("type error: Gt expects Int, got " + type_name(va) + " and " + type_name(vb))
+            match values_eq(va, vb)
+                VBool(eq) => Ok(VBool(!eq))
+                _ => Ok(VBool(False))
             end
         end
         Eq(a, b) =>
@@ -853,7 +946,7 @@ fn list_at(elems: List<Val>, i: Int, orig: Int) -> Result<Val, String>
 end
 
 # 参数按序求值（手写递归以用 ? 传播错误；Ok 包裹保持顺序）
-fn eval_args(args: List<Expr>, env: Map<Val>, fns: List<Decl>) -> Result<List<Val>, String> ! [IO]
+fn eval_args(args: List<Expr>, env: Map<Val>, fns: Map<Decl>) -> Result<List<Val>, String> ! [IO]
     if list_is_empty(args)
         Ok(list_empty())
     else
@@ -863,21 +956,11 @@ fn eval_args(args: List<Expr>, env: Map<Val>, fns: List<Decl>) -> Result<List<Va
     end
 end
 
-# 按名查找函数（线性；未找到显式 Err）
-fn find_fn(fns: List<Decl>, name: String) -> Result<Decl, String>
-    if list_is_empty(fns)
-        Err("undefined function '" + name + "'")
-    else
-        match list_head(fns)
-            DFn(n, ps, body) =>
-                if n == name
-                    Ok(DFn(n, ps, body))
-                else
-                    find_fn(list_tail(fns), name)
-                end
-            end
-            DStmt(s) => find_fn(list_tail(fns), name)
-        end
+# 按名查找函数（Phase 5.23：Map O(1) 查找，未找到显式 Err）
+fn find_fn(fns: Map<Decl>, name: String) -> Result<Decl, String>
+    match map_get(fns, name)
+        Some(d) => Ok(d)
+        None => Err("undefined function '" + name + "'")
     end
 end
 
@@ -892,7 +975,7 @@ fn bind_params(params: List<String>, args: List<Val>, env: Map<Val>) -> Unit
     end
 end
 
-fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Result<Val, String> ! [IO]
+fn call_fn(decl: Decl, args: List<Val>, fns: Map<Decl>) -> Result<Val, String> ! [IO]
     match decl
         DFn(name, params, body) =>
             if list_length(params) == list_length(args)
@@ -913,7 +996,7 @@ end
 #   SExpr  → 值是表达式求值结果（in_fn=True 时不打印）
 #   SIf    → 值是被执行分支块的值（if 即表达式）
 #   SLet / SWhile → 值为 VInt(0)
-fn exec_stmt(s: Stmt, env: Map<Val>, fns: List<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
+fn exec_stmt(s: Stmt, env: Map<Val>, fns: Map<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
     match s
         SError(msg) => Err("parse error: " + msg)
         SLet(name, e) =>
@@ -950,7 +1033,7 @@ end
 
 # 顺序执行语句序列，返回 Result<最后一条语句的值, String>
 # list_fold 累积 Result：Err 短路穿透，Ok 继续执行（错误即值的折叠形态）
-fn exec_stmts(stmts: List<Stmt>, env: Map<Val>, fns: List<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
+fn exec_stmts(stmts: List<Stmt>, env: Map<Val>, fns: Map<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
     list_fold(fn(acc: Result<Val, String>, s: Stmt) -> Result<Val, String>
         match acc
             Err(e) => Err(e)
@@ -1070,13 +1153,16 @@ end
 
 # ===== 主入口 =====
 
-# 收集全部函数定义（cons 累积，顺序无关——按名查找）
-fn collect_fns(decls: List<Decl>, acc: List<Decl>) -> List<Decl>
+# 收集全部函数定义进 Map（Phase 5.23：函数表从 List 换 Map，按名 O(1) 查找）
+fn collect_fns(decls: List<Decl>, acc: Map<Decl>) -> Map<Decl>
     if list_is_empty(decls)
         acc
     else
         match list_head(decls)
-            DFn(n, ps, body) => collect_fns(list_tail(decls), list_cons(DFn(n, ps, body), acc))
+            DFn(n, ps, body) =>
+                map_set(acc, n, DFn(n, ps, body))
+                collect_fns(list_tail(decls), acc)
+            end
             DStmt(s) => collect_fns(list_tail(decls), acc)
         end
     end
@@ -1124,7 +1210,7 @@ fn intrinsic_arity(name: String) -> Int
     end
 end
 
-fn check_exprs(es: List<Expr>, scope: Map<Int>, fns: List<Decl>) -> List<String>
+fn check_exprs(es: List<Expr>, scope: Map<Int>, fns: Map<Decl>) -> List<String>
     if list_is_empty(es)
         list_empty()
     else
@@ -1146,7 +1232,7 @@ fn check_call_fn(d: Decl, name: String, nargs: Int, arg_errs: List<String>) -> L
     end
 end
 
-fn check_call(name: String, nargs: Int, arg_errs: List<String>, fns: List<Decl>) -> List<String>
+fn check_call(name: String, nargs: Int, arg_errs: List<String>, fns: Map<Decl>) -> List<String>
     if is_intrinsic(name)
         if intrinsic_arity(name) == nargs
             arg_errs
@@ -1161,7 +1247,7 @@ fn check_call(name: String, nargs: Int, arg_errs: List<String>, fns: List<Decl>)
     end
 end
 
-fn check_expr(e: Expr, scope: Map<Int>, fns: List<Decl>) -> List<String>
+fn check_expr(e: Expr, scope: Map<Int>, fns: Map<Decl>) -> List<String>
     match e
         Num(n) => list_empty()
         StrLit(s) => list_empty()
@@ -1178,6 +1264,10 @@ fn check_expr(e: Expr, scope: Map<Int>, fns: List<Decl>) -> List<String>
         Mul(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
         Div(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
         Gt(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        Lt(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        GtEq(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        LtEq(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
+        NEq(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
         Eq(a, b) => cat(check_expr(a, scope, fns), check_expr(b, scope, fns))
         ListLit(elems) => check_exprs(elems, scope, fns)
         Index(t, i) => cat(check_expr(t, scope, fns), check_expr(i, scope, fns))
@@ -1188,7 +1278,7 @@ fn check_expr(e: Expr, scope: Map<Int>, fns: List<Decl>) -> List<String>
     end
 end
 
-fn check_stmt(s: Stmt, scope: Map<Int>, fns: List<Decl>) -> List<String>
+fn check_stmt(s: Stmt, scope: Map<Int>, fns: Map<Decl>) -> List<String>
     match s
         SError(msg) => list_empty()
         SLet(name, e) =>
@@ -1206,7 +1296,7 @@ fn check_stmt(s: Stmt, scope: Map<Int>, fns: List<Decl>) -> List<String>
     end
 end
 
-fn check_stmts(stmts: List<Stmt>, scope: Map<Int>, fns: List<Decl>) -> List<String>
+fn check_stmts(stmts: List<Stmt>, scope: Map<Int>, fns: Map<Decl>) -> List<String>
     if list_is_empty(stmts)
         list_empty()
     else
@@ -1215,7 +1305,7 @@ fn check_stmts(stmts: List<Stmt>, scope: Map<Int>, fns: List<Decl>) -> List<Stri
 end
 
 # 函数体用全新作用域（只有参数可见）——与 call_fn 的 map_empty() 语义一致
-fn check_fn_bodies(decls: List<Decl>, fns: List<Decl>) -> List<String>
+fn check_fn_bodies(decls: List<Decl>, fns: Map<Decl>) -> List<String>
     if list_is_empty(decls)
         list_empty()
     else
@@ -1234,7 +1324,7 @@ fn check_fn_bodies(decls: List<Decl>, fns: List<Decl>) -> List<String>
     end
 end
 
-fn check_program(decls: List<Decl>, fns: List<Decl>) -> List<String>
+fn check_program(decls: List<Decl>, fns: Map<Decl>) -> List<String>
     let fn_errs = check_fn_bodies(decls, fns)
     let scope = map_empty()
     cat(fn_errs, check_stmts(collect_stmts(decls), scope, fns))
@@ -1253,7 +1343,7 @@ fn run_program(src: String) -> Unit ! [IO]
     let tokens = lex(src)
     let decls = parse_program(tokens)
     # 先收集函数表再执行语句 → 前向引用/互递归天然支持
-    let fns = collect_fns(decls, list_empty())
+    let fns = collect_fns(decls, map_empty())
     let stmts = collect_stmts(decls)
     # Phase 5.22：先静态检查再执行——有检查诊断则不执行（对齐宿主 check 拦截语义）
     let errs = check_program(decls, fns)
@@ -1349,4 +1439,12 @@ fn main() -> Unit
     run_program("let x = x")
     run_program("len(1, 2)")
     run_program("let x = 7\nx")
+
+    # 程序 14（Phase 5.23）：比较运算符补全 < <= >= !=（含列表不等）
+    # ->  true / true / false / true / true
+    run_program("let a = 3\nlet b = 4\na < b")
+    run_program("3 >= 3")
+    run_program("5 <= 4")
+    run_program("5 != 4")
+    run_program("[1, 2] != [1, 3]")
 end
