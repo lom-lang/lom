@@ -1,13 +1,13 @@
 [package]
 name = "lom"
-version = "0.1.0"
+version = "0.5.1"
 edition = "2024"
-description = "Lom (Language of Machine) — an AI-native programming language. Phase 1: minimal interpreter."
+description = "Lom (Language of Machine) — an AI-native programming language: LLM-repair-native toolchain (lom fix), progressive typing, explicit effects, self-hosting-verified."
 license = "Apache-2.0"
 
 [dependencies]
-# Phase 1: zero dependencies — hand-written lexer/parser/interpreter for minimalism.
-# Phase 2 will add: logos (lexer), thiserror (errors), miette (diagnostics).
+# 永久零依赖（设计决策，非临时状态）：手写 lexer/parser/interpreter/JSON，
+# 供应链攻击面为零，构建可复现。历史上曾计划引入 logos/thiserror/miette，均未采用。
 
 [profile.release]
 debug = true  # keep debug info for easier debugging of the interpreter itself

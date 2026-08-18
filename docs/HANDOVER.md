@@ -64,7 +64,7 @@
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
 
-**版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
+**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐为 `0.5.1`，并打了首个 git tag `v0.5.1`。此前惯例是 Cargo.toml 一直 0.1.0、commit message 里的 v0.x 只是里程碑标记——Phase 6.1 起改为**语义版本管理**：语言/工具链破坏性变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。
 
 ---
 

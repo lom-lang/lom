@@ -36,6 +36,8 @@ struct CliArgs {
     json: bool,
     check: bool,
     help: bool,
+    /// Phase 6.1: --version 标志（打印编译器版本，来自 Cargo.toml）
+    version: bool,
     /// Phase 2.7: --plan 标志（lom fix 专用，表示仅生成计划不应用；当前 --plan 是默认行为，标志仅作显式标记）
     plan: bool,
     /// Phase 3.1: --apply 标志（lom fix 专用，应用修复到源文件）
@@ -49,7 +51,7 @@ struct CliArgs {
 }
 
 fn print_help(prog: &str) {
-    eprintln!("Lom 解释器 (Phase 3.5) — AI 原生编程语言");
+    eprintln!("Lom 解释器 v{} — AI 原生编程语言", env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("用法:");
     eprintln!("  {prog} <file.lom>                运行 .lom 程序（默认）");
@@ -64,6 +66,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} lsp                        启动 LSP 服务器（Phase 4.3，stdio JSON-RPC）");
     eprintln!("  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）");
     eprintln!("  {prog} --help | -h               显示帮助");
+    eprintln!("  {prog} --version | -V            显示版本");
     eprintln!();
     eprintln!("子命令:");
     eprintln!("  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema");
@@ -85,6 +88,7 @@ fn print_help(prog: &str) {
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
     eprintln!("  --history  lom fix 子命令专用：查看修复历史记录（Phase 4.1.3）");
     eprintln!("  --help, -h 显示本帮助");
+    eprintln!("  --version, -V 显示版本号（Phase 6.1）");
     eprintln!();
     eprintln!("退出码:");
     eprintln!("  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功 / apply 应用成功");
@@ -136,6 +140,7 @@ fn parse_args(args: &[String]) -> CliArgs {
             "--dry-run" => out.dry_run = true,
             "--history" => out.history = true,
             "--help" | "-h" => out.help = true,
+            "--version" | "-V" => out.version = true,
             _ => {
                 if a.starts_with('-') {
                     eprintln!("未知选项: {}", a);
@@ -171,6 +176,12 @@ fn main_inner() {
 
     if cli.help {
         print_help(&args[0]);
+        return;
+    }
+
+    // Phase 6.1: --version（版本号单一事实源是 Cargo.toml）
+    if cli.version {
+        println!("lom {}", env!("CARGO_PKG_VERSION"));
         return;
     }
 
