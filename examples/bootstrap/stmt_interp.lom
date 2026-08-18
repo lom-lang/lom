@@ -1,24 +1,25 @@
-# 自举验证 5：带语句层、函数与多类型值的解释器（Phase 5.2 → 5.12）
+# 自举验证 5：带语句层、函数、多类型值与诊断的解释器（Phase 5.2 → 5.13）
 # 源语言支持：let 绑定、if/else、while、块、比较/四则运算、变量、函数定义与调用、
-#             Int/String/Bool 三类值、字符串字面量、== 相等比较（Phase 5.12）
+#             Int/String/Bool 三类值、字符串字面量、== 相等比较、显式错误诊断（Phase 5.13）
 #   SLet(name, expr)      let name = expr
 #   SExpr(expr)           裸表达式（顶层打印；函数体内产出值）
 #   SIf(cond, then, else) if cond ... else ... end
 #   SWhile(cond, body)    while cond ... end
 #   DFn(name, params, body)  fn name(p1, p2) ... end
 #   Call(name, args)         name(e1, e2)
-#   Val = VInt | VStr | VBool                            （Phase 5.12 新增值系统）
+#   Val = VInt | VStr | VBool
 # 设计要点：
-#   - 环境函数式：exec_stmt 返回 (新环境, 语句值)；函数调用在全新环境绑定参数（词法作用域）
+#   - 环境函数式：exec_stmt 返回 Result<(新环境, 语句值), String>；函数调用在全新环境绑定参数（词法作用域）
 #   - 语句值语义：SIf 的值=被执行分支块的值（if 即表达式）；块的值=尾语句的值（尾表达式返回）
 #   - in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值
 #   - collect_fns 先收集全部函数再执行 → 前向引用/互递归天然支持
-#   - Phase 5.12：= / == 显式成 token（TAssign/TEq）——根治 Phase 5.11 发现的"= 被静默丢弃"陷阱
-#   - 类型错误（如 Int - String）静默得 VInt(0)：已知限制，留给后续诊断层
+#   - Phase 5.12：= / == 显式成 token（TAssign/TEq）
+#   - Phase 5.13 诊断层：全链路 Result<_, String> + ? 传播（dogfood Lom 的"错误即值"哲学）——
+#     未定义变量/函数、参数个数不符、类型错误、除以零全部显式报错，不再静默得 0
 #   - Add 混合规则镜像 Lom v0.4.1：任一侧是 String 时另一侧 show() 提升拼接
 
 from string import { split, string_to_int, int_to_string, contains, len }
-from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_fold, list_map }
+from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_fold }
 
 # ===== Token =====
 enum Token
@@ -70,7 +71,7 @@ enum Decl
     | DStmt(Stmt)
 end
 
-# ===== 值系统（Phase 5.12）=====
+# ===== 值系统 =====
 enum Val
     | VInt(Int)
     | VStr(String)
@@ -124,7 +125,7 @@ fn flush_num(acc: String, rest: List<Token>) -> List<Token>
     end
 end
 
-# 字符串字面量："..." —— 未闭合时宽容产出已有内容（已知限制，无错误报告）
+# 字符串字面量："..." —— 未闭合时宽容产出已有内容（已知限制，无诊断）
 fn lex_str(chars: List<String>, acc: String) -> List<Token>
     if list_is_empty(chars)
         list_cons(TStr(acc), list_empty())
@@ -162,7 +163,7 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
     elif c == "\""
         lex_str(rest_chars, "")
     elif c == "="
-        # Phase 5.12：= 与 == 显式成 token（不再静默丢弃）
+        # = 与 == 是显式 token（Phase 5.12 根治"静默丢弃"陷阱）
         if list_is_empty(rest_chars)
             list_cons(TAssign, lex_rec(rest_chars, ""))
         else
@@ -213,7 +214,6 @@ end
 # ===== Expr Parser =====
 # 文法: Expr = Term (("+"|"-"|">"|"==") Term)*   Term = Factor (("*"|"/") Factor)*
 #        Factor = Int | Str | Ident | Ident "(" Args ")" | "(" Expr ")"
-# （比较运算与加减同级左结合——测试程序不混用，够用）
 
 # 调用参数：expr, expr, ... 直到 TRParen（消耗之）
 fn parse_call_args(tokens: List<Token>) -> (List<Expr>, List<Token>)
@@ -333,7 +333,7 @@ fn ident_of(t: Token) -> String
     end
 end
 
-# let name = expr（TAssign 现在是显式 token，跳过之）
+# let name = expr（TAssign 是显式 token，跳过之）
 fn parse_stmt_let(tokens: List<Token>) -> (Stmt, List<Token>)
     # tokens: TLet TIdent(name) TAssign expr ...
     let name = ident_of(list_head(list_tail(tokens)))
@@ -458,6 +458,15 @@ fn show(v: Val) -> String
     end
 end
 
+# 类型名（诊断消息用）
+fn type_name(v: Val) -> String
+    match v
+        VInt(n) => "Int"
+        VStr(s) => "String"
+        VBool(b) => "Bool"
+    end
+end
+
 # 条件真值判断：VBool 直取；VInt 非零为真；VStr 非空为真
 fn truthy(v: Val) -> Bool
     match v
@@ -505,118 +514,133 @@ fn values_eq(a: Val, b: Val) -> Val
     end
 end
 
-# ===== Evaluator =====
+# ===== Evaluator（Phase 5.13：全链路 Result + ? 传播）=====
 
-fn env_lookup(env: List<(String, Val)>, name: String) -> Val
+fn env_lookup(env: List<(String, Val)>, name: String) -> Result<Val, String>
     if list_is_empty(env)
-        VInt(0)
+        Err("undefined variable '" + name + "'")
     else
         let pair = list_head(env)
         if pair.0 == name
-            pair.1
+            Ok(pair.1)
         else
             env_lookup(list_tail(env), name)
         end
     end
 end
 
-fn eval(e: Expr, env: List<(String, Val)>, fns: List<Decl>) -> Val ! [IO]
+fn eval(e: Expr, env: List<(String, Val)>, fns: List<Decl>) -> Result<Val, String> ! [IO]
     match e
-        Num(n) => VInt(n)
-        StrLit(s) => VStr(s)
+        Num(n) => Ok(VInt(n))
+        StrLit(s) => Ok(VStr(s))
         Var(name) => env_lookup(env, name)
         Add(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
             # 镜像 Lom v0.4.1：任一侧是 String 时另一侧 show() 提升拼接
             match va
                 VInt(x) =>
                     match vb
-                        VInt(y) => VInt(x + y)
-                        VStr(y) => VStr(show(va) + y)
-                        _ => VInt(0)
+                        VInt(y) => Ok(VInt(x + y))
+                        VStr(y) => Ok(VStr(show(va) + y))
+                        _ => Err("type error: Add expects Int or String, got Int and " + type_name(vb))
                     end
                 end
-                VStr(x) => VStr(x + show(vb))
-                _ => VInt(0)
+                VStr(x) => Ok(VStr(x + show(vb)))
+                _ => Err("type error: Add expects Int or String, got " + type_name(va) + " and " + type_name(vb))
             end
         end
         Sub(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
             match va
                 VInt(x) =>
                     match vb
-                        VInt(y) => VInt(x - y)
-                        _ => VInt(0)
+                        VInt(y) => Ok(VInt(x - y))
+                        _ => Err("type error: Sub expects Int, got Int and " + type_name(vb))
                     end
                 end
-                _ => VInt(0)
+                _ => Err("type error: Sub expects Int, got " + type_name(va) + " and " + type_name(vb))
             end
         end
         Mul(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
             match va
                 VInt(x) =>
                     match vb
-                        VInt(y) => VInt(x * y)
-                        _ => VInt(0)
+                        VInt(y) => Ok(VInt(x * y))
+                        _ => Err("type error: Mul expects Int, got Int and " + type_name(vb))
                     end
                 end
-                _ => VInt(0)
+                _ => Err("type error: Mul expects Int, got " + type_name(va) + " and " + type_name(vb))
             end
         end
         Div(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
             match va
                 VInt(x) =>
                     match vb
-                        VInt(y) => VInt(x / y)
-                        _ => VInt(0)
+                        VInt(y) =>
+                            if y == 0
+                                Err("division by zero")
+                            else
+                                Ok(VInt(x / y))
+                            end
+                        end
+                        _ => Err("type error: Div expects Int, got Int and " + type_name(vb))
                     end
                 end
-                _ => VInt(0)
+                _ => Err("type error: Div expects Int, got " + type_name(va) + " and " + type_name(vb))
             end
         end
         Gt(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
             match va
                 VInt(x) =>
                     match vb
-                        VInt(y) => VBool(x > y)
-                        _ => VBool(False)
+                        VInt(y) => Ok(VBool(x > y))
+                        _ => Err("type error: Gt expects Int, got Int and " + type_name(vb))
                     end
                 end
-                _ => VBool(False)
+                _ => Err("type error: Gt expects Int, got " + type_name(va) + " and " + type_name(vb))
             end
         end
         Eq(a, b) =>
-            let va = eval(a, env, fns)
-            let vb = eval(b, env, fns)
-            values_eq(va, vb)
+            let va = eval(a, env, fns)?
+            let vb = eval(b, env, fns)?
+            Ok(values_eq(va, vb))
         end
         Call(name, arg_exprs) =>
-            # 参数按序求值（list_map + 闭包捕获 env/fns）
-            let args = list_map(fn(a: Expr) -> Val
-                eval(a, env, fns)
-            end, arg_exprs)
-            call_fn(find_fn(fns, name), args, fns)
+            let args = eval_args(arg_exprs, env, fns)?
+            let decl = find_fn(fns, name)?
+            call_fn(decl, args, fns)
         end
     end
 end
 
-# 按名查找函数（线性；未找到返回占位 DStmt，调用得 VInt(0) —— 已知限制）
-fn find_fn(fns: List<Decl>, name: String) -> Decl
+# 参数按序求值（手写递归以用 ? 传播错误；Ok 包裹保持顺序）
+fn eval_args(args: List<Expr>, env: List<(String, Val)>, fns: List<Decl>) -> Result<List<Val>, String> ! [IO]
+    if list_is_empty(args)
+        Ok(list_empty())
+    else
+        let v = eval(list_head(args), env, fns)?
+        let rest = eval_args(list_tail(args), env, fns)?
+        Ok(list_cons(v, rest))
+    end
+end
+
+# 按名查找函数（线性；未找到显式 Err —— Phase 5.13，不再静默占位）
+fn find_fn(fns: List<Decl>, name: String) -> Result<Decl, String>
     if list_is_empty(fns)
-        DStmt(SExpr(Num(0)))
+        Err("undefined function '" + name + "'")
     else
         match list_head(fns)
             DFn(n, ps, body) =>
                 if n == name
-                    DFn(n, ps, body)
+                    Ok(DFn(n, ps, body))
                 else
                     find_fn(list_tail(fns), name)
                 end
@@ -635,39 +659,43 @@ fn bind_params(params: List<String>, args: List<Val>, env: List<(String, Val)>) 
     end
 end
 
-fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Val ! [IO]
+fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Result<Val, String> ! [IO]
     match decl
         DFn(name, params, body) =>
-            let env = bind_params(params, args, list_empty())
-            let (env2, v) = exec_stmts(body, env, fns, True)
-            v
+            if list_length(params) == list_length(args)
+                let env = bind_params(params, args, list_empty())
+                let (env2, v) = exec_stmts(body, env, fns, True)?
+                Ok(v)
+            else
+                Err("arity error: function '" + name + "' expects " + list_length(params) + " args, got " + list_length(args))
+            end
         end
-        DStmt(s) => VInt(0)
+        DStmt(s) => Err("internal: DStmt is not callable")
     end
 end
 
-# 执行语句，返回 (新环境, 语句值)：
+# 执行语句，返回 Result<(新环境, 语句值), String>：
 #   SExpr  → 值是表达式求值结果（in_fn=True 时不打印——函数体内的表达式是"求值"不是"输出"）
 #   SIf    → 值是被执行分支块的值（递归）——if 即表达式，函数体尾部的 if 能带出返回值
 #   SLet / SWhile → 值为 VInt(0)
 # 条件用 truthy() 判断（VBool 直取 / VInt 非零 / VStr 非空）
-fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> (List<(String, Val)>, Val) ! [IO]
+fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> Result<(List<(String, Val)>, Val), String> ! [IO]
     match s
         SLet(name, e) =>
-            let v = eval(e, env, fns)
-            (list_cons((name, v), env), VInt(0))
+            let v = eval(e, env, fns)?
+            Ok((list_cons((name, v), env), VInt(0)))
         end
         SExpr(e) =>
-            let v = eval(e, env, fns)
+            let v = eval(e, env, fns)?
             if in_fn
                 0
             else
                 println(show(v))
             end
-            (env, v)
+            Ok((env, v))
         end
         SIf(c, then_block, else_block) =>
-            if truthy(eval(c, env, fns))
+            if truthy(eval(c, env, fns)?)
                 exec_stmts(then_block, env, fns, in_fn)
             else
                 exec_stmts(else_block, env, fns, in_fn)
@@ -675,23 +703,29 @@ fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) ->
         end
         SWhile(c, body) =>
             # 函数式环境的循环 threading：每轮把 body 执行后的新环境带入下一轮
+            # ? 在循环内直接穿透——任一轮出错立即整体返回 Err
             let mut cur = env
-            while truthy(eval(c, cur, fns))
-                let (next_env, v) = exec_stmts(body, cur, fns, in_fn)
+            while truthy(eval(c, cur, fns)?)
+                let (next_env, v) = exec_stmts(body, cur, fns, in_fn)?
                 cur = next_env
             end
-            (cur, VInt(0))
+            Ok((cur, VInt(0)))
         end
     end
 end
 
-# 顺序执行语句序列，返回 (最终环境, 最后一条语句的值)
-# list_fold 累积 (env, last) 元组——块尾语句的值自然成为块的值（尾表达式语义）
-fn exec_stmts(stmts: List<Stmt>, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> (List<(String, Val)>, Val) ! [IO]
-    list_fold(fn(acc: (List<(String, Val)>, Val), s: Stmt) -> (List<(String, Val)>, Val)
-        let (acc_env, last) = acc
-        exec_stmt(s, acc_env, fns, in_fn)
-    end, (env, VInt(0)), stmts)
+# 顺序执行语句序列，返回 Result<(最终环境, 最后一条语句的值), String>
+# list_fold 累积 Result：Err 短路穿透，Ok 继续执行（错误即值的折叠形态）
+fn exec_stmts(stmts: List<Stmt>, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> Result<(List<(String, Val)>, Val), String> ! [IO]
+    list_fold(fn(acc: Result<(List<(String, Val)>, Val), String>, s: Stmt) -> Result<(List<(String, Val)>, Val), String>
+        match acc
+            Err(e) => Err(e)
+            Ok(pair) =>
+                let (acc_env, last) = pair
+                exec_stmt(s, acc_env, fns, in_fn)
+            end
+        end
+    end, Ok((env, VInt(0))), stmts)
 end
 
 # ===== 主入口 =====
@@ -726,8 +760,11 @@ fn run_program(src: String) -> Unit ! [IO]
     # 先收集函数表再执行语句 → 前向引用/互递归天然支持
     let fns = collect_fns(decls, list_empty())
     let stmts = collect_stmts(decls)
-    # 绑定最终结果使块尾是语句而非表达式（返回 Unit，消除 TYPE010）
-    let final_result = exec_stmts(stmts, list_empty(), fns, False)
+    # Phase 5.13：顶层捕获 Result，错误显式打印（诊断层的最终出口）
+    match exec_stmts(stmts, list_empty(), fns, False)
+        Ok(pair) => 0
+        Err(msg) => println("error: " + msg)
+    end
 end
 
 fn main() -> Unit
@@ -747,19 +784,27 @@ fn main() -> Unit
     # fn add(a, b) a + b end / fn square(n) n * n end / let x = add(3, 4) / let y = square(x) / y   ->  49
     run_program("fn add(a, b)\na + b\nend\nfn square(n)\nn * n\nend\nlet x = add(3, 4)\nlet y = square(x)\ny")
 
-    # 程序 5（Phase 5.11）：递归 + 前向引用（is_odd 在 collatz_len 之后定义）
+    # 程序 5（Phase 5.11/5.12）：递归 + 前向引用 + == 比较（is_odd 在 collatz_len 之后定义）
     # collatz_len(6): 6→3→10→5→16→8→4→2→1   ->  8
     run_program("fn collatz_len(n)\nif 2 > n\n0\nelse\nif is_odd(n) > 0\n1 + collatz_len(n * 3 + 1)\nelse\n1 + collatz_len(n / 2)\nend\nend\nend\nfn is_odd(n)\nn - (n / 2) * 2\nend\ncollatz_len(6)")
 
     # 程序 6（Phase 5.12）：字符串值 + 拼接 + Bool 打印
-    # let name = "lom" / let greeting = "hello, " + name / greeting   ->  hello, lom
-    # 3 > 2   ->  true（Bool 显示为小写，与 Lom 一致）
+    # ->  hello, lom / true
     run_program("let name = \"lom\"\nlet greeting = \"hello, \" + name\ngreeting")
     run_program("3 > 2")
 
-    # 程序 7（Phase 5.12）：字符串函数 + while 累积 + == 比较（Phase 5.12 起 == 是显式 token）
-    # fn shout(s, n) ... / shout("ab", 3)   ->  ababab
-    # fn eq1(a, b) a == b end / eq1(2 + 2, 4)   ->  true
+    # 程序 7（Phase 5.12）：字符串函数 + while 累积 + == 比较
+    # ->  ababab / true
     run_program("fn shout(s, n)\nlet r = \"\"\nlet i = n\nwhile i > 0\nlet r = r + s\nlet i = i - 1\nend\nr\nend\nshout(\"ab\", 3)")
     run_program("fn eq1(a, b)\na == b\nend\neq1(2 + 2, 4)")
+
+    # 程序 8（Phase 5.13）：诊断层——错误显式报告而非静默得 0
+    # ->  error: undefined variable 'x'
+    # ->  error: arity error: function 'f' expects 1 args, got 2
+    # ->  error: division by zero
+    # ->  error: type error: Sub expects Int, got Int and String
+    run_program("x + 1")
+    run_program("fn f(a)\na\nend\nf(1, 2)")
+    run_program("1 / 0")
+    run_program("let n = 5\nn - \"abc\"")
 end
