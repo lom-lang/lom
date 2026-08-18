@@ -1,17 +1,22 @@
-# 自举验证 5：带语句层的解释器（Phase 5.2，Phase 5.10 扩展）
-# 源语言支持：let 绑定、if/else 语句、while 循环、块、比较运算、四则运算、变量
-# 在表达式解释器（mini_interp.lom）之上加 Stmt 层：
+# 自举验证 5：带语句层与函数的解释器（Phase 5.2 → 5.10 → 5.11 扩展）
+# 源语言支持：let 绑定、if/else、while、块、比较/四则运算、变量、函数定义与调用
 #   SLet(name, expr)      let name = expr
-#   SExpr(expr)           裸表达式（求值并打印）
+#   SExpr(expr)           裸表达式（顶层求值并打印；函数体最后一条的值即返回值）
 #   SIf(cond, then, else) if cond ... else ... end
-#   SWhile(cond, body)    while cond ... end          （Phase 5.10 新增）
-# 环境扩展用函数式风格：exec_stmt 返回新环境（cons 头插，新绑定遮蔽旧绑定）
-# 全程使用 Phase 5.1 的 let 元组解构
-# Phase 5.10：exec_stmts 改用 list_fold + 闭包（dogfood v0.4.3 高阶标准库 + v0.4.2 闭包作参数）；
-#             SWhile 执行用 let mut + Lom while（dogfood 可变绑定与循环）
+#   SWhile(cond, body)    while cond ... end
+#   DFn(name, params, body)  fn name(p1, p2) ... end   （Phase 5.11 新增）
+#   Call(name, args)         name(e1, e2)               （Phase 5.11 新增）
+# 设计要点：
+#   - 环境函数式：exec_stmt 返回 (新环境, 语句值)；函数调用在全新环境中绑定参数（词法作用域）
+#   - 语句值语义：SExpr 的值=表达式值；SIf 的值=被执行分支块的值（if 即表达式）；
+#     块的值=尾语句的值 → 函数返回值=函数体尾语句的值（尾表达式风格，与 Lom 自身哲学一致，无需 return）
+#   - in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值（递归调用不污染输出）
+#   - run_program 先 collect_fns 收集全部函数再执行语句 → 前向引用/互递归天然支持
+#   - Phase 5.10：exec_stmts 用 list_fold + 闭包；Phase 5.11：Call 参数求值用 list_map + 闭包
+# 已知限制：函数未定义/参数个数不符时静默得 0（无错误报告，留给后续诊断层）
 
 from string import { split, string_to_int, contains, len }
-from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_fold }
+from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_fold, list_map }
 
 # ===== Token =====
 enum Token
@@ -23,11 +28,13 @@ enum Token
     | TSlash
     | TLParen
     | TRParen
+    | TComma
     | TLet
     | TIf
     | TElse
     | TEnd
     | TWhile
+    | TFn
     | TGt
 end
 
@@ -40,6 +47,7 @@ enum Expr
     | Mul(Expr, Expr)
     | Div(Expr, Expr)
     | Gt(Expr, Expr)
+    | Call(String, List<Expr>)
 end
 
 enum Stmt
@@ -47,6 +55,12 @@ enum Stmt
     | SExpr(Expr)
     | SIf(Expr, List<Stmt>, List<Stmt>)
     | SWhile(Expr, List<Stmt>)
+end
+
+# 顶层声明：函数定义 or 语句（Phase 5.11）
+enum Decl
+    | DFn(String, List<String>, List<Stmt>)
+    | DStmt(Stmt)
 end
 
 # ===== Lexer =====
@@ -69,7 +83,7 @@ fn is_alnum(c: String) -> Bool
     end
 end
 
-# 关键字识别：let/if/else/end/while 是保留字，其余为标识符
+# 关键字识别：let/if/else/end/while/fn 是保留字，其余为标识符
 fn keyword_or_ident(s: String) -> Token
     if s == "let"
         TLet
@@ -81,6 +95,8 @@ fn keyword_or_ident(s: String) -> Token
         TEnd
     elif s == "while"
         TWhile
+    elif s == "fn"
+        TFn
     else
         TIdent(s)
     end
@@ -113,6 +129,8 @@ fn lex_char(c: String, rest_chars: List<String>) -> List<Token>
         list_cons(TLParen, lex_rec(rest_chars, ""))
     elif c == ")"
         list_cons(TRParen, lex_rec(rest_chars, ""))
+    elif c == ","
+        list_cons(TComma, lex_rec(rest_chars, ""))
     else
         lex_rec(rest_chars, "")
     end
@@ -153,13 +171,43 @@ end
 
 # ===== Expr Parser =====
 # 文法: Expr = Term (("+"|"-"|">") Term)*   Term = Factor (("*"|"/") Factor)*
-#        Factor = Int | Ident | "(" Expr ")"
+#        Factor = Int | Ident | Ident "(" Args ")" | "(" Expr ")"
 # （比较运算与加减同级左结合——测试程序不混用，够用）
+
+# 调用参数：expr, expr, ... 直到 TRParen（消耗之）
+fn parse_call_args(tokens: List<Token>) -> (List<Expr>, List<Token>)
+    match list_head(tokens)
+        TRParen => (list_empty(), list_tail(tokens))
+        _ =>
+            let (e, rest) = parse_expr(tokens)
+            match list_head(rest)
+                TComma =>
+                    let (more, rest2) = parse_call_args(list_tail(rest))
+                    (list_cons(e, more), rest2)
+                end
+                TRParen => (list_cons(e, list_empty()), list_tail(rest))
+            end
+        end
+    end
+end
 
 fn parse_factor(tokens: List<Token>) -> (Expr, List<Token>)
     match list_head(tokens)
         TInt(n) => (Num(n), list_tail(tokens))
-        TIdent(name) => (Var(name), list_tail(tokens))
+        TIdent(name) =>
+            # 前瞻：Ident 后跟 TLParen 是函数调用，否则是变量引用
+            if list_is_empty(list_tail(tokens))
+                (Var(name), list_tail(tokens))
+            else
+                match list_head(list_tail(tokens))
+                    TLParen =>
+                        let (args, rest) = parse_call_args(list_tail(list_tail(tokens)))
+                        (Call(name, args), rest)
+                    end
+                    _ => (Var(name), list_tail(tokens))
+                end
+            end
+        end
         TLParen =>
             let (e, rest) = parse_expr(list_tail(tokens))
             (e, list_tail(rest))
@@ -227,7 +275,7 @@ fn parse_expr(tokens: List<Token>) -> (Expr, List<Token>)
     parse_expr_rest(left, rest)
 end
 
-# ===== Stmt Parser =====
+# ===== Stmt / Decl Parser =====
 
 # 从 TIdent token 提取名字（防御性：非 TIdent 返回空串）
 fn ident_of(t: Token) -> String
@@ -239,7 +287,7 @@ end
 
 # let name = expr
 fn parse_stmt_let(tokens: List<Token>) -> (Stmt, List<Token>)
-    # tokens: TLet TIdent(name) = expr ...
+    # tokens: TLet TIdent(name) = expr ...（= 被 lexer 丢弃）
     let name = ident_of(list_head(list_tail(tokens)))
     let (e, rest) = parse_expr(list_tail(list_tail(tokens)))
     (SLet(name, e), rest)
@@ -298,12 +346,50 @@ fn parse_stmt(tokens: List<Token>) -> (Stmt, List<Token>)
     end
 end
 
-fn parse_program(tokens: List<Token>) -> List<Stmt>
+# fn 参数名列表：(p1, p2, ...) —— tokens 从 TLParen 开始
+fn parse_params(tokens: List<Token>) -> (List<String>, List<Token>)
+    match list_head(list_tail(tokens))
+        TRParen => (list_empty(), list_tail(list_tail(tokens)))
+        _ => parse_params_rec(list_tail(tokens))
+    end
+end
+
+fn parse_params_rec(tokens: List<Token>) -> (List<String>, List<Token>)
+    let name = ident_of(list_head(tokens))
+    match list_head(list_tail(tokens))
+        TComma =>
+            let (more, rest) = parse_params_rec(list_tail(list_tail(tokens)))
+            (list_cons(name, more), rest)
+        end
+        TRParen => (list_cons(name, list_empty()), list_tail(list_tail(tokens)))
+    end
+end
+
+# fn name(p1, p2)
+#     body-block
+# end
+fn parse_fn(tokens: List<Token>) -> (Decl, List<Token>)
+    # tokens: TFn TIdent(name) TLParen ...
+    let name = ident_of(list_head(list_tail(tokens)))
+    let (params, rest) = parse_params(list_tail(list_tail(tokens)))
+    let (body, rest2) = parse_block(rest)
+    (DFn(name, params, body), rest2)
+end
+
+fn parse_program(tokens: List<Token>) -> List<Decl>
     if list_is_empty(tokens)
         list_empty()
     else
-        let (stmt, rest) = parse_stmt(tokens)
-        list_cons(stmt, parse_program(rest))
+        match list_head(tokens)
+            TFn =>
+                let (d, rest) = parse_fn(tokens)
+                list_cons(d, parse_program(rest))
+            end
+            _ =>
+                let (s, rest) = parse_stmt(tokens)
+                list_cons(DStmt(s), parse_program(rest))
+            end
+        end
     end
 end
 
@@ -322,70 +408,151 @@ fn env_lookup(env: List<(String, Int)>, name: String) -> Int
     end
 end
 
-fn eval(e: Expr, env: List<(String, Int)>) -> Int
+fn eval(e: Expr, env: List<(String, Int)>, fns: List<Decl>) -> Int ! [IO]
     match e
         Num(n) => n
         Var(name) => env_lookup(env, name)
-        Add(a, b) => eval(a, env) + eval(b, env)
-        Sub(a, b) => eval(a, env) - eval(b, env)
-        Mul(a, b) => eval(a, env) * eval(b, env)
-        Div(a, b) => eval(a, env) / eval(b, env)
+        Add(a, b) => eval(a, env, fns) + eval(b, env, fns)
+        Sub(a, b) => eval(a, env, fns) - eval(b, env, fns)
+        Mul(a, b) => eval(a, env, fns) * eval(b, env, fns)
+        Div(a, b) => eval(a, env, fns) / eval(b, env, fns)
         Gt(a, b) =>
-            if eval(a, env) > eval(b, env)
+            if eval(a, env, fns) > eval(b, env, fns)
                 1
             else
                 0
             end
         end
+        Call(name, arg_exprs) =>
+            # 参数按序求值（list_map + 闭包捕获 env/fns —— dogfood v0.4.3）
+            let args = list_map(fn(a: Expr) -> Int
+                eval(a, env, fns)
+            end, arg_exprs)
+            call_fn(find_fn(fns, name), args, fns)
+        end
     end
 end
 
-# 执行语句，返回扩展后的环境（let 绑定 cons 头插——新绑定遮蔽旧绑定）
-# ! [IO]：SExpr 臂会 println（Phase 5.10 效应标注补齐）
-fn exec_stmt(s: Stmt, env: List<(String, Int)>) -> List<(String, Int)> ! [IO]
+# 按名查找函数（线性；未找到返回占位 DStmt，调用得 0 —— 已知限制）
+fn find_fn(fns: List<Decl>, name: String) -> Decl
+    if list_is_empty(fns)
+        DStmt(SExpr(Num(0)))
+    else
+        match list_head(fns)
+            DFn(n, ps, body) =>
+                if n == name
+                    DFn(n, ps, body)
+                else
+                    find_fn(list_tail(fns), name)
+                end
+            end
+            DStmt(s) => find_fn(list_tail(fns), name)
+        end
+    end
+end
+
+# 参数绑定：全新环境（词法作用域——函数看不到调用者的局部变量）
+fn bind_params(params: List<String>, args: List<Int>, env: List<(String, Int)>) -> List<(String, Int)>
+    if list_is_empty(params)
+        env
+    else
+        bind_params(list_tail(params), list_tail(args), list_cons((list_head(params), list_head(args)), env))
+    end
+end
+
+fn call_fn(decl: Decl, args: List<Int>, fns: List<Decl>) -> Int ! [IO]
+    match decl
+        DFn(name, params, body) =>
+            let env = bind_params(params, args, list_empty())
+            let (env2, v) = exec_stmts(body, env, fns, True)
+            v
+        end
+        DStmt(s) => 0
+    end
+end
+
+# 执行语句，返回 (新环境, 语句值)：
+#   SExpr  → 值是表达式求值结果（in_fn=True 时不打印——函数体内的表达式是"求值"不是"输出"）
+#   SIf    → 值是被执行分支块的值（递归）——这使 if 成为表达式，函数体尾部的 if 能带出返回值
+#   SLet / SWhile → 值为 0
+# in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值
+fn exec_stmt(s: Stmt, env: List<(String, Int)>, fns: List<Decl>, in_fn: Bool) -> (List<(String, Int)>, Int) ! [IO]
     match s
         SLet(name, e) =>
-            let v = eval(e, env)
-            list_cons((name, v), env)
+            let v = eval(e, env, fns)
+            (list_cons((name, v), env), 0)
         end
         SExpr(e) =>
-            println(eval(e, env))
-            env
+            let v = eval(e, env, fns)
+            if in_fn
+                0
+            else
+                println(v)
+            end
+            (env, v)
         end
         SIf(c, then_block, else_block) =>
-            if eval(c, env) == 1
-                exec_stmts(then_block, env)
+            if eval(c, env, fns) == 1
+                exec_stmts(then_block, env, fns, in_fn)
             else
-                exec_stmts(else_block, env)
+                exec_stmts(else_block, env, fns, in_fn)
             end
         end
         SWhile(c, body) =>
-            # Phase 5.10：函数式环境的循环 threading —— 每轮把 body 执行后的新环境带入下一轮
-            # （cons 头插遮蔽使 let 重新绑定生效；环境单调增长，查找永远命中最新绑定）
+            # 函数式环境的循环 threading：每轮把 body 执行后的新环境带入下一轮
             let mut cur = env
-            while eval(c, cur) == 1
-                cur = exec_stmts(body, cur)
+            while eval(c, cur, fns) == 1
+                let (next_env, v) = exec_stmts(body, cur, fns, in_fn)
+                cur = next_env
             end
-            cur
+            (cur, 0)
         end
     end
 end
 
-# 顺序执行语句序列（Phase 5.10 改为 list_fold + 闭包：
-# fold 的回调签名是 f(acc, x)，exec_stmt 是 (stmt, env)，用闭包适配参数顺序）
-fn exec_stmts(stmts: List<Stmt>, env: List<(String, Int)>) -> List<(String, Int)> ! [IO]
-    list_fold(fn(acc: List<(String, Int)>, s: Stmt) -> List<(String, Int)>
-        exec_stmt(s, acc)
-    end, env, stmts)
+# 顺序执行语句序列，返回 (最终环境, 最后一条语句的值)
+# list_fold 累积 (env, last) 元组——块尾语句的值自然成为块的值（尾表达式语义）
+fn exec_stmts(stmts: List<Stmt>, env: List<(String, Int)>, fns: List<Decl>, in_fn: Bool) -> (List<(String, Int)>, Int) ! [IO]
+    list_fold(fn(acc: (List<(String, Int)>, Int), s: Stmt) -> (List<(String, Int)>, Int)
+        let (acc_env, last) = acc
+        exec_stmt(s, acc_env, fns, in_fn)
+    end, (env, 0), stmts)
 end
 
 # ===== 主入口 =====
 
+# 收集全部函数定义（cons 累积，顺序无关——按名查找）
+fn collect_fns(decls: List<Decl>, acc: List<Decl>) -> List<Decl>
+    if list_is_empty(decls)
+        acc
+    else
+        match list_head(decls)
+            DFn(n, ps, body) => collect_fns(list_tail(decls), list_cons(DFn(n, ps, body), acc))
+            DStmt(s) => collect_fns(list_tail(decls), acc)
+        end
+    end
+end
+
+# 收集全部顶层语句（保持顺序）
+fn collect_stmts(decls: List<Decl>) -> List<Stmt>
+    if list_is_empty(decls)
+        list_empty()
+    else
+        match list_head(decls)
+            DFn(n, ps, body) => collect_stmts(list_tail(decls))
+            DStmt(s) => list_cons(s, collect_stmts(list_tail(decls)))
+        end
+    end
+end
+
 fn run_program(src: String) -> Unit ! [IO]
     let tokens = lex(src)
-    let program = parse_program(tokens)
-    # 绑定最终环境使块尾是语句而非表达式（返回 Unit，消除 TYPE010）
-    let final_env = exec_stmts(program, list_empty())
+    let decls = parse_program(tokens)
+    # 先收集函数表再执行语句 → 前向引用/互递归天然支持
+    let fns = collect_fns(decls, list_empty())
+    let stmts = collect_stmts(decls)
+    # 绑定最终结果使块尾是语句而非表达式（返回 Unit，消除 TYPE010）
+    let final_result = exec_stmts(stmts, list_empty(), fns, False)
 end
 
 fn main() -> Unit
@@ -400,4 +567,13 @@ fn main() -> Unit
     # 程序 3（Phase 5.10）：while 循环 + 环境遮蔽
     # let i = 3 / let s = 0 / while i > 0 / let s = s + i / let i = i - 1 / end / s   ->  6
     run_program("let i = 3\nlet s = 0\nwhile i > 0\nlet s = s + i\nlet i = i - 1\nend\ns")
+
+    # 程序 4（Phase 5.11）：函数定义与调用 + 词法作用域
+    # fn add(a, b) a + b end / fn square(n) n * n end / let x = add(3, 4) / let y = square(x) / y   ->  49
+    run_program("fn add(a, b)\na + b\nend\nfn square(n)\nn * n\nend\nlet x = add(3, 4)\nlet y = square(x)\ny")
+
+    # 程序 5（Phase 5.11）：递归 + 前向引用（is_odd 在 collatz_len 之后定义）
+    # 注意：源语言只有 > 比较（无 ==），相等判断用算术表达（奇偶 = n - (n/2)*2）
+    # collatz_len(6): 6→3→10→5→16→8→4→2→1   ->  8
+    run_program("fn collatz_len(n)\nif 2 > n\n0\nelse\nif is_odd(n) > 0\n1 + collatz_len(n * 3 + 1)\nelse\n1 + collatz_len(n / 2)\nend\nend\nend\nfn is_odd(n)\nn - (n / 2) * 2\nend\ncollatz_len(6)")
 end
