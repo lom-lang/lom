@@ -1,0 +1,65 @@
+# Lom CI — 三平台构建 + 全量回归（Phase 6.3）
+#
+# 每个 push/PR 在 Linux / macOS / Windows 上跑：
+#   1. cargo test --release（Rust 单元测试）
+#   2. 自举回归（stmt_interp.lom 全量输出非空且无异常退出）
+#   3. eval 参考解验证（Unix 用 run.sh + jq；Windows 用 run.ps1）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+
+      - name: Build (release)
+        # 注意：Cargo.lock 按仓库惯例不入库（gitignore），且零依赖，无需 --locked
+        run: cargo build --release
+
+      - name: Unit tests
+        run: cargo test --release
+
+      - name: Bootstrap regression (stmt_interp)
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then BIN=./target/release/lom.exe; else BIN=./target/release/lom; fi
+          out=$($BIN examples/bootstrap/stmt_interp.lom)
+          lines=$(echo "$out" | wc -l)
+          echo "stmt_interp output lines: $lines"
+          # 39 条输出逐字验证基线；少于此数即回归
+          test "$lines" -ge 39
+
+      - name: Eval verify (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          sudo apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null || true
+          ./eval/runner/run.sh --verify
+
+      - name: Eval verify (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe
