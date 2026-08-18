@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.8 完成，具名函数作为值，v0.4.2 P1 三件套全部完成）
+> 最后更新：2026-08-18（Phase 5.9 完成，高阶 list 标准库，v0.4.3）
 
 ---
 
@@ -31,12 +31,12 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **316/316 通过** |
-| eval 评测集 | **106/106 参考解通过** |
+| Rust 测试 | **320/320 通过** |
+| eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp） |
-| 当前进度 | Phase 5.8 完成（具名函数作为值，v0.4.2 P1 三件套全部完成） |
-| 下一步 | 候选：list_map/list_filter 高阶标准库（P1-3 已解锁）；P2：char 类型、HashMap/Set |
+| 当前进度 | Phase 5.9 完成（list_map/list_filter/list_fold，v0.4.3） |
+| 下一步 | 自举深化（用 v0.4.x 新特性重写/扩展 bootstrap）；P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -203,7 +203,8 @@ end
 3. ✅ **具名函数作为值**（2026-08-18 完成，Phase 5.8 / v0.4.2）：interpreter 把具名函数包装为闭包值（env=globals，与 call_function 父环境一致）；typechecker 本就放行（Unknown）零改动；3 个新测试 + eval 任务 106。注意：**内置函数（println 等）仍不能当值**（没有 NativeFn 值变体），只有用户具名函数可以。
 
 **v0.4.2 P1 三件套已全部完成。** 下一步候选：
-- **list_map / list_filter / list_fold 高阶标准库**（P1-3 已解锁语言前提，注意需要参数是 Fn 类型 + 调用闭包，参考 apply 模式）
+- ✅ **list_map / list_filter / list_fold 高阶标准库**（2026-08-18 完成，Phase 5.9 / v0.4.3）：call_builtin 改 &mut self 以回调闭包；typechecker 注册签名（f: Fn）；4 个新测试 + eval 任务 107。注意：filter 的 f 返回非 Bool 会走 is_truthy 报运行时错（与 if 条件同规则）。
+- **自举深化**：用 v0.4.x 新特性（range/for-in-List/拼接提升/复合赋值/高阶函数）重写或扩展 bootstrap 解释器，验证新特性在自举场景的真实表现
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
@@ -239,7 +240,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 316/316
+2. `cargo build --release && cargo test --release` 确认 320/320
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

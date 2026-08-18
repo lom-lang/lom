@@ -922,6 +922,8 @@
     <br><br>
     <strong>Phase 5.8 具名函数作为值（2026-08-18，v0.4.2 P1-3）</strong>：<code>let f = double</code> 合法——interpreter 把具名函数包装为闭包值（环境取 globals，与 <code>call_function</code> 父环境一致，行为与直接调用完全等价；函数体内按名递归仍走 functions 表，不受影响）。此前报"不能将函数作为值使用（仅支持闭包字面量）"。typechecker 本就放行函数引用（Unknown，渐进式），零改动；3 个新测试（316/316 通过），eval 新增任务 106（106/106 通过，closures 类 11/11）。<strong>这是 list_map/list_filter 等高阶标准库函数的语言前提。</strong>
     <br><br>
+    <strong>Phase 5.9 高阶 list 标准库（2026-08-18，v0.4.3）</strong>：<code>list_map(f, xs)</code> / <code>list_filter(f, xs)</code> / <code>list_fold(f, init, xs)</code>。<code>call_builtin</code> 从 <code>&amp;self</code> 改为 <code>&amp;mut self</code>（高阶函数内部要回调闭包）；f 接受闭包字面量或具名函数（Phase 5.8 包装值）；filter 复用 is_truthy 的 Bool 强制；typechecker 注册签名（f 标 <code>Fn</code>，实参 Unknown 不触发误报）。与前期特性天然组合：<code>list_map(double, 1..6)</code>（range + 具名函数值）、<code>list_fold(字符串拼接, "", xs)</code>（拼接提升）。4 个新测试（320/320 通过），eval 新增任务 107（107/107 通过，closures 类 12/12）。顺带补齐 SPEC_FOR_AI 缺失的 list 模块全表（Phase 3.3 以来的文档欠账）。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

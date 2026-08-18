@@ -954,7 +954,7 @@ from io import { println as log }            # per-item alias
 | `io` | `println`, `print` | Also in prelude (auto-available); explicit import only needed for aliasing |
 | `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with` | Phase 3.4 adds `split`/`contains`/`replace`/`starts_with`/`ends_with` (§9.2) |
 | `math` | `sqrt`, `abs`, `min`, `max` | Must be imported to use |
-| `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons` | Phase 3.3 — immutable list ops (§9.3) |
+| `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons`, `list_map`, `list_filter`, `list_fold` | Phase 3.3 — immutable list ops (§9.3); v0.4.3 adds higher-order ops |
 | `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
 | `file` | `file_read`, `file_write`, `file_append`, `file_exists` | Phase 3.4 — file system I/O, all declare `[IO]` effect (§9.5) |
 | `env` | `args` | Phase 3.5 — command-line arguments (§9.6) |
@@ -1029,7 +1029,7 @@ A pure, immutable list type exposed through the `list` standard library module. 
 
 **Type representation**: `List<T>` is encoded as `Type::Generic("List", [T])`. The type checker signatures use `List<_Any>` to accept any element type; element-type tracking is deferred to a later phase.
 
-**Construction**: there is no list literal syntax `[1, 2, 3]` yet. Build a list by chaining `list_cons` on `list_empty()`, or obtain one from `json_parse("[1,2,3]")` (which maps JSON arrays to `List`).
+**Construction**: there is no list literal syntax `[1, 2, 3]` yet. Build a list by chaining `list_cons` on `list_empty()`, from the range expression `1..4` (v0.4.2, `List<Int>`), or obtain one from `json_parse("[1,2,3]")` (which maps JSON arrays to `List`).
 
 | Function | Type | Notes |
 |---|---|---|
@@ -1040,6 +1040,9 @@ A pure, immutable list type exposed through the `list` standard library module. 
 | `list_is_empty(list)` | `List<_Any> -> Bool` | True iff length is 0 |
 | `list_head(list)` | `List<_Any> -> _Any` | First element; runtime error on empty list |
 | `list_tail(list)` | `List<_Any> -> List<_Any>` | All elements but the first; runtime error on empty list |
+| `list_map(f, list)` (v0.4.3) | `(Fn, List<_Any>) -> List<_Any>` | Apply `f` to each element, return the new list. `f` may be a closure literal or a named function (v0.4.2+) |
+| `list_filter(f, list)` (v0.4.3) | `(Fn, List<_Any>) -> List<_Any>` | Keep elements where `f(x)` is `True` (non-Bool result is a runtime error, same truthiness rule as `if`) |
+| `list_fold(f, init, list)` (v0.4.3) | `(Fn, _Any, List<_Any>) -> _Any` | Left fold: `acc = f(acc, x)` starting from `init` |
 
 All functions are pure (no `! [...]` effect). Examples: [examples/list_demo.lom](examples/list_demo.lom).
 

@@ -439,6 +439,23 @@ end
 
 **`io` module** (same as prelude; explicit import only needed for aliasing): `println`, `print`.
 
+**`list` module** (requires `from list import {...}`; Lists are immutable — every function returns a new List):
+
+| Function | Signature | Description |
+|---|---|---|
+| `list_empty()` | `() -> List<T>` | Empty list |
+| `list_length(xs)` | `List<T> -> Int` | Element count |
+| `list_get(xs, i)` | `(List<T>, Int) -> T` | Element at index (0-based) |
+| `list_is_empty(xs)` | `List<T> -> Bool` | Empty check |
+| `list_head(xs)` | `List<T> -> T` | First element |
+| `list_tail(xs)` | `List<T> -> List<T>` | All but first |
+| `list_cons(x, xs)` | `(T, List<T>) -> List<T>` | Prepend: `[x, ...xs]` |
+| `list_map(f, xs)` (v0.4.3) | `(Fn, List<T>) -> List<U>` | Apply `f` to each element |
+| `list_filter(f, xs)` (v0.4.3) | `(Fn, List<T>) -> List<T>` | Keep elements where `f(x)` is `True` |
+| `list_fold(f, init, xs)` (v0.4.3) | `(Fn, U, List<T>) -> U` | Left fold: `acc = f(acc, x)` |
+
+`f` can be a closure literal or a named function (v0.4.2+): `list_map(double, 1..6)` → `[2, 4, 6, 8, 10]`.
+
 ---
 
 ## 11c. Error Diagnostics (Phase 2.3)
