@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.9 完成，高阶 list 标准库，v0.4.3）
+> 最后更新：2026-08-18（Phase 5.10 完成，自举深化 SWhile + list_fold 重写）
 
 ---
 
@@ -34,9 +34,9 @@
 | Rust 测试 | **320/320 通过** |
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp） |
-| 当前进度 | Phase 5.9 完成（list_map/list_filter/list_fold，v0.4.3） |
-| 下一步 | 自举深化（用 v0.4.x 新特性重写/扩展 bootstrap）；P2：char 类型、HashMap/Set |
+| 自举验证 | 4 个 bootstrap 文件全通过（char_scan / recursive_enum / mini_interp / stmt_interp，stmt_interp 输出 11/10/6 且 --check 0 诊断） |
+| 当前进度 | Phase 5.10 完成（自举深化：SWhile + exec_stmts 改 list_fold） |
+| 下一步 | 候选：自举继续深化（函数定义/调用层？）、P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -204,7 +204,7 @@ end
 
 **v0.4.2 P1 三件套已全部完成。** 下一步候选：
 - ✅ **list_map / list_filter / list_fold 高阶标准库**（2026-08-18 完成，Phase 5.9 / v0.4.3）：call_builtin 改 &mut self 以回调闭包；typechecker 注册签名（f: Fn）；4 个新测试 + eval 任务 107。注意：filter 的 f 返回非 Bool 会走 is_truthy 报运行时错（与 if 条件同规则）。
-- **自举深化**：用 v0.4.x 新特性（range/for-in-List/拼接提升/复合赋值/高阶函数）重写或扩展 bootstrap 解释器，验证新特性在自举场景的真实表现
+- ✅ **自举深化**（2026-08-18 完成，Phase 5.10）：stmt_interp.lom 加 SWhile（let mut + Lom while 做函数式环境 threading）；exec_stmts 改 list_fold + 闭包；新测试程序 3 输出 6；补效应标注链后 --check 0 诊断。注意 fold 回调是 f(acc, x) 而 exec_stmt 是 (stmt, env)，参数顺序要用闭包适配，不能直接 list_fold(exec_stmt, ...)。
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。

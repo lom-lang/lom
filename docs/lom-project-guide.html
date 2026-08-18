@@ -924,6 +924,8 @@
     <br><br>
     <strong>Phase 5.9 高阶 list 标准库（2026-08-18，v0.4.3）</strong>：<code>list_map(f, xs)</code> / <code>list_filter(f, xs)</code> / <code>list_fold(f, init, xs)</code>。<code>call_builtin</code> 从 <code>&amp;self</code> 改为 <code>&amp;mut self</code>（高阶函数内部要回调闭包）；f 接受闭包字面量或具名函数（Phase 5.8 包装值）；filter 复用 is_truthy 的 Bool 强制；typechecker 注册签名（f 标 <code>Fn</code>，实参 Unknown 不触发误报）。与前期特性天然组合：<code>list_map(double, 1..6)</code>（range + 具名函数值）、<code>list_fold(字符串拼接, "", xs)</code>（拼接提升）。4 个新测试（320/320 通过），eval 新增任务 107（107/107 通过，closures 类 12/12）。顺带补齐 SPEC_FOR_AI 缺失的 list 模块全表（Phase 3.3 以来的文档欠账）。
     <br><br>
+    <strong>Phase 5.10 自举深化（2026-08-18）</strong>：<a href="../examples/bootstrap/stmt_interp.lom">stmt_interp.lom</a> 扩展 <code>SWhile</code> 语句（源语言支持 while 循环；执行侧用 <code>let mut</code> + Lom while 做函数式环境的循环 threading，cons 遮蔽使重新绑定生效）。同时用 v0.4.x 新特性重写执行器核心：<code>exec_stmts</code> 从手写递归改为 <code>list_fold</code> + 闭包适配参数顺序——在自举场景真实 dogfood 了 5.8（闭包作参数）与 5.9（高阶标准库）。新增测试程序 3（while 倒计时求和 3+2+1=6），输出 <code>11 / 10 / 6</code> 全对。顺带补齐效应标注链（exec_stmt/exec_stmts/run_program 加 <code>! [IO]</code>）并消除 TYPE010（run_program 块尾改语句），<code>--check</code> 从 2 个历史警告降为 <strong>0 诊断</strong>。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>
