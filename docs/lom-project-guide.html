@@ -903,7 +903,7 @@
 
 <h2>2.7 阶段 5：生态与自举（16-24 周）</h2>
 <div class="phase">
-  <h3>阶段 5 · 生态与自举 <span class="tag">生产级</span></h3>
+  <h3>阶段 5 · 生态与自举 <span class="tag">生产级</span> <span class="tag" style="background:#16a34a;color:white;">✅ 已完成（2026-08-19，见文末收尾评估）</span></h3>
   <p><strong>目标</strong>：语言能"养活自己"。</p>
   <div class="warn" style="background:#fef3c7;border-color:#f59e0b;">
     <strong>自举可行性验证（2026-08-13）</strong>：已完成极简自举验证——用 Lom 自身实现了一个完整的算术表达式解释器（lexer + 递归下降 parser + evaluator），正确处理运算符优先级和左结合性（<code>"3+4*2"→11</code>、<code>"1+2*3+4"→11</code>）。验证结论：<strong>Lom 可以"养活自己"，递归 enum + match + split("") 逐字符扫描足够表达编译器核心三阶段</strong>。代码见 [examples/bootstrap/](../examples/bootstrap/)。
@@ -960,6 +960,16 @@
     <strong>Phase 5.23 自举收尾：函数表 Map 化 + 运算符补全（2026-08-19）</strong>：函数表从 <code>List&lt;Decl&gt;</code> 线性扫描换为 <code>Map&lt;Decl&gt;</code>（collect_fns 直接建表，find_fn 缩成 4 行 map_get match）——<strong>自举解释器的所有按名查找至此全部 O(1)</strong>（环境 5.21、函数表 5.23、检查作用域 5.22）。迷你语言补全比较运算符 <code>&lt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>!=</code>：lexer 用与 <code>=</code>/<code>==</code> 相同的前瞻模式区分 <code>&gt;</code>/<code>&gt;=</code>、<code>&lt;</code>/<code>&lt;=</code>、<code>!=</code>/裸 <code>!</code>（裸 ! 仍报未知字符——迷你语言无一元 not）；求值收进统一的 eval_cmp_int 骨架（错误消息与逐臂版逐字一致）；<code>!=</code> 对任意值类型取 values_eq 的反（列表不等 <code>[1,2] != [1,3]</code> 正确）。新程序 14 五条输出逐字验证（true/true/false/true/true），39 条输出全对，--check 0 诊断。
     <br><br>
     <strong>Phase 5.24 char 类型决策（2026-08-19，纯决策无代码）</strong>：关闭 LANGUAGE_SPEC 挂了全程的开放问题 #3——<strong>不设独立 Char 类型</strong>，单字符 String 即字符（Python/JS 模型）。理由三条：(a) LLM 原生——LLM 最熟的 Python 没有 char，Rust 式 <code>'a'</code>/<code>"a"</code> 区分是已知 LLM 混淆源（与 <code>a..b</code>/<code>a..=</code> 同类）；(b) 需求从未出现——自举 lexer 从 5.0 起用 <code>split(s, "")</code> 逐字符扫描一直可行，实测瓶颈在列表表示（5.19）和线性查找（5.20/5.21），从来不在 char；(c) 简单性——少一个基础类型，LLM 和检查器都受益。落于 LANGUAGE_SPEC §11 开放问题 #3 + DESIGN_RATIONALE §11.7。<strong>至此 P2 三项（List 表示 / HashMap / char）全部关闭。</strong>
+    <br><br>
+    <strong>Phase 5 收尾评估（2026-08-19，正式关闭）</strong>：
+    <ul>
+      <li><strong>目标达成度</strong>：阶段目标是"语言能养活自己"——已通过自举达成：用 Lom 写的迷你解释器具备<strong>完整编译器流水线</strong>（词法 → 语法 → 静态检查 → 求值四段，stmt_interp.lom 约 1400 行 Lom 代码），14 个测试程序 39 条输出逐字验证，全程 0 诊断。递归 enum + match + 结构记录 + Map 被证明足以表达编译器核心。</li>
+      <li><strong>退出标准对照</strong>："编译器自身能用 Lom 写并编译通过"——<strong>可行性已完整验证</strong>（迷你语言全流水线），但<strong>完整 Lom 编译器的全量自举是独立 phase 级工作量</strong>（完整语法、模式匹配、效应、模块系统的自举版），且 5.18 实测证明树遍历自举有 ~10⁴ 递归深度天花板（根治要显式堆栈/trampoline）——<strong>全量自举正式移交"编译器阶段"</strong>（与 LLVM/WASM 后端一并做方向决策）。本阶段交付的是"自举可行性 + 全流水线验证 + 语言缺口全修复"，不是 Lom 编译 Lom 本身。</li>
+      <li><strong>缺口清单</strong>：8 项全部关闭（for-in-List、拼接提升、复合赋值、元组解构、栈深度、HashMap/Set、char，加两条误判澄清）。P0/P1/P2 排期项全清零。</li>
+      <li><strong>生态项去向</strong>：包注册中心/调试器/性能调优（PGO）/文档生成工具/概率类型 → <strong>移交 Phase 6</strong>（生产级），均非自举主线。</li>
+      <li><strong>性能账</strong>（同机实测，全链路）：List 换 cons 表示提速 13-46×（5.19）；查找换 Map 再提速 ~330×（5.20）；自举解释器环境换 Map 提速 3.7-8.3×（5.21）。三段全是"测量 → 决策 → 复测"闭环。</li>
+      <li><strong>最终基线</strong>：325/325 Rust 测试；eval 108/108；自举 39 条输出逐字正确；31 个 .lom 示例。</li>
+    </ul>
     <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
