@@ -1015,11 +1015,28 @@ impl TypeChecker {
         for arm in &m.arms {
             let mut arm_env = env.child();
             let variant_name = self.check_pattern(&arm.pattern, &scrut_ty, &mut arm_env);
-            if let Some(vn) = variant_name {
-                matched_variants.insert(vn);
+            // v0.4.2 P1-2: guard —— 检查类型为 Bool;带 guard 的臂不计入穷尽性(Rust 语义:
+            // guard 运行时才知真假,不能证明覆盖)
+            if let Some(g) = &arm.guard {
+                if let TypeOrUnknown::Known(gt) = self.check_expr(g, &mut arm_env) {
+                    if !matches!(gt, Type::Bool) && !self.is_any_type(&gt) {
+                        self.push_diag(
+                            Severity::Warning,
+                            "TYPE002".into(),
+                            format!("match guard 应为 Bool，得到 {:?}", gt),
+                            0,
+                            0,
+                        );
+                    }
+                }
             }
-            if matches!(arm.pattern, Pattern::Wildcard) {
-                has_wildcard = true;
+            if arm.guard.is_none() {
+                if let Some(vn) = variant_name {
+                    matched_variants.insert(vn);
+                }
+                if matches!(arm.pattern, Pattern::Wildcard) {
+                    has_wildcard = true;
+                }
             }
             let body_ty = match &arm.body {
                 MatchArmBody::Expr(e) => self.check_expr(e, &mut arm_env),
@@ -1965,6 +1982,33 @@ mod tests {
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert_eq!(type_diags.len(), 0);
+    }
+
+    #[test]
+    fn match_guard_non_bool_warns() {
+        // v0.4.2 P1-2: guard 应为 Bool,得到 Int 报 TYPE002
+        let src = "fn f(n: Int) -> Int\n    match n\n        m if m + 1 => 1\n        _ => 0\n    end\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE002").collect();
+        assert!(!d.is_empty());
+    }
+
+    #[test]
+    fn match_guarded_arm_not_exhaustive() {
+        // 带 guard 的臂不计入穷尽性:用户枚举全部臂带 guard 且无通配 → MAT001
+        let src = "enum Color = Red | Green\nfn f(c: Color) -> Int\n    match c\n        Red if True => 1\n        Green if True => 2\n    end\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+        assert!(!d.is_empty());
+    }
+
+    #[test]
+    fn match_guard_with_wildcard_ok() {
+        // guard 臂 + 无 guard 通配兜底 → 无 MAT001;guard 用绑定变量合法
+        let src = "fn f(n: Int) -> String\n    match n\n        m if m > 10 => \"big\"\n        _ => \"small\"\n    end\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001" || d.code == "TYPE002" || d.code == "NAM003").collect();
+        assert_eq!(d.len(), 0);
     }
 
     #[test]

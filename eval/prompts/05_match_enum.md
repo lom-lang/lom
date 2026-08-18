@@ -302,6 +302,10 @@ end。写函数 opposite(d: Direction) -> Direction 用 match：North => South, 
 
 声明 enum LogLevel = Debug | Info | Warn | Error。写函数 log_prefix(level: LogLevel) -> String 用 match：Debug => "[DBG]", Info => "[INF]", Warn => "[WRN]", Error => "[ERR]"。写函数 log_message(level: LogLevel, msg: String) -> String 返回 log_prefix(level) + " " + msg。main 调用 println(log_message(Info, "started"))、println(log_message(Error, "crashed"))、println(log_message(Debug, "x=42"))。
 
+### Task 105
+
+写函数 classify(n: Int) -> String 用 match 加 guard(模式后跟 if 条件):m if m < 0 => "negative",0 => "zero",m if m > 100 => "big",_ => "normal"。main 调用 println(classify(-5))、println(classify(0))、println(classify(42))、println(classify(200))。
+
 
 ---
 

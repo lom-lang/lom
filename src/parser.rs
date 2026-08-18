@@ -1189,6 +1189,12 @@ impl Parser {
     /// Form B：=> 后跨行 block（以 end 闭合）
     fn parse_match_arm(&mut self) -> Result<MatchArm, ParseError> {
         let pattern = self.parse_pattern()?;
+        // v0.4.2 P1-2: 可选 guard —— pattern if cond => body
+        let guard = if self.matches(&Token::If) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
         self.expect(&Token::FatArrow, "'=>'")?;
         let body = if self.is_newline_before() {
             // Form B：跨行 block
@@ -1197,7 +1203,11 @@ impl Parser {
             // Form A：同行单表达式
             MatchArmBody::Expr(self.parse_expr()?)
         };
-        Ok(MatchArm { pattern, body })
+        Ok(MatchArm {
+            pattern,
+            guard,
+            body,
+        })
     }
 
     /// 解析模式

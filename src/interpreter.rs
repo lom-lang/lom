@@ -860,6 +860,13 @@ impl Interpreter {
                     // 每个分支独立作用域，绑定模式变量
                     let arm_env = Scope::new(Some(env.clone()));
                     if self.match_pattern(&arm.pattern, &scrutinee_val, &arm_env)? {
+                        // v0.4.2 P1-2: guard 求值，为 False 则继续尝试下一臂
+                        if let Some(g) = &arm.guard {
+                            let gv = self.eval_expr(g, arm_env.clone())?;
+                            if !gv.is_truthy()? {
+                                continue;
+                            }
+                        }
                         return match &arm.body {
                             MatchArmBody::Expr(e) => self.eval_expr(e, arm_env),
                             MatchArmBody::Block(b) => {
@@ -1970,6 +1977,60 @@ end
 fn main() -> Unit
     let xs = 1.5..3
     println(xs)
+end
+"#;
+        assert!(run_src(src).is_err());
+    }
+
+    #[test]
+    fn test_match_guard() {
+        // v0.4.2 P1-2: match guard —— 模式匹配后再看 guard,为假继续下一臂
+        let src = r#"
+fn classify(n: Int) -> String
+    match n
+        m if m < 0 => "negative"
+        0 => "zero"
+        m if m > 100 => "big"
+        _ => "normal"
+    end
+end
+
+fn main() -> Unit
+    println(classify(-5))
+    println(classify(0))
+    println(classify(42))
+    println(classify(200))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_match_guard_uses_binding() {
+        // guard 可以使用模式绑定的变量;guard 失败穿透到后面的普通变体臂
+        let src = r#"
+fn main() -> Unit
+    match Some(5)
+        Some(x) if x > 10 => "big"
+        Some(x) => "some: " + x
+        None => "none"
+    end
+    |> println
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_match_guard_all_false_no_match() {
+        // 全部 guard 为假且无兜底 → 运行时"无匹配分支"错误
+        let src = r#"
+fn main() -> Unit
+    match 5
+        m if m > 10 => "big"
+        m if m < 0 => "neg"
+    end
+    |> println
 end
 "#;
         assert!(run_src(src).is_err());

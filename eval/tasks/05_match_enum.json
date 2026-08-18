@@ -133,5 +133,14 @@
     "solution": "enum LogLevel = Debug | Info | Warn | Error\n\nfn log_prefix(level: LogLevel) -> String\n    match level\n        Debug => \"[DBG]\"\n        Info => \"[INF]\"\n        Warn => \"[WRN]\"\n        Error => \"[ERR]\"\n    end\nend\n\nfn log_message(level: LogLevel, msg: String) -> String\n    log_prefix(level) + \" \" + msg\nend\n\nfn main() -> Unit\n    println(log_message(Info, \"started\"))\n    println(log_message(Error, \"crashed\"))\n    println(log_message(Debug, \"x=42\"))\nend\n",
     "expected": "[INF] started\n[ERR] crashed\n[DBG] x=42\n",
     "notes": "enum + match + 函数组合 + 字符串拼接。考察多函数协作。"
+  },
+  {
+    "id": "105",
+    "category": "match_enum",
+    "difficulty": "medium",
+    "prompt": "写函数 classify(n: Int) -> String 用 match 加 guard(模式后跟 if 条件):m if m < 0 => \"negative\",0 => \"zero\",m if m > 100 => \"big\",_ => \"normal\"。main 调用 println(classify(-5))、println(classify(0))、println(classify(42))、println(classify(200))。",
+    "solution": "fn classify(n: Int) -> String\n    match n\n        m if m < 0 => \"negative\"\n        0 => \"zero\"\n        m if m > 100 => \"big\"\n        _ => \"normal\"\n    end\nend\n\nfn main() -> Unit\n    println(classify(-5))\n    println(classify(0))\n    println(classify(42))\n    println(classify(200))\nend\n",
+    "expected": "negative\nzero\nnormal\nbig\n",
+    "notes": "match guard(v0.4.2 新增,P1 缺口修复):pattern if cond => body,guard 为假穿透下一臂。guard 可用绑定变量。带 guard 的臂不计入穷尽性,需 _ 兜底。"
   }
 ]

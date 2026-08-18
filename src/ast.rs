@@ -254,6 +254,9 @@ pub struct MatchExpr {
 #[derive(Debug, Clone)]
 pub struct MatchArm {
     pub pattern: Pattern,
+    /// 可选守卫（v0.4.2 P1-2）：`pattern if cond => body`
+    /// 模式匹配成功后再求值 cond，为 False 则继续尝试下一臂
+    pub guard: Option<Expr>,
     pub body: MatchArmBody,
 }
 
