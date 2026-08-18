@@ -7,7 +7,7 @@
 #   Num/StrLit/Var/Add/Sub/Mul/Div/Gt/Eq/Call/ListLit/Index/EError(msg)   表达式
 #   Val = VInt | VStr | VBool | VList(List<Val>)
 # 设计要点：
-#   - 环境函数式：exec_stmt 返回 Result<(新环境, 语句值), String>；词法作用域（全新参数环境）
+#   - 环境用宿主 Map（5.21 起，此前是函数式关联表）；词法作用域（函数调用用全新环境）
 #   - 语句值语义：SIf 的值=被执行分支块的值（if 即表达式）；块的值=尾语句的值
 #   - in_fn 标志区分语境：顶层 SExpr 打印，函数体内 SExpr 只产出值
 #   - collect_fns 先收集全部函数再执行 → 前向引用/互递归天然支持
@@ -17,9 +17,14 @@
 #   - Phase 5.17 位置信息：token 包成记录 {t: Token, ln: Int}（宿主结构记录），
 #     peek_kind/peek_line 隔离变化，解析错误消息带 "at line N"（对齐主语言诊断形态）
 #   - Add 混合规则镜像 Lom v0.4.1：任一侧是 String 时另一侧 show() 提升拼接
+#   - Phase 5.21 环境换 Map：变量环境从 List<(String, Val)> 关联表改为宿主的 Map
+#     （引用语义，map_set 就地修改），env_lookup 从 O(n) 线性扫描降为 O(1)；
+#     函数调用仍词法作用域——callee 用全新 map_empty() 环境，参数 map_set 进去；
+#     exec_stmt/exec_stmts 不再返回环境（就地突变，无需 threading），只返回语句值
 
 from string import { split, string_to_int, int_to_string, contains, len, trim }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_fold, list_map }
+from map import { map_empty, map_set, map_get }
 
 # ===== Token =====
 # 词法单元本身（不带位置）；位置由外层记录 Tok 承载
@@ -706,20 +711,14 @@ end
 
 # ===== Evaluator（全链路 Result + ? 传播）=====
 
-fn env_lookup(env: List<(String, Val)>, name: String) -> Result<Val, String>
-    if list_is_empty(env)
-        Err("undefined variable '" + name + "'")
-    else
-        let pair = list_head(env)
-        if pair.0 == name
-            Ok(pair.1)
-        else
-            env_lookup(list_tail(env), name)
-        end
+fn env_lookup(env: Map<Val>, name: String) -> Result<Val, String>
+    match map_get(env, name)
+        Some(v) => Ok(v)
+        None => Err("undefined variable '" + name + "'")
     end
 end
 
-fn eval(e: Expr, env: List<(String, Val)>, fns: List<Decl>) -> Result<Val, String> ! [IO]
+fn eval(e: Expr, env: Map<Val>, fns: List<Decl>) -> Result<Val, String> ! [IO]
     match e
         Num(n) => Ok(VInt(n))
         StrLit(s) => Ok(VStr(s))
@@ -850,7 +849,7 @@ fn list_at(elems: List<Val>, i: Int, orig: Int) -> Result<Val, String>
 end
 
 # 参数按序求值（手写递归以用 ? 传播错误；Ok 包裹保持顺序）
-fn eval_args(args: List<Expr>, env: List<(String, Val)>, fns: List<Decl>) -> Result<List<Val>, String> ! [IO]
+fn eval_args(args: List<Expr>, env: Map<Val>, fns: List<Decl>) -> Result<List<Val>, String> ! [IO]
     if list_is_empty(args)
         Ok(list_empty())
     else
@@ -878,12 +877,14 @@ fn find_fn(fns: List<Decl>, name: String) -> Result<Decl, String>
     end
 end
 
-# 参数绑定：全新环境（词法作用域——函数看不到调用者的局部变量）
-fn bind_params(params: List<String>, args: List<Val>, env: List<(String, Val)>) -> List<(String, Val)>
-    if list_is_empty(params)
-        env
-    else
-        bind_params(list_tail(params), list_tail(args), list_cons((list_head(params), list_head(args)), env))
+# 参数绑定：把形参按序写入环境（callee 用全新 Map，词法作用域——看不到调用者的局部变量）
+fn bind_params(params: List<String>, args: List<Val>, env: Map<Val>) -> Unit
+    let mut ps = params
+    let mut argv = args
+    while !(list_is_empty(ps))
+        map_set(env, list_head(ps), list_head(argv))
+        ps = list_tail(ps)
+        argv = list_tail(argv)
     end
 end
 
@@ -891,8 +892,9 @@ fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Result<Val, String> 
     match decl
         DFn(name, params, body) =>
             if list_length(params) == list_length(args)
-                let env = bind_params(params, args, list_empty())
-                let (env2, v) = exec_stmts(body, env, fns, True)?
+                let env = map_empty()
+                bind_params(params, args, env)
+                let v = exec_stmts(body, env, fns, True)?
                 Ok(v)
             else
                 Err("arity error: function '" + name + "' expects " + list_length(params) + " args, got " + list_length(args))
@@ -902,17 +904,18 @@ fn call_fn(decl: Decl, args: List<Val>, fns: List<Decl>) -> Result<Val, String> 
     end
 end
 
-# 执行语句，返回 Result<(新环境, 语句值), String>：
+# 执行语句，返回 Result<语句值, String>（环境是 Map，就地突变，不再返回新环境）：
 #   SError → 解析错误经诊断通道显式报告（错误是节点，不是崩溃）
 #   SExpr  → 值是表达式求值结果（in_fn=True 时不打印）
 #   SIf    → 值是被执行分支块的值（if 即表达式）
 #   SLet / SWhile → 值为 VInt(0)
-fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> Result<(List<(String, Val)>, Val), String> ! [IO]
+fn exec_stmt(s: Stmt, env: Map<Val>, fns: List<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
     match s
         SError(msg) => Err("parse error: " + msg)
         SLet(name, e) =>
             let v = eval(e, env, fns)?
-            Ok((list_cons((name, v), env), VInt(0)))
+            map_set(env, name, v)
+            Ok(VInt(0))
         end
         SExpr(e) =>
             let v = eval(e, env, fns)?
@@ -921,7 +924,7 @@ fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) ->
             else
                 println(show(v))
             end
-            Ok((env, v))
+            Ok(v)
         end
         SIf(c, then_block, else_block) =>
             if truthy(eval(c, env, fns)?)
@@ -931,30 +934,25 @@ fn exec_stmt(s: Stmt, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) ->
             end
         end
         SWhile(c, body) =>
-            # 函数式环境的循环 threading：每轮把 body 执行后的新环境带入下一轮
+            # Map 就地突变：循环体对环境的修改直接可见，无需把新环境带入下一轮
             # ? 在循环内直接穿透——任一轮出错立即整体返回 Err
-            let mut cur = env
-            while truthy(eval(c, cur, fns)?)
-                let (next_env, v) = exec_stmts(body, cur, fns, in_fn)?
-                cur = next_env
+            while truthy(eval(c, env, fns)?)
+                exec_stmts(body, env, fns, in_fn)?
             end
-            Ok((cur, VInt(0)))
+            Ok(VInt(0))
         end
     end
 end
 
-# 顺序执行语句序列，返回 Result<(最终环境, 最后一条语句的值), String>
+# 顺序执行语句序列，返回 Result<最后一条语句的值, String>
 # list_fold 累积 Result：Err 短路穿透，Ok 继续执行（错误即值的折叠形态）
-fn exec_stmts(stmts: List<Stmt>, env: List<(String, Val)>, fns: List<Decl>, in_fn: Bool) -> Result<(List<(String, Val)>, Val), String> ! [IO]
-    list_fold(fn(acc: Result<(List<(String, Val)>, Val), String>, s: Stmt) -> Result<(List<(String, Val)>, Val), String>
+fn exec_stmts(stmts: List<Stmt>, env: Map<Val>, fns: List<Decl>, in_fn: Bool) -> Result<Val, String> ! [IO]
+    list_fold(fn(acc: Result<Val, String>, s: Stmt) -> Result<Val, String>
         match acc
             Err(e) => Err(e)
-            Ok(pair) =>
-                let (acc_env, last) = pair
-                exec_stmt(s, acc_env, fns, in_fn)
-            end
+            Ok(last) => exec_stmt(s, env, fns, in_fn)
         end
-    end, Ok((env, VInt(0))), stmts)
+    end, Ok(VInt(0)), stmts)
 end
 
 # ===== 内建函数（Phase 5.16）=====
@@ -1099,8 +1097,8 @@ fn run_program(src: String) -> Unit ! [IO]
     let fns = collect_fns(decls, list_empty())
     let stmts = collect_stmts(decls)
     # 顶层捕获 Result，错误显式打印（诊断层的最终出口）
-    match exec_stmts(stmts, list_empty(), fns, False)
-        Ok(pair) => 0
+    match exec_stmts(stmts, map_empty(), fns, False)
+        Ok(v) => 0
         Err(msg) => println("error: " + msg)
     end
 end
