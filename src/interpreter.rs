@@ -726,12 +726,15 @@ impl Interpreter {
                     })
                 } else if self.functions.contains_key(name) {
                     // 函数引用（转为闭包）
+                    // v0.4.2 P1-3: 具名函数作为一等值 —— 包装为闭包值
+                    // 环境取 globals（与 call_function 的父环境一致），行为与直接调用完全等价；
+                    // 递归不受影响（函数体内按名调用仍走 functions 表）
                     let f = self.functions.get(name).unwrap();
-                    // Phase 1 限制：不支持函数作为一等值传递（仅闭包字面量可以）
-                    Err(RuntimeError::Msg(format!(
-                        "不能将函数 '{}' 作为值使用（限制：仅支持闭包字面量作为一等值）",
-                        name
-                    )))
+                    Ok(Value::Closure {
+                        params: f.params.clone(),
+                        body: f.body.clone(),
+                        env: self.globals.clone(),
+                    })
                 } else {
                     Err(RuntimeError::Msg(format!("未定义变量: '{}'", name)))
                 }
@@ -2034,6 +2037,61 @@ fn main() -> Unit
 end
 "#;
         assert!(run_src(src).is_err());
+    }
+
+    #[test]
+    fn test_named_fn_as_value() {
+        // v0.4.2 P1-3: 具名函数可以赋给变量当一等值使用
+        let src = r#"
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit
+    let f = double
+    println(f(21))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_named_fn_as_argument() {
+        // 具名函数可以作为参数传递(高阶函数)
+        let src = r#"
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn apply(f: Fn, x: Int) -> Int
+    f(x)
+end
+
+fn main() -> Unit
+    println(apply(double, 7))
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_named_fn_value_recursion() {
+        // 包装成闭包的具名函数,递归调用不受影响(函数体按名调用走 functions 表)
+        let src = r#"
+fn fact(n: Int) -> Int
+    if n <= 1
+        1
+    else
+        n * fact(n - 1)
+    end
+end
+
+fn main() -> Unit
+    let g = fact
+    println(g(5))
+end
+"#;
+        run_src(src).unwrap();
     }
 
     #[test]

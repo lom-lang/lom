@@ -2,7 +2,7 @@
   "schema": "lom-eval/v1",
   "version": "0.1.0",
   "phase": "2.8",
-  "total_tasks": 105,
+  "total_tasks": 106,
   "categories": [
     {
       "id": "01_arithmetic",
@@ -28,7 +28,7 @@
     {
       "id": "04_closures",
       "name": "Closures & Higher-Order Functions",
-      "task_count": 10,
+      "task_count": 11,
       "description": "Closure literals, Fn parameter type, capture, apply_twice/compose/map patterns.",
       "file": "tasks/04_closures.json"
     },

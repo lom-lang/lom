@@ -277,6 +277,10 @@ main 中直接定义闭包 let double = fn(x: Int) -> Int 返回 x * 2 end。然
 
 写函数 pipeline3(f: Fn, g: Fn, h: Fn, x: Int) -> Int 返回 h(g(f(x)))。main 中 let inc = fn(n: Int) -> Int n + 1 end，let double = fn(n: Int) -> Int n * 2 end，let negate = fn(n: Int) -> Int -n end，println(pipeline3(inc, double, negate, 5))（即 negate(double(inc(5)))=negate(double(6))=negate(12)=-12）。
 
+### Task 106
+
+写具名函数 double(x: Int) -> Int 返回 x * 2,写高阶函数 apply_twice(f: Fn, x: Int) -> Int 返回 f(f(x))。main 调用 println(apply_twice(double, 3))(具名函数直接当参数传),再 let inc = fn(x: Int) -> Int x + 1 end,println(apply_twice(inc, 10))。
+
 
 ---
 
