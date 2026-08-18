@@ -940,6 +940,15 @@
     <br><br>
     <strong>Phase 5.17 自举：诊断带位置信息（2026-08-18）</strong>：token 从裸枚举包成记录 <code>{t: Token, ln: Int}</code>（恰好用上宿主的结构记录），lexer 逐函数穿通行号；parser 侧用 <code>peek_kind</code>/<code>peek_line</code> 两个辅助函数隔离变化——所有现有 match 结构零改动，只有错误节点消息内嵌 <code>at line N</code>。测试程序 12：<code>@</code> 报 "at line 4"、畸形 let/fn 各报其行。至此迷你语言的诊断形态对齐主语言（阶段 + 消息 + 位置），差异只剩 JSON schema。开发事故记录：重写时再次漏掉"Form B 臂嵌套内层 match"的一个 end（§4.1 陷阱第三次应验——报错漂移特征"期望表达式，得到 FatArrow"已是已知指纹）。31 条输出逐字验证，<code>--check</code> 0 诊断。
     <br><br>
+    <strong>Phase 5.18 性能摸底（2026-08-18）</strong>：新增 <a href="../examples/bench.lom">examples/bench.lom</a>（<code>lom bench.lom -- &lt;bench&gt; &lt;n&gt;</code>，外部 wall-clock 计时，Lom 无内置时钟）。<strong>真实测量数据</strong>（Windows, release 构建，单次运行）：
+    <table>
+      <tr><th>负载</th><th>规模</th><th>耗时</th><th>增长</th><th>结论</th></tr>
+      <tr><td>list_build(cons 建表 + for 求和)</td><td>1000→2000→4000→8000</td><td>55→104→181→494 ms</td><td>超线性（净耗时约 2-3×/倍增）</td><td>list_cons 每次 O(n) 复制,总量 O(n²) 但常数小</td></tr>
+      <tr><td>lookup(自举式线性环境查找)</td><td>200→400→800</td><td>2383→10784→86875 ms</td><td><strong>~4.5×/倍增(近立方)</strong></td><td><code>list_tail</code> 每次 <code>elems[1..].to_vec()</code> O(n) 复制 → 扫描 O(n²)、总 O(n³)</td></tr>
+      <tr><td>recurse(线性递归 countdown)</td><td>10000 / 100000 / 1000000</td><td>82 ms / <strong>栈溢出</strong> / 栈溢出</td><td>—</td><td>256MB 大栈线程完好,但每个 Lom 帧约耗 2.6KB Rust 栈 → 安全深度约 10⁴ 量级</td></tr>
+    </table>
+    <strong>P2 决策依据（数据驱动修订）</strong>：自举的真实瓶颈不是缺 HashMap——是 <code>Value::List</code> 的 Vec 表示让函数式列表处理(head/tail/cons)沦为 O(n²)。P2 应优先做 <strong>List 的 Rc cons 单元或持久化结构</strong>（head/tail/cons O(1)），其次才是 HashMap；递归深度限制（~10⁴）记入已知限制，根治需要显式堆栈或 trampoline，留待真正的编译器阶段。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

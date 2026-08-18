@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.17 完成，自举诊断带行号 token 记录 {t, ln}）
+> 最后更新：2026-08-18（Phase 5.18 完成，性能摸底——P2 优先级被数据修订：先 List 表示后 HashMap）
 
 ---
 
@@ -35,8 +35,20 @@
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 12 程序 31 条输出全对，--check 0 诊断） |
-| 当前进度 | Phase 5.17 完成（token 记录化 {t, ln}，诊断带行号） |
-| 下一步 | 候选：自举性能摸底（深递归/大列表，为 P2 攒数据）、教程收尾、P2：char 类型、HashMap/Set |
+| 当前进度 | Phase 5.18 完成（性能摸底，见下） |
+| 下一步 | **P2 已修订**：先做 Value::List 的 Rc cons 表示（证据在 §10），HashMap 其次；或教程收尾 |
+
+## 10. 性能实测数据（Phase 5.18，2026-08-18）
+
+基准程序 `examples/bench.lom`（用法 `lom examples/bench.lom -- <bench> <n>`；Lom 无时钟，外部 wall-clock）。Windows release 单次运行，真实数据：
+
+| 负载 | 数据点 | 结论 |
+|---|---|---|
+| list_build | n=1000/2000/4000/8000 → 55/104/181/494 ms | 含 ~35ms 进程启动；净耗时超线性——list_cons 每次 O(n) 复制，建表总 O(n²)，常数小尚可忍 |
+| lookup（自举式线性环境查找） | n=200/400/800 → 2.4/10.8/86.9 **秒** | **近立方**：`list_tail` 每次 `elems[1..].to_vec()` O(n) 复制 → 扫描 O(n²)，n 次扫描 O(n³)。这是自举最大的性能瓶颈 |
+| recurse | n=10000 → 82ms OK；n=100000 → **256MB 栈溢出** | 每个 Lom 递归帧约耗 2.6KB Rust 栈；安全深度 ~10⁴。根治要显式堆栈/trampoline，留待编译器阶段 |
+
+**P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
