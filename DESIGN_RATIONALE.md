@@ -231,6 +231,10 @@ These are workload-native features. Lom defers them to Phase 4 (adjustable miles
 
 Macros, compile-time code generation, and reflection are excluded in Phase 0-3. They make LLM code harder to verify (the generated code is not visible). Lom prioritizes *what you see is what runs*.
 
+### 11.7 No separate `Char` type (Phase 5.24 decision)
+
+Single-char Strings are Char (the Python/JS model). Three reasons: (a) **LLM-native** — Python, the language LLMs know best, has no char type; Rust's `'a'` vs `"a"` distinction is a documented LLM confusion source (same class as `a..b` vs `a..=b`). (b) **The need never materialized** — the bootstrap lexer has used `split(s, "")` char scanning since Phase 5.0 without issue; the measured bottlenecks were List's representation (5.19) and linear lookups (5.20/5.21), never the absence of Char. (c) **Simplicity** — one fewer primitive type for both LLMs and the checker. If a future compiler backend needs byte-level control, that decision belongs to the compiler phase, not the interpreter.
+
 ---
 
 ## 12. How to evaluate Lom's AI-nativeness

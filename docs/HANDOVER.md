@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-19（Phase 5.23 完成，自举收尾——函数表 Map 化（全部按名查找 O(1)）+ 比较运算符补全 < <= >= !=）
+> 最后更新：2026-08-19（Phase 5.24 完成，char 决策落地——不设独立 Char 类型，P2 三项全部关闭）
 
 ---
 
@@ -35,8 +35,8 @@
 | eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
-| 当前进度 | Phase 5.23 完成（自举收尾：fns 表 Map 化 + 比较运算符补全；所有按名查找 O(1)） |
-| 下一步 | P2 剩余：char；或教程收尾 |
+| 当前进度 | Phase 5.24 完成（char 决策：不设独立 Char 类型；P2 三项全部关闭） |
+| 下一步 | Phase 5 收尾评估（正式关闭阶段，明确超范围项去向） |
 
 **Phase 5.21 已把 map 回喂自举**（数据见 §10）。stmt_interp.lom 的 env 从 `List<(String, Val)>` 关联表换成宿主 Map：env_lookup 缩成 4 行 map_get match；exec_stmt/exec_stmts 不再返回环境（就地突变取代 threading），签名降为 `Result<Val, String>`；词法作用域靠 callee 用全新 map_empty() 保持。31 条输出逐字不变。注意：Lom 的 Map 是引用语义，写自举代码时**不要**指望"旧环境还在"——需要快照就用 map_keys 重建。
 
@@ -239,7 +239,7 @@ end
 - ✅ **map 模块（HashMap）**（2026-08-19 完成，Phase 5.20 / v0.5.1）：`Value::Map(Rc<RefCell<HashMap<String, Value>>>)` + 8 个内建。**设计取舍**：引用语义（Rc<RefCell>）而非 List 式不可变持久化——写时复制方案被否决，因为 call_builtin 的 args 切片永远持有 Rc，Rc::get_mut 永远失败，克隆路径 100% 命中等于白做。Map=可变共享结构，不可变结构化数据用 Record。map_keys/map_values/json_stringify 按键排序输出（HashMap 遍历序不稳定，必须排序保确定性）。实测：lookup(List) n=2000 → 18136ms vs map_lookup n=2000 → 55ms（~330×）。
 - ✅ **自举环境换 Map**（2026-08-19 完成，Phase 5.21）：stmt_interp.lom env 从 `List<(String, Val)>` 关联表换 Map。env_lookup 10 行递归→4 行 map_get match；exec_stmt/exec_stmts 签名从 `Result<(Env, Val), String>` 降为 `Result<Val, String>`（就地突变取代 threading）；call_fn 用全新 map_empty() 保持词法作用域。压测 N=200/400：842→226ms / 2436→292ms（3.7×/8.3×）。31 条输出逐字不变。
 - ✅ **自举静态检查层**（2026-08-19 完成，Phase 5.22）：parse→check→eval 三段对齐宿主。check_program 收集未定义变量/函数 + arity 为 `List<String>`，有诊断不执行。注意：① 调用检查拆 check_call/check_call_fn 两个辅助函数绕开嵌套 match 的 end 陷阱；② SLet 先查 RHS 再 map_set 绑定（let x = x 正确报错）；③ 程序 8 的前两条错误输出从 `error:` 升级为 `check error:`（检查期拦截），34 条输出逐字验证。
-- P2（缓做）：char 类型（动类型系统根基，等自举更深按需再做）
+- P2（缓做）：char 类型（动类型系统根基，等自举更深按需再做）→ ✅ **Phase 5.24 决策：不设独立 Char 类型**（单字符 String 即字符，Python/JS 模型；spec 开放问题 #3 关闭，理由见 DESIGN_RATIONALE §11.7）。**P2 三项全部关闭。**
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
 
@@ -254,6 +254,7 @@ end
 - **显式导入禁止通配符**：避免 LLM 编造符号。实测 0 导入缺失，别放开。
 - **`end` 闭合块 / 线性管道**：实测 0 语法错误的主要功臣，别改成花括号。
 - **`Value::List` 不可变 + cons 风格**：函数式风格是刻意的，环境管理也走 `List<(String,Int)>` 线性查找（自举已验证可行，慢但正确）。
+- **不设独立 Char 类型（2026-08-19，Phase 5.24）**：单字符 String 即字符（Python/JS 模型）。LLM 最熟的 Python 没有 char；Rust 式 `'a'`/`"a"` 区分是已知 LLM 混淆源；实测瓶颈从不在 char（5.19-5.21 已根治真瓶颈）。spec 开放问题 #3 关闭，详见 DESIGN_RATIONALE §11.7。
 - **闭包不支持 mut 捕获**：已知限制，eval 任务里有绕开写法。
 
 ---
