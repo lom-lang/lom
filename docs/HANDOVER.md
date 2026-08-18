@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-19（Phase 5.22 完成，自举静态检查层——parse/check/eval 三段架构对齐宿主，程序 8 两条错误升级检查期）
+> 最后更新：2026-08-19（Phase 5.23 完成，自举收尾——函数表 Map 化（全部按名查找 O(1)）+ 比较运算符补全 < <= >= !=）
 
 ---
 
@@ -34,8 +34,8 @@
 | Rust 测试 | **325/325 通过** |
 | eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 13 程序 34 条输出全对，--check 0 诊断；环境已换 Map、检查层已落地，见 Phase 5.21/5.22） |
-| 当前进度 | Phase 5.22 完成（自举静态检查层：未定义变量/函数 + arity 检查期拦截，对齐宿主 parse→check→eval 架构） |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
+| 当前进度 | Phase 5.23 完成（自举收尾：fns 表 Map 化 + 比较运算符补全；所有按名查找 O(1)） |
 | 下一步 | P2 剩余：char；或教程收尾 |
 
 **Phase 5.21 已把 map 回喂自举**（数据见 §10）。stmt_interp.lom 的 env 从 `List<(String, Val)>` 关联表换成宿主 Map：env_lookup 缩成 4 行 map_get match；exec_stmt/exec_stmts 不再返回环境（就地突变取代 threading），签名降为 `Result<Val, String>`；词法作用域靠 callee 用全新 map_empty() 保持。31 条输出逐字不变。注意：Lom 的 Map 是引用语义，写自举代码时**不要**指望"旧环境还在"——需要快照就用 map_keys 重建。
