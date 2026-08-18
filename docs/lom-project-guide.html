@@ -938,6 +938,8 @@
     <br><br>
     <strong>Phase 5.16 自举：内建函数机制（2026-08-18）</strong>：把 5.14 的 <code>len</code> 特例升级为正规分派——<code>try_intrinsic</code> 统一入口（返回 <code>Option&lt;Result&lt;Val, String&gt;&gt;</code>：None 交给用户函数解析），内建优先于用户函数。新增 <code>split</code>（String→List，元素映射用 list_map+闭包）/ <code>contains</code> / <code>trim</code> / <code>to_string</code>（复用 show）/ <code>push</code>（尾插，与宿主 list_cons 头插互补；append 手写递归）。全部经诊断通道做参数检查（arity/type error）。测试程序 11 的 6 条输出逐字验证（<code>[a, b, c]</code>、<code>3</code>、<code>true</code>、<code>x</code>、<code>[1, 2, 3]</code>、<code>42!</code>）。迷你语言至此具备写字符串处理程序的基本能力。
     <br><br>
+    <strong>Phase 5.17 自举：诊断带位置信息（2026-08-18）</strong>：token 从裸枚举包成记录 <code>{t: Token, ln: Int}</code>（恰好用上宿主的结构记录），lexer 逐函数穿通行号；parser 侧用 <code>peek_kind</code>/<code>peek_line</code> 两个辅助函数隔离变化——所有现有 match 结构零改动，只有错误节点消息内嵌 <code>at line N</code>。测试程序 12：<code>@</code> 报 "at line 4"、畸形 let/fn 各报其行。至此迷你语言的诊断形态对齐主语言（阶段 + 消息 + 位置），差异只剩 JSON schema。开发事故记录：重写时再次漏掉"Form B 臂嵌套内层 match"的一个 end（§4.1 陷阱第三次应验——报错漂移特征"期望表达式，得到 FatArrow"已是已知指纹）。31 条输出逐字验证，<code>--check</code> 0 诊断。
+    <br><br>
     <strong>发现的语言缺口</strong>（自举扩展需解决）：
     <ul>
       <li>✅ <code>for x in xs</code> 遍历 List → <strong>Phase 5.3 已补</strong>（此前报 <code>RUNTIME000 for 循环不支持迭代 List</code>，只能用 <code>for i in list_length(xs)</code> + <code>list_get</code> 绕）</li>

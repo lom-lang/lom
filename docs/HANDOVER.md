@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-18（Phase 5.16 完成，自举内建函数机制 split/contains/trim/to_string/push）
+> 最后更新：2026-08-18（Phase 5.17 完成，自举诊断带行号 token 记录 {t, ln}）
 
 ---
 
@@ -34,9 +34,9 @@
 | Rust 测试 | **320/320 通过** |
 | eval 评测集 | **107/107 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 11 程序 27 条输出全对，--check 0 诊断） |
-| 当前进度 | Phase 5.16 完成（自举内建函数：try_intrinsic 分派 + split/contains/trim/to_string/push） |
-| 下一步 | 候选：诊断带位置信息（token 带行号）、自举性能摸底（深度递归/大列表）、P2：char 类型、HashMap/Set |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 12 程序 31 条输出全对，--check 0 诊断） |
+| 当前进度 | Phase 5.17 完成（token 记录化 {t, ln}，诊断带行号） |
+| 下一步 | 候选：自举性能摸底（深递归/大列表，为 P2 攒数据）、教程收尾、P2：char 类型、HashMap/Set |
 
 **版本号注意**：Cargo.toml 一直是 `0.1.0` 没动过。commit message 里的 v0.2.x/v0.3.x/v0.4.0 只是里程碑标记，**没有打 git tag**。如果下一个版本要同步版本号，记得连 Cargo.toml 一起改（或者维持现状——历史惯例就是不改）。
 
@@ -211,6 +211,7 @@ end
 - ✅ **自举 VList 递归值**（2026-08-18 完成，Phase 5.14）：列表字面量 `[1, 2]` + 索引 `xs[i]` + `len()` 内建。**坑**：list_at 递归递减 i 时错误消息会显示递减后的值而非原始下标——带 orig 参数保留。列表元素求值直接复用 eval_args（顺序 + ? 传播都对）。
 - ✅ **自举容错解析**（2026-08-18 完成，Phase 5.15）：错误即节点（EError/SError）+ peek_tok 全函数化 + TUnknown。**坑三个**：① Form B 臂里嵌套 match 要数三个 end（臂的 + 内 match 的 + 外 match 的），报错位置会漂移到下一个无辜函数；② **Form A 臂（=> 同行单表达式）不需要 end，只有 Form B 需要**——纠偏时别看错形态；③ 写完跑一遍 --check，TYPE003 会抓到 list_cons 参数顺序这类潜伏 bug（list_cons(head, list)，别写反）。
 - ✅ **自举内建函数**（2026-08-18 完成，Phase 5.16）：`try_intrinsic` 返回 `Option<Result<Val, String>>`（None 交用户函数）；内建优先于同名用户函数。新增 split/contains/trim/to_string/push（push 是尾插，append_val 手写递归——宿主只有头插 cons）。
+- ✅ **自举位置信息**（2026-08-18 完成，Phase 5.17）：token 包记录 `{t: Token, ln: Int}`；`peek_kind`/`peek_line` 隔离变化（match 结构不动）。**铁律第三次应验**：Form B 臂嵌套内层 match 漏 end → "期望表达式，得到 FatArrow"——这个报错指纹以后看到就先数 end。
 - P2（缓做）：char 类型、HashMap/Set（动类型系统根基，等自举更深按性能瓶颈再动）
 
 **每补一个缺口，三件事**：① eval/tasks/ 加对应任务 ② 跑全量回归三件套（§2.2）③ 更新 lom-project-guide.html 的缺口清单（把 ⚠️ 改 ✅）。
