@@ -637,6 +637,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>5.8 具名函数作为值(v0.4.2)</strong>:<code>let f = double</code> 合法了——具名函数和闭包字面量地位平等,可以直接传给高阶函数。实现只有几行:把函数的参数表和函数体连同全局环境打包成一个闭包值,之后走现成的闭包调用路径。这为将来的 <code>list_map</code>/<code>list_filter</code> 铺平了路。</li>
   <li><strong>5.9 高阶 list 标准库(v0.4.3)</strong>:函数式三件套 <code>list_map</code>/<code>list_filter</code>/<code>list_fold</code> 到位。从 5.3 到 5.9 像搭积木:for 能遍历列表(5.3)→ 字符串随便拼(5.4)→ <code>1..6</code> 就是列表(5.6)→ 函数能当值传(5.8)→ 于是 <code>list_map(double, 1..6)</code> 这种教科书写法自然成立。每个特性单独看都很小,组合起来语言就"像样"了。</li>
   <li><strong>5.10 自举深化</strong>:用 Lom 写的迷你解释器又长本事了——源语言支持 while 循环了。更有意思的是它的执行器核心被换成了 <code>list_fold</code>:5.9 刚给语言加的高阶函数,转头就被用在了自举代码里。这就是狗食法的正循环——语言每强一点,自举代码就简洁一点,而写自举代码时发现的不便,又是下一个语言特性的需求来源。</li>
+  <li><strong>5.11 自举函数</strong>:迷你解释器支持 <code>fn</code> 定义和调用函数了,而且是<strong>词法作用域</strong>(函数看不到调用者的局部变量)——是的,就是 2.4 节讲的那个词法作用域,现在轮到我们在 Lom 里为它实现一遍。开发中踩了一个很有教育意义的坑:迷你语言没有 <code>==</code> 运算符,lexer 把 <code>=</code> 静默丢掉,导致 <code>n == 1</code> 变成两个无关表达式,程序无限递归把栈撑爆——"输入被静默吞掉"永远是调试噩梦,这也是为什么 Lom 主语言选择显式报错。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
