@@ -18,6 +18,7 @@ mod ast;
 mod diagnostics;
 mod doc;
 mod fix;
+mod fmt;
 mod fix_history;
 mod info;
 mod interpreter;
@@ -61,6 +62,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} <file.lom> --check        仅诊断，输出人类可读格式（不执行）");
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
     eprintln!("  {prog} doc <file.lom> [--json]   生成 API 文档（Markdown 或 lom-doc/v1）");
+    eprintln!("  {prog} fmt <file.lom> [--apply|--check]  格式化源码（默认预览到 stdout）");
     eprintln!("  {prog} fix <file.lom> [--plan] [--json]  生成 AI 修复计划（lom-fix/v1）");
     eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
@@ -73,6 +75,8 @@ fn print_help(prog: &str) {
     eprintln!("子命令:");
     eprintln!("  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema");
     eprintln!("  doc         生成 API 文档（Phase 6.4）。默认 Markdown；--json 输出 lom-doc/v1 schema。文档注释 = 签名上方连续的 # 行");
+    eprintln!("  fmt         格式化源码（Phase 6.5）。token 流驱动，注释/字符串内容保留，只规范化缩进（4 空格/层）");
+    eprintln!("              默认预览到 stdout；--apply 就地改写；--check 用于 CI 门禁");
     eprintln!("  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema");
     eprintln!("              --plan：仅生成计划不应用（默认行为）");
     eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
@@ -111,6 +115,10 @@ fn parse_args(args: &[String]) -> CliArgs {
             }
             "doc" => {
                 out.subcommand = Some("doc".to_string());
+                iter.next();
+            }
+            "fmt" => {
+                out.subcommand = Some("fmt".to_string());
                 iter.next();
             }
             "fix" => {
@@ -276,6 +284,12 @@ fn main_inner() {
         return;
     }
 
+    // ===== 子命令：fmt（Phase 6.5 格式化）=====
+    if cli.subcommand.as_deref() == Some("fmt") {
+        run_fmt(&src, path, &cli);
+        return;
+    }
+
     // ===== 子命令：fix（Phase 2.7 修复计划 / Phase 3.1 应用修复）=====
     if cli.subcommand.as_deref() == Some("fix") {
         run_fix(&src, path, &cli);
@@ -423,6 +437,46 @@ fn run_doc(src: &str, path: &str, json: bool) {
         print!("{}", doc::to_markdown(&module));
     }
     process::exit(0);
+}
+
+/// Phase 6.5: 执行 `lom fmt` 子命令
+///
+/// 默认输出格式化结果到 stdout（预览）；--apply 就地改写；--check 已格式化退出 0 否则 1。
+/// 词法错误拒绝格式化（fmt 必须基于可靠 token 流，见 fmt.rs 设计说明）。
+fn run_fmt(src: &str, path: &str, cli: &CliArgs) {
+    match fmt::format_source(src) {
+        Ok(formatted) => {
+            if cli.check {
+                if formatted == src {
+                    println!("{}: 已格式化。", path);
+                    process::exit(0);
+                } else {
+                    eprintln!("{}: 未格式化（运行 lom fmt --apply 修复）", path);
+                    process::exit(1);
+                }
+            } else if cli.apply {
+                if formatted == src {
+                    println!("{}: 无需修改。", path);
+                } else {
+                    match fs::write(path, &formatted) {
+                        Ok(_) => println!("{}: 已格式化并写入。", path),
+                        Err(e) => {
+                            eprintln!("写入文件 '{}': {}", path, e);
+                            process::exit(1);
+                        }
+                    }
+                }
+                process::exit(0);
+            } else {
+                print!("{}", formatted);
+                process::exit(0);
+            }
+        }
+        Err(e) => {
+            eprintln!("无法格式化 '{}': {}", path, e);
+            process::exit(1);
+        }
+    }
 }
 
 /// Phase 4.4: 执行 `lom build` 子命令
