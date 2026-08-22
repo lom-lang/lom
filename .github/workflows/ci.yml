@@ -55,9 +55,13 @@ jobs:
 
       - name: Eval verify (Unix)
         if: runner.os != 'Windows'
+        env:
+          # run.sh 默认在 PATH 找 lom；CI 里二进制不在 PATH，显式指定绝对路径
+          LOM_BIN: ${{ github.workspace }}/target/release/lom
         run: |
           sudo apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null || true
-          ./eval/runner/run.sh --verify
+          # 用 bash 显式调用：仓库在 Windows 上维护，git 文件模式无执行位（100644）
+          bash eval/runner/run.sh --verify
 
       - name: Eval verify (Windows)
         if: runner.os == 'Windows'
