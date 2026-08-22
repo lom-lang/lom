@@ -36,9 +36,11 @@ pub enum PkgError {
     CircularDep { chain: Vec<String> },
     /// 包源码解析失败
     SourceParse { pkg: String, file: String, reason: String },
-    /// 未知包导入
+    /// 未知包导入（当前经字符串错误报告；变体为 API 完整性保留）
+    #[allow(dead_code)]
     UnknownPackage { name: String },
-    /// 包不导出请求符号
+    /// 包不导出请求符号（同上，为 API 完整性保留）
+    #[allow(dead_code)]
     SymbolNotFound { pkg: String, symbol: String },
 }
 
@@ -89,9 +91,13 @@ pub struct PackageManifest {
 /// 已解析的包：清单 + 源码文件 + 公开符号
 #[derive(Debug, Clone)]
 pub struct ResolvedPackage {
+    /// 包名（序列化/调试保留字段）
+    #[allow(dead_code)]
     pub name: String,
     /// 包根目录（lom.toml 所在目录）
     pub root: PathBuf,
+    /// 清单（保留字段，供后续版本校验用）
+    #[allow(dead_code)]
     pub manifest: PackageManifest,
     /// 包内所有 .lom 源码文件路径
     pub source_files: Vec<PathBuf>,
@@ -102,16 +108,19 @@ pub struct ResolvedPackage {
 /// 依赖图：根包 + 所有已解析的依赖包
 #[derive(Debug)]
 pub struct DependencyGraph {
-    /// 根项目清单
+    /// 根项目清单（保留字段）
+    #[allow(dead_code)]
     pub root_manifest: PackageManifest,
-    /// 根项目目录
+    /// 根项目目录（保留字段）
+    #[allow(dead_code)]
     pub root_path: PathBuf,
     /// 所有已解析的依赖包：name -> ResolvedPackage
     pub packages: HashMap<String, ResolvedPackage>,
 }
 
 impl DependencyGraph {
-    /// 查找包是否已声明为依赖
+    /// 查找包是否已声明为依赖（工具链 API，当前主路径未用）
+    #[allow(dead_code)]
     pub fn get_package(&self, name: &str) -> Option<&ResolvedPackage> {
         self.packages.get(name)
     }

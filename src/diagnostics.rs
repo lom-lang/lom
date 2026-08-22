@@ -66,6 +66,8 @@ impl Stage {
 pub enum Severity {
     Error,
     Warning,
+    /// schema 保留级别（当前规则未产出）
+    #[allow(dead_code)]
     Info,
 }
 
@@ -96,6 +98,8 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     /// 从词法错误构造诊断
+    /// 测试与外部工具用的构造器（主路径走 from_parse_result）
+    #[allow(dead_code)]
     pub fn from_lex(err: &LexError, file: &str, source_lines: &[&str]) -> Self {
         let code = classify_lex_error(&err.message);
         let source_line = source_lines

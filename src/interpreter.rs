@@ -304,7 +304,7 @@ impl Value {
 type ScopeRef = Rc<RefCell<Scope>>;
 
 #[derive(Default)]
-struct Scope {
+pub struct Scope {
     vars: HashMap<String, Value>,
     parent: Option<ScopeRef>,
 }

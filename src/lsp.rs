@@ -24,8 +24,7 @@
 //   - parse_message / make_response 用于 JSON-RPC 传输
 
 use crate::ast::*;
-use crate::diagnostics::{Diagnostics, Diagnostic, Severity, Stage};
-use crate::info::{self, ProgramInfo};
+use crate::diagnostics::{Diagnostics, Diagnostic, Severity};
 use crate::parser::Parser;
 use crate::typechecker;
 
@@ -437,7 +436,7 @@ fn extract_json_object_field(json: &str, key: &str) -> Option<String> {
 // ===== Diagnostic → JSON-RPC =====
 
 /// 将 Diagnostic 转为 LSP Diagnostic JSON
-pub fn diagnostic_to_lsp_json(d: &Diagnostic, uri: &str) -> String {
+pub fn diagnostic_to_lsp_json(d: &Diagnostic, _uri: &str) -> String {
     let severity = match d.severity {
         Severity::Error => 1,
         Severity::Warning => 2,
@@ -474,6 +473,7 @@ pub fn make_publish_diagnostics(uri: &str, diags: &[Diagnostic]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::diagnostics::Stage; // 仅测试用（主代码路径未引用 Stage）
 
     const SAMPLE_SRC: &str = "\
 fn add(x: Int, y: Int) -> Int

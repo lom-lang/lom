@@ -1,0 +1,39 @@
+11
+10
+6
+49
+8
+hello, lom
+true
+ababab
+true
+check error: undefined variable 'x'
+check error: arity error: function 'f' expects 1 args, got 2
+error: division by zero
+error: type error: Sub expects Int, got Int and String
+20
+true
+3
+[[1, 2], [3]]
+error: index out of bounds: 5 (list too short)
+7
+error: parse error: unexpected unknown character '@' at line 4
+error: parse error: unexpected end of input
+[a, b, c]
+3
+true
+x
+[1, 2, 3]
+42!
+7
+error: parse error: unexpected unknown character '@' at line 4
+error: parse error: let: expected variable name, got '=' at line 1
+error: parse error: fn: expected function name at line 1
+check error: undefined variable 'x'
+check error: arity error: intrinsic 'len' expects 1 args, got 2
+7
+true
+true
+false
+true
+true

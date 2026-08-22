@@ -18,6 +18,8 @@ pub struct Span {
 
 impl Span {
     /// 构造一个起始位置 span（end = start，用于单点定位）
+    /// 保留给工具链/测试的便捷构造（解释器主路径未用）
+    #[allow(dead_code)]
     pub fn at(line: usize, col: usize) -> Self {
         Span { line, col, end_line: line, end_col: col }
     }
@@ -149,6 +151,8 @@ pub struct Block {
 pub enum Stmt {
     /// let [mut] name [: type] = expr
     Let {
+        /// 可变性标记（解释器经环境另行判定；字段为 AST 完整性保留）
+        #[allow(dead_code)]
         mutable: bool,
         name: String,
         ty: Option<Type>,

@@ -74,12 +74,15 @@ function Test-OneTask($task, $src) {
     Rename-Item $tmp $tmpPath
     try {
         [System.IO.File]::WriteAllText($tmpPath, $src)
-        $actual = & $LomBin $tmpPath 2>&1 | Out-String
+        # 只比对 stdout：stderr 是诊断通道（2026-08-22 起运行时类型检查 warning 走 stderr）
+        # 同时要求进程退出码 0——"先打印正确输出再崩溃"不能算通过
+        $actual = & $LomBin $tmpPath 2>$null | Out-String
+        $exitCode = $LASTEXITCODE
         # Normalize line endings; use -ceq for case-sensitive comparison
         $expected = $task.expected -replace "`r`n", "`n"
         $actual = $actual -replace "`r`n", "`n"
         return [pscustomobject]@{
-            Pass = ($actual -ceq $expected)
+            Pass = (($actual -ceq $expected) -and ($exitCode -eq 0))
             Expected = $expected
             Actual = $actual
         }

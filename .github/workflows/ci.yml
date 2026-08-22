@@ -43,15 +43,36 @@ jobs:
       - name: Unit tests
         run: cargo test --release
 
-      - name: Bootstrap regression (stmt_interp)
+      - name: Bootstrap regression (stmt_interp, golden 逐字比对)
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then BIN=./target/release/lom.exe; else BIN=./target/release/lom; fi
-          out=$($BIN examples/bootstrap/stmt_interp.lom)
-          lines=$(echo "$out" | wc -l)
-          echo "stmt_interp output lines: $lines"
-          # 39 条输出逐字验证基线；少于此数即回归
-          test "$lines" -ge 39
+          # golden 文件逐字比对（39 条输出；行数防线太弱——内容错乱但行数不变的回归也要抓到）
+          # tr -d '\r'：Windows 检出可能带 CRLF（autocrlf），比对前统一去 CR
+          $BIN examples/bootstrap/stmt_interp.lom > /tmp/stmt_actual.txt
+          diff <(tr -d '\r' < examples/bootstrap/stmt_interp.expected.txt) <(tr -d '\r' < /tmp/stmt_actual.txt)
+
+      - name: Zero-dependency gate
+        # SECURITY.md 承诺：Cargo.toml 引入任何依赖即构建失败（零依赖是永久设计决策，例外需 RFC）
+        shell: bash
+        run: |
+          if grep -A5 '^\[dependencies\]' Cargo.toml | grep -E '^[a-zA-Z_]'; then
+            echo "ERROR: Cargo.toml [dependencies] 非空——零依赖政策被破坏（例外需 RFC）"; exit 1
+          fi
+          echo "zero-dependency gate: OK"
+
+      - name: lom fmt gate
+        # 全部示例必须是 fmt 幂等的（apply_test.lom 是故意坏文件，豁免）
+        shell: pwsh
+        run: |
+          $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
+          $bad = @()
+          Get-ChildItem -Recurse examples -Filter *.lom | Where-Object { $_.Name -ne "apply_test.lom" } | ForEach-Object {
+            & $bin fmt $_.FullName --check | Out-Null
+            if ($LASTEXITCODE -ne 0) { $bad += $_.FullName }
+          }
+          if ($bad.Count -gt 0) { $bad | ForEach-Object { Write-Error "未格式化: $_" }; exit 1 }
+          Write-Output "fmt gate: all examples canonical"
 
       - name: Eval verify (all platforms)
         # 统一走 PowerShell runner：macOS 自带 bash 3.2 而 run.sh 用了 bash4 关联数组；

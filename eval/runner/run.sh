@@ -100,14 +100,16 @@ for file in "$TASKS_DIR"/*.json; do
 
         tmpfile="$(mktemp).lom"
         printf '%s' "$src" > "$tmpfile"
-        actual=$("$LOM_BIN" "$tmpfile" 2>&1 || true)
+        # 只比对 stdout（stderr 是诊断通道）并要求退出码 0（与 run.ps1 语义一致，2026-08-22）
+        actual=$("$LOM_BIN" "$tmpfile" 2>/dev/null)
+        lom_exit=$?
         rm -f "$tmpfile"
 
         # Normalize line endings (jq already strips trailing \n; we re-add for comparison)
         actual_normalized=$(printf '%s\n' "$actual")
         expected_normalized=$(printf '%s\n' "$expected")
 
-        if [[ "$actual_normalized" == "$expected_normalized" ]]; then
+        if [[ "$actual_normalized" == "$expected_normalized" && $lom_exit -eq 0 ]]; then
             PASSED=$((PASSED + 1))
             CAT_PASSED[$category]=$((CAT_PASSED[$category] + 1))
             [[ $VERBOSE -eq 1 ]] && echo "  [$task_id] PASS ($category)"

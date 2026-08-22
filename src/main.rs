@@ -322,7 +322,6 @@ fn main_inner() {
 
     // ===== 类型检查（Phase 2.4 渐进式类型检查器）=====
     // --check 模式：执行类型检查，收集 TYPE/MAT/NAM 诊断
-    // 默认运行模式：跳过类型检查（渐进式：动态可跑）
     if cli.check {
         let program = parser::Parser::parse_recover(&src).program;
         typechecker::check_program(&program, &src, path, &mut diags);
@@ -337,6 +336,18 @@ fn main_inner() {
             println!("{}: 诊断通过，无错误。", path);
         }
         return;
+    }
+
+    // ===== 默认运行模式：类型检查可见化（2026-08-22，评审整改）=====
+    // 此前运行模式完全跳过类型检查——"渐进式类型"在默认路径上不可见（名不副实）。
+    // 现在：照常执行类型检查，诊断打印到 stderr，但**永不拦截执行**——
+    // 渐进式承诺不变（动态可跑），只是让 LLM/用户在每次运行时都能看到类型反馈。
+    {
+        let program = parser::Parser::parse_recover(&src).program;
+        typechecker::check_program(&program, &src, path, &mut diags);
+        if !diags.diagnostics.is_empty() {
+            eprint!("{}", diags.to_human());
+        }
     }
 
     // ===== 执行阶段 =====
@@ -393,7 +404,7 @@ fn run_info(src: &str, path: &str, json: bool) {
 
     if !result.is_ok() {
         // 解析失败：输出诊断（复用 diagnostics 模块）
-        let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
+        let diags = diagnostics::Diagnostics::from_parse_result(src, path);
         if json {
             print!("{}", diags.to_json());
         } else {
@@ -420,7 +431,7 @@ fn run_doc(src: &str, path: &str, json: bool) {
     let result = parser::Parser::parse_recover(src);
 
     if !result.is_ok() {
-        let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
+        let diags = diagnostics::Diagnostics::from_parse_result(src, path);
         if json {
             print!("{}", diags.to_json());
         } else {

@@ -64,6 +64,8 @@ struct FnSig {
     effects: Vec<Effect>,
     /// Phase 3.2: 函数签名 span（来自 FnDecl.span，用于 EFF001/TYPE010/NAM002 诊断定位）
     /// 替代 Phase 3.1 的 sig_line hack（find_fn_line 扫描源码）
+    /// 签名位置（预留，当前诊断用 current_fn_span 替代）
+    #[allow(dead_code)]
     span: Span,
 }
 
@@ -76,6 +78,8 @@ struct EnumInfo {
     /// 内置：Result=[Ok(T), Err(E)], Option=[Some(T), None]
     variants: Vec<(String, Vec<Type>)>,
     /// 类型参数（如 Result 的 T, E）
+    /// 泛型参数（预留，泛型实例化未实现）
+    #[allow(dead_code)]
     type_params: Vec<String>,
 }
 
@@ -95,6 +99,8 @@ impl TypeOrUnknown {
     fn unknown() -> Self {
         TypeOrUnknown::Unknown
     }
+    /// 便捷访问器（保留）
+    #[allow(dead_code)]
     fn as_type(&self) -> Option<&Type> {
         match self {
             TypeOrUnknown::Known(t) => Some(t),

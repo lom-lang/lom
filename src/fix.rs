@@ -112,6 +112,8 @@ pub struct FixAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionKind {
     Insert,
+    /// schema 预留（当前规则未产出 Replace 动作）
+    #[allow(dead_code)]
     Replace,
     Delete,
     Hint,
@@ -329,7 +331,7 @@ fn fix_lex_bad_number(d: &Diagnostic) -> Vec<FixAction> {
 ///
 /// 高置信度：意外字符通常是误输入（如 BOM、全角符号），删除即可。
 /// 位置：(line, col) .. (line, col+1)
-fn fix_lex_unexpected_char(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+fn fix_lex_unexpected_char(d: &Diagnostic, _source_lines: &[&str]) -> Vec<FixAction> {
     // 解析 message 中的字符（格式："意外字符 'X'"）
     let ch = extract_quoted_char(&d.message).unwrap_or('?');
     vec![FixAction {
