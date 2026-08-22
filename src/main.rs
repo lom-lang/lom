@@ -29,6 +29,7 @@ mod package;
 mod parser;
 mod repl;
 mod typechecker;
+mod wasm;
 
 #[derive(Debug, Default)]
 struct CliArgs {
