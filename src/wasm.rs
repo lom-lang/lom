@@ -82,14 +82,65 @@ pub mod op {
     pub const LOCAL_TEE: u8 = 0x22;
     pub const GLOBAL_GET: u8 = 0x23;
     pub const GLOBAL_SET: u8 = 0x24;
+    // 内存访问（memarg = align LEB + offset LEB；align 给 0 即 1 字节对齐，永远安全）
     pub const I32_LOAD: u8 = 0x28;
     pub const I64_LOAD: u8 = 0x29;
+    pub const F64_LOAD: u8 = 0x2B;
+    pub const I32_LOAD8_U: u8 = 0x2D;
     pub const I32_STORE: u8 = 0x36;
     pub const I64_STORE: u8 = 0x37;
+    pub const F32_STORE: u8 = 0x38;
+    pub const F64_STORE: u8 = 0x39;
+    // 常量
     pub const I32_CONST: u8 = 0x41;
     pub const I64_CONST: u8 = 0x42;
-    pub const F64_CONST: u8 = 0x44;
+    pub const F64_CONST: u8 = 0x44; // 后跟 8 字节小端 f64 位模式（非 LEB）
+    // i32 比较/算术（heap 指针用）
     pub const I32_EQZ: u8 = 0x45;
+    pub const I32_EQ: u8 = 0x46;
+    pub const I32_NE: u8 = 0x47;
+    pub const I32_LT_U: u8 = 0x49;
+    pub const I32_GE_U: u8 = 0x4F;
+    pub const I32_ADD: u8 = 0x6A;
+    pub const I32_SUB: u8 = 0x6B;
+    // i64 比较（结果 i32，可直接喂 if/br_if）
+    pub const I64_EQZ: u8 = 0x50;
+    pub const I64_EQ: u8 = 0x51;
+    pub const I64_NE: u8 = 0x52;
+    pub const I64_LT_S: u8 = 0x53;
+    pub const I64_GT_S: u8 = 0x55;
+    pub const I64_LE_S: u8 = 0x57;
+    pub const I64_GE_S: u8 = 0x59;
+    // f64 比较（结果 i32）
+    pub const F64_EQ: u8 = 0x61;
+    pub const F64_NE: u8 = 0x62;
+    pub const F64_LT: u8 = 0x63;
+    pub const F64_GT: u8 = 0x64;
+    pub const F64_LE: u8 = 0x65;
+    pub const F64_GE: u8 = 0x66;
+    // i64 算术/位运算
+    pub const I64_ADD: u8 = 0x7C;
+    pub const I64_SUB: u8 = 0x7D;
+    pub const I64_MUL: u8 = 0x7E;
+    pub const I64_DIV_S: u8 = 0x7F;
+    pub const I64_REM_S: u8 = 0x81;
+    pub const I64_AND: u8 = 0x83;
+    pub const I64_OR: u8 = 0x84;
+    pub const I64_XOR: u8 = 0x85;
+    pub const I64_SHL: u8 = 0x86;
+    pub const I64_SHR_S: u8 = 0x87;
+    pub const I64_SHR_U: u8 = 0x88;
+    // f64 算术
+    pub const F64_NEG: u8 = 0x9A;
+    pub const F64_TRUNC: u8 = 0x9D; // f64 无取余指令：a % b = a - trunc(a/b) * b
+    pub const F64_ADD: u8 = 0xA0;
+    pub const F64_SUB: u8 = 0xA1;
+    pub const F64_MUL: u8 = 0xA2;
+    pub const F64_DIV: u8 = 0xA3;
+    // 类型转换
+    pub const I32_WRAP_I64: u8 = 0xA7;
+    pub const I64_EXTEND_I32_S: u8 = 0xAC;
+    pub const F64_CONVERT_I64_S: u8 = 0xB9;
 }
 
 /// 函数类型：(params) -> results
@@ -154,6 +205,15 @@ pub struct DataSegment {
     pub bytes: Vec<u8>,
 }
 
+/// 全局变量（7.2 起用于 bump allocator 堆指针）
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Global {
+    pub ty: ValType,
+    pub mutable: bool,
+    /// 初始值（i32/i64 按 leb_s 编码，f64 按 8 字节小端）
+    pub init: i64,
+}
+
 /// WASM 模块构建器
 #[derive(Default)]
 pub struct Module {
@@ -162,6 +222,7 @@ pub struct Module {
     pub funcs: Vec<Function>,
     /// 线性内存下限页数（1 页 = 64KiB）；None = 无内存
     pub memory_min_pages: Option<u32>,
+    pub globals: Vec<Global>,
     pub exports: Vec<(String, ExportKind, u32)>,
     pub data: Vec<DataSegment>,
 }
@@ -238,6 +299,31 @@ impl Module {
             p.push(0x00); // flags: 无 max
             p.extend(leb_u(min as u64));
             Self::section(&mut out, 5, &p);
+        }
+
+        // 6. global section
+        if !self.globals.is_empty() {
+            let mut p = leb_u(self.globals.len() as u64);
+            for g in &self.globals {
+                p.push(g.ty.encode());
+                p.push(if g.mutable { 0x01 } else { 0x00 });
+                match g.ty {
+                    ValType::I32 => {
+                        p.push(op::I32_CONST);
+                        p.extend(leb_s(g.init));
+                    }
+                    ValType::I64 => {
+                        p.push(op::I64_CONST);
+                        p.extend(leb_s(g.init));
+                    }
+                    ValType::F64 => {
+                        p.push(op::F64_CONST);
+                        p.extend(f64::from_bits(g.init as u64).to_le_bytes());
+                    }
+                }
+                p.push(op::END);
+            }
+            Self::section(&mut out, 6, &p);
         }
 
         // 7. export section

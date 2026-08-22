@@ -30,6 +30,7 @@ mod parser;
 mod repl;
 mod typechecker;
 mod wasm;
+mod wasm_codegen;
 
 #[derive(Debug, Default)]
 struct CliArgs {
@@ -49,6 +50,10 @@ struct CliArgs {
     dry_run: bool,
     /// Phase 4.1.3: --history 标志（lom fix 专用，查看修复历史记录）
     history: bool,
+    /// Phase 7.2: --target <t>（lom build <file> --target wasm 编译到 WASM）
+    target: Option<String>,
+    /// Phase 7.2: -o/--output <path>（编译产物输出路径，默认 <file> 换 .wasm 后缀）
+    output: Option<String>,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     program_args: Vec<String>,
 }
@@ -70,6 +75,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} repl                       启动交互式 REPL（Phase 4.2）");
     eprintln!("  {prog} lsp                        启动 LSP 服务器（Phase 4.3，stdio JSON-RPC）");
     eprintln!("  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）");
+    eprintln!("  {prog} build <file> --target wasm [-o out.wasm]  编译为 WASM 二进制（Phase 7.2）");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
     eprintln!();
@@ -157,6 +163,25 @@ fn parse_args(args: &[String]) -> CliArgs {
             "--history" => out.history = true,
             "--help" | "-h" => out.help = true,
             "--version" | "-V" => out.version = true,
+            // Phase 7.2: 带值选项
+            "--target" => {
+                out.target = Some(match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("--target 需要一个值（如 --target wasm）");
+                        process::exit(1);
+                    }
+                });
+            }
+            "-o" | "--output" => {
+                out.output = Some(match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("-o/--output 需要一个路径值");
+                        process::exit(1);
+                    }
+                });
+            }
             _ => {
                 if a.starts_with('-') {
                     eprintln!("未知选项: {}", a);
@@ -233,7 +258,12 @@ fn main_inner() {
     }
 
     // Phase 4.4: lom build 读取 lom.toml，解析依赖，对包源码执行类型检查
+    // Phase 7.2: lom build <file.lom> --target wasm [-o out.wasm] 编译到 WASM
     if cli.subcommand.as_deref() == Some("build") {
+        if let Some(f) = &cli.file {
+            // run_build_wasm 永不返回（-> !），故无 return
+            run_build_wasm(f, cli.target.as_deref(), cli.output.as_deref());
+        }
         run_build(cli.json);
         return;
     }
@@ -532,6 +562,65 @@ fn run_fmt(src: &str, path: &str, cli: &CliArgs) {
 /// 退出码：
 ///   0 — 清单解析成功且所有包源码无错误
 ///   1 — 清单解析失败 / 依赖解析失败 / 包源码有错误
+/// Phase 7.2: lom build <file.lom> --target wasm [-o out.wasm]
+/// 把 Lom 源文件编译为 WASM 二进制（动态语义，与解释器逐字对齐为长期目标）。
+/// 解析错误（LEX/PARSE）按既有惯例走人类可读诊断；不支持的构造报编译期错误。
+fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
+    // 1. target 校验
+    match target {
+        Some("wasm") => {}
+        Some(t) => {
+            eprintln!("未知编译目标 '{}'（当前仅支持 --target wasm）", t);
+            process::exit(1);
+        }
+        None => {
+            eprintln!("lom build <file> 需要 --target wasm（不带文件的 lom build 是包管理流程）");
+            process::exit(1);
+        }
+    }
+    // 2. 读源文件
+    let src = match fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("无法读取文件 '{}': {}", file, e);
+            process::exit(1);
+        }
+    };
+    // 3. 解析（容错模式收集全部诊断；有 error 则不编译）
+    let diags = diagnostics::Diagnostics::from_parse_result(&src, file);
+    if !diags.ok {
+        eprint!("{}", diags.to_human());
+        process::exit(1);
+    }
+    let program = parser::Parser::parse_recover(&src).program;
+    // 4. 编译
+    let bytes = match wasm_codegen::compile_program(&program) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
+    // 5. 写产物（默认 <file> 换 .wasm 后缀）
+    let out_path = match output {
+        Some(o) => o.to_string(),
+        None => {
+            let p = std::path::Path::new(file);
+            p.with_extension("wasm").to_string_lossy().into_owned()
+        }
+    };
+    match fs::write(&out_path, &bytes) {
+        Ok(()) => {
+            eprintln!("已编译 {} → {}（{} 字节）", file, out_path, bytes.len());
+            process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("无法写入 '{}': {}", out_path, e);
+            process::exit(1);
+        }
+    }
+}
+
 fn run_build(json: bool) {
     let toml_path = std::path::Path::new("lom.toml");
     if !toml_path.exists() {
