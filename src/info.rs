@@ -149,10 +149,10 @@ pub fn collect_info(program: &Program, file: &str) -> ProgramInfo {
     }
 }
 
-/// 将 Type 转换为字符串表示（用于 JSON 输出）
+/// 将 Type 转换为字符串表示（用于 JSON 输出；Phase 6.4 起 pub，供 doc.rs 复用）
 ///
 /// 例：Int -> "Int", Result<T, E> -> "Result<T, E>", {x: Int, y: Int} -> "{x: Int, y: Int}"
-fn type_to_string(t: &Type) -> String {
+pub fn type_to_string(t: &Type) -> String {
     match t {
         Type::Int => "Int".to_string(),
         Type::Float => "Float".to_string(),

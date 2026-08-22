@@ -16,6 +16,7 @@ use std::process;
 mod apply;
 mod ast;
 mod diagnostics;
+mod doc;
 mod fix;
 mod fix_history;
 mod info;
@@ -59,6 +60,7 @@ fn print_help(prog: &str) {
     eprintln!("  {prog} <file.lom> --json         仅诊断，输出结构化 JSON（不执行）");
     eprintln!("  {prog} <file.lom> --check        仅诊断，输出人类可读格式（不执行）");
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
+    eprintln!("  {prog} doc <file.lom> [--json]   生成 API 文档（Markdown 或 lom-doc/v1）");
     eprintln!("  {prog} fix <file.lom> [--plan] [--json]  生成 AI 修复计划（lom-fix/v1）");
     eprintln!("  {prog} fix <file.lom> --apply [--dry-run] [--json]  应用修复到源文件");
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
@@ -70,6 +72,7 @@ fn print_help(prog: &str) {
     eprintln!();
     eprintln!("子命令:");
     eprintln!("  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema");
+    eprintln!("  doc         生成 API 文档（Phase 6.4）。默认 Markdown；--json 输出 lom-doc/v1 schema。文档注释 = 签名上方连续的 # 行");
     eprintln!("  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema");
     eprintln!("              --plan：仅生成计划不应用（默认行为）");
     eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
@@ -104,6 +107,10 @@ fn parse_args(args: &[String]) -> CliArgs {
         match first.as_str() {
             "info" => {
                 out.subcommand = Some("info".to_string());
+                iter.next();
+            }
+            "doc" => {
+                out.subcommand = Some("doc".to_string());
                 iter.next();
             }
             "fix" => {
@@ -263,6 +270,12 @@ fn main_inner() {
         return;
     }
 
+    // ===== 子命令：doc（Phase 6.4 文档生成）=====
+    if cli.subcommand.as_deref() == Some("doc") {
+        run_doc(&src, path, cli.json);
+        return;
+    }
+
     // ===== 子命令：fix（Phase 2.7 修复计划 / Phase 3.1 应用修复）=====
     if cli.subcommand.as_deref() == Some("fix") {
         run_fix(&src, path, &cli);
@@ -381,6 +394,33 @@ fn run_info(src: &str, path: &str, json: bool) {
         print!("{}", info::to_json(&info));
     } else {
         print!("{}", info::to_human(&info));
+    }
+    process::exit(0);
+}
+
+/// Phase 6.4: 执行 `lom doc` 子命令
+///
+/// 解析源码后从 AST 提取顶层 fn/enum 签名，从源码回捞 `#` 文档注释，
+/// 输出 Markdown（默认）或 lom-doc/v1 JSON（--json）。
+fn run_doc(src: &str, path: &str, json: bool) {
+    let result = parser::Parser::parse_recover(src);
+
+    if !result.is_ok() {
+        let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
+        if json {
+            print!("{}", diags.to_json());
+        } else {
+            eprint!("{}", diags.to_human());
+        }
+        process::exit(1);
+    }
+
+    let module = doc::collect_doc(&result.program, src, path);
+
+    if json {
+        print!("{}", doc::to_json(&module));
+    } else {
+        print!("{}", doc::to_markdown(&module));
     }
     process::exit(0);
 }
