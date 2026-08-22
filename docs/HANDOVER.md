@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-22（**Phase 6 工程面完成 + 评审整改一轮**——类型检查默认可见、CI 三 gate、文档清扫、零 warning、v0.6.0；评审遗留项如实保留，见 §1）
+> 最后更新：2026-08-23（**交接就绪态**：Phase 6 工程面完成 + 两轮评审整改全落地；v0.6.1 已打 tag；CI 三平台连续全绿；工作区干净。新会话先读 §1 快照与 §11 最新坑）
 
 ---
 
@@ -26,17 +26,20 @@
 
 ---
 
-## 1. 项目现状快照（2026-08-17）
+## 1. 项目现状快照（2026-08-23）
 
 | 项 | 状态 |
 |---|---|
-| 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **349/349 通过** |
-| eval 评测集 | **108/108 参考解通过** |
-| LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
-| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
-| 当前进度 | **Phase 6 工程面已完成 + 评审整改一轮**（2026-08-22：第三方评审后修复类型检查默认可见性、CI 三 gate、文档腐坏、runner 退出码；v0.6.0） |
+| 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit `b2f2deb`） |
+| 版本 | **v0.6.1**（Cargo.toml + git tag 一致；tag 还有 v0.5.1/v0.6.0） |
+| Rust 测试 | **349/349 通过**，构建零 warning |
+| eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
+| CI | **三平台全绿**（最近 run #11-13 全 success；含 golden 逐字比对、fmt gate、零依赖 gate） |
+| LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
+| 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
+| 当前进度 | **Phase 5 + Phase 6 均已完成**（路线图 7 阶段全部收尾；两轮外部评审整改完毕） |
 | 下一步 | 编译器阶段方向决策（LLVM/WASM/全量自举）或 v1.0 冻结——等用户指令 |
+| 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（编译器阶段）；包注册中心/调试器/概率类型（v1.0 后按需） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -74,16 +77,38 @@
 
 ---
 
+## 11. 2026-08-22/23 会话新增坑（评审整改轮踩的，前面章节没有的）
+
+**工具链/环境**：
+- **`cargo test --release` 不更新 `target/release/lom.exe`**——它只构建测试 harness。改完代码跑 CLI 验证前必须显式 `cargo build --release`，否则你在测一个旧二进制（本轮因此误判过一次"NAM003 未注册"）。
+- **Git Bash 的 `/tmp` 与 Windows 进程不通**：`lom.exe /tmp/x.lom` 读不到（/tmp 是 Git Bash 虚拟挂载）。临时 .lom 文件放项目目录（用完即删），别放 /tmp。Windows Python 也读不到 Git Bash 的 /tmp（写脚本管道时直接 stdout 管道，别落盘 /tmp）。
+- **运行 examples 会产生运行时产物**：file 模块 demo 会在 examples/ 下写 `_file_demo_tmp.txt`。批量跑示例后 `git status` 要检查，别误提交（本轮误提交过一次，已 git rm + gitignore；`.lom/` 目录同理已 gitignore）。
+- **.gitignore 的 `#` 只在行首是注释**：`.lom/  # 注释` 这种行内写法会让整个 pattern 失效。改完 .gitignore 用 `git check-ignore` 验证。
+- **eval/run.sh 本地无法验证**（本机无 jq），改动后只能推理 + 靠 CI。CI 已不走 run.sh（统一 pwsh + run.ps1），run.sh 是二等公民。
+
+**CI/CD**：
+- **CI 脚本必须看首跑结果再宣布完成**（§8 已记，这里展开查法）：GitHub API 免认证查公开仓库——`curl https://api.github.com/repos/lom-lang/lom/actions/runs?per_page=N` 拿 run id，再 `/runs/{id}/jobs` 看每个 job 的 failed step。
+- **`grep -A5 '^\[dependencies\]'` 会越界扫到下一个 section**（`[profile.release]` 的 `debug = true` 触发误报）——TOML section 扫描用 awk 状态机（遇下一个 `[` 即停），且要覆盖 `[dependencies.foo]` 表形态。
+- **Windows CI runner 的 autocrlf**：checkout 出来是 CRLF，任何"逐字节比对"（fmt --check、golden diff）都要先 `tr -d '\r'` 或保持行尾风格（lom fmt 现在跟随输入行尾）。
+
+**流程/方法论**：
+- **评审 subagent 的报告要逐条复核再动手**——本轮复审的六条逐条验过逻辑全属实，但优先级要自己判断；盲信和盲改都不可取。
+- **类型检查可见化有涟漪效应**：把检查器输出推到默认路径后，检查器自身的假阳性（pkg_demo NAM003、Int+Float TYPE001、管道 TYPE003）立刻变成用户可见噪音——**可见性整改会倒逼检查器质量**，改之前先把示例库全跑一遍看 stderr。
+- **示例代码本身就是测试面**：try_operator.lom 的 `use_option` 是真类型错误写法，检查器可见化后才暴露。示例要保持"stderr 干净"，它们是用户的第一印象。
+- **python 批量文本替换必须 assert old in s**（不 assert 的 replace 静默 no-op，本轮 .gitignore 因此漏改一次）。
+
+---
+
 ## 2. 构建与验证命令（Windows PowerShell 环境特有坑）
 
 ### 2.1 构建运行
 
 ```powershell
-cargo build --release                    # 构建后有 20 个 warning，是历史遗留，不是错误，别慌
+cargo build --release                    # 构建应零 warning（2026-08-22 已清零；出现新 warning 就修掉，别攒）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 直接传文件运行
 ```
 
-**坑 1：没有 `lom run` 子命令**。运行就是 `lom.exe <file>`。子命令只有 `info` / `fix` / `repl` / `lsp` / `build`（见 src/main.rs）。
+**坑 1：没有 `lom run` 子命令**。运行就是 `lom.exe <file>`。子命令有 `info` / `fix` / `repl` / `lsp` / `build` / `doc` / `fmt`（见 src/main.rs）。另有 `--check` / `--json` / `--version`。**注意：默认运行模式也会执行类型检查**（诊断走 stderr，不拦截执行）——示例程序 stderr 应保持干净。
 
 **坑 2：lom.exe 不在 PATH**。跑 eval runner 必须指定路径：
 
@@ -95,10 +120,12 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 349/349（2026-08-22 基线）
-.\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望 39 条输出（逐字比对 examples/bootstrap/stmt_interp.expected.txt）
+cargo test --release                                    # 期望 349/349（2026-08-23 基线）
+.\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 108/108
 ```
+
+改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
 
 ### 2.3 git 提交与推送（不依赖任何 GitHub 插件）
 
@@ -111,6 +138,8 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ```powershell
 git commit -m "feat: 标题一行" -m "- 第一行`n- 第二行`n- 第三行"
 ```
+
+注：如果经 Git Bash 执行（本会话方式），多行 `-m` 字符串直接可用，无需反引号转义。
 
 commit 风格：conventional commits（`feat:` / `fix:` / `docs:`），标题带 Phase 号，正文列要点。文档同步通常跟功能提交分开（看 git log 有 `feat:` + `docs:` 成对提交的惯例）。
 
@@ -220,7 +249,9 @@ end
 
 ---
 
-## 6. 已排期的下一步：P0 刚需缺口（v0.4.1 计划）
+## 6. 已排期项历史档案（P0/P1/P2 全部关闭，仅作考古参考）
+
+> **2026-08-23 注**：本节所有排期项（P0 三件套、P1 三件套、P2 三项）已全部完成，下面的清单是历史记录。当前无已排期待办——下一步是编译器阶段方向决策或 v1.0 冻结，等用户指令。评审整改的两轮记录见 §1。
 
 2026-08-17 实测确认的缺口清单，按优先级（完整版含 P1/P2 见对话记录，核心是这三个）：
 
@@ -283,8 +314,9 @@ end
 
 ## 9. 快速上手检查单（新 AI 第一天）
 
-1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 349/349
+1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
+2. `cargo build --release && cargo test --release` 确认 349/349、零 warning、`./target/release/lom.exe --version` 显示 0.6.1
 3. 跑 §2.2 回归三件套确认基线
-4. 读 §6 的 P0 三件套，等用户指令开工
-5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**
+4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
+5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（编译器阶段 / v1.0 / 其他）
+6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**

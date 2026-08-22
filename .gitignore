@@ -35,3 +35,5 @@ desktop.ini
 .claude/
 .cursor/
 _file_demo_tmp.txt
+# Lom 运行时产物（fix-history.jsonl 等）
+.lom/
