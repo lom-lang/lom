@@ -30,16 +30,16 @@
 
 | 项 | 状态 |
 |---|---|
-| 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit `b2f2deb`） |
+| 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
 | 版本 | **v0.6.1**（Cargo.toml + git tag 一致；tag 还有 v0.5.1/v0.6.0） |
 | Rust 测试 | **349/349 通过**，构建零 warning |
 | eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
-| CI | **三平台全绿**（最近 run #11-13 全 success；含 golden 逐字比对、fmt gate、零依赖 gate） |
+| CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | **Phase 5 + Phase 6 均已完成**（路线图 7 阶段全部收尾；两轮外部评审整改完毕） |
-| 下一步 | 编译器阶段方向决策（LLVM/WASM/全量自举）或 v1.0 冻结——等用户指令 |
-| 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（编译器阶段）；包注册中心/调试器/概率类型（v1.0 后按需） |
+| 当前进度 | 路线图 Phase 0-6 全部收尾；巩固期 P-0（文档腐坏清扫）+ P-1（RFC-0001 关闭 spec 四问：#5 元组+解构 / #6 无 self / #7 v1.0 无 trait / #8 无 pub）已完成 |
+| 下一步 | **Phase 7 — WASM 编译后端**（RFC-0002 accepted 2026-08-23：手写零依赖 emitter，树遍历保留为参考实现；里程碑 7.1-7.10 见 RFC）；从 7.1 emitter 骨架动工 |
+| 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（Phase 7 顺手解决递归天花板）；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举移交 Phase 8 候选 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
