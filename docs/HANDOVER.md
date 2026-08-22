@@ -96,6 +96,7 @@
 - **类型检查可见化有涟漪效应**：把检查器输出推到默认路径后，检查器自身的假阳性（pkg_demo NAM003、Int+Float TYPE001、管道 TYPE003）立刻变成用户可见噪音——**可见性整改会倒逼检查器质量**，改之前先把示例库全跑一遍看 stderr。
 - **示例代码本身就是测试面**：try_operator.lom 的 `use_option` 是真类型错误写法，检查器可见化后才暴露。示例要保持"stderr 干净"，它们是用户的第一印象。
 - **python 批量文本替换必须 assert old in s**（不 assert 的 replace 静默 no-op，本轮 .gitignore 因此漏改一次）。
+- **文档腐坏第三轮清扫（2026-08-23，巩固期 P-0）**：SPEC_FOR_AI 三处——§8 模块节（"user modules arrive in Phase 3"→ Phase 4.4 lom.toml 包管理现状；pub 标注 v0.5.x→v0.6.x）、§11e fix 节（--apply/--history 早已实现，replace 动作改为"schema 预留但无规则产出"、runtime 位置声明级 span 现状）、结尾段（Phase 2.6 时代"NOT yet implemented"清单全部已实现，重写为 v0.6.1 现状）；LANGUAGE_SPEC §11 结尾陈旧句（Phase 0 DeepSeek 时代）改为"5-8 未决、移交 v1.0 范围裁决"；guide §4.6 CI 行（clippy/fmt 虚构 gate → 实际 6 gate 清单，issue/PR 模板与 release 流程标注"规划未落地"）。教训：**写"将在 Phase X 实现"的句子一定要带可检索的标记**，否则实现后没人回来改。
 
 ---
 

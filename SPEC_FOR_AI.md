@@ -312,7 +312,7 @@ end
 
 ---
 
-## 8. Modules (Phase 2.1.5: stdlib imports; Phase 3: user modules)
+## 8. Modules (stdlib imports; user packages since Phase 4.4)
 
 ```
 from math import { sqrt, abs, min, max }
@@ -326,8 +326,8 @@ from io import { println as log }    # per-item alias: name as alias
   - `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` → `from string import {...}`
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
-- User multi-file modules (`from utils.helpers import {...}`) arrive in Phase 3.
-- `pub` marks exportable items (**design sketch — NOT implemented as of v0.5.x**; `pub` is an ordinary identifier, all top-level items are public):
+- **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Example: `examples/pkg_demo/`.
+- `pub` marks exportable items (**design sketch — NOT implemented as of v0.6.x**; `pub` is an ordinary identifier, all top-level items are public):
 ```
 pub fn greet(name: String) -> String
     "Hello, " + name
@@ -580,10 +580,12 @@ Key points:
 
 - `lom fix <file>` — human-readable plan to stdout.
 - `lom fix <file> --json` — `lom-fix/v1` JSON to stdout (for LLM consumption).
-- `lom fix <file> --plan` — explicit flag; `--plan` is the default in Phase 2.7. `--apply` (auto-edit source) is deferred to Phase 3 (needs AST spans).
+- `lom fix <file> --plan` — explicit flag; `--plan` is the default.
+- `lom fix <file> --apply [--dry-run] [--json]` (Phase 3.1) — applies `confidence=high` + non-`hint` fixes to the source file in place; `--dry-run` previews without writing; output follows the `lom-apply/v1` schema.
+- `lom fix --history [--json]` (Phase 4.1.3) — shows past applied fixes from `.lom/fix-history.jsonl` (NDJSON, `lom-fix-history/v1` schema).
 - Exit code is `0` whenever the plan was generated successfully — **even if the file has errors.** This lets you consume the JSON without parsing exit codes.
 
-**What `fix` does NOT do**: it does not edit the source file, does not run the program, does not re-check after applying fixes. It only emits the plan; you (the LLM) apply the fixes yourself.
+**What `fix` (plan mode) does NOT do**: it does not edit the source file, does not run the program, does not re-check after applying fixes. Only `fix --apply` edits the source — and only for high-confidence, non-hint fixes; everything else remains advisory.
 
 **`lom-fix/v1` schema**:
 ```json
@@ -620,7 +622,7 @@ Key points:
 - **`plans[].diagnostic`**: embedded copy of the diagnostic — you don't need to cross-reference `lom-diag/v1`.
 - **`plans[].fixes[].action`**:
   - `insert` — insert `text` at `(line, col)`.
-  - `replace` — replace range `(line,col)..(end_line,end_col)` with `text`. (Reserved for Phase 3.)
+  - `replace` — replace range `(line,col)..(end_line,end_col)` with `text`. (Schema-reserved: `fix --apply` supports it, but no current rule emits `replace` actions.)
   - `delete` — delete the range. Used by LEX005 (1-char delete).
   - `hint` — guidance text only; `line`/`col` may be `0`. May still carry `text` (a snippet to use, e.g. `! [IO]`, `Green => ()`).
 - **`plans[].fixes[].confidence`**: `high` / `medium` / `low`. When multiple fixes exist for one diagnostic, they are listed in order but not ranked — you choose.
@@ -645,15 +647,14 @@ Key points:
 1. Write the file.
 2. Run `lom <file> --json` to get diagnostics.
 3. If `ok == false`, run `lom fix <file> --json` to get the repair plan.
-4. Apply the fixes (you do this — `fix` does not auto-edit). For `hint`-with-`text` fixes like EFF001/MAT001, the `text` is a ready-to-paste snippet.
+4. Apply the fixes — either yourself (`fix` plan mode does not auto-edit) or via `lom fix <file> --apply` (applies high-confidence non-hint fixes in place). For `hint`-with-`text` fixes like EFF001/MAT001, the `text` is a ready-to-paste snippet.
 5. Re-run `lom <file> --json` to verify. Repeat until `ok == true`.
 6. Run `lom <file>` to execute.
 
-**Limitations** (Phase 2.7):
-- No `--apply`: fixes are advisory; you apply them.
-- No span-based `replace`: positions are line/col without precise end positions (except LEX005's 1-char delete). Precise `replace` arrives with Phase 3 AST spans.
+**Limitations**:
+- No span-based `replace` from rules yet: positions are line/col without precise end positions (except LEX005's 1-char delete). `fix --apply` supports the `replace` action in the schema, but no rule currently emits it.
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
-- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance — runtime positions are still `(0, 0)` until Phase 3.
+- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans exist since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); expression-level and runtime positions remain coarse.
 
 ---
 
@@ -682,4 +683,4 @@ Key points:
 
 ---
 
-*End of Lom Spec for AI v0.3. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parser with holey AST (`Stmt::Hole` on parse error, all errors collected, sync-point recovery). Phase 2.3 adds: structured JSON diagnostics (`lom-diag/v1` schema), `--json` / `--check` / `--help` CLI flags, error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved for 2.4-2.5). Phase 2.4 adds: gradual type checker (`--check` / `--json` emits TYPE/MAT/NAM diagnostics; warnings are non-fatal — the program still runs). Phase 2.5 adds: explicit effect system (`! [IO, Clock]` annotation, `EFF001` warning when a pure function calls an effectful one; `main` is exempt). Phase 2.6 adds: `lom info <file> [--json]` type info export (`lom-info/v1` schema — functions/enums/imports; no type-check, no run; parse failure falls back to `lom-diag/v1`). NOT yet implemented: user multi-file modules (Phase 3), exhaustive-match compile check (runtime error on no match), `fix`/`retry` diagnostic fields (Phase 2.7), 100-task eval set (Phase 2.8). When unsure, prefer the explicit form (annotate types, handle all match cases with `_`).*
+*End of Lom Spec for AI v0.3. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parser with holey AST (`Stmt::Hole` on parse error, all errors collected, sync-point recovery). Phase 2.3 adds: structured JSON diagnostics (`lom-diag/v1` schema), `--json` / `--check` / `--help` CLI flags, error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved for 2.4-2.5). Phase 2.4 adds: gradual type checker (`--check` / `--json` emits TYPE/MAT/NAM diagnostics; warnings are non-fatal — the program still runs). Phase 2.5 adds: explicit effect system (`! [IO, Clock]` annotation, `EFF001` warning when a pure function calls an effectful one; `main` is exempt). Phase 2.6 adds: `lom info <file> [--json]` type info export (`lom-info/v1` schema — functions/enums/imports; no type-check, no run; parse failure falls back to `lom-diag/v1`). Since then (through v0.6.1): MAT001 non-exhaustive-match compile warnings, the `fix`/`retry` diagnostic fields with `lom fix --plan` / `--apply` / `--history` (Phases 2.7 / 3.1 / 4.1.3), the 108-task eval suite (`eval/`), the `list` / `json` / `map` / `file` / `env` stdlib modules, user packages via `lom.toml` path dependencies (Phase 4.4), `lom doc` / `lom fmt` / `lom repl` / `lom lsp`, and type checking visible on the default run path (diagnostics on stderr, never blocking execution). When unsure, prefer the explicit form (annotate types, handle all match cases with `_`).*

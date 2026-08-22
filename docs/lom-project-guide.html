@@ -1132,9 +1132,9 @@
   <li><code>LICENSE</code>：Apache 2.0</li>
   <li><code>CODE_OF_CONDUCT.md</code>：Contributor Covenant</li>
   <li><code>CONTRIBUTING.md</code>：贡献流程、代码规范、提交规范</li>
-  <li>issue/PR 模板：bug report、feature request、RFC</li>
-  <li>CI 矩阵：GitHub Actions（cargo build/test/clippy/fmt + 文档 lint）</li>
-  <li>release 流程：Git tag + GitHub Release + 多平台二进制（Linux x64、macOS arm64、Windows x64）</li>
+  <li>issue/PR 模板：bug report、feature request、RFC（规划项，未落地——当前无 PR 流程，直接推 main）</li>
+  <li>CI 矩阵（已落地，Phase 6.3）：GitHub Actions 三平台（ubuntu / macOS / windows）——cargo build/test + 自举 golden 逐字比对 + 零依赖 gate + <code>lom fmt --check</code> + eval verify（统一走 pwsh run.ps1）</li>
+  <li>release 流程（规划项，未落地）：Git tag 已有（v0.5.1 / v0.6.0 / v0.6.1）；GitHub Release + 多平台预编译二进制待首个正式发布</li>
   <li><code>.gitattributes</code>：<code>*.lom linguist-language=Lom</code></li>
 </ul>
 

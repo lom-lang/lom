@@ -1240,7 +1240,7 @@ end
 7. **Trait dispatch**: static (monomorphized) only, or dynamic (vtable) too?
 8. **`pub` granularity**: per-item `pub` keyword, or module-level `pub use`?
 
-These are tracked and will be resolved in Phase 0 spec iterations based on DeepSeek readability tests.
+Questions 1-4 are resolved (recorded inline above). Questions 5-8 remain open and are deferred to v1.0 scoping decisions — each may legitimately be answered "not in v1.0" (e.g. `pub` is a deliberate non-feature so far: all top-level items are public).
 
 ---
 
