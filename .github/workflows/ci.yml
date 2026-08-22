@@ -3,7 +3,7 @@
 # 每个 push/PR 在 Linux / macOS / Windows 上跑：
 #   1. cargo test --release（Rust 单元测试）
 #   2. 自举回归（stmt_interp.lom 全量输出非空且无异常退出）
-#   3. eval 参考解验证（Unix 用 run.sh + jq；Windows 用 run.ps1）
+#   3. eval 参考解验证（三平台统一 run.ps1 + pwsh；macOS 自带 bash 3.2 跑不动 run.sh 的关联数组）
 name: CI
 
 on:
@@ -53,17 +53,10 @@ jobs:
           # 39 条输出逐字验证基线；少于此数即回归
           test "$lines" -ge 39
 
-      - name: Eval verify (Unix)
-        if: runner.os != 'Windows'
-        env:
-          # run.sh 默认在 PATH 找 lom；CI 里二进制不在 PATH，显式指定绝对路径
-          LOM_BIN: ${{ github.workspace }}/target/release/lom
-        run: |
-          sudo apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null || true
-          # 用 bash 显式调用：仓库在 Windows 上维护，git 文件模式无执行位（100644）
-          bash eval/runner/run.sh --verify
-
-      - name: Eval verify (Windows)
-        if: runner.os == 'Windows'
+      - name: Eval verify (all platforms)
+        # 统一走 PowerShell runner：macOS 自带 bash 3.2 而 run.sh 用了 bash4 关联数组；
+        # pwsh 在 GitHub 三平台 runner 均预装，run.ps1 是一等维护对象
         shell: pwsh
-        run: ./eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe
+        run: |
+          $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
+          ./eval/runner/run.ps1 -Verify -LomBin $bin
