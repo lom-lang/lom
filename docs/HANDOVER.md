@@ -31,7 +31,7 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **345/345 通过** |
+| Rust 测试 | **346/346 通过** |
 | eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 345/345（2026-08-22 基线）
+cargo test --release                                    # 期望 346/346（2026-08-22 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望 39 条输出（逐字比对 examples/bootstrap/stmt_interp.expected.txt）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 108/108
 ```
@@ -282,7 +282,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 345/345
+2. `cargo build --release && cargo test --release` 确认 346/346
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**

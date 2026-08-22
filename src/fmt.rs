@@ -129,7 +129,12 @@ pub fn format_source(src: &str) -> Result<String, String> {
         }
     }
 
-    Ok(out)
+    // 行尾保持输入风格：CRLF 文件输出 CRLF（Windows 检出 autocrlf 时 --check 不会因行尾误报）
+    if src.contains("\r\n") {
+        Ok(out.replace('\n', "\r\n"))
+    } else {
+        Ok(out)
+    }
 }
 
 fn push_indented(out: &mut String, depth: i32, text: &str) {
@@ -214,6 +219,14 @@ mod tests {
     fn fmt_trailing_whitespace_removed() {
         let src = "fn f() -> Unit\n    println(1)   \nend\n";
         let expected = "fn f() -> Unit\n    println(1)\nend\n";
+        assert_eq!(format_source(src).unwrap(), expected);
+    }
+
+    #[test]
+    fn fmt_crlf_preserved() {
+        // CRLF 输入输出仍为 CRLF（否则 Windows autocrlf 检出下 --check 全误报）
+        let src = "fn f() -> Unit\r\nprintln(1)\r\nend\r\n";
+        let expected = "fn f() -> Unit\r\n    println(1)\r\nend\r\n";
         assert_eq!(format_source(src).unwrap(), expected);
     }
 
