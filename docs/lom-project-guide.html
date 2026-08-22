@@ -504,7 +504,7 @@
       </ul>
     </li>
   </ul>
-  <h4>2.8 已完成内容 · <code>eval/</code> 100 任务评测集</h4>
+  <h4>2.8 已完成内容 · <code>eval/</code> 100 任务评测集 <span class="meta">（历史记录：交付时为 100 任务；后经 Phase 5.3-5.9/5.20 增补至 108 任务，2026-08-22 起 eval/README.md 以 108 为准。99/100 实测为 2026-08-03 原 100 任务集上的数据，任务 101-108 尚未跑过 LLM 实测）</span></h4>
   <ul>
     <li><strong>目录结构</strong>：
       <ul>
@@ -800,7 +800,7 @@
   <p><span class="tag" style="background:#16a34a;color:white;">评测集完成 ✅</span> + <span class="tag" style="background:#16a34a;color:white;">LLM 通过率达标 ✅ 99%</span> + 标志性 demo：<strong>LLM 生成错误代码 → Lom 返回结构化 JSON 修复建议</strong>（<code>lom fix --json</code> 已在 Phase 2.7 实现并端到端验证）。<strong>Phase 2 退出标准全部达成。</strong></p>
 </div>
 
-<h2>2.5 阶段 3：可用 MVP（8-12 周）</h2>
+<h2 id="2.5">2.5 阶段 3：可用 MVP（8-12 周）</h2>
 <div class="phase">
   <h3>阶段 3 · 可用 MVP <span class="tag">MVP</span></h3>
   <p><strong>目标</strong>：语言可用于小规模实际任务。</p>
@@ -854,7 +854,7 @@
   </div>
 </div>
 
-<h2>2.6 阶段 4：LLM 修复原生 + 基础工具链（调整后）</h2>
+<h2 id="2.6">2.6 阶段 4：LLM 修复原生 + 基础工具链（调整后）</h2>
 <div class="phase">
   <h3>阶段 4 · LLM 修复原生 + 基础工具链 <span class="tag" style="background:#2563eb;color:white;">方向已调整</span></h3>
   <p><strong>目标</strong>：把 <code>lom fix</code> 做成最强 LLM 代码修复工具（差异化），补齐语言基础工具链（REPL/LSP/包管理）。</p>
@@ -901,7 +901,7 @@
   <p><code>lom fix</code> 覆盖主要诊断类别的自动修复 + 置信度模型可用 + REPL 可交互运行 + LSP 基础 hover/诊断推送 + 包管理雏形可创建项目并解析依赖。</p>
 </div>
 
-<h2>2.7 阶段 5：生态与自举（16-24 周）</h2>
+<h2 id="2.7">2.7 阶段 5：生态与自举（16-24 周）</h2>
 <div class="phase">
   <h3>阶段 5 · 生态与自举 <span class="tag">生产级</span> <span class="tag" style="background:#16a34a;color:white;">✅ 已完成（2026-08-19，见文末收尾评估）</span></h3>
   <p><strong>目标</strong>：语言能"养活自己"。</p>
@@ -1001,7 +1001,7 @@
   <p>编译器自身能用 Lom 写并编译通过（自举完成）。</p>
 </div>
 
-<h2>2.8 阶段 6：生产级（持续）</h2>
+<h2 id="2.8">2.8 阶段 6：生产级（持续）</h2>
 <div class="phase">
   <h3>阶段 6 · 生产级 <span class="tag">生产级</span> <span class="tag" style="background:#16a34a;color:white;">✅ 工程面已完成（2026-08-22，见文末收尾评估）</span></h3>
   <p><strong>目标</strong>：社区化、稳定、可用作生产。</p>

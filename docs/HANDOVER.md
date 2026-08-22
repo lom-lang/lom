@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-22（**Phase 6 工程面完成**——6.1 语义版本 v0.5.1+tag、6.2 治理文档、6.3 三平台 CI、6.4 lom doc、6.5 lom fmt、6.6 安全审计；退出标准"第三方生产使用"无法自证，诚实声明见 guide §2.8）
+> 最后更新：2026-08-22（**Phase 6 工程面完成 + 评审整改一轮**——类型检查默认可见、CI 三 gate、文档清扫、零 warning、v0.6.0；评审遗留项如实保留，见 §1）
 
 ---
 
@@ -35,8 +35,10 @@
 | eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
-| 当前进度 | **Phase 6 工程面已完成**（2026-08-22：语义版本 v0.5.1+tag、治理文档、三平台 CI、lom doc、lom fmt、安全审计；详见 guide §2.8 收尾评估） |
+| 当前进度 | **Phase 6 工程面已完成 + 评审整改一轮**（2026-08-22：第三方评审后修复类型检查默认可见性、CI 三 gate、文档腐坏、runner 退出码；v0.6.0） |
 | 下一步 | 编译器阶段方向决策（LLVM/WASM/全量自举）或 v1.0 冻结——等用户指令 |
+
+**评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
 **Phase 6 收尾评估（2026-08-22）**：工程面全落地——6.1 语义版本（Cargo.toml 0.5.1 对齐里程碑，首个 tag v0.5.1，`lom --version` 从 CARGO_PKG_VERSION 读）/ 6.2 治理三件套（CONTRIBUTING/CODE_OF_CONDUCT/RFC 模板含 LLM 影响分析必填节）/ 6.3 三平台 CI / 6.4 lom doc（文档注释从源码回捞，lexer 丢注释）/ 6.5 lom fmt（**token 流驱动而非 AST 重写**——AST 没有注释，重写必丢；单行枚举 `enum X = A | B` 无 end 要特判）/ 6.6 SECURITY.md（零依赖供应链 + grep 验证零 unsafe + 威胁模型）。**退出标准"第三方生产使用"无法自证**——工程面关闭，标准保留为长期北极星。挂起项：包注册中心（需公共基础设施）、调试器、概率类型（v1.0 后按需）。
 
@@ -66,7 +68,7 @@
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
 
-**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐为 `0.5.1`，并打了首个 git tag `v0.5.1`。此前惯例是 Cargo.toml 一直 0.1.0、commit message 里的 v0.x 只是里程碑标记——Phase 6.1 起改为**语义版本管理**：语言/工具链破坏性变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。
+**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.6.0`（tag v0.6.0；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
 
 ---
 
@@ -91,9 +93,9 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 287/287
-.\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望输出 11 和 10
-powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 10 类全 100%
+cargo test --release                                    # 期望 345/345（2026-08-22 基线）
+.\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望 39 条输出（逐字比对 examples/bootstrap/stmt_interp.expected.txt）
+powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 108/108
 ```
 
 ### 2.3 git 提交与推送（不依赖任何 GitHub 插件）

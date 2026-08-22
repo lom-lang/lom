@@ -40,7 +40,8 @@ type
 pipe  (reserved for |>)
 ```
 
-*Reserved for later phases*: `async await mod pub use ref move where grad tensor`
+*Reserved for later phases*: `async await mod use ref move where grad tensor`
+*(note: `pub` was listed here historically but was never implemented or reserved — as of v0.5.x `pub` is an ordinary identifier; all top-level items are public, see §8.3)*
 
 ### 2.3 Operators (by precedence, low → high)
 
@@ -967,7 +968,9 @@ Calling an unimported non-prelude builtin produces a structured error:
 符号 'len' 未导入。需在文件顶部声明：from string import {len}
 ```
 
-### 8.3 Public/private (Phase 3 draft)
+### 8.3 Public/private (design sketch — **not implemented**)
+
+> **Status (v0.5.x)**: `pub` is not a keyword and this syntax does not parse. The package manager (Phase 4.4) treats **all top-level `fn`/`enum` as public**; there is no privacy. This section is a design sketch for a future phase, kept for reference.
 
 ```
 pub fn greet(name: String) -> String

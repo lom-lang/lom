@@ -1,12 +1,12 @@
 # Lom Eval Suite (Phase 2.8)
 
-100-task benchmark for measuring **LLM generation pass-rate** on Lom code.
+108-task benchmark for measuring **LLM generation pass-rate** on Lom code.
 
 > This is the **core deliverable of Phase 2** — the hard metric that backs Lom's "AI-native" claim. An LLM is given a prompt; it generates `.lom` code; the runner executes the code and compares stdout to the expected output.
 
 ## Design goals
 
-1. **Coverage** — 100 tasks across 10 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair).
+1. **Coverage** — 108 tasks across 10 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair).
 2. **Reproducibility** — every task has a verified reference solution and expected output; the runner self-checks the eval set before any LLM run.
 3. **LLM-coding-native focus** — tasks are designed to probe Lom's AI-friendly features (tolerant parse, structured diagnostics, `|>` linearity, structural types, `Result`/`match`).
 4. **Multi-model comparability** — same prompts, same runner, same expected outputs across DeepSeek / Claude / GPT / Kimi / GLM / Gemini.
@@ -53,7 +53,7 @@ Each `tasks/NN_<category>.json` file is an array of task objects:
 ```
 
 Fields:
-- **`id`** — zero-padded 3-digit task id (001-100), globally unique
+- **`id`** — zero-padded 3-digit task id (001-108), globally unique
 - **`category`** — one of the 10 categories (matches filename suffix)
 - **`difficulty`** — `easy` / `medium` / `hard`
 - **`prompt`** — Chinese natural-language description of what the LLM should generate. Mentions required functions, expected behavior, and any constraints. **The LLM only sees this field** (plus `SPEC_FOR_AI.md`); it does not see `solution` or `expected`.
@@ -77,7 +77,7 @@ cargo build --quiet
 eval/runner/run.sh --verify
 ```
 
-This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **100/100 pass**. Use this to catch regressions in the interpreter or the eval set.
+This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **108/108 pass**. Use this to catch regressions in the interpreter or the eval set.
 
 ### Evaluate LLM-generated candidates
 
@@ -112,4 +112,4 @@ This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses �
 
 ## Baseline results
 
-Phase 2.8 only ships the framework + reference solutions. Baseline LLM pass-rates will be measured separately and recorded in `eval/results/` (TBD).
+Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/100 on the original 100-task set) is recorded in `REPORT.md`; raw candidates are preserved in `eval/candidates/`. Note: tasks 101-108 were added after that baseline run and have not yet been LLM-tested.

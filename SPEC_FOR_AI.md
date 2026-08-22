@@ -327,7 +327,7 @@ from io import { println as log }    # per-item alias: name as alias
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
 - User multi-file modules (`from utils.helpers import {...}`) arrive in Phase 3.
-- `pub` marks exportable items (Phase 3):
+- `pub` marks exportable items (**design sketch — NOT implemented as of v0.5.x**; `pub` is an ordinary identifier, all top-level items are public):
 ```
 pub fn greet(name: String) -> String
     "Hello, " + name
