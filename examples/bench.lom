@@ -8,7 +8,7 @@
 
 from env import { args }
 from string import { string_to_int, int_to_string }
-from list import { list_cons, list_empty, list_get, list_head, list_tail, list_is_empty }
+from list import { list_cons, list_empty, list_get, list_head, list_tail, list_is_empty, list_length }
 from map import { map_empty, map_set, map_get }
 
 # n 次 cons 建列表,再 for-in 求和(返回总和防优化)
@@ -87,17 +87,21 @@ end
 
 fn main() -> Unit
     let argv = args()
-    let bench = list_get(argv, 1)
-    let n = string_to_int(list_get(argv, 2))
-    if bench == "list_build"
-        println(bench_list_build(n))
-    elif bench == "lookup"
-        println(bench_lookup(n))
-    elif bench == "recurse"
-        println(bench_recurse(n))
-    elif bench == "map_lookup"
-        println(bench_map_lookup(n))
-    else
+    if list_length(argv) < 3
         println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup> <n>")
+    else
+        let bench = list_get(argv, 1)
+        let n = string_to_int(list_get(argv, 2))
+        if bench == "list_build"
+            println(bench_list_build(n))
+        elif bench == "lookup"
+            println(bench_lookup(n))
+        elif bench == "recurse"
+            println(bench_recurse(n))
+        elif bench == "map_lookup"
+            println(bench_map_lookup(n))
+        else
+            println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup> <n>")
+        end
     end
 end

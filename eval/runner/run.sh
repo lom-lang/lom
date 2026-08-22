@@ -101,8 +101,12 @@ for file in "$TASKS_DIR"/*.json; do
         tmpfile="$(mktemp).lom"
         printf '%s' "$src" > "$tmpfile"
         # 只比对 stdout（stderr 是诊断通道）并要求退出码 0（与 run.ps1 语义一致，2026-08-22）
-        actual=$("$LOM_BIN" "$tmpfile" 2>/dev/null)
-        lom_exit=$?
+        # 注意 set -e：命令直接赋值会在失败时杀死脚本，必须用 if 包住才能拿到真实退出码
+        if actual=$("$LOM_BIN" "$tmpfile" 2>/dev/null); then
+            lom_exit=0
+        else
+            lom_exit=$?
+        fi
         rm -f "$tmpfile"
 
         # Normalize line endings (jq already strips trailing \n; we re-add for comparison)

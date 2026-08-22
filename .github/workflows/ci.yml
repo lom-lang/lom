@@ -57,7 +57,8 @@ jobs:
         # 只扫描 [dependencies] section 内、非注释非空白的条目行（跨 section 即停）
         shell: bash
         run: |
-          if awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+ *=/{found=1; print "  found dependency: " $0} END{exit found}' Cargo.toml; then
+          # 覆盖 [dependencies] 与 [dependencies.foo] 表形态（TOML 合法写法都拦）
+          if awk '/^\[(dev-|build-)?dependencies(\..*)?\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+ *=/{found=1; print "  found dependency: " $0} END{exit found}' Cargo.toml; then
             echo "zero-dependency gate: OK"
           else
             echo "ERROR: Cargo.toml [dependencies] 非空——零依赖政策被破坏（例外需 RFC）"; exit 1

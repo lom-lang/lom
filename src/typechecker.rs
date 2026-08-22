@@ -52,6 +52,10 @@ pub struct TypeChecker {
     file: String,
     /// 源码行（用于诊断的 source_line 字段）
     source_lines: Vec<String>,
+    /// Phase 6.7 评审整改：外部包公开符号（lom.toml 依赖的 fn/enum/变体名）
+    /// 这些符号由解释器经 load_packages 注册；typechecker 不解析包，
+    /// 对名单内符号跳过 NAM003（包源码在其包内已被检查过，签名此处不可知 → Unknown）
+    external_symbols: std::collections::HashSet<String>,
 }
 
 /// 函数签名
@@ -121,6 +125,7 @@ impl TypeChecker {
             diags: Vec::new(),
             file: file.to_string(),
             source_lines,
+            external_symbols: std::collections::HashSet::new(),
         };
         tc.register_builtins();
         tc
@@ -866,17 +871,13 @@ impl TypeChecker {
                 }
             }
             Expr::Pipe { left, right } => {
-                let left_ty = self.check_expr(left, env);
-                // right 应该是 callee（Ident 或 Call）；把 left_ty 作为第一个参数
+                // right 应该是 callee（Ident 或 Call）；left 作为第一个参数
                 if let Expr::Call { callee, args } = right.as_ref() {
-                    let mut all_args = vec![left_ty];
-                    for a in args {
-                        all_args.push(self.check_expr(a, env));
-                    }
-                    self.check_call(callee, &all_args_args_to_exprs(args), env);
-                    let _ = all_args;
-                    // 返回 callee 的返回类型
-                    self.callee_return_type(callee, env)
+                    // 2026-08-22 修复 TYPE003 假阳性：arity 检查必须把管道传入的 left 计入
+                    // （此前只传显式 args，`x |> add(1)` 被误报"期望 2 个参数，得到 1 个"）
+                    let mut full_args: Vec<Expr> = vec![left.as_ref().clone()];
+                    full_args.extend(args.iter().cloned());
+                    self.check_call(callee, &full_args, env)
                 } else {
                     // x |> f => f(x)
                     self.check_call(right, std::slice::from_ref(left), env)
@@ -1010,6 +1011,9 @@ impl TypeChecker {
                     ret_ty
                 } else if env.get(name).is_some() {
                     // 局部变量（可能是闭包）— 不深入检查
+                    TypeOrUnknown::unknown()
+                } else if self.external_symbols.contains(name) {
+                    // 外部包公开符号（lom.toml 依赖）：签名此处不可知 → Unknown，不报 NAM003
                     TypeOrUnknown::unknown()
                 } else {
                     self.push_diag(
@@ -1343,6 +1347,11 @@ impl TypeChecker {
                     (TypeOrUnknown::Known(Type::Float), TypeOrUnknown::Known(Type::Float)) => {
                         TypeOrUnknown::known(Type::Float)
                     }
+                    // Int/Float 混合：提升为 Float（与解释器 eval_binary 的 Int→Float 提升一致，2026-08-22 对齐）
+                    (TypeOrUnknown::Known(Type::Int), TypeOrUnknown::Known(Type::Float))
+                    | (TypeOrUnknown::Known(Type::Float), TypeOrUnknown::Known(Type::Int)) => {
+                        TypeOrUnknown::known(Type::Float)
+                    }
                     (TypeOrUnknown::Known(Type::String), TypeOrUnknown::Known(_))
                     | (TypeOrUnknown::Known(_), TypeOrUnknown::Known(Type::String)) => {
                         TypeOrUnknown::known(Type::String)
@@ -1370,6 +1379,11 @@ impl TypeChecker {
                         TypeOrUnknown::known(Type::Int)
                     }
                     (TypeOrUnknown::Known(Type::Float), TypeOrUnknown::Known(Type::Float)) => {
+                        TypeOrUnknown::known(Type::Float)
+                    }
+                    // Int/Float 混合提升为 Float（与解释器一致，2026-08-22 对齐）
+                    (TypeOrUnknown::Known(Type::Int), TypeOrUnknown::Known(Type::Float))
+                    | (TypeOrUnknown::Known(Type::Float), TypeOrUnknown::Known(Type::Int)) => {
                         TypeOrUnknown::known(Type::Float)
                     }
                     (TypeOrUnknown::Known(a), TypeOrUnknown::Known(b)) => {
@@ -1497,19 +1511,6 @@ impl TypeChecker {
             }
         }
         (0, TypeOrUnknown::unknown())
-    }
-
-    fn callee_return_type(&mut self, callee: &Expr, env: &mut TypeEnv) -> TypeOrUnknown {
-        match callee {
-            Expr::Ident(name) => {
-                if let Some(sig) = self.functions.get(name) {
-                    sig.ret.clone().map(TypeOrUnknown::Known).unwrap_or(TypeOrUnknown::unknown())
-                } else {
-                    self.check_expr(callee, env)
-                }
-            }
-            _ => self.check_expr(callee, env),
-        }
     }
 
     /// Phase 4.1.1: 为未定义名找拼写建议
@@ -1675,11 +1676,6 @@ fn levenshtein(a: &str, b: &str) -> usize {
     prev[n]
 }
 
-// 辅助函数：把 args 转回表达式切片（用于管道场景的递归调用）
-fn all_args_args_to_exprs(args: &[Expr]) -> Vec<Expr> {
-    args.to_vec()
-}
-
 /// 判断类型是否为内置变体的泛型占位符（如 Result 的 T/E、Option 的 T）
 /// 这些占位符在类型推断中应视为 Unknown，避免误报类型不匹配。
 fn is_generic_placeholder(t: &Type) -> bool {
@@ -1690,8 +1686,20 @@ fn is_generic_placeholder(t: &Type) -> bool {
 
 /// 对程序执行类型检查，将诊断合并到 diags
 pub fn check_program(program: &Program, src: &str, file: &str, diags: &mut Diagnostics) {
+    check_program_with_externals(program, src, file, diags, &[]);
+}
+
+/// 带外部包符号的检查入口（Phase 6.7：调用方从 lom.toml 依赖图收集公开符号传入）
+pub fn check_program_with_externals(
+    program: &Program,
+    src: &str,
+    file: &str,
+    diags: &mut Diagnostics,
+    externals: &[String],
+) {
     let source_lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
-    let tc = TypeChecker::new(file, source_lines);
+    let mut tc = TypeChecker::new(file, source_lines);
+    tc.external_symbols = externals.iter().cloned().collect();
     tc.check(program, diags);
 }
 
@@ -2001,6 +2009,46 @@ mod tests {
         let diags = check_src(src);
         let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
         assert_eq!(type_diags.len(), 0);
+    }
+
+    #[test]
+    fn int_plus_float_promotion_no_warn() {
+        // 2026-08-22 评审整改：Int/Float 混合运算与解释器提升语义一致（→ Float），不报 TYPE001
+        let src = "fn f() -> Unit\n    let x = 1 + 0.5\n    let y = 2.0 * 3\nend\n";
+        let diags = check_src(src);
+        let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+        assert_eq!(type_diags.len(), 0, "Int/Float 混合不应报 TYPE001: {:?}", type_diags.iter().map(|d| &d.message).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn pipe_arity_no_false_positive() {
+        // 2026-08-22 评审整改：管道左值计入 arity——`5 |> add(1)` 对 add(a,b) 不应报 TYPE003
+        let src = "fn add(a: Int, b: Int) -> Int\n    a + b\nend\nfn main() -> Unit\n    println(5 |> add(1))\nend\n";
+        let diags = check_src(src);
+        let arity_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE003").collect();
+        assert_eq!(arity_diags.len(), 0, "管道场景不应报 TYPE003: {:?}", arity_diags.iter().map(|d| &d.message).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn external_symbols_skip_nam003() {
+        // 2026-08-22 评审整改：外部包符号（lom.toml 依赖）不报 NAM003
+        let src = "from mathlib import { square }\nfn main() -> Unit\n    println(square(5))\nend\n";
+        let result = crate::parser::Parser::parse_recover(src);
+        assert!(result.is_ok());
+        let mut diags = Diagnostics::new("test.lom");
+        crate::typechecker::check_program_with_externals(
+            &result.program,
+            src,
+            "test.lom",
+            &mut diags,
+            &["square".to_string()],
+        );
+        let nam003: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+        assert_eq!(nam003.len(), 0, "外部包符号不应报 NAM003");
+        // 对照组：不在外部名单里的符号仍报 NAM003
+        let mut diags2 = Diagnostics::new("test.lom");
+        crate::typechecker::check_program_with_externals(&result.program, src, "test.lom", &mut diags2, &[]);
+        assert!(diags2.diagnostics.iter().any(|d| d.code == "NAM003"));
     }
 
     #[test]

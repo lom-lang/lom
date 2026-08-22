@@ -303,7 +303,8 @@ fn main_inner() {
         // JSON 模式：仅诊断，不执行；解析通过后执行类型检查（Phase 2.4）
         if diags.ok {
             let program = parser::Parser::parse_recover(&src).program;
-            typechecker::check_program(&program, &src, path, &mut diags);
+            let externals = collect_package_symbols(path);
+            typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
         }
         print!("{}", diags.to_json());
         process::exit(if diags.ok { 0 } else { 1 });
@@ -324,7 +325,8 @@ fn main_inner() {
     // --check 模式：执行类型检查，收集 TYPE/MAT/NAM 诊断
     if cli.check {
         let program = parser::Parser::parse_recover(&src).program;
-        typechecker::check_program(&program, &src, path, &mut diags);
+        let externals = collect_package_symbols(path);
+        typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
         // 有诊断（error 或 warning）时都输出，便于 LLM/用户看到类型提示
         if !diags.diagnostics.is_empty() {
             print!("{}", diags.to_human());
@@ -344,7 +346,8 @@ fn main_inner() {
     // 渐进式承诺不变（动态可跑），只是让 LLM/用户在每次运行时都能看到类型反馈。
     {
         let program = parser::Parser::parse_recover(&src).program;
-        typechecker::check_program(&program, &src, path, &mut diags);
+        let externals = collect_package_symbols(path);
+        typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
         if !diags.diagnostics.is_empty() {
             eprint!("{}", diags.to_human());
         }
@@ -421,6 +424,30 @@ fn run_info(src: &str, path: &str, json: bool) {
         print!("{}", info::to_human(&info));
     }
     process::exit(0);
+}
+
+/// Phase 6.7 评审整改：收集 lom.toml 依赖包的公开符号（fn/enum/变体名）
+/// 供 typechecker 免于对包符号误报 NAM003（此前 pkg_demo 在默认运行路径喷 5 条假 error）
+fn collect_package_symbols(path: &str) -> Vec<String> {
+    let file_dir = std::path::Path::new(path)
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let toml_path = file_dir.join("lom.toml");
+    if !toml_path.exists() {
+        return Vec::new();
+    }
+    match package::load_manifest_file(&toml_path) {
+        Ok(manifest) => match package::resolve_dependencies(&manifest, &file_dir) {
+            Ok(graph) => graph
+                .packages
+                .values()
+                .flat_map(|p| p.public_symbols.iter().cloned())
+                .collect(),
+            Err(_) => Vec::new(),
+        },
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Phase 6.4: 执行 `lom doc` 子命令

@@ -32,9 +32,9 @@ fn find_first(items: String) -> Option<String>
     end
 end
 
-fn use_option(s: String) -> String
+fn use_option(s: String) -> Option<String>
     let v = find_first(s)?
-    v
+    Some(v)
 end
 
 fn main() -> Unit
