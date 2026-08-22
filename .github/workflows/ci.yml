@@ -54,12 +54,14 @@ jobs:
 
       - name: Zero-dependency gate
         # SECURITY.md 承诺：Cargo.toml 引入任何依赖即构建失败（零依赖是永久设计决策，例外需 RFC）
+        # 只扫描 [dependencies] section 内、非注释非空白的条目行（跨 section 即停）
         shell: bash
         run: |
-          if grep -A5 '^\[dependencies\]' Cargo.toml | grep -E '^[a-zA-Z_]'; then
+          if awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+ *=/{found=1; print "  found dependency: " $0} END{exit found}' Cargo.toml; then
+            echo "zero-dependency gate: OK"
+          else
             echo "ERROR: Cargo.toml [dependencies] 非空——零依赖政策被破坏（例外需 RFC）"; exit 1
           fi
-          echo "zero-dependency gate: OK"
 
       - name: lom fmt gate
         # 全部示例必须是 fmt 幂等的（apply_test.lom 是故意坏文件，豁免）
