@@ -151,7 +151,7 @@ Docs File 4 §3 "twelve design principles" lists "strong type system" and "exhau
 
 - No dispatch on type name (no virtual methods based on nominal identity).
 - No way to distinguish two records with the same shape but different intent (`UserId = Int` vs `OrderId = Int` are the same type structurally).
-- **Mitigation**: type aliases (`type UserId = Int`) provide documentation but not type safety. Nominal newtypes may be added in Phase 3 if needed.
+- **Mitigation**: none currently — type aliases were sketched but never implemented and are not planned for v1.0; distinct intents with the same shape are distinguished by naming conventions and documentation instead.
 
 ### Evidence
 
@@ -234,6 +234,17 @@ Macros, compile-time code generation, and reflection are excluded in Phase 0-3. 
 ### 11.7 No separate `Char` type (Phase 5.24 decision)
 
 Single-char Strings are Char (the Python/JS model). Three reasons: (a) **LLM-native** — Python, the language LLMs know best, has no char type; Rust's `'a'` vs `"a"` distinction is a documented LLM confusion source (same class as `a..b` vs `a..=b`). (b) **The need never materialized** — the bootstrap lexer has used `split(s, "")` char scanning since Phase 5.0 without issue; the measured bottlenecks were List's representation (5.19) and linear lookups (5.20/5.21), never the absence of Char. (c) **Simplicity** — one fewer primitive type for both LLMs and the checker. If a future compiler backend needs byte-level control, that decision belongs to the compiler phase, not the interpreter.
+
+### 11.8 No traits / no `self` / no `pub`; multi-return = tuples (RFC-0001, 2026-08-23)
+
+The four remaining LANGUAGE_SPEC §11 open questions were closed by RFC-0001:
+
+- **Multiple return values = tuples + `let (a, b)` destructuring** (both already implemented). Out-params rejected: a second, mutable output channel is a known LLM confusion source (C# `out`); tuple returns keep outputs in the value domain where match/destructure apply uniformly.
+- **No `self`** — Lom has no methods at all: structural records carry data, behavior lives in plain functions. With no method system, no receiver keyword is needed. The question is moot by design, not deferred.
+- **No traits in v1.0** — dispatch (static or dynamic) presupposes the method system Lom deliberately lacks; structural typing already provides shape-based substitutability for observed usage. If real shared-behavior demand appears post-v1.0, it enters via a new RFC.
+- **No `pub`** — all top-level items are public (the Phase 4.4 package manager already assumes this; `pub` was never even a keyword). A privacy modifier is per-item bookkeeping LLMs must track, with no demonstrated need at current package scale.
+
+Common thread: every rejected feature is *name/binding bookkeeping* — exactly the category LLMs handle worst. Each rejection also shrinks the reserved-word and grammar surface an LLM must keep straight.
 
 ---
 

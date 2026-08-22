@@ -23,7 +23,7 @@
 ## 2. Lexical
 
 - **Comments**: `# line` and `#- block -#`
-- **Keywords**: `fn let mut if elif else while for in return match end True False Int Float Bool String Unit Result Ok Err from import as struct enum trait impl type`
+- **Keywords**: `fn let mut if elif else while for in return match end and or True False from import as enum` — the complete reserved set (verified against the v0.6.1 lexer). Type names (`Int Float Bool String Unit Result Ok Err Some None`) are ordinary identifiers recognized in type position; `struct trait impl type pub` are NOT keywords.
 - **Operators** (low → high precedence): `or`, `and`, `== != < > <= >=`, `|>`, `+ -`, `* / %`, `! -` (prefix), `?` (postfix), call/index/field
 - **Literals**: `42` (Int), `3.14` (Float), `True`/`False` (Bool), `"hi"` (String), `()` (Unit)
 
@@ -327,7 +327,7 @@ from io import { println as log }    # per-item alias: name as alias
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
 - **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Example: `examples/pkg_demo/`.
-- `pub` marks exportable items (**design sketch — NOT implemented as of v0.6.x**; `pub` is an ordinary identifier, all top-level items are public):
+- `pub` marks exportable items (**rejected for v1.0** — RFC-0001; `pub` is an ordinary identifier, all top-level items are public, no privacy is planned):
 ```
 pub fn greet(name: String) -> String
     "Hello, " + name

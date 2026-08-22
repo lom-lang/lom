@@ -1,7 +1,7 @@
 # Lom Language Specification (v0.1 Draft)
 
 > **Status**: Phase 0 Draft · 2026-08-02
-> **Stability**: Unstable — syntax and semantics may change before Phase 1 freeze.
+> **Stability**: Unstable — syntax and semantics may change before v1.0 freeze.
 > **Scope**: This spec covers the Phase 1 minimal subset (interpreter-runnable) and drafts the Phase 2 LLM-coding-native features. ~~Workload-native features (tensor, autodiff, MLIR) are out of scope and will be specified in Phase 4.~~ **Update (2026-08-07 retrospective)**: Phase 4 direction changed from "workload-native" to "LLM-repair-native + toolchain" — `lom fix` auto-repair expansion, REPL, LSP, package manager. Workload-native (tensor/autodiff/MLIR) is dropped (Mojo acquired by Qualcomm saturates the AI-compute lane). See [§2.5 retrospective](docs/lom-project-guide.html).
 
 ---
@@ -30,18 +30,13 @@ Lom is designed so that **LLMs can write it with low error rate and easy recover
 
 ```
 fn let mut if else elif while for in return
-match end
+match end and or
 True False
-Int Float Bool String Unit
-Result Ok Err
-from import as
-struct enum trait impl
-type
-pipe  (reserved for |>)
+from import as enum
 ```
 
-*Reserved for later phases*: `async await mod use ref move where grad tensor`
-*(note: `pub` was listed here historically but was never implemented or reserved — as of v0.5.x `pub` is an ordinary identifier; all top-level items are public, see §8.3)*
+*Type names (`Int Float Bool String Unit Result Option Ok Err Some None`) are **ordinary identifiers**, not keywords — the parser recognizes them in type position.*
+*(verified against `src/lexer.rs` v0.6.1: the 20 keywords above are the complete reserved set. `struct` / `trait` / `impl` / `type` / `pub` were listed here historically but have **never been reserved** — they are ordinary identifiers today; `pub`/traits are rejected for v1.0, see RFC-0001. `pipe` is not a keyword either — `|>` is a punctuation token. The older "reserved for later phases: async await mod use ref move where grad tensor" note described intent, not lexer reality — none of those are reserved either.)*
 
 ### 2.3 Operators (by precedence, low → high)
 
@@ -237,11 +232,11 @@ end
 | `Result<T, E>` | `Ok(v)` / `Err(e)` | §6.1 |
 | `Option<T>` | `Some(v)` / `None` | §6.1 |
 | Tuples | `(Int, String)` | §6.3 |
-| Type aliases | `type UserId = Int` | §6.5 |
-| Traits | `trait Show { fn show(self) -> String }` | §6.6 |
+| ~~Type aliases~~ | ~~`type UserId = Int`~~ | §6.5 — **never implemented** (`type` is an ordinary identifier; parse error, verified v0.6.1) |
+| ~~Traits~~ | ~~`trait Show { fn show(self) -> String }`~~ | §6.6 — **rejected for v1.0** (RFC-0001) |
 | `List<T>` (immutable, Phase 3.3) | `List<Int>` via `Type::Generic("List", [T])` | §9.3 |
 
-> **Phase 3.3 `List<T>`**: a runtime `Value::List { elems: Vec<Value> }` variant exposed through the `list` stdlib module (§9.3). No list literal syntax yet — construct via `list_cons` or `json_parse`. Type-checker signatures use `List<_Any>` to accept any element type; element type tracking is deferred.
+> **Phase 3.3 `List<T>`**: a runtime `Value::List(ListVal)` variant (Rc cons cells since v0.5.0/Phase 5.19) exposed through the `list` stdlib module (§9.3). No list literal syntax yet — construct via `list_cons` or `json_parse`. Type-checker signatures use `List<_Any>` to accept any element type; element type tracking is deferred.
 
 ### 4.4 Why structural types (not nominal)
 
@@ -258,7 +253,7 @@ Phase 2.4 adds a **gradual** type checker (`src/typechecker.rs`). "Gradual" mean
 
 | Mode | Type check? | Behavior |
 |---|---|---|
-| `lom <file>` (default run) | No | Dynamic execution; type errors ignored |
+| `lom <file>` (default run) | Yes (since v0.6.0) | Diagnostics on stderr; **never blocks execution** |
 | `lom <file> --check` | Yes | Reports type diagnostics (human-readable); exit 1 only on Error-level, exit 0 on warnings |
 | `lom <file> --json` | Yes | Emits `lom-diag/v1` JSON including `stage: "type"` diagnostics |
 
@@ -291,7 +286,7 @@ Phase 2.4 adds a **gradual** type checker (`src/typechecker.rs`). "Gradual" mean
 
 #### 4.5.5 What Phase 2.4 does NOT check
 
-- Trait resolution (Phase 2.6)
+- Trait resolution (traits rejected for v1.0 — RFC-0001)
 - ~~Effect system (Phase 2.5)~~ — implemented in Phase 2.5 (see §6.7)
 - Generic instantiation (only placeholder compatibility)
 - Precise tuple index inference (`.0`/`.1`)
@@ -465,18 +460,22 @@ Patterns (Phase 2 subset):
 - record destructure: `{x, y}` or `{x: px, y: py}`
 - `or` patterns: `1 or 2 or 3`
 
-**Exhaustiveness check**: `match` on `Result` and `Option` must cover all variants or have a `_` arm. Non-exhaustive match is a compile error. This forces LLMs to handle failure branches.
+**Exhaustiveness check**: `match` on `Result` and `Option` should cover all variants or have a `_` arm. Non-exhaustive match is a compile-time **warning** (`MAT001`, non-fatal — the program still runs). This nudges LLMs to handle failure branches.
 
 **Arm separation**: arms are separated by newlines. No semicolons. This is consistent with Lom's newline-sensitive statement separation (§2.4.1).
 
-### 6.5 Type aliases
+### 6.5 Type aliases (design sketch — **never implemented**)
+
+> **Status (v0.6.1)**: `type` is an ordinary identifier; `type UserId = Int` is a parse error (PARSE001, verified). Kept as a design sketch only — no type aliases are planned for v1.0.
 
 ```
 type UserId = Int
 type Point = {x: Float, y: Float}
 ```
 
-### 6.6 Traits (structural, Phase 2 draft)
+### 6.6 Traits (structural, Phase 2 draft — **rejected for v1.0**, RFC-0001)
+
+> **Status (v0.6.1)**: `trait` / `impl` / `self` have never been keywords or implemented; there are no methods in the language (structural records carry data only). The v1.0 scoping decision (RFC-0001) is to **not** add traits — shared behavior needs will be re-evaluated by a future RFC if real demand appears. Kept as a rejected design sketch for reference.
 
 ```
 trait Show
@@ -968,9 +967,9 @@ Calling an unimported non-prelude builtin produces a structured error:
 符号 'len' 未导入。需在文件顶部声明：from string import {len}
 ```
 
-### 8.3 Public/private (design sketch — **not implemented**)
+### 8.3 Public/private (**rejected for v1.0** — RFC-0001)
 
-> **Status (v0.5.x)**: `pub` is not a keyword and this syntax does not parse. The package manager (Phase 4.4) treats **all top-level `fn`/`enum` as public**; there is no privacy. This section is a design sketch for a future phase, kept for reference.
+> **Status (v0.6.1)**: `pub` is not a keyword and this syntax does not parse. The package manager (Phase 4.4) treats **all top-level `fn`/`enum` as public**; there is no privacy. RFC-0001 closed this question: **no `pub` keyword is planned** — per-item privacy adds a modifier LLMs must track without a demonstrated need at current package scale. The sketch below is kept for reference only.
 
 ```
 pub fn greet(name: String) -> String
@@ -1236,11 +1235,15 @@ end
 4. **Match arm separator**: `=>` (chosen) vs `->` (conflicts with closure return type)?
    - **Resolved (v0.1.1)**: `=>` confirmed. `->` is used for closure return type (`fn(x: Int) -> Int`), so `=>` for match arms avoids ambiguity.
 5. **Multiple return values**: tuples only, or out-params, or destructuring assignment?
+   - **Resolved (v0.6.1, RFC-0001)**: **tuples + destructuring** — both already implemented (`return (a, b)`; `let (a, b) = ...` since v0.4.0/Phase 5.1). Out-params rejected: they add a second, mutable output channel that LLMs routinely confuse (C# `out` is a known error source); tuple return keeps outputs in the value domain where match/destructure apply uniformly.
 6. **`self` / `self` keyword**: lowercase `self` (Rust) vs `this` (Java) vs explicit first param name?
+   - **Resolved (v0.6.1, RFC-0001)**: **no `self`** — Lom has no methods at all (structural records carry data; behavior lives in plain functions). The question is moot by design, not deferred: with traits rejected (question 7), no construct needs a receiver keyword.
 7. **Trait dispatch**: static (monomorphized) only, or dynamic (vtable) too?
+   - **Resolved (v0.6.1, RFC-0001)**: **no traits in v1.0** — the §6.6 structural-trait sketch is rejected. Trait dispatch (static or dynamic) presupposes a method system Lom deliberately lacks. If real shared-behavior demand appears post-v1.0, it enters via a new RFC.
 8. **`pub` granularity**: per-item `pub` keyword, or module-level `pub use`?
+   - **Resolved (v0.6.1, RFC-0001)**: **no `pub`** — all top-level items are public (the Phase 4.4 package manager already works this way; `pub` was never a keyword). Per-item privacy is a modifier LLMs must track with no demonstrated need at current package scale. See §8.3.
 
-Questions 1-4 are resolved (recorded inline above). Questions 5-8 remain open and are deferred to v1.0 scoping decisions — each may legitimately be answered "not in v1.0" (e.g. `pub` is a deliberate non-feature so far: all top-level items are public).
+All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08-23). The earlier note that these "will be resolved in Phase 0 spec iterations" was stale.
 
 ---
 
