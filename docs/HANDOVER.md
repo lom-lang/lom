@@ -273,6 +273,7 @@ end
 - lom-tutorial.html 是零基础教程（v0.3.0 加的），新语言特性落地后要同步教程章节。
 - 用户偶尔说"继续"——意思是按当前 todo list 往下推进，不是新任务。
 - 交接时若发现本文与代码不符，**以代码和 lom-project-guide.html 为准**，然后更新本文。
+- **CI 事故记录（2026-08-22）**：ci.yml 首版上线后 Unix 两连败，两个坑都源于"本机是 Windows"：① run.sh 在 git 里无执行位（100644）→ 已用 `git update-index --chmod=+x` 补上；② macOS runner 自带 bash 3.2，而 run.sh 用了 bash4 关联数组（`declare -A`）→ CI 已统一走 pwsh + run.ps1（三平台预装，run.ps1 是一等维护对象）。**教训：CI 脚本不能只在本机验，推上去看首跑结果再宣布完成。**
 
 ---
 
