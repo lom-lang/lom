@@ -31,7 +31,7 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程） |
-| Rust 测试 | **346/346 通过** |
+| Rust 测试 | **349/349 通过** |
 | eval 评测集 | **108/108 参考解通过** |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；唯一失败是 effects 类的输出格式理解偏差，非语言错误） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出全对，--check 0 诊断；环境+函数表均 Map 化、检查层落地，见 Phase 5.21-5.23） |
@@ -39,6 +39,8 @@
 | 下一步 | 编译器阶段方向决策（LLVM/WASM/全量自举）或 v1.0 冻结——等用户指令 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
+
+**第三轮评审整改（2026-08-22，复审 A- 后执行）**：复审验证上一轮全部修复为真，并抓出六个新问题，全部已修：① **typechecker 包符号感知**——新增 `check_program_with_externals`，main.rs 从 lom.toml 依赖图收集公开符号（fn/enum/变体）传入，pkg_demo 不再喷 5 条 NAM003 假 error（根因：解释器 load_packages 注册包符号，检查器此前不知情）。② **typechecker 对齐运行时提升语义**——Int/Float 混合算术记 Float 不报 TYPE001（解释器 5.x 早就提升，检查器没跟上）；**管道 arity 假阳性修复**——`x |> add(1)` 的 TYPE003 现在把管道左值计入（此前误报"期望 2 得 1"）。③ run.sh 退出码死代码修复（`set -e` 会在赋值失败时杀死脚本，`lom_exit=$?` 永远只见 0；改 if 包裹拿真实退出码）。④ 零依赖 gate 覆盖 `[dependencies.foo]`/`[dev-dependencies]` 表形态（awk 正则扩展，三种形态本地验证）。⑤ bench.lom 无参先判个数再取参（此前直接 RUNTIME000 崩）。⑥ v0.6.1 补发（v0.6.0 的 tag 切在两个 CI 修复之前——教训：**tag 永远切在 CI 全绿之后**）。新行为各有回归测试锁定（int_plus_float_promotion_no_warn / pipe_arity_no_false_positive / external_symbols_skip_nam003）。另：try_operator.lom 的 use_option 修正为返回 Option<String>（`?` 语义正确写法；该函数本就未被调用，输出不变）。
 
 **Phase 6 收尾评估（2026-08-22）**：工程面全落地——6.1 语义版本（Cargo.toml 0.5.1 对齐里程碑，首个 tag v0.5.1，`lom --version` 从 CARGO_PKG_VERSION 读）/ 6.2 治理三件套（CONTRIBUTING/CODE_OF_CONDUCT/RFC 模板含 LLM 影响分析必填节）/ 6.3 三平台 CI / 6.4 lom doc（文档注释从源码回捞，lexer 丢注释）/ 6.5 lom fmt（**token 流驱动而非 AST 重写**——AST 没有注释，重写必丢；单行枚举 `enum X = A | B` 无 end 要特判）/ 6.6 SECURITY.md（零依赖供应链 + grep 验证零 unsafe + 威胁模型）。**退出标准"第三方生产使用"无法自证**——工程面关闭，标准保留为长期北极星。挂起项：包注册中心（需公共基础设施）、调试器、概率类型（v1.0 后按需）。
 
@@ -68,7 +70,7 @@
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
 
-**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.6.0`（tag v0.6.0；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
+**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.6.1`（tag v0.6.1；v0.6.0 的 tag 不慎切在两个 CI 修复之前，复审发现后补发 v0.6.1 含全部 CI 修复；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
 
 ---
 
@@ -93,7 +95,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 346/346（2026-08-22 基线）
+cargo test --release                                    # 期望 349/349（2026-08-22 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望 39 条输出（逐字比对 examples/bootstrap/stmt_interp.expected.txt）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 108/108
 ```
@@ -282,7 +284,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文 + lom-project-guide.html 的 Phase 4/5 部分
-2. `cargo build --release && cargo test --release` 确认 346/346
+2. `cargo build --release && cargo test --release` 确认 349/349
 3. 跑 §2.2 回归三件套确认基线
 4. 读 §6 的 P0 三件套，等用户指令开工
 5. 记住：**改动前先读代码，提交前跑回归，推送前用户可能要先看**
