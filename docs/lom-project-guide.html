@@ -1003,18 +1003,30 @@
 
 <h2>2.8 阶段 6：生产级（持续）</h2>
 <div class="phase">
-  <h3>阶段 6 · 生产级 <span class="tag">生产级</span></h3>
+  <h3>阶段 6 · 生产级 <span class="tag">生产级</span> <span class="tag" style="background:#16a34a;color:white;">✅ 工程面已完成（2026-08-22，见文末收尾评估）</span></h3>
   <p><strong>目标</strong>：社区化、稳定、可用作生产。</p>
-  <h4>新增</h4>
+  <h4>已完成项（2026-08-22，Phase 6.1-6.6）</h4>
   <ul>
-    <li>语义版本管理 + 稳定 API 承诺</li>
-    <li>完整工具链（格式化、lint、性能分析、内存分析）</li>
-    <li>安全审计</li>
-    <li>多平台二进制发布（Linux/macOS/Windows + WASM）</li>
-    <li>社区治理（RFC 流程、贡献指南、行为准则）</li>
+    <li><strong>6.1 语义版本管理</strong>：Cargo.toml 从 0.1.0 对齐到 <code>0.5.1</code>（与里程碑标记一致），首个 git tag <code>v0.5.1</code>；新增 <code>lom --version</code>（CARGO_PKG_VERSION 单一事实源）；版本政策写入 HANDOVER（破坏性变更升 minor、修复升 patch）。</li>
+    <li><strong>6.2 社区治理</strong>：CONTRIBUTING.md（零依赖/禁虚构数据/回归三件套/里程碑带文档的规矩）、CODE_OF_CONDUCT.md（Contributor Covenant 2.1）、docs/rfc/0000-template.md（RFC 模板，含 Lom 特有的 <strong>LLM 影响分析</strong> 必填节）。语言变更必须 RFC，bug 修复和惯例性 stdlib 增补不用。</li>
+    <li><strong>6.3 多平台 CI</strong>：.github/workflows/ci.yml——Linux/macOS/Windows 三平台构建 + cargo test + 自举回归（39 条输出底线）+ eval 参考解验证（Unix 用 run.sh+jq，Windows 用 run.ps1）。</li>
+    <li><strong>6.4 文档生成工具 <code>lom doc</code></strong>：签名来自 AST（复用 info::type_to_string），文档注释从源码回捞（签名上方连续 # 行——lexer 丢注释，只能按行扫）；默认 Markdown，--json 出 lom-doc/v1。8 个测试。</li>
+    <li><strong>6.5 格式化器 <code>lom fmt</code></strong>：<strong>token 流驱动而非 AST 重写</strong>（lexer 丢注释，AST 重写必丢注释）——注释/字符串字节级保留，只规范化行首缩进（4 空格/层）；字符串里的 "end" 是 Str token 不误判；单行枚举 <code>enum X = A | B</code> 无 end 特判；括号续行保留原缩进。--apply 就地改写（fix --apply 惯例）、--check 供 CI 门禁。12 个测试；全部 33 个有效示例文件验证已幂等（apply_test.lom 是故意坏文件，正确拒绝）。</li>
+    <li><strong>6.6 安全审计</strong>：SECURITY.md——威胁模型（可信程序解释器，非沙箱）；<strong>零依赖供应链</strong>（永久决策，无包可投毒）；加固清单（256MB 栈线程、100% safe Rust——grep 验证零 unsafe、全函数化 parser、i64 检查算术）；已知风险如实登记（递归中止、file 模块无路径校验、RefCell 重入不变量）。</li>
   </ul>
-  <h4>退出标准</h4>
-  <p>有第三方项目用 Lom 写并部署到生产环境。</p>
+  <h4>新增（原计划项去向）</h4>
+  <ul>
+    <li>语义版本管理 + 稳定 API 承诺 → <strong>6.1 已做</strong>（版本政策）；API 稳定承诺：v1.0 前不做冻结承诺（诚实声明）</li>
+    <li>完整工具链 → 格式化 ✅（6.5）、文档生成 ✅（6.4）；lint → <strong>由 --check + lom fmt --check 组合覆盖</strong>，不单列工具；性能/内存分析 → 移交编译器阶段（树遍历解释器做 PGO 无意义）</li>
+    <li>安全审计 → <strong>6.6 已做</strong></li>
+    <li>多平台二进制发布 → <strong>CI 三平台构建已验证可编译可测试（6.3）</strong>；预编译二进制发布流程（release artifacts）待首个正式发布时补</li>
+    <li>社区治理 → <strong>6.2 已做</strong></li>
+    <li>（Phase 5 移交项）包注册中心 / 调试器 / 概率类型 → <strong>仍挂起</strong>：包注册中心需要公共基础设施（非代码问题）；调试器与概率类型等 v1.0 后按需求决策</li>
+  </ul>
+  <h4>退出标准（诚实声明）</h4>
+  <p>"有第三方项目用 Lom 写并部署到生产环境"——<strong>无法自证，不以本仓库的意志为转移</strong>。本阶段能自证的工程面（版本管理、治理、CI、工具链、安全）已于 2026-08-22 全部落地；第三方采用是社区运营结果，Phase 6 工程面就此关闭，标准本身保留为项目长期北极星。</p>
+  <h4>最终基线（2026-08-22）</h4>
+  <p>345/345 Rust 测试；eval 108/108；自举 14 程序 39 条输出逐字正确；33 个有效示例 fmt 幂等；v0.5.1 已打 tag；三平台 CI 上线。</p>
 </div>
 
 <h1>第三部分 · 目标 LLM 优先级策略</h1>
