@@ -31,8 +31,8 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.7.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1/v0.6.0/v0.6.1） |
-| Rust 测试 | **370/370 通过**（含 wasm 12 单测 + 9 个 Node e2e），构建零 warning |
+| 版本 | **v0.8.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1/v0.6.0/v0.6.1/v0.7.0） |
+| Rust 测试 | **377/377 通过**（含 wasm 12 单测 + 16 个 Node e2e），构建零 warning |
 | eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
@@ -100,6 +100,7 @@
 - **巩固期 P-1（2026-08-23，RFC-0001 四问裁决）**：LANGUAGE_SPEC §11 剩余四问全部关闭——#5 多返回值=元组+解构（已实现即答案，拒 out-param）、#6 不设 self（无方法系统，问题失效）、#7 v1.0 不做 trait（§6.6 草稿标记 rejected）、#8 不做 pub（顶层全公开为正式语义）。**清扫中抓出的额外谎言**（全部实测验证后修正）：① spec 关键字表虚构——lexer 实际保留字只有 20 个（含 and/or，两文档都漏列），`struct/trait/impl/type/pub/pipe` 全是普通标识符；② `type UserId = Int` 类型别名从未实现（实测 PARSE001），但 §4.3 表格和 §6.5 一直当特性写；③ §4.5.1 表格称默认运行不做类型检查——v0.6.0 起已做（stderr 不拦截）；④ §6.4 称非穷尽 match 是"compile error"——MAT001 实为 warning。教训：**spec 里的"特性表"要定期拿 lexer/parser 实测对账**，文档腐坏密度远超预期。RFC 编号从 0001 起（0000 是模板）。
 - **Phase 7.1 WASM emitter 骨架（2026-08-23）**：`src/wasm.rs` 手写零依赖 emitter——LEB128（规范测试向量）、七个 section（type/import/func/memory/export/code/data）、函数索引空间导入在前、hello_module 最小模块。验证双层：逐字节 golden 单测 + **Node v24 真实实例化冒烟**（本机有 node，临时 .mjs harness 用完即删，未入库——7.9 才加 CI wasm gate）。**新坑**：binary crate 里 pub API 仅被测试消费会触发 dead_code warning——wasm.rs 模块级 `#[allow(dead_code)]` 注明有意保留（沿用 Phase 6.7 的既有惯例），7.2 接上 main 路径后可摘。版本纪律判断：7.1 无 CLI 面（没有 `lom build --target wasm`），非用户可见，**不升版本**；第一次升 minor 应在 CLI 可用的那个里程碑。
 - **Phase 7.2 动态语义 codegen（2026-08-23，v0.7.0）**：`src/wasm_codegen.rs` + `lom build <file> --target wasm [-o out]`。tagged i64（低 3 位 tag：0=Int 1=Bool 2=Unit 3=F64 盒 4=Str[len:u32+utf8]）；19 个手写 WASM helper 承担运行时 tag 分派（rt_add/eq/print/truthy/str_eq 等），codegen 只做结构翻译。**实测**：8 个 examples + eval 01/02 的 21/23 与解释器 stdout 逐字一致（101 list/104 range 是 7.6 的活，编译期报错指名 Phase）。**坑三个**：① **opcode 表看错行两次**——f64.store 是 0x39 不是 0x38（0x38=f32.store）、f64.convert_i64_s 是 0xB9 不是 0xB7（0xB7=f64.convert_i32_s）、f64.trunc 是 0x9D（f64 无取余指令，a%b 用 a-trunc(a/b)*b 合成）；Node 的验证报错会精确给出函数号和字节偏移，是第一调试工具。② **if 也是 WASM label**——return 的 br 深度漏计 if 层数会导致 return 穿透失败（eval 020 抓到：`first_even(1,4,7)` 返回 -1 而非 4）；Label 栈加 If 变体，break/continue 只认 Block/Loop。③ **bash heredoc 追加大文件会被截断**（wasm_codegen.rs 尾部丢过一次）——大文件用 Write/Edit 工具，别用 cat>>heredoc。另：JS 边界 i64 参数是 BigInt（harness 里 `v === 0n` 判断）；f64 显示对齐解释器 to_display（整数值补 .0）。e2e 测试 node 缺失自动跳过（CI 三平台预装 node，不影响 gate）。
+- **Phase 7.3 闭包（2026-08-23，v0.8.0）**：闭包值 = 堆对象 [table_idx][env_ptr]（tag 5），env 对象 [n][v0..vn] 值拷贝捕获；free_vars 静态分析（按首次使用序）；闭包体 = (env, params...)->i64 的 WASM 函数，调用走 call_indirect（funcref 表 + 元素段）；具名函数当值 = 忽略 env 的 shim；**递归闭包 = 预绑定 local + 创建后 env 槽位补丁**（对齐解释器共享作用域语义）；任意表达式 callee（make_adder(5)(10)）支持，求值顺序对齐解释器（先 args 后 callee）。**实测**：closures/hof/logical/nested_calls 四例 + eval 04 的 11/12 逐字一致（107 需 list_map → 7.6）。**已知语义差异（如实记录）**：捕获是创建时值拷贝，解释器是 Rc 共享作用域——创建后修改被捕获变量时两后端行为不同（代码头注释已声明）。**坑**：用户函数必须先预推占位 Function 固定 funcidx，否则函数体里产生的闭包函数会挤占索引空间；call_indirect 的操作数顺序是"参数在下、表索引在栈顶"。
 
 ---
 
