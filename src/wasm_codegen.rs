@@ -80,11 +80,17 @@ const RT_REPLACE: u32 = 37; // (i64, i64, i64) -> i64  全量替换（两遍扫�
 const RT_STR_CMP: u32 = 38; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
 const RT_STR_CHAR_AT: u32 = 39; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
 const RT_FTOA_STR: u32 = 40; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
+// ===== 7.5：枚举 / match / ? =====
+const RT_ENUM_PRINT: u32 = 41; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
+const RT_ENUM_STR: u32 = 42; // (i64) -> i64                 枚举 → Str（display 用）
+const RT_ENUM_EQ: u32 = 43; // (i64, i64) -> i32              枚举递归相等
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 41;
+const FIRST_USER_FN: u32 = 44;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
+/// 枚举值 tag：堆对象布局 [variant_idx: i32][n_args: i32][args: i64×n]（7.5）
+const TAG_ENUM: i64 = 6;
 
 // ===== 最小汇编器（WASM 指令按顺序发射；条件必须先算好再写 if/br_if）=====
 #[derive(Default)]
@@ -348,14 +354,16 @@ pub struct Codegen {
     shim_idx: std::collections::HashMap<String, (u32, u32)>,
     /// funcref 表内容（table 槽位 i → funcidx）；闭包/函数值的 call_indirect 目标
     table_entries: Vec<u32>,
-    /// 枚举变体名集合（用于给出"7.5 才支持"的明确错误）
-    variant_names: std::collections::HashSet<String>,
+    /// 枚举变体：名 → (全局索引, 参数个数)。内建 Ok=0/Err=1/Some=2/None=3，用户从 4 起
+    variant_idx: std::collections::HashMap<String, (u32, usize)>,
     /// 导入别名 → 真实内建名（from string import { len as slen }）
     import_aliases: std::collections::HashMap<String, String>,
     /// 已导入可用的内建函数（别名后的可用名）
     available_builtins: std::collections::HashSet<String>,
     /// 静态数据镜像（offset 0 起）；字节 0 固定是 '\n'（rt_print 换行用）
     data: Vec<u8>,
+    /// "(" / ")" / ", " 三个静态串的偏移（枚举打印用）
+    paren_offs: (u32, u32, u32),
     str_off: std::collections::HashMap<String, u32>,
     f64_off: std::collections::HashMap<u64, u32>,
 }
@@ -378,7 +386,8 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
             }
             Item::Enum(e) => {
                 for v in &e.variants {
-                    cg.variant_names.insert(v.name.clone());
+                    let idx = cg.variant_idx.len() as u32;
+                    cg.variant_idx.entry(v.name.clone()).or_insert((idx, v.fields.len()));
                 }
             }
             Item::Import(imp) => {
@@ -456,11 +465,20 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
         }
     }
 
-    // 收尾：funcref 表 + 数据段 + 全局（hp 堆指针 + ftoa 64 字节 scratch 缓冲）
+    // 收尾：funcref 表 + 变体名表 + 数据段 + 全局（hp 堆指针 + ftoa 64 字节 scratch 缓冲）
     if !cg.table_entries.is_empty() {
         let n = cg.table_entries.len() as u32;
         cg.m.table = Some((n, Some(n)));
         cg.m.elems = cg.table_entries.clone();
+    }
+    // 变体名表（7.5）：按 idx 顺序的 [name_off: i32] 数组；枚举打印/串化 helper 的体在这里填
+    let variant_table_off = cg.build_variant_table();
+    {
+        let (po, pc, co) = cg.paren_offs;
+        let pi = (RT_ENUM_PRINT - N_IMPORTS) as usize;
+        cg.m.funcs[pi].body = build_enum_print(variant_table_off, po, pc, co);
+        let si = (RT_ENUM_STR - N_IMPORTS) as usize;
+        cg.m.funcs[si].body = build_enum_str(variant_table_off, po, pc, co);
     }
     let data_end = cg.data.len() as u32;
     let heap_base = data_end + 64; // 64 字节 ftoa scratch（global 1）
@@ -494,6 +512,10 @@ impl Codegen {
         let true_off = intern_static(&mut data, &mut str_off, "true");
         let false_off = intern_static(&mut data, &mut str_off, "false");
         let unit_off = intern_static(&mut data, &mut str_off, "()");
+        // 7.5 枚举打印用："(", ")", ", "
+        let paren_open_off = intern_static(&mut data, &mut str_off, "(");
+        let paren_close_off = intern_static(&mut data, &mut str_off, ")");
+        let comma_off = intern_static(&mut data, &mut str_off, ", ");
         // 类型注册（add_type 自动去重）
         let ty_ii_unit = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![] });
         let ty_fi_unit = m.add_type(FuncType { params: vec![ValType::F64, ValType::I64], results: vec![] });
@@ -559,14 +581,20 @@ impl Codegen {
             (ty_ii_i32, vec![ValType::I32; 6], build_str_cmp()),
             (ty_ii_i64, vec![ValType::I32; 5], build_str_char_at()),
             (ty_f_i64, vec![ValType::I32; 3], build_ftoa_str()),
+            // ===== 7.5：枚举 / match / ? =====
+            // RT_ENUM_PRINT / RT_ENUM_STR 的体在 finalize 填（需要变体名表偏移）
+            (ty_ii_unit, vec![ValType::I32; 5], vec![]),
+            (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], vec![]),
+            (ty_ii_i32, vec![ValType::I32; 4], build_enum_eq()),
         ];
         for (ty, locals, body) in helpers {
             m.funcs.push(Function { type_idx: ty, locals, body });
         }
 
-        let mut variant_names = std::collections::HashSet::new();
-        for v in ["Ok", "Err", "Some", "None"] {
-            variant_names.insert(v.to_string());
+        // 内建变体：Ok=0 Err=1 Some=2 None=3（None 零参）
+        let mut variant_idx: std::collections::HashMap<String, (u32, usize)> = std::collections::HashMap::new();
+        for (i, (v, arity)) in [("Ok", 1), ("Err", 1), ("Some", 1), ("None", 0)].iter().enumerate() {
+            variant_idx.insert(v.to_string(), (i as u32, *arity));
         }
         let mut available_builtins = std::collections::HashSet::new();
         for b in ["println", "print"] {
@@ -578,10 +606,11 @@ impl Codegen {
             fn_arity: std::collections::HashMap::new(),
             shim_idx: std::collections::HashMap::new(),
             table_entries: Vec::new(),
-            variant_names,
+            variant_idx,
             import_aliases: std::collections::HashMap::new(),
             available_builtins,
             data,
+            paren_offs: (paren_open_off, paren_close_off, comma_off),
             str_off,
             f64_off: std::collections::HashMap::new(),
         }
@@ -613,6 +642,159 @@ impl Codegen {
             o
         };
         ((off as i64) << 3) | TAG_F64
+    }
+
+    /// 枚举构造：参数求值 → [variant_idx: i32][n: i32][args: i64×n] 堆对象（tag 6）
+    fn emit_enum_construct(&mut self, ctx: &mut FnCtx, a: &mut Asm, vidx: u32, args: &[Expr]) -> Result<(), String> {
+        let mut scratches = Vec::new();
+        for arg in args {
+            self.compile_expr(ctx, a, arg)?;
+            let s = ctx.alloc();
+            a.lset(s);
+            scratches.push(s);
+        }
+        let p = ctx.alloc();
+        a.i32c(8 + 8 * args.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
+        a.lget(p).op(op::I32_WRAP_I64).i32c(vidx as i32).i32_store(0);
+        a.lget(p).op(op::I32_WRAP_I64).i32c(args.len() as i32).i32_store(4);
+        for (k, s) in scratches.iter().enumerate() {
+            a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(8 + 8 * k as u32);
+        }
+        a.lget(p).tag_int().i64c(TAG_ENUM).op(op::I64_OR);
+        Ok(())
+    }
+
+    /// match 表达式：$done 块带值，臂链依序测试，无匹配 trap（对齐解释器运行时错误）
+    fn compile_match(&mut self, ctx: &mut FnCtx, a: &mut Asm, m: &MatchExpr) -> Result<(), String> {
+        self.compile_expr(ctx, a, &m.scrutinee)?;
+        let s = ctx.alloc();
+        a.lset(s);
+        a.block_i64();
+        ctx.labels.push(Label::Block); // $done
+        let done_pos = ctx.labels.len() - 1;
+        for arm in &m.arms {
+            ctx.scopes.push(Vec::new()); // 臂作用域（模式绑定在这里）
+            self.compile_pattern_test(ctx, a, &arm.pattern, s)?;
+            a.if_();
+            ctx.labels.push(Label::If);
+            if let Some(g) = &arm.guard {
+                // guard 为假 → 穿透到下一臂（v0.4.2 语义）
+                self.compile_expr(ctx, a, g)?;
+                a.call(RT_TRUTHY).if_();
+                ctx.labels.push(Label::If);
+                self.compile_arm_body(ctx, a, &arm.body)?;
+                a.br(ctx.depth(done_pos));
+                ctx.labels.pop();
+                a.end();
+            } else {
+                self.compile_arm_body(ctx, a, &arm.body)?;
+                a.br(ctx.depth(done_pos));
+            }
+            ctx.labels.pop();
+            a.end();
+            ctx.scopes.pop();
+        }
+        a.op(op::UNREACHABLE); // 无臂匹配（解释器：运行时错误）
+        a.end();
+        ctx.labels.pop();
+        Ok(())
+    }
+
+    fn compile_arm_body(&mut self, ctx: &mut FnCtx, a: &mut Asm, body: &MatchArmBody) -> Result<(), String> {
+        match body {
+            MatchArmBody::Expr(e) => self.compile_expr(ctx, a, e),
+            MatchArmBody::Block(b) => self.compile_block_value(ctx, a, b),
+        }
+    }
+
+    /// 模式测试：栈上留 i32 条件；绑定变量写入当前臂作用域
+    fn compile_pattern_test(&mut self, ctx: &mut FnCtx, a: &mut Asm, pat: &Pattern, s: u32) -> Result<(), String> {
+        match pat {
+            Pattern::Wildcard => {
+                a.i32c(1);
+                Ok(())
+            }
+            Pattern::Binder(name) => {
+                if let Some(&(vidx, 0)) = self.variant_idx.get(name.as_str()) {
+                    // 零参变体模式（None 等）：tag6 + idx 相等（对齐解释器 nullary_variants 判定）
+                    self.emit_variant_test(a, s, vidx);
+                } else {
+                    // 绑定：被测值绑到新 local，恒真
+                    let idx = ctx.bind(name);
+                    a.lget(s).lset(idx);
+                    a.i32c(1);
+                }
+                Ok(())
+            }
+            Pattern::Lit(e) => {
+                // 字面量模式：值相等（rt_eq；Int/Float/Bool/Str 四种子集，对齐解释器）
+                match e {
+                    Expr::Int(n) => {
+                        a.i64c(n << 3);
+                    }
+                    Expr::Float(f) => {
+                        let v = self.intern_f64(*f);
+                        a.i64c(v);
+                    }
+                    Expr::Bool(bv) => {
+                        a.i64c(if *bv { V_TRUE } else { V_FALSE });
+                    }
+                    Expr::Str(txt) => {
+                        let v = self.intern_str(txt);
+                        a.i64c(v);
+                    }
+                    _ => return Err(format!("WASM 编译：不支持的字面量模式 {:?}", e)),
+                }
+                a.lget(s).call(RT_EQ).untag().op(op::I32_WRAP_I64);
+                Ok(())
+            }
+            Pattern::Variant { name, sub } => {
+                let &(vidx, arity) = match self.variant_idx.get(name.as_str()) {
+                    Some(v) => v,
+                    None => return Err(format!("WASM 编译：未知变体 '{}'", name)),
+                };
+                if sub.len() != arity {
+                    return Err(format!(
+                        "WASM 编译：变体 '{}' 期望 {} 个子模式，得到 {} 个",
+                        name, arity, sub.len()
+                    ));
+                }
+                self.emit_variant_test(a, s, vidx);
+                for (k, sp) in sub.iter().enumerate() {
+                    // arg_k 装入新 local 再递归测试
+                    let arg_l = ctx.alloc();
+                    a.lget(s).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
+                    self.compile_pattern_test(ctx, a, sp, arg_l)?;
+                    a.op(op::I32_AND);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// 变体测试（tag6 且 variant_idx 相等）→ i32
+    fn emit_variant_test(&mut self, a: &mut Asm, s: u32, vidx: u32) {
+        a.lget(s).tag().i64c(TAG_ENUM).op(op::I64_EQ);
+        a.lget(s).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(vidx as i32).op(op::I32_EQ);
+        a.op(op::I32_AND);
+    }
+
+    /// 变体名表：按 idx 顺序把变体名 intern 进数据段，再写 [name_off: i32] 数组；返回表偏移
+    fn build_variant_table(&mut self) -> u32 {
+        // 按 idx 排序（内建 0-3 在前，用户变体按声明序）
+        let mut by_idx: Vec<(u32, String)> = self.variant_idx.iter().map(|(n, &(i, _))| (i, n.clone())).collect();
+        by_idx.sort_by_key(|(i, _)| *i);
+        // 先 intern 所有名字（复用 str_off 去重），记录偏移
+        let mut name_offs = Vec::with_capacity(by_idx.len());
+        for (_, name) in &by_idx {
+            let off = self.intern_str(name);
+            name_offs.push(((off - TAG_STR) >> 3) as u32); // 去掉 tag 还原裸偏移
+        }
+        let table_off = self.data.len() as u32;
+        for no in name_offs {
+            self.data.extend(no.to_le_bytes());
+        }
+        table_off
     }
 
     /// 编译一个用户函数（返回 Function，由调用方写入预分配的槽位）
@@ -893,8 +1075,12 @@ impl Codegen {
                     a.lget(0).op(op::I32_WRAP_I64).i64_load(4 + 8 * slot);
                     return Ok(());
                 }
-                if self.variant_names.contains(name) {
-                    return unsupported(&format!("枚举变体 '{}'", name), "Phase 7.5");
+                if let Some(&(vidx, arity)) = self.variant_idx.get(name) {
+                    // 零参变体作值（None 等）：构造 0 参数枚举对象
+                    if arity == 0 {
+                        return self.emit_enum_construct(ctx, a, vidx, &[]);
+                    }
+                    return Err(format!("WASM 编译：变体 '{}' 需要 {} 个参数（构造写 {}(...)）", name, arity, name));
                 }
                 if self.fn_idx.contains_key(name) {
                     // 具名函数当值（v0.4.2 语义）：包装为零捕获闭包（shim 忽略 env 直调原函数）
@@ -973,8 +1159,32 @@ impl Codegen {
                 self.compile_closure(ctx, a, params, body)?;
                 Ok(())
             }
-            Expr::Match(_) => unsupported("match", "Phase 7.5"),
-            Expr::Try(_) => unsupported("? 操作符", "Phase 7.5"),
+            Expr::Match(m) => self.compile_match(ctx, a, m),
+            Expr::Try(inner) => {
+                // `?`：Ok(v)/Some(v) → 解包；Err(e)/None → 整个值 br $ret（对齐解释器 EarlyReturn）
+                self.compile_expr(ctx, a, inner)?;
+                let t = ctx.alloc();
+                a.lset(t);
+                a.tag_is(t, TAG_ENUM).if_().else_().op(op::UNREACHABLE).end();
+                // idx = load32(ptr)；Ok=0/Some=2 解包，Err=1/None=3 早退
+                let vi = ctx.alloc();
+                a.lget(t).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(vi);
+                a.lget(vi).i64c(0).op(op::I64_EQ);
+                a.lget(vi).i64c(2).op(op::I64_EQ);
+                a.op(op::I32_OR).if_i64();
+                ctx.labels.push(Label::If); // if 也是 label，br 深度要计入（7.2 的坑）
+                {
+                    a.lget(t).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
+                }
+                a.else_();
+                {
+                    a.lget(t);
+                    a.br(ctx.depth(0)); // br $ret：整个 Err/None 值
+                }
+                a.end();
+                ctx.labels.pop();
+                Ok(())
+            }
             Expr::Record { .. } => unsupported("记录", "Phase 7.6"),
             Expr::Tuple { .. } => unsupported("元组", "Phase 7.6"),
             Expr::Index { .. } => unsupported("索引", "Phase 7.6"),
@@ -990,11 +1200,14 @@ impl Codegen {
             // real 用 owned String 避免借用 self 卡住后续可变调用
             let real: String = self.import_aliases.get(orig).cloned().unwrap_or_else(|| orig.to_string());
             // 顺序对齐解释器 eval_call：变体（未被遮蔽）→ 内建 → 用户函数 → 闭包变量
-            if self.variant_names.contains(orig)
-                && ctx.lookup(orig).is_none()
-                && ctx.capture_slot(orig).is_none()
-            {
-                return unsupported(&format!("枚举变体构造 '{}(...)'", orig), "Phase 7.5");
+            // 枚举变体构造（未被局部变量遮蔽时）
+            if let Some(&(vidx, arity)) = self.variant_idx.get(orig) {
+                if ctx.lookup(orig).is_none() && ctx.capture_slot(orig).is_none() {
+                    if arity != args.len() {
+                        return Err(format!("WASM 编译：变体 '{}' 期望 {} 个参数，得到 {} 个", orig, arity, args.len()));
+                    }
+                    return self.emit_enum_construct(ctx, a, vidx, args);
+                }
             }
             // println / print（prelude）
             if real == "println" || real == "print" {
@@ -1409,8 +1622,17 @@ fn build_eq() -> Vec<u8> {
             }
             a.else_();
             {
-                // Int/Bool/Unit：tagged 值完全相等即值相等
-                a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                // 枚举：变体 idx + 参数递归相等（7.5，对齐解释器 values_eq）
+                a.tag_is(0, TAG_ENUM).if_i64();
+                {
+                    a.lget(0).lget(1).call(RT_ENUM_EQ).bool_tag();
+                }
+                a.else_();
+                {
+                    // Int/Bool/Unit：tagged 值完全相等即值相等
+                    a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                }
+                a.end();
             }
             a.end();
         }
@@ -1520,6 +1742,11 @@ fn build_print(closure_off: u32) -> Vec<u8> {
             }
             a.end();
             a.br(1);
+        }
+        a.end();
+        a.tag_is(0, TAG_ENUM).if_();
+        {
+            a.lget(0).lget(1).call(RT_ENUM_PRINT).br(1);
         }
         a.end();
         a.op(op::UNREACHABLE); // 其他 tag（List/Map/...）将在 7.6 支持
@@ -1697,15 +1924,24 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32) -> Vec<u8> {
                     {
                         a.lget(0).call(RT_UNBOX_F64).call(RT_FTOA_STR);
                     }
-                    a.else_().op(op::UNREACHABLE).end(); // List/Map/闭包等的 display 在 7.6
-                }
-                a.end();
+                    a.else_();
+                    {
+                        // 枚举：rt_enum_str（7.5）
+                        a.tag_is(0, TAG_ENUM).if_i64();
+                        {
+                            a.lget(0).call(RT_ENUM_STR);
+                        }
+                        a.else_().op(op::UNREACHABLE).end(); // List/Map/闭包等的 display 在 7.6
+                        a.end();
+                    }
+                    a.end();
             }
             a.end();
         }
         a.end();
     }
     a.end();
+    }
     a.b
 }
 
@@ -2315,6 +2551,134 @@ fn build_str_char_at() -> Vec<u8> {
     a.b
 }
 
+// ===== 7.5：枚举 helper（enum_eq 体直接构建；print/str 的体在 finalize 延迟填充）=====
+
+/// rt_enum_eq: (i64 a, i64 b) -> i32；变体 idx + 参数个数 + 参数递归 rt_eq
+/// locals: 2=pa, 3=pb, 4=na, 5=k（全 i32）
+fn build_enum_eq() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2); // 复用：tagged → 堆指针（枚举对象同布局）
+    emit_str_ptr(&mut a, 1, 3);
+    // 变体 idx 不等 → 0
+    a.lget(2).i32_load(0).lget(3).i32_load(0).op(op::I32_NE).if_();
+    a.i32c(0).op(op::RETURN);
+    a.end();
+    // 参数个数不等 → 0
+    a.lget(2).i32_load(4).lget(3).i32_load(4).op(op::I32_NE).if_();
+    a.i32c(0).op(op::RETURN);
+    a.end();
+    a.lget(2).i32_load(4).lset(4); // na
+    a.i32c(0).lset(5);
+    a.block();
+    a.loop_();
+    {
+        a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
+        // rt_eq(arg_a_k, arg_b_k) == false → return 0
+        a.lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+        a.lget(3).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.i32c(0).op(op::RETURN);
+        a.end();
+        a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i32c(1);
+    a.b
+}
+
+/// rt_enum_print: (i64 v, i64 nl) -> ()；变体名 + (arg, ...)，参数递归 rt_print
+/// locals: 2=p, 3=idx, 4=n, 5=k, 6=name_off（全 i32）
+fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u32) -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    a.lget(2).i32_load(0).lset(3); // idx
+    a.lget(2).i32_load(4).lset(4); // n
+    // name_off = load(table + idx*4)
+    a.i32c(table_off as i32).lget(3).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(6);
+    // lom_print(name_off+4, name_len)
+    a.lget(6).i32c(4).op(op::I32_ADD).lget(6).i32_load(0).call(IMP_PRINT_STR);
+    // 参数部分
+    a.lget(4).i32c(0).op(op::I32_GT_S).if_();
+    {
+        a.i32c((open_off + 4) as i32).i32c(1).call(IMP_PRINT_STR); // "("
+        a.i32c(0).lset(5);
+        a.block();
+        a.loop_();
+        {
+            a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
+            // rt_print(arg_k, 0)
+            a.lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+            a.i64c(0).call(RT_PRINT);
+            // k+1 < n → ", "
+            a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
+            {
+                a.i32c((comma_off + 4) as i32).i32c(2).call(IMP_PRINT_STR);
+            }
+            a.end();
+            a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        a.i32c((close_off + 4) as i32).i32c(1).call(IMP_PRINT_STR); // ")"
+    }
+    a.end();
+    // 换行
+    a.lget(1).i64c(0).op(op::I64_NE).if_();
+    {
+        a.i32c(0).i32c(1).call(IMP_PRINT_STR);
+    }
+    a.end();
+    a.b
+}
+
+/// rt_enum_str: (i64 v) -> i64 Str；枚举 → to_display 字符串（concat 链）
+/// locals: 2=p, 3=idx, 4=n, 5=k, 6=name_off（i32），7=acc（i64）
+fn build_enum_str(table_off: u32, open_off: u32, close_off: u32, comma_off: u32) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 3) | TAG_STR };
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    a.lget(2).i32_load(0).lset(3);
+    a.lget(2).i32_load(4).lset(4);
+    a.i32c(table_off as i32).lget(3).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(6);
+    // acc = 变体名（静态串直接作值）
+    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR).lset(7);
+    a.lget(4).op(op::I32_EQZ).if_i64();
+    {
+        a.lget(7);
+    }
+    a.else_();
+    {
+        // acc += "("
+        a.lget(7).i64c(tag_str(open_off)).call(RT_STR_CONCAT).lset(7);
+        a.i32c(0).lset(5);
+        a.block();
+        a.loop_();
+        {
+            a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
+            // acc += display(arg_k)
+            a.lget(7).lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(7);
+            // k+1 < n → acc += ", "
+            a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
+            {
+                a.lget(7).i64c(tag_str(comma_off)).call(RT_STR_CONCAT).lset(7);
+            }
+            a.end();
+            a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        // acc += ")"
+        a.lget(7).i64c(tag_str(close_off)).call(RT_STR_CONCAT).lset(7);
+        a.lget(7);
+    }
+    a.end();
+    a.b
+}
+
 // ===== 闭包支持（Phase 7.3）=====
 
 /// 捕获来源：创建点的值从哪来
@@ -2345,7 +2709,7 @@ impl Codegen {
             } else if let Some(slot) = ctx.capture_slot(name) {
                 caps.push((name.clone(), CapSrc::Capture(slot)));
             } else if self.fn_idx.contains_key(name)
-                || self.variant_names.contains(name)
+                || self.variant_idx.contains_key(name)
                 || name == "println"
                 || name == "print"
                 || self.available_builtins.contains(name)
@@ -2646,11 +3010,13 @@ mod tests {
 
     #[test]
     fn unsupported_constructs_report_phase() {
-        // match → 7.5；range → 7.6（闭包自 7.3 起已支持，见 e2e）
-        let e = compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap_err();
-        assert!(e.contains("7.5"), "{}", e);
+        // range/记录 → 7.6（match 自 7.5 起已支持，见 e2e）
         let e = compile("fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\nend").unwrap_err();
         assert!(e.contains("7.6"), "{}", e);
+        let e = compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r)\nend").unwrap_err();
+        assert!(e.contains("7.6"), "{}", e);
+        // match 现在编译通过
+        compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap();
     }
 
     #[test]
@@ -2906,6 +3272,56 @@ mod e2e {
             "from io import { println as log }\nfrom string import { len as slen }\nfn main() -> Unit\n    log(\"hi\")\n    log(slen(\"hello\"))\nend",
             "alias",
             "hi\n5\n",
+        );
+    }
+
+    // ===== Phase 7.5: 枚举 / match / ? =====
+
+    #[test]
+    fn e2e_match_option_result() {
+        check(
+            "fn parse_int(s: String) -> Result<Int, String>\n    from_string_check(s)\nend\nfn from_string_check(s: String) -> Result<Int, String>\n    if s == \"x\"\n        Err(\"bad\")\n    else\n        Ok(42)\n    end\nend\nfn main() -> Unit\n    match parse_int(\"x\")\n        Ok(n) => println(n)\n        Err(e) => println(\"err: \" + e)\n    end\n    match parse_int(\"y\")\n        Ok(n) => println(n)\n        Err(e) => println(\"err: \" + e)\n    end\nend",
+            "match_res",
+            "err: bad\n42\n",
+        );
+    }
+
+    #[test]
+    fn e2e_match_user_enum_and_literals() {
+        check(
+            "enum Color = Red | Green | Blue\nfn code(c: Color) -> Int\n    match c\n        Red => 1\n        Green => 2\n        Blue => 3\n    end\nend\nfn main() -> Unit\n    println(code(Green))\n    match 2\n        1 => println(\"one\")\n        2 => println(\"two\")\n        _ => println(\"other\")\n    end\n    match \"hi\"\n        \"hello\" => println(\"hello\")\n        _ => println(\"fallback\")\n    end\nend",
+            "match_enum",
+            "2\ntwo\nfallback\n",
+        );
+    }
+
+    #[test]
+    fn e2e_match_guard() {
+        // guard 为假穿透下一臂（v0.4.2 语义）
+        check(
+            "fn classify(n: Int) -> String\n    match n\n        x if x < 0 => \"neg\"\n        x if x == 0 => \"zero\"\n        _ => \"pos\"\n    end\nend\nfn main() -> Unit\n    println(classify(-5))\n    println(classify(0))\n    println(classify(9))\nend",
+            "guard",
+            "neg\nzero\npos\n",
+        );
+    }
+
+    #[test]
+    fn e2e_try_propagation() {
+        // `?`：Ok 解包；Err/None 提前返回（对齐解释器 EarlyReturn）
+        check(
+            "fn fail() -> Result<Int, String>\n    Err(\"boom\")\nend\nfn caller() -> Result<Int, String>\n    let x = fail()?\n    Ok(x + 1)\nend\nfn maybe(b: Bool) -> Option<Int>\n    if b\n        Some(7)\n    else\n        None\n    end\nend\nfn use_maybe(b: Bool) -> Option<Int>\n    let v = maybe(b)?\n    Some(v * 2)\nend\nfn main() -> Unit\n    match caller()\n        Ok(n) => println(n)\n        Err(e) => println(\"err: \" + e)\n    end\n    println(use_maybe(True))\n    println(use_maybe(False))\nend",
+            "try",
+            "err: boom\nSome(14)\nNone\n",
+        );
+    }
+
+    #[test]
+    fn e2e_enum_print_and_eq() {
+        // 枚举打印（递归参数）+ 枚举相等（结构递归）
+        check(
+            "fn main() -> Unit\n    println(Ok(42))\n    println(None)\n    println(Ok(1) == Ok(1))\n    println(Ok(1) == Ok(2))\n    println(None == None)\n    println(Some(\"hi\") == Some(\"hi\"))\nend",
+            "enum_pe",
+            "Ok(42)\nNone\ntrue\nfalse\ntrue\ntrue\n",
         );
     }
 }
