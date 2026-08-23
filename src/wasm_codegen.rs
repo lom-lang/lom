@@ -39,30 +39,49 @@ const IMP_PRINT_FLOAT: u32 = 1; // (f64 v, i64 newline) -> ()
 const IMP_PRINT_BOOL: u32 = 2; // (i64 v, i64 newline) -> ()
 const IMP_PRINT_UNIT: u32 = 3; // (i64 newline) -> ()
 const IMP_PRINT_STR: u32 = 4; // (i32 ptr, i32 len) -> () —— 原始字节
+const IMP_FTOA: u32 = 5; // (f64 v, i32 buf) -> i32 —— f64 格式化写入 buf，返回长度（7.4）
+/// 导入总数（funcidx 换算基座）
+const N_IMPORTS: u32 = 6;
 
 // ===== 运行时 helper 函数索引 =====
-const RT_BOX_F64: u32 = 5; // (f64) -> i64      动态装盒（bump alloc 8 字节）
-const RT_UNBOX_F64: u32 = 6; // (i64) -> f64    拆盒
-const RT_PROMOTE_F64: u32 = 7; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
-const RT_STR_EQ: u32 = 8; // (i64, i64) -> i32 字符串按字节相等
-const RT_ADD: u32 = 9; // (i64, i64) -> i64
-const RT_SUB: u32 = 10;
-const RT_MUL: u32 = 11;
-const RT_DIV: u32 = 12;
-const RT_MOD: u32 = 13;
-const RT_LT: u32 = 14; // (i64, i64) -> i64（Bool tagged）
-const RT_GT: u32 = 15;
-const RT_LE: u32 = 16;
-const RT_GE: u32 = 17;
-const RT_EQ: u32 = 18;
-const RT_NE: u32 = 19;
-const RT_NEG: u32 = 20; // (i64) -> i64
-const RT_NOT: u32 = 21; // (i64) -> i64
-const RT_TRUTHY: u32 = 22; // (i64) -> i32      非 Bool 时 trap
-const RT_PRINT: u32 = 23; // (i64 v, i64 newline) -> ()
-const RT_ALLOC: u32 = 24; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
+const RT_BOX_F64: u32 = 6; // (f64) -> i64      动态装盒（bump alloc 8 字节）
+const RT_UNBOX_F64: u32 = 7; // (i64) -> f64    拆盒
+const RT_PROMOTE_F64: u32 = 8; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
+const RT_STR_EQ: u32 = 9; // (i64, i64) -> i32 字符串按字节相等
+const RT_ADD: u32 = 10; // (i64, i64) -> i64
+const RT_SUB: u32 = 11;
+const RT_MUL: u32 = 12;
+const RT_DIV: u32 = 13;
+const RT_MOD: u32 = 14;
+const RT_LT: u32 = 15; // (i64, i64) -> i64（Bool tagged）
+const RT_GT: u32 = 16;
+const RT_LE: u32 = 17;
+const RT_GE: u32 = 18;
+const RT_EQ: u32 = 19;
+const RT_NE: u32 = 20;
+const RT_NEG: u32 = 21; // (i64) -> i64
+const RT_NOT: u32 = 22; // (i64) -> i64
+const RT_TRUTHY: u32 = 23; // (i64) -> i32      非 Bool 时 trap
+const RT_PRINT: u32 = 24; // (i64 v, i64 newline) -> ()
+const RT_ALLOC: u32 = 25; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
+// ===== 7.4：字符串 / stdlib helper =====
+const RT_STR_CONCAT: u32 = 26; // (i64, i64) -> i64     两字符串拼接（新堆对象）
+const RT_DISPLAY: u32 = 27; // (i64) -> i64            to_display → tagged Str
+const RT_ITOA: u32 = 28; // (i64 tagged Int) -> i64    十进制格式化
+const RT_STR_LEN: u32 = 29; // (i64 Str) -> i64 Int    字符数（数非续字节，对齐 chars().count()）
+const RT_STOI: u32 = 30; // (i64 Str) -> i64           解析整数；失败返回 Unit（对齐解释器）
+const RT_TRIM: u32 = 31; // (i64 Str) -> i64           ASCII 空白（注意：解释器是 Unicode 空白，差异已记录）
+const RT_UPPER: u32 = 32; // (i64 Str) -> i64          ASCII 大小写（Unicode 差异已记录）
+const RT_LOWER: u32 = 33; // (i64 Str) -> i64
+const RT_CONTAINS: u32 = 34; // (i64, i64) -> i64 Bool 朴素子串查找（UTF-8 安全：模式是合法 UTF-8）
+const RT_STARTS: u32 = 35; // (i64, i64) -> i64 Bool
+const RT_ENDS: u32 = 36; // (i64, i64) -> i64 Bool
+const RT_REPLACE: u32 = 37; // (i64, i64, i64) -> i64  全量替换（两遍扫描）
+const RT_STR_CMP: u32 = 38; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
+const RT_STR_CHAR_AT: u32 = 39; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
+const RT_FTOA_STR: u32 = 40; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 25;
+const FIRST_USER_FN: u32 = 41;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
@@ -176,6 +195,12 @@ impl Asm {
     }
     fn i32_store(&mut self, offset: u32) -> &mut Self {
         self.op(op::I32_STORE);
+        self.b.extend([0x00]);
+        self.b.extend(leb_u(offset as u64));
+        self
+    }
+    fn i32_store8(&mut self, offset: u32) -> &mut Self {
+        self.op(op::I32_STORE8);
         self.b.extend([0x00]);
         self.b.extend(leb_u(offset as u64));
         self
@@ -325,6 +350,10 @@ pub struct Codegen {
     table_entries: Vec<u32>,
     /// 枚举变体名集合（用于给出"7.5 才支持"的明确错误）
     variant_names: std::collections::HashSet<String>,
+    /// 导入别名 → 真实内建名（from string import { len as slen }）
+    import_aliases: std::collections::HashMap<String, String>,
+    /// 已导入可用的内建函数（别名后的可用名）
+    available_builtins: std::collections::HashSet<String>,
     /// 静态数据镜像（offset 0 起）；字节 0 固定是 '\n'（rt_print 换行用）
     data: Vec<u8>,
     str_off: std::collections::HashMap<String, u32>,
@@ -353,12 +382,51 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
                 }
             }
             Item::Import(imp) => {
-                // 7.2 只支持 io 模块（println/print 在 prelude 已可用，显式导入等价 no-op）
-                if imp.module != "io" {
-                    return Err(format!(
-                        "WASM 后端暂不支持导入模块 '{}'（将在 7.4+ 支持；io 的 println/print 无需导入）",
-                        imp.module
-                    ));
+                // io：println/print 在 prelude 已可用，显式导入等价 no-op
+                // 7.4 起支持 string / math；list/json/map 待 7.6，file/env 待 7.8
+                const STRING_BUILTINS: &[&str] = &[
+                    "len", "int_to_string", "string_to_int", "trim", "upper", "lower",
+                    "contains", "replace", "starts_with", "ends_with",
+                ];
+                // 已导出但 WASM 侧未就绪（依赖 List/Json 等 7.6 类型）
+                const DEFERRED: &[&str] = &["split"];
+                const MATH_BUILTINS: &[&str] = &["sqrt", "abs", "min", "max"];
+                let exports: Option<&[&str]> = match imp.module.as_str() {
+                    "io" => Some(&["println", "print"]),
+                    "string" => Some(STRING_BUILTINS),
+                    "math" => Some(MATH_BUILTINS),
+                    "list" | "json" | "map" => {
+                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.6 支持）", imp.module))
+                    }
+                    "file" | "env" => {
+                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.8 支持）", imp.module))
+                    }
+                    _ => None,
+                };
+                match exports {
+                    Some(list) => {
+                        for it in &imp.items {
+                            if DEFERRED.contains(&it.name.as_str()) {
+                                return Err(format!(
+                                    "WASM 后端暂不支持内置函数 '{}'（将在 7.6 支持）",
+                                    it.name
+                                ));
+                            }
+                            if !list.contains(&it.name.as_str()) {
+                                return Err(format!(
+                                    "WASM 编译：模块 '{}' 不导出符号 '{}'",
+                                    imp.module, it.name
+                                ));
+                            }
+                            if it.alias != it.name {
+                                cg.import_aliases.insert(it.alias.clone(), it.name.clone());
+                            }
+                            cg.available_builtins.insert(it.alias.clone());
+                        }
+                    }
+                    None => {
+                        return Err(format!("WASM 编译：未知模块 '{}'", imp.module));
+                    }
                 }
             }
         }
@@ -383,21 +451,23 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
     for item in &prog.items {
         if let Item::Fn(f) = item {
             let func = cg.compile_fn(f)?;
-            let slot = (cg.fn_idx[&f.name] - 5) as usize; // funcidx - 导入数 = funcs 下标
+            let slot = (cg.fn_idx[&f.name] - N_IMPORTS) as usize; // funcidx - 导入数 = funcs 下标
             cg.m.funcs[slot] = func;
         }
     }
 
-    // 收尾：funcref 表 + 数据段 + 堆指针全局（heap 从静态数据末尾开始，arena bump）
+    // 收尾：funcref 表 + 数据段 + 全局（hp 堆指针 + ftoa 64 字节 scratch 缓冲）
     if !cg.table_entries.is_empty() {
         let n = cg.table_entries.len() as u32;
         cg.m.table = Some((n, Some(n)));
         cg.m.elems = cg.table_entries.clone();
     }
-    let heap_base = cg.data.len() as u32;
+    let data_end = cg.data.len() as u32;
+    let heap_base = data_end + 64; // 64 字节 ftoa scratch（global 1）
     let pages = (heap_base / 65536) + 1;
     cg.m.memory_min_pages = Some(pages.max(1));
-    cg.m.globals.push(Global { ty: ValType::I32, mutable: true, init: heap_base as i64 });
+    cg.m.globals.push(Global { ty: ValType::I32, mutable: true, init: heap_base as i64 }); // global 0 = hp
+    cg.m.globals.push(Global { ty: ValType::I32, mutable: false, init: data_end as i64 }); // global 1 = ftoa buf
     cg.m.exports.push(("memory".into(), ExportKind::Memory, 0));
     let main_idx = cg.fn_idx["main"];
     cg.m.exports.push(("main".into(), ExportKind::Func, main_idx));
@@ -409,11 +479,21 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
 impl Codegen {
     fn new() -> Self {
         let mut m = Module::new();
-        // 静态数据开头：offset 0 = '\n'（rt_print 换行）；随后是 "<闭包>" 字面量（rt_print 的 tag5 分支用）
+        // 静态数据开头：offset 0 = '\n'（rt_print 换行）；随后是 "<闭包>"（rt_print tag5）
+        // 与 rt_display 用的 "true"/"false"/"()" 字面量
         let mut data: Vec<u8> = vec![b'\n'];
-        let closure_off = data.len() as u32;
-        data.extend(8u32.to_le_bytes()); // "<闭包>" = 8 字节 UTF-8
-        data.extend("<闭包>".as_bytes());
+        let mut str_off: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        fn intern_static(data: &mut Vec<u8>, str_off: &mut std::collections::HashMap<String, u32>, s: &str) -> u32 {
+            let off = data.len() as u32;
+            data.extend((s.len() as u32).to_le_bytes());
+            data.extend(s.as_bytes());
+            str_off.insert(s.to_string(), off);
+            off
+        }
+        let closure_off = intern_static(&mut data, &mut str_off, "<闭包>");
+        let true_off = intern_static(&mut data, &mut str_off, "true");
+        let false_off = intern_static(&mut data, &mut str_off, "false");
+        let unit_off = intern_static(&mut data, &mut str_off, "()");
         // 类型注册（add_type 自动去重）
         let ty_ii_unit = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![] });
         let ty_fi_unit = m.add_type(FuncType { params: vec![ValType::F64, ValType::I64], results: vec![] });
@@ -426,19 +506,22 @@ impl Codegen {
         let ty_i64_i64 = m.add_type(FuncType { params: vec![ValType::I64], results: vec![ValType::I64] });
         let ty_i64_i32 = m.add_type(FuncType { params: vec![ValType::I64], results: vec![ValType::I32] });
         let ty_i32_i32 = m.add_type(FuncType { params: vec![ValType::I32], results: vec![ValType::I32] });
+        let ty_ftoa = m.add_type(FuncType { params: vec![ValType::F64, ValType::I32], results: vec![ValType::I32] });
+        let ty_iii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64, ValType::I64], results: vec![ValType::I64] });
 
-        // 导入（funcidx 0-4）
+        // 导入（funcidx 0-5）
         for (name, ty) in [
             ("lom_print_int", ty_ii_unit),
             ("lom_print_float", ty_fi_unit),
             ("lom_print_bool", ty_ii_unit),
             ("lom_print_unit", ty_i_unit),
             ("lom_print", ty_pp_unit),
+            ("lom_ftoa", ty_ftoa),
         ] {
             m.imports.push(Import { module: "env".into(), name: name.into(), type_idx: ty });
         }
 
-        // 运行时 helper（funcidx 5-24；新增 helper 必须同步 FIRST_USER_FN 与上面的 RT_* 常量）
+        // 运行时 helper（funcidx 6-40；新增 helper 必须同步 FIRST_USER_FN 与上面的 RT_* 常量）
         let helpers: Vec<(u32, Vec<ValType>, Vec<u8>)> = vec![
             (ty_f_i64, vec![ValType::I64], build_box_f64()),
             (ty_i64_f, vec![], build_unbox_f64()),
@@ -449,10 +532,10 @@ impl Codegen {
             (ty_ii_i64, vec![], build_arith(ArithKind::Mul)),
             (ty_ii_i64, vec![], build_arith(ArithKind::Div)),
             (ty_ii_i64, vec![], build_arith(ArithKind::Mod)),
-            (ty_ii_i64, vec![], build_cmp(op::I64_LT_S, op::F64_LT)),
-            (ty_ii_i64, vec![], build_cmp(op::I64_GT_S, op::F64_GT)),
-            (ty_ii_i64, vec![], build_cmp(op::I64_LE_S, op::F64_LE)),
-            (ty_ii_i64, vec![], build_cmp(op::I64_GE_S, op::F64_GE)),
+            (ty_ii_i64, vec![], build_cmp(CmpKind::Lt)),
+            (ty_ii_i64, vec![], build_cmp(CmpKind::Gt)),
+            (ty_ii_i64, vec![], build_cmp(CmpKind::Le)),
+            (ty_ii_i64, vec![], build_cmp(CmpKind::Ge)),
             (ty_ii_i64, vec![], build_eq()),
             (ty_ii_i64, vec![], build_ne()),
             (ty_i64_i64, vec![], build_neg()),
@@ -460,6 +543,22 @@ impl Codegen {
             (ty_i64_i32, vec![], build_truthy()),
             (ty_ii_unit, vec![ValType::I32], build_print(closure_off)),
             (ty_i32_i32, vec![ValType::I32], build_alloc()),
+            // ===== 7.4：字符串 / stdlib =====
+            (ty_ii_i64, vec![ValType::I32; 6], build_str_concat()),
+            (ty_i64_i64, vec![], build_display(true_off, false_off, unit_off)),
+            (ty_i64_i64, vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], build_itoa()),
+            (ty_i64_i64, vec![ValType::I32; 4], build_str_len()),
+            (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], build_stoi()),
+            (ty_i64_i64, vec![ValType::I32; 7], build_trim()),
+            (ty_i64_i64, vec![ValType::I32; 5], build_case(true)),  // upper
+            (ty_i64_i64, vec![ValType::I32; 5], build_case(false)), // lower
+            (ty_ii_i64, vec![ValType::I32; 6], build_contains()),
+            (ty_ii_i64, vec![ValType::I32; 5], build_starts_ends(true)),
+            (ty_ii_i64, vec![ValType::I32; 5], build_starts_ends(false)),
+            (ty_iii_i64, vec![ValType::I32; 13], build_replace()),
+            (ty_ii_i32, vec![ValType::I32; 6], build_str_cmp()),
+            (ty_ii_i64, vec![ValType::I32; 5], build_str_char_at()),
+            (ty_f_i64, vec![ValType::I32; 3], build_ftoa_str()),
         ];
         for (ty, locals, body) in helpers {
             m.funcs.push(Function { type_idx: ty, locals, body });
@@ -469,6 +568,10 @@ impl Codegen {
         for v in ["Ok", "Err", "Some", "None"] {
             variant_names.insert(v.to_string());
         }
+        let mut available_builtins = std::collections::HashSet::new();
+        for b in ["println", "print"] {
+            available_builtins.insert(b.to_string());
+        }
         Codegen {
             m,
             fn_idx: std::collections::HashMap::new(),
@@ -476,8 +579,10 @@ impl Codegen {
             shim_idx: std::collections::HashMap::new(),
             table_entries: Vec::new(),
             variant_names,
+            import_aliases: std::collections::HashMap::new(),
+            available_builtins,
             data,
-            str_off: std::collections::HashMap::new(),
+            str_off,
             f64_off: std::collections::HashMap::new(),
         }
     }
@@ -613,39 +718,81 @@ impl Codegen {
                 Ok(())
             }
             Stmt::For { var, iter, body } => {
-                // 7.2 仅支持 for i in <Int>（0..n 语义）；String/List 迭代在 7.4/7.6
+                // 支持 for i in <Int>（0..n）与 for c in <String>（逐字符，7.4）；List 迭代在 7.6
                 let it = ctx.alloc();
                 let limit = ctx.alloc();
                 let cnt = ctx.alloc();
                 let var_idx = ctx.alloc();
                 self.compile_expr(ctx, a, iter)?;
                 a.lset(it);
-                // 运行时必须为 Int，否则 trap（与解释器"for 循环不支持迭代 X"对应，7.2 无结构化消息）
-                a.tag_is(it, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
-                a.lget(it).untag().lset(limit);
-                a.i64c(0).lset(cnt);
-                a.block();
-                ctx.labels.push(Label::Block);
-                a.loop_();
-                ctx.labels.push(Label::Loop);
-                a.lget(cnt).lget(limit).op(op::I64_GE_S);
-                let bd = ctx.break_depth();
-                a.br_if(bd);
-                a.lget(cnt).tag_int().lset(var_idx);
-                ctx.scopes.push(vec![(var.clone(), var_idx)]);
-                for s in &body.stmts {
-                    self.compile_stmt(ctx, a, s)?;
+                a.tag_is(it, TAG_INT).if_();
+                {
+                    // Int 迭代：0..n
+                    a.lget(it).untag().lset(limit);
+                    a.i64c(0).lset(cnt);
+                    a.block();
+                    ctx.labels.push(Label::Block);
+                    a.loop_();
+                    ctx.labels.push(Label::Loop);
+                    a.lget(cnt).lget(limit).op(op::I64_GE_S);
+                    let bd = ctx.break_depth();
+                    a.br_if(bd);
+                    a.lget(cnt).tag_int().lset(var_idx);
+                    ctx.scopes.push(vec![(var.clone(), var_idx)]);
+                    for s in &body.stmts {
+                        self.compile_stmt(ctx, a, s)?;
+                    }
+                    if let Some(e) = &body.tail {
+                        self.compile_expr(ctx, a, e)?;
+                        a.op(op::DROP);
+                    }
+                    ctx.scopes.pop();
+                    a.lget(cnt).i64c(1).op(op::I64_ADD).lset(cnt);
+                    a.br(ctx.depth(ctx.labels.len() - 1));
+                    ctx.labels.pop();
+                    a.end();
+                    ctx.labels.pop();
+                    a.end();
                 }
-                if let Some(e) = &body.tail {
-                    self.compile_expr(ctx, a, e)?;
-                    a.op(op::DROP);
+                a.else_();
+                {
+                    a.tag_is(it, TAG_STR).if_();
+                    {
+                        // String 迭代：按 UTF-8 字符（cnt = 字节偏移；步进 = 当前字符字节数）
+                        a.lget(it).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(limit);
+                        a.i64c(0).lset(cnt);
+                        a.block();
+                        ctx.labels.push(Label::Block);
+                        a.loop_();
+                        ctx.labels.push(Label::Loop);
+                        a.lget(cnt).lget(limit).op(op::I64_GE_S);
+                        let bd = ctx.break_depth();
+                        a.br_if(bd);
+                        a.lget(it).lget(cnt).call(RT_STR_CHAR_AT).lset(var_idx);
+                        ctx.scopes.push(vec![(var.clone(), var_idx)]);
+                        for s in &body.stmts {
+                            self.compile_stmt(ctx, a, s)?;
+                        }
+                        if let Some(e) = &body.tail {
+                            self.compile_expr(ctx, a, e)?;
+                            a.op(op::DROP);
+                        }
+                        ctx.scopes.pop();
+                        // cnt += 当前字符字节数（从 var 的字符串头读）
+                        a.lget(var_idx).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0)
+                            .op(op::I64_EXTEND_I32_S).lget(cnt).op(op::I64_ADD).lset(cnt);
+                        a.br(ctx.depth(ctx.labels.len() - 1));
+                        ctx.labels.pop();
+                        a.end();
+                        ctx.labels.pop();
+                        a.end();
+                    }
+                    a.else_();
+                    {
+                        a.op(op::UNREACHABLE); // List 等其他可迭代类型在 7.6
+                    }
+                    a.end();
                 }
-                ctx.scopes.pop();
-                a.lget(cnt).i64c(1).op(op::I64_ADD).lset(cnt);
-                a.br(ctx.depth(ctx.labels.len() - 1));
-                ctx.labels.pop();
-                a.end();
-                ctx.labels.pop();
                 a.end();
                 Ok(())
             }
@@ -838,27 +985,41 @@ impl Codegen {
 
     fn compile_call(&mut self, ctx: &mut FnCtx, a: &mut Asm, callee: &Expr, args: &[Expr]) -> Result<(), String> {
         if let Expr::Ident(name) = callee {
+            let orig: &str = name;
+            // 导入别名解析（log → println 等）；变体/用户函数/闭包判断用 orig，内建分派用真名 real
+            // real 用 owned String 避免借用 self 卡住后续可变调用
+            let real: String = self.import_aliases.get(orig).cloned().unwrap_or_else(|| orig.to_string());
             // 顺序对齐解释器 eval_call：变体（未被遮蔽）→ 内建 → 用户函数 → 闭包变量
-            if self.variant_names.contains(name.as_str())
-                && ctx.lookup(name).is_none()
-                && ctx.capture_slot(name).is_none()
+            if self.variant_names.contains(orig)
+                && ctx.lookup(orig).is_none()
+                && ctx.capture_slot(orig).is_none()
             {
-                return unsupported(&format!("枚举变体构造 '{}(...)'", name), "Phase 7.5");
+                return unsupported(&format!("枚举变体构造 '{}(...)'", orig), "Phase 7.5");
             }
             // println / print（prelude）
-            if name == "println" || name == "print" {
+            if real == "println" || real == "print" {
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：{} 期望 1 个参数，得到 {} 个", name, args.len()));
+                    return Err(format!("WASM 编译：{} 期望 1 个参数，得到 {} 个", orig, args.len()));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
-                a.i64c(if name == "println" { 1 } else { 0 });
+                a.i64c(if real == "println" { 1 } else { 0 });
                 a.call(RT_PRINT);
                 a.i64c(V_UNIT); // println 返回 Unit
                 return Ok(());
             }
+            // 内建函数（string/math，7.4）：可用性看导入时的名字（orig），分派用真名（real）
+            if self.available_builtins.contains(orig) {
+                if self.compile_builtin(ctx, a, real.as_str(), args)? {
+                    return Ok(());
+                }
+                return Err(format!(
+                    "WASM 后端暂不支持内置函数 '{}'（split/list/json/map/file/env 系列在 7.6/7.8 提供）",
+                    real
+                ));
+            }
             // 用户函数（具名直调；注意解释器里具名函数优先于同名闭包变量，保持一致）
-            if let Some(&idx) = self.fn_idx.get(name.as_str()) {
-                self.check_arity(name, args.len())?;
+            if let Some(&idx) = self.fn_idx.get(orig) {
+                self.check_arity(orig, args.len())?;
                 for arg in args {
                     self.compile_expr(ctx, a, arg)?;
                 }
@@ -866,16 +1027,151 @@ impl Codegen {
                 return Ok(());
             }
             // 闭包变量调用
-            if ctx.lookup(name).is_some() || ctx.capture_slot(name).is_some() {
+            if ctx.lookup(orig).is_some() || ctx.capture_slot(orig).is_some() {
                 return self.emit_closure_call(ctx, a, callee, args);
             }
             return Err(format!(
-                "WASM 后端暂不支持内置函数 '{}'（7.3 仅 println/print + 用户函数 + 闭包调用；其余在 7.4+ 提供）",
-                name
+                "WASM 编译：未定义函数或内建未导入 '{}'（string/math 内建需 from ... import 显式导入）",
+                orig
             ));
         }
         // 任意表达式 callee（如 make_adder(5)(10)）——闭包调用
         self.emit_closure_call(ctx, a, callee, args)
+    }
+
+    /// 7.4 内建函数编译（调用点已确认名字已导入可用）。返回 Ok(true)=已处理。
+    /// 类型检查策略：tag 不符即 trap（对齐解释器运行时错误；结构化错误消息在 7.9 对齐）。
+    fn compile_builtin(&mut self, ctx: &mut FnCtx, a: &mut Asm, name: &str, args: &[Expr]) -> Result<bool, String> {
+        // 单字符串参数辅助：编译 + tag 检查 + call helper
+        let str_unary = |cg: &mut Self, ctx: &mut FnCtx, a: &mut Asm, args: &[Expr], helper: u32, what: &str| -> Result<(), String> {
+            if args.len() != 1 {
+                return Err(format!("WASM 编译：{} 期望 1 个参数，得到 {} 个", what, args.len()));
+            }
+            cg.compile_expr(ctx, a, &args[0])?;
+            let s = ctx.alloc();
+            a.lset(s);
+            a.tag_is(s, TAG_STR).if_().else_().op(op::UNREACHABLE).end();
+            a.lget(s).call(helper);
+            Ok(())
+        };
+        match name {
+            "len" => str_unary(self, ctx, a, args, RT_STR_LEN, "len")?,
+            "int_to_string" => {
+                if args.len() != 1 {
+                    return Err(format!("WASM 编译：int_to_string 期望 1 个参数，得到 {} 个", args.len()));
+                }
+                self.compile_expr(ctx, a, &args[0])?;
+                let s = ctx.alloc();
+                a.lset(s);
+                a.tag_is(s, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
+                a.lget(s).call(RT_ITOA);
+            }
+            "string_to_int" => str_unary(self, ctx, a, args, RT_STOI, "string_to_int")?,
+            "trim" => str_unary(self, ctx, a, args, RT_TRIM, "trim")?,
+            "upper" => str_unary(self, ctx, a, args, RT_UPPER, "upper")?,
+            "lower" => str_unary(self, ctx, a, args, RT_LOWER, "lower")?,
+            "contains" | "starts_with" | "ends_with" | "replace" => {
+                let (want, helper) = match name {
+                    "contains" => (2, RT_CONTAINS),
+                    "starts_with" => (2, RT_STARTS),
+                    "ends_with" => (2, RT_ENDS),
+                    _ => (3, RT_REPLACE),
+                };
+                if args.len() != want {
+                    return Err(format!("WASM 编译：{} 期望 {} 个参数，得到 {} 个", name, want, args.len()));
+                }
+                // 每个参数只求值一次：先进 scratch（带 tag 检查），再按序压栈
+                let mut scratches = Vec::new();
+                for arg in args {
+                    self.compile_expr(ctx, a, arg)?;
+                    let s = ctx.alloc();
+                    a.lset(s);
+                    a.tag_is(s, TAG_STR).if_().else_().op(op::UNREACHABLE).end();
+                    scratches.push(s);
+                }
+                for s in scratches {
+                    a.lget(s);
+                }
+                a.call(helper);
+            }
+            "sqrt" => {
+                // Int/Float → Float（promote 内部对非数值 trap）
+                if args.len() != 1 {
+                    return Err(format!("WASM 编译：sqrt 期望 1 个参数，得到 {} 个", args.len()));
+                }
+                self.compile_expr(ctx, a, &args[0])?;
+                a.call(RT_PROMOTE_F64).op(op::F64_SQRT).call(RT_BOX_F64);
+            }
+            "abs" => {
+                // Int→Int（无分支绝对值：(v^(v>>63))-(v>>63)）；Float→Float
+                if args.len() != 1 {
+                    return Err(format!("WASM 编译：abs 期望 1 个参数，得到 {} 个", args.len()));
+                }
+                self.compile_expr(ctx, a, &args[0])?;
+                let s = ctx.alloc();
+                a.lset(s);
+                a.tag_is(s, TAG_INT).if_i64();
+                {
+                    a.lget(s).untag(); // v
+                    a.lget(s).untag().i64c(63).op(op::I64_SHR_S); // t = v>>63
+                    a.op(op::I64_XOR); // v^t
+                    a.lget(s).untag().i64c(63).op(op::I64_SHR_S); // t
+                    a.op(op::I64_SUB).tag_int();
+                }
+                a.else_();
+                {
+                    a.tag_is(s, TAG_F64).if_i64();
+                    {
+                        a.lget(s).call(RT_UNBOX_F64).op(op::F64_ABS).call(RT_BOX_F64);
+                    }
+                    a.else_().op(op::UNREACHABLE).end();
+                }
+                a.end();
+            }
+            "min" | "max" => {
+                // 同类型对（Int,Int）/（Float,Float)；混合 trap（对齐解释器）
+                if args.len() != 2 {
+                    return Err(format!("WASM 编译：{} 期望 2 个参数，得到 {} 个", name, args.len()));
+                }
+                let (i64cmp, f64op) = if name == "min" {
+                    (op::I64_LT_S, op::F64_MIN)
+                } else {
+                    (op::I64_GT_S, op::F64_MAX)
+                };
+                let sa = ctx.alloc();
+                let sb = ctx.alloc();
+                self.compile_expr(ctx, a, &args[0])?;
+                a.lset(sa);
+                self.compile_expr(ctx, a, &args[1])?;
+                a.lset(sb);
+                a.tag_is(sa, TAG_INT).if_i64();
+                {
+                    a.tag_is(sb, TAG_INT).if_i64();
+                    {
+                        // select(a, b, a<b) —— min；max 用 a>b
+                        a.lget(sa).untag().lget(sb).untag();
+                        a.lget(sa).untag().lget(sb).untag().op(i64cmp);
+                        a.op(op::SELECT).tag_int();
+                    }
+                    a.else_().op(op::UNREACHABLE).end();
+                }
+                a.else_();
+                {
+                    a.tag_is(sa, TAG_F64).if_i64();
+                    {
+                        a.tag_is(sb, TAG_F64).if_i64();
+                        {
+                            a.lget(sa).call(RT_UNBOX_F64).lget(sb).call(RT_UNBOX_F64).op(f64op).call(RT_BOX_F64);
+                        }
+                        a.else_().op(op::UNREACHABLE).end();
+                    }
+                    a.else_().op(op::UNREACHABLE).end();
+                    a.end();
+                }
+            }
+            _ => return Ok(false),
+        }
+        Ok(true)
     }
 
     fn check_arity(&self, name: &str, got: usize) -> Result<(), String> {
@@ -944,8 +1240,28 @@ fn emit_float_path(a: &mut Asm, kind: ArithKind) {
 
 /// rt_add/sub/mul/div/mod: (i64 l, i64 r) -> i64
 /// Int/Int 走整数路径；含 Float 走 promote 路径；其他组合 trap
+/// Add 特例（v0.4.1 拼接提升）：任一侧是 Str → 两侧 to_display 后拼接
 fn build_arith(kind: ArithKind) -> Vec<u8> {
     let mut a = Asm::new();
+    if matches!(kind, ArithKind::Add) {
+        // tag4(l) or tag4(r) → concat(display(l), display(r))
+        a.lget(0).tag().i64c(TAG_STR).op(op::I64_EQ);
+        a.lget(1).tag().i64c(TAG_STR).op(op::I64_EQ);
+        a.op(op::I32_OR).if_i64();
+        {
+            a.lget(0).call(RT_DISPLAY).lget(1).call(RT_DISPLAY).call(RT_STR_CONCAT);
+        }
+        a.else_();
+        build_arith_numeric(&mut a, kind);
+        a.end();
+        return a.b;
+    }
+    build_arith_numeric(&mut a, kind);
+    a.b
+}
+
+/// 算术的数值路径（Int/Int → 整数；含 F64 → promote；其他 trap）
+fn build_arith_numeric(a: &mut Asm, kind: ArithKind) {
     a.tag_is(0, TAG_INT).if_i64();
     {
         a.tag_is(1, TAG_INT).if_i64();
@@ -955,7 +1271,7 @@ fn build_arith(kind: ArithKind) -> Vec<u8> {
         a.else_();
         {
             a.tag_is(1, TAG_F64).if_i64();
-            emit_float_path(&mut a, kind);
+            emit_float_path(a, kind);
             a.else_().op(op::UNREACHABLE).end();
         }
         a.end();
@@ -965,11 +1281,11 @@ fn build_arith(kind: ArithKind) -> Vec<u8> {
         a.tag_is(0, TAG_F64).if_i64();
         {
             a.tag_is(1, TAG_INT).if_i64();
-            emit_float_path(&mut a, kind);
+            emit_float_path(a, kind);
             a.else_();
             {
                 a.tag_is(1, TAG_F64).if_i64();
-                emit_float_path(&mut a, kind);
+                emit_float_path(a, kind);
                 a.else_().op(op::UNREACHABLE).end();
             }
             a.end();
@@ -977,19 +1293,55 @@ fn build_arith(kind: ArithKind) -> Vec<u8> {
         a.else_().op(op::UNREACHABLE).end();
     }
     a.end();
-    a.b
+}
+
+/// 比较种类（7.4 重构：build_cmp 按种类选 i64/f64/i32 三套 opcode）
+#[derive(Clone, Copy)]
+enum CmpKind {
+    Lt,
+    Gt,
+    Le,
+    Ge,
+}
+
+impl CmpKind {
+    fn i64_op(self) -> u8 {
+        match self {
+            CmpKind::Lt => op::I64_LT_S,
+            CmpKind::Gt => op::I64_GT_S,
+            CmpKind::Le => op::I64_LE_S,
+            CmpKind::Ge => op::I64_GE_S,
+        }
+    }
+    fn f64_op(self) -> u8 {
+        match self {
+            CmpKind::Lt => op::F64_LT,
+            CmpKind::Gt => op::F64_GT,
+            CmpKind::Le => op::F64_LE,
+            CmpKind::Ge => op::F64_GE,
+        }
+    }
+    /// 对 rt_str_cmp 的 -1/0/1 结果做判断（i32 与 0 比较）
+    fn i32_op(self) -> u8 {
+        match self {
+            CmpKind::Lt => op::I32_LT_S,
+            CmpKind::Gt => op::I32_GT_S,
+            CmpKind::Le => op::I32_LE_S,
+            CmpKind::Ge => op::I32_GE_S,
+        }
+    }
 }
 
 /// rt_lt/gt/le/ge: (i64 l, i64 r) -> i64(Bool)
-/// Int/Int、F64/F64、Bool/Bool 三组同类型对（对齐解释器 eval_compare：混合类型报错→trap）
-/// 注意：字符串大小比较 7.2 不支持（trap）；==/!= 走 build_eq 支持字符串
-fn build_cmp(int_op: u8, f64_op: u8) -> Vec<u8> {
+/// Int/Int、F64/F64、Bool/Bool、Str/Str（7.4 起，字节序对齐 Rust str Ord）四组同类型对
+/// （对齐解释器 eval_compare：混合类型报错→trap）
+fn build_cmp(kind: CmpKind) -> Vec<u8> {
     let mut a = Asm::new();
     a.tag_is(0, TAG_INT).if_i64();
     {
         a.tag_is(1, TAG_INT).if_i64();
         {
-            a.lget(0).untag().lget(1).untag().op(int_op).bool_tag();
+            a.lget(0).untag().lget(1).untag().op(kind.i64_op()).bool_tag();
         }
         a.else_().op(op::UNREACHABLE).end();
     }
@@ -999,7 +1351,7 @@ fn build_cmp(int_op: u8, f64_op: u8) -> Vec<u8> {
         {
             a.tag_is(1, TAG_F64).if_i64();
             {
-                a.lget(0).call(RT_UNBOX_F64).lget(1).call(RT_UNBOX_F64).op(f64_op).bool_tag();
+                a.lget(0).call(RT_UNBOX_F64).lget(1).call(RT_UNBOX_F64).op(kind.f64_op()).bool_tag();
             }
             a.else_().op(op::UNREACHABLE).end();
         }
@@ -1010,11 +1362,24 @@ fn build_cmp(int_op: u8, f64_op: u8) -> Vec<u8> {
             {
                 a.tag_is(1, TAG_BOOL).if_i64();
                 {
-                    a.lget(0).lget(1).op(int_op).bool_tag();
+                    a.lget(0).lget(1).op(kind.i64_op()).bool_tag();
                 }
                 a.else_().op(op::UNREACHABLE).end();
             }
-            a.else_().op(op::UNREACHABLE).end();
+            a.else_();
+            {
+                // Str/Str：字节序比较（7.4）
+                a.tag_is(0, TAG_STR).if_i64();
+                {
+                    a.tag_is(1, TAG_STR).if_i64();
+                    {
+                        a.lget(0).lget(1).call(RT_STR_CMP).i32c(0).op(kind.i32_op()).bool_tag();
+                    }
+                    a.else_().op(op::UNREACHABLE).end();
+                }
+                a.else_().op(op::UNREACHABLE).end();
+            }
+            a.end();
         }
         a.end();
     }
@@ -1244,6 +1609,712 @@ fn build_str_eq() -> Vec<u8> {
     a.b
 }
 
+// ===== 7.4：字符串 / stdlib helper 函数体 =====
+
+/// 发射：tagged Str 参数 → 堆指针（i32）存入 local
+fn emit_str_ptr(a: &mut Asm, param: u32, local: u32) {
+    a.lget(param).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(local);
+}
+
+/// rt_str_concat: (i64 a, i64 b) -> i64
+/// locals: 2=pa, 3=pb, 4=la, 5=lb, 6=pout, 7=i（全 i32）
+fn build_str_concat() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 3);
+    a.lget(2).i32_load(0).lset(4); // la
+    a.lget(3).i32_load(0).lset(5); // lb
+    // pout = alloc(4 + la + lb)
+    a.lget(4).lget(5).op(op::I32_ADD).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(6);
+    a.lget(6).lget(4).lget(5).op(op::I32_ADD).i32_store(0);
+    // copy a
+    a.i32c(0).lset(7);
+    a.block();
+    a.loop_();
+    {
+        a.lget(7).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(6).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD); // dest = pout+4+i
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0); // byte
+        a.i32_store8(0);
+        a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // copy b（dest 偏移 la）
+    a.i32c(0).lset(7);
+    a.block();
+    a.loop_();
+    {
+        a.lget(7).lget(5).op(op::I32_GE_U).br_if(1);
+        a.lget(6).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
+        a.lget(3).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// rt_display: (i64 v) -> i64 Str；对齐解释器 to_display
+/// Int→itoa，F64→ftoa，Bool→"true"/"false"，Unit→"()"，Str→原样
+fn build_display(true_off: u32, false_off: u32, unit_off: u32) -> Vec<u8> {
+    let tag_str_of = |off: u32| -> i64 { ((off as i64) << 3) | TAG_STR };
+    let mut a = Asm::new();
+    a.tag_is(0, TAG_INT).if_i64();
+    {
+        a.lget(0).call(RT_ITOA);
+    }
+    a.else_();
+    {
+        a.tag_is(0, TAG_STR).if_i64();
+        {
+            a.lget(0); // Str 原样
+        }
+        a.else_();
+        {
+            a.tag_is(0, TAG_BOOL).if_i64();
+            {
+                // (v>>3)!=0 → true
+                a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).if_i64();
+                a.i64c(tag_str_of(true_off));
+                a.else_();
+                a.i64c(tag_str_of(false_off));
+                a.end();
+            }
+            a.else_();
+            {
+                a.tag_is(0, TAG_UNIT).if_i64();
+                {
+                    a.i64c(tag_str_of(unit_off));
+                }
+                a.else_();
+                {
+                    a.tag_is(0, TAG_F64).if_i64();
+                    {
+                        a.lget(0).call(RT_UNBOX_F64).call(RT_FTOA_STR);
+                    }
+                    a.else_().op(op::UNREACHABLE).end(); // List/Map/闭包等的 display 在 7.6
+                }
+                a.end();
+            }
+            a.end();
+        }
+        a.end();
+    }
+    a.end();
+    a.b
+}
+
+/// rt_itoa: (i64 tagged Int) -> i64 Str
+/// locals: 1=mag(i64), 2=pos(i32), 3=neg(i32), 4=len(i32), 5=p(i32), 6=i(i32)
+/// 数字倒序写入 ftoa scratch 尾部（global 1 + 64 处往前），再正向拷到堆对象
+fn build_itoa() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).untag().lset(1); // 原值
+    // neg = n < 0
+    a.lget(1).i64c(0).op(op::I64_LT_S).lset(3);
+    // mag = neg ? 0 - n : n（wrapping，覆盖 i64::MIN）
+    a.lget(3).if_i64();
+    a.i64c(0).lget(1).op(op::I64_SUB);
+    a.else_();
+    a.lget(1);
+    a.end();
+    a.lset(1);
+    // pos = buf + 64（从尾部往前写）
+    a.gget(1).i32c(64).op(op::I32_ADD).lset(2);
+    // do-while：写数字
+    a.loop_();
+    {
+        a.lget(2).i32c(1).op(op::I32_SUB).lset(2);
+        a.lget(2).lget(1).i64c(10).op(op::I64_REM_U).i64c(48).op(op::I64_ADD).op(op::I32_WRAP_I64).i32_store8(0);
+        a.lget(1).i64c(10).op(op::I64_DIV_U).lset(1);
+        a.lget(1).i64c(0).op(op::I64_GT_U).br_if(0);
+    }
+    a.end();
+    // 负号
+    a.lget(3).if_();
+    {
+        a.lget(2).i32c(1).op(op::I32_SUB).lset(2);
+        a.lget(2).i32c(45).i32_store8(0);
+    }
+    a.end();
+    // len = (buf+64) - pos
+    a.gget(1).i32c(64).op(op::I32_ADD).lget(2).op(op::I32_SUB).lset(4);
+    // p = alloc(4 + len)；store len；正向拷贝
+    a.lget(4).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(5);
+    a.lget(5).lget(4).i32_store(0);
+    a.i32c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(5).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD);
+        a.lget(2).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// rt_ftoa_str: (f64) -> i64 Str；经宿主 lom_ftoa 导入写 scratch，再拷到堆对象
+/// locals: 1=len, 2=p, 3=i（全 i32）
+fn build_ftoa_str() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).gget(1).call(IMP_FTOA).lset(1); // len = ftoa(v, buf)
+    a.lget(1).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(2);
+    a.lget(2).lget(1).i32_store(0);
+    a.i32c(0).lset(3);
+    a.block();
+    a.loop_();
+    {
+        a.lget(3).lget(1).op(op::I32_GE_U).br_if(1);
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD);
+        a.gget(1).lget(3).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(2).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// rt_str_len: (i64 Str) -> i64 Int；字符数 = 非 UTF-8 续字节计数（对齐 chars().count()）
+/// locals: 1=ptr, 2=len, 3=i, 4=count（全 i32）
+fn build_str_len() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 1);
+    a.lget(1).i32_load(0).lset(2);
+    a.i32c(0).lset(3).i32c(0).lset(4);
+    a.block();
+    a.loop_();
+    {
+        a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
+        // (b & 0xC0) != 0x80 → count++（非续字节 = 字符头）
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0);
+        a.i32c(0xC0).op(op::I32_AND).i32c(0x80).op(op::I32_NE).if_();
+        {
+            a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
+        }
+        a.end();
+        a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(4).op(op::I64_EXTEND_I32_S).tag_int();
+    a.b
+}
+
+/// rt_stoi: (i64 Str) -> i64；解析 [+-]?digits，失败/溢出返回 Unit（对齐解释器）
+/// locals: 1=ptr, 2=len, 3=i, 4=neg, 5=c（全 i32），6=acc（i64）
+fn build_stoi() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 1);
+    a.lget(1).i32_load(0).lset(2);
+    // 空串 → Unit
+    a.lget(2).op(op::I32_EQZ).if_();
+    a.i64c(V_UNIT).op(op::RETURN);
+    a.end();
+    a.i32c(0).lset(3).i32c(0).lset(4);
+    // 符号
+    a.lget(1).i32_load8_u(4).i32c(45).op(op::I32_EQ).if_(); // '-'
+    {
+        a.i32c(1).lset(4).i32c(1).lset(3);
+    }
+    a.else_();
+    {
+        a.lget(1).i32_load8_u(4).i32c(43).op(op::I32_EQ).if_(); // '+'
+        a.i32c(1).lset(3);
+        a.end();
+    }
+    a.end();
+    // 只有符号位 → Unit
+    a.lget(3).lget(2).op(op::I32_EQ).if_();
+    a.i64c(V_UNIT).op(op::RETURN);
+    a.end();
+    // 数字循环
+    a.i64c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
+        // c = byte - 48；c >u 9 → Unit（无符号比较同时挡掉负数）
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(48).op(op::I32_SUB).lset(5);
+        a.lget(5).i32c(9).op(op::I32_GT_U).if_();
+        a.i64c(V_UNIT).op(op::RETURN);
+        a.end();
+        // 溢出预检：acc >u (u64::MAX-9)/10 = 1844674407370955161 → Unit
+        a.lget(6).i64c(1844674407370955161).op(op::I64_GT_U).if_();
+        a.i64c(V_UNIT).op(op::RETURN);
+        a.end();
+        a.lget(6).i64c(10).op(op::I64_MUL).lget(5).op(op::I64_EXTEND_I32_S).op(op::I64_ADD).lset(6);
+        a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 范围检查 + 符号
+    a.lget(4).if_i64();
+    {
+        // neg：acc >u 2^63（位型 = i64::MIN）→ Unit；否则 0 - acc
+        a.lget(6).i64c(i64::MIN).op(op::I64_GT_U).if_();
+        a.i64c(V_UNIT).op(op::RETURN);
+        a.end();
+        a.i64c(0).lget(6).op(op::I64_SUB).tag_int();
+    }
+    a.else_();
+    {
+        a.lget(6).i64c(i64::MAX).op(op::I64_GT_U).if_();
+        a.i64c(V_UNIT).op(op::RETURN);
+        a.end();
+        a.lget(6).tag_int();
+    }
+    a.end();
+    a.b
+}
+
+/// 发射"byte 在 local `b` 是 ASCII 空白（32/9/10/13）"的 i32 条件
+fn emit_is_ws(a: &mut Asm, b: u32) {
+    a.lget(b).i32c(32).op(op::I32_EQ);
+    a.lget(b).i32c(9).op(op::I32_EQ).op(op::I32_OR);
+    a.lget(b).i32c(10).op(op::I32_EQ).op(op::I32_OR);
+    a.lget(b).i32c(13).op(op::I32_EQ).op(op::I32_OR);
+}
+
+/// rt_trim: (i64 Str) -> i64；ASCII 空白（与解释器 Unicode trim 的差异已记录）
+/// locals: 1=ptr, 2=len, 3=start, 4=end, 5=b, 6=pout, 7=i（全 i32）
+fn build_trim() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 1);
+    a.lget(1).i32_load(0).lset(2);
+    a.i32c(0).lset(3);
+    a.lget(2).lset(4);
+    // 前扫
+    a.block();
+    a.loop_();
+    {
+        a.lget(3).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).lset(5);
+        emit_is_ws(&mut a, 5);
+        a.op(op::I32_EQZ).br_if(1); // 非空白 → 停
+        a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 后扫
+    a.block();
+    a.loop_();
+    {
+        a.lget(4).lget(3).op(op::I32_LE_S).br_if(1);
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).i32c(1).op(op::I32_SUB).i32_load8_u(0).lset(5);
+        emit_is_ws(&mut a, 5);
+        a.op(op::I32_EQZ).br_if(1);
+        a.lget(4).i32c(1).op(op::I32_SUB).lset(4);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // out = alloc(4 + (end-start))
+    a.lget(4).lget(3).op(op::I32_SUB).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(6);
+    a.lget(6).lget(4).lget(3).op(op::I32_SUB).i32_store(0);
+    a.i32c(0).lset(7);
+    a.block();
+    a.loop_();
+    {
+        a.lget(7).lget(4).lget(3).op(op::I32_SUB).op(op::I32_GE_U).br_if(1);
+        a.lget(6).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// rt_upper/rt_lower: (i64 Str) -> i64；ASCII-only（与解释器 Unicode 大小写的差异已记录）
+/// locals: 1=ptr, 2=len, 3=i, 4=pout, 5=b（全 i32）
+fn build_case(upper: bool) -> Vec<u8> {
+    let (lo, hi) = if upper { (97, 122) } else { (65, 90) };
+    let delta: i32 = if upper { -32 } else { 32 };
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 1);
+    a.lget(1).i32_load(0).lset(2);
+    a.lget(2).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(4);
+    a.lget(4).lget(2).i32_store(0);
+    a.i32c(0).lset(3);
+    a.block();
+    a.loop_();
+    {
+        a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
+        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).lset(5);
+        // dest 地址先压栈
+        a.lget(4).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD);
+        // value：在范围内则 ±32
+        a.lget(5).i32c(lo).op(op::I32_GE_S);
+        a.lget(5).i32c(hi).op(op::I32_LE_S);
+        a.op(op::I32_AND).if_i32();
+        a.lget(5).i32c(delta).op(op::I32_ADD);
+        a.else_();
+        a.lget(5);
+        a.end();
+        a.i32_store8(0);
+        a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(4).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// rt_contains: (i64 s, i64 sub) -> i64 Bool；朴素子串查找
+/// locals: 2=ps, 3=ls, 4=psub, 5=lsub, 6=i, 7=j（全 i32）
+fn build_contains() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 4);
+    a.lget(2).i32_load(0).lset(3);
+    a.lget(4).i32_load(0).lset(5);
+    // lsub == 0 → true；lsub > ls → false
+    a.lget(5).op(op::I32_EQZ).if_();
+    a.i64c(V_TRUE).op(op::RETURN);
+    a.end();
+    a.lget(5).lget(3).op(op::I32_GT_S).if_();
+    a.i64c(V_FALSE).op(op::RETURN);
+    a.end();
+    a.i32c(0).lset(6);
+    a.block(); // $done
+    a.loop_();
+    {
+        // i + lsub > ls → break
+        a.lget(6).lget(5).op(op::I32_ADD).lget(3).op(op::I32_GT_S).br_if(1);
+        // j 扫描：全部相等 → return true
+        a.i32c(0).lset(7);
+        a.block(); // $next
+        a.loop_();
+        {
+            a.lget(7).lget(5).op(op::I32_GE_U).if_();
+            a.i64c(V_TRUE).op(op::RETURN);
+            a.end();
+            a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+            a.lget(4).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+            a.op(op::I32_NE).br_if(1); // 不等 → 下一个 i
+            a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i64c(V_FALSE);
+    a.b
+}
+
+/// rt_starts_with / rt_ends_with: (i64 s, i64 sub) -> i64 Bool
+/// locals: 2=ps, 3=ls, 4=psub, 5=lsub, 6=i（全 i32）
+fn build_starts_ends(is_starts: bool) -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 4);
+    a.lget(2).i32_load(0).lset(3);
+    a.lget(4).i32_load(0).lset(5);
+    // lsub > ls → false
+    a.lget(5).lget(3).op(op::I32_GT_S).if_();
+    a.i64c(V_FALSE).op(op::RETURN);
+    a.end();
+    a.i32c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(5).op(op::I32_GE_U).br_if(1);
+        // s 侧偏移：starts 是 i；ends 是 (ls-lsub)+i
+        a.lget(2).i32c(4).op(op::I32_ADD);
+        if !is_starts {
+            a.lget(3).lget(5).op(op::I32_SUB);
+            a.op(op::I32_ADD); // ps+4 + (ls-lsub)——曾漏这一个 ADD（地址算成 (ls-lsub)+i）
+        }
+        a.lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.op(op::I32_NE).if_();
+        a.i64c(V_FALSE).op(op::RETURN);
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i64c(V_TRUE);
+    a.b
+}
+
+/// rt_replace: (i64 s, i64 from, i64 to) -> i64 Str；全量替换（两遍扫描）
+/// locals: 3=ps, 4=ls, 5=pf, 6=lf, 7=pt, 8=lt, 9=i, 10=j, 11=cnt, 12=olen, 13=pout, 14=o, 15=mf
+fn build_replace() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 3);
+    emit_str_ptr(&mut a, 1, 5);
+    emit_str_ptr(&mut a, 2, 7);
+    a.lget(3).i32_load(0).lset(4); // ls
+    a.lget(5).i32_load(0).lset(6); // lf
+    a.lget(7).i32_load(0).lset(8); // lt
+    // 特例：from 为空（Rust 语义：每个间隙插入 to，含两端）
+    a.lget(6).op(op::I32_EQZ).if_();
+    {
+        // olen = ls + lt * (ls + 1)
+        a.lget(4).lget(8).lget(4).i32c(1).op(op::I32_ADD).op(op::I32_MUL).op(op::I32_ADD).lset(12);
+        a.lget(12).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(13);
+        a.lget(13).lget(12).i32_store(0);
+        a.i32c(0).lset(9); // i
+        a.i32c(0).lset(14); // o
+        a.block();
+        a.loop_();
+        {
+            a.lget(9).lget(4).op(op::I32_GT_S).br_if(1); // i in 0..=ls
+            // 写 to
+            a.i32c(0).lset(10);
+            a.block();
+            a.loop_();
+            {
+                a.lget(10).lget(8).op(op::I32_GE_U).br_if(1);
+                a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
+                a.lget(7).i32c(4).op(op::I32_ADD).lget(10).op(op::I32_ADD).i32_load8_u(0);
+                a.i32_store8(0);
+                a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
+                a.lget(10).i32c(1).op(op::I32_ADD).lset(10);
+                a.br(0);
+            }
+            a.end();
+            a.end();
+            // 写 s[i]（i < ls 时）
+            a.lget(9).lget(4).op(op::I32_LT_S).if_();
+            {
+                a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
+                a.lget(3).i32c(4).op(op::I32_ADD).lget(9).op(op::I32_ADD).i32_load8_u(0);
+                a.i32_store8(0);
+                a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
+            }
+            a.end();
+            a.lget(9).i32c(1).op(op::I32_ADD).lset(9);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        a.lget(13).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR).op(op::RETURN);
+    }
+    a.end();
+    // pass 1：数非重叠匹配
+    a.i32c(0).lset(9).i32c(0).lset(11);
+    a.block();
+    a.loop_();
+    {
+        // i + lf > ls → break
+        a.lget(9).lget(6).op(op::I32_ADD).lget(4).op(op::I32_GT_S).br_if(1);
+        // match_at(i) → mf
+        emit_match_at(&mut a, 3, 5, 6, 9, 10, 15);
+        a.lget(15).if_();
+        {
+            a.lget(11).i32c(1).op(op::I32_ADD).lset(11);
+            a.lget(9).lget(6).op(op::I32_ADD).lset(9);
+        }
+        a.else_();
+        {
+            a.lget(9).i32c(1).op(op::I32_ADD).lset(9);
+        }
+        a.end();
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // olen = ls - cnt*lf + cnt*lt
+    a.lget(4).lget(11).lget(6).op(op::I32_MUL).op(op::I32_SUB).lget(11).lget(8).op(op::I32_MUL).op(op::I32_ADD).lset(12);
+    a.lget(12).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(13);
+    a.lget(13).lget(12).i32_store(0);
+    // pass 2：填充
+    a.i32c(0).lset(9).i32c(0).lset(14);
+    a.block();
+    a.loop_();
+    {
+        a.lget(9).lget(4).op(op::I32_GE_U).br_if(1); // i >= ls → done
+        // 可匹配？
+        a.lget(9).lget(6).op(op::I32_ADD).lget(4).op(op::I32_LE_S).if_();
+        {
+            emit_match_at(&mut a, 3, 5, 6, 9, 10, 15);
+        }
+        a.else_();
+        {
+            a.i32c(0).lset(15);
+        }
+        a.end();
+        a.lget(15).if_();
+        {
+            // 写 to 全文
+            a.i32c(0).lset(10);
+            a.block();
+            a.loop_();
+            {
+                a.lget(10).lget(8).op(op::I32_GE_U).br_if(1);
+                a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
+                a.lget(7).i32c(4).op(op::I32_ADD).lget(10).op(op::I32_ADD).i32_load8_u(0);
+                a.i32_store8(0);
+                a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
+                a.lget(10).i32c(1).op(op::I32_ADD).lset(10);
+                a.br(0);
+            }
+            a.end();
+            a.end();
+            a.lget(9).lget(6).op(op::I32_ADD).lset(9);
+        }
+        a.else_();
+        {
+            // 抄一个字节
+            a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
+            a.lget(3).i32c(4).op(op::I32_ADD).lget(9).op(op::I32_ADD).i32_load8_u(0);
+            a.i32_store8(0);
+            a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
+            a.lget(9).i32c(1).op(op::I32_ADD).lset(9);
+        }
+        a.end();
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(13).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// 发射 match_at(i)：ps 从偏移 i 起与 pf 逐字节比较（lf 长度），结果(1/0)写 local mf
+/// 参数：ps/lf/i/j/mf 的 local 编号
+fn emit_match_at(a: &mut Asm, ps: u32, pf: u32, lf: u32, i: u32, j: u32, mf: u32) {
+    a.i32c(1).lset(mf);
+    a.i32c(0).lset(j);
+    a.block();
+    a.loop_();
+    {
+        a.lget(j).lget(lf).op(op::I32_GE_U).br_if(1);
+        a.lget(ps).i32c(4).op(op::I32_ADD).lget(i).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(pf).i32c(4).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
+        a.op(op::I32_NE).if_();
+        {
+            a.i32c(0).lset(mf);
+            a.br(2); // 跳出 block（loop 是 0，block 是 1，br(2)?? —— 见下方注释）
+        }
+        a.end();
+        a.lget(j).i32c(1).op(op::I32_ADD).lset(j);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+}
+
+/// rt_str_cmp: (i64 a, i64 b) -> i32(-1/0/1)；字节序（对齐 Rust str Ord）
+/// locals: 2=pa, 3=la, 4=pb, 5=lb, 6=i, 7=min（全 i32）
+fn build_str_cmp() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 4);
+    a.lget(2).i32_load(0).lset(3);
+    a.lget(4).i32_load(0).lset(5);
+    // min = la < lb ? la : lb
+    a.lget(3).lget(5).lget(3).lget(5).op(op::I32_LT_S).op(op::SELECT).lset(7);
+    a.i32c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(7).op(op::I32_GE_U).br_if(1);
+        // ca vs cb
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0); // ca
+        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0); // cb
+        // ca < cb → -1；ca > cb → 1
+        a.op(op::I32_SUB); // ca - cb（栈上一个值）
+        // 用 tee 思路：重复装入太啰嗦——直接两分支重算
+        // 栈上有 diff；diff < 0 → return -1
+        // i32 没有 tee 便捷法，用 if 双分支+重算开销可接受（比较循环不长）
+        // 这里 diff 已在栈：直接判断
+        a.i32c(0).op(op::I32_LT_S).if_();
+        a.i32c(-1).op(op::RETURN);
+        a.end();
+        // 重算 diff > 0
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.op(op::I32_SUB).i32c(0).op(op::I32_GT_S).if_();
+        a.i32c(1).op(op::RETURN);
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 等长前缀相等：短者小
+    a.lget(3).lget(5).op(op::I32_LT_S).if_();
+    a.i32c(-1).op(op::RETURN);
+    a.end();
+    a.lget(3).lget(5).op(op::I32_GT_S).if_();
+    a.i32c(1).op(op::RETURN);
+    a.end();
+    a.i32c(0);
+    a.b
+}
+
+/// rt_str_char_at: (i64 Str, i64 byte_off) -> i64 Str；按 UTF-8 头字节取单字符
+/// locals: 2=ptr, 3=o, 4=clen, 5=p, 6=k（全 i32）
+fn build_str_char_at() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    a.lget(1).op(op::I32_WRAP_I64).lset(3);
+    // clen：0xF0+ → 4，0xE0+ → 3，0xC0+ → 2，否则 1
+    a.i32c(1).lset(4);
+    a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xF0).op(op::I32_GE_U).if_();
+    a.i32c(4).lset(4);
+    a.else_();
+    {
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xE0).op(op::I32_GE_U).if_();
+        a.i32c(3).lset(4);
+        a.else_();
+        {
+            a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xC0).op(op::I32_GE_U).if_();
+            a.i32c(2).lset(4);
+            a.end();
+        }
+        a.end();
+    }
+    a.end();
+    // p = alloc(4 + clen)；store len；逐字节拷贝
+    a.lget(4).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(5);
+    a.lget(5).lget(4).i32_store(0);
+    a.i32c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(5).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD);
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
 // ===== 闭包支持（Phase 7.3）=====
 
 /// 捕获来源：创建点的值从哪来
@@ -1277,6 +2348,7 @@ impl Codegen {
                 || self.variant_names.contains(name)
                 || name == "println"
                 || name == "print"
+                || self.available_builtins.contains(name)
             {
                 // 全局符号：函数直调、变体（7.5 报错点在构造处）、prelude——不捕获
             } else {
@@ -1298,7 +2370,7 @@ impl Codegen {
         ca.block_i64();
         self.compile_block_value(&mut cctx, &mut ca, body)?;
         ca.end();
-        let funcidx = 5 + self.m.funcs.len() as u32;
+        let funcidx = N_IMPORTS + self.m.funcs.len() as u32;
         self.m.funcs.push(Function { type_idx: ty, locals: cctx.locals, body: ca.b });
         let tslot = self.table_entries.len() as u32;
         self.table_entries.push(funcidx);
@@ -1342,7 +2414,7 @@ impl Codegen {
                 s.lget((i + 1) as u32);
             }
             s.call(real);
-            let funcidx = 5 + self.m.funcs.len() as u32;
+            let funcidx = N_IMPORTS + self.m.funcs.len() as u32;
             self.m.funcs.push(Function { type_idx: ty, locals: vec![], body: s.b });
             let ts = self.table_entries.len() as u32;
             self.table_entries.push(funcidx);
@@ -1784,6 +2856,56 @@ mod e2e {
             "fn main() -> Unit\n    let f = fn(x: Int) -> Int\n        x\n    end\n    println(f)\nend",
             "clo_show",
             "<闭包>\n",
+        );
+    }
+
+    // ===== Phase 7.4: 字符串 / stdlib =====
+
+    #[test]
+    fn e2e_string_concat_promotion() {
+        // v0.4.1 拼接提升：任一侧 String 即可拼接（Int/Float/Bool/Unit 全测）
+        check(
+            "fn main() -> Unit\n    println(\"n = \" + 42)\n    println(\"f = \" + 1.5)\n    println(\"b = \" + True)\n    println(1 + 2)\nend",
+            "concat",
+            "n = 42\nf = 1.5\nb = true\n3\n",
+        );
+    }
+
+    #[test]
+    fn e2e_string_builtins() {
+        check(
+            "from string import { len, int_to_string, string_to_int, trim, upper, lower, contains, replace, starts_with, ends_with }\nfn main() -> Unit\n    println(len(\"hello\"))\n    println(int_to_string(42) + \"!\")\n    println(string_to_int(\"123\") + 1)\n    println(string_to_int(\"abc\"))\n    println(trim(\"  hi  \"))\n    println(upper(\"hello\"))\n    println(lower(\"HeLLo\"))\n    println(contains(\"hello world\", \"o w\"))\n    println(starts_with(\"hello\", \"he\"))\n    println(ends_with(\"hello\", \"lo\"))\n    println(replace(\"a-b-c\", \"-\", \"+\"))\n    println(replace(\"abc\", \"\", \"x\"))\nend",
+            "strlib",
+            "5\n42!\n124\n()\nhi\nHELLO\nhello\ntrue\ntrue\ntrue\na+b+c\nxaxbxcx\n",
+        );
+    }
+
+    #[test]
+    fn e2e_math_builtins() {
+        check(
+            "from math import { sqrt, abs, min, max }\nfn main() -> Unit\n    println(sqrt(16.0))\n    println(sqrt(9))\n    println(abs(-7))\n    println(abs(-7.5))\n    println(min(3, 7))\n    println(max(3.5, 1.5))\nend",
+            "math",
+            "4.0\n3.0\n7\n7.5\n3\n3.5\n",
+        );
+    }
+
+    #[test]
+    fn e2e_string_compare_and_for_char() {
+        // 字符串大小比较（7.4 补齐 7.2 的缺口）+ for 逐字符迭代
+        check(
+            "fn main() -> Unit\n    println(\"abc\" < \"abd\")\n    println(\"b\" > \"a\")\n    println(\"abc\" <= \"abc\")\n    let mut s = \"\"\n    for c in \"hey\"\n        s = s + \"[\" + c + \"]\"\n    end\n    println(s)\nend",
+            "strcmp",
+            "true\ntrue\ntrue\n[h][e][y]\n",
+        );
+    }
+
+    #[test]
+    fn e2e_import_alias() {
+        // from io import { println as log }（别名解析）
+        check(
+            "from io import { println as log }\nfrom string import { len as slen }\nfn main() -> Unit\n    log(\"hi\")\n    log(slen(\"hello\"))\nend",
+            "alias",
+            "hi\n5\n",
         );
     }
 }

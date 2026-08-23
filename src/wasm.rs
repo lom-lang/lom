@@ -99,10 +99,19 @@ pub mod op {
     pub const I32_EQZ: u8 = 0x45;
     pub const I32_EQ: u8 = 0x46;
     pub const I32_NE: u8 = 0x47;
+    pub const I32_LT_S: u8 = 0x48;
     pub const I32_LT_U: u8 = 0x49;
+    pub const I32_GT_S: u8 = 0x4A;
+    pub const I32_LE_S: u8 = 0x4C;
+    pub const I32_GE_S: u8 = 0x4E;
     pub const I32_GE_U: u8 = 0x4F;
     pub const I32_ADD: u8 = 0x6A;
     pub const I32_SUB: u8 = 0x6B;
+    pub const I32_MUL: u8 = 0x6C;
+    pub const I32_AND: u8 = 0x71; // 0x70 是 i32.rem_u（曾在 7.4 踩坑：漏排 div/rem 导致 and/or 错位）
+    pub const I32_OR: u8 = 0x72;
+    pub const I32_GT_U: u8 = 0x4B;
+    pub const I32_STORE8: u8 = 0x3A;
     // i64 比较（结果 i32，可直接喂 if/br_if）
     pub const I64_EQZ: u8 = 0x50;
     pub const I64_EQ: u8 = 0x51;
@@ -111,6 +120,7 @@ pub mod op {
     pub const I64_GT_S: u8 = 0x55;
     pub const I64_LE_S: u8 = 0x57;
     pub const I64_GE_S: u8 = 0x59;
+    pub const I64_GT_U: u8 = 0x56; // 曾在 7.4 踩坑写成 0x5A（那是 GE_U）：比较块是 lt_s,lt_u,gt_s,gt_u,le_s,le_u,ge_s,ge_u 成对排
     // f64 比较（结果 i32）
     pub const F64_EQ: u8 = 0x61;
     pub const F64_NE: u8 = 0x62;
@@ -123,7 +133,9 @@ pub mod op {
     pub const I64_SUB: u8 = 0x7D;
     pub const I64_MUL: u8 = 0x7E;
     pub const I64_DIV_S: u8 = 0x7F;
+    pub const I64_DIV_U: u8 = 0x80;
     pub const I64_REM_S: u8 = 0x81;
+    pub const I64_REM_U: u8 = 0x82;
     pub const I64_AND: u8 = 0x83;
     pub const I64_OR: u8 = 0x84;
     pub const I64_XOR: u8 = 0x85;
@@ -141,6 +153,12 @@ pub mod op {
     pub const I32_WRAP_I64: u8 = 0xA7;
     pub const I64_EXTEND_I32_S: u8 = 0xAC;
     pub const F64_CONVERT_I64_S: u8 = 0xB9;
+    // 其他
+    pub const SELECT: u8 = 0x1B;
+    pub const F64_SQRT: u8 = 0x9F;
+    pub const F64_ABS: u8 = 0x99;
+    pub const F64_MIN: u8 = 0xA4;
+    pub const F64_MAX: u8 = 0xA5;
 }
 
 /// 函数类型：(params) -> results

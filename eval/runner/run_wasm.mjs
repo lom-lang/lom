@@ -28,6 +28,13 @@ const imports = {
     lom_print: (ptr, len) => {
       out += Buffer.from(new Uint8Array(memory.buffer, ptr, len)).toString('utf8');
     },
+    // (f64, buf) -> i32：把 to_display 格式的浮点字符串写入 memory[buf..]，返回字节数（7.4）
+    lom_ftoa: (v, buf) => {
+      const s = fmtFloat(v);
+      const b = Buffer.from(s, 'utf8');
+      new Uint8Array(memory.buffer, buf, b.length).set(b);
+      return b.length;
+    },
   },
 };
 
