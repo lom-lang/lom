@@ -223,6 +223,10 @@ pub struct Module {
     /// 线性内存下限页数（1 页 = 64KiB）；None = 无内存
     pub memory_min_pages: Option<u32>,
     pub globals: Vec<Global>,
+    /// funcref 表（call_indirect 用；Phase 7.3 闭包）：(min, max)；None = 无表
+    pub table: Option<(u32, Option<u32>)>,
+    /// 主动元素段：table 0 从 offset 0 起填入这些 funcidx（闭包/函数值的调用目标）
+    pub elems: Vec<u32>,
     pub exports: Vec<(String, ExportKind, u32)>,
     pub data: Vec<DataSegment>,
 }
@@ -293,6 +297,24 @@ impl Module {
             Self::section(&mut out, 3, &p);
         }
 
+        // 4. table section（funcref 表，call_indirect 用）
+        if let Some((min, max)) = self.table {
+            let mut p = leb_u(1);
+            p.push(0x70); // elemtype: funcref
+            match max {
+                Some(mx) => {
+                    p.push(0x01); // flags: 有 max
+                    p.extend(leb_u(min as u64));
+                    p.extend(leb_u(mx as u64));
+                }
+                None => {
+                    p.push(0x00);
+                    p.extend(leb_u(min as u64));
+                }
+            }
+            Self::section(&mut out, 4, &p);
+        }
+
         // 5. memory section（limits: flags=00, min=页数；首版不设上限）
         if let Some(min) = self.memory_min_pages {
             let mut p = leb_u(1);
@@ -335,6 +357,20 @@ impl Module {
                 p.extend(leb_u(*idx as u64));
             }
             Self::section(&mut out, 7, &p);
+        }
+
+        // 9. element section（MVP 主动段：table 0, offset 0）
+        if !self.elems.is_empty() {
+            let mut p = leb_u(1); // 一个主动元素段
+            p.push(0x00); // flags: active, table 0
+            p.push(op::I32_CONST);
+            p.extend(leb_s(0));
+            p.push(op::END);
+            p.extend(leb_u(self.elems.len() as u64));
+            for f in &self.elems {
+                p.extend(leb_u(*f as u64));
+            }
+            Self::section(&mut out, 9, &p);
         }
 
         // 10. code section
