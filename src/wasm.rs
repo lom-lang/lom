@@ -201,6 +201,7 @@ pub struct Import {
 pub enum ExportKind {
     Func,
     Memory,
+    Global,
 }
 
 impl ExportKind {
@@ -208,6 +209,7 @@ impl ExportKind {
         match self {
             ExportKind::Func => 0x00,
             ExportKind::Memory => 0x02,
+            ExportKind::Global => 0x03,
         }
     }
 }

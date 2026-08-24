@@ -40,79 +40,81 @@ const IMP_PRINT_BOOL: u32 = 2; // (i64 v, i64 newline) -> ()
 const IMP_PRINT_UNIT: u32 = 3; // (i64 newline) -> ()
 const IMP_PRINT_STR: u32 = 4; // (i32 ptr, i32 len) -> () —— 原始字节
 const IMP_FTOA: u32 = 5; // (f64 v, i32 buf) -> i32 —— f64 格式化写入 buf，返回长度（7.4）
+const IMP_JSON_PARSE: u32 = 6; // (i32 ptr, i32 len) -> i64 —— 宿主 JSON 解析（7.7，契约见 harness）
+const IMP_JSON_STRINGIFY: u32 = 7; // (i64 v) -> i64 —— 宿主 JSON 序列化（7.7）
 /// 导入总数（funcidx 换算基座）
-const N_IMPORTS: u32 = 6;
+const N_IMPORTS: u32 = 8;
 
 // ===== 运行时 helper 函数索引 =====
-const RT_BOX_F64: u32 = 6; // (f64) -> i64      动态装盒（bump alloc 8 字节）
-const RT_UNBOX_F64: u32 = 7; // (i64) -> f64    拆盒
-const RT_PROMOTE_F64: u32 = 8; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
-const RT_STR_EQ: u32 = 9; // (i64, i64) -> i32 字符串按字节相等
-const RT_ADD: u32 = 10; // (i64, i64) -> i64
-const RT_SUB: u32 = 11;
-const RT_MUL: u32 = 12;
-const RT_DIV: u32 = 13;
-const RT_MOD: u32 = 14;
-const RT_LT: u32 = 15; // (i64, i64) -> i64（Bool tagged）
-const RT_GT: u32 = 16;
-const RT_LE: u32 = 17;
-const RT_GE: u32 = 18;
-const RT_EQ: u32 = 19;
-const RT_NE: u32 = 20;
-const RT_NEG: u32 = 21; // (i64) -> i64
-const RT_NOT: u32 = 22; // (i64) -> i64
-const RT_TRUTHY: u32 = 23; // (i64) -> i32      非 Bool 时 trap
-const RT_PRINT: u32 = 24; // (i64 v, i64 newline) -> ()
-const RT_ALLOC: u32 = 25; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
+const RT_BOX_F64: u32 = 8; // (f64) -> i64      动态装盒（bump alloc 8 字节）
+const RT_UNBOX_F64: u32 = 9; // (i64) -> f64    拆盒
+const RT_PROMOTE_F64: u32 = 10; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
+const RT_STR_EQ: u32 = 11; // (i64, i64) -> i32 字符串按字节相等
+const RT_ADD: u32 = 12; // (i64, i64) -> i64
+const RT_SUB: u32 = 13;
+const RT_MUL: u32 = 14;
+const RT_DIV: u32 = 15;
+const RT_MOD: u32 = 16;
+const RT_LT: u32 = 17; // (i64, i64) -> i64（Bool tagged）
+const RT_GT: u32 = 18;
+const RT_LE: u32 = 19;
+const RT_GE: u32 = 20;
+const RT_EQ: u32 = 21;
+const RT_NE: u32 = 22;
+const RT_NEG: u32 = 23; // (i64) -> i64
+const RT_NOT: u32 = 24; // (i64) -> i64
+const RT_TRUTHY: u32 = 25; // (i64) -> i32      非 Bool 时 trap
+const RT_PRINT: u32 = 26; // (i64 v, i64 newline) -> ()
+const RT_ALLOC: u32 = 27; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
 // ===== 7.4：字符串 / stdlib helper =====
-const RT_STR_CONCAT: u32 = 26; // (i64, i64) -> i64     两字符串拼接（新堆对象）
-const RT_DISPLAY: u32 = 27; // (i64) -> i64            to_display → tagged Str
-const RT_ITOA: u32 = 28; // (i64 tagged Int) -> i64    十进制格式化
-const RT_STR_LEN: u32 = 29; // (i64 Str) -> i64 Int    字符数（数非续字节，对齐 chars().count()）
-const RT_STOI: u32 = 30; // (i64 Str) -> i64           解析整数；失败返回 Unit（对齐解释器）
-const RT_TRIM: u32 = 31; // (i64 Str) -> i64           ASCII 空白（注意：解释器是 Unicode 空白，差异已记录）
-const RT_UPPER: u32 = 32; // (i64 Str) -> i64          ASCII 大小写（Unicode 差异已记录）
-const RT_LOWER: u32 = 33; // (i64 Str) -> i64
-const RT_CONTAINS: u32 = 34; // (i64, i64) -> i64 Bool 朴素子串查找（UTF-8 安全：模式是合法 UTF-8）
-const RT_STARTS: u32 = 35; // (i64, i64) -> i64 Bool
-const RT_ENDS: u32 = 36; // (i64, i64) -> i64 Bool
-const RT_REPLACE: u32 = 37; // (i64, i64, i64) -> i64  全量替换（两遍扫描）
-const RT_STR_CMP: u32 = 38; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
-const RT_STR_CHAR_AT: u32 = 39; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
-const RT_FTOA_STR: u32 = 40; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
+const RT_STR_CONCAT: u32 = 28; // (i64, i64) -> i64     两字符串拼接（新堆对象）
+const RT_DISPLAY: u32 = 29; // (i64) -> i64            to_display → tagged Str
+const RT_ITOA: u32 = 30; // (i64 tagged Int) -> i64    十进制格式化
+const RT_STR_LEN: u32 = 31; // (i64 Str) -> i64 Int    字符数（数非续字节，对齐 chars().count()）
+const RT_STOI: u32 = 32; // (i64 Str) -> i64           解析整数；失败返回 Unit（对齐解释器）
+const RT_TRIM: u32 = 33; // (i64 Str) -> i64           ASCII 空白（注意：解释器是 Unicode 空白，差异已记录）
+const RT_UPPER: u32 = 34; // (i64 Str) -> i64          ASCII 大小写（Unicode 差异已记录）
+const RT_LOWER: u32 = 35; // (i64 Str) -> i64
+const RT_CONTAINS: u32 = 36; // (i64, i64) -> i64 Bool 朴素子串查找（UTF-8 安全：模式是合法 UTF-8）
+const RT_STARTS: u32 = 37; // (i64, i64) -> i64 Bool
+const RT_ENDS: u32 = 38; // (i64, i64) -> i64 Bool
+const RT_REPLACE: u32 = 39; // (i64, i64, i64) -> i64  全量替换（两遍扫描）
+const RT_STR_CMP: u32 = 40; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
+const RT_STR_CHAR_AT: u32 = 41; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
+const RT_FTOA_STR: u32 = 42; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
 // ===== 7.5：枚举 / match / ? =====
-const RT_ENUM_PRINT: u32 = 41; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
-const RT_ENUM_STR: u32 = 42; // (i64) -> i64                 枚举 → Str（display 用）
-const RT_ENUM_EQ: u32 = 43; // (i64, i64) -> i32              枚举递归相等
+const RT_ENUM_PRINT: u32 = 43; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
+const RT_ENUM_STR: u32 = 44; // (i64) -> i64                 枚举 → Str（display 用）
+const RT_ENUM_EQ: u32 = 45; // (i64, i64) -> i32              枚举递归相等
 // ===== 7.6a：Record/Tuple/List =====
-const RT_CONS: u32 = 44; // (i64 head, i64 tail) -> i64        cons 单元（tag 9）
-const RT_RANGE: u32 = 45; // (i64 start, i64 end) -> i64       a..b → List<Int>（左闭右开）
-const RT_LIST_LEN: u32 = 46; // (i64) -> i64 Int
-const RT_LIST_GET: u32 = 47; // (i64, i64 Int) -> i64          越界 trap
-const RT_SPLIT: u32 = 48; // (i64 s, i64 sep) -> i64 List      空 sep 逐字符
-const RT_LIST_MAP: u32 = 49; // (i64 f, i64 xs) -> i64         保序（反构再反转）
-const RT_LIST_FILTER: u32 = 50; // (i64 f, i64 xs) -> i64
-const RT_LIST_FOLD: u32 = 51; // (i64 f, i64 init, i64 xs) -> i64
-const RT_SUBSTR: u32 = 52; // (i64 s, i64 start, i64 end) -> i64 Str（字节切片）
-const RT_LIST_STR: u32 = 53; // (i64) -> i64  各 tag 的 display
-const RT_TUPLE_STR: u32 = 54;
-const RT_RECORD_STR: u32 = 55;
-const RT_TUPLE_EQ: u32 = 56; // (i64, i64) -> i32
-const RT_RECORD_EQ: u32 = 57;
-const RT_LIST_EQ: u32 = 58;
+const RT_CONS: u32 = 46; // (i64 head, i64 tail) -> i64        cons 单元（tag 9）
+const RT_RANGE: u32 = 47; // (i64 start, i64 end) -> i64       a..b → List<Int>（左闭右开）
+const RT_LIST_LEN: u32 = 48; // (i64) -> i64 Int
+const RT_LIST_GET: u32 = 49; // (i64, i64 Int) -> i64          越界 trap
+const RT_SPLIT: u32 = 50; // (i64 s, i64 sep) -> i64 List      空 sep 逐字符
+const RT_LIST_MAP: u32 = 51; // (i64 f, i64 xs) -> i64         保序（反构再反转）
+const RT_LIST_FILTER: u32 = 52; // (i64 f, i64 xs) -> i64
+const RT_LIST_FOLD: u32 = 53; // (i64 f, i64 init, i64 xs) -> i64
+const RT_SUBSTR: u32 = 54; // (i64 s, i64 start, i64 end) -> i64 Str（字节切片）
+const RT_LIST_STR: u32 = 55; // (i64) -> i64  各 tag 的 display
+const RT_TUPLE_STR: u32 = 56;
+const RT_RECORD_STR: u32 = 57;
+const RT_TUPLE_EQ: u32 = 58; // (i64, i64) -> i32
+const RT_RECORD_EQ: u32 = 59;
+const RT_LIST_EQ: u32 = 60;
 // ===== 7.6b：Map（开放寻址 + 墓碑 + FNV-1a）=====
-const RT_MAP_NEW: u32 = 59; // () -> i64
-const RT_MAP_PROBE: u32 = 60; // (i64 m, i64 k) -> i32      命中=桶下标；未命中= -（插入槽+1)
-const RT_MAP_SET: u32 = 61; // (i64 m, i64 k, i64 v) -> i64 Unit
-const RT_MAP_GET: u32 = 62; // (i64 m, i64 k) -> i64 Option
-const RT_MAP_HAS: u32 = 63; // (i64 m, i64 k) -> i64 Bool
-const RT_MAP_REMOVE: u32 = 64; // (i64 m, i64 k) -> i64 Unit
-const RT_MAP_KEYS: u32 = 65; // (i64) -> i64 List（str_cmp 插入排序，确定性）
-const RT_MAP_VALUES: u32 = 66; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
-const RT_MAP_STR: u32 = 67; // (i64) -> i64 Str（排序 "{k: v}"）
-const RT_MAP_EQ: u32 = 68; // (i64, i64) -> i32
+const RT_MAP_NEW: u32 = 61; // () -> i64
+const RT_MAP_PROBE: u32 = 62; // (i64 m, i64 k) -> i32      命中=桶下标；未命中= -（插入槽+1)
+const RT_MAP_SET: u32 = 63; // (i64 m, i64 k, i64 v) -> i64 Unit
+const RT_MAP_GET: u32 = 64; // (i64 m, i64 k) -> i64 Option
+const RT_MAP_HAS: u32 = 65; // (i64 m, i64 k) -> i64 Bool
+const RT_MAP_REMOVE: u32 = 66; // (i64 m, i64 k) -> i64 Unit
+const RT_MAP_KEYS: u32 = 67; // (i64) -> i64 List（str_cmp 插入排序，确定性）
+const RT_MAP_VALUES: u32 = 68; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
+const RT_MAP_STR: u32 = 69; // (i64) -> i64 Str（排序 "{k: v}"）
+const RT_MAP_EQ: u32 = 70; // (i64, i64) -> i32
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 69;
+const FIRST_USER_FN: u32 = 71;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
@@ -460,9 +462,7 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
                     "math" => Some(MATH_BUILTINS),
                     "list" => Some(LIST_BUILTINS),
                     "map" => Some(&["map_empty", "map_set", "map_get", "map_has", "map_remove", "map_keys", "map_values", "map_size"]),
-                    "json" => {
-                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（json 在 7.7 支持）", imp.module))
-                    }
+                    "json" => Some(&["json_parse", "json_stringify"]),
                     "file" | "env" => {
                         return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.8 支持）", imp.module))
                     }
@@ -537,6 +537,10 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
     cg.m.memory_min_pages = Some(pages.max(1));
     cg.m.globals.push(Global { ty: ValType::I32, mutable: true, init: heap_base as i64 }); // global 0 = hp
     cg.m.globals.push(Global { ty: ValType::I32, mutable: false, init: data_end as i64 }); // global 1 = ftoa buf
+    // 7.7：宿主 JSON 契约 —— 导出 lom_alloc（宿主物化值时分配）+ lom_variant_table（枚举串化查名）
+    cg.m.globals.push(Global { ty: ValType::I32, mutable: false, init: variant_table_off as i64 }); // global 2
+    cg.m.exports.push(("lom_alloc".into(), ExportKind::Func, RT_ALLOC));
+    cg.m.exports.push(("lom_variant_table".into(), ExportKind::Global, 2));
     cg.m.exports.push(("memory".into(), ExportKind::Memory, 0));
     let main_idx = cg.fn_idx["main"];
     cg.m.exports.push(("main".into(), ExportKind::Func, main_idx));
@@ -593,6 +597,7 @@ impl Codegen {
         let ty_ftoa = m.add_type(FuncType { params: vec![ValType::F64, ValType::I32], results: vec![ValType::I32] });
         let ty_iii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64, ValType::I64], results: vec![ValType::I64] });
         let ty_unit_i64 = m.add_type(FuncType { params: vec![], results: vec![ValType::I64] });
+        let ty_json_parse = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I64] });
 
         // 导入（funcidx 0-5）
         for (name, ty) in [
@@ -602,6 +607,8 @@ impl Codegen {
             ("lom_print_unit", ty_i_unit),
             ("lom_print", ty_pp_unit),
             ("lom_ftoa", ty_ftoa),
+            ("lom_json_parse", ty_json_parse),
+            ("lom_json_stringify", ty_i64_i64),
         ] {
             m.imports.push(Import { module: "env".into(), name: name.into(), type_idx: ty });
         }
@@ -1404,8 +1411,8 @@ impl Codegen {
                 {
                     a.tag_is(s, TAG_RECORD).if_i64();
                     {
-                        // 记录字段：按 name_off（编译期 intern 偏移）线性查找
-                        let target = (self.intern_str(name) - TAG_STR) >> 4;
+                        // 记录字段：按字段名内容比较（7.7 起：宿主物化记录与编译期 intern 不同源）
+                        let target = self.intern_str(name); // tagged Str
                         let rp = ctx.alloc(); // 记录指针（i64 槽装 i32 扩展）
                         a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).op(op::I64_EXTEND_I32_S).lset(rp);
                         let i = ctx.alloc();
@@ -1419,9 +1426,10 @@ impl Codegen {
                         {
                             // i >= n → 字段不存在 → trap
                             a.lget(i).lget(rp).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).op(op::I64_GE_S).if_().op(op::UNREACHABLE).end();
-                            // name_off[i] == target → br $found（带值）
+                            // 字段名内容比较（7.7 修正：宿主物化的记录与编译期 intern 偏移不同源，必须比内容）
                             a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
-                            a.i32c(target as i32).op(op::I32_EQ).if_();
+                            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+                            a.i64c(target as i64).call(RT_STR_EQ).if_();
                             ctx.labels.push(Label::If);
                             {
                                 a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
@@ -1705,6 +1713,17 @@ impl Codegen {
             "split" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
                 a.lget(s[0]).lget(s[1]).call(RT_SPLIT);
+            }
+            // ===== 7.7：json 模块（宿主中介：harness 用 JS JSON.parse/stringify 实现）=====
+            "json_parse" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR)])?;
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD); // ptr+4（跳过 len 头）
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0); // len
+                a.call(IMP_JSON_PARSE);
+            }
+            "json_stringify" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[None])?;
+                a.lget(s[0]).call(IMP_JSON_STRINGIFY);
             }
             // ===== 7.6b：map 模块 =====
             "map_empty" => {
@@ -3978,10 +3997,12 @@ fn build_record_eq() -> Vec<u8> {
         a.loop_();
         {
             a.lget(7).lget(5).op(op::I32_GE_U).br_if(1);
-            // name_off 相等？
+            // 字段名内容比较（7.7：宿主物化记录与编译期 intern 不同源）
             a.lget(2).i32c(4).op(op::I32_ADD).lget(6).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
             a.lget(3).i32c(4).op(op::I32_ADD).lget(7).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
-            a.op(op::I32_EQ).if_();
+            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.call(RT_STR_EQ).if_();
             {
                 a.i32c(1).lset(8);
                 // 值递归相等？
@@ -4377,16 +4398,17 @@ mod tests {
 
     #[test]
     fn unsupported_constructs_report_phase() {
-        // json → 7.7；file/env → 7.8（map 自 7.6b 起已支持）
-        let e = compile("from json import { json_parse }\nfn main() -> Unit\n    println(json_parse(\"1\"))\nend").unwrap_err();
-        assert!(e.contains("7.7"), "{}", e);
+        // file/env → 7.8（json/map 自 7.7/7.6b 起已支持）
         let e = compile("from env import { args }\nfn main() -> Unit\n    println(args())\nend").unwrap_err();
         assert!(e.contains("7.8"), "{}", e);
-        // match / record / range / map 现在编译通过
+        let e = compile("from file import { file_read }\nfn main() -> Unit\n    println(file_read(\"x\"))\nend").unwrap_err();
+        assert!(e.contains("7.8"), "{}", e);
+        // match / record / range / map / json 现在编译通过
         compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap();
         compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r.x)\nend").unwrap();
         compile("fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\nend").unwrap();
         compile("from map import { map_empty, map_set, map_get }\nfn main() -> Unit\n    let m = map_empty()\n    map_set(m, \"a\", 1)\n    println(map_get(m, \"a\"))\nend").unwrap();
+        compile("from json import { json_parse }\nfn main() -> Unit\n    println(json_parse(\"1\"))\nend").unwrap();
     }
 
     #[test]
@@ -4764,6 +4786,18 @@ mod e2e {
             "fn main() -> Unit\n    let p = {x: 1, y: 2}\n    println(p.x + p.y)\n    println(p)\nend",
             "tag4bit",
             "3\n{x: 1, y: 2}\n",
+        );
+    }
+
+    // ===== Phase 7.7：json（宿主中介）=====
+
+    #[test]
+    fn e2e_json_parse_stringify() {
+        // json_parse（Record/List/Int/Float/Bool/Unit 物化）+ json_stringify（含 Map 排序键、转义）
+        check(
+            "from json import { json_parse, json_stringify }\nfrom list import { list_get, list_length }\nfn main() -> Unit\n    let data = json_parse(\"{\\\"name\\\": \\\"Alice\\\", \\\"age\\\": 30, \\\"scores\\\": [90, 85]}\")\n    println(data.name)\n    println(data.age)\n    println(list_get(data.scores, 1))\n    println(json_stringify(data))\n    println(json_parse(\"[1, 2.5, true, null, \\\"x\\\"]\"))\n    println(json_stringify(json_parse(\"{}\")))\nend",
+            "json",
+            "Alice\n30\n85\n{\"name\":\"Alice\",\"age\":30,\"scores\":[90,85]}\n[1, 2.5, true, (), x]\n{}\n",
         );
     }
 }
