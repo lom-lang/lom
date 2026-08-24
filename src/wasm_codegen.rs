@@ -42,79 +42,84 @@ const IMP_PRINT_STR: u32 = 4; // (i32 ptr, i32 len) -> () —— 原始字节
 const IMP_FTOA: u32 = 5; // (f64 v, i32 buf) -> i32 —— f64 格式化写入 buf，返回长度（7.4）
 const IMP_JSON_PARSE: u32 = 6; // (i32 ptr, i32 len) -> i64 —— 宿主 JSON 解析（7.7，契约见 harness）
 const IMP_JSON_STRINGIFY: u32 = 7; // (i64 v) -> i64 —— 宿主 JSON 序列化（7.7）
-/// 导入总数（funcidx 换算基座）
-const N_IMPORTS: u32 = 8;
+const IMP_FILE_READ: u32 = 8; // (i32 ptr, i32 len) -> i64 Str —— 7.8；失败宿主抛异常 → trap
+const IMP_FILE_WRITE: u32 = 9; // (i32 pp, i32 pl, i32 cp, i32 cl) -> i64 Unit
+const IMP_FILE_APPEND: u32 = 10; // 同上
+const IMP_FILE_EXISTS: u32 = 11; // (i32 ptr, i32 len) -> i64 Bool
+const IMP_ENV_ARGS: u32 = 12; // () -> i64 List<String>（宿主物化：argv=[wasm 路径, ...用户参数]）
+/// 导入总数（funcidx 换算基座；RT_* 全部相对它定义——改导入数不用再手抖重编号）
+const N_IMPORTS: u32 = 13;
 
 // ===== 运行时 helper 函数索引 =====
-const RT_BOX_F64: u32 = 8; // (f64) -> i64      动态装盒（bump alloc 8 字节）
-const RT_UNBOX_F64: u32 = 9; // (i64) -> f64    拆盒
-const RT_PROMOTE_F64: u32 = 10; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
-const RT_STR_EQ: u32 = 11; // (i64, i64) -> i32 字符串按字节相等
-const RT_ADD: u32 = 12; // (i64, i64) -> i64
-const RT_SUB: u32 = 13;
-const RT_MUL: u32 = 14;
-const RT_DIV: u32 = 15;
-const RT_MOD: u32 = 16;
-const RT_LT: u32 = 17; // (i64, i64) -> i64（Bool tagged）
-const RT_GT: u32 = 18;
-const RT_LE: u32 = 19;
-const RT_GE: u32 = 20;
-const RT_EQ: u32 = 21;
-const RT_NE: u32 = 22;
-const RT_NEG: u32 = 23; // (i64) -> i64
-const RT_NOT: u32 = 24; // (i64) -> i64
-const RT_TRUTHY: u32 = 25; // (i64) -> i32      非 Bool 时 trap
-const RT_PRINT: u32 = 26; // (i64 v, i64 newline) -> ()
-const RT_ALLOC: u32 = 27; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
+const RT_BOX_F64: u32 = N_IMPORTS + 0; // (f64) -> i64      动态装盒（bump alloc 8 字节）
+const RT_UNBOX_F64: u32 = N_IMPORTS + 1; // (i64) -> f64    拆盒
+const RT_PROMOTE_F64: u32 = N_IMPORTS + 2; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
+const RT_STR_EQ: u32 = N_IMPORTS + 3; // (i64, i64) -> i32 字符串按字节相等
+const RT_ADD: u32 = N_IMPORTS + 4; // (i64, i64) -> i64
+const RT_SUB: u32 = N_IMPORTS + 5;
+const RT_MUL: u32 = N_IMPORTS + 6;
+const RT_DIV: u32 = N_IMPORTS + 7;
+const RT_MOD: u32 = N_IMPORTS + 8;
+const RT_LT: u32 = N_IMPORTS + 9; // (i64, i64) -> i64（Bool tagged）
+const RT_GT: u32 = N_IMPORTS + 10;
+const RT_LE: u32 = N_IMPORTS + 11;
+const RT_GE: u32 = N_IMPORTS + 12;
+const RT_EQ: u32 = N_IMPORTS + 13;
+const RT_NE: u32 = N_IMPORTS + 14;
+const RT_NEG: u32 = N_IMPORTS + 15; // (i64) -> i64
+const RT_NOT: u32 = N_IMPORTS + 16; // (i64) -> i64
+const RT_TRUTHY: u32 = N_IMPORTS + 17; // (i64) -> i32      非 Bool 时 trap
+const RT_PRINT: u32 = N_IMPORTS + 18; // (i64 v, i64 newline) -> ()
+const RT_ALLOC: u32 = N_IMPORTS + 19; // (i32 size) -> i32  bump allocator（7.3 起：闭包 env/对象分配）
 // ===== 7.4：字符串 / stdlib helper =====
-const RT_STR_CONCAT: u32 = 28; // (i64, i64) -> i64     两字符串拼接（新堆对象）
-const RT_DISPLAY: u32 = 29; // (i64) -> i64            to_display → tagged Str
-const RT_ITOA: u32 = 30; // (i64 tagged Int) -> i64    十进制格式化
-const RT_STR_LEN: u32 = 31; // (i64 Str) -> i64 Int    字符数（数非续字节，对齐 chars().count()）
-const RT_STOI: u32 = 32; // (i64 Str) -> i64           解析整数；失败返回 Unit（对齐解释器）
-const RT_TRIM: u32 = 33; // (i64 Str) -> i64           ASCII 空白（注意：解释器是 Unicode 空白，差异已记录）
-const RT_UPPER: u32 = 34; // (i64 Str) -> i64          ASCII 大小写（Unicode 差异已记录）
-const RT_LOWER: u32 = 35; // (i64 Str) -> i64
-const RT_CONTAINS: u32 = 36; // (i64, i64) -> i64 Bool 朴素子串查找（UTF-8 安全：模式是合法 UTF-8）
-const RT_STARTS: u32 = 37; // (i64, i64) -> i64 Bool
-const RT_ENDS: u32 = 38; // (i64, i64) -> i64 Bool
-const RT_REPLACE: u32 = 39; // (i64, i64, i64) -> i64  全量替换（两遍扫描）
-const RT_STR_CMP: u32 = 40; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
-const RT_STR_CHAR_AT: u32 = 41; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
-const RT_FTOA_STR: u32 = 42; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
+const RT_STR_CONCAT: u32 = N_IMPORTS + 20; // (i64, i64) -> i64     两字符串拼接（新堆对象）
+const RT_DISPLAY: u32 = N_IMPORTS + 21; // (i64) -> i64            to_display → tagged Str
+const RT_ITOA: u32 = N_IMPORTS + 22; // (i64 tagged Int) -> i64    十进制格式化
+const RT_STR_LEN: u32 = N_IMPORTS + 23; // (i64 Str) -> i64 Int    字符数（数非续字节，对齐 chars().count()）
+const RT_STOI: u32 = N_IMPORTS + 24; // (i64 Str) -> i64           解析整数；失败返回 Unit（对齐解释器）
+const RT_TRIM: u32 = N_IMPORTS + 25; // (i64 Str) -> i64           ASCII 空白（注意：解释器是 Unicode 空白，差异已记录）
+const RT_UPPER: u32 = N_IMPORTS + 26; // (i64 Str) -> i64          ASCII 大小写（Unicode 差异已记录）
+const RT_LOWER: u32 = N_IMPORTS + 27; // (i64 Str) -> i64
+const RT_CONTAINS: u32 = N_IMPORTS + 28; // (i64, i64) -> i64 Bool 朴素子串查找（UTF-8 安全：模式是合法 UTF-8）
+const RT_STARTS: u32 = N_IMPORTS + 29; // (i64, i64) -> i64 Bool
+const RT_ENDS: u32 = N_IMPORTS + 30; // (i64, i64) -> i64 Bool
+const RT_REPLACE: u32 = N_IMPORTS + 31; // (i64, i64, i64) -> i64  全量替换（两遍扫描）
+const RT_STR_CMP: u32 = N_IMPORTS + 32; // (i64, i64) -> i32       字节序比较（对齐 Rust str Ord）→ -1/0/1
+const RT_STR_CHAR_AT: u32 = N_IMPORTS + 33; // (i64 Str, i64 byte_off) -> i64 Str  按 UTF-8 头字节取单字符
+const RT_FTOA_STR: u32 = N_IMPORTS + 34; // (f64) -> i64          经 lom_ftoa 导入格式化 → 堆字符串
 // ===== 7.5：枚举 / match / ? =====
-const RT_ENUM_PRINT: u32 = 43; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
-const RT_ENUM_STR: u32 = 44; // (i64) -> i64                 枚举 → Str（display 用）
-const RT_ENUM_EQ: u32 = 45; // (i64, i64) -> i32              枚举递归相等
+const RT_ENUM_PRINT: u32 = N_IMPORTS + 35; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
+const RT_ENUM_STR: u32 = N_IMPORTS + 36; // (i64) -> i64                 枚举 → Str（display 用）
+const RT_ENUM_EQ: u32 = N_IMPORTS + 37; // (i64, i64) -> i32              枚举递归相等
 // ===== 7.6a：Record/Tuple/List =====
-const RT_CONS: u32 = 46; // (i64 head, i64 tail) -> i64        cons 单元（tag 9）
-const RT_RANGE: u32 = 47; // (i64 start, i64 end) -> i64       a..b → List<Int>（左闭右开）
-const RT_LIST_LEN: u32 = 48; // (i64) -> i64 Int
-const RT_LIST_GET: u32 = 49; // (i64, i64 Int) -> i64          越界 trap
-const RT_SPLIT: u32 = 50; // (i64 s, i64 sep) -> i64 List      空 sep 逐字符
-const RT_LIST_MAP: u32 = 51; // (i64 f, i64 xs) -> i64         保序（反构再反转）
-const RT_LIST_FILTER: u32 = 52; // (i64 f, i64 xs) -> i64
-const RT_LIST_FOLD: u32 = 53; // (i64 f, i64 init, i64 xs) -> i64
-const RT_SUBSTR: u32 = 54; // (i64 s, i64 start, i64 end) -> i64 Str（字节切片）
-const RT_LIST_STR: u32 = 55; // (i64) -> i64  各 tag 的 display
-const RT_TUPLE_STR: u32 = 56;
-const RT_RECORD_STR: u32 = 57;
-const RT_TUPLE_EQ: u32 = 58; // (i64, i64) -> i32
-const RT_RECORD_EQ: u32 = 59;
-const RT_LIST_EQ: u32 = 60;
+const RT_CONS: u32 = N_IMPORTS + 38; // (i64 head, i64 tail) -> i64        cons 单元（tag 9）
+const RT_RANGE: u32 = N_IMPORTS + 39; // (i64 start, i64 end) -> i64       a..b → List<Int>（左闭右开）
+const RT_LIST_LEN: u32 = N_IMPORTS + 40; // (i64) -> i64 Int
+const RT_LIST_GET: u32 = N_IMPORTS + 41; // (i64, i64 Int) -> i64          越界 trap
+const RT_SPLIT: u32 = N_IMPORTS + 42; // (i64 s, i64 sep) -> i64 List      空 sep 逐字符
+const RT_LIST_MAP: u32 = N_IMPORTS + 43; // (i64 f, i64 xs) -> i64         保序（反构再反转）
+const RT_LIST_FILTER: u32 = N_IMPORTS + 44; // (i64 f, i64 xs) -> i64
+const RT_LIST_FOLD: u32 = N_IMPORTS + 45; // (i64 f, i64 init, i64 xs) -> i64
+const RT_SUBSTR: u32 = N_IMPORTS + 46; // (i64 s, i64 start, i64 end) -> i64 Str（字节切片）
+const RT_LIST_STR: u32 = N_IMPORTS + 47; // (i64) -> i64  各 tag 的 display
+const RT_TUPLE_STR: u32 = N_IMPORTS + 48;
+const RT_RECORD_STR: u32 = N_IMPORTS + 49;
+const RT_TUPLE_EQ: u32 = N_IMPORTS + 50; // (i64, i64) -> i32
+const RT_RECORD_EQ: u32 = N_IMPORTS + 51;
+const RT_LIST_EQ: u32 = N_IMPORTS + 52;
 // ===== 7.6b：Map（开放寻址 + 墓碑 + FNV-1a）=====
-const RT_MAP_NEW: u32 = 61; // () -> i64
-const RT_MAP_PROBE: u32 = 62; // (i64 m, i64 k) -> i32      命中=桶下标；未命中= -（插入槽+1)
-const RT_MAP_SET: u32 = 63; // (i64 m, i64 k, i64 v) -> i64 Unit
-const RT_MAP_GET: u32 = 64; // (i64 m, i64 k) -> i64 Option
-const RT_MAP_HAS: u32 = 65; // (i64 m, i64 k) -> i64 Bool
-const RT_MAP_REMOVE: u32 = 66; // (i64 m, i64 k) -> i64 Unit
-const RT_MAP_KEYS: u32 = 67; // (i64) -> i64 List（str_cmp 插入排序，确定性）
-const RT_MAP_VALUES: u32 = 68; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
-const RT_MAP_STR: u32 = 69; // (i64) -> i64 Str（排序 "{k: v}"）
-const RT_MAP_EQ: u32 = 70; // (i64, i64) -> i32
+const RT_MAP_NEW: u32 = N_IMPORTS + 53; // () -> i64
+const RT_MAP_PROBE: u32 = N_IMPORTS + 54; // (i64 m, i64 k) -> i32      命中=桶下标；未命中= -（插入槽+1)
+const RT_MAP_SET: u32 = N_IMPORTS + 55; // (i64 m, i64 k, i64 v) -> i64 Unit
+const RT_MAP_GET: u32 = N_IMPORTS + 56; // (i64 m, i64 k) -> i64 Option
+const RT_MAP_HAS: u32 = N_IMPORTS + 57; // (i64 m, i64 k) -> i64 Bool
+const RT_MAP_REMOVE: u32 = N_IMPORTS + 58; // (i64 m, i64 k) -> i64 Unit
+const RT_MAP_KEYS: u32 = N_IMPORTS + 59; // (i64) -> i64 List（str_cmp 插入排序，确定性）
+const RT_MAP_VALUES: u32 = N_IMPORTS + 60; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
+const RT_MAP_STR: u32 = N_IMPORTS + 61; // (i64) -> i64 Str（排序 "{k: v}"）
+const RT_MAP_EQ: u32 = N_IMPORTS + 62; // (i64, i64) -> i32
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 71;
+const FIRST_USER_FN: u32 = N_IMPORTS + 63;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
@@ -414,6 +419,8 @@ pub struct Codegen {
     import_aliases: std::collections::HashMap<String, String>,
     /// 已导入可用的内建函数（别名后的可用名）
     available_builtins: std::collections::HashSet<String>,
+    /// 已知包名（7.8 包链接：from <pkg> import 的模块名校验）
+    known_packages: std::collections::HashSet<String>,
     /// 静态数据镜像（offset 0 起）；字节 0 固定是 '\n'（rt_print 换行用）
     data: Vec<u8>,
     /// display/打印用的符号静态串偏移
@@ -424,19 +431,30 @@ pub struct Codegen {
 
 /// 编译整个程序为 WASM 二进制。失败返回中文错误（不支持的构造/未定义符号等）。
 pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
+    compile_program_with_packages(prog, &[])
+}
+
+/// 带包名集合的编译入口（7.8 包链接）：from <pkg> import {...} 的模块名按包名校验
+pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Result<Vec<u8>, String> {
     let mut cg = Codegen::new();
+    for p in pkg_names {
+        cg.known_packages.insert(p.clone());
+    }
 
     // 第一遍：注册函数名（支持递归/前向引用）、收集枚举变体名、校验导入
     let mut next_fn = FIRST_USER_FN;
     for item in &prog.items {
         match item {
             Item::Fn(f) => {
-                if cg.fn_idx.contains_key(&f.name) {
-                    return Err(format!("WASM 编译：函数 '{}' 重复定义", f.name));
+                if !cg.fn_idx.contains_key(&f.name) {
+                    cg.fn_idx.insert(f.name.clone(), next_fn);
+                    cg.fn_arity.insert(f.name.clone(), f.params.len());
+                    next_fn += 1;
+                } else {
+                    // 7.8 包合并：重名函数后定义覆盖先定义（对齐解释器 load_packages 的后注册覆盖），
+                    // 复用已有槽位——占位/填体都走 fn_idx，不新增槽位
+                    cg.fn_arity.insert(f.name.clone(), f.params.len());
                 }
-                cg.fn_idx.insert(f.name.clone(), next_fn);
-                cg.fn_arity.insert(f.name.clone(), f.params.len());
-                next_fn += 1;
             }
             Item::Enum(e) => {
                 for v in &e.variants {
@@ -463,11 +481,20 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
                     "list" => Some(LIST_BUILTINS),
                     "map" => Some(&["map_empty", "map_set", "map_get", "map_has", "map_remove", "map_keys", "map_values", "map_size"]),
                     "json" => Some(&["json_parse", "json_stringify"]),
-                    "file" | "env" => {
-                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.8 支持）", imp.module))
-                    }
+                    "file" => Some(&["file_read", "file_write", "file_append", "file_exists"]),
+                    "env" => Some(&["args"]),
                     _ => None,
                 };
+                // 7.8：包模块（符号在包合并时已进函数表；只注册别名——包符号是普通用户函数，
+                // 不进 available_builtins，否则调用会被错误地路由到内建分派）
+                if exports.is_none() && cg.known_packages.contains(imp.module.as_str()) {
+                    for it in &imp.items {
+                        if it.alias != it.name {
+                            cg.import_aliases.insert(it.alias.clone(), it.name.clone());
+                        }
+                    }
+                    continue;
+                }
                 match exports {
                     Some(list) => {
                         for it in &imp.items {
@@ -496,8 +523,13 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
 
     // 第一遍收尾：为每个用户函数预推占位 Function——
     // 固定 funcidx 布局（函数体编译期间产生的闭包函数只能往后排，不能挤占用户函数槽位）
+    // 7.8：重名函数（包合并覆盖）只占一个槽位
+    let mut seen_fns = std::collections::HashSet::new();
     for item in &prog.items {
         if let Item::Fn(f) = item {
+            if !seen_fns.insert(f.name.clone()) {
+                continue; // 重名：复用首个槽位（第二遍后写覆盖）
+            }
             let ty = cg.m.add_type(FuncType {
                 params: vec![ValType::I64; f.params.len()],
                 results: vec![ValType::I64],
@@ -598,6 +630,7 @@ impl Codegen {
         let ty_iii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64, ValType::I64], results: vec![ValType::I64] });
         let ty_unit_i64 = m.add_type(FuncType { params: vec![], results: vec![ValType::I64] });
         let ty_json_parse = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I64] });
+        let ty_file_rw = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], results: vec![ValType::I64] });
 
         // 导入（funcidx 0-5）
         for (name, ty) in [
@@ -609,6 +642,11 @@ impl Codegen {
             ("lom_ftoa", ty_ftoa),
             ("lom_json_parse", ty_json_parse),
             ("lom_json_stringify", ty_i64_i64),
+            ("lom_file_read", ty_json_parse),
+            ("lom_file_write", ty_file_rw),
+            ("lom_file_append", ty_file_rw),
+            ("lom_file_exists", ty_json_parse),
+            ("lom_env_args", ty_unit_i64),
         ] {
             m.imports.push(Import { module: "env".into(), name: name.into(), type_idx: ty });
         }
@@ -731,6 +769,7 @@ impl Codegen {
             variant_idx,
             import_aliases: std::collections::HashMap::new(),
             available_builtins,
+            known_packages: std::collections::HashSet::new(),
             data,
             statics,
             str_off,
@@ -1500,7 +1539,7 @@ impl Codegen {
                 ));
             }
             // 用户函数（具名直调；注意解释器里具名函数优先于同名闭包变量，保持一致）
-            if let Some(&idx) = self.fn_idx.get(orig) {
+            if let Some(&idx) = self.fn_idx.get(orig).or_else(|| self.fn_idx.get(real.as_str())) {
                 self.check_arity(orig, args.len())?;
                 for arg in args {
                     self.compile_expr(ctx, a, arg)?;
@@ -1713,6 +1752,25 @@ impl Codegen {
             "split" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
                 a.lget(s[0]).lget(s[1]).call(RT_SPLIT);
+            }
+            // ===== 7.8：file/env 模块（宿主导入）=====
+            "file_read" | "file_exists" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR)])?;
+                // (ptr+4, len)
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+                a.call(if name == "file_read" { IMP_FILE_READ } else { IMP_FILE_EXISTS });
+            }
+            "file_write" | "file_append" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
+                for i in 0..2 {
+                    a.lget(s[i]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
+                    a.lget(s[i]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+                }
+                a.call(if name == "file_write" { IMP_FILE_WRITE } else { IMP_FILE_APPEND });
+            }
+            "args" => {
+                a.call(IMP_ENV_ARGS);
             }
             // ===== 7.7：json 模块（宿主中介：harness 用 JS JSON.parse/stringify 实现）=====
             "json_parse" => {
@@ -4398,11 +4456,7 @@ mod tests {
 
     #[test]
     fn unsupported_constructs_report_phase() {
-        // file/env → 7.8（json/map 自 7.7/7.6b 起已支持）
-        let e = compile("from env import { args }\nfn main() -> Unit\n    println(args())\nend").unwrap_err();
-        assert!(e.contains("7.8"), "{}", e);
-        let e = compile("from file import { file_read }\nfn main() -> Unit\n    println(file_read(\"x\"))\nend").unwrap_err();
-        assert!(e.contains("7.8"), "{}", e);
+        // 7.8 起全部 stdlib 模块（io/string/math/list/json/map/file/env）都可编译——没有"不支持"的模块了
         // match / record / range / map / json 现在编译通过
         compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap();
         compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r.x)\nend").unwrap();

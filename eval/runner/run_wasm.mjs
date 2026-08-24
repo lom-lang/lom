@@ -218,6 +218,42 @@ const imports = {
       return materialize(v);
     },
     lom_json_stringify: (v) => taggedStr(stringifyVal(readVal(v))),
+    // 7.8：file/env（宿主文件系统/进程参数；ptr/len 是裸内存区间）
+    lom_file_read: (pp, pl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      return taggedStr(fs.readFileSync(p, 'utf8')); // 失败抛异常 → trap → 退出码 1（对齐解释器）
+    },
+    lom_file_write: (pp, pl, cp, cl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      const c = Buffer.from(new Uint8Array(memory.buffer, cp, cl)); // 字节写（对齐 fs::write 的 as_bytes）
+      fs.writeFileSync(p, c);
+      return 2n; // Unit
+    },
+    lom_file_append: (pp, pl, cp, cl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      const c = Buffer.from(new Uint8Array(memory.buffer, cp, cl));
+      fs.appendFileSync(p, c);
+      return 2n;
+    },
+    lom_file_exists: (pp, pl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      return fs.existsSync(p) ? 17n : 1n; // Bool tagged（true=17, false=1）
+    },
+    // args() → List<String>：argv = [wasm 路径, ...用户参数]（对齐解释器 argv[0]=程序路径）
+    // CLI 惯例：第一个裸 "--" 是分隔符，剥掉
+    lom_env_args: () => {
+      let args = process.argv.slice(2);
+      const dd = args.indexOf('--');
+      if (dd >= 0) args = [args[0], ...args.slice(dd + 1)];
+      let list = 9n; // Nil
+      for (let i = args.length - 1; i >= 0; i--) {
+        const p = instance.exports.lom_alloc(16);
+        rd().setBigInt64(p, taggedStr(args[i]), true);
+        rd().setBigInt64(p + 8, list, true);
+        list = (BigInt(p) << 4n) | 9n;
+      }
+      return list;
+    },
   },
 };
 

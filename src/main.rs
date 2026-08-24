@@ -562,6 +562,51 @@ fn run_fmt(src: &str, path: &str, cli: &CliArgs) {
 /// 退出码：
 ///   0 — 清单解析成功且所有包源码无错误
 ///   1 — 清单解析失败 / 依赖解析失败 / 包源码有错误
+/// Phase 7.8: 包合并（WASM 编译用）。当前目录有 lom.toml 时解析依赖图，
+/// 把每个依赖包的源码 item 合并到主程序前面（重名后主文件覆盖，对齐解释器语义）。
+/// 无 lom.toml 时原样返回。
+fn merge_packages_for_wasm(mut program: ast::Program) -> (ast::Program, Vec<String>) {
+    let toml_path = std::path::Path::new("lom.toml");
+    if !toml_path.exists() {
+        return (program, Vec::new());
+    }
+    let manifest = match package::load_manifest_file(toml_path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("lom.toml 解析失败: {}", e);
+            process::exit(1);
+        }
+    };
+    let graph = match package::resolve_dependencies(&manifest, std::path::Path::new(".")) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("依赖解析失败: {}", e);
+            process::exit(1);
+        }
+    };
+    let mut dep_items = Vec::new();
+    // 依赖顺序排序保确定性（HashMap 遍历序不稳定）
+    let mut pkgs: Vec<_> = graph.packages.values().collect();
+    pkgs.sort_by(|a, b| a.root.cmp(&b.root));
+    for pkg in pkgs {
+        for file in &pkg.source_files {
+            match fs::read_to_string(file) {
+                Ok(src) => {
+                    let items = parser::Parser::parse_recover(&src).program.items;
+                    dep_items.extend(items);
+                }
+                Err(e) => {
+                    eprintln!("无法读取包源码 '{}': {}", file.display(), e);
+                    process::exit(1);
+                }
+            }
+        }
+    }
+    dep_items.append(&mut program.items);
+    let names = graph.packages.keys().cloned().collect();
+    (ast::Program { items: dep_items }, names)
+}
+
 /// Phase 7.2: lom build <file.lom> --target wasm [-o out.wasm]
 /// 把 Lom 源文件编译为 WASM 二进制（动态语义，与解释器逐字对齐为长期目标）。
 /// 解析错误（LEX/PARSE）按既有惯例走人类可读诊断；不支持的构造报编译期错误。
@@ -593,8 +638,16 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         process::exit(1);
     }
     let program = parser::Parser::parse_recover(&src).program;
+    // 7.8 包链接：当前目录有 lom.toml 时，把依赖包源码合并进编译单元
+    // （包内 item 在前，主文件在后；重名函数后主文件覆盖——对齐解释器 load_packages 语义）
+    let (program, pkg_names) = merge_packages_for_wasm(program);
     // 4. 编译
-    let bytes = match wasm_codegen::compile_program(&program) {
+    // 无包走 compile_program（零开销路径），有包走 with_packages
+    let bytes = match if pkg_names.is_empty() {
+        wasm_codegen::compile_program(&program)
+    } else {
+        wasm_codegen::compile_program_with_packages(&program, &pkg_names)
+    } {
         Ok(b) => b,
         Err(e) => {
             eprintln!("{}", e);
