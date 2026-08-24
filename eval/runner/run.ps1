@@ -16,7 +16,10 @@ param(
     [switch]$Verbose,
     [switch]$Help,
     [string]$LomBin = "lom",
-    [string]$EvalDir = (Split-Path -Parent $PSScriptRoot)
+    [string]$EvalDir = (Split-Path -Parent $PSScriptRoot),
+    # Phase 7.9：后端选择——interp（默认，树遍历解释器）/ wasm（编译后经 node run_wasm.mjs 运行）
+    [string]$Backend = "interp",
+    [string]$NodeBin = "node"
 )
 
 if ($Help -or (-not $Verify -and -not $CandidatesDir)) {
@@ -76,8 +79,21 @@ function Test-OneTask($task, $src) {
         [System.IO.File]::WriteAllText($tmpPath, $src)
         # 只比对 stdout：stderr 是诊断通道（2026-08-22 起运行时类型检查 warning 走 stderr）
         # 同时要求进程退出码 0——"先打印正确输出再崩溃"不能算通过
-        $actual = & $LomBin $tmpPath 2>$null | Out-String
-        $exitCode = $LASTEXITCODE
+        if ($Backend -eq "wasm") {
+            # Phase 7.9：wasm 后端——先编译再经 node harness 运行
+            $wasmPath = $tmpPath -replace '\.lom$', '.wasm'
+            & $LomBin build $tmpPath --target wasm -o $wasmPath 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                return [pscustomobject]@{ Pass = $false; Expected = $task.expected; Actual = "<wasm 编译失败>" }
+            }
+            $harness = Join-Path $PSScriptRoot "run_wasm.mjs"
+            $actual = & $NodeBin $harness $wasmPath 2>$null | Out-String
+            $exitCode = $LASTEXITCODE
+            Remove-Item $wasmPath -Force -ErrorAction SilentlyContinue
+        } else {
+            $actual = & $LomBin $tmpPath 2>$null | Out-String
+            $exitCode = $LASTEXITCODE
+        }
         # Normalize line endings; use -ceq for case-sensitive comparison
         $expected = $task.expected -replace "`r`n", "`n"
         $actual = $actual -replace "`r`n", "`n"

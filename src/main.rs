@@ -641,6 +641,14 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
     // 7.8 包链接：当前目录有 lom.toml 时，把依赖包源码合并进编译单元
     // （包内 item 在前，主文件在后；重名函数后主文件覆盖——对齐解释器 load_packages 语义）
     let (program, pkg_names) = merge_packages_for_wasm(program);
+    // 7.9：类型检查可见性对齐——编译前跑检查器，诊断走 stderr，不拦截编译（渐进式承诺与解释器一致）
+    {
+        let mut tdiags = diagnostics::Diagnostics::new(file);
+        typechecker::check_program(&program, &src, file, &mut tdiags);
+        if !tdiags.ok {
+            eprint!("{}", tdiags.to_human());
+        }
+    }
     // 4. 编译
     // 无包走 compile_program（零开销路径），有包走 with_packages
     let bytes = match if pkg_names.is_empty() {

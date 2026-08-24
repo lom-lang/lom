@@ -84,3 +84,20 @@ jobs:
         run: |
           $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
           ./eval/runner/run.ps1 -Verify -LomBin $bin
+
+      - name: WASM eval parity (108 tasks via node, Phase 7.9)
+        # 双后端对齐 gate：eval 全套在 WASM 后端跑一遍（node 在三平台 runner 均预装）
+        shell: pwsh
+        run: |
+          $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
+          ./eval/runner/run.ps1 -Verify -LomBin $bin -Backend wasm
+
+      - name: WASM bootstrap golden (stmt_interp 逐字比对, Phase 7.9)
+        # 自举程序编译到 WASM 后与 golden 逐字比对；产物放工作目录而非 /tmp（Windows 上 Git Bash 的 /tmp 对 node.exe 不可见）
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then BIN=./target/release/lom.exe; else BIN=./target/release/lom; fi
+          $BIN build examples/bootstrap/stmt_interp.lom --target wasm -o _ci_stmt_interp.wasm
+          node eval/runner/run_wasm.mjs _ci_stmt_interp.wasm > _ci_stmt_wasm.txt
+          diff <(tr -d '\r' < examples/bootstrap/stmt_interp.expected.txt) <(tr -d '\r' < _ci_stmt_wasm.txt)
+          rm -f _ci_stmt_interp.wasm _ci_stmt_wasm.txt
