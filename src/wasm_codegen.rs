@@ -2,7 +2,7 @@
 //
 // 设计（RFC-0002）：
 // - 编译的是**动态语义**（与树遍历解释器逐字对齐），不是静态类型特化
-// - 值表示：tagged i64，低 3 位 tag：
+// - 值表示：tagged i64，低 4 位 tag（7.6 起；3 位曾导致 tag 8+ 被掩码截断）：
 //     0 = Int（v<<3）        1 = Bool（true=9, false=1）   2 = Unit（常量 2）
 //     3 = F64 盒（堆指针）    4 = Str（堆指针，布局 [len:u32][utf8 字节]）
 //   （List/Map/Record/Tuple/Enum/Closure 是 7.3-7.6 的事，本阶段编译期报错）
@@ -29,9 +29,9 @@ const TAG_UNIT: i64 = 2;
 const TAG_F64: i64 = 3;
 const TAG_STR: i64 = 4;
 
-const V_FALSE: i64 = 1; // (0<<3)|1
-const V_TRUE: i64 = 9; //  (1<<3)|1
-const V_UNIT: i64 = 2; //  (0<<3)|2
+const V_FALSE: i64 = 1; // (0<<4)|1
+const V_TRUE: i64 = 17; // (1<<4)|1
+const V_UNIT: i64 = 2; //  (0<<4)|2
 
 // ===== 导入函数索引（函数索引空间：导入在前）=====
 const IMP_PRINT_INT: u32 = 0; // (i64 v, i64 newline) -> ()
@@ -84,13 +84,39 @@ const RT_FTOA_STR: u32 = 40; // (f64) -> i64          经 lom_ftoa 导入格式�
 const RT_ENUM_PRINT: u32 = 41; // (i64 v, i64 newline) -> ()  枚举打印（含参数递归）；体在 finalize 填（需变体名表）
 const RT_ENUM_STR: u32 = 42; // (i64) -> i64                 枚举 → Str（display 用）
 const RT_ENUM_EQ: u32 = 43; // (i64, i64) -> i32              枚举递归相等
+// ===== 7.6a：Record/Tuple/List =====
+const RT_CONS: u32 = 44; // (i64 head, i64 tail) -> i64        cons 单元（tag 9）
+const RT_RANGE: u32 = 45; // (i64 start, i64 end) -> i64       a..b → List<Int>（左闭右开）
+const RT_LIST_LEN: u32 = 46; // (i64) -> i64 Int
+const RT_LIST_GET: u32 = 47; // (i64, i64 Int) -> i64          越界 trap
+const RT_SPLIT: u32 = 48; // (i64 s, i64 sep) -> i64 List      空 sep 逐字符
+const RT_LIST_MAP: u32 = 49; // (i64 f, i64 xs) -> i64         保序（反构再反转）
+const RT_LIST_FILTER: u32 = 50; // (i64 f, i64 xs) -> i64
+const RT_LIST_FOLD: u32 = 51; // (i64 f, i64 init, i64 xs) -> i64
+const RT_SUBSTR: u32 = 52; // (i64 s, i64 start, i64 end) -> i64 Str（字节切片）
+const RT_LIST_STR: u32 = 53; // (i64) -> i64  各 tag 的 display
+const RT_TUPLE_STR: u32 = 54;
+const RT_RECORD_STR: u32 = 55;
+const RT_TUPLE_EQ: u32 = 56; // (i64, i64) -> i32
+const RT_RECORD_EQ: u32 = 57;
+const RT_LIST_EQ: u32 = 58;
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 44;
+const FIRST_USER_FN: u32 = 59;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
 /// 枚举值 tag：堆对象布局 [variant_idx: i32][n_args: i32][args: i64×n]（7.5）
 const TAG_ENUM: i64 = 6;
+/// 元组 tag：[n: i32][elems: i64×n]（7.6）
+const TAG_TUPLE: i64 = 7;
+/// 记录 tag：[n: i32][(name_off: i32, val: i64)×n]（name_off 是静态串偏移，字段查找比偏移相等）
+const TAG_RECORD: i64 = 8;
+/// 列表 tag：cons 单元 [head: i64][tail: i64]；Nil = ptr 0 哨兵（对齐解释器 ListVal）
+const TAG_LIST: i64 = 9;
+/// Map tag：[buckets: i32][cap: i32][size: i32]；桶 [state: i32][key_off: i32][val: i64] 步长 16
+/// （state: 0 空 / 1 用 / 2 墓碑；bump arena 内存零初始化，空桶免费）
+#[allow(dead_code)] // 7.6b（Map 模块）使用
+const TAG_MAP: i64 = 10;
 
 // ===== 最小汇编器（WASM 指令按顺序发射；条件必须先算好再写 if/br_if）=====
 #[derive(Default)]
@@ -244,7 +270,7 @@ impl Asm {
     }
     /// 栈顶 i64 → tag（v & 7）
     fn tag(&mut self) -> &mut Self {
-        self.i64c(7).op(op::I64_AND)
+        self.i64c(15).op(op::I64_AND)
     }
     /// local `l` 的 tag == `tag`？（→ i32）
     fn tag_is(&mut self, l: u32, tag: i64) -> &mut Self {
@@ -252,16 +278,16 @@ impl Asm {
     }
     /// Int tagged → 原值（>>3 算术）
     fn untag(&mut self) -> &mut Self {
-        self.i64c(3).op(op::I64_SHR_S)
+        self.i64c(4).op(op::I64_SHR_S)
     }
-    /// 原值 → Int tagged（<<3）
+    /// 原值 → Int tagged（<<4）
     fn tag_int(&mut self) -> &mut Self {
-        self.i64c(3).op(op::I64_SHL)
+        self.i64c(4).op(op::I64_SHL)
     }
     /// i32(0/1) → Bool tagged i64
     fn bool_tag(&mut self) -> &mut Self {
         self.op(op::I64_EXTEND_I32_S)
-            .i64c(3)
+            .i64c(4)
             .op(op::I64_SHL)
             .i64c(TAG_BOOL)
             .op(op::I64_OR)
@@ -269,6 +295,7 @@ impl Asm {
 }
 
 /// 编译错误（不支持的构造，信息里指明哪个 Phase 7.x 支持）
+#[allow(dead_code)] // 7.6b（map）/7.7（json）落地前仍有调用点
 fn unsupported<T>(what: &str, phase: &str) -> Result<T, String> {
     Err(format!("WASM 后端暂不支持 {}（将在 {} 支持）", what, phase))
 }
@@ -343,6 +370,20 @@ impl FnCtx {
     }
 }
 
+/// display/打印用的符号静态串偏移（全在数据段静态区）
+#[derive(Clone, Copy)]
+struct Statics {
+    open_paren: u32,   // (
+    close_paren: u32,  // )
+    comma_sp: u32,     // ", "
+    open_bracket: u32, // [
+    close_bracket: u32,// ]
+    open_brace: u32,   // {
+    close_brace: u32,  // }
+    colon_sp: u32,     // ": "
+    comma: u32,        // ,
+}
+
 /// 编译器主结构
 pub struct Codegen {
     m: Module,
@@ -362,8 +403,8 @@ pub struct Codegen {
     available_builtins: std::collections::HashSet<String>,
     /// 静态数据镜像（offset 0 起）；字节 0 固定是 '\n'（rt_print 换行用）
     data: Vec<u8>,
-    /// "(" / ")" / ", " 三个静态串的偏移（枚举打印用）
-    paren_offs: (u32, u32, u32),
+    /// display/打印用的符号静态串偏移
+    statics: Statics,
     str_off: std::collections::HashMap<String, u32>,
     f64_off: std::collections::HashMap<u64, u32>,
 }
@@ -392,20 +433,23 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
             }
             Item::Import(imp) => {
                 // io：println/print 在 prelude 已可用，显式导入等价 no-op
-                // 7.4 起支持 string / math；list/json/map 待 7.6，file/env 待 7.8
+                // 7.4 起 string / math；7.6a 起 list；json 待 7.7，map 待 7.6b，file/env 待 7.8
                 const STRING_BUILTINS: &[&str] = &[
                     "len", "int_to_string", "string_to_int", "trim", "upper", "lower",
-                    "contains", "replace", "starts_with", "ends_with",
+                    "contains", "replace", "starts_with", "ends_with", "split",
                 ];
-                // 已导出但 WASM 侧未就绪（依赖 List/Json 等 7.6 类型）
-                const DEFERRED: &[&str] = &["split"];
                 const MATH_BUILTINS: &[&str] = &["sqrt", "abs", "min", "max"];
+                const LIST_BUILTINS: &[&str] = &[
+                    "list_empty", "list_length", "list_get", "list_is_empty", "list_head",
+                    "list_tail", "list_cons", "list_map", "list_filter", "list_fold",
+                ];
                 let exports: Option<&[&str]> = match imp.module.as_str() {
                     "io" => Some(&["println", "print"]),
                     "string" => Some(STRING_BUILTINS),
                     "math" => Some(MATH_BUILTINS),
-                    "list" | "json" | "map" => {
-                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.6 支持）", imp.module))
+                    "list" => Some(LIST_BUILTINS),
+                    "json" | "map" => {
+                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（map 在 7.6b、json 在 7.7 支持）", imp.module))
                     }
                     "file" | "env" => {
                         return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.8 支持）", imp.module))
@@ -415,12 +459,6 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
                 match exports {
                     Some(list) => {
                         for it in &imp.items {
-                            if DEFERRED.contains(&it.name.as_str()) {
-                                return Err(format!(
-                                    "WASM 后端暂不支持内置函数 '{}'（将在 7.6 支持）",
-                                    it.name
-                                ));
-                            }
                             if !list.contains(&it.name.as_str()) {
                                 return Err(format!(
                                     "WASM 编译：模块 '{}' 不导出符号 '{}'",
@@ -466,7 +504,8 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
     }
 
     // 收尾：funcref 表 + 变体名表 + 数据段 + 全局（hp 堆指针 + ftoa 64 字节 scratch 缓冲）
-    if !cg.table_entries.is_empty() {
+    // 表恒存在（哪怕空）——list_map/fold 等 helper 内含 call_indirect，无表即验证失败
+    {
         let n = cg.table_entries.len() as u32;
         cg.m.table = Some((n, Some(n)));
         cg.m.elems = cg.table_entries.clone();
@@ -474,11 +513,11 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
     // 变体名表（7.5）：按 idx 顺序的 [name_off: i32] 数组；枚举打印/串化 helper 的体在这里填
     let variant_table_off = cg.build_variant_table();
     {
-        let (po, pc, co) = cg.paren_offs;
+        let st = cg.statics;
         let pi = (RT_ENUM_PRINT - N_IMPORTS) as usize;
-        cg.m.funcs[pi].body = build_enum_print(variant_table_off, po, pc, co);
+        cg.m.funcs[pi].body = build_enum_print(variant_table_off, &st);
         let si = (RT_ENUM_STR - N_IMPORTS) as usize;
-        cg.m.funcs[si].body = build_enum_str(variant_table_off, po, pc, co);
+        cg.m.funcs[si].body = build_enum_str(variant_table_off, &st);
     }
     let data_end = cg.data.len() as u32;
     let heap_base = data_end + 64; // 64 字节 ftoa scratch（global 1）
@@ -512,10 +551,21 @@ impl Codegen {
         let true_off = intern_static(&mut data, &mut str_off, "true");
         let false_off = intern_static(&mut data, &mut str_off, "false");
         let unit_off = intern_static(&mut data, &mut str_off, "()");
-        // 7.5 枚举打印用："(", ")", ", "
+        // 7.5 枚举打印 + 7.6 display 用符号静态串
         let paren_open_off = intern_static(&mut data, &mut str_off, "(");
         let paren_close_off = intern_static(&mut data, &mut str_off, ")");
         let comma_off = intern_static(&mut data, &mut str_off, ", ");
+        let statics = Statics {
+            open_paren: paren_open_off,
+            close_paren: paren_close_off,
+            comma_sp: comma_off,
+            open_bracket: intern_static(&mut data, &mut str_off, "["),
+            close_bracket: intern_static(&mut data, &mut str_off, "]"),
+            open_brace: intern_static(&mut data, &mut str_off, "{"),
+            close_brace: intern_static(&mut data, &mut str_off, "}"),
+            colon_sp: intern_static(&mut data, &mut str_off, ": "),
+            comma: intern_static(&mut data, &mut str_off, ","),
+        };
         // 类型注册（add_type 自动去重）
         let ty_ii_unit = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![] });
         let ty_fi_unit = m.add_type(FuncType { params: vec![ValType::F64, ValType::I64], results: vec![] });
@@ -567,7 +617,7 @@ impl Codegen {
             (ty_i32_i32, vec![ValType::I32], build_alloc()),
             // ===== 7.4：字符串 / stdlib =====
             (ty_ii_i64, vec![ValType::I32; 6], build_str_concat()),
-            (ty_i64_i64, vec![], build_display(true_off, false_off, unit_off)),
+            (ty_i64_i64, vec![], build_display(true_off, false_off, unit_off, closure_off)),
             (ty_i64_i64, vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], build_itoa()),
             (ty_i64_i64, vec![ValType::I32; 4], build_str_len()),
             (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], build_stoi()),
@@ -586,6 +636,34 @@ impl Codegen {
             (ty_ii_unit, vec![ValType::I32; 5], vec![]),
             (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], vec![]),
             (ty_ii_i32, vec![ValType::I32; 4], build_enum_eq()),
+            // ===== 7.6a：Record/Tuple/List =====
+            (ty_ii_i64, vec![ValType::I64; 1], build_cons()),
+            (ty_ii_i64, vec![ValType::I64; 2], build_range()),
+            (ty_i64_i64, vec![ValType::I64; 2], build_list_len()),
+            (ty_ii_i64, vec![ValType::I64; 2], build_list_get()),
+            (ty_ii_i64, {
+                let mut v = vec![ValType::I32; 8];
+                v.extend([ValType::I64; 2]);
+                v
+            }, build_split()),
+            (ty_ii_i64, vec![ValType::I64; 3], build_list_map(ty_ii_i64)),
+            (ty_ii_i64, vec![ValType::I64; 3], build_list_filter(ty_ii_i64)),
+            (ty_iii_i64, vec![ValType::I64; 3], build_list_fold(ty_iii_i64)),
+            (ty_iii_i64, vec![ValType::I32; 5], build_substr()),
+            (ty_i64_i64, vec![ValType::I64; 3], build_list_str(&statics)),
+            (ty_i64_i64, {
+                let mut v = vec![ValType::I64; 1];
+                v.extend([ValType::I32; 3]);
+                v
+            }, build_tuple_str(&statics)),
+            (ty_i64_i64, {
+                let mut v = vec![ValType::I64; 1];
+                v.extend([ValType::I32; 3]);
+                v
+            }, build_record_str(&statics)),
+            (ty_ii_i32, vec![ValType::I32; 4], build_tuple_eq()),
+            (ty_ii_i32, vec![ValType::I32; 7], build_record_eq()),
+            (ty_ii_i32, vec![ValType::I64; 2], build_list_eq()),
         ];
         for (ty, locals, body) in helpers {
             m.funcs.push(Function { type_idx: ty, locals, body });
@@ -610,7 +688,7 @@ impl Codegen {
             import_aliases: std::collections::HashMap::new(),
             available_builtins,
             data,
-            paren_offs: (paren_open_off, paren_close_off, comma_off),
+            statics,
             str_off,
             f64_off: std::collections::HashMap::new(),
         }
@@ -627,7 +705,7 @@ impl Codegen {
             self.str_off.insert(s.to_string(), o);
             o
         };
-        ((off as i64) << 3) | TAG_STR
+        ((off as i64) << 4) | TAG_STR
     }
 
     /// f64 字面量 → 静态数据段装盒（去重），返回 tagged 值
@@ -641,7 +719,7 @@ impl Codegen {
             self.f64_off.insert(bits, o);
             o
         };
-        ((off as i64) << 3) | TAG_F64
+        ((off as i64) << 4) | TAG_F64
     }
 
     /// 枚举构造：参数求值 → [variant_idx: i32][n: i32][args: i64×n] 堆对象（tag 6）
@@ -730,7 +808,7 @@ impl Codegen {
                 // 字面量模式：值相等（rt_eq；Int/Float/Bool/Str 四种子集，对齐解释器）
                 match e {
                     Expr::Int(n) => {
-                        a.i64c(n << 3);
+                        a.i64c(n << 4);
                     }
                     Expr::Float(f) => {
                         let v = self.intern_f64(*f);
@@ -763,7 +841,7 @@ impl Codegen {
                 for (k, sp) in sub.iter().enumerate() {
                     // arg_k 装入新 local 再递归测试
                     let arg_l = ctx.alloc();
-                    a.lget(s).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
+                    a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
                     self.compile_pattern_test(ctx, a, sp, arg_l)?;
                     a.op(op::I32_AND);
                 }
@@ -775,7 +853,7 @@ impl Codegen {
     /// 变体测试（tag6 且 variant_idx 相等）→ i32
     fn emit_variant_test(&mut self, a: &mut Asm, s: u32, vidx: u32) {
         a.lget(s).tag().i64c(TAG_ENUM).op(op::I64_EQ);
-        a.lget(s).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(vidx as i32).op(op::I32_EQ);
+        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(vidx as i32).op(op::I32_EQ);
         a.op(op::I32_AND);
     }
 
@@ -788,7 +866,7 @@ impl Codegen {
         let mut name_offs = Vec::with_capacity(by_idx.len());
         for (_, name) in &by_idx {
             let off = self.intern_str(name);
-            name_offs.push(((off - TAG_STR) >> 3) as u32); // 去掉 tag 还原裸偏移
+            name_offs.push(((off - TAG_STR) >> 4) as u32); // 去掉 tag 还原裸偏移
         }
         let table_off = self.data.len() as u32;
         for no in name_offs {
@@ -870,7 +948,19 @@ impl Codegen {
                 a.lset(idx);
                 Ok(())
             }
-            Stmt::LetDestruct { .. } => unsupported("元组解构 let (a, b) = ...", "Phase 7.6"),
+            Stmt::LetDestruct { names, value } => {
+                // 元组解构（Phase 5.1）：tag7 + 数量一致，逐元素绑定
+                self.compile_expr(ctx, a, value)?;
+                let t = ctx.alloc();
+                a.lset(t);
+                a.tag_is(t, TAG_TUPLE).if_().else_().op(op::UNREACHABLE).end();
+                a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(names.len() as i32).op(op::I32_NE).if_().op(op::UNREACHABLE).end();
+                for (i, name) in names.iter().enumerate() {
+                    let idx = ctx.bind(name);
+                    a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(4 + 8 * i as u32).lset(idx);
+                }
+                Ok(())
+            }
             Stmt::Assign { target, value } => {
                 let idx = match ctx.lookup(target) {
                     Some(i) => i,
@@ -941,7 +1031,7 @@ impl Codegen {
                     a.tag_is(it, TAG_STR).if_();
                     {
                         // String 迭代：按 UTF-8 字符（cnt = 字节偏移；步进 = 当前字符字节数）
-                        a.lget(it).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(limit);
+                        a.lget(it).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(limit);
                         a.i64c(0).lset(cnt);
                         a.block();
                         ctx.labels.push(Label::Block);
@@ -961,7 +1051,7 @@ impl Codegen {
                         }
                         ctx.scopes.pop();
                         // cnt += 当前字符字节数（从 var 的字符串头读）
-                        a.lget(var_idx).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0)
+                        a.lget(var_idx).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0)
                             .op(op::I64_EXTEND_I32_S).lget(cnt).op(op::I64_ADD).lset(cnt);
                         a.br(ctx.depth(ctx.labels.len() - 1));
                         ctx.labels.pop();
@@ -971,7 +1061,39 @@ impl Codegen {
                     }
                     a.else_();
                     {
-                        a.op(op::UNREACHABLE); // List 等其他可迭代类型在 7.6
+                        a.tag_is(it, TAG_LIST).if_();
+                        {
+                            // List 迭代（7.6）：cnt 复用为当前 cons 指针；Nil（值 9）终止
+                            a.lget(it).lset(cnt);
+                            a.block();
+                            ctx.labels.push(Label::Block);
+                            a.loop_();
+                            ctx.labels.push(Label::Loop);
+                            a.lget(cnt).i64c(9).op(op::I64_EQ); // Nil 哨兵 = (0<<3)|9
+                            let bd = ctx.break_depth();
+                            a.br_if(bd);
+                            a.lget(cnt).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(var_idx);
+                            ctx.scopes.push(vec![(var.clone(), var_idx)]);
+                            for s in &body.stmts {
+                                self.compile_stmt(ctx, a, s)?;
+                            }
+                            if let Some(e) = &body.tail {
+                                self.compile_expr(ctx, a, e)?;
+                                a.op(op::DROP);
+                            }
+                            ctx.scopes.pop();
+                            a.lget(cnt).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(cnt);
+                            a.br(ctx.depth(ctx.labels.len() - 1));
+                            ctx.labels.pop();
+                            a.end();
+                            ctx.labels.pop();
+                            a.end();
+                        }
+                        a.else_();
+                        {
+                            a.op(op::UNREACHABLE); // Map/其他不可迭代
+                        }
+                        a.end();
                     }
                     a.end();
                 }
@@ -1044,7 +1166,7 @@ impl Codegen {
     fn compile_expr(&mut self, ctx: &mut FnCtx, a: &mut Asm, expr: &Expr) -> Result<(), String> {
         match expr {
             Expr::Int(n) => {
-                a.i64c(n << 3); // tag 0
+                a.i64c(n << 4); // tag 0
                 Ok(())
             }
             Expr::Float(f) => {
@@ -1168,13 +1290,13 @@ impl Codegen {
                 a.tag_is(t, TAG_ENUM).if_().else_().op(op::UNREACHABLE).end();
                 // idx = load32(ptr)；Ok=0/Some=2 解包，Err=1/None=3 早退
                 let vi = ctx.alloc();
-                a.lget(t).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(vi);
+                a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(vi);
                 a.lget(vi).i64c(0).op(op::I64_EQ);
                 a.lget(vi).i64c(2).op(op::I64_EQ);
                 a.op(op::I32_OR).if_i64();
                 ctx.labels.push(Label::If); // if 也是 label，br 深度要计入（7.2 的坑）
                 {
-                    a.lget(t).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
+                    a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
                 }
                 a.else_();
                 {
@@ -1185,11 +1307,113 @@ impl Codegen {
                 ctx.labels.pop();
                 Ok(())
             }
-            Expr::Record { .. } => unsupported("记录", "Phase 7.6"),
-            Expr::Tuple { .. } => unsupported("元组", "Phase 7.6"),
-            Expr::Index { .. } => unsupported("索引", "Phase 7.6"),
-            Expr::Field { .. } => unsupported("字段访问", "Phase 7.6"),
-            Expr::Range { .. } => unsupported("range 表达式 a..b", "Phase 7.6"),
+            Expr::Tuple { elems } => {
+                // 元组：[n: i32][elems: i64×n]（tag 7）
+                let mut scratches = Vec::new();
+                for e in elems {
+                    self.compile_expr(ctx, a, e)?;
+                    let s = ctx.alloc();
+                    a.lset(s);
+                    scratches.push(s);
+                }
+                let p = ctx.alloc();
+                a.i32c(4 + 8 * elems.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
+                a.lget(p).op(op::I32_WRAP_I64).i32c(elems.len() as i32).i32_store(0);
+                for (k, s) in scratches.iter().enumerate() {
+                    a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(4 + 8 * k as u32);
+                }
+                a.lget(p).tag_int().i64c(TAG_TUPLE).op(op::I64_OR);
+                Ok(())
+            }
+            Expr::Record { fields } => {
+                // 记录：[n: i32][(name_off: i32, val: i64)×n]（tag 8）；name_off 编译期 intern
+                let mut scratches = Vec::new();
+                for (_, e) in fields {
+                    self.compile_expr(ctx, a, e)?;
+                    let s = ctx.alloc();
+                    a.lset(s);
+                    scratches.push(s);
+                }
+                let p = ctx.alloc();
+                a.i32c(4 + 12 * fields.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
+                a.lget(p).op(op::I32_WRAP_I64).i32c(fields.len() as i32).i32_store(0);
+                for (k, ((fname, _), s)) in fields.iter().zip(scratches.iter()).enumerate() {
+                    let noff = (self.intern_str(fname) - TAG_STR) >> 4; // 裸偏移
+                    a.lget(p).op(op::I32_WRAP_I64).i32c(noff as i32).i32_store(4 + 12 * k as u32);
+                    a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(8 + 12 * k as u32);
+                }
+                a.lget(p).tag_int().i64c(TAG_RECORD).op(op::I64_OR);
+                Ok(())
+            }
+            Expr::Field { expr: obj, name } => {
+                // 元组 .N / 记录 .name（运行时按 tag 分派）
+                self.compile_expr(ctx, a, obj)?;
+                let s = ctx.alloc();
+                a.lset(s);
+                a.tag_is(s, TAG_TUPLE).if_i64();
+                match name.parse::<u32>() {
+                    Ok(idx) => {
+                    // 越界检查：idx < n（否则 trap）
+                    a.i32c(idx as i32).lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+                    a.op(op::I32_GE_U).if_().op(op::UNREACHABLE).end();
+                    a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(4 + 8 * idx);
+                    }
+                    Err(_) => {
+                        // 非数字字段名不可能是元组访问——运行到这里即 trap（记录字段走下面的 RECORD 分支）
+                        a.op(op::UNREACHABLE);
+                    }
+                }
+                a.else_();
+                {
+                    a.tag_is(s, TAG_RECORD).if_i64();
+                    {
+                        // 记录字段：按 name_off（编译期 intern 偏移）线性查找
+                        let target = (self.intern_str(name) - TAG_STR) >> 4;
+                        let rp = ctx.alloc(); // 记录指针（i64 槽装 i32 扩展）
+                        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).op(op::I64_EXTEND_I32_S).lset(rp);
+                        let i = ctx.alloc();
+                        a.i64c(0).lset(i);
+                        // $found 块带值：找到即 br
+                        a.block_i64();
+                        ctx.labels.push(Label::Block);
+                        let found_pos = ctx.labels.len() - 1;
+                        a.loop_();
+                        ctx.labels.push(Label::Loop);
+                        {
+                            // i >= n → 字段不存在 → trap
+                            a.lget(i).lget(rp).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).op(op::I64_GE_S).if_().op(op::UNREACHABLE).end();
+                            // name_off[i] == target → br $found（带值）
+                            a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
+                            a.i32c(target as i32).op(op::I32_EQ).if_();
+                            ctx.labels.push(Label::If);
+                            {
+                                a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+                                a.br(ctx.depth(found_pos));
+                            }
+                            a.end();
+                            ctx.labels.pop();
+                            a.lget(i).i64c(1).op(op::I64_ADD).lset(i);
+                            a.br(ctx.depth(ctx.labels.len() - 1));
+                        }
+                        ctx.labels.pop();
+                        a.end();
+                        a.op(op::UNREACHABLE); // loop 不会自然结束（要么 br 要么 trap）
+                        a.end();
+                        ctx.labels.pop();
+                    }
+                    a.else_().op(op::UNREACHABLE).end();
+                }
+                a.end();
+                Ok(())
+            }
+            Expr::Range { start, end } => {
+                // a..b → List<Int>（左闭右开，对齐解释器：两端须 Int）
+                self.compile_expr(ctx, a, start)?;
+                self.compile_expr(ctx, a, end)?;
+                a.call(RT_RANGE);
+                Ok(())
+            }
+            Expr::Index { .. } => Err("WASM 编译：索引操作 xs[i] 在解释器侧也未实现（用 list_get）".to_string()),
         }
     }
 
@@ -1250,6 +1474,21 @@ impl Codegen {
         }
         // 任意表达式 callee（如 make_adder(5)(10)）——闭包调用
         self.emit_closure_call(ctx, a, callee, args)
+    }
+
+    /// 求值参数到 scratch local，带可选 tag 检查；返回 scratch 列表
+    fn eval_args_tagged(&mut self, ctx: &mut FnCtx, a: &mut Asm, args: &[Expr], tags: &[Option<i64>]) -> Result<Vec<u32>, String> {
+        let mut out = Vec::new();
+        for (i, arg) in args.iter().enumerate() {
+            self.compile_expr(ctx, a, arg)?;
+            let s = ctx.alloc();
+            a.lset(s);
+            if let Some(t) = tags.get(i).copied().flatten() {
+                a.tag_is(s, t).if_().else_().op(op::UNREACHABLE).end();
+            }
+            out.push(s);
+        }
+        Ok(out)
     }
 
     /// 7.4 内建函数编译（调用点已确认名字已导入可用）。返回 Ok(true)=已处理。
@@ -1381,6 +1620,54 @@ impl Codegen {
                     a.else_().op(op::UNREACHABLE).end();
                     a.end();
                 }
+            }
+            // ===== 7.6a：list 模块 + split =====
+            "list_empty" => {
+                a.i64c(9); // Nil 哨兵 = (0<<3)|9
+            }
+            "list_is_empty" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
+                a.lget(s[0]).i64c(9).op(op::I64_EQ).bool_tag();
+            }
+            "list_head" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
+                a.lget(s[0]).i64c(9).op(op::I64_EQ).if_().op(op::UNREACHABLE).end(); // 空表 trap
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+            }
+            "list_tail" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
+                a.lget(s[0]).i64c(9).op(op::I64_EQ).if_().op(op::UNREACHABLE).end();
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
+            }
+            "list_length" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
+                a.lget(s[0]).call(RT_LIST_LEN);
+            }
+            "list_get" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST), Some(TAG_INT)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_LIST_GET);
+            }
+            "list_cons" => {
+                // cons(head, list)
+                let s = self.eval_args_tagged(ctx, a, args, &[None, Some(TAG_LIST)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_CONS);
+            }
+            "list_map" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_LIST_MAP);
+            }
+            "list_filter" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_LIST_FILTER);
+            }
+            "list_fold" => {
+                // list_fold(f, init, xs)
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), None, Some(TAG_LIST)])?;
+                a.lget(s[0]).lget(s[1]).lget(s[2]).call(RT_LIST_FOLD);
+            }
+            "split" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_SPLIT);
             }
             _ => return Ok(false),
         }
@@ -1629,8 +1916,32 @@ fn build_eq() -> Vec<u8> {
                 }
                 a.else_();
                 {
-                    // Int/Bool/Unit：tagged 值完全相等即值相等
-                    a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                    a.tag_is(0, TAG_TUPLE).if_i64();
+                    {
+                        a.lget(0).lget(1).call(RT_TUPLE_EQ).bool_tag();
+                    }
+                    a.else_();
+                    {
+                        a.tag_is(0, TAG_RECORD).if_i64();
+                        {
+                            a.lget(0).lget(1).call(RT_RECORD_EQ).bool_tag();
+                        }
+                        a.else_();
+                        {
+                            a.tag_is(0, TAG_LIST).if_i64();
+                            {
+                                a.lget(0).lget(1).call(RT_LIST_EQ).bool_tag();
+                            }
+                            a.else_();
+                            {
+                                // Int/Bool/Unit：tagged 值完全相等即值相等
+                                a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                            }
+                            a.end();
+                        }
+                        a.end();
+                    }
+                    a.end();
                 }
                 a.end();
             }
@@ -1645,7 +1956,7 @@ fn build_eq() -> Vec<u8> {
 /// rt_ne: rt_eq 结果翻转 Bool 位（v ^ 8：1↔9）
 fn build_ne() -> Vec<u8> {
     let mut a = Asm::new();
-    a.lget(0).lget(1).call(RT_EQ).i64c(8).op(op::I64_XOR);
+    a.lget(0).lget(1).call(RT_EQ).i64c(16).op(op::I64_XOR);
     a.b
 }
 
@@ -1673,7 +1984,7 @@ fn build_not() -> Vec<u8> {
     let mut a = Asm::new();
     a.tag_is(0, TAG_BOOL).if_i64();
     {
-        a.lget(0).i64c(8).op(op::I64_XOR);
+        a.lget(0).i64c(16).op(op::I64_XOR);
     }
     a.else_().op(op::UNREACHABLE).end();
     a.b
@@ -1684,7 +1995,7 @@ fn build_truthy() -> Vec<u8> {
     let mut a = Asm::new();
     a.tag_is(0, TAG_BOOL).if_i32();
     {
-        a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64);
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64);
     }
     a.else_().op(op::UNREACHABLE).end();
     a.b
@@ -1704,7 +2015,7 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.end();
         a.tag_is(0, TAG_BOOL).if_();
         {
-            a.lget(0).i64c(3).op(op::I64_SHR_U).lget(1).call(IMP_PRINT_BOOL).br(1);
+            a.lget(0).i64c(4).op(op::I64_SHR_U).lget(1).call(IMP_PRINT_BOOL).br(1);
         }
         a.end();
         a.tag_is(0, TAG_UNIT).if_();
@@ -1720,7 +2031,7 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.tag_is(0, TAG_STR).if_();
         {
             // ptr = wrap(v >> 3)
-            a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+            a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
             // lom_print(ptr + 4, len)
             a.lget(2).i32c(4).op(op::I32_ADD).lget(2).i32_load(0).call(IMP_PRINT_STR);
             // newline：打数据段 offset 0 处的 '\n'
@@ -1749,11 +2060,20 @@ fn build_print(closure_off: u32) -> Vec<u8> {
             a.lget(0).lget(1).call(RT_ENUM_PRINT).br(1);
         }
         a.end();
-        a.op(op::UNREACHABLE); // 其他 tag（List/Map/...）将在 7.6 支持
+        // 兜底：其余 tag（Tuple/Record/List 等）→ display 转字符串打印（对齐解释器 println 走 to_display）
+        {
+            a.lget(0).call(RT_DISPLAY).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+            a.lget(2).i32c(4).op(op::I32_ADD).lget(2).i32_load(0).call(IMP_PRINT_STR);
+            a.lget(1).i64c(0).op(op::I64_NE).if_();
+            {
+                a.i32c(0).i32c(1).call(IMP_PRINT_STR);
+            }
+            a.end();
+        }
+        }
+        a.end();
+        a.b
     }
-    a.end();
-    a.b
-}
 
 /// rt_alloc: (i32 size) -> i32；bump allocator（arena，不释放）
 /// local 1 (i32)：旧 hp 暂存（作为返回值）
@@ -1779,7 +2099,7 @@ fn build_box_f64() -> Vec<u8> {
 /// rt_unbox_f64: (i64 tagged) -> f64
 fn build_unbox_f64() -> Vec<u8> {
     let mut a = Asm::new();
-    a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).f64_load(0);
+    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).f64_load(0);
     a.b
 }
 
@@ -1806,8 +2126,8 @@ fn build_promote_f64() -> Vec<u8> {
 /// locals: 2=pl, 3=pr, 4=len, 5=i（全 i32）
 fn build_str_eq() -> Vec<u8> {
     let mut a = Asm::new();
-    a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
-    a.lget(1).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(3);
+    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+    a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(3);
     a.lget(2).i32_load(0).lset(4);
     // 长度不等 → return 0
     a.lget(4).lget(3).i32_load(0).op(op::I32_NE).if_();
@@ -1840,7 +2160,7 @@ fn build_str_eq() -> Vec<u8> {
 
 /// 发射：tagged Str 参数 → 堆指针（i32）存入 local
 fn emit_str_ptr(a: &mut Asm, param: u32, local: u32) {
-    a.lget(param).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(local);
+    a.lget(param).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(local);
 }
 
 /// rt_str_concat: (i64 a, i64 b) -> i64
@@ -1888,8 +2208,8 @@ fn build_str_concat() -> Vec<u8> {
 
 /// rt_display: (i64 v) -> i64 Str；对齐解释器 to_display
 /// Int→itoa，F64→ftoa，Bool→"true"/"false"，Unit→"()"，Str→原样
-fn build_display(true_off: u32, false_off: u32, unit_off: u32) -> Vec<u8> {
-    let tag_str_of = |off: u32| -> i64 { ((off as i64) << 3) | TAG_STR };
+fn build_display(true_off: u32, false_off: u32, unit_off: u32, closure_off: u32) -> Vec<u8> {
+    let tag_str_of = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
     let mut a = Asm::new();
     a.tag_is(0, TAG_INT).if_i64();
     {
@@ -1906,7 +2226,7 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32) -> Vec<u8> {
             a.tag_is(0, TAG_BOOL).if_i64();
             {
                 // (v>>3)!=0 → true
-                a.lget(0).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).if_i64();
+                a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).if_i64();
                 a.i64c(tag_str_of(true_off));
                 a.else_();
                 a.i64c(tag_str_of(false_off));
@@ -1931,7 +2251,39 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32) -> Vec<u8> {
                         {
                             a.lget(0).call(RT_ENUM_STR);
                         }
-                        a.else_().op(op::UNREACHABLE).end(); // List/Map/闭包等的 display 在 7.6
+                        a.else_();
+                        {
+                            a.tag_is(0, TAG_TUPLE).if_i64();
+                            {
+                                a.lget(0).call(RT_TUPLE_STR);
+                            }
+                            a.else_();
+                            {
+                                a.tag_is(0, TAG_RECORD).if_i64();
+                                {
+                                    a.lget(0).call(RT_RECORD_STR);
+                                }
+                                a.else_();
+                                {
+                                    a.tag_is(0, TAG_LIST).if_i64();
+                                    {
+                                        a.lget(0).call(RT_LIST_STR);
+                                    }
+                                    a.else_();
+                                    {
+                                        a.tag_is(0, TAG_CLOSURE).if_i64();
+                                        {
+                                            a.i64c(tag_str_of(closure_off));
+                                        }
+                                        a.else_().op(op::UNREACHABLE).end(); // Map 等：7.6b
+                                    }
+                                    a.end();
+                                }
+                                a.end();
+                            }
+                            a.end();
+                        }
+                        a.end();
                         a.end();
                     }
                     a.end();
@@ -2590,7 +2942,7 @@ fn build_enum_eq() -> Vec<u8> {
 
 /// rt_enum_print: (i64 v, i64 nl) -> ()；变体名 + (arg, ...)，参数递归 rt_print
 /// locals: 2=p, 3=idx, 4=n, 5=k, 6=name_off（全 i32）
-fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u32) -> Vec<u8> {
+fn build_enum_print(table_off: u32, st: &Statics) -> Vec<u8> {
     let mut a = Asm::new();
     emit_str_ptr(&mut a, 0, 2);
     a.lget(2).i32_load(0).lset(3); // idx
@@ -2602,7 +2954,7 @@ fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u3
     // 参数部分
     a.lget(4).i32c(0).op(op::I32_GT_S).if_();
     {
-        a.i32c((open_off + 4) as i32).i32c(1).call(IMP_PRINT_STR); // "("
+        a.i32c((st.open_paren + 4) as i32).i32c(1).call(IMP_PRINT_STR); // "("
         a.i32c(0).lset(5);
         a.block();
         a.loop_();
@@ -2614,7 +2966,7 @@ fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u3
             // k+1 < n → ", "
             a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
             {
-                a.i32c((comma_off + 4) as i32).i32c(2).call(IMP_PRINT_STR);
+                a.i32c((st.comma_sp + 4) as i32).i32c(2).call(IMP_PRINT_STR);
             }
             a.end();
             a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
@@ -2622,7 +2974,7 @@ fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u3
         }
         a.end();
         a.end();
-        a.i32c((close_off + 4) as i32).i32c(1).call(IMP_PRINT_STR); // ")"
+        a.i32c((st.close_paren + 4) as i32).i32c(1).call(IMP_PRINT_STR); // ")"
     }
     a.end();
     // 换行
@@ -2636,8 +2988,8 @@ fn build_enum_print(table_off: u32, open_off: u32, close_off: u32, comma_off: u3
 
 /// rt_enum_str: (i64 v) -> i64 Str；枚举 → to_display 字符串（concat 链）
 /// locals: 2=p, 3=idx, 4=n, 5=k, 6=name_off（i32），7=acc（i64）
-fn build_enum_str(table_off: u32, open_off: u32, close_off: u32, comma_off: u32) -> Vec<u8> {
-    let tag_str = |off: u32| -> i64 { ((off as i64) << 3) | TAG_STR };
+fn build_enum_str(table_off: u32, st: &Statics) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
     let mut a = Asm::new();
     emit_str_ptr(&mut a, 0, 2);
     a.lget(2).i32_load(0).lset(3);
@@ -2652,7 +3004,7 @@ fn build_enum_str(table_off: u32, open_off: u32, close_off: u32, comma_off: u32)
     a.else_();
     {
         // acc += "("
-        a.lget(7).i64c(tag_str(open_off)).call(RT_STR_CONCAT).lset(7);
+        a.lget(7).i64c(tag_str(st.open_paren)).call(RT_STR_CONCAT).lset(7);
         a.i32c(0).lset(5);
         a.block();
         a.loop_();
@@ -2663,7 +3015,7 @@ fn build_enum_str(table_off: u32, open_off: u32, close_off: u32, comma_off: u32)
             // k+1 < n → acc += ", "
             a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
             {
-                a.lget(7).i64c(tag_str(comma_off)).call(RT_STR_CONCAT).lset(7);
+                a.lget(7).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(7);
             }
             a.end();
             a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
@@ -2672,10 +3024,506 @@ fn build_enum_str(table_off: u32, open_off: u32, close_off: u32, comma_off: u32)
         a.end();
         a.end();
         // acc += ")"
-        a.lget(7).i64c(tag_str(close_off)).call(RT_STR_CONCAT).lset(7);
+        a.lget(7).i64c(tag_str(st.close_paren)).call(RT_STR_CONCAT).lset(7);
         a.lget(7);
     }
     a.end();
+    a.b
+}
+
+// ===== 7.6a：Record/Tuple/List helper =====
+
+/// 闭包调用序列（在 helper 里）：env + 参数 + 表索引，call_indirect
+/// f_local 是装着闭包值（tag5）的 i64 local；arg_locals 依次压参数
+fn emit_helper_call_closure(a: &mut Asm, f_local: u32, ty: u32, arg_locals: &[u32]) {
+    // env（obj+4 的 i32 → i64）
+    a.lget(f_local).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(4).op(op::I64_EXTEND_I32_S);
+    for &al in arg_locals {
+        a.lget(al);
+    }
+    // 表索引（obj+0 的 i32）
+    a.lget(f_local).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+    a.call_indirect(ty);
+}
+
+/// rt_cons: (i64 head, i64 tail) -> i64 List；cons 单元 [head][tail]（tag 9）
+/// local 2 (i64)：新单元指针
+fn build_cons() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.i32c(16).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(2);
+    a.lget(2).op(op::I32_WRAP_I64).lget(0).i64_store(0);
+    a.lget(2).op(op::I32_WRAP_I64).lget(1).i64_store(8);
+    a.lget(2).tag_int().i64c(TAG_LIST).op(op::I64_OR);
+    a.b
+}
+
+/// rt_range: (i64 start, i64 end) -> i64 List<Int>；左闭右开
+/// locals: 2=v(i64), 3=list(i64)
+fn build_range() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(0, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(1, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(1).untag().lset(2); // v = end
+    a.i64c(9).lset(3); // list = Nil
+    a.block();
+    a.loop_();
+    {
+        a.lget(2).lget(0).untag().op(op::I64_LE_S).br_if(1); // v <= start → 完成
+        a.lget(2).i64c(1).op(op::I64_SUB).lset(2); // v--
+        a.lget(2).tag_int().lget(3).call(RT_CONS).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(3);
+    a.b
+}
+
+/// rt_list_len: (i64) -> i64 Int
+/// locals: 1=cur(i64), 2=n(i64)
+fn build_list_len() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(0, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(0).lset(1);
+    a.i64c(0).lset(2);
+    a.block();
+    a.loop_();
+    {
+        a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
+        a.lget(2).i64c(1).op(op::I64_ADD).lset(2);
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(2).tag_int();
+    a.b
+}
+
+/// rt_list_get: (i64 xs, i64 i) -> i64；越界 trap（对齐解释器报错）
+/// locals: 2=cur(i64), 3=k(i64)
+fn build_list_get() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(0, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(1, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(0).lset(2);
+    a.lget(1).untag().lset(3);
+    a.loop_();
+    {
+        a.lget(2).i64c(9).op(op::I64_EQ).if_();
+        a.op(op::UNREACHABLE); // 越界
+        a.end();
+        a.lget(3).op(op::I64_EQZ).if_();
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).op(op::RETURN);
+        a.end();
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.lget(3).i64c(1).op(op::I64_SUB).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.op(op::UNREACHABLE); // loop 不自然结束
+    a.b
+}
+
+/// rt_substr: (i64 s, i64 start, i64 end) -> i64 Str（字节切片；调用方保证 0<=start<=end<=len）
+/// locals: 3=ps, 4=st, 5=p, 6=len, 7=i（全 i32）
+fn build_substr() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 3);
+    a.lget(1).untag().op(op::I32_WRAP_I64).lset(4); // st
+    // len = end - start
+    a.lget(2).untag().op(op::I32_WRAP_I64).lget(4).op(op::I32_SUB).lset(6);
+    a.lget(6).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(5);
+    a.lget(5).lget(6).i32_store(0);
+    a.i32c(0).lset(7);
+    a.block();
+    a.loop_();
+    {
+        a.lget(7).lget(6).op(op::I32_GE_U).br_if(1);
+        a.lget(5).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
+        a.lget(3).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.i32_store8(0);
+        a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
+/// 列表反序逻辑（inline 于 split/map/filter）：out（反序）→ res（正序）；都是 i64 local
+fn emit_list_reverse(a: &mut Asm, out: u32, res: u32) {
+    a.i64c(9).lset(res); // Nil
+    a.block();
+    a.loop_();
+    {
+        a.lget(out).i64c(9).op(op::I64_EQ).br_if(1);
+        a.lget(out).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+        a.lget(res).call(RT_CONS).lset(res);
+        a.lget(out).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(out);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+}
+
+/// rt_split: (i64 s, i64 sep) -> i64 List；空 sep 逐字符（UTF-8）；非空按子串（Rust split 语义，含尾空段）
+/// locals: 2=ps,3=ls,4=psep,5=lsep,6=i,7=start,8=j,9=mf（i32）；10=out(i64),11=tmp(i64)
+fn build_split() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(0, TAG_STR).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(1, TAG_STR).if_().else_().op(op::UNREACHABLE).end();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 4);
+    a.lget(2).i32_load(0).lset(3);
+    a.lget(4).i32_load(0).lset(5);
+    a.i64c(9).lset(10); // out = Nil
+    // 空 sep → 逐字符
+    a.lget(5).op(op::I32_EQZ).if_();
+    {
+        a.i32c(0).lset(6);
+        a.block();
+        a.loop_();
+        {
+            a.lget(6).lget(3).op(op::I32_GE_U).br_if(1);
+            // ch = str_char_at(s, i)；cons；i += 字符字节数
+            a.lget(0).lget(6).op(op::I64_EXTEND_I32_S).call(RT_STR_CHAR_AT).lset(11);
+            a.lget(11).lget(10).call(RT_CONS).lset(10);
+            a.lget(11).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(6).op(op::I32_ADD).lset(6);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+    }
+    a.else_();
+    {
+        a.i32c(0).lset(6).i32c(0).lset(7);
+        a.block();
+        a.loop_();
+        {
+            // i + lsep > ls → break
+            a.lget(6).lget(5).op(op::I32_ADD).lget(3).op(op::I32_GT_S).br_if(1);
+            emit_match_at(&mut a, 2, 4, 5, 6, 8, 9);
+            a.lget(9).if_();
+            {
+                // piece = substr(s, start, i)
+                a.lget(0).lget(7).op(op::I64_EXTEND_I32_S).tag_int().lget(6).op(op::I64_EXTEND_I32_S).tag_int().call(RT_SUBSTR).lset(11);
+                a.lget(11).lget(10).call(RT_CONS).lset(10);
+                a.lget(6).lget(5).op(op::I32_ADD).lset(6);
+                a.lget(6).lset(7);
+            }
+            a.else_();
+            {
+                a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+            }
+            a.end();
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        // 尾段
+        a.lget(0).lget(7).op(op::I64_EXTEND_I32_S).tag_int().lget(3).op(op::I64_EXTEND_I32_S).tag_int().call(RT_SUBSTR).lset(11);
+        a.lget(11).lget(10).call(RT_CONS).lset(10);
+    }
+    a.end();
+    // 反序回正
+    emit_list_reverse(&mut a, 10, 11);
+    a.lget(11);
+    a.b
+}
+
+/// rt_list_map: (i64 f, i64 xs) -> i64 List；保序（反构再反转）
+/// locals: 2=cur(i64), 3=out(i64), 4=tmp(i64)
+fn build_list_map(ty_call1: u32) -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(1, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(1).lset(2);
+    a.i64c(9).lset(3);
+    a.block();
+    a.loop_();
+    {
+        a.lget(2).i64c(9).op(op::I64_EQ).br_if(1);
+        // r = f(head)：head 先入 tmp
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(4);
+        emit_helper_call_closure(&mut a, 0, ty_call1, &[4]);
+        a.lget(3).call(RT_CONS).lset(3); // cons(r, out)——call 结果在栈
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    emit_list_reverse(&mut a, 3, 4);
+    a.lget(4);
+    a.b
+}
+
+/// rt_list_filter: (i64 f, i64 xs) -> i64 List；f 结果走 truthy（对齐解释器 is_truthy）
+/// locals: 2=cur(i64), 3=out(i64), 4=tmp(i64)
+fn build_list_filter(ty_call1: u32) -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(1, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(1).lset(2);
+    a.i64c(9).lset(3);
+    a.block();
+    a.loop_();
+    {
+        a.lget(2).i64c(9).op(op::I64_EQ).br_if(1);
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(4); // head
+        emit_helper_call_closure(&mut a, 0, ty_call1, &[4]);
+        a.call(RT_TRUTHY).if_(); // truthy(f(head)) → 保留
+        {
+            a.lget(4).lget(3).call(RT_CONS).lset(3);
+        }
+        a.end();
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    emit_list_reverse(&mut a, 3, 4);
+    a.lget(4);
+    a.b
+}
+
+/// rt_list_fold: (i64 f, i64 init, i64 xs) -> i64
+/// locals: 3=acc(i64), 4=cur(i64), 5=head(i64)
+fn build_list_fold(ty_call2: u32) -> Vec<u8> {
+    let mut a = Asm::new();
+    a.tag_is(2, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(1).lset(3); // acc = init
+    a.lget(2).lset(4);
+    a.block();
+    a.loop_();
+    {
+        a.lget(4).i64c(9).op(op::I64_EQ).br_if(1);
+        // acc = f(acc, head)
+        a.lget(4).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(5); // head
+        emit_helper_call_closure(&mut a, 0, ty_call2, &[3, 5]);
+        a.lset(3);
+        a.lget(4).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(4);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(3);
+    a.b
+}
+
+/// rt_list_str: (i64) -> i64 Str；"[a, b]"
+/// locals: 1=cur(i64), 2=acc(i64), 3=first(i64)
+fn build_list_str(st: &Statics) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
+    let mut a = Asm::new();
+    a.i64c(tag_str(st.open_bracket)).lset(2); // acc = "["
+    a.i64c(1).lset(3); // first = true
+    a.lget(0).lset(1);
+    a.block();
+    a.loop_();
+    {
+        a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
+        // first 之外加 ", "
+        a.lget(3).op(op::I64_EQZ).if_();
+        {
+            a.lget(2).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(2);
+        }
+        a.end();
+        a.lget(2).lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(2);
+        a.i64c(0).lset(3);
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(2).i64c(tag_str(st.close_bracket)).call(RT_STR_CONCAT);
+    a.b
+}
+
+/// rt_tuple_str: "(a, b)"；单元素 "(a,)"
+/// locals: 1=acc(i64), 2=p(i32), 3=n(i32), 4=k(i32)
+fn build_tuple_str(st: &Statics) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
+    let mut a = Asm::new();
+    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+    a.lget(2).i32_load(0).lset(3); // n
+    a.i64c(tag_str(st.open_paren)).lset(1);
+    a.i32c(0).lset(4);
+    a.block();
+    a.loop_();
+    {
+        a.lget(4).lget(3).op(op::I32_GE_U).br_if(1);
+        // k>0 → ", "
+        a.lget(4).i32c(0).op(op::I32_GT_S).if_();
+        {
+            a.lget(1).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(1);
+        }
+        a.end();
+        a.lget(1).lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(1);
+        a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 单元素补 ","（对齐解释器 "(1,)"）
+    a.lget(3).i32c(1).op(op::I32_EQ).if_();
+    {
+        a.lget(1).i64c(tag_str(st.comma)).call(RT_STR_CONCAT).lset(1);
+    }
+    a.end();
+    a.lget(1).i64c(tag_str(st.close_paren)).call(RT_STR_CONCAT);
+    a.b
+}
+
+/// rt_record_str: "{x: 3, y: 4}"（声明顺序）
+/// locals: 1=acc(i64), 2=p(i32), 3=n(i32), 4=k(i32)
+fn build_record_str(st: &Statics) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
+    let mut a = Asm::new();
+    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+    a.lget(2).i32_load(0).lset(3);
+    a.i64c(tag_str(st.open_brace)).lset(1);
+    a.i32c(0).lset(4);
+    a.block();
+    a.loop_();
+    {
+        a.lget(4).lget(3).op(op::I32_GE_U).br_if(1);
+        a.lget(4).i32c(0).op(op::I32_GT_S).if_();
+        {
+            a.lget(1).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(1);
+        }
+        a.end();
+        // 字段名（静态串偏移 → tagged str）+ ": " + display(val)
+        a.lget(1);
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+        a.op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+        a.call(RT_STR_CONCAT).i64c(tag_str(st.colon_sp)).call(RT_STR_CONCAT).lset(1);
+        a.lget(1).lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(1);
+        a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(1).i64c(tag_str(st.close_brace)).call(RT_STR_CONCAT);
+    a.b
+}
+
+/// rt_tuple_eq: (i64, i64) -> i32
+/// locals: 2=pa, 3=pb, 4=na, 5=k（全 i32）
+fn build_tuple_eq() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 3);
+    a.lget(2).i32_load(0).lset(4);
+    a.lget(4).lget(3).i32_load(0).op(op::I32_NE).if_();
+    a.i32c(0).op(op::RETURN);
+    a.end();
+    a.i32c(0).lset(5);
+    a.block();
+    a.loop_();
+    {
+        a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(2).i32c(4).op(op::I32_ADD).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0);
+        a.lget(3).i32c(4).op(op::I32_ADD).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0);
+        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.i32c(0).op(op::RETURN);
+        a.end();
+        a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i32c(1);
+    a.b
+}
+
+/// rt_record_eq: (i64, i64) -> i32；字段集相同（顺序不敏感）+ 对应值递归相等
+/// locals: 2=pa, 3=pb, 4=na, 5=nb, 6=i, 7=j, 8=found（全 i32）
+fn build_record_eq() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 3);
+    a.lget(2).i32_load(0).lset(4);
+    a.lget(3).i32_load(0).lset(5);
+    a.lget(4).lget(5).op(op::I32_NE).if_();
+    a.i32c(0).op(op::RETURN);
+    a.end();
+    a.i32c(0).lset(6); // i
+    a.block(); // $outer
+    a.loop_();
+    {
+        a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
+        // 在 b 里找 a 的第 i 个字段名
+        a.i32c(0).lset(8); // found = 0
+        a.i32c(0).lset(7); // j
+        a.block(); // $find
+        a.loop_();
+        {
+            a.lget(7).lget(5).op(op::I32_GE_U).br_if(1);
+            // name_off 相等？
+            a.lget(2).i32c(4).op(op::I32_ADD).lget(6).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+            a.lget(3).i32c(4).op(op::I32_ADD).lget(7).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+            a.op(op::I32_EQ).if_();
+            {
+                a.i32c(1).lset(8);
+                // 值递归相等？
+                a.lget(2).i32c(4).op(op::I32_ADD).lget(6).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4);
+                a.lget(3).i32c(4).op(op::I32_ADD).lget(7).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4);
+                a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+                a.i32c(0).op(op::RETURN); // 值不等 → 0
+                a.end();
+                a.br(2); // 跳出 $find（继续下一字段）
+            }
+            a.end();
+            a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        // 没找到 → 0
+        a.lget(8).op(op::I32_EQZ).if_();
+        a.i32c(0).op(op::RETURN);
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i32c(1);
+    a.b
+}
+
+/// rt_list_eq: (i64, i64) -> i32
+/// locals: 2=ca(i64), 3=cb(i64)
+fn build_list_eq() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).lset(2);
+    a.lget(1).lset(3);
+    a.loop_();
+    {
+        // ca == Nil → return (cb == Nil)
+        a.lget(2).i64c(9).op(op::I64_EQ).if_();
+        {
+            a.lget(3).i64c(9).op(op::I64_EQ).op(op::RETURN);
+        }
+        a.end();
+        // cb == Nil → return 0
+        a.lget(3).i64c(9).op(op::I64_EQ).if_();
+        {
+            a.i32c(0).op(op::RETURN);
+        }
+        a.end();
+        // head 不等 → 0
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+        a.lget(3).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.i32c(0).op(op::RETURN);
+        a.end();
+        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.lget(3).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(3);
+        a.br(0);
+    }
+    a.end();
+    a.op(op::UNREACHABLE);
     a.b
 }
 
@@ -2811,11 +3659,11 @@ impl Codegen {
         // 3. 必须是闭包值（解释器报"不能调用 X 类型的值"，7.3 用 trap 兜底）
         a.tag_is(cl, TAG_CLOSURE).if_().else_().op(op::UNREACHABLE).end();
         // 4. 压 env（obj+4 的 i32 → i64）→ 参数 → 表索引（最后压栈）
-        a.lget(cl).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(4).op(op::I64_EXTEND_I32_S);
+        a.lget(cl).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(4).op(op::I64_EXTEND_I32_S);
         for s in &scratches {
             a.lget(*s);
         }
-        a.lget(cl).i64c(3).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+        a.lget(cl).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
         let ty = self.m.add_type(FuncType {
             params: vec![ValType::I64; args.len() + 1],
             results: vec![ValType::I64],
@@ -3010,13 +3858,15 @@ mod tests {
 
     #[test]
     fn unsupported_constructs_report_phase() {
-        // range/记录 → 7.6（match 自 7.5 起已支持，见 e2e）
-        let e = compile("fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\nend").unwrap_err();
-        assert!(e.contains("7.6"), "{}", e);
-        let e = compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r)\nend").unwrap_err();
-        assert!(e.contains("7.6"), "{}", e);
-        // match 现在编译通过
+        // map 模块 → 7.6b；json → 7.7（match/record/range 自 7.5/7.6a 起已支持，见 e2e）
+        let e = compile("from map import { map_empty }\nfn main() -> Unit\n    println(map_empty())\nend").unwrap_err();
+        assert!(e.contains("7.6b"), "{}", e);
+        let e = compile("from json import { json_parse }\nfn main() -> Unit\n    println(json_parse(\"1\"))\nend").unwrap_err();
+        assert!(e.contains("7.7"), "{}", e);
+        // match / record / range 现在编译通过
         compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap();
+        compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r.x)\nend").unwrap();
+        compile("fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\nend").unwrap();
     }
 
     #[test]
@@ -3322,6 +4172,46 @@ mod e2e {
             "fn main() -> Unit\n    println(Ok(42))\n    println(None)\n    println(Ok(1) == Ok(1))\n    println(Ok(1) == Ok(2))\n    println(None == None)\n    println(Some(\"hi\") == Some(\"hi\"))\nend",
             "enum_pe",
             "Ok(42)\nNone\ntrue\nfalse\ntrue\ntrue\n",
+        );
+    }
+
+    // ===== Phase 7.6a：Record/Tuple/List =====
+
+    #[test]
+    fn e2e_tuple_record_field() {
+        check(
+            "fn swap(pair: (Int, String)) -> (String, Int)\n    (pair.1, pair.0)\nend\nfn main() -> Unit\n    let p = {x: 3, y: 4}\n    println(p.x + p.y)\n    let t = (10, \"hello\", True)\n    println(t.0)\n    println(t.1)\n    println(t.2)\n    let s = swap((42, \"world\"))\n    println(s.0)\n    println(s.1)\n    let (a, b) = (1, 2)\n    println(a + b)\nend",
+            "tup_rec",
+            "7\n10\nhello\ntrue\nworld\n42\n3\n",
+        );
+    }
+
+    #[test]
+    fn e2e_record_eq_order_insensitive() {
+        // 结构等价：字段顺序不敏感（对齐解释器 values_eq）
+        check(
+            "fn main() -> Unit\n    println({x: 1, y: 2} == {y: 2, x: 1})\n    println({x: 1} == {x: 2})\n    println((1, 2, 3) == (1, 2, 3))\n    println((1, 2) == (1, 3))\nend",
+            "rec_eq",
+            "true\nfalse\ntrue\nfalse\n",
+        );
+    }
+
+    #[test]
+    fn e2e_list_builtins_and_range() {
+        check(
+            "from list import { list_cons, list_head, list_tail, list_length, list_get, list_is_empty, list_empty }\nfn main() -> Unit\n    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))\n    println(list_length(xs))\n    println(list_head(xs))\n    println(list_head(list_tail(xs)))\n    println(list_get(xs, 2))\n    println(list_is_empty(xs))\n    println(list_is_empty(list_empty()))\n    println(1..4)\n    let mut s = 0\n    for x in 1..5\n        s = s + x\n    end\n    println(s)\nend",
+            "list",
+            "3\n1\n2\n3\nfalse\ntrue\n[1, 2, 3]\n10\n",
+        );
+    }
+
+    #[test]
+    fn e2e_list_hof_and_split() {
+        // list_map/filter/fold + split（命名函数当值 + 闭包回调）
+        check(
+            "from list import { list_map, list_filter, list_fold }\nfrom string import { split }\nfn double(x: Int) -> Int\n    x * 2\nend\nfn main() -> Unit\n    println(list_map(double, 1..4))\n    println(list_filter(fn(x: Int) -> Bool\n        x % 2 == 0\n    end, 1..6))\n    println(list_fold(fn(acc: Int, x: Int) -> Int\n        acc + x\n    end, 0, 1..5))\n    println(split(\"a-b-c\", \"-\"))\n    println(split(\"hi\", \"\"))\nend",
+            "hof_list",
+            "[2, 4, 6]\n[2, 4]\n10\n[a, b, c]\n[h, i]\n",
         );
     }
 }
