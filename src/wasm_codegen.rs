@@ -100,8 +100,19 @@ const RT_RECORD_STR: u32 = 55;
 const RT_TUPLE_EQ: u32 = 56; // (i64, i64) -> i32
 const RT_RECORD_EQ: u32 = 57;
 const RT_LIST_EQ: u32 = 58;
+// ===== 7.6b：Map（开放寻址 + 墓碑 + FNV-1a）=====
+const RT_MAP_NEW: u32 = 59; // () -> i64
+const RT_MAP_PROBE: u32 = 60; // (i64 m, i64 k) -> i32      命中=桶下标；未命中= -（插入槽+1)
+const RT_MAP_SET: u32 = 61; // (i64 m, i64 k, i64 v) -> i64 Unit
+const RT_MAP_GET: u32 = 62; // (i64 m, i64 k) -> i64 Option
+const RT_MAP_HAS: u32 = 63; // (i64 m, i64 k) -> i64 Bool
+const RT_MAP_REMOVE: u32 = 64; // (i64 m, i64 k) -> i64 Unit
+const RT_MAP_KEYS: u32 = 65; // (i64) -> i64 List（str_cmp 插入排序，确定性）
+const RT_MAP_VALUES: u32 = 66; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
+const RT_MAP_STR: u32 = 67; // (i64) -> i64 Str（排序 "{k: v}"）
+const RT_MAP_EQ: u32 = 68; // (i64, i64) -> i32
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = 59;
+const FIRST_USER_FN: u32 = 69;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
@@ -448,8 +459,9 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
                     "string" => Some(STRING_BUILTINS),
                     "math" => Some(MATH_BUILTINS),
                     "list" => Some(LIST_BUILTINS),
-                    "json" | "map" => {
-                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（map 在 7.6b、json 在 7.7 支持）", imp.module))
+                    "map" => Some(&["map_empty", "map_set", "map_get", "map_has", "map_remove", "map_keys", "map_values", "map_size"]),
+                    "json" => {
+                        return Err(format!("WASM 后端暂不支持导入模块 '{}'（json 在 7.7 支持）", imp.module))
                     }
                     "file" | "env" => {
                         return Err(format!("WASM 后端暂不支持导入模块 '{}'（将在 7.8 支持）", imp.module))
@@ -580,6 +592,7 @@ impl Codegen {
         let ty_i32_i32 = m.add_type(FuncType { params: vec![ValType::I32], results: vec![ValType::I32] });
         let ty_ftoa = m.add_type(FuncType { params: vec![ValType::F64, ValType::I32], results: vec![ValType::I32] });
         let ty_iii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64, ValType::I64], results: vec![ValType::I64] });
+        let ty_unit_i64 = m.add_type(FuncType { params: vec![], results: vec![ValType::I64] });
 
         // 导入（funcidx 0-5）
         for (name, ty) in [
@@ -614,7 +627,7 @@ impl Codegen {
             (ty_i64_i64, vec![], build_not()),
             (ty_i64_i32, vec![], build_truthy()),
             (ty_ii_unit, vec![ValType::I32], build_print(closure_off)),
-            (ty_i32_i32, vec![ValType::I32], build_alloc()),
+            (ty_i32_i32, vec![ValType::I32; 3], build_alloc()),
             // ===== 7.4：字符串 / stdlib =====
             (ty_ii_i64, vec![ValType::I32; 6], build_str_concat()),
             (ty_i64_i64, vec![], build_display(true_off, false_off, unit_off, closure_off)),
@@ -664,6 +677,30 @@ impl Codegen {
             (ty_ii_i32, vec![ValType::I32; 4], build_tuple_eq()),
             (ty_ii_i32, vec![ValType::I32; 7], build_record_eq()),
             (ty_ii_i32, vec![ValType::I64; 2], build_list_eq()),
+            // ===== 7.6b：Map =====
+            (ty_unit_i64, vec![ValType::I32; 1], build_map_new()),
+            (ty_ii_i32, vec![ValType::I32; 9], build_map_probe()),
+            (ty_iii_i64, vec![ValType::I32; 11], build_map_set()),
+            (ty_ii_i64, vec![ValType::I32, ValType::I64, ValType::I64], build_map_get()),
+            (ty_ii_i64, vec![], build_map_has()),
+            (ty_ii_i64, vec![ValType::I32; 1], build_map_remove()),
+            (ty_i64_i64, {
+                let mut v = vec![ValType::I32; 8];
+                v.push(ValType::I64);
+                v
+            }, build_map_keys()),
+            (ty_i64_i64, {
+                let mut v = vec![ValType::I64; 3];
+                v.push(ValType::I32);
+                v
+            }, build_map_values()),
+            (ty_i64_i64, {
+                let mut v = vec![ValType::I64; 3];
+                v.push(ValType::I32);
+                v.push(ValType::I64);
+                v
+            }, build_map_str(&statics)),
+            (ty_ii_i32, vec![ValType::I32; 6], build_map_eq()),
         ];
         for (ty, locals, body) in helpers {
             m.funcs.push(Function { type_idx: ty, locals, body });
@@ -1669,6 +1706,40 @@ impl Codegen {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
                 a.lget(s[0]).lget(s[1]).call(RT_SPLIT);
             }
+            // ===== 7.6b：map 模块 =====
+            "map_empty" => {
+                a.call(RT_MAP_NEW);
+            }
+            "map_set" => {
+                // map_set(m, k, v)；引用语义就地改（对齐解释器）——返回 Unit
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR), None])?;
+                a.lget(s[0]).lget(s[1]).lget(s[2]).call(RT_MAP_SET);
+            }
+            "map_get" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_MAP_GET);
+            }
+            "map_has" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_MAP_HAS);
+            }
+            "map_remove" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR)])?;
+                a.lget(s[0]).lget(s[1]).call(RT_MAP_REMOVE);
+            }
+            "map_keys" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP)])?;
+                a.lget(s[0]).call(RT_MAP_KEYS);
+            }
+            "map_values" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP)])?;
+                a.lget(s[0]).call(RT_MAP_VALUES);
+            }
+            "map_size" => {
+                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP)])?;
+                // 内联：load size 字段 → tagged Int
+                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(8).op(op::I64_EXTEND_I32_S).tag_int();
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -1934,8 +2005,16 @@ fn build_eq() -> Vec<u8> {
                             }
                             a.else_();
                             {
-                                // Int/Bool/Unit：tagged 值完全相等即值相等
-                                a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                                a.tag_is(0, TAG_MAP).if_i64();
+                                {
+                                    a.lget(0).lget(1).call(RT_MAP_EQ).bool_tag();
+                                }
+                                a.else_();
+                                {
+                                    // Int/Bool/Unit：tagged 值完全相等即值相等
+                                    a.lget(0).lget(1).op(op::I64_EQ).bool_tag();
+                                }
+                                a.end();
                             }
                             a.end();
                         }
@@ -2075,12 +2154,22 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.b
     }
 
-/// rt_alloc: (i32 size) -> i32；bump allocator（arena，不释放）
-/// local 1 (i32)：旧 hp 暂存（作为返回值）
+/// rt_alloc: (i32 size) -> i32；bump allocator（arena，不释放）；不足自动 memory.grow
+/// locals: 1=result(旧 hp), 2=new_hp, 3=mem_bytes（全 i32）
 fn build_alloc() -> Vec<u8> {
     let mut a = Asm::new();
     a.gget(0).lset(1); // result = hp
-    a.gget(0).lget(0).op(op::I32_ADD).gset(0); // hp += size
+    a.gget(0).lget(0).op(op::I32_ADD).lset(2); // new_hp
+    // new_hp > memory.size<<16 → memory.grow（失败返回 -1 → trap）
+    a.lget(2).op(op::MEMORY_SIZE).op(0x00).i32c(16).op(op::I32_SHL).op(op::I32_GT_S).if_();
+    {
+        // grow((new_hp - membytes + 65535) >> 16) 页
+        a.lget(2).op(op::MEMORY_SIZE).op(0x00).i32c(16).op(op::I32_SHL).op(op::I32_SUB).i32c(65535).op(op::I32_ADD).i32c(16).op(op::I32_SHR_U);
+        a.op(op::MEMORY_GROW).op(0x00);
+        a.i32c(0).op(op::I32_LT_S).if_().op(op::UNREACHABLE).end();
+    }
+    a.end();
+    a.lget(2).gset(0); // hp = new_hp
     a.lget(1);
     a.b
 }
@@ -2275,7 +2364,15 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32, closure_off: u32)
                                         {
                                             a.i64c(tag_str_of(closure_off));
                                         }
-                                        a.else_().op(op::UNREACHABLE).end(); // Map 等：7.6b
+                                        a.else_();
+                                        {
+                                            a.tag_is(0, TAG_MAP).if_i64();
+                                            {
+                                                a.lget(0).call(RT_MAP_STR);
+                                            }
+                                            a.else_().op(op::UNREACHABLE).end();
+                                        }
+                                        a.end();
                                     }
                                     a.end();
                                 }
@@ -3028,6 +3125,428 @@ fn build_enum_str(table_off: u32, st: &Statics) -> Vec<u8> {
         a.lget(7);
     }
     a.end();
+    a.b
+}
+
+// ===== 7.6b：Map helper（开放寻址 + 墓碑 + FNV-1a + 0.5 负载翻倍）=====
+
+/// rt_map_new: () -> i64；[buckets][cap=16][size=0]，桶区 16*16=256 字节（零初始化）
+/// local 1 (i32)：map 指针
+fn build_map_new() -> Vec<u8> {
+    let mut a = Asm::new();
+    // 注意：无参数，locals 从 0 起
+    a.i32c(12).call(RT_ALLOC).lset(0);
+    a.lget(0).i32c(256).call(RT_ALLOC).i32_store(0); // buckets
+    a.lget(0).i32c(16).i32_store(4); // cap
+    a.lget(0).i32c(0).i32_store(8); // size
+    a.lget(0).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_MAP).op(op::I64_OR);
+    a.b
+}
+
+/// 发射：FNV-1a 哈希（key 指针在 kp local，结果写 h local；j 是循环暂存）
+fn emit_fnv_hash(a: &mut Asm, kp: u32, h: u32, j: u32) {
+    // h = 2166136261（i32 位型 = -2128831035）
+    a.i32c(-2128831035).lset(h);
+    a.i32c(0).lset(j);
+    a.block();
+    a.loop_();
+    {
+        a.lget(j).lget(kp).i32_load(0).op(op::I32_GE_U).br_if(1);
+        // h = (h ^ byte) * 16777619
+        a.lget(h);
+        a.lget(kp).i32c(4).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
+        a.op(op::I32_XOR).i32c(16777619).op(op::I32_MUL).lset(h);
+        a.lget(j).i32c(1).op(op::I32_ADD).lset(j);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+}
+
+/// rt_map_probe: (i64 m, i64 k) -> i32；命中 → 桶下标（>=0）；未命中 → -(插入槽+1)
+/// locals: 2=mp, 3=kp, 4=buckets, 5=cap, 6=h, 7=i, 8=j, 9=ff, 10=addr（全 i32）
+fn build_map_probe() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2); // mp
+    emit_str_ptr(&mut a, 1, 3); // kp
+    a.lget(2).i32_load(0).lset(4); // buckets
+    a.lget(2).i32_load(4).lset(5); // cap
+    emit_fnv_hash(&mut a, 3, 6, 8);
+    // i = h & (cap-1)
+    a.lget(6).lget(5).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(7);
+    a.i32c(-1).lset(9); // first_free = -1
+    a.block(); // $done
+    a.loop_();
+    {
+        // addr = buckets + i*16
+        a.lget(4).lget(7).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lset(10);
+        let st = |a: &mut Asm| {
+            a.lget(10).i32_load(0);
+        };
+        // st == 0（空）→ 未命中：return -(ff>=0?ff:i)-1
+        st(&mut a);
+        a.op(op::I32_EQZ).if_();
+        {
+            // select(ff, i, ff>=0)
+            a.lget(9).lget(7).lget(9).i32c(0).op(op::I32_GE_S).op(op::SELECT);
+            // → slot；return -(slot+1)
+            a.i32c(-1).op(op::I32_MUL).i32c(1).op(op::I32_SUB).op(op::RETURN);
+        }
+        a.end();
+        // st == 2（墓碑）→ 记 ff，继续
+        st(&mut a);
+        a.i32c(2).op(op::I32_EQ).if_();
+        {
+            a.lget(9).i32c(0).op(op::I32_GE_S).if_().else_();
+            {
+                a.lget(7).lset(9);
+            }
+            a.end();
+        }
+        a.end();
+        // st == 1（占用）→ 比 key
+        st(&mut a);
+        a.i32c(1).op(op::I32_EQ).if_();
+        {
+            // key_off → tagged str，与 param 1 比内容
+            a.lget(10).i32_load(4).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(1).call(RT_STR_EQ).if_();
+            {
+                a.lget(7).op(op::RETURN); // 命中
+            }
+            a.end();
+        }
+        a.end();
+        // i = (i+1) & (cap-1)
+        a.lget(7).i32c(1).op(op::I32_ADD).lget(5).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(7);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.op(op::UNREACHABLE); // 负载 < 1 保证必有空桶
+    a.b
+}
+
+/// rt_map_set: (i64 m, i64 k, i64 v) -> i64 Unit；命中覆盖，未命中插入，超 0.5 负载翻倍扩容
+/// locals: 3=r(i32), 4=mp, 5=addr, 6=kp（i32）；扩容用 7=nb, 8=ncap, 9=j, 10=h, 11=bi, 12=oldb, 13=oldcap（i32）
+fn build_map_set() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).lget(1).call(RT_MAP_PROBE).lset(3);
+    emit_str_ptr(&mut a, 0, 4); // mp
+    emit_str_ptr(&mut a, 1, 6); // kp
+    // 命中 → 覆盖 val
+    a.lget(3).i32c(0).op(op::I32_GE_S).if_();
+    {
+        a.lget(4).i32_load(0).lget(3).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lget(2).i64_store(8);
+        a.i64c(V_UNIT).op(op::RETURN);
+    }
+    a.end();
+    // 插入槽 = -r-1
+    a.lget(3).i32c(-1).op(op::I32_MUL).i32c(1).op(op::I32_SUB).lset(3); // r 复用为 slot
+    // addr = buckets + slot*16
+    a.lget(4).i32_load(0).lget(3).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lset(5);
+    a.lget(5).i32c(1).i32_store(0); // state=1
+    a.lget(5).lget(6).i32_store(4); // key_off
+    a.lget(5).lget(2).i64_store(8); // val
+    // size++
+    a.lget(4).lget(4).i32_load(8).i32c(1).op(op::I32_ADD).i32_store(8);
+    // size*2 > cap → 扩容
+    a.lget(4).i32_load(8).i32c(2).op(op::I32_MUL).lget(4).i32_load(4).op(op::I32_GT_S).if_();
+    {
+        // ncap = cap*2；nb = alloc(ncap*16)（零初始化）
+        a.lget(4).i32_load(4).i32c(2).op(op::I32_MUL).lset(8); // ncap
+        a.lget(8).i32c(16).op(op::I32_MUL).call(RT_ALLOC).lset(7); // nb
+        a.lget(4).i32_load(0).lset(12); // oldb
+        a.lget(4).i32_load(4).lset(13); // oldcap
+        // 逐桶搬运
+        a.i32c(0).lset(9); // j
+        a.block();
+        a.loop_();
+        {
+            a.lget(9).lget(13).op(op::I32_GE_U).br_if(1);
+            // state==1 才搬
+            a.lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+            {
+                // 重哈希：key 指针在 oldb+j*16+4
+                a.lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4).lset(6); // kp 复用
+                emit_fnv_hash(&mut a, 6, 10, 11);
+                // bi = h & (ncap-1)，线性探到空桶
+                a.lget(10).lget(8).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(11);
+                a.block();
+                a.loop_();
+                {
+                    a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).op(op::I32_EQZ).br_if(1);
+                    a.lget(11).i32c(1).op(op::I32_ADD).lget(8).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(11);
+                    a.br(0);
+                }
+                a.end();
+                a.end();
+                // 写入 nb+bi*16：state=1, key, val（val 从旧桶拷）
+                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32c(1).i32_store(0);
+                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lget(6).i32_store(4);
+                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD)
+                    .lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8)
+                    .i64_store(8);
+            }
+            a.end();
+            a.lget(9).i32c(1).op(op::I32_ADD).lset(9);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        // 头更新
+        a.lget(4).lget(7).i32_store(0);
+        a.lget(4).lget(8).i32_store(4);
+    }
+    a.end();
+    a.i64c(V_UNIT);
+    a.b
+}
+
+/// rt_map_get: (i64 m, i64 k) -> i64 Option（Some(v) / None）
+/// locals: 2=r(i32), 3=v(i64), 4=p(i64)
+fn build_map_get() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).lget(1).call(RT_MAP_PROBE).lset(2);
+    a.lget(2).i32c(0).op(op::I32_GE_S).if_i64();
+    {
+        // v = load64(buckets + r*16 + 8)
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(2).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).lset(3);
+        // Some(v) = [idx=2][n=1][v]
+        a.i32c(16).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(4);
+        a.lget(4).op(op::I32_WRAP_I64).i32c(2).i32_store(0);
+        a.lget(4).op(op::I32_WRAP_I64).i32c(1).i32_store(4);
+        a.lget(4).op(op::I32_WRAP_I64).lget(3).i64_store(8);
+        a.lget(4).tag_int().i64c(TAG_ENUM).op(op::I64_OR);
+    }
+    a.else_();
+    {
+        // None = [idx=3][n=0]
+        a.i32c(8).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(4);
+        a.lget(4).op(op::I32_WRAP_I64).i32c(3).i32_store(0);
+        a.lget(4).op(op::I32_WRAP_I64).i32c(0).i32_store(4);
+        a.lget(4).tag_int().i64c(TAG_ENUM).op(op::I64_OR);
+    }
+    a.end();
+    a.b
+}
+
+/// rt_map_has: (i64 m, i64 k) -> i64 Bool
+fn build_map_has() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).lget(1).call(RT_MAP_PROBE);
+    a.i32c(0).op(op::I32_GE_S).bool_tag();
+    a.b
+}
+
+/// rt_map_remove: (i64 m, i64 k) -> i64 Unit；命中 → 墓碑 + size--
+/// locals: 2=r(i32)
+fn build_map_remove() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).lget(1).call(RT_MAP_PROBE).lset(2);
+    a.lget(2).i32c(0).op(op::I32_GE_S).if_();
+    {
+        // state = 2
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(2).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32c(2).i32_store(0);
+        // size--
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64)
+            .lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(8).i32c(1).op(op::I32_SUB).i32_store(8);
+    }
+    a.end();
+    a.i64c(V_UNIT);
+    a.b
+}
+
+/// rt_map_keys: (i64 m) -> i64 List<String>；str_cmp 插入排序（确定性输出）
+/// locals: 2=mp, 3=cap, 4=buckets, 5=sz, 6=arr, 7=i, 8=j, 9=key（i32）；10=out(i64)
+fn build_map_keys() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 1);
+    a.lget(1).i32_load(4).lset(2); // cap
+    a.lget(1).i32_load(0).lset(3); // buckets
+    a.lget(1).i32_load(8).lset(4); // sz
+    // arr = alloc(sz*4)
+    a.lget(4).i32c(4).op(op::I32_MUL).call(RT_ALLOC).lset(5);
+    // 收集 used key_off
+    a.i32c(0).lset(6); // i
+    a.i32c(0).lset(8); // n（复用 key 槽，收集期是 n）
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(2).op(op::I32_GE_U).br_if(1);
+        // state==1 → arr[n++] = key_off
+        a.lget(3).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+        {
+            a.lget(5).lget(8).i32c(4).op(op::I32_MUL).op(op::I32_ADD);
+            a.lget(3).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
+            a.i32_store(0);
+            a.lget(8).i32c(1).op(op::I32_ADD).lset(8);
+        }
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 插入排序（arr[0..n)，str_cmp 比较键内容）
+    a.i32c(1).lset(6); // i = 1
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(8).op(op::I32_GE_U).br_if(1);
+        // key = arr[i]
+        a.lget(5).lget(6).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(7); // key → 8
+        a.lget(6).i32c(1).op(op::I32_SUB).lset(1); // j = i-1（mp 复用为 j）
+        a.block();
+        a.loop_();
+        {
+            // j < 0 → break
+            a.lget(1).i32c(0).op(op::I32_LT_S).br_if(1);
+            // str_cmp(arr[j], key) <= 0 → break
+            a.lget(5).lget(1).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(7).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.call(RT_STR_CMP).i32c(0).op(op::I32_LE_S).br_if(1);
+            // arr[j+1] = arr[j]
+            a.lget(5).lget(1).i32c(1).op(op::I32_ADD).i32c(4).op(op::I32_MUL).op(op::I32_ADD);
+            a.lget(5).lget(1).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+            a.i32_store(0);
+            a.lget(1).i32c(1).op(op::I32_SUB).lset(1);
+            a.br(0);
+        }
+        a.end();
+        a.end();
+        // arr[j+1] = key
+        a.lget(5).lget(1).i32c(1).op(op::I32_ADD).i32c(4).op(op::I32_MUL).op(op::I32_ADD).lget(7).i32_store(0);
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // 从尾到头 cons → 正序 list
+    a.i64c(9).lset(9); // out = Nil
+    a.block();
+    a.loop_();
+    {
+        a.lget(8).op(op::I32_EQZ).br_if(1); // n==0 → done
+        a.lget(8).i32c(1).op(op::I32_SUB).lset(8);
+        a.lget(5).lget(8).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+        a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+        a.lget(9).call(RT_CONS).lset(9);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(9);
+    a.b
+}
+
+/// rt_map_values: (i64 m) -> i64 List；keys 序（复用 RT_MAP_KEYS + probe 查值）
+/// locals: 2=keys(i64), 3=out(i64), 4=val(i64), 5=r(i32)
+fn build_map_values() -> Vec<u8> {
+    let mut a = Asm::new();
+    a.lget(0).call(RT_MAP_KEYS).lset(1);
+    a.i64c(9).lset(2);
+    a.block();
+    a.loop_();
+    {
+        a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
+        // r = probe(m, head)
+        a.lget(0);
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0); // head（tagged str）
+        a.call(RT_MAP_PROBE).lset(4);
+        // val = load64(buckets + r*16 + 8)（probe 必命中）
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(4).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).lset(3);
+        a.lget(3).lget(2).call(RT_CONS).lset(2);
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    // cons 反序了——回正（out=2，res 复用 val=3）
+    emit_list_reverse(&mut a, 2, 3);
+    a.lget(3);
+    a.b
+}
+
+/// rt_map_str: (i64 m) -> i64 Str；"{k: v, ...}"（keys 排序）
+/// locals: 2=keys(i64), 3=acc(i64), 4=first(i64), 5=r(i32), 6=k(i64)
+fn build_map_str(st: &Statics) -> Vec<u8> {
+    let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
+    let mut a = Asm::new();
+    a.lget(0).call(RT_MAP_KEYS).lset(1);
+    a.i64c(tag_str(st.open_brace)).lset(2);
+    a.i64c(1).lset(3); // first
+    a.block();
+    a.loop_();
+    {
+        a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
+        // k = head
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(5);
+        // 分隔符
+        a.lget(3).op(op::I64_EQZ).if_();
+        {
+            a.lget(2).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(2);
+        }
+        a.end();
+        // acc += key + ": "
+        a.lget(2).lget(5).call(RT_STR_CONCAT).i64c(tag_str(st.colon_sp)).call(RT_STR_CONCAT).lset(2);
+        // val = load64(buckets + probe(m,k)*16 + 8)；acc += display(val)
+        a.lget(0).lget(5).call(RT_MAP_PROBE).lset(4);
+        a.lget(2);
+        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(4).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).call(RT_DISPLAY);
+        a.call(RT_STR_CONCAT).lset(2);
+        a.i64c(0).lset(3);
+        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.lget(2).i64c(tag_str(st.close_brace)).call(RT_STR_CONCAT);
+    a.b
+}
+
+/// rt_map_eq: (i64, i64) -> i32；size 相等 + 逐键查 b + 值递归相等
+/// locals: 2=ma, 3=mb, 4=cap, 5=buckets, 6=i, 7=r（全 i32）
+fn build_map_eq() -> Vec<u8> {
+    let mut a = Asm::new();
+    emit_str_ptr(&mut a, 0, 2);
+    emit_str_ptr(&mut a, 1, 3);
+    // size 不等 → 0
+    a.lget(2).i32_load(8).lget(3).i32_load(8).op(op::I32_NE).if_();
+    a.i32c(0).op(op::RETURN);
+    a.end();
+    a.lget(2).i32_load(4).lset(4); // cap
+    a.lget(2).i32_load(0).lset(5); // buckets
+    a.i32c(0).lset(6);
+    a.block();
+    a.loop_();
+    {
+        a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
+        a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+        {
+            // key = tagged str；probe b
+            a.lget(1);
+            a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
+            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.call(RT_MAP_PROBE).lset(7);
+            // 未命中 → 0
+            a.lget(7).i32c(0).op(op::I32_LT_S).if_();
+            a.i32c(0).op(op::RETURN);
+            a.end();
+            // 值不等 → 0
+            a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+            a.lget(3).i32_load(0).lget(7).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+            a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+            a.i32c(0).op(op::RETURN);
+            a.end();
+        }
+        a.end();
+        a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
+        a.br(0);
+    }
+    a.end();
+    a.end();
+    a.i32c(1);
     a.b
 }
 
@@ -3858,15 +4377,16 @@ mod tests {
 
     #[test]
     fn unsupported_constructs_report_phase() {
-        // map 模块 → 7.6b；json → 7.7（match/record/range 自 7.5/7.6a 起已支持，见 e2e）
-        let e = compile("from map import { map_empty }\nfn main() -> Unit\n    println(map_empty())\nend").unwrap_err();
-        assert!(e.contains("7.6b"), "{}", e);
+        // json → 7.7；file/env → 7.8（map 自 7.6b 起已支持）
         let e = compile("from json import { json_parse }\nfn main() -> Unit\n    println(json_parse(\"1\"))\nend").unwrap_err();
         assert!(e.contains("7.7"), "{}", e);
-        // match / record / range 现在编译通过
+        let e = compile("from env import { args }\nfn main() -> Unit\n    println(args())\nend").unwrap_err();
+        assert!(e.contains("7.8"), "{}", e);
+        // match / record / range / map 现在编译通过
         compile("fn main() -> Unit\n    match 1\n        _ => println(1)\n    end\nend").unwrap();
         compile("fn main() -> Unit\n    let r = {x: 1}\n    println(r.x)\nend").unwrap();
         compile("fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\nend").unwrap();
+        compile("from map import { map_empty, map_set, map_get }\nfn main() -> Unit\n    let m = map_empty()\n    map_set(m, \"a\", 1)\n    println(map_get(m, \"a\"))\nend").unwrap();
     }
 
     #[test]
@@ -4212,6 +4732,38 @@ mod e2e {
             "from list import { list_map, list_filter, list_fold }\nfrom string import { split }\nfn double(x: Int) -> Int\n    x * 2\nend\nfn main() -> Unit\n    println(list_map(double, 1..4))\n    println(list_filter(fn(x: Int) -> Bool\n        x % 2 == 0\n    end, 1..6))\n    println(list_fold(fn(acc: Int, x: Int) -> Int\n        acc + x\n    end, 0, 1..5))\n    println(split(\"a-b-c\", \"-\"))\n    println(split(\"hi\", \"\"))\nend",
             "hof_list",
             "[2, 4, 6]\n[2, 4]\n10\n[a, b, c]\n[h, i]\n",
+        );
+    }
+
+    // ===== Phase 7.6b：Map =====
+
+    #[test]
+    fn e2e_map_builtins() {
+        // map 全套：set/get/has/remove/keys/values/size + 排序确定性 + 扩容 rehash + 引用语义
+        check(
+            "from map import { map_empty, map_set, map_get, map_has, map_remove, map_keys, map_values, map_size }\nfrom string import { int_to_string }\nfn main() -> Unit\n    let m = map_empty()\n    map_set(m, \"b\", 2)\n    map_set(m, \"a\", 1)\n    map_set(m, \"c\", 3)\n    println(map_size(m))\n    println(map_get(m, \"a\"))\n    println(map_get(m, \"zz\"))\n    println(map_has(m, \"c\"))\n    map_set(m, \"a\", 100)\n    println(map_get(m, \"a\"))\n    println(map_keys(m))\n    println(map_values(m))\n    println(m)\n    map_remove(m, \"b\")\n    println(map_size(m))\n    println(map_keys(m))\n    println(map_has(m, \"b\"))\n    let big = map_empty()\n    let mut i = 0\n    while i < 20\n        map_set(big, \"k\" + int_to_string(i), i)\n        i += 1\n    end\n    println(map_size(big))\n    println(map_get(big, \"k7\"))\n    println(map_get(big, \"k19\"))\nend",
+            "map",
+            "3\nSome(1)\nNone\ntrue\nSome(100)\n[a, b, c]\n[100, 2, 3]\n{a: 100, b: 2, c: 3}\n2\n[a, c]\nfalse\n20\nSome(7)\nSome(19)\n",
+        );
+    }
+
+    #[test]
+    fn e2e_map_alias_semantics() {
+        // 引用语义：let 别名共享同一 Map（与解释器一致）
+        check(
+            "from map import { map_empty, map_set, map_get }\nfn main() -> Unit\n    let a = map_empty()\n    let b = a\n    map_set(b, \"k\", 42)\n    println(map_get(a, \"k\"))\nend",
+            "map_alias",
+            "Some(42)\n",
+        );
+    }
+
+    /// 回归：7.6b 前 3 位 tag 掩码截断 tag 8+（Record 被当 Int）
+    #[test]
+    fn e2e_record_after_tag_migration() {
+        check(
+            "fn main() -> Unit\n    let p = {x: 1, y: 2}\n    println(p.x + p.y)\n    println(p)\nend",
+            "tag4bit",
+            "3\n{x: 1, y: 2}\n",
         );
     }
 }

@@ -110,6 +110,12 @@ pub mod op {
     pub const I32_MUL: u8 = 0x6C;
     pub const I32_AND: u8 = 0x71; // 0x70 是 i32.rem_u（曾在 7.4 踩坑：漏排 div/rem 导致 and/or 错位）
     pub const I32_OR: u8 = 0x72;
+    pub const I32_XOR: u8 = 0x73;
+    pub const I32_SHL: u8 = 0x74;
+    pub const I32_SHR_U: u8 = 0x76;
+    // 内存管理（操作数是 0x00 保留字节）
+    pub const MEMORY_SIZE: u8 = 0x3F;
+    pub const MEMORY_GROW: u8 = 0x40;
     pub const I32_GT_U: u8 = 0x4B;
     pub const I32_STORE8: u8 = 0x3A;
     // i64 比较（结果 i32，可直接喂 if/br_if）
