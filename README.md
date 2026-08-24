@@ -97,6 +97,7 @@ Phase 4 complete. All four sub-phases implemented: `lom fix` rule expansion + fi
 - ✅ 7.6a Record/Tuple/List (v0.11.0) — tuples, records (order-insensitive equality), cons-cell lists, `a..b` ranges, for-over-List, `split`, `list_map/filter/fold` (closure callbacks via `call_indirect`). **Value representation migrated to 4-bit tags** (3-bit mask truncated tags 8+)
 - ✅ 7.6b Map + memory.grow (v0.12.0) — hand-written open-addressing hash table (FNV-1a, linear probe, tombstones, 2x rehash), sorted deterministic output; bump allocator auto-grows memory pages. **eval 108/108 byte-identical on BOTH backends**; the ~1400-line self-hosted mini-interpreter (`stmt_interp.lom`) compiles to WASM and matches its golden file verbatim
 - ✅ 7.7 json module via host mediation (v0.13.0) — `lom_json_parse`/`lom_json_stringify` host imports (harness implements with JS JSON + value layout read/write; `lom_alloc` + `lom_variant_table` exports for host-side materialization). Documented divergence: Int/Float split of JSON numbers decided by JS value, not source syntax
+- ✅ 7.8 file/env + package linking (v0.14.0) — file_read/write/append/exists + env::args() via host imports; `lom build` merges lom.toml dependency sources into one WASM module (later definition wins on name clash, matching the interpreter). All stdlib modules now compile to WASM
 
 See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full project guide (positioning, design philosophy, 7-phase roadmap, target LLM strategy, risk mitigation, repo governance).
 
