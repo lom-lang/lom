@@ -622,7 +622,7 @@ Key points:
 - **`plans[].diagnostic`**: embedded copy of the diagnostic — you don't need to cross-reference `lom-diag/v1`.
 - **`plans[].fixes[].action`**:
   - `insert` — insert `text` at `(line, col)`.
-  - `replace` — replace range `(line,col)..(end_line,end_col)` with `text`. (Schema-reserved: `fix --apply` supports it, but no current rule emits `replace` actions.)
+  - `replace` — replace range `(line,col)..(end_line,end_col)` with `text`. Emitted by NAM003/NAM004 spelling fixes (medium confidence — never auto-applied).
   - `delete` — delete the range. Used by LEX005 (1-char delete).
   - `hint` — guidance text only; `line`/`col` may be `0`. May still carry `text` (a snippet to use, e.g. `! [IO]`, `Green => ()`).
 - **`plans[].fixes[].confidence`**: `high` / `medium` / `low`. When multiple fixes exist for one diagnostic, they are listed in order but not ranked — you choose.
@@ -652,7 +652,7 @@ Key points:
 6. Run `lom <file>` to execute.
 
 **Limitations**:
-- No span-based `replace` from rules yet: positions are line/col without precise end positions (except LEX005's 1-char delete). `fix --apply` supports the `replace` action in the schema, but no rule currently emits it.
+- NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Positions come from whole-token source scanning (typechecker diagnostics carry no expression-level spans yet).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
 - Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans exist since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); expression-level and runtime positions remain coarse.
 

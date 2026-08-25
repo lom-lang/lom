@@ -31,14 +31,14 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.15.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.14.0） |
-| Rust 测试 | **395/395 通过**（含 wasm 单测 + 33 个 Node e2e），构建零 warning |
+| 版本 | **v0.16.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.15.0） |
+| Rust 测试 | **406/406 通过**（含 wasm 单测 + 33 个 Node e2e），构建零 warning |
 | eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环（Phase 7 WASM 编译后端 7.1-7.10，RFC-0002 退出标准结算见 §10 末与 guide §2.9）；巩固期 P-0（文档腐坏清扫）+ P-1（RFC-0001 关闭 spec 四问）已完成 |
-| 下一步 | **Phase 7 全部闭环（7.1-7.10，v0.15.0）**——WASM 后端双后端 golden 一致 + eval 108/108×2 + CI wasm gate 全绿。下一步候选：全量自举（Phase 8，递归天花板已变为宿主栈可调）/ v1.0 冻结 / 其他——等用户指令 |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；战略复盘后转入**修复引擎深化**（repair-native 核心加固）：M1 拼写修复 Replace 落地（v0.16.0）已完成 |
+| 下一步 | 修复引擎深化 M2（--apply 迭代闭环）→ M3（PARSE001 针对性修复）→ M4（error_repair 扩充 + 覆盖率度量）；远期候选：全量自举（RFC-0003 draft 已存档）/ v1.0 冻结 |
 | 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（Phase 7 顺手解决递归天花板）；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举移交 Phase 8 候选 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
@@ -118,6 +118,7 @@
 - **Phase 7.5 枚举/match/?（2026-08-23，v0.10.0）**：枚举值 = 堆对象 [variant_idx: i32][n_args: i32][args: i64×n]（tag 6）；变体名→全局索引表（内建 Ok/Err/Some/None=0-3）；match = 臂链 + $done 带值块（guard 穿透、模式绑定进臂作用域、字面量模式走 rt_eq）；`?` = Ok/Some 解包、Err/None 整体 br $ret。**静态布局依赖的 helper 用"占位 + finalize 填体"模式**（rt_enum_print/rt_enum_str 需要变体名表偏移——表在数据段，名字复用 str_off 去重）。**实测**：4 个 match/try 示例 + eval 7 类目 74/78 逐字一致（4 skip 全属 7.6）。**坑**：① Try 的 if_i64 忘了压 Label::If → br $ret 深度错（7.2 的 if-is-label 坑第二次踩——**以后任何手写 if/block 都要同步压 Label 栈**）；② build_display 嵌套 if 链少一个 Rust `}`（rustc unclosed delimiter 定位在函数头，用逐行 depth 脚本数最靠谱）。
 - **Phase 7.4 字符串 + stdlib（2026-08-23，v0.9.0）**：15 个新 helper（concat/display/itoa/stoi/str_len/trim/case/contains/starts/ends/replace/str_cmp/str_char_at/ftoa_str）；拼接提升进 rt_add；字符串大小比较补齐；for-over-String（UTF-8 逐字符）；sqrt/abs/min/max；string/math 导入 + 别名解析（**orig 判可用性、real 做分派**——别名列可用性 bug 抓到一次）；闭包捕获放行已导入内建。**实测**：examples 18 个 PASS + eval 01/02/03/04/09 的 48/52 逐字一致（4 个 skip 全属 7.6）。**坑（两个深坑，方法论价值高）**：① **WASM opcode 表会连串看错**——i32.and/or 因漏排 div/rem 写成 0x70/0x71（实为 rem_u/and；正确 0x71/0x72），i64.gt_u 写成 0x5A（实为 ge_u；gt_u=0x56）——比较块是 lt_s,lt_u,gt_s,gt_u,le_s,le_u,ge_s,ge_u 成对排，跳项必错。**症状极具迷惑性**：trim/upper 静默变成恒等函数（or 链变 and 链恒 false），itoa 无限循环 OOB（ge_u 0 恒真）。② **栈上多余操作数在 loop 里能过验证**（br 截断到 label 高度）——build_starts_ends 的 ends 分支漏了一个 I32_ADD，地址算成 (ls-lsub)+i，字节全对、验证全过、结果全错。**调试方法论沉淀**：Node 实例化报错精确到函数号+偏移；抠 helper 字节离线单测（手写模块包装器）是终极隔离手段——本次靠它分别定位到 or 链恒 0 和 ge_u 恒真。③ Git Bash heredoc 写非 ASCII 会双编码（"é"→"Ã©"）——含非 ASCII 的测试文件必须用 Write 工具。min/max 分支嵌套 if 多数了一个 end（trailing code after function end）——Node 报 "trailing code" 时去数 if/else/end 配对。
 - **Phase 7.3 闭包（2026-08-23，v0.8.0）**：闭包值 = 堆对象 [table_idx][env_ptr]（tag 5），env 对象 [n][v0..vn] 值拷贝捕获；free_vars 静态分析（按首次使用序）；闭包体 = (env, params...)->i64 的 WASM 函数，调用走 call_indirect（funcref 表 + 元素段）；具名函数当值 = 忽略 env 的 shim；**递归闭包 = 预绑定 local + 创建后 env 槽位补丁**（对齐解释器共享作用域语义）；任意表达式 callee（make_adder(5)(10)）支持，求值顺序对齐解释器（先 args 后 callee）。**实测**：closures/hof/logical/nested_calls 四例 + eval 04 的 11/12 逐字一致（107 需 list_map → 7.6）。**已知语义差异（如实记录）**：捕获是创建时值拷贝，解释器是 Rc 共享作用域——创建后修改被捕获变量时两后端行为不同（代码头注释已声明）。**坑**：用户函数必须先预推占位 Function 固定 funcidx，否则函数体里产生的闭包函数会挤占索引空间；call_indirect 的操作数顺序是"参数在下、表索引在栈顶"。
+- **修复引擎深化 M1 拼写修复（2026-08-25，v0.16.0）**：NAM003/NAM004 带"是否想用 'X'？"建议时 fix 产出 Replace 动作（Medium——用户裁决**猜测性修复不自动改**，--apply 只动 100% 确定的）。**关键设计约束**：typechecker 的 NAM003/NAM004 全部 push 在 (0,0)——表达式级 span 是 Phase 3.2b 挂账项，从未做。所以 Replace 定位走**整词源码扫描**（fix.rs `find_token_occurrences`）：跳过字符串字面量（含 `\"` 转义）与 # 注释；记录字段要求 `.` 前缀防误改同名变量；变体名 message 有两个引号对要取**最后一个**（extract_last_quoted）。typechecker 侧把 4.1.1 的 best-match 逻辑抽成自由函数 `best_spelling`（suggest_spelling 委托之），NAM004 记录字段/枚举变体两处补上建议。**行为发现**：无参数变体拼错（`Grean`）在 parser 层就是 Binder 模式而非变体，typechecker 不会报 NAM004——只有带子模式的 `Circl(r)` 才走变体路径；这不是 bug，是模式语义的既有设计。测试 +11（406/406）。
 
 ---
 

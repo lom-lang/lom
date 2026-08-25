@@ -1,21 +1,23 @@
-// Lom WASM 后端 —— Phase 7.2：AST → WASM 编译器
+// Lom WASM 后端 —— Phase 7（7.2-7.10）：AST → WASM 编译器
 //
 // 设计（RFC-0002）：
 // - 编译的是**动态语义**（与树遍历解释器逐字对齐），不是静态类型特化
 // - 值表示：tagged i64，低 4 位 tag（7.6 起；3 位曾导致 tag 8+ 被掩码截断）：
-//     0 = Int（v<<3）        1 = Bool（true=9, false=1）   2 = Unit（常量 2）
+//     0 = Int（v<<4）        1 = Bool（true=17, false=1）   2 = Unit（常量 2）
 //     3 = F64 盒（堆指针）    4 = Str（堆指针，布局 [len:u32][utf8 字节]）
-//   （List/Map/Record/Tuple/Enum/Closure 是 7.3-7.6 的事，本阶段编译期报错）
+//     5 = Closure  6 = Enum  7 = Tuple  8 = Record  9 = List（cons）  10 = Map
+//   （7.6b 起全部语言特性与 stdlib 模块均可编译，特性零排除——eval 108/108 双后端逐字一致）
 // - Float/Str 字面量编译期进数据段（去重）；运行时 Float 运算结果走 bump allocator
 //   动态装盒（全局 $hp，arena 不释放——目标负载是短生命周期 CLI，见 RFC-0002）
 // - 运行时 tag 分派逻辑集中在一组手写 helper 函数（rt_add/rt_eq/rt_print 等），
 //   codegen 只负责结构翻译 + call helper，避免每个二元运算处内联展开
-// - 与解释器的已知差异（7.2 如实记录）：
+// - 与解释器的已知差异（如实记录，见 SPEC_FOR_AI §11f）：
 //   除零/取模零在 WASM 是 trap（harness 退出码 1），消息文本与解释器不同；
-//   不支持的构造是**编译期错误**而非运行时错误（更严格，宁缺毋滥）；
-//   字符串大小比较（</> 等）未实现（==/!= 已实现）；Int 溢出回绕（与 release 解释器一致）；
+//   trim 只去 ASCII 空白（解释器是 Unicode 空白）；
+//   JSON 数字的 Int/Float 由 JS 宿主值决定（解释器按源语法判定）；
 //   闭包捕获是**创建时值拷贝**（解释器是 Rc 共享作用域——创建后修改被捕获变量，
-//   解释器的闭包会看到新值，WASM 后端不会；该模式在实践中罕见，如需共享语义请提 issue）。
+//   解释器的闭包会看到新值，WASM 后端不会；该模式在实践中罕见，如需共享语义请提 issue）；
+//   Int 溢出回绕（与 release 解释器一致）。
 
 use crate::ast::*;
 use crate::wasm::{
