@@ -208,7 +208,7 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
         )],
 
         // ===== 语法错误 =====
-        "PARSE001" => fix_parse_expected_token(d),
+        "PARSE001" => fix_parse_expected_token(d, source_lines),
         "PARSE002" => vec![hint_only(
             "Result<T, E> 需要 2 个类型参数，如 Result<Int, String>",
             Confidence::Medium,
@@ -343,19 +343,117 @@ fn fix_lex_unexpected_char(d: &Diagnostic, _source_lines: &[&str]) -> Vec<FixAct
     }]
 }
 
-/// PARSE001 期望某 token：仅 hint
+/// PARSE001 期望某 token：针对性修复（修复引擎深化 M3）
 ///
-/// 低置信度：Phase 2.x 无 span，无法精准定位需要替换的范围；
-/// 且"期望 X 得到 Y"有多种修复方向（补 X、改 Y、删除多余符号等）。
-fn fix_parse_expected_token(d: &Diagnostic) -> Vec<FixAction> {
-    // 尝试从 message 提取期望的 token，给出更具体的 hint
-    // message 格式："期望 ')'，得到 '}'" 或 "期望标识符，得到 文件结束"
-    let hint = if d.message.contains("期望") {
-        format!("语法错误：{}。检查该位置的语法结构是否完整", d.message)
-    } else {
-        "语法错误：检查关键字/分隔符是否匹配".to_string()
+/// 只对插入点无歧义的两种形态产出动作，其余保持 hint（宁缺毋滥）：
+///   期望 ')' + 违规 token 在行首（新语句/End/文件结束）→ 在上一非空行末插 ')'（High）
+///   期望 ')' + 违规 token 在行中 → 在出错位置插 ')'（Medium——也可能是缺 ','）
+///   期望 'end'（match 未闭合，parser 唯一的 end 类报错）→ 插入 'end'（Medium——
+///     缺的是哪个块的 end 有歧义；fn/if/while 缺 end 被容错解析静默接受，不产生诊断）
+fn fix_parse_expected_token(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    // message 格式："期望 'X'，得到 Y"（parser.rs expect 统一格式），第一个引号对是期望的 token
+    let expected = extract_quoted_string(&d.message);
+    match expected.as_deref() {
+        Some(")") => fix_parse_missing_rparen(d, source_lines),
+        Some("end") => fix_parse_missing_end(d, source_lines),
+        _ => {
+            let hint = if d.message.contains("期望") {
+                format!("语法错误：{}。检查该位置的语法结构是否完整", d.message)
+            } else {
+                "语法错误：检查关键字/分隔符是否匹配".to_string()
+            };
+            vec![hint_only(&hint, Confidence::Low)]
+        }
+    }
+}
+
+/// PARSE001 期望 ')'：在正确的位置补闭括号
+fn fix_parse_missing_rparen(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    // 违规 token 是否在其所在行的行首（首个非空白字符）——是则它是"下一条语句"，
+    // 缺失的 ')' 属于上一非空行的行末；否则是行内情况，直接插在出错位置。
+    let at_line_start = match source_lines.get(d.line.wrapping_sub(1)) {
+        Some(line) => {
+            let first_non_ws = line.chars().position(|c| !c.is_whitespace());
+            match first_non_ws {
+                Some(idx) => idx + 1 == d.col, // col 是 1-based
+                None => true,                  // 空行（异常输入，按行首处理）
+            }
+        }
+        None => true, // d.line 超出源码行数 = 文件结束
     };
-    vec![hint_only(&hint, Confidence::Low)]
+
+    if at_line_start {
+        if let Some((pline, pcol)) = prev_nonempty_line_end(source_lines, d.line) {
+            return vec![FixAction {
+                description: format!("在第 {} 行行末插入 ')' 闭合表达式", pline),
+                action: ActionKind::Insert,
+                line: pline,
+                col: pcol,
+                end_line: None,
+                end_col: None,
+                text: Some(")".to_string()),
+                confidence: Confidence::High,
+            }];
+        }
+        return vec![hint_only("缺少 ')'：检查括号是否配对", Confidence::Low)];
+    }
+
+    vec![FixAction {
+        description: "在出错位置插入 ')'（也可能是缺 ','——请确认）".to_string(),
+        action: ActionKind::Insert,
+        line: d.line,
+        col: d.col,
+        end_line: None,
+        end_col: None,
+        text: Some(")".to_string()),
+        confidence: Confidence::Medium,
+    }]
+}
+
+/// PARSE001 期望 'end'（match 未闭合）：插入 end
+fn fix_parse_missing_end(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    let line_count = source_lines.len();
+    if d.line > line_count {
+        // 文件结束：在最后一行末尾换行补 end
+        if let Some((pline, pcol)) = prev_nonempty_line_end(source_lines, d.line) {
+            return vec![FixAction {
+                description: "在文件末尾补 'end' 闭合块".to_string(),
+                action: ActionKind::Insert,
+                line: pline,
+                col: pcol,
+                end_line: None,
+                end_col: None,
+                text: Some("\nend\n".to_string()),
+                confidence: Confidence::Medium,
+            }];
+        }
+    } else {
+        // 在出错行之前插入 end 行（缩进交给 lom fmt）
+        return vec![FixAction {
+            description: "在出错行之前插入 'end' 闭合块".to_string(),
+            action: ActionKind::Insert,
+            line: d.line,
+            col: 1,
+            end_line: None,
+            end_col: None,
+            text: Some("end\n".to_string()),
+            confidence: Confidence::Medium,
+        }];
+    }
+    vec![hint_only("缺少 'end'：检查块结构是否配对", Confidence::Low)]
+}
+
+/// 找 err_line 之前最近的非空行，返回 (行号, 行末插入列)
+fn prev_nonempty_line_end(source_lines: &[&str], err_line: usize) -> Option<(usize, usize)> {
+    let mut li = err_line.saturating_sub(1); // 1-based，从上一行开始
+    while li >= 1 {
+        let line = source_lines.get(li - 1)?;
+        if !line.trim().is_empty() {
+            return Some((li, line.chars().count() + 1));
+        }
+        li -= 1;
+    }
+    None
 }
 
 /// TYPE003 参数数量不符：仅 hint
@@ -1014,13 +1112,104 @@ mod tests {
     }
 
     #[test]
-    fn parse001_generates_hint_only() {
+    fn parse001_mid_line_rparen_generates_medium_insert() {
+        // M3：违规 token 在行中 → 在出错位置插 ')'（Medium——也可能是缺 ','）
         let err = ParseError {
             message: "期望 ')'，得到 '}'".to_string(),
             line: 3,
             col: 2,
         };
         let lines: Vec<&str> = vec!["fn f()", "  1", "} end"];
+        let d = Diagnostic::from_parse(&err, "test.lom", &lines);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert_eq!(fixes[0].text.as_deref(), Some(")"));
+        assert_eq!(fixes[0].line, 3);
+        assert_eq!(fixes[0].col, 2);
+    }
+
+    /// M3：违规 token 在行首（新语句）→ 在上一非空行末插 ')'（High，可 --apply）
+    #[test]
+    fn parse001_rparen_before_end_generates_high_insert_prev_line() {
+        // eval 086 同款场景：println(add(3, 4) 缺 ')'，错误报在下一行的 end
+        let src = "fn main() -> Unit\n    println(add(3, 4)\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let err = ParseError {
+            message: "期望 ')'，得到 End".to_string(),
+            line: 3,
+            col: 1,
+        };
+        let d = Diagnostic::from_parse(&err, "test.lom", &lines);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+        assert_eq!(fixes[0].line, 2, "应插在 println 所在行");
+        assert_eq!(fixes[0].col, 22, "行末 +1（4 空格 + 17 字符 = 21，插入列 22）");
+        assert_eq!(fixes[0].text.as_deref(), Some(")"));
+    }
+
+    /// M3：文件结束时的缺 ')' → 在最后一行行末插入（High）
+    #[test]
+    fn parse001_rparen_at_eof_inserts_at_last_line_end() {
+        let src = "fn main() -> Unit\n    println(add(3, 4)\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let err = ParseError {
+            message: "期望 ')'，得到 文件结束".to_string(),
+            line: 3,
+            col: 1,
+        };
+        let d = Diagnostic::from_parse(&err, "test.lom", &lines);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].col, 22);
+    }
+
+    /// M3：缺 ')' 且中间隔着空行 → 跳过空行找最近非空行
+    #[test]
+    fn parse001_rparen_skips_blank_lines() {
+        let src = "fn main() -> Unit\n    println(add(3, 4)\n\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let err = ParseError {
+            message: "期望 ')'，得到 End".to_string(),
+            line: 4,
+            col: 1,
+        };
+        let d = Diagnostic::from_parse(&err, "test.lom", &lines);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].line, 2, "应跳过第 3 行的空行");
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// M3：match 未闭合（期望 'end'）→ Medium 插入，不自动应用
+    #[test]
+    fn parse001_missing_end_match_generates_medium_insert() {
+        let src = "fn main() -> Unit\n    match x\n        _ => 1\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let err = ParseError {
+            message: "期望 'end' 闭合 match".to_string(),
+            line: 4,
+            col: 1,
+        };
+        let d = Diagnostic::from_parse(&err, "test.lom", &lines);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert_eq!(fixes[0].text.as_deref(), Some("\nend\n"));
+        assert_eq!(fixes[0].line, 3, "EOF 场景插在最后一行");
+    }
+
+    /// M3：其他期望 token（非 ')'/'end'）保持 hint
+    #[test]
+    fn parse001_other_expected_token_keeps_hint() {
+        let err = ParseError {
+            message: "期望 ','，得到 标识符 'x'".to_string(),
+            line: 1,
+            col: 5,
+        };
+        let lines: Vec<&str> = vec!["f(a x)"];
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
         let fixes = fix_for_diagnostic(&d, &lines);
         assert_eq!(fixes[0].action, ActionKind::Hint);
