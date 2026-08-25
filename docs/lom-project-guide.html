@@ -1054,6 +1054,7 @@
   <p><strong>方向定案</strong>：路线图 Phase 0-7 全部闭环后的战略复盘结论——项目差异化宣称是 LLM-repair-native，但修复引擎恰是全家桶里最薄的一层（~20 个诊断码里只有 4 类有真实修复动作，其余全 hint-only；<code>--apply</code> 单趟无迭代；schema 的 <code>replace</code> 动作预留三年无规则产出）。深化分四个里程碑：M1 拼写修复落地、M2 --apply 迭代闭环、M3 PARSE001 针对性修复、M4 error_repair 扩充 + 覆盖率度量。<strong>安全策略（用户裁决）</strong>：猜测性修复（拼写建议类）一律 Medium 置信度，只进 --plan 供 LLM/人确认，--apply 永不自动改。</p>
   <ul>
     <li><strong>M1 拼写修复 Replace 落地</strong> <span class="tag" style="background:#16a34a;color:white;">✅ 2026-08-25</span>：NAM003/NAM004 诊断带"是否想用 'X'？"建议时，fix 产出具体 <code>replace</code> 动作（NAM004 的字段/变体建议是本次新增——复用 4.1.1 的 Levenshtein 机制，候选集=记录字段名/枚举变体名）。typechecker 诊断无表达式级 span（line/col=0 是挂账项），出现处靠<strong>整词源码扫描</strong>定位（跳过字符串字面量与 # 注释；记录字段要求 <code>.</code> 前缀，同名普通变量不被误改）。schema 预留的 <code>replace</code> 动作首次有真实产出；Medium 置信度不被 --apply 应用（有测试锁定）。新增 11 个测试（406/406），回归三件套全绿。<strong>v0.16.0</strong>。</li>
+    <li><strong>M2 --apply 迭代修复闭环</strong> <span class="tag" style="background:#16a34a;color:white;">✅ 2026-08-25</span>：<code>lom fix --apply</code> 从单趟升级为<strong>迭代闭环</strong>：重新诊断 → 应用 → 重复，直到无高置信度可应用项或源码不再变化（上限 5 轮防震荡）。"修完 A 暴露 B"的典型场景一次命令收敛（删掉意外字符 → 解析通过 → 类型检查暴露 EFF001 → 第 2 轮补上，实测两轮修复一轮收敛判定）。输出按轮分组（人类可读）/ JSON 加 <code>rounds</code> 与逐变更 <code>round</code> 字段（schema 保持 lom-apply/v1）；fix-history 每轮一条 entry（旧记录无 round 按 1 读取，向后兼容）；退出码语义不变。apply.rs 单轮 to_json/to_human 并入多轮版（零 warning 纪律）；循环体抽成 <code>apply_iterative</code> 供单测（main.rs 首个测试模块）。新增 5 个测试（411/411）。<strong>v0.17.0</strong>。</li>
   </ul>
 </div>
 

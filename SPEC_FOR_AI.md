@@ -581,7 +581,7 @@ Key points:
 - `lom fix <file>` — human-readable plan to stdout.
 - `lom fix <file> --json` — `lom-fix/v1` JSON to stdout (for LLM consumption).
 - `lom fix <file> --plan` — explicit flag; `--plan` is the default.
-- `lom fix <file> --apply [--dry-run] [--json]` (Phase 3.1) — applies `confidence=high` + non-`hint` fixes to the source file in place; `--dry-run` previews without writing; output follows the `lom-apply/v1` schema.
+- `lom fix <file> --apply [--dry-run] [--json]` (Phase 3.1) — applies `confidence=high` + non-`hint` fixes to the source file in place; `--dry-run` previews without writing; output follows the `lom-apply/v1` schema. Since v0.17.0 (M2), `--apply` **iterates**: re-diagnose → apply → repeat until no high-confidence fixes remain or the source stops changing (max 5 rounds, anti-oscillation brake); JSON output gains `rounds` and per-change `round` fields, and each applied round is recorded as a separate entry (with `round`) in fix history.
 - `lom fix --history [--json]` (Phase 4.1.3) — shows past applied fixes from `.lom/fix-history.jsonl` (NDJSON, `lom-fix-history/v1` schema).
 - Exit code is `0` whenever the plan was generated successfully — **even if the file has errors.** This lets you consume the JSON without parsing exit codes.
 
