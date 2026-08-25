@@ -31,14 +31,14 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.17.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.16.0） |
-| Rust 测试 | **411/411 通过**（含 wasm 单测 + 33 个 Node e2e），构建零 warning |
+| 版本 | **v0.18.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.16.0） |
+| Rust 测试 | **416/416 通过**（含 wasm 单测 + 33 个 Node e2e），构建零 warning |
 | eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化**进行中：M1 拼写修复 Replace（v0.16.0）+ M2 --apply 迭代闭环（v0.17.0）已完成 |
-| 下一步 | 修复引擎深化 M3（PARSE001 针对性修复）→ M4（error_repair 扩充 + 覆盖率度量）；远期候选：全量自举（RFC-0003 draft 已存档）/ v1.0 冻结 |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化**进行中：M1 拼写修复 Replace（v0.16.0）+ M2 --apply 迭代闭环（v0.17.0）+ M3 PARSE001 针对性修复（v0.18.0）已完成 |
+| 下一步 | 修复引擎深化 M4（error_repair 扩充 + 覆盖率度量）；远期候选：全量自举（RFC-0003 draft 已存档）/ v1.0 冻结 |
 | 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（Phase 7 顺手解决递归天花板）；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举移交 Phase 8 候选 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
@@ -120,6 +120,7 @@
 - **Phase 7.3 闭包（2026-08-23，v0.8.0）**：闭包值 = 堆对象 [table_idx][env_ptr]（tag 5），env 对象 [n][v0..vn] 值拷贝捕获；free_vars 静态分析（按首次使用序）；闭包体 = (env, params...)->i64 的 WASM 函数，调用走 call_indirect（funcref 表 + 元素段）；具名函数当值 = 忽略 env 的 shim；**递归闭包 = 预绑定 local + 创建后 env 槽位补丁**（对齐解释器共享作用域语义）；任意表达式 callee（make_adder(5)(10)）支持，求值顺序对齐解释器（先 args 后 callee）。**实测**：closures/hof/logical/nested_calls 四例 + eval 04 的 11/12 逐字一致（107 需 list_map → 7.6）。**已知语义差异（如实记录）**：捕获是创建时值拷贝，解释器是 Rc 共享作用域——创建后修改被捕获变量时两后端行为不同（代码头注释已声明）。**坑**：用户函数必须先预推占位 Function 固定 funcidx，否则函数体里产生的闭包函数会挤占索引空间；call_indirect 的操作数顺序是"参数在下、表索引在栈顶"。
 - **修复引擎深化 M1 拼写修复（2026-08-25，v0.16.0）**：NAM003/NAM004 带"是否想用 'X'？"建议时 fix 产出 Replace 动作（Medium——用户裁决**猜测性修复不自动改**，--apply 只动 100% 确定的）。**关键设计约束**：typechecker 的 NAM003/NAM004 全部 push 在 (0,0)——表达式级 span 是 Phase 3.2b 挂账项，从未做。所以 Replace 定位走**整词源码扫描**（fix.rs `find_token_occurrences`）：跳过字符串字面量（含 `\"` 转义）与 # 注释；记录字段要求 `.` 前缀防误改同名变量；变体名 message 有两个引号对要取**最后一个**（extract_last_quoted）。typechecker 侧把 4.1.1 的 best-match 逻辑抽成自由函数 `best_spelling`（suggest_spelling 委托之），NAM004 记录字段/枚举变体两处补上建议。**行为发现**：无参数变体拼错（`Grean`）在 parser 层就是 Binder 模式而非变体，typechecker 不会报 NAM004——只有带子模式的 `Circl(r)` 才走变体路径；这不是 bug，是模式语义的既有设计。测试 +11（406/406）。
 - **修复引擎深化 M2 --apply 迭代闭环（2026-08-25，v0.17.0）**：run_fix 的 --apply 从单趟升级为迭代闭环（抽成 `apply_iterative(src, path, max_rounds)` 供单测——main.rs 此前没有测试模块，process::exit 的 CLI 层不可测，循环逻辑必须抽出来）。收敛三重刹车：applied==0 / patched==current / 上限 5 轮。fix-history 每轮一条 entry（FixHistoryEntry 加 round 字段，**旧记录无 round 读取时默认 1**——parse_entry 的 unwrap_or(1)，有兼容测试）。**坑**：apply.rs 的单轮 to_json/to_human 被多轮版取代后变 dead code 触发 warning——按零 warning 纪律删除（唯一的测试调用方改用 rounds_to_json），binary crate 里"pub 但无人调"就是会警告，别指望 pub 能挡。输出契约：JSON 保持 lom-apply/v1 schema，新增 rounds + 逐变更 round 字段（additive 兼容）；退出码语义不变（apply 跑完即 0）。实测两轮收敛案例：LEX005 删 '@'（语法期）→ 解析通过 → typecheck 暴露 EFF001 → 第二轮插效应注解 → 第三轮收敛。测试 +5（411/411）。
+- **修复引擎深化 M3 PARSE001 针对性修复（2026-08-25，v0.18.0）**：**动手前先用 --json 探针实测 parser 真实报错形态，推翻两个计划假设**——① fn/if/while 缺 end 被容错解析**静默接受**（ok:true 零诊断，唯一 end 类报错是 `期望 'end' 闭合 match`）；② 缺 ')' 的错误位置在**下一个 token**（如下一行的 end/println 或 EOF 行），不是缺括号处。最终规则（fix.rs `fix_parse_missing_rparen/missing_end`）：期望 ')' + 违规 token 在行首（首个非空白字符 == d.col，或 d.line 超出行数=EOF）→ 在上一非空行末插 ')'（**High**）；行中 → 出错位置插入（Medium，可能是缺逗号）；期望 'end' → Medium。**parser 零改动**（诊断已带全部信息）。新坑：① token 名是 "End"（首字母大写）/"文件结束"/"标识符 'xxx'" 三种形态，判断行首别靠 token 名靠 col 与行内首非空白位置比较；② 测试里手写列号先数一遍字符（4 空格缩进的 println 行末是 22 不是 21，数错挂了两个测试）。评估记录：`expect` 统一走 parser.rs:144 的 "期望 X，得到 Y" 格式，第一个引号对=期望 token（extract_quoted_string 复用）。测试 +6（416/416），eval 086 同款场景 --apply 端到端实测修复后输出 7。
 
 ---
 
