@@ -53,51 +53,70 @@ pub struct AppliedChange {
     pub diagnostic_code: String,
 }
 
-/// 应用结果 JSON 输出
-pub fn to_json(result: &ApplyResult, file: &str) -> String {
+// ===== 迭代修复的多轮输出（修复引擎深化 M2；单轮 to_json/to_human 已并入多轮版）=====
+
+/// 多轮 apply 的 JSON 输出（lom-apply/v1 + rounds 扩展字段）
+///
+/// 字段语义：
+///   applied — 所有轮次应用的修复总数
+///   skipped — 最后一轮的 skipped（迭代收敛后剩余不可自动修复项）
+///   rounds  — 实际执行的轮数（含最后一轮 applied==0 的收敛判定轮）
+///   changes — 全部轮次的变更，每条多一个 "round" 字段
+pub fn rounds_to_json(results: &[ApplyResult], file: &str) -> String {
+    let total_applied: usize = results.iter().map(|r| r.applied).sum();
+    let final_skipped: usize = results.last().map(|r| r.skipped).unwrap_or(0);
+
     let mut s = String::new();
     s.push_str("{\n");
     s.push_str("  \"schema\": \"lom-apply/v1\",\n");
     s.push_str(&format!("  \"file\": {},\n", json_str(file)));
-    s.push_str(&format!("  \"applied\": {},\n", result.applied));
-    s.push_str(&format!("  \"skipped\": {},\n", result.skipped));
+    s.push_str(&format!("  \"applied\": {},\n", total_applied));
+    s.push_str(&format!("  \"skipped\": {},\n", final_skipped));
+    s.push_str(&format!("  \"rounds\": {},\n", results.len()));
     s.push_str("  \"changes\": [");
-    if result.changes.is_empty() {
+    let all_changes: Vec<(usize, &AppliedChange)> = results
+        .iter()
+        .enumerate()
+        .flat_map(|(i, r)| r.changes.iter().map(move |c| (i + 1, c)))
+        .collect();
+    if all_changes.is_empty() {
         s.push_str("],\n");
     } else {
         s.push('\n');
-        for (i, c) in result.changes.iter().enumerate() {
+        for (i, (round, c)) in all_changes.iter().enumerate() {
             s.push_str("    {\n");
             s.push_str(&format!("      \"line\": {},\n", c.line));
             s.push_str(&format!("      \"col\": {},\n", c.col));
-            s.push_str(&format!(
-                "      \"action\": \"{}\",\n",
-                action_str(c.action)
-            ));
-            s.push_str(&format!("      \"description\": {}\n", json_str(&c.description)));
-            s.push_str(&format!("      \"code\": {}\n", json_str(&c.diagnostic_code)));
+            s.push_str(&format!("      \"action\": \"{}\",\n", action_str(c.action)));
+            s.push_str(&format!("      \"description\": {},\n", json_str(&c.description)));
+            s.push_str(&format!("      \"code\": {},\n", json_str(&c.diagnostic_code)));
+            s.push_str(&format!("      \"round\": {}\n", round));
             s.push_str("    }");
-            if i + 1 < result.changes.len() {
+            if i + 1 < all_changes.len() {
                 s.push(',');
             }
             s.push('\n');
         }
         s.push_str("  ],\n");
     }
-    s.push_str(&format!("  \"ok\": {}\n", result.applied > 0));
+    s.push_str(&format!("  \"ok\": {}\n", total_applied > 0));
     s.push_str("}\n");
     s
 }
 
-/// 人类可读输出
-pub fn to_human(result: &ApplyResult, file: &str) -> String {
+/// 多轮 apply 的人类可读输出（按轮分组）
+pub fn rounds_to_human(results: &[ApplyResult], file: &str) -> String {
+    let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let mut s = String::new();
-    s.push_str(&format!("lom apply: {}\n", file));
-    s.push_str(&format!("  applied: {}\n", result.applied));
-    s.push_str(&format!("  skipped: {}\n", result.skipped));
-    if !result.changes.is_empty() {
-        s.push_str("  changes:\n");
-        for c in &result.changes {
+    s.push_str(&format!("lom apply: {}（迭代 {} 轮）\n", file, results.len()));
+    for (i, r) in results.iter().enumerate() {
+        s.push_str(&format!(
+            "  round {}: applied {}, skipped {}\n",
+            i + 1,
+            r.applied,
+            r.skipped
+        ));
+        for c in &r.changes {
             s.push_str(&format!(
                 "    [{}:{}] {} ({}) — {}\n",
                 c.line,
@@ -108,6 +127,7 @@ pub fn to_human(result: &ApplyResult, file: &str) -> String {
             ));
         }
     }
+    s.push_str(&format!("  总计: applied {}\n", total_applied));
     s
 }
 
@@ -537,9 +557,12 @@ mod tests {
             ],
             patched_source: "fixed\n".to_string(),
         };
-        let json = to_json(&result, "test.lom");
+        // M2 起 CLI 只走多轮输出（rounds_to_json），单轮 to_json 已移除
+        let json = rounds_to_json(&[result], "test.lom");
         assert!(json.contains("\"schema\": \"lom-apply/v1\""));
         assert!(json.contains("\"applied\": 2"));
+        assert!(json.contains("\"rounds\": 1"));
+        assert!(json.contains("\"round\": 1"));
         assert!(json.contains("\"action\": \"delete\""));
         assert!(json.contains("\"action\": \"insert\""));
         assert!(json.contains("删除意外字符"));
@@ -636,6 +659,7 @@ mod tests {
             applied: result.applied,
             skipped: result.skipped,
             changes,
+            round: 1,
         };
 
         // 4. 追加到历史文件

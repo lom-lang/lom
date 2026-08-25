@@ -86,7 +86,7 @@ fn print_help(prog: &str) {
     eprintln!("              默认预览到 stdout；--apply 就地改写；--check 用于 CI 门禁");
     eprintln!("  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema");
     eprintln!("              --plan：仅生成计划不应用（默认行为）");
-    eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1）");
+    eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1；M2 起迭代至收敛，上限 5 轮）");
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
     eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
     eprintln!("  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令");
@@ -98,7 +98,7 @@ fn print_help(prog: &str) {
     eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
-    eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1）");
+    eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
     eprintln!("  --history  lom fix 子命令专用：查看修复历史记录（Phase 4.1.3）");
     eprintln!("  --help, -h 显示本帮助");
@@ -786,7 +786,7 @@ fn run_build(json: bool) {
 ///
 /// 为诊断集合生成修复计划，或应用修复到源文件：
 /// - 默认 / `--plan`：生成修复计划（lom-fix/v1）
-/// - `--apply`：应用高置信度修复到源文件（lom-apply/v1）
+/// - `--apply`：应用高置信度修复到源文件（lom-apply/v1；M2 起迭代至收敛，上限 5 轮）
 ///   - `--dry-run`：只预览不写文件
 ///   - `--json`：输出 lom-apply/v1 schema
 ///
@@ -814,46 +814,58 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     let plan = fix::generate_plan(&diags, src);
 
     // Phase 3.1: --apply 模式 — 应用修复到源文件
+    // 修复引擎深化 M2：从单趟升级为**迭代闭环**——应用后重新诊断再修，
+    // 直到无高置信度可应用项（applied==0）或源码不再变化，上限 5 轮防震荡死循环。
     if cli.apply {
-        let result = apply::apply_plan(&plan, src);
+        const MAX_ROUNDS: usize = 5;
+        let (current, results) = apply_iterative(src, path, MAX_ROUNDS);
 
         if cli.json {
-            print!("{}", apply::to_json(&result, path));
+            print!("{}", apply::rounds_to_json(&results, path));
         } else {
-            print!("{}", apply::to_human(&result, path));
+            print!("{}", apply::rounds_to_human(&results, path));
         }
 
-        // --dry-run 不写文件；否则写回源文件
-        if !cli.dry_run && result.applied > 0 {
-            if let Err(e) = fs::write(path, &result.patched_source) {
+        let total_applied: usize = results.iter().map(|r| r.applied).sum();
+
+        // --dry-run 不写文件；否则把迭代收敛后的源码写回
+        if !cli.dry_run && total_applied > 0 {
+            if let Err(e) = fs::write(path, &current) {
                 eprintln!("apply 写文件失败: {}", e);
                 process::exit(1);
             }
 
             // Phase 4.1.3: 追加修复历史记录到 .lom/fix-history.jsonl
             // 供 LLM 学习"过去修了什么"，辅助后续修复决策
-            let changes: Vec<fix_history::HistoryChange> = result
-                .changes
-                .iter()
-                .map(|c| fix_history::HistoryChange {
-                    line: c.line,
-                    col: c.col,
-                    action: apply::action_str(c.action).to_string(),
-                    description: c.description.clone(),
-                    diagnostic_code: c.diagnostic_code.clone(),
-                })
-                .collect();
-            let entry = fix_history::FixHistoryEntry {
-                timestamp: fix_history::current_timestamp(),
-                file: path.to_string(),
-                applied: result.applied,
-                skipped: result.skipped,
-                changes,
-            };
+            // M2：每一轮各写一条 entry（带 round 字段；旧格式无 round 读取时按 1 处理）
             let history_path = std::path::Path::new(".lom/fix-history.jsonl");
-            if let Err(e) = fix_history::append_history(&entry, history_path) {
-                eprintln!("警告：修复历史记录写入失败: {}", e);
-                // 历史记录失败不阻止 apply 成功
+            for (i, result) in results.iter().enumerate() {
+                if result.applied == 0 {
+                    continue;
+                }
+                let changes: Vec<fix_history::HistoryChange> = result
+                    .changes
+                    .iter()
+                    .map(|c| fix_history::HistoryChange {
+                        line: c.line,
+                        col: c.col,
+                        action: apply::action_str(c.action).to_string(),
+                        description: c.description.clone(),
+                        diagnostic_code: c.diagnostic_code.clone(),
+                    })
+                    .collect();
+                let entry = fix_history::FixHistoryEntry {
+                    timestamp: fix_history::current_timestamp(),
+                    file: path.to_string(),
+                    applied: result.applied,
+                    skipped: result.skipped,
+                    changes,
+                    round: i + 1,
+                };
+                if let Err(e) = fix_history::append_history(&entry, history_path) {
+                    eprintln!("警告：修复历史记录写入失败: {}", e);
+                    // 历史记录失败不阻止 apply 成功
+                }
             }
         }
 
@@ -869,6 +881,34 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
 
     // fix 子命令的退出码语义：计划生成成功即 0（无论是否有诊断）
     process::exit(0);
+}
+
+/// 修复引擎深化 M2：迭代应用修复直到收敛
+///
+/// 每轮：重新诊断（词法+语法+类型）→ 生成计划 → 应用高置信度修复。
+/// 收敛条件：一轮 applied==0（无可自动修复项）或修补后源码不再变化；
+/// `max_rounds` 是震荡死循环的最后防线（修复 A 引入诊断 B、修 B 又引入 A 的场景）。
+/// 返回 (最终源码, 各轮结果)。
+fn apply_iterative(src: &str, path: &str, max_rounds: usize) -> (String, Vec<apply::ApplyResult>) {
+    let mut current = src.to_string();
+    let mut results: Vec<apply::ApplyResult> = Vec::new();
+
+    for _round in 1..=max_rounds {
+        let mut round_diags = diagnostics::Diagnostics::from_parse_result(&current, path);
+        if round_diags.ok {
+            let program = parser::Parser::parse_recover(&current).program;
+            typechecker::check_program(&program, &current, path, &mut round_diags);
+        }
+        let round_plan = fix::generate_plan(&round_diags, &current);
+        let result = apply::apply_plan(&round_plan, &current);
+        let no_progress = result.applied == 0 || result.patched_source == current;
+        current = result.patched_source.clone();
+        results.push(result);
+        if no_progress {
+            break;
+        }
+    }
+    (current, results)
 }
 
 /// Phase 4.2: 启动交互式 REPL
@@ -1213,4 +1253,61 @@ fn extract_last_text_field(json: &str) -> Option<String> {
         search_from = end + 1;
     }
     last_text
+}
+
+// ===== 单元测试（修复引擎深化 M2：迭代闭环）=====
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 两轮收敛案例：第 1 轮删意外字符（LEX005，语法期），
+    /// 第 2 轮解析通过后类型检查暴露 EFF001（插效应注解），第 3 轮收敛。
+    const TWO_ROUND_SRC: &str = "fn helper(x: Int) -> Int\n    println(x)\n    x\nend\n\nfn main() -> Unit\n    println@(helper(1))\nend\n";
+
+    #[test]
+    fn iterative_apply_converges_in_two_fix_rounds() {
+        let (final_src, results) = apply_iterative(TWO_ROUND_SRC, "test.lom", 5);
+        let total_applied: usize = results.iter().map(|r| r.applied).sum();
+        assert_eq!(total_applied, 2, "应修 2 处（@ 和效应注解）");
+        assert_eq!(results.len(), 3, "两轮修复 + 一轮收敛判定");
+        assert_eq!(results.last().unwrap().applied, 0, "末轮应无可修项");
+        assert!(final_src.contains("! [IO]"), "final: {:?}", final_src);
+        assert!(!final_src.contains('@'), "final: {:?}", final_src);
+        // 修复后的源码应能干净通过诊断
+        let diags = diagnostics::Diagnostics::from_parse_result(&final_src, "test.lom");
+        assert!(diags.ok, "修复后仍有诊断: {:?}", diags.to_human());
+    }
+
+    #[test]
+    fn iterative_apply_respects_max_rounds() {
+        // 上限 1 轮：只修掉 @，EFF001 留给下一轮（被上限截断）
+        let (final_src, results) = apply_iterative(TWO_ROUND_SRC, "test.lom", 1);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].applied, 1);
+        assert!(!final_src.contains('@'));
+        assert!(!final_src.contains("! [IO]"), "上限截断，效应注解未修");
+    }
+
+    #[test]
+    fn iterative_apply_clean_source_single_round() {
+        let (final_src, results) = apply_iterative(
+            "fn main() -> Unit\n    println(1)\nend\n",
+            "test.lom",
+            5,
+        );
+        assert_eq!(results.len(), 1, "干净源码一轮即收敛");
+        assert_eq!(results[0].applied, 0);
+        assert_eq!(final_src, "fn main() -> Unit\n    println(1)\nend\n");
+    }
+
+    #[test]
+    fn iterative_apply_medium_fixes_not_applied() {
+        // 拼写修复是 Medium（M1 用户裁决）——迭代闭环不会自动改，一轮收敛
+        let src = "fn main() -> Unit\n    let length = 5\n    println(lenght)\nend\n";
+        let (final_src, results) = apply_iterative(src, "test.lom", 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].applied, 0);
+        assert_eq!(final_src, src, "Medium 修复不被自动应用");
+    }
 }

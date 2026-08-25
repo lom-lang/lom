@@ -53,6 +53,8 @@ pub struct FixHistoryEntry {
     pub skipped: usize,
     /// 具体变更列表
     pub changes: Vec<HistoryChange>,
+    /// 迭代修复的轮次（修复引擎深化 M2；单趟时代记录无此字段，读取时按 1 处理）
+    pub round: usize,
 }
 
 // ===== 时间戳 =====
@@ -138,6 +140,7 @@ pub fn entry_to_json(entry: &FixHistoryEntry) -> String {
     s.push_str(&format!(",\"file\":{}", json_str(&entry.file)));
     s.push_str(&format!(",\"applied\":{}", entry.applied));
     s.push_str(&format!(",\"skipped\":{}", entry.skipped));
+    s.push_str(&format!(",\"round\":{}", entry.round));
     s.push_str(",\"changes\":[");
     for (i, c) in entry.changes.iter().enumerate() {
         if i > 0 {
@@ -207,6 +210,8 @@ pub fn parse_entry(json: &str) -> Option<FixHistoryEntry> {
     let file = extract_json_string(json, "file")?;
     let applied = extract_json_number(json, "applied")?;
     let skipped = extract_json_number(json, "skipped")?;
+    // M2 新增字段：旧记录无 round，按单趟时代的语义默认为 1
+    let round = extract_json_number(json, "round").unwrap_or(1);
 
     // 解析 changes 数组：提取每个 {...} 对象
     let changes = parse_changes_array(json);
@@ -217,6 +222,7 @@ pub fn parse_entry(json: &str) -> Option<FixHistoryEntry> {
         applied,
         skipped,
         changes,
+        round,
     })
 }
 
@@ -361,8 +367,8 @@ pub fn to_human(entries: &[FixHistoryEntry]) -> String {
     for (i, e) in entries.iter().enumerate() {
         s.push_str(&format!("[{}] {} | {}\n", i + 1, e.timestamp, e.file));
         s.push_str(&format!(
-            "    applied: {}, skipped: {}\n",
-            e.applied, e.skipped
+            "    applied: {}, skipped: {}, round: {}\n",
+            e.applied, e.skipped, e.round
         ));
         for c in &e.changes {
             s.push_str(&format!(
@@ -410,6 +416,7 @@ mod tests {
             applied: changes.len(),
             skipped: 0,
             changes,
+            round: 1,
         }
     }
 
@@ -463,6 +470,7 @@ mod tests {
                 description: "添加 \" 引号".to_string(),
                 diagnostic_code: "LEX001".to_string(),
             }],
+            round: 1,
         };
         let json = entry_to_json(&entry);
         // 转义的引号
@@ -498,6 +506,7 @@ mod tests {
                 description: "删除 '意外字符'".to_string(),
                 diagnostic_code: "LEX005".to_string(),
             }],
+            round: 1,
         };
         let json = entry_to_json(&entry);
         let parsed = parse_entry(&json).expect("解析失败");
@@ -572,6 +581,15 @@ mod tests {
         assert!(json.contains("\"schema\": \"lom-fix-history/v1\""));
         assert!(json.contains("\"count\": 1"));
         assert!(json.contains("\"file\":\"main.lom\""));
+    }
+
+    /// M2：旧格式记录（无 round 字段）读取时按第 1 轮处理（向后兼容）
+    #[test]
+    fn test_parse_entry_without_round_defaults_to_1() {
+        let legacy = "{\"timestamp\":\"2024-08-08T10:30:00Z\",\"file\":\"main.lom\",\"applied\":1,\"skipped\":0,\"changes\":[{\"line\":3,\"col\":1,\"action\":\"insert\",\"description\":\"LEX001 修复\",\"code\":\"LEX001\"}]}";
+        let parsed = parse_entry(legacy).expect("旧格式解析失败");
+        assert_eq!(parsed.round, 1);
+        assert_eq!(parsed.applied, 1);
     }
 
     #[test]
