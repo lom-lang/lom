@@ -112,8 +112,8 @@ pub struct FixAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionKind {
     Insert,
-    /// schema 预留（当前规则未产出 Replace 动作）
-    #[allow(dead_code)]
+    /// 替换 (line,col)..(end_line,end_col) 范围为 text
+    /// （修复引擎深化 M1 起由 NAM003/NAM004 拼写修复产出）
     Replace,
     Delete,
     Hint,
@@ -253,11 +253,8 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
             "重复定义：重命名其中一个，或删除多余的定义",
             Confidence::Low,
         )],
-        "NAM003" => fix_nam_undefined(d),
-        "NAM004" => vec![hint_only(
-            "无此字段/变体：检查拼写或查阅类型定义",
-            Confidence::Low,
-        )],
+        "NAM003" => fix_nam_undefined(d, source_lines),
+        "NAM004" => fix_nam_unknown_member(d, source_lines),
 
         // ===== 效应系统（Phase 2.5）=====
         "EFF001" => fix_eff_undeclared(d, source_lines),
@@ -440,18 +437,87 @@ fn fix_mat_non_exhaustive(d: &Diagnostic) -> Vec<FixAction> {
     }
 }
 
-/// NAM003 未定义变量：仅 hint（含可能的拼写建议）
+/// NAM003 未定义变量/函数：有拼写建议时产出 Replace 动作（修复引擎深化 M1）
 ///
-/// 低置信度：未定义变量可能是拼写错误、遗漏 import、遗漏 let 声明等，
-/// 无 span 难以做拼写纠正。
-fn fix_nam_undefined(d: &Diagnostic) -> Vec<FixAction> {
-    vec![hint_only(
-        &format!(
-            "未定义变量（{}）：检查拼写、是否遗漏 let 声明或 import 导入",
-            d.message
-        ),
-        Confidence::Low,
-    )]
+/// typechecker 的 NAM003 诊断无表达式级位置（line/col = 0，表达式 span 是挂账项），
+/// 因此在源码中按"整词 + 跳过字符串/注释"扫描该名的所有出现处，每处一个 Replace。
+/// 置信度 Medium——猜测性修复不自动应用（用户裁决：--apply 只动 100% 确定的修复），
+/// 只进 --plan 供 LLM/人确认。无建议时保持原 hint。
+fn fix_nam_undefined(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    let name = extract_last_quoted(&d.message);
+    let suggestion = extract_suggestion(&d.hint);
+    match (name, suggestion) {
+        (Some(name), Some(sugg)) => {
+            let occ = find_token_occurrences(source_lines, &name, false);
+            if occ.is_empty() {
+                return vec![hint_only(
+                    &format!(
+                        "未定义 '{}'：是否想用 '{}'？（未能在源码中定位出现位置）",
+                        name, sugg
+                    ),
+                    Confidence::Medium,
+                )];
+            }
+            occ.iter()
+                .map(|&(line, col, end_col)| FixAction {
+                    description: format!("将 '{}' 替换为 '{}'", name, sugg),
+                    action: ActionKind::Replace,
+                    line,
+                    col,
+                    end_line: Some(line),
+                    end_col: Some(end_col),
+                    text: Some(sugg.clone()),
+                    confidence: Confidence::Medium,
+                })
+                .collect()
+        }
+        _ => vec![hint_only(
+            &format!(
+                "未定义变量（{}）：检查拼写、是否遗漏 let 声明或 import 导入",
+                d.message
+            ),
+            Confidence::Low,
+        )],
+    }
+}
+
+/// NAM004 无此字段/变体：有拼写建议时产出 Replace 动作（修复引擎深化 M1）
+///
+/// message 两种形态：
+///   "记录无字段 'X'"   —— 只扫描 `.X`（点前缀）出现处，避免误改同名变量
+///   "枚举 E 无变体 'V'" —— 整词扫描 V（未定义变体出现的每一处都是错的）
+/// 与 NAM003 同：typechecker 诊断无位置，靠源码扫描定位；置信度 Medium。
+fn fix_nam_unknown_member(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    let is_field = d.message.contains("无字段");
+    let name = extract_last_quoted(&d.message);
+    let suggestion = extract_suggestion(&d.hint);
+    match (name, suggestion) {
+        (Some(name), Some(sugg)) => {
+            let occ = find_token_occurrences(source_lines, &name, is_field);
+            if occ.is_empty() {
+                return vec![hint_only(
+                    &format!("'{}' 不存在：是否想用 '{}'？（未能定位出现位置）", name, sugg),
+                    Confidence::Medium,
+                )];
+            }
+            occ.iter()
+                .map(|&(line, col, end_col)| FixAction {
+                    description: format!("将 '{}' 替换为 '{}'", name, sugg),
+                    action: ActionKind::Replace,
+                    line,
+                    col,
+                    end_line: Some(line),
+                    end_col: Some(end_col),
+                    text: Some(sugg.clone()),
+                    confidence: Confidence::Medium,
+                })
+                .collect()
+        }
+        _ => vec![hint_only(
+            "无此字段/变体：检查拼写或查阅类型定义",
+            Confidence::Low,
+        )],
+    }
 }
 
 /// EFF001 效应未声明：在函数签名行插入效应注解
@@ -561,10 +627,13 @@ fn find_effect_close_bracket(line: &str) -> Option<usize> {
 }
 
 /// RUNTIME002 未定义变量/函数（运行时）：仅 hint
+///
+/// 运行时诊断位置粗糙，不产出 Replace；提示用户走静态检查拿拼写建议。
 fn fix_runtime_undefined(d: &Diagnostic) -> Vec<FixAction> {
     vec![hint_only(
         &format!(
-            "运行时未定义（{}）：确认变量/函数已声明、导入，拼写无误",
+            "运行时未定义（{}）：确认变量/函数已声明、导入，拼写无误；\
+             若是拼写错误，静态检查的 NAM003/NAM004 诊断会附带 \"是否想用 'X'？\" 建议",
             d.message
         ),
         Confidence::Low,
@@ -602,6 +671,96 @@ fn extract_quoted_string(msg: &str) -> Option<String> {
 /// 返回第一个单引号对内的第一个字符。
 fn extract_quoted_char(msg: &str) -> Option<char> {
     extract_quoted_string(msg).and_then(|s| s.chars().next())
+}
+
+/// 提取 message 中最后一个单引号对内的内容
+///
+/// 用于名字在末尾的消息："未定义变量 'lenght'" → "lenght"、
+/// "枚举 Color 无变体 'Grean'" → "Grean"。
+fn extract_last_quoted(msg: &str) -> Option<String> {
+    let end = msg.rfind('\'')?;
+    let before = &msg[..end];
+    let start = before.rfind('\'')?;
+    Some(before[start + 1..].to_string())
+}
+
+/// 从诊断 hint "是否想用 'X'？" 中提取拼写建议名
+fn extract_suggestion(hint: &Option<String>) -> Option<String> {
+    let h = hint.as_ref()?;
+    if !h.contains("是否想用") {
+        return None;
+    }
+    let start = h.find('\'')?;
+    let rest = &h[start + 1..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
+}
+
+/// 标识符字符（字母/数字/下划线；Lom 标识符字符集）
+fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+/// 在源码中整词扫描 `name` 的所有出现处（跳过字符串字面量与 `#` 注释）
+///
+/// 用于 NAM003/NAM004 的 Replace 定位——typechecker 诊断无表达式级位置（line/col=0），
+/// 只能靠扫描。`dot_prefix` = true 时要求名字前一个字符是 `.`
+/// （记录字段场景，避免误改同名的普通变量）。
+/// 返回 (line, col, end_col)：1-based 字符位置，end_col = col + 名字字符数
+/// （与 LEX005 delete 的 col..col+1 约定一致，为左闭右开）。
+fn find_token_occurrences(
+    source_lines: &[&str],
+    name: &str,
+    dot_prefix: bool,
+) -> Vec<(usize, usize, usize)> {
+    let name_chars: Vec<char> = name.chars().collect();
+    let n = name_chars.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (li, line) in source_lines.iter().enumerate() {
+        let chars: Vec<char> = line.chars().collect();
+        let mut in_string = false;
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            if in_string {
+                if c == '\\' {
+                    i += 2; // 跳过转义对（如 \"），避免把转义引号当字符串结束
+                    continue;
+                }
+                if c == '"' {
+                    in_string = false;
+                }
+                i += 1;
+                continue;
+            }
+            if c == '"' {
+                in_string = true;
+                i += 1;
+                continue;
+            }
+            if c == '#' {
+                break; // 行注释，剩余内容跳过
+            }
+            if i + n <= chars.len() && chars[i..i + n] == name_chars[..] {
+                let left_ok = if dot_prefix {
+                    i > 0 && chars[i - 1] == '.'
+                } else {
+                    i == 0 || !is_ident_char(chars[i - 1])
+                };
+                let right_ok = i + n == chars.len() || !is_ident_char(chars[i + n]);
+                if left_ok && right_ok {
+                    out.push((li + 1, i + 1, i + 1 + n));
+                }
+                i += n;
+                continue;
+            }
+            i += 1;
+        }
+    }
+    out
 }
 
 /// 从 message 中提取第二个方括号内的内容
@@ -1172,5 +1331,125 @@ mod tests {
         let fixes = fix_for_diagnostic(&d, &[]);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert!(fixes[0].description.contains("fooo"));
+    }
+
+    // ===== 修复引擎深化 M1：NAM003/NAM004 拼写 Replace =====
+
+    fn make_nam_diag(code: &str, message: &str, hint: Option<&str>) -> Diagnostic {
+        Diagnostic {
+            severity: Severity::Error,
+            stage: Stage::Type,
+            code: code.to_string(),
+            message: message.to_string(),
+            file: "test.lom".to_string(),
+            line: 0,
+            col: 0,
+            source_line: None,
+            is_hole: false,
+            hint: hint.map(|h| h.to_string()),
+        }
+    }
+
+    #[test]
+    fn nam003_suggestion_produces_replace() {
+        let src = "fn main() -> Unit\n    println(lenght + 1)\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag(
+            "NAM003",
+            "未定义变量 'lenght'",
+            Some("是否想用 'length'？"),
+        );
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].confidence, Confidence::Medium); // 猜测性修复不自动应用
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].col, 13);
+        assert_eq!(fixes[0].end_line, Some(2));
+        assert_eq!(fixes[0].end_col, Some(19)); // "lenght" 6 字符，13+6
+        assert_eq!(fixes[0].text.as_deref(), Some("length"));
+    }
+
+    #[test]
+    fn nam003_replace_skips_strings_and_comments() {
+        let src = "println(lenght)\nprintln(\"lenght\")\n# lenght 注释\nlet x = lenght\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag(
+            "NAM003",
+            "未定义变量 'lenght'",
+            Some("是否想用 'length'？"),
+        );
+        let fixes = fix_for_diagnostic(&d, &lines);
+        // 只有第 1、4 行的真实出现；字符串与注释里的不算
+        assert_eq!(fixes.len(), 2);
+        assert_eq!(fixes[0].line, 1);
+        assert_eq!(fixes[1].line, 4);
+    }
+
+    #[test]
+    fn nam003_substring_does_not_match() {
+        // "len" 不应匹配 "length" 的子串（标识符边界检查）
+        let src = "let length = 1\nprintln(len)\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("NAM003", "未定义变量 'len'", Some("是否想用 'lenx'？"));
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].col, 9);
+    }
+
+    #[test]
+    fn nam003_no_suggestion_keeps_hint() {
+        let src = "println(zzz)\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("NAM003", "未定义变量 'zzz'", None);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Low);
+    }
+
+    #[test]
+    fn nam004_record_field_requires_dot_prefix() {
+        // `.nam` 才替换；普通变量 nam 不动
+        let src = "println(p.nam)\nlet nam = 1\nprintln(nam)\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("NAM004", "记录无字段 'nam'", Some("是否想用 'name'？"));
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 1);
+        assert_eq!(fixes[0].col, 11); // "println(p." 之后
+        assert_eq!(fixes[0].end_col, Some(14));
+        assert_eq!(fixes[0].text.as_deref(), Some("name"));
+    }
+
+    #[test]
+    fn nam004_variant_uses_last_quoted_name() {
+        // message 有两个引号对（枚举名 + 变体名），要取最后一个
+        let src = "match s\n    Circl(r) => println(r)\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag(
+            "NAM004",
+            "枚举 Shape 无变体 'Circl'",
+            Some("是否想用 'Circle'？"),
+        );
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].col, 5);
+        assert_eq!(fixes[0].end_col, Some(10)); // "Circl" 5 字符
+        assert_eq!(fixes[0].text.as_deref(), Some("Circle"));
+    }
+
+    #[test]
+    fn find_token_occurrences_escaped_quote_in_string() {
+        // 字符串里的转义引号不应终止字符串状态
+        let src = "println(\"a\\\" lenght b\")\nprintln(lenght)\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let occ = find_token_occurrences(&lines, "lenght", false);
+        assert_eq!(occ.len(), 1);
+        assert_eq!(occ[0].0, 2);
     }
 }

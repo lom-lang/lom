@@ -759,6 +759,12 @@ impl TypeChecker {
                             0,
                             0,
                         );
+                        // 字段名拼写建议（候选 = 该记录的字段名），供 fix 产出 Replace
+                        let candidates: Vec<String> =
+                            fields.iter().map(|(fname, _)| fname.clone()).collect();
+                        if let Some(sugg) = best_spelling(field, candidates) {
+                            self.patch_last_hint(&sugg);
+                        }
                         TypeOrUnknown::unknown()
                     }
                     TypeOrUnknown::Known(Type::Tuple(_)) => {
@@ -1220,6 +1226,14 @@ impl TypeChecker {
                         0,
                         0,
                     );
+                    // 变体名拼写建议（候选 = 该枚举的变体名），供 fix 产出 Replace
+                    if let Some(info) = self.enums.get(&enum_name) {
+                        let candidates: Vec<String> =
+                            info.variants.iter().map(|(vn, _)| vn.clone()).collect();
+                        if let Some(sugg) = best_spelling(name, candidates) {
+                            self.patch_last_hint(&sugg);
+                        }
+                    }
                 } else if expected_arity != sub.len() {
                     self.push_diag(
                         Severity::Warning,
@@ -1528,25 +1542,7 @@ impl TypeChecker {
                 candidates.push(vn.clone());
             }
         }
-        let mut best: Option<(usize, String)> = None;
-        for c in candidates {
-            if c == name {
-                continue;
-            }
-            let d = levenshtein(name, &c);
-            if d <= 2 {
-                // 距离更小必更新；距离相同则偏好更长的候选名
-                // （用户更可能漏字符，如 printl→println 而非 print）
-                let should_update = match &best {
-                    None => true,
-                    Some((bd, bs)) => d < *bd || (d == *bd && c.len() > bs.len()),
-                };
-                if should_update {
-                    best = Some((d, c));
-                }
-            }
-        }
-        best.map(|(_, c)| c)
+        best_spelling(name, candidates)
     }
 
     /// Phase 4.1.1: 为最后一条 NAM003 诊断附加拼写建议 hint
@@ -1555,9 +1551,16 @@ impl TypeChecker {
     /// "是否想用 'X'？"，让 LLM/fix 拿到具体修复方向。
     fn patch_nam003_hint(&mut self, name: &str, env: &TypeEnv) {
         if let Some(suggestion) = self.suggest_spelling(name, env) {
-            if let Some(last) = self.diags.last_mut() {
-                last.hint = Some(format!("是否想用 '{}'？", suggestion));
-            }
+            self.patch_last_hint(&suggestion);
+        }
+    }
+
+    /// 覆盖最后一条诊断的 hint 为拼写建议 "是否想用 'X'？"
+    ///
+    /// NAM003（4.1.1）与 NAM004（修复引擎深化 M1）共用。
+    fn patch_last_hint(&mut self, suggestion: &str) {
+        if let Some(last) = self.diags.last_mut() {
+            last.hint = Some(format!("是否想用 '{}'？", suggestion));
         }
     }
 
@@ -1644,6 +1647,30 @@ fn type_hint(code: &str) -> Option<String> {
         "MAT001" => Some("添加缺失的 match 分支，或用 `_` 通配符".into()),
         _ => None,
     }
+}
+
+/// Phase 4.1.1: 从候选名中找编辑距离 ≤ 2 的最佳拼写建议
+///
+/// 距离更小优先；距离相同则偏好更长的候选名
+/// （用户更可能漏字符，如 printl→println 而非 print）。
+fn best_spelling(name: &str, candidates: Vec<String>) -> Option<String> {
+    let mut best: Option<(usize, String)> = None;
+    for c in candidates {
+        if c == name {
+            continue;
+        }
+        let d = levenshtein(name, &c);
+        if d <= 2 {
+            let should_update = match &best {
+                None => true,
+                Some((bd, bs)) => d < *bd || (d == *bd && c.len() > bs.len()),
+            };
+            if should_update {
+                best = Some((d, c));
+            }
+        }
+    }
+    best.map(|(_, c)| c)
 }
 
 /// Phase 4.1.1: Levenshtein 编辑距离
@@ -1803,6 +1830,46 @@ mod tests {
         assert!(
             !hint.contains("是否想用"),
             "无相似名不应给建议，实际: {}",
+            hint
+        );
+    }
+
+    /// 修复引擎深化 M1: NAM004 记录字段拼写建议
+    #[test]
+    fn nam004_suggests_similar_record_field() {
+        // p.nam 拼错，应建议 name
+        let src = "fn main() -> Unit\n    let p = {name: \"a\", age: 3}\n    println(p.nam)\nend\n";
+        let diags = check_src(src);
+        let nam004: Vec<_> = diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM004")
+            .collect();
+        assert!(!nam004.is_empty(), "应报 NAM004");
+        let hint = nam004[0].hint.as_ref().expect("应有 hint");
+        assert!(
+            hint.contains("是否想用 'name'"),
+            "hint 应建议 name，实际: {}",
+            hint
+        );
+    }
+
+    /// 修复引擎深化 M1: NAM004 枚举变体拼写建议
+    #[test]
+    fn nam004_suggests_similar_enum_variant() {
+        // Circl(r) 拼错，应建议 Circle
+        let src = "enum Shape\n    | Circle(Int)\n    | Square(Int)\nend\nfn main() -> Unit\n    let s = Circle(1)\n    match s\n        Circl(r) => println(r)\n        Square(x) => println(x)\n    end\nend\n";
+        let diags = check_src(src);
+        let nam004: Vec<_> = diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM004")
+            .collect();
+        assert!(!nam004.is_empty(), "应报 NAM004");
+        let hint = nam004[0].hint.as_ref().expect("应有 hint");
+        assert!(
+            hint.contains("是否想用 'Circle'"),
+            "hint 应建议 Circle，实际: {}",
             hint
         );
     }

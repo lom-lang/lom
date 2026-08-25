@@ -652,5 +652,48 @@ mod tests {
 
         let _ = std::fs::remove_file(&history_path);
     }
+
+    /// M1：Replace 动作的应用路径（此前 schema 预留，无任何测试覆盖）
+    #[test]
+    fn test_replace_applies() {
+        // NAM003 拼写修复场景：把 lenght 替换为 length
+        let source = "fn main() -> Unit\n    println(lenght + 1)\nend\n";
+        let fix = FixAction {
+            description: "将 'lenght' 替换为 'length'".to_string(),
+            action: ActionKind::Replace,
+            line: 2,
+            col: 13,
+            end_line: Some(2),
+            end_col: Some(19),
+            text: Some("length".to_string()),
+            confidence: Confidence::High, // 测试 replace 执行路径本身（实际规则产出 Medium）
+        };
+        let plan = make_plan(vec![fix]);
+        let result = apply_plan(&plan, source);
+        assert_eq!(result.applied, 1, "patched: {:?}", result.patched_source);
+        assert!(result.patched_source.contains("println(length + 1)"));
+        assert!(!result.patched_source.contains("lenght"));
+    }
+
+    /// M1：Medium 置信度的 Replace 不被 --apply 应用（用户裁决：猜测性修复不自动改）
+    #[test]
+    fn test_medium_replace_not_applied() {
+        let source = "fn main() -> Unit\n    println(lenght + 1)\nend\n";
+        let fix = FixAction {
+            description: "将 'lenght' 替换为 'length'".to_string(),
+            action: ActionKind::Replace,
+            line: 2,
+            col: 13,
+            end_line: Some(2),
+            end_col: Some(19),
+            text: Some("length".to_string()),
+            confidence: Confidence::Medium,
+        };
+        let plan = make_plan(vec![fix]);
+        let result = apply_plan(&plan, source);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.skipped, 1);
+        assert!(result.patched_source.contains("lenght"), "源码不应被改动");
+    }
 }
 
