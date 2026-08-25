@@ -234,7 +234,7 @@
 
 <h2>2.4 阶段 2：LLM 编码原生核心（6-10 周）— 身份阶段</h2>
 <div class="phase">
-  <h3>阶段 2 · LLM 编码原生核心 <span class="tag">MVP</span> <span class="tag" style="background:#eab308;color:white;">进行中</span></h3>
+  <h3>阶段 2 · LLM 编码原生核心 <span class="tag">MVP</span> <span class="tag" style="background:#16a34a;color:white;">✅ 已完成</span></h3>
   <p><strong>目标</strong>：把"LLM 编码原生"做出来。这是与其他语言的区别点，也是 Lom 身份的成立点。</p>
   <h4>进度（2.1 语法扩展子阶段）</h4>
   <ul>
@@ -1029,9 +1029,9 @@
   <p>345/345 Rust 测试；eval 108/108；自举 14 程序 39 条输出逐字正确；33 个有效示例 fmt 幂等；v0.5.1 已打 tag；三平台 CI 上线。</p>
 </div>
 
-<h2 id="2.9">2.9 阶段 7：WASM 编译后端（2026-08-23 启动）</h2>
+<h2 id="2.9">2.9 阶段 7：WASM 编译后端（2026-08-23 启动并闭环）</h2>
 <div class="phase">
-  <h3>阶段 7 · WASM 编译后端 <span class="tag" style="background:#eab308;color:white;">进行中</span></h3>
+  <h3>阶段 7 · WASM 编译后端 <span class="tag" style="background:#16a34a;color:white;">✅ 已完成（2026-08-23，7.1-7.10 全闭环）</span></h3>
   <p><strong>方向定案</strong>：RFC-0002（accepted，2026-08-23）。编译器阶段三选项（LLVM / WASM / 全量自举）裁决为<strong>手写零依赖 WASM emitter</strong>——inkwell 破零依赖永久政策、Cranelift 已在 Phase 4 复盘否决、全量自举被 5.18 实测的 ~10⁴ 递归天花板硬阻塞（WASM 后端恰好顺手解锁）。树遍历解释器保留为参考实现与默认运行路径；编译的是动态语义（tagged i64 + 线性内存 arena）；退出标准核心是<strong>双后端 golden 逐字一致 + eval 108/108×2</strong>。里程碑 7.1-7.10 详见 <code>docs/rfc/0002-phase7-wasm-backend.md</code>。</p>
   <ul>
     <li><strong>7.1 emitter 骨架</strong> <span class="tag" style="background:#16a34a;color:white;">✅ 2026-08-23</span>：<code>src/wasm.rs</code>——LEB128（含规范测试向量）、type/import/func/memory/export/code/data 七个 section 编码、函数索引空间（导入在前）、<code>hello_module</code> 最小模块（导入 env.lom_print + 数据段常量打印）。验证双层：逐字节 golden 单测 + <strong>Node v24 真实实例化冒烟</strong>（import 回调正确收到 "hello from wasm"）。6 个测试。无 CLI 面（故不升版本号）；API 面暂仅测试消费，模块级 #[allow(dead_code)] 已注明是有意保留。</li>

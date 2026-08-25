@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-23（**交接就绪态**：Phase 6 工程面完成 + 两轮评审整改全落地；v0.6.1 已打 tag；CI 三平台连续全绿；工作区干净。新会话先读 §1 快照与 §11 最新坑）
+> 最后更新：2026-08-25（**交接就绪态**：Phase 7 WASM 编译后端全部闭环（7.1-7.10，v0.15.0）；CI 三平台全绿；工作区干净。新会话先读 §1 快照与 §11 最新坑）
 
 ---
 
@@ -26,18 +26,18 @@
 
 ---
 
-## 1. 项目现状快照（2026-08-23）
+## 1. 项目现状快照（2026-08-25）
 
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
 | 版本 | **v0.15.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.14.0） |
-| Rust 测试 | **395/395 通过**（含 wasm 单测 + 34 个 Node e2e），构建零 warning |
+| Rust 测试 | **395/395 通过**（含 wasm 单测 + 33 个 Node e2e），构建零 warning |
 | eval 评测集 | **108/108**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-6 全部收尾；巩固期 P-0（文档腐坏清扫）+ P-1（RFC-0001 关闭 spec 四问：#5 元组+解构 / #6 无 self / #7 v1.0 无 trait / #8 无 pub）已完成 |
+| 当前进度 | 路线图 Phase 0-7 全部闭环（Phase 7 WASM 编译后端 7.1-7.10，RFC-0002 退出标准结算见 §10 末与 guide §2.9）；巩固期 P-0（文档腐坏清扫）+ P-1（RFC-0001 关闭 spec 四问）已完成 |
 | 下一步 | **Phase 7 全部闭环（7.1-7.10，v0.15.0）**——WASM 后端双后端 golden 一致 + eval 108/108×2 + CI wasm gate 全绿。下一步候选：全量自举（Phase 8，递归天花板已变为宿主栈可调）/ v1.0 冻结 / 其他——等用户指令 |
 | 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（Phase 7 顺手解决递归天花板）；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举移交 Phase 8 候选 |
 
@@ -83,7 +83,7 @@
 
 **P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
 
-**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.6.1`（tag v0.6.1；v0.6.0 的 tag 不慎切在两个 CI 修复之前，复审发现后补发 v0.6.1 含全部 CI 修复；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
+**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.15.0`（tag v0.15.0；历史教训：v0.6.0 的 tag 不慎切在两个 CI 修复之前，复审发现后补发 v0.6.1 含全部 CI 修复；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
 
 ---
 
@@ -142,7 +142,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 349/349（2026-08-23 基线）
+cargo test --release                                    # 期望 395/395（2026-08-25 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 108/108
 ```
@@ -257,8 +257,8 @@ end
 |---|---|---|
 | src/main.rs | CLI 入口 | 256MB 栈线程在这里；子命令分发在这里 |
 | src/lexer.rs / parser.rs / ast.rs | 前端 | parser 有错误恢复模式（`self.recover`），panic! 的那些是测试断言不是运行时路径 |
-| src/typechecker.rs | 类型检查 | **88KB 大文件**，Read 会被 64KB 限制拒，用 offset/limit 分段读或 Grep 定位 |
-| src/interpreter.rs | 树遍历求值器 | 内置函数全在这（约 32 个，见 `"xxx" =>` 模式匹配），`Value::List` 不可变 |
+| src/typechecker.rs | 类型检查 | **103KB 大文件**，Read 会被 100KB 限制拒，用 offset/limit 分段读或 Grep 定位 |
+| src/interpreter.rs | 树遍历求值器 | 内置函数全在这（42 个，见 `module_of` 的模块分派），`Value::List` 不可变 |
 | src/fix.rs + apply.rs + fix_history.rs | AI 修复闭环 | `lom fix --plan/--apply/--dry-run/--history`；历史写 `.lom/fix-history.jsonl`（NDJSON） |
 | src/repl.rs | REPL | `:q/:help/:reset/:show` 特殊命令；`is_input_complete()` 多行判定 |
 | src/lsp.rs | LSP | stdio JSON-RPC 2.0，**手写的**，无 serde/tower-lsp 依赖 |
@@ -273,7 +273,7 @@ end
 
 ## 6. 已排期项历史档案（P0/P1/P2 全部关闭，仅作考古参考）
 
-> **2026-08-23 注**：本节所有排期项（P0 三件套、P1 三件套、P2 三项）已全部完成，下面的清单是历史记录。当前无已排期待办——下一步是编译器阶段方向决策或 v1.0 冻结，等用户指令。评审整改的两轮记录见 §1。
+> **2026-08-23 注**：本节所有排期项（P0 三件套、P1 三件套、P2 三项）已全部完成，下面的清单是历史记录。当前无已排期待办——编译器阶段方向已定案并闭环（Phase 7 WASM，RFC-0002，v0.15.0）；下一步候选：全量自举（Phase 8）/ v1.0 冻结 / 其他，等用户指令。评审整改的两轮记录见 §1。
 
 2026-08-17 实测确认的缺口清单，按优先级（完整版含 P1/P2 见对话记录，核心是这三个）：
 
@@ -337,8 +337,8 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 349/349、零 warning、`./target/release/lom.exe --version` 显示 0.6.1
+2. `cargo build --release && cargo test --release` 确认 395/395、零 warning、`./target/release/lom.exe --version` 显示 0.15.0
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（编译器阶段 / v1.0 / 其他）
+5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（全量自举 Phase 8 / v1.0 冻结 / 其他）
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
