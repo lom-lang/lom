@@ -133,5 +133,50 @@
     "solution": "from string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_to_string(n)\n    println(s)\nend\n",
     "expected": "42\n",
     "notes": "NAM003/RUNTIME002: 函数名拼写错误 int_tostring -> int_to_string。考察 LLM 对标识符精确性的把握。"
+  },
+  {
+    "id": "109",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 3。\n\n错误代码：\nfn add(a: Int, b: Int) -> Int\n    a + b\nend\n\nfn main() -> Unit\n    let s = \"abc\n    println(add(1, 2)\nend\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"lex\",\"code\":\"LEX001\",\"message\":\"未闭合的字符串\",\"line\":6,\"col\":13,\"hint\":\"在字符串末尾添加 \\\" 闭合\"},{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 ')'，得到 End\",\"line\":8,\"col\":1,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn add(a: Int, b: Int) -> Int\n    a + b\nend\n\nfn main() -> Unit\n    let s = \"abc\"\n    println(add(1, 2))\nend\n",
+    "expected": "3\n",
+    "notes": "多错误文件：LEX001 未闭合字符串 + PARSE001 缺 ')' 需同时修复（修复引擎深化 M4 新增）"
+  },
+  {
+    "id": "110",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 42。\n\n错误代码：\nfn main() -> Unit\n    let count = 41\n    println(cont + 1)\nend\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"type\",\"code\":\"NAM003\",\"message\":\"未定义变量 'cont'\",\"line\":0,\"col\":0,\"hint\":\"是否想用 'count'？\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    let count = 41\n    println(count + 1)\nend\n",
+    "expected": "42\n",
+    "notes": "NAM003 拼写错误，诊断 hint 含\"是否想用 'count'？\"建议（M1 拼写建议落地后的对应任务）"
+  },
+  {
+    "id": "111",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 lom。\n\n错误代码：\nfn main() -> Unit\n    let user = {name: \"lom\", age: 1}\n    println(user.nam)\nend\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"type\",\"code\":\"NAM004\",\"message\":\"记录无字段 'nam'\",\"line\":0,\"col\":0,\"hint\":\"是否想用 'name'？\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    let user = {name: \"lom\", age: 1}\n    println(user.name)\nend\n",
+    "expected": "lom\n",
+    "notes": "NAM004 记录字段拼写错误，hint 含\"是否想用 'name'？\"（M1 新增 NAM004 建议的对应任务）"
+  },
+  {
+    "id": "112",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码能运行但有两个效应警告（lom-diag/v1 诊断如下）。请补全效应注解消除警告，保持输出不变（boot 然后 1）。\n\n代码：\nfn log_line(s: String) -> Unit\n    println(s)\nend\n\nfn show(n: Int) -> Unit\n    println(n)\nend\n\nfn main() -> Unit\n    log_line(\"boot\")\n    show(1)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"EFF001\",\"message\":\"纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'\",\"line\":1,\"col\":1,\"hint\":null},{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"EFF001\",\"message\":\"纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'\",\"line\":5,\"col\":1,\"hint\":null}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn log_line(s: String) -> Unit ! [IO]\n    println(s)\nend\n\nfn show(n: Int) -> Unit ! [IO]\n    println(n)\nend\n\nfn main() -> Unit\n    log_line(\"boot\")\n    show(1)\nend\n",
+    "expected": "boot\n1\n",
+    "notes": "效应链：两个函数各自缺 ! [IO] 注解（EFF001 ×2）"
+  },
+  {
+    "id": "113",
+    "category": "error_repair",
+    "difficulty": "hard",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 x。\n\n错误代码：\nfn main() -> Unit\n    let x = 1\n    match x\n        _ => println(\"x\")\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 闭合 match\",\"line\":5,\"col\":1,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
+    "solution": "fn main() -> Unit\n    let x = 1\n    match x\n        _ => println(\"x\")\n    end\nend\n",
+    "expected": "x\n",
+    "notes": "match 未闭合（期望 'end' 闭合 match）——M3 实测确认这是唯一的 end 类报错形态"
   }
 ]

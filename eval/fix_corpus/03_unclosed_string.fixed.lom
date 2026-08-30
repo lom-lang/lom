@@ -1,0 +1,4 @@
+fn main() -> Unit
+    let s = "hello, world"
+    println(s)
+end

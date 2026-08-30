@@ -533,6 +533,89 @@ end
 
 请输出修复后的完整代码。期望输出 42。
 
+### Task 109
+
+以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 3。
+
+错误代码：
+fn add(a: Int, b: Int) -> Int
+    a + b
+end
+
+fn main() -> Unit
+    let s = "abc
+    println(add(1, 2)
+end
+诊断 JSON：
+{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"lex","code":"LEX001","message":"未闭合的字符串","line":6,"col":13,"hint":"在字符串末尾添加 \" 闭合"},{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 ')'，得到 End","line":8,"col":1,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
+
+请输出修复后的完整代码。
+
+### Task 110
+
+以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 42。
+
+错误代码：
+fn main() -> Unit
+    let count = 41
+    println(cont + 1)
+end
+诊断 JSON：
+{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"type","code":"NAM003","message":"未定义变量 'cont'","line":0,"col":0,"hint":"是否想用 'count'？"}]}
+
+请输出修复后的完整代码。
+
+### Task 111
+
+以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 lom。
+
+错误代码：
+fn main() -> Unit
+    let user = {name: "lom", age: 1}
+    println(user.nam)
+end
+诊断 JSON：
+{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"type","code":"NAM004","message":"记录无字段 'nam'","line":0,"col":0,"hint":"是否想用 'name'？"}]}
+
+请输出修复后的完整代码。
+
+### Task 112
+
+以下 .lom 代码能运行但有两个效应警告（lom-diag/v1 诊断如下）。请补全效应注解消除警告，保持输出不变（boot 然后 1）。
+
+代码：
+fn log_line(s: String) -> Unit
+    println(s)
+end
+
+fn show(n: Int) -> Unit
+    println(n)
+end
+
+fn main() -> Unit
+    log_line("boot")
+    show(1)
+end
+
+诊断 JSON：
+{"schema":"lom-diag/v1","ok":true,"diagnostics":[{"severity":"warning","stage":"type","code":"EFF001","message":"纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'","line":1,"col":1,"hint":null},{"severity":"warning","stage":"type","code":"EFF001","message":"纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'","line":5,"col":1,"hint":null}]}
+
+请输出修复后的完整代码。
+
+### Task 113
+
+以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 x。
+
+错误代码：
+fn main() -> Unit
+    let x = 1
+    match x
+        _ => println("x")
+诊断 JSON：
+{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' 闭合 match","line":5,"col":1,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
+
+请输出修复后的完整代码。
+
 
 ---
 

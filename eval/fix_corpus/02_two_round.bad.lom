@@ -1,0 +1,8 @@
+fn helper(x: Int) -> Int
+    println(x)
+    x
+end
+
+fn main() -> Unit
+    println@(helper(1))
+end

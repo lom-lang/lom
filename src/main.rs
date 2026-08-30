@@ -1310,4 +1310,34 @@ mod tests {
         assert_eq!(results[0].applied, 0);
         assert_eq!(final_src, src, "Medium 修复不被自动应用");
     }
+
+    /// M4：fix 语料端到端回归——每对 (bad, fixed) 跑 apply_iterative 后逐字一致。
+    /// 语料在 eval/fix_corpus/，新增修复规则时应同步加语料对。
+    /// 注意 04_spelling_medium：fixed 与 bad 逐字相同是**有意为之**
+    /// （Medium 猜测性修复不被自动应用，源码必须保持不变）。
+    #[test]
+    fn fix_corpus_end_to_end() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("eval/fix_corpus");
+        let mut entries: Vec<_> = std::fs::read_dir(&dir)
+            .expect("fix_corpus 目录不存在")
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.to_string_lossy().ends_with(".bad.lom"))
+            .collect();
+        entries.sort();
+        assert!(!entries.is_empty(), "fix_corpus 为空");
+        for bad_path in entries {
+            let fixed_path = bad_path.with_file_name(
+                bad_path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace(".bad.lom", ".fixed.lom"),
+            );
+            let bad = std::fs::read_to_string(&bad_path).unwrap();
+            let fixed = std::fs::read_to_string(&fixed_path)
+                .unwrap_or_else(|_| panic!("缺少配对 fixed 文件: {:?}", fixed_path));
+            let (final_src, _results) = apply_iterative(&bad, &bad_path.to_string_lossy(), 5);
+            assert_eq!(final_src, fixed, "语料 {:?} 修复结果不符", bad_path);
+        }
+    }
 }

@@ -2,7 +2,7 @@
   "schema": "lom-eval/v1",
   "version": "0.1.0",
   "phase": "2.8",
-  "total_tasks": 108,
+  "total_tasks": 113,
   "categories": [
     {
       "id": "01_arithmetic",
@@ -70,7 +70,7 @@
     {
       "id": "10_error_repair",
       "name": "Error Repair (lom fix flow)",
-      "task_count": 15,
+      "task_count": 20,
       "description": "Given broken .lom code + lom-diag/v1 JSON, produce fixed .lom code. Tests full LLM-coding-native loop.",
       "file": "tasks/10_error_repair.json"
     }
