@@ -1,7 +1,7 @@
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock 自 v0.19.1 起入库（Rust 官方对二进制项目的惯例；此前零依赖下无实际差异）
 
 # Build artifacts
 *.exe

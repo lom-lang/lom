@@ -1,3 +1,5 @@
+# 故意写坏的文件：lom fix 的演示/测试对象（LEX001 未闭合字符串 + LEX005 意外字符）
+# 不要修复本文件——CI fmt gate 与示例回归均豁免它（.github/workflows/ci.yml 注释）
 fn main() -> Unit
     println("hello)
     println@("world")

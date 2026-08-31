@@ -37,7 +37,6 @@ jobs:
           key: ${{ matrix.os }}-cargo-${{ hashFiles('Cargo.toml') }}
 
       - name: Build (release)
-        # 注意：Cargo.lock 按仓库惯例不入库（gitignore），且零依赖，无需 --locked
         run: cargo build --release
 
       - name: Unit tests
@@ -85,7 +84,7 @@ jobs:
           $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
           ./eval/runner/run.ps1 -Verify -LomBin $bin
 
-      - name: WASM eval parity (108 tasks via node, Phase 7.9)
+      - name: WASM eval parity (113 tasks via node, Phase 7.9)
         # 双后端对齐 gate：eval 全套在 WASM 后端跑一遍（node 在三平台 runner 均预装）
         shell: pwsh
         run: |
@@ -101,3 +100,17 @@ jobs:
           node eval/runner/run_wasm.mjs _ci_stmt_interp.wasm > _ci_stmt_wasm.txt
           diff <(tr -d '\r' < examples/bootstrap/stmt_interp.expected.txt) <(tr -d '\r' < _ci_stmt_wasm.txt)
           rm -f _ci_stmt_interp.wasm _ci_stmt_wasm.txt
+
+  # 第四轮评审整改（2026-08-31）：clippy 存量清零后转 gate（只跑 ubuntu，风格 lint 与平台无关）
+  # 注意：clippy 随 stable 演进，未来新版新增 lint 可能让旧代码报错——届时修掉或按需 allow，别降 gate
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy (deny warnings)
+        run: cargo clippy --release -- -D warnings

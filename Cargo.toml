@@ -1,9 +1,12 @@
 [package]
 name = "lom"
-version = "0.19.0"
+version = "0.19.1"
 edition = "2024"
 description = "Lom (Language of Machine) — an AI-native programming language: LLM-repair-native toolchain (lom fix), progressive typing, explicit effects, self-hosting-verified."
 license = "Apache-2.0"
+repository = "https://github.com/lom-lang/lom"
+homepage = "https://github.com/lom-lang/lom"
+keywords = ["ai-native", "programming-language", "llm", "interpreter", "wasm"]
 
 [dependencies]
 # 永久零依赖（设计决策，非临时状态）：手写 lexer/parser/interpreter/JSON，
