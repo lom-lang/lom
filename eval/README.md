@@ -19,15 +19,15 @@ eval/
   manifest.json              # category metadata + task counts
   tasks/
     01_arithmetic.json       # 10 tasks — basic math, let, fn
-    02_control_flow.json     # 10 tasks — if/elif/else, while, for, return
-    03_types.json            # 10 tasks — annotations, inference, casts
-    04_closures.json         # 10 tasks — closures, HOF, capture
-    05_match_enum.json       # 15 tasks — match, enum, Result, Option
+    02_control_flow.json     # 13 tasks — if/elif/else, while, for, return
+    03_types.json            # 11 tasks — annotations, inference, casts
+    04_closures.json         # 12 tasks — closures, HOF, capture
+    05_match_enum.json       # 16 tasks — match, enum, Result, Option
     06_pipeline.json         # 10 tasks — |> operator
     07_records_tuples.json   # 10 tasks — records, tuples, field access
     08_effects.json          #  5 tasks — ! [IO, Clock] annotations
-    09_modules.json          #  5 tasks — from ... import
-    10_error_repair.json     # 15 tasks — fix broken code (lom fix flow)
+    09_modules.json          #  6 tasks — from ... import
+    10_error_repair.json     # 20 tasks — fix broken code (lom fix flow)
   runner/
     run.ps1                  # PowerShell runner (Windows, no deps)
     run.sh                   # Bash runner (requires jq + lom on PATH)
@@ -112,4 +112,4 @@ This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses �
 
 ## Baseline results
 
-Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/100 on the original 100-task set) is recorded in `REPORT.md`; raw candidates are preserved in `eval/candidates/`. Note: tasks 101-108 were added after that baseline run and have not yet been LLM-tested.
+Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/100 on the original 100-task set) is recorded in `REPORT.md`; raw candidates are preserved in `eval/candidates/`. Note: tasks 101-113 were added after that baseline run and have not yet been LLM-tested.

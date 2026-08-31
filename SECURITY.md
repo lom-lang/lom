@@ -24,7 +24,7 @@ Lom is a **tree-walking interpreter for trusted programs**. Running a `.lom` fil
 
 ## Reporting a vulnerability
 
-Open a GitHub issue for non-sensitive reports. For sensitive issues, contact the repository owner directly (see `CODE_OF_CONDUCT.md` enforcement channel). Do not file public issues for exploitable vulnerabilities before they are triaged.
+Open a [GitHub issue](https://github.com/lom-lang/lom/issues) for non-sensitive reports. For sensitive issues, use GitHub's **private vulnerability reporting** (repository Security tab → Report a vulnerability) or contact the repository owner (@wyty) via GitHub directly. Do not file public issues for exploitable vulnerabilities before they are triaged.
 
 ## Audit procedure for future changes
 

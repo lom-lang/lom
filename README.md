@@ -4,6 +4,23 @@
 
 LLM-coding-native first, workloads later. Built in Rust.
 
+## Quick Start
+
+```powershell
+cargo build --release            # builds target/release/lom (zero dependencies)
+./target/release/lom examples/fib.lom    # run a program
+```
+
+A minimal Lom program (`fn` + tail-expression return; blocks close with `end`):
+
+```lom
+fn main() -> Unit
+    println("hello, lom")
+end
+```
+
+Save as `hello.lom`, run `lom hello.lom`. New here? Read the [tutorial](docs/lom-tutorial.html) (zh) or [SPEC_FOR_AI.md](SPEC_FOR_AI.md) (the LLM-facing language spec). AI maintainers start at [docs/HANDOVER.md](docs/HANDOVER.md).
+
 ## Status
 
 ✅ **Phase 1 — Minimal Interpreter** (completed)
@@ -114,8 +131,9 @@ See [`docs/lom-project-guide.html`](docs/lom-project-guide.html) for the full pr
 
 Lom is a **progressively fused** AI-native programming language:
 
-1. **Phase 0-3 — LLM-coding-native**: tolerant parser, structured JSON diagnostics, linear pipeline syntax, structural types, gradual typing, explicit effect system. Target: LLMs write Lom with low error rate and easy recovery. (Done — 99% LLM pass-rate)
+1. **Phase 0-3 — LLM-coding-native**: tolerant parser, structured JSON diagnostics, linear pipeline syntax, structural types, gradual typing, explicit effect system. Target: LLMs write Lom with low error rate and easy recovery. (Done — 99% LLM pass-rate on the original 100-task set; single model, single run, 2026-08-03 — preliminary evidence, multi-model validation pending; see [eval/REPORT.md](eval/REPORT.md))
 2. **Phase 4 — LLM-repair-native + toolchain** (direction adjusted 2026-08-07): expand `lom fix` in-place auto-repair (differentiation — MoonBit doesn't do in-place repair), add REPL / LSP / package manager. Original "workload-native" (tensor/autodiff/MLIR) dropped — Mojo (acquired by Qualcomm) saturates the AI-compute lane.
+3. **Phase 5-7 — ecosystem & backends** (done 2026-08): bootstrap self-hosting feasibility (a 1450-line mini-interpreter written in Lom), production engineering (semver, 3-platform CI, `lom doc`/`fmt`), and a hand-written zero-dependency **WASM compiler backend** (`lom build --target wasm`) with byte-identical dual-backend output. Since 2026-08-25: fix-engine deepening (M1-M4 — spelling-repair `replace` actions, iterative `--apply` loop, targeted PARSE001 fixes, expanded error_repair eval).
 
 ## Why Lom
 
@@ -125,7 +143,7 @@ The "AI-native language" space (2026-08 retrospective):
 |---|---|---|
 | Workload-native (tensor / autodiff / GPU) | Mojo (acquired by Qualcomm $3.9B), Bend | Saturated. Mojo binds to Qualcomm hardware strategy. Not Lom's lane. |
 | LLM-coding-native (write-it-right) | MoonBit (IEEE TSE 2026 paper: 1/7 corpus but 2x AI gen rate vs Gleam; ~400k users; 1.0 imminent Sep 2026) | MoonBit leads. Lom's 99% eval validates the same thesis. |
-| **LLM-repair-native (fix-it-fast)** — Lom's lane | Lom (`lom fix --apply` in-place repair, tolerant parse, gradual typing) | **Empty.** MoonBit regenerates on error; Lom patches in-place. Complementary, not competitive. |
+| **LLM-repair-native (fix-it-fast)** — Lom's lane | Lom (`lom fix --apply` iterative in-place repair, tolerant parse, gradual typing) | **Empty.** MoonBit regenerates on error; Lom patches in-place. Complementary, not competitive. |
 
 Lom takes the **differentiated route**: occupy the empty LLM-repair-native lane — in-place auto-repair (`lom fix --apply`), tolerant parsing, confidence-graded fixes — complementary to MoonBit's write-it-right approach.
 
@@ -145,8 +163,9 @@ Lom takes the **differentiated route**: occupy the empty LLM-repair-native lane 
 | 2 | LLM-coding-native Core | 6-10 w | LLM generation pass-rate eval set meets baseline |
 | 3 | Usable MVP | 8-12 w | Write a complete CLI tool or simple web service | ✅ Done (3.5 todo CLI) |
 | 4 | LLM-repair-native + toolchain (adjusted 2026-08) | — | `lom fix` covers main diagnostic auto-repair + confidence model + REPL + LSP + package manager |
-| 5 | Ecosystem & Bootstrapping | 16-24 w | Compiler self-hosts |
-| 6 | Production | ongoing | Third-party projects deployed in production |
+| 5 | Ecosystem & Bootstrapping | done 2026-08-19 | Bootstrap feasibility proven (mini-interpreter in Lom; full self-hosting = RFC-0003 draft, parked) |
+| 6 | Production engineering | done 2026-08-22 | Semver, 3-platform CI, governance, `lom doc`/`fmt`, SECURITY.md |
+| 7 | WASM compiler backend | done 2026-08-23 (v0.15.0) | `lom build --target wasm`; dual-backend byte-identical golden + eval 113/113×2 |
 
 See the [project guide](docs/lom-project-guide.html) for details.
 
@@ -161,7 +180,7 @@ See the [project guide](docs/lom-project-guide.html) for details.
 ## Tech Stack
 
 - **Host language**: Rust
-- **Phase 1**: logos (lexer) + hand-written recursive descent (parser) + tree-walking (interp)
+- **Phase 1+**: hand-written lexer / recursive-descent parser / tree-walking interpreter / WASM emitter — **zero third-party dependencies** (CI-enforced). The crate is a binary, not a library — a deliberate keep-it-readable decision.
 - **Phase 4**: reuse existing interpreter/typechecker/diagnostics — no new low-level deps (no Cranelift/MLIR). Adds `lom fix` rule expansion, REPL, LSP server, package manager.
 
 ## License

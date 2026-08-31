@@ -1,6 +1,6 @@
-# Lom Language Specification (v0.1 Draft)
+# Lom Language Specification (v0.2)
 
-> **Status**: Phase 0 Draft · 2026-08-02
+> **Status**: Living document · updated 2026-08-31
 > **Stability**: Unstable — syntax and semantics may change before v1.0 freeze.
 > **Scope**: This spec covers the Phase 1 minimal subset (interpreter-runnable) and drafts the Phase 2 LLM-coding-native features. ~~Workload-native features (tensor, autodiff, MLIR) are out of scope and will be specified in Phase 4.~~ **Update (2026-08-07 retrospective)**: Phase 4 direction changed from "workload-native" to "LLM-repair-native + toolchain" — `lom fix` auto-repair expansion, REPL, LSP, package manager. Workload-native (tensor/autodiff/MLIR) is dropped (Mojo acquired by Qualcomm saturates the AI-compute lane). See [§2.5 retrospective](docs/lom-project-guide.html).
 
@@ -128,9 +128,9 @@ String literals support escape sequences: `\n \t \r \" \\`.
 ```
 program       = { item } ;
 
-item          = fn_decl ;
+item          = fn_decl | enum_decl | import_decl ;
 
-fn_decl       = "fn" identifier "(" [ params ] ")" [ ":" type ] block ;
+fn_decl       = "fn" identifier "(" [ params ] ")" [ "->" type ] [ "!" "[" effects "]" ] block ;
 params        = param { "," param } ;
 param         = identifier ":" type ;
 block         = { stmt } "end" ;
@@ -224,7 +224,7 @@ end
 - Function params **must** be annotated (no inference across function boundaries in Phase 1, for LLM-debuggability)
 - Function return type **may** be omitted; inferred from body
 
-### 4.3 Phase 2 types (drafted, specified in §6)
+### 4.3 Phase 2 types (implemented, specified in §6)
 
 | Feature | Syntax | Status |
 |---|---|---|
@@ -302,7 +302,7 @@ Prelude (`println`, `print`) and stdlib modules (`io`, `string`, `math`) functio
 
 ### 5.1 Immutability
 
-- `let x = 3` — `x` is immutable. Reassignment is a compile error.
+- `let x = 3` — `x` is immutable. Reassignment is intended to be rejected. **Known gap (verified 2026-08-31)**: neither the typechecker nor the interpreter currently enforces this — `x = 4` after `let x = 3` runs silently. Enforcement (warning-level, per the gradual-typing philosophy) is tracked as a pending decision in docs/HANDOVER.md.
 - `let mut x = 3` — `x` is mutable. `x = 4` is allowed.
 - Compound assignment (v0.4.1, Phase 5.5): `x += e` / `x -= e` / `x *= e` / `x /= e` desugar to `x = x + e` etc. Target must be mutable. `+=` composes with string concat promotion.
 - Function parameters are always immutable (no `mut` param in Phase 1).
@@ -341,9 +341,9 @@ end
 
 ---
 
-## 6. Phase 2 LLM-Coding-Native Features (drafted)
+## 6. Phase 2 LLM-Coding-Native Features (implemented)
 
-> These features define Lom's identity as an LLM-coding-native language. They are drafted here for spec completeness but implemented in Phase 2.
+> These features define Lom's identity as an LLM-coding-native language. Drafted in Phase 0; implemented in Phase 2.
 
 ### 6.1 Result and Option (error-as-value)
 
@@ -803,7 +803,7 @@ Phase 3.1 used `find_fn_line` (a source-line scanner in the typechecker) to loca
 - **`Span` type** (`src/ast.rs`): `{ line, col, end_line, end_col }` (1-based, matching `SpannedToken`). Added to `FnDecl` and `EnumDecl`.
 - **Parser fills spans**: `parse_fn_decl`/`parse_enum_decl` record the `fn`/`enum` keyword position as the start and use `prev_token_pos()` (the token before the body) as the signature end.
 - **Typechecker consumes spans**: `FnSig` now stores `span: Span` (replacing `sig_line: usize`). `check_fn_body` sets `current_fn_span = f.span`; EFF001/TYPE010 diagnostics use `current_fn_span.line/col` instead of `(0,0)`. `collect_fn_sig` uses `f.span` for NAM002 (duplicate function). The `find_fn_line` source-scanning hack is removed.
-- **End-to-end verified**: `lom examples/effects_bad.lom --check` now reports `EFF001` at `(9:1)` and `(20:1)` (the `fn` keyword positions of `helper` and `bad_helper`), previously `(0:0)`. `lom fix --apply --dry-run` still produces correct inserts at `[9:25]` and `[20:35]`.
+- **End-to-end verified**: `lom examples/effects_bad.lom --check` reports `EFF001` at `(10:1)` and `(21:1)` (the `fn` keyword positions of `helper` and `bad_helper`), previously `(0:0)`; `lom fix --plan` produces inserts at `[10:25]` and `[21:35]` (re-verified 2026-08-31).
 
 > **Scope**: Only `FnDecl`/`EnumDecl` carry spans. Statement/expression-level diagnostics (TYPE001, NAM003, etc.) still report `(0,0)`; runtime errors still report `(0,0)`. Full expression-level spans are deferred to Phase 3 LSP work.
 
@@ -1028,7 +1028,7 @@ Require explicit `from <module> import { ... }`:
 
 ### 9.3 `list` module (Phase 3.3 — implemented)
 
-A pure, immutable list type exposed through the `list` standard library module. Internally backed by `Value::List { elems: Vec<Value> }`; all operations return new `List` values without mutating the input (immutable semantics, in the spirit of functional data structures).
+A pure, immutable list type exposed through the `list` standard library module. Internally backed by `Value::List(ListVal)` — Rc cons cells since v0.5.0 (O(1) cons/head/tail; random-access `list_get` is an O(n) walk); all operations return new `List` values without mutating the input (immutable semantics, in the spirit of functional data structures).
 
 **Type representation**: `List<T>` is encoded as `Type::Generic("List", [T])`. The type checker signatures use `List<_Any>` to accept any element type; element-type tracking is deferred to a later phase.
 
@@ -1249,7 +1249,7 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 
 ## 12. Evaluation Suite (Phase 2.8 — implemented)
 
-Lom ships a 100-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+Lom ships a 113-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
 
@@ -1259,15 +1259,15 @@ eval/
   manifest.json          # lom-eval/v1: 10 categories × task counts
   tasks/
     01_arithmetic.json        # 10 — §3 grammar, §4 types, §5 semantics
-    02_control_flow.json      # 10 — §5 if/while/for/return, short-circuit
-    03_types.json             # 10 — §4 Int/Float/Bool/String/Unit
-    04_closures.json          # 10 — §6.3 first-class closures
-    05_match_enum.json        # 15 — §6.4 match/enum, §6.5 Result/Option
+    02_control_flow.json      # 13 — §5 if/while/for/return, short-circuit
+    03_types.json             # 11 — §4 Int/Float/Bool/String/Unit
+    04_closures.json          # 12 — §6.3 first-class closures
+    05_match_enum.json        # 16 — §6.4 match/enum, §6.5 Result/Option
     06_pipeline.json          # 10 — §6.6 `|>` linear pipeline
     07_records_tuples.json    # 10 — §6.7 structural records/tuples
     08_effects.json           #  5 — §6.8 explicit effects `! [IO, Clock]`
-    09_modules.json           #  5 — §8 module system, §9 stdlib
-    10_error_repair.json      # 15 — §7 diagnostics + §6.9 fix plan (AI-native core)
+    09_modules.json           #  6 — §8 module system, §9 stdlib
+    10_error_repair.json      # 20 — §7 diagnostics + §6.9 fix plan (AI-native core)
   runner/
     run.ps1                   # PowerShell (Windows, zero-dep)
     run.sh                    # Bash (Unix, needs jq)
@@ -1328,6 +1328,12 @@ Each task is a JSON object:
 - **v0.2.1 (2026-08-03)**: Phase 3.2 — AST span-based diagnostic positioning.
   - Added §6.9.6 documenting `Span` on `FnDecl`/`EnumDecl`, parser `prev_token_pos()`, and typechecker `current_fn_span`. Removed Phase 3.1 `find_fn_line` hack. EFF001/TYPE010/NAM002 now report signature positions instead of `(0,0)`.
 - **v0.2.2 (2026-08-03)**: Phase 3.3 — `list` + `json` standard library modules.
+- **v0.19 (2026-08-31)**: Consolidated catch-up (this spec's prose was drifting; full detail lives in README milestone entries + docs/HANDOVER.md):
+  - §4.3/§6 "(drafted)" labels removed — all Phase 2 features implemented long ago.
+  - §9.3 List internal representation corrected: `Vec` → Rc cons cells (v0.5.0).
+  - §12 eval counts updated to the 113-task set (was 100-task era).
+  - §3 EBNF: `item` now includes `enum_decl`/`import_decl`; `fn_decl` return type is `->` (not `:`) with optional effect annotation.
+  - Phase 4-7 feature surface (REPL/LSP/packages, `map`/`file`/`env` modules, WASM backend via `lom build --target wasm`) is documented in README + docs/lom-project-guide.html; this spec's §1-§9 language core remains accurate as of v0.19.0.
   - Added §4.3 `List<T>` type entry; §8.2/§9.2 stdlib module tables extended with `list` and `json`.
   - Added §9.3 `list` module (immutable list API: `list_empty`/`list_cons`/`list_length`/`list_get`/`list_is_empty`/`list_head`/`list_tail`) and §9.4 `json` module (`json_parse`/`json_stringify` with JSON↔Lom Value mapping table, surrogate pair support, compact serialization).
   - Added `Value::List { elems: Vec<Value> }` runtime variant (immutable semantics). Type-checker signatures use `List<_Any>`.

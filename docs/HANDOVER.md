@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-25（**交接就绪态**：Phase 7 WASM 编译后端全部闭环（7.1-7.10，v0.15.0）；CI 三平台全绿；工作区干净。新会话先读 §1 快照与 §11 最新坑）
+> 最后更新：2026-08-31（**交接就绪态**：修复引擎深化 M1-M4 完成（v0.19.1）+ 第四轮评审整改落地；CI 三平台全绿。新会话先读 §1 快照与 §11 最新坑）
 
 ---
 
@@ -26,20 +26,20 @@
 
 ---
 
-## 1. 项目现状快照（2026-08-25）
+## 1. 项目现状快照（2026-08-31）
 
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.19.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.18.0） |
-| Rust 测试 | **417/417 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端），构建零 warning |
+| 版本 | **v0.19.1**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.19.0） |
+| Rust 测试 | **418/418 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
 | eval 评测集 | **113/113**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **99/100**（2026-08-03，网页版专家模型+思考模式；注意：101-108 任务是后加的，未跑过 LLM 实测） |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化 M1-M4 全部完成**（拼写修复 Replace / --apply 迭代闭环 / PARSE001 针对性修复 / error_repair 扩充 113 任务 + fix_corpus 回归语料，v0.16.0-v0.19.0） |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化 M1-M4 全部完成**（v0.16.0-v0.19.0）；**第四轮评审整改完成**（2026-08-31，docs/reviews/review-2026-08-31.html，记录见 §11 末条） |
 | 下一步 | 修复引擎深化收官；远期候选：LLM 复测（需真实 LLM 资源，108→113 任务包已就绪）/ 全量自举（RFC-0003 draft 已存档）/ v1.0 冻结——等用户指令 |
-| 遗留挂账 | error_repair 扩充 + 第三方 LLM 复测（需真实 LLM 资源）；栈溢出结构化诊断（Phase 7 顺手解决递归天花板）；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举移交 Phase 8 候选 |
+| 遗留挂账 | 第三方 LLM 复测（需真实 LLM 资源，101-113 未实测）；**不可变重赋值无任何校验**（`let x=3; x=4` 静默通过，spec §5.1 已诚实化，是否实现 warning 级校验待用户裁决——第四轮评审复核自发现）；表达式级 span（Phase 3.2b 挂账，M1 拼写修复因此只能整词扫描定位）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举（RFC-0003 草案搁置中） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -54,76 +54,6 @@
 **Phase 5.20 已执行 P2-②**（数据见 §10）。`Value::Map(Rc<RefCell<HashMap<String, Value>>>)` + `map` 模块 8 个内建（map_empty/map_set/map_get→Option/map_has/map_remove/map_keys/map_values/map_size）。**引用语义**（map_set 就地改，let 别名共享）——与 List 不可变持久化刻意不同；写时复制被否决（args 切片永远持有 Rc，Rc::get_mut 永远失败）。map_keys/map_values/json_stringify 的 Map 输出都按键排序（确定性）。改动面：interpreter（variant+5 处匹配分支+8 内建+3 处注册）、typechecker（8 个签名）、json.rs（stringify Map 分支）。
 
 **Phase 5.19 已执行 P2-①**（数据见 §10 下方对比）。`Value::List` 现在是 `ListVal`（`Nil | Cons(Rc<ConsNode>)`），公开 API：cons/head/tail/len/get/is_empty/from_vec/iter。注意：list_get 随机访问现在是 O(n) 走查（原来 O(1)）——遍历式代码无感，频繁随机访问的代码会退化；这是将来 HashMap/数组类型的位置。lookup 残余的平方增长是算法固有（线性扫描），不是表示问题。
-
-## 10. 性能实测数据（Phase 5.18，2026-08-18）
-
-基准程序 `examples/bench.lom`（用法 `lom examples/bench.lom -- <bench> <n>`；Lom 无时钟，外部 wall-clock）。Windows release 单次运行，真实数据：
-
-| 负载 | 数据点 | 结论 |
-|---|---|---|
-| list_build | n=1000/2000/4000/8000 → 55/104/181/494 ms | 含 ~35ms 进程启动；净耗时超线性——list_cons 每次 O(n) 复制，建表总 O(n²)，常数小尚可忍 |
-| lookup（自举式线性环境查找） | n=200/400/800 → 2.4/10.8/86.9 **秒** | **近立方**：`list_tail` 每次 `elems[1..].to_vec()` O(n) 复制 → 扫描 O(n²)，n 次扫描 O(n³)。这是自举最大的性能瓶颈 |
-
-**v0.5.0 修复后（Phase 5.19，同机同基准）**：lookup n=200/400/800/1600 → **184/559/1893/7328 ms**（n=800 提速 46×，n=1600 从不可行变可行）；list_build n=8000：494→39 ms（12×+）。残余平方增长是算法固有的线性扫描，留给将来的 HashMap。
-
-**v0.5.1 map 模块（Phase 5.20，同机同基准，2026-08-19）**：lookup(List 关联表) n=500/1000/2000 → **898/3043/18136 ms**（每次翻倍 ×3.4-6，平方增长）；map_lookup n=500/1000/2000 → **64/66/55 ms**（平线；其中 ~48ms 是解释器启动开销，实测 `map_lookup 1` 三次为 47-49ms）。n=2000 墙钟提速 **~330×**，扣除启动开销后纯计算提速 ~2500×。lookup 的 O(n²) 算法瓶颈就此闭合。
-
-**Phase 5.21 自举环境换 Map（2026-08-19，同机实测）**：压测程序（100 个 let + N 轮 while、每轮查 3 个变量 + 2 次遮蔽重绑）跑在 stmt_interp 上——N=200：关联表 842ms → Map 226ms（3.7×）；N=400：2436ms → 292ms（8.3×）。旧实现每翻倍 ×2.9（平方增长：env 每轮 +2 个 cons 遮蔽条目，查找扫到底），新实现 ×1.3（近线性）。两版输出逐字一致（31 条基线 + 压测结果 29800/59600 均正确）。
-| recurse | n=10000 → 82ms OK；n=100000 → **256MB 栈溢出** | 每个 Lom 递归帧约耗 2.6KB Rust 栈；安全深度 ~10⁴。根治要显式堆栈/trampoline，留待编译器阶段 |
-
-**Phase 7.10 WASM 后端对照（2026-08-23，同机实测，单次 wall-clock）**：
-
-| 负载 | 树遍历 | WASM（node harness） | 备注 |
-|---|---|---|---|
-| list_build 8000 | 69ms | 104ms | node 空启动基线 ~98ms，小负载被启动开销主导 |
-| map_lookup 2000 | 54ms | 100ms | 同上 |
-| lookup 1000（自举式 O(n²) 关联表扫描） | 3329ms | 166ms | **墙钟 20×；扣启动开销后纯计算 ~49×**（解释器循环被编译掉了） |
-
-**递归深度（RFC-0002 退出标准 4 的诚实结算）**：树遍历 ~10⁴ 层（256MB 栈线程）；WASM 在 node 默认栈 ~1-3 万层（V8 默认栈 ~1MB，deep 帧 ~33B/帧实测）；`node --stack-size=60000` 时 10⁵ 层实测通过。**结论：天花板从"硬限"变为"宿主栈可配"——同量级但可调；真正的根治（显式栈机/trampoline）仍是编译器阶段后续可选项**。RFC-0002 标准 4 记为"部分达成（可调至 10⁵）"。
-
-**P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
-
-**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.15.0`（tag v0.15.0；历史教训：v0.6.0 的 tag 不慎切在两个 CI 修复之前，复审发现后补发 v0.6.1 含全部 CI 修复；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
-
----
-
-## 11. 2026-08-22/23 会话新增坑（评审整改轮踩的，前面章节没有的）
-
-**工具链/环境**：
-- **`cargo test --release` 不更新 `target/release/lom.exe`**——它只构建测试 harness。改完代码跑 CLI 验证前必须显式 `cargo build --release`，否则你在测一个旧二进制（本轮因此误判过一次"NAM003 未注册"）。
-- **Git Bash 的 `/tmp` 与 Windows 进程不通**：`lom.exe /tmp/x.lom` 读不到（/tmp 是 Git Bash 虚拟挂载）。临时 .lom 文件放项目目录（用完即删），别放 /tmp。Windows Python 也读不到 Git Bash 的 /tmp（写脚本管道时直接 stdout 管道，别落盘 /tmp）。
-- **运行 examples 会产生运行时产物**：file 模块 demo 会在 examples/ 下写 `_file_demo_tmp.txt`。批量跑示例后 `git status` 要检查，别误提交（本轮误提交过一次，已 git rm + gitignore；`.lom/` 目录同理已 gitignore）。
-- **.gitignore 的 `#` 只在行首是注释**：`.lom/  # 注释` 这种行内写法会让整个 pattern 失效。改完 .gitignore 用 `git check-ignore` 验证。
-- **eval/run.sh 本地无法验证**（本机无 jq），改动后只能推理 + 靠 CI。CI 已不走 run.sh（统一 pwsh + run.ps1），run.sh 是二等公民。
-
-**CI/CD**：
-- **CI 脚本必须看首跑结果再宣布完成**（§8 已记，这里展开查法）：GitHub API 免认证查公开仓库——`curl https://api.github.com/repos/lom-lang/lom/actions/runs?per_page=N` 拿 run id，再 `/runs/{id}/jobs` 看每个 job 的 failed step。
-- **`grep -A5 '^\[dependencies\]'` 会越界扫到下一个 section**（`[profile.release]` 的 `debug = true` 触发误报）——TOML section 扫描用 awk 状态机（遇下一个 `[` 即停），且要覆盖 `[dependencies.foo]` 表形态。
-- **Windows CI runner 的 autocrlf**：checkout 出来是 CRLF，任何"逐字节比对"（fmt --check、golden diff）都要先 `tr -d '\r'` 或保持行尾风格（lom fmt 现在跟随输入行尾）。
-
-**流程/方法论**：
-- **评审 subagent 的报告要逐条复核再动手**——本轮复审的六条逐条验过逻辑全属实，但优先级要自己判断；盲信和盲改都不可取。
-- **类型检查可见化有涟漪效应**：把检查器输出推到默认路径后，检查器自身的假阳性（pkg_demo NAM003、Int+Float TYPE001、管道 TYPE003）立刻变成用户可见噪音——**可见性整改会倒逼检查器质量**，改之前先把示例库全跑一遍看 stderr。
-- **示例代码本身就是测试面**：try_operator.lom 的 `use_option` 是真类型错误写法，检查器可见化后才暴露。示例要保持"stderr 干净"，它们是用户的第一印象。
-- **python 批量文本替换必须 assert old in s**（不 assert 的 replace 静默 no-op，本轮 .gitignore 因此漏改一次）。
-- **文档腐坏第三轮清扫（2026-08-23，巩固期 P-0）**：SPEC_FOR_AI 三处——§8 模块节（"user modules arrive in Phase 3"→ Phase 4.4 lom.toml 包管理现状；pub 标注 v0.5.x→v0.6.x）、§11e fix 节（--apply/--history 早已实现，replace 动作改为"schema 预留但无规则产出"、runtime 位置声明级 span 现状）、结尾段（Phase 2.6 时代"NOT yet implemented"清单全部已实现，重写为 v0.6.1 现状）；LANGUAGE_SPEC §11 结尾陈旧句（Phase 0 DeepSeek 时代）改为"5-8 未决、移交 v1.0 范围裁决"；guide §4.6 CI 行（clippy/fmt 虚构 gate → 实际 6 gate 清单，issue/PR 模板与 release 流程标注"规划未落地"）。教训：**写"将在 Phase X 实现"的句子一定要带可检索的标记**，否则实现后没人回来改。
-- **巩固期 P-1（2026-08-23，RFC-0001 四问裁决）**：LANGUAGE_SPEC §11 剩余四问全部关闭——#5 多返回值=元组+解构（已实现即答案，拒 out-param）、#6 不设 self（无方法系统，问题失效）、#7 v1.0 不做 trait（§6.6 草稿标记 rejected）、#8 不做 pub（顶层全公开为正式语义）。**清扫中抓出的额外谎言**（全部实测验证后修正）：① spec 关键字表虚构——lexer 实际保留字只有 20 个（含 and/or，两文档都漏列），`struct/trait/impl/type/pub/pipe` 全是普通标识符；② `type UserId = Int` 类型别名从未实现（实测 PARSE001），但 §4.3 表格和 §6.5 一直当特性写；③ §4.5.1 表格称默认运行不做类型检查——v0.6.0 起已做（stderr 不拦截）；④ §6.4 称非穷尽 match 是"compile error"——MAT001 实为 warning。教训：**spec 里的"特性表"要定期拿 lexer/parser 实测对账**，文档腐坏密度远超预期。RFC 编号从 0001 起（0000 是模板）。
-- **Phase 7.1 WASM emitter 骨架（2026-08-23）**：`src/wasm.rs` 手写零依赖 emitter——LEB128（规范测试向量）、七个 section（type/import/func/memory/export/code/data）、函数索引空间导入在前、hello_module 最小模块。验证双层：逐字节 golden 单测 + **Node v24 真实实例化冒烟**（本机有 node，临时 .mjs harness 用完即删，未入库——7.9 才加 CI wasm gate）。**新坑**：binary crate 里 pub API 仅被测试消费会触发 dead_code warning——wasm.rs 模块级 `#[allow(dead_code)]` 注明有意保留（沿用 Phase 6.7 的既有惯例），7.2 接上 main 路径后可摘。版本纪律判断：7.1 无 CLI 面（没有 `lom build --target wasm`），非用户可见，**不升版本**；第一次升 minor 应在 CLI 可用的那个里程碑。
-- **Phase 7.2 动态语义 codegen（2026-08-23，v0.7.0）**：`src/wasm_codegen.rs` + `lom build <file> --target wasm [-o out]`。tagged i64（低 3 位 tag：0=Int 1=Bool 2=Unit 3=F64 盒 4=Str[len:u32+utf8]）；19 个手写 WASM helper 承担运行时 tag 分派（rt_add/eq/print/truthy/str_eq 等），codegen 只做结构翻译。**实测**：8 个 examples + eval 01/02 的 21/23 与解释器 stdout 逐字一致（101 list/104 range 是 7.6 的活，编译期报错指名 Phase）。**坑三个**：① **opcode 表看错行两次**——f64.store 是 0x39 不是 0x38（0x38=f32.store）、f64.convert_i64_s 是 0xB9 不是 0xB7（0xB7=f64.convert_i32_s）、f64.trunc 是 0x9D（f64 无取余指令，a%b 用 a-trunc(a/b)*b 合成）；Node 的验证报错会精确给出函数号和字节偏移，是第一调试工具。② **if 也是 WASM label**——return 的 br 深度漏计 if 层数会导致 return 穿透失败（eval 020 抓到：`first_even(1,4,7)` 返回 -1 而非 4）；Label 栈加 If 变体，break/continue 只认 Block/Loop。③ **bash heredoc 追加大文件会被截断**（wasm_codegen.rs 尾部丢过一次）——大文件用 Write/Edit 工具，别用 cat>>heredoc。另：JS 边界 i64 参数是 BigInt（harness 里 `v === 0n` 判断）；f64 显示对齐解释器 to_display（整数值补 .0）。e2e 测试 node 缺失自动跳过（CI 三平台预装 node，不影响 gate）。
-- **Phase 7.9 golden 总验收 + CI wasm gate（2026-08-23，v0.15.0）**：run.ps1 加 -Backend wasm（逐任务编译+node 运行+stdout 比对，108/108）；CI 加 eval wasm parity + stmt_interp golden wasm 两 step（产物放工作目录——Windows 的 Git Bash /tmp 对 node.exe 不可见，别放 /tmp）；lom build --target wasm 编译前跑类型检查（stderr 不拦截，对齐解释器路径）。RFC-0002 退出标准 1/2/3 达成。
-- **Phase 7.8 file/env + 包链接（2026-08-23，v0.14.0）**：file 四件套 + env::args() 走宿主导入；lom build 自动合并 lom.toml 依赖包源码（重名后主文件覆盖，对齐解释器）；from <pkg> import 按包名校验（包符号是普通用户函数，**不进 available_builtins**——否则被错误路由到内建分派）。**RT_* 常量重构为 N_IMPORTS 相对值**（加导入不用再重编号）。坑：① file_write/append 调用后多压了一个 V_UNIT（宿主已返回 Unit）——fallthru found 3/2 是栈余数；② harness 的 args 要剥掉第一个裸 "--"（CLI 惯例）；③ todo.lom 的运行时产物是 examples/_todo_data.json（已 gitignore）。实测：file_demo/todo/bench/pkg_demo 全部逐字一致。
-- **Phase 7.7 json 宿主中介（2026-08-23，v0.13.0）**：json_parse/json_stringify 走宿主导入（harness 的 JS JSON.parse/stringify + 值布局读写，契约写在 run_wasm.mjs 文件头）；wasm 侧导出 lom_alloc + lom_variant_table（ExportKind::Global 新增）。**决策记录**：Lom 层自写 JSON 被 reflection 缺口阻塞（type_of/record_items/char_from_code 三内建），手写 WASM JSON 解析器性价比最低——宿主中介零语言面变化，符合冻结倾向。**真设计缺陷修复**：记录字段查找从"编译期 intern 偏移相等"改为内容比较（str_eq）——宿主物化的记录字段名与编译期静态串不同源，json_parse 结果一访问字段就露馅。坑：json_parse 导入参数忘了跳过 Str 的 len 头（ptr 应为 ptr+4）——host 读到的文本以 4 字节长度头开头。**Rust 字符串里嵌套 Lom 字符串的转义层级**（\\\" 三层）极易错——e2e 测试因此挂了一次（多转义一层，Lom 源里出现裸 \"）；教训：e2e 测试的 Lom 源先在文件里跑通再内嵌。
-- **Phase 7.6b Map + memory.grow（2026-08-23，v0.12.0）**：Map = 手写开放寻址哈希表（FNV-1a、线性探测、墓碑删除、0.5 负载翻倍 rehash）；rt_map_probe 一个 helper 服务 get/has/remove/set（命中返回桶下标、未命中返回 -（插入槽+1)）；keys/values/str 排序保确定性；eq 逐键 probe。**rt_alloc 自动 memory.grow**（越页自动扩页——stmt_interp 级别的分配量 64KB 一页不够）。**实测：eval 108/108 双后端逐字一致（skip 清零）+ stmt_interp.lom（约 1400 行自举迷你解释器）编译到 WASM 后 39 条输出与 golden 逐字一致**。坑（同族第三次）：① 单参数 helper 的 locals 从 1 起（不是 2！）——map_keys/values/str 三个写错，统一偏移修正；② 修正时的正则替换把两位数下标改坏（lget(10)→lget(19)）——**批量替换后必须逐个验证**；③ helper 里嵌套 display 链加分支时注意"内块 } + 外 if end"配对——错一处就 trailing code。
-- **Phase 7.6a Record/Tuple/List（2026-08-23，v0.11.0）**：Tuple [n][elems]（tag 7）、Record [n][(name_off,val)]（tag 8，name_off 是编译期 intern 的静态串偏移——字段查找比 i32 相等而非字符串比较）、List cons [head][tail]（tag 9，Nil=空指针哨兵）。字段访问/元组 .N/let 解构/range/for-over-List/split（Rust 语义含尾空段）/list_map/filter/fold（helper 内 call_indirect 回调）。rt_eq/rt_display/rt_print 四个新 tag 分支（rt_print 兜底 = display 转字符串打印）。**实测：26 个可编译示例 + 3 个 bootstrap 小程序 + eval 全类目 107/108 逐字一致**（唯一 skip = 086 map → 7.6b）。**大坑**：① **tag 掩码耗尽**——7.2 设计"低 3 位 tag"（掩码 7），7.6 加 tag 8/9/10 后 8&7=0 被当 Int——值表示全局迁 4 位（教训：**tag 空间预留扩展位；掩码值必须单一事实源**——本次迁移用全局文本替换+人工复核，V_TRUE 9→17、bool 翻位 XOR 8→16）。② call_indirect 要求模块有 table section，哪怕空表——helper 里的 call_indirect 在"无闭包"的模块里也要表（现恒发空表）。③ 一个"幽灵函数"惊吓是虚惊：_p.lom 是 getx 版不是最小版——**调试时先确认测的是你以为的文件**（浪费半小时）。
-- **Phase 7.5 枚举/match/?（2026-08-23，v0.10.0）**：枚举值 = 堆对象 [variant_idx: i32][n_args: i32][args: i64×n]（tag 6）；变体名→全局索引表（内建 Ok/Err/Some/None=0-3）；match = 臂链 + $done 带值块（guard 穿透、模式绑定进臂作用域、字面量模式走 rt_eq）；`?` = Ok/Some 解包、Err/None 整体 br $ret。**静态布局依赖的 helper 用"占位 + finalize 填体"模式**（rt_enum_print/rt_enum_str 需要变体名表偏移——表在数据段，名字复用 str_off 去重）。**实测**：4 个 match/try 示例 + eval 7 类目 74/78 逐字一致（4 skip 全属 7.6）。**坑**：① Try 的 if_i64 忘了压 Label::If → br $ret 深度错（7.2 的 if-is-label 坑第二次踩——**以后任何手写 if/block 都要同步压 Label 栈**）；② build_display 嵌套 if 链少一个 Rust `}`（rustc unclosed delimiter 定位在函数头，用逐行 depth 脚本数最靠谱）。
-- **Phase 7.4 字符串 + stdlib（2026-08-23，v0.9.0）**：15 个新 helper（concat/display/itoa/stoi/str_len/trim/case/contains/starts/ends/replace/str_cmp/str_char_at/ftoa_str）；拼接提升进 rt_add；字符串大小比较补齐；for-over-String（UTF-8 逐字符）；sqrt/abs/min/max；string/math 导入 + 别名解析（**orig 判可用性、real 做分派**——别名列可用性 bug 抓到一次）；闭包捕获放行已导入内建。**实测**：examples 18 个 PASS + eval 01/02/03/04/09 的 48/52 逐字一致（4 个 skip 全属 7.6）。**坑（两个深坑，方法论价值高）**：① **WASM opcode 表会连串看错**——i32.and/or 因漏排 div/rem 写成 0x70/0x71（实为 rem_u/and；正确 0x71/0x72），i64.gt_u 写成 0x5A（实为 ge_u；gt_u=0x56）——比较块是 lt_s,lt_u,gt_s,gt_u,le_s,le_u,ge_s,ge_u 成对排，跳项必错。**症状极具迷惑性**：trim/upper 静默变成恒等函数（or 链变 and 链恒 false），itoa 无限循环 OOB（ge_u 0 恒真）。② **栈上多余操作数在 loop 里能过验证**（br 截断到 label 高度）——build_starts_ends 的 ends 分支漏了一个 I32_ADD，地址算成 (ls-lsub)+i，字节全对、验证全过、结果全错。**调试方法论沉淀**：Node 实例化报错精确到函数号+偏移；抠 helper 字节离线单测（手写模块包装器）是终极隔离手段——本次靠它分别定位到 or 链恒 0 和 ge_u 恒真。③ Git Bash heredoc 写非 ASCII 会双编码（"é"→"Ã©"）——含非 ASCII 的测试文件必须用 Write 工具。min/max 分支嵌套 if 多数了一个 end（trailing code after function end）——Node 报 "trailing code" 时去数 if/else/end 配对。
-- **Phase 7.3 闭包（2026-08-23，v0.8.0）**：闭包值 = 堆对象 [table_idx][env_ptr]（tag 5），env 对象 [n][v0..vn] 值拷贝捕获；free_vars 静态分析（按首次使用序）；闭包体 = (env, params...)->i64 的 WASM 函数，调用走 call_indirect（funcref 表 + 元素段）；具名函数当值 = 忽略 env 的 shim；**递归闭包 = 预绑定 local + 创建后 env 槽位补丁**（对齐解释器共享作用域语义）；任意表达式 callee（make_adder(5)(10)）支持，求值顺序对齐解释器（先 args 后 callee）。**实测**：closures/hof/logical/nested_calls 四例 + eval 04 的 11/12 逐字一致（107 需 list_map → 7.6）。**已知语义差异（如实记录）**：捕获是创建时值拷贝，解释器是 Rc 共享作用域——创建后修改被捕获变量时两后端行为不同（代码头注释已声明）。**坑**：用户函数必须先预推占位 Function 固定 funcidx，否则函数体里产生的闭包函数会挤占索引空间；call_indirect 的操作数顺序是"参数在下、表索引在栈顶"。
-- **修复引擎深化 M1 拼写修复（2026-08-25，v0.16.0）**：NAM003/NAM004 带"是否想用 'X'？"建议时 fix 产出 Replace 动作（Medium——用户裁决**猜测性修复不自动改**，--apply 只动 100% 确定的）。**关键设计约束**：typechecker 的 NAM003/NAM004 全部 push 在 (0,0)——表达式级 span 是 Phase 3.2b 挂账项，从未做。所以 Replace 定位走**整词源码扫描**（fix.rs `find_token_occurrences`）：跳过字符串字面量（含 `\"` 转义）与 # 注释；记录字段要求 `.` 前缀防误改同名变量；变体名 message 有两个引号对要取**最后一个**（extract_last_quoted）。typechecker 侧把 4.1.1 的 best-match 逻辑抽成自由函数 `best_spelling`（suggest_spelling 委托之），NAM004 记录字段/枚举变体两处补上建议。**行为发现**：无参数变体拼错（`Grean`）在 parser 层就是 Binder 模式而非变体，typechecker 不会报 NAM004——只有带子模式的 `Circl(r)` 才走变体路径；这不是 bug，是模式语义的既有设计。测试 +11（406/406）。
-- **修复引擎深化 M2 --apply 迭代闭环（2026-08-25，v0.17.0）**：run_fix 的 --apply 从单趟升级为迭代闭环（抽成 `apply_iterative(src, path, max_rounds)` 供单测——main.rs 此前没有测试模块，process::exit 的 CLI 层不可测，循环逻辑必须抽出来）。收敛三重刹车：applied==0 / patched==current / 上限 5 轮。fix-history 每轮一条 entry（FixHistoryEntry 加 round 字段，**旧记录无 round 读取时默认 1**——parse_entry 的 unwrap_or(1)，有兼容测试）。**坑**：apply.rs 的单轮 to_json/to_human 被多轮版取代后变 dead code 触发 warning——按零 warning 纪律删除（唯一的测试调用方改用 rounds_to_json），binary crate 里"pub 但无人调"就是会警告，别指望 pub 能挡。输出契约：JSON 保持 lom-apply/v1 schema，新增 rounds + 逐变更 round 字段（additive 兼容）；退出码语义不变（apply 跑完即 0）。实测两轮收敛案例：LEX005 删 '@'（语法期）→ 解析通过 → typecheck 暴露 EFF001 → 第二轮插效应注解 → 第三轮收敛。测试 +5（411/411）。
-- **修复引擎深化 M3 PARSE001 针对性修复（2026-08-25，v0.18.0）**：**动手前先用 --json 探针实测 parser 真实报错形态，推翻两个计划假设**——① fn/if/while 缺 end 被容错解析**静默接受**（ok:true 零诊断，唯一 end 类报错是 `期望 'end' 闭合 match`）；② 缺 ')' 的错误位置在**下一个 token**（如下一行的 end/println 或 EOF 行），不是缺括号处。最终规则（fix.rs `fix_parse_missing_rparen/missing_end`）：期望 ')' + 违规 token 在行首（首个非空白字符 == d.col，或 d.line 超出行数=EOF）→ 在上一非空行末插 ')'（**High**）；行中 → 出错位置插入（Medium，可能是缺逗号）；期望 'end' → Medium。**parser 零改动**（诊断已带全部信息）。新坑：① token 名是 "End"（首字母大写）/"文件结束"/"标识符 'xxx'" 三种形态，判断行首别靠 token 名靠 col 与行内首非空白位置比较；② 测试里手写列号先数一遍字符（4 空格缩进的 println 行末是 22 不是 21，数错挂了两个测试）。评估记录：`expect` 统一走 parser.rs:144 的 "期望 X，得到 Y" 格式，第一个引号对=期望 token（extract_quoted_string 复用）。测试 +6（416/416），eval 086 同款场景 --apply 端到端实测修复后输出 7。
-- **修复引擎深化 M4 error_repair 扩充 + fix_corpus（2026-08-25，v0.19.0）**：eval error_repair 15→20 任务（109 多错误/110 NAM003 拼写/111 NAM004 字段/112 效应链×2/113 match 未闭合）；**prompt 内嵌诊断 JSON 全部来自真实 `lom --json` 输出**（严禁虚构纪律），参考答案全部实跑验证。新增 `eval/fix_corpus/`（*.bad.lom + *.fixed.lom 配对，main.rs 测试驱动 apply_iterative 逐字比对）——repair-native 的回归网。语料即覆盖率：4 例 3 例全自动、1 例按设计仅建议。**抓到真问题（如实记录为已知限制）**：`println("hello, world)` 这类"未闭合字符串吞掉行尾 )"的场景，LEX001 行尾补引号会把 ) 关进字符串——语法修通、语义错（多打印一个 )）。M2 的迭代闭环会接着补 ')' 让语法通过，放大了这个误修。不修（启发式太猜），corpus 03 改用干净案例。**教训：修复规则的组合会产生单规则时看不到的语义误修，语料回归网就是为此建的**。另注意 apply 同位置多个 insert 都去重豁免——LEX001 与 PARSE001 同列插入会发生（顺序依赖稳定排序），本次碰巧正确，后续若改排序要小心。eval 113/113 双后端，417/417。prompts 已用 _generate.ps1 重生成（10_error_repair.md 20 任务）。
-
----
 
 ## 2. 构建与验证命令（Windows PowerShell 环境特有坑）
 
@@ -146,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 395/395（2026-08-25 基线）
+cargo test --release                                    # 期望 417/417（2026-08-31 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 113/113
 ```
@@ -342,8 +272,79 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 395/395、零 warning、`./target/release/lom.exe --version` 显示 0.15.0
+2. `cargo build --release && cargo test --release` 确认 417/417、零 warning、`./target/release/lom.exe --version` 显示 0.19.1
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（全量自举 Phase 8 / v1.0 冻结 / 其他）
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
+
+## 10. 性能实测数据（Phase 5.18，2026-08-18）
+
+基准程序 `examples/bench.lom`（用法 `lom examples/bench.lom -- <bench> <n>`；Lom 无时钟，外部 wall-clock）。Windows release 单次运行，真实数据：
+
+| 负载 | 数据点 | 结论 |
+|---|---|---|
+| list_build | n=1000/2000/4000/8000 → 55/104/181/494 ms | 含 ~35ms 进程启动；净耗时超线性——list_cons 每次 O(n) 复制，建表总 O(n²)，常数小尚可忍 |
+| lookup（自举式线性环境查找） | n=200/400/800 → 2.4/10.8/86.9 **秒** | **近立方**：`list_tail` 每次 `elems[1..].to_vec()` O(n) 复制 → 扫描 O(n²)，n 次扫描 O(n³)。这是自举最大的性能瓶颈 |
+
+**v0.5.0 修复后（Phase 5.19，同机同基准）**：lookup n=200/400/800/1600 → **184/559/1893/7328 ms**（n=800 提速 46×，n=1600 从不可行变可行）；list_build n=8000：494→39 ms（12×+）。残余平方增长是算法固有的线性扫描，留给将来的 HashMap。
+
+**v0.5.1 map 模块（Phase 5.20，同机同基准，2026-08-19）**：lookup(List 关联表) n=500/1000/2000 → **898/3043/18136 ms**（每次翻倍 ×3.4-6，平方增长）；map_lookup n=500/1000/2000 → **64/66/55 ms**（平线；其中 ~48ms 是解释器启动开销，实测 `map_lookup 1` 三次为 47-49ms）。n=2000 墙钟提速 **~330×**，扣除启动开销后纯计算提速 ~2500×。lookup 的 O(n²) 算法瓶颈就此闭合。
+
+**Phase 5.21 自举环境换 Map（2026-08-19，同机实测）**：压测程序（100 个 let + N 轮 while、每轮查 3 个变量 + 2 次遮蔽重绑）跑在 stmt_interp 上——N=200：关联表 842ms → Map 226ms（3.7×）；N=400：2436ms → 292ms（8.3×）。旧实现每翻倍 ×2.9（平方增长：env 每轮 +2 个 cons 遮蔽条目，查找扫到底），新实现 ×1.3（近线性）。两版输出逐字一致（31 条基线 + 压测结果 29800/59600 均正确）。
+| recurse | n=10000 → 82ms OK；n=100000 → **256MB 栈溢出** | 每个 Lom 递归帧约耗 2.6KB Rust 栈；安全深度 ~10⁴。根治要显式堆栈/trampoline，留待编译器阶段 |
+
+**Phase 7.10 WASM 后端对照（2026-08-23，同机实测，单次 wall-clock）**：
+
+| 负载 | 树遍历 | WASM（node harness） | 备注 |
+|---|---|---|---|
+| list_build 8000 | 69ms | 104ms | node 空启动基线 ~98ms，小负载被启动开销主导 |
+| map_lookup 2000 | 54ms | 100ms | 同上 |
+| lookup 1000（自举式 O(n²) 关联表扫描） | 3329ms | 166ms | **墙钟 20×；扣启动开销后纯计算 ~49×**（解释器循环被编译掉了） |
+
+**递归深度（RFC-0002 退出标准 4 的诚实结算）**：树遍历 ~10⁴ 层（256MB 栈线程）；WASM 在 node 默认栈 ~1-3 万层（V8 默认栈 ~1MB，deep 帧 ~33B/帧实测）；`node --stack-size=60000` 时 10⁵ 层实测通过。**结论：天花板从"硬限"变为"宿主栈可配"——同量级但可调；真正的根治（显式栈机/trampoline）仍是编译器阶段后续可选项**。RFC-0002 标准 4 记为"部分达成（可调至 10⁵）"。
+
+**P2 修订**：优先级从"char/HashMap"改为 ① Value::List 改 Rc cons 单元（head/tail/cons 全 O(1)，动 Value 表示是深水区，改前全量回归）② HashMap/Set ③ char。递归深度是已知限制，写自举程序时避免超万层递归。
+
+**版本号（2026-08-19 起变更）**：Cargo.toml 已与里程碑对齐并启用**语义版本管理**：语言/工具链变更升 minor，修复升 patch；`lom --version` 从 Cargo.toml 读取（单一事实源）。每次发布里程碑记得同步 Cargo.toml + 打 tag。当前 `0.15.0`（tag v0.15.0；历史教训：v0.6.0 的 tag 不慎切在两个 CI 修复之前，复审发现后补发 v0.6.1 含全部 CI 修复；v0.5.1 是首个 tag）。⚠️ 教训：v0.5.1 后 6.4/6.5 加了 lom doc/fmt 没及时升版，被评审抓到"政策发布当周自我违背"——**加了用户可见功能就升 minor，别攒**。
+
+---
+
+## 11. 2026-08-22/23 会话新增坑（评审整改轮踩的，前面章节没有的）
+
+**工具链/环境**：
+- **`cargo test --release` 不更新 `target/release/lom.exe`**——它只构建测试 harness。改完代码跑 CLI 验证前必须显式 `cargo build --release`，否则你在测一个旧二进制（本轮因此误判过一次"NAM003 未注册"）。
+- **Git Bash 的 `/tmp` 与 Windows 进程不通**：`lom.exe /tmp/x.lom` 读不到（/tmp 是 Git Bash 虚拟挂载）。临时 .lom 文件放项目目录（用完即删），别放 /tmp。Windows Python 也读不到 Git Bash 的 /tmp（写脚本管道时直接 stdout 管道，别落盘 /tmp）。
+- **运行 examples 会产生运行时产物**：file 模块 demo 会在 examples/ 下写 `_file_demo_tmp.txt`。批量跑示例后 `git status` 要检查，别误提交（本轮误提交过一次，已 git rm + gitignore；`.lom/` 目录同理已 gitignore）。
+- **.gitignore 的 `#` 只在行首是注释**：`.lom/  # 注释` 这种行内写法会让整个 pattern 失效。改完 .gitignore 用 `git check-ignore` 验证。
+- **eval/run.sh 本地无法验证**（本机无 jq），改动后只能推理 + 靠 CI。CI 已不走 run.sh（统一 pwsh + run.ps1），run.sh 是二等公民。
+
+**CI/CD**：
+- **CI 脚本必须看首跑结果再宣布完成**（§8 已记，这里展开查法）：GitHub API 免认证查公开仓库——`curl https://api.github.com/repos/lom-lang/lom/actions/runs?per_page=N` 拿 run id，再 `/runs/{id}/jobs` 看每个 job 的 failed step。
+- **`grep -A5 '^\[dependencies\]'` 会越界扫到下一个 section**（`[profile.release]` 的 `debug = true` 触发误报）——TOML section 扫描用 awk 状态机（遇下一个 `[` 即停），且要覆盖 `[dependencies.foo]` 表形态。
+- **Windows CI runner 的 autocrlf**：checkout 出来是 CRLF，任何"逐字节比对"（fmt --check、golden diff）都要先 `tr -d '\r'` 或保持行尾风格（lom fmt 现在跟随输入行尾）。
+
+**流程/方法论**：
+- **评审 subagent 的报告要逐条复核再动手**——本轮复审的六条逐条验过逻辑全属实，但优先级要自己判断；盲信和盲改都不可取。
+- **类型检查可见化有涟漪效应**：把检查器输出推到默认路径后，检查器自身的假阳性（pkg_demo NAM003、Int+Float TYPE001、管道 TYPE003）立刻变成用户可见噪音——**可见性整改会倒逼检查器质量**，改之前先把示例库全跑一遍看 stderr。
+- **示例代码本身就是测试面**：try_operator.lom 的 `use_option` 是真类型错误写法，检查器可见化后才暴露。示例要保持"stderr 干净"，它们是用户的第一印象。
+- **python 批量文本替换必须 assert old in s**（不 assert 的 replace 静默 no-op，本轮 .gitignore 因此漏改一次）。
+- **文档腐坏第三轮清扫（2026-08-23，巩固期 P-0）**：SPEC_FOR_AI 三处——§8 模块节（"user modules arrive in Phase 3"→ Phase 4.4 lom.toml 包管理现状；pub 标注 v0.5.x→v0.6.x）、§11e fix 节（--apply/--history 早已实现，replace 动作改为"schema 预留但无规则产出"、runtime 位置声明级 span 现状）、结尾段（Phase 2.6 时代"NOT yet implemented"清单全部已实现，重写为 v0.6.1 现状）；LANGUAGE_SPEC §11 结尾陈旧句（Phase 0 DeepSeek 时代）改为"5-8 未决、移交 v1.0 范围裁决"；guide §4.6 CI 行（clippy/fmt 虚构 gate → 实际 6 gate 清单，issue/PR 模板与 release 流程标注"规划未落地"）。教训：**写"将在 Phase X 实现"的句子一定要带可检索的标记**，否则实现后没人回来改。
+- **巩固期 P-1（2026-08-23，RFC-0001 四问裁决）**：LANGUAGE_SPEC §11 剩余四问全部关闭——#5 多返回值=元组+解构（已实现即答案，拒 out-param）、#6 不设 self（无方法系统，问题失效）、#7 v1.0 不做 trait（§6.6 草稿标记 rejected）、#8 不做 pub（顶层全公开为正式语义）。**清扫中抓出的额外谎言**（全部实测验证后修正）：① spec 关键字表虚构——lexer 实际保留字只有 20 个（含 and/or，两文档都漏列），`struct/trait/impl/type/pub/pipe` 全是普通标识符；② `type UserId = Int` 类型别名从未实现（实测 PARSE001），但 §4.3 表格和 §6.5 一直当特性写；③ §4.5.1 表格称默认运行不做类型检查——v0.6.0 起已做（stderr 不拦截）；④ §6.4 称非穷尽 match 是"compile error"——MAT001 实为 warning。教训：**spec 里的"特性表"要定期拿 lexer/parser 实测对账**，文档腐坏密度远超预期。RFC 编号从 0001 起（0000 是模板）。
+- **Phase 7.1 WASM emitter 骨架（2026-08-23）**：`src/wasm.rs` 手写零依赖 emitter——LEB128（规范测试向量）、七个 section（type/import/func/memory/export/code/data）、函数索引空间导入在前、hello_module 最小模块。验证双层：逐字节 golden 单测 + **Node v24 真实实例化冒烟**（本机有 node，临时 .mjs harness 用完即删，未入库——7.9 才加 CI wasm gate）。**新坑**：binary crate 里 pub API 仅被测试消费会触发 dead_code warning——wasm.rs 模块级 `#[allow(dead_code)]` 注明有意保留（沿用 Phase 6.7 的既有惯例），7.2 接上 main 路径后可摘。版本纪律判断：7.1 无 CLI 面（没有 `lom build --target wasm`），非用户可见，**不升版本**；第一次升 minor 应在 CLI 可用的那个里程碑。
+- **Phase 7.2 动态语义 codegen（2026-08-23，v0.7.0）**：`src/wasm_codegen.rs` + `lom build <file> --target wasm [-o out]`。tagged i64（低 3 位 tag：0=Int 1=Bool 2=Unit 3=F64 盒 4=Str[len:u32+utf8]）；19 个手写 WASM helper 承担运行时 tag 分派（rt_add/eq/print/truthy/str_eq 等），codegen 只做结构翻译。**实测**：8 个 examples + eval 01/02 的 21/23 与解释器 stdout 逐字一致（101 list/104 range 是 7.6 的活，编译期报错指名 Phase）。**坑三个**：① **opcode 表看错行两次**——f64.store 是 0x39 不是 0x38（0x38=f32.store）、f64.convert_i64_s 是 0xB9 不是 0xB7（0xB7=f64.convert_i32_s）、f64.trunc 是 0x9D（f64 无取余指令，a%b 用 a-trunc(a/b)*b 合成）；Node 的验证报错会精确给出函数号和字节偏移，是第一调试工具。② **if 也是 WASM label**——return 的 br 深度漏计 if 层数会导致 return 穿透失败（eval 020 抓到：`first_even(1,4,7)` 返回 -1 而非 4）；Label 栈加 If 变体，break/continue 只认 Block/Loop。③ **bash heredoc 追加大文件会被截断**（wasm_codegen.rs 尾部丢过一次）——大文件用 Write/Edit 工具，别用 cat>>heredoc。另：JS 边界 i64 参数是 BigInt（harness 里 `v === 0n` 判断）；f64 显示对齐解释器 to_display（整数值补 .0）。e2e 测试 node 缺失自动跳过（CI 三平台预装 node，不影响 gate）。
+- **Phase 7.9 golden 总验收 + CI wasm gate（2026-08-23，v0.15.0）**：run.ps1 加 -Backend wasm（逐任务编译+node 运行+stdout 比对，108/108）；CI 加 eval wasm parity + stmt_interp golden wasm 两 step（产物放工作目录——Windows 的 Git Bash /tmp 对 node.exe 不可见，别放 /tmp）；lom build --target wasm 编译前跑类型检查（stderr 不拦截，对齐解释器路径）。RFC-0002 退出标准 1/2/3 达成。
+- **Phase 7.8 file/env + 包链接（2026-08-23，v0.14.0）**：file 四件套 + env::args() 走宿主导入；lom build 自动合并 lom.toml 依赖包源码（重名后主文件覆盖，对齐解释器）；from <pkg> import 按包名校验（包符号是普通用户函数，**不进 available_builtins**——否则被错误路由到内建分派）。**RT_* 常量重构为 N_IMPORTS 相对值**（加导入不用再重编号）。坑：① file_write/append 调用后多压了一个 V_UNIT（宿主已返回 Unit）——fallthru found 3/2 是栈余数；② harness 的 args 要剥掉第一个裸 "--"（CLI 惯例）；③ todo.lom 的运行时产物是 examples/_todo_data.json（已 gitignore）。实测：file_demo/todo/bench/pkg_demo 全部逐字一致。
+- **Phase 7.7 json 宿主中介（2026-08-23，v0.13.0）**：json_parse/json_stringify 走宿主导入（harness 的 JS JSON.parse/stringify + 值布局读写，契约写在 run_wasm.mjs 文件头）；wasm 侧导出 lom_alloc + lom_variant_table（ExportKind::Global 新增）。**决策记录**：Lom 层自写 JSON 被 reflection 缺口阻塞（type_of/record_items/char_from_code 三内建），手写 WASM JSON 解析器性价比最低——宿主中介零语言面变化，符合冻结倾向。**真设计缺陷修复**：记录字段查找从"编译期 intern 偏移相等"改为内容比较（str_eq）——宿主物化的记录字段名与编译期静态串不同源，json_parse 结果一访问字段就露馅。坑：json_parse 导入参数忘了跳过 Str 的 len 头（ptr 应为 ptr+4）——host 读到的文本以 4 字节长度头开头。**Rust 字符串里嵌套 Lom 字符串的转义层级**（\\\" 三层）极易错——e2e 测试因此挂了一次（多转义一层，Lom 源里出现裸 \"）；教训：e2e 测试的 Lom 源先在文件里跑通再内嵌。
+- **Phase 7.6b Map + memory.grow（2026-08-23，v0.12.0）**：Map = 手写开放寻址哈希表（FNV-1a、线性探测、墓碑删除、0.5 负载翻倍 rehash）；rt_map_probe 一个 helper 服务 get/has/remove/set（命中返回桶下标、未命中返回 -（插入槽+1)）；keys/values/str 排序保确定性；eq 逐键 probe。**rt_alloc 自动 memory.grow**（越页自动扩页——stmt_interp 级别的分配量 64KB 一页不够）。**实测：eval 108/108 双后端逐字一致（skip 清零）+ stmt_interp.lom（约 1400 行自举迷你解释器）编译到 WASM 后 39 条输出与 golden 逐字一致**。坑（同族第三次）：① 单参数 helper 的 locals 从 1 起（不是 2！）——map_keys/values/str 三个写错，统一偏移修正；② 修正时的正则替换把两位数下标改坏（lget(10)→lget(19)）——**批量替换后必须逐个验证**；③ helper 里嵌套 display 链加分支时注意"内块 } + 外 if end"配对——错一处就 trailing code。
+- **Phase 7.6a Record/Tuple/List（2026-08-23，v0.11.0）**：Tuple [n][elems]（tag 7）、Record [n][(name_off,val)]（tag 8，name_off 是编译期 intern 的静态串偏移——字段查找比 i32 相等而非字符串比较）、List cons [head][tail]（tag 9，Nil=空指针哨兵）。字段访问/元组 .N/let 解构/range/for-over-List/split（Rust 语义含尾空段）/list_map/filter/fold（helper 内 call_indirect 回调）。rt_eq/rt_display/rt_print 四个新 tag 分支（rt_print 兜底 = display 转字符串打印）。**实测：26 个可编译示例 + 3 个 bootstrap 小程序 + eval 全类目 107/108 逐字一致**（唯一 skip = 086 map → 7.6b）。**大坑**：① **tag 掩码耗尽**——7.2 设计"低 3 位 tag"（掩码 7），7.6 加 tag 8/9/10 后 8&7=0 被当 Int——值表示全局迁 4 位（教训：**tag 空间预留扩展位；掩码值必须单一事实源**——本次迁移用全局文本替换+人工复核，V_TRUE 9→17、bool 翻位 XOR 8→16）。② call_indirect 要求模块有 table section，哪怕空表——helper 里的 call_indirect 在"无闭包"的模块里也要表（现恒发空表）。③ 一个"幽灵函数"惊吓是虚惊：_p.lom 是 getx 版不是最小版——**调试时先确认测的是你以为的文件**（浪费半小时）。
+- **Phase 7.5 枚举/match/?（2026-08-23，v0.10.0）**：枚举值 = 堆对象 [variant_idx: i32][n_args: i32][args: i64×n]（tag 6）；变体名→全局索引表（内建 Ok/Err/Some/None=0-3）；match = 臂链 + $done 带值块（guard 穿透、模式绑定进臂作用域、字面量模式走 rt_eq）；`?` = Ok/Some 解包、Err/None 整体 br $ret。**静态布局依赖的 helper 用"占位 + finalize 填体"模式**（rt_enum_print/rt_enum_str 需要变体名表偏移——表在数据段，名字复用 str_off 去重）。**实测**：4 个 match/try 示例 + eval 7 类目 74/78 逐字一致（4 skip 全属 7.6）。**坑**：① Try 的 if_i64 忘了压 Label::If → br $ret 深度错（7.2 的 if-is-label 坑第二次踩——**以后任何手写 if/block 都要同步压 Label 栈**）；② build_display 嵌套 if 链少一个 Rust `}`（rustc unclosed delimiter 定位在函数头，用逐行 depth 脚本数最靠谱）。
+- **Phase 7.4 字符串 + stdlib（2026-08-23，v0.9.0）**：15 个新 helper（concat/display/itoa/stoi/str_len/trim/case/contains/starts/ends/replace/str_cmp/str_char_at/ftoa_str）；拼接提升进 rt_add；字符串大小比较补齐；for-over-String（UTF-8 逐字符）；sqrt/abs/min/max；string/math 导入 + 别名解析（**orig 判可用性、real 做分派**——别名列可用性 bug 抓到一次）；闭包捕获放行已导入内建。**实测**：examples 18 个 PASS + eval 01/02/03/04/09 的 48/52 逐字一致（4 个 skip 全属 7.6）。**坑（两个深坑，方法论价值高）**：① **WASM opcode 表会连串看错**——i32.and/or 因漏排 div/rem 写成 0x70/0x71（实为 rem_u/and；正确 0x71/0x72），i64.gt_u 写成 0x5A（实为 ge_u；gt_u=0x56）——比较块是 lt_s,lt_u,gt_s,gt_u,le_s,le_u,ge_s,ge_u 成对排，跳项必错。**症状极具迷惑性**：trim/upper 静默变成恒等函数（or 链变 and 链恒 false），itoa 无限循环 OOB（ge_u 0 恒真）。② **栈上多余操作数在 loop 里能过验证**（br 截断到 label 高度）——build_starts_ends 的 ends 分支漏了一个 I32_ADD，地址算成 (ls-lsub)+i，字节全对、验证全过、结果全错。**调试方法论沉淀**：Node 实例化报错精确到函数号+偏移；抠 helper 字节离线单测（手写模块包装器）是终极隔离手段——本次靠它分别定位到 or 链恒 0 和 ge_u 恒真。③ Git Bash heredoc 写非 ASCII 会双编码（"é"→"Ã©"）——含非 ASCII 的测试文件必须用 Write 工具。min/max 分支嵌套 if 多数了一个 end（trailing code after function end）——Node 报 "trailing code" 时去数 if/else/end 配对。
+- **Phase 7.3 闭包（2026-08-23，v0.8.0）**：闭包值 = 堆对象 [table_idx][env_ptr]（tag 5），env 对象 [n][v0..vn] 值拷贝捕获；free_vars 静态分析（按首次使用序）；闭包体 = (env, params...)->i64 的 WASM 函数，调用走 call_indirect（funcref 表 + 元素段）；具名函数当值 = 忽略 env 的 shim；**递归闭包 = 预绑定 local + 创建后 env 槽位补丁**（对齐解释器共享作用域语义）；任意表达式 callee（make_adder(5)(10)）支持，求值顺序对齐解释器（先 args 后 callee）。**实测**：closures/hof/logical/nested_calls 四例 + eval 04 的 11/12 逐字一致（107 需 list_map → 7.6）。**已知语义差异（如实记录）**：捕获是创建时值拷贝，解释器是 Rc 共享作用域——创建后修改被捕获变量时两后端行为不同（代码头注释已声明）。**坑**：用户函数必须先预推占位 Function 固定 funcidx，否则函数体里产生的闭包函数会挤占索引空间；call_indirect 的操作数顺序是"参数在下、表索引在栈顶"。
+- **修复引擎深化 M1 拼写修复（2026-08-25，v0.16.0）**：NAM003/NAM004 带"是否想用 'X'？"建议时 fix 产出 Replace 动作（Medium——用户裁决**猜测性修复不自动改**，--apply 只动 100% 确定的）。**关键设计约束**：typechecker 的 NAM003/NAM004 全部 push 在 (0,0)——表达式级 span 是 Phase 3.2b 挂账项，从未做。所以 Replace 定位走**整词源码扫描**（fix.rs `find_token_occurrences`）：跳过字符串字面量（含 `\"` 转义）与 # 注释；记录字段要求 `.` 前缀防误改同名变量；变体名 message 有两个引号对要取**最后一个**（extract_last_quoted）。typechecker 侧把 4.1.1 的 best-match 逻辑抽成自由函数 `best_spelling`（suggest_spelling 委托之），NAM004 记录字段/枚举变体两处补上建议。**行为发现**：无参数变体拼错（`Grean`）在 parser 层就是 Binder 模式而非变体，typechecker 不会报 NAM004——只有带子模式的 `Circl(r)` 才走变体路径；这不是 bug，是模式语义的既有设计。测试 +11（406/406）。
+- **修复引擎深化 M2 --apply 迭代闭环（2026-08-25，v0.17.0）**：run_fix 的 --apply 从单趟升级为迭代闭环（抽成 `apply_iterative(src, path, max_rounds)` 供单测——main.rs 此前没有测试模块，process::exit 的 CLI 层不可测，循环逻辑必须抽出来）。收敛三重刹车：applied==0 / patched==current / 上限 5 轮。fix-history 每轮一条 entry（FixHistoryEntry 加 round 字段，**旧记录无 round 读取时默认 1**——parse_entry 的 unwrap_or(1)，有兼容测试）。**坑**：apply.rs 的单轮 to_json/to_human 被多轮版取代后变 dead code 触发 warning——按零 warning 纪律删除（唯一的测试调用方改用 rounds_to_json），binary crate 里"pub 但无人调"就是会警告，别指望 pub 能挡。输出契约：JSON 保持 lom-apply/v1 schema，新增 rounds + 逐变更 round 字段（additive 兼容）；退出码语义不变（apply 跑完即 0）。实测两轮收敛案例：LEX005 删 '@'（语法期）→ 解析通过 → typecheck 暴露 EFF001 → 第二轮插效应注解 → 第三轮收敛。测试 +5（411/411）。
+- **修复引擎深化 M3 PARSE001 针对性修复（2026-08-25，v0.18.0）**：**动手前先用 --json 探针实测 parser 真实报错形态，推翻两个计划假设**——① fn/if/while 缺 end 被容错解析**静默接受**（ok:true 零诊断，唯一 end 类报错是 `期望 'end' 闭合 match`）；② 缺 ')' 的错误位置在**下一个 token**（如下一行的 end/println 或 EOF 行），不是缺括号处。最终规则（fix.rs `fix_parse_missing_rparen/missing_end`）：期望 ')' + 违规 token 在行首（首个非空白字符 == d.col，或 d.line 超出行数=EOF）→ 在上一非空行末插 ')'（**High**）；行中 → 出错位置插入（Medium，可能是缺逗号）；期望 'end' → Medium。**parser 零改动**（诊断已带全部信息）。新坑：① token 名是 "End"（首字母大写）/"文件结束"/"标识符 'xxx'" 三种形态，判断行首别靠 token 名靠 col 与行内首非空白位置比较；② 测试里手写列号先数一遍字符（4 空格缩进的 println 行末是 22 不是 21，数错挂了两个测试）。评估记录：`expect` 统一走 parser.rs:144 的 "期望 X，得到 Y" 格式，第一个引号对=期望 token（extract_quoted_string 复用）。测试 +6（416/416），eval 086 同款场景 --apply 端到端实测修复后输出 7。
+- **修复引擎深化 M4 error_repair 扩充 + fix_corpus（2026-08-25，v0.19.0）**：eval error_repair 15→20 任务（109 多错误/110 NAM003 拼写/111 NAM004 字段/112 效应链×2/113 match 未闭合）；**prompt 内嵌诊断 JSON 全部来自真实 `lom --json` 输出**（严禁虚构纪律），参考答案全部实跑验证。新增 `eval/fix_corpus/`（*.bad.lom + *.fixed.lom 配对，main.rs 测试驱动 apply_iterative 逐字比对）——repair-native 的回归网。语料即覆盖率：4 例 3 例全自动、1 例按设计仅建议。**抓到真问题（如实记录为已知限制）**：`println("hello, world)` 这类"未闭合字符串吞掉行尾 )"的场景，LEX001 行尾补引号会把 ) 关进字符串——语法修通、语义错（多打印一个 )）。M2 的迭代闭环会接着补 ')' 让语法通过，放大了这个误修。不修（启发式太猜），corpus 03 改用干净案例。**教训：修复规则的组合会产生单规则时看不到的语义误修，语料回归网就是为此建的**。另注意 apply 同位置多个 insert 都去重豁免——LEX001 与 PARSE001 同列插入会发生（顺序依赖稳定排序），本次碰巧正确，后续若改排序要小心。eval 113/113 双后端，417/417。prompts 已用 _generate.ps1 重生成（10_error_repair.md 20 任务）。
+- **第四轮评审整改（2026-08-31，docs/reviews/review-2026-08-31.html，独立审查 agent，基线 v0.19.0）**：逐条复核后执行。**采纳并修复**：① P0 SPEC_FOR_AI §4 "运行不做类型检查"（v0.6.0 整改时漏改了这处——同一轮整改的涟漪没扫全）；② README：logos 残留（与零依赖铁律直接冲突）、补 Quick Start、Roadmap 表补 Phase 7、"What is Lom" 补 Phase 5-7、99% 宣称加限定词（单模型单次采样，初步证据）；③ LANGUAGE_SPEC 一批腐坏（标题 v0.1 Draft、EBNF item 只有 fn_decl 且返回类型写成冒号、§4.3/§6 "drafted" 标签、§9.3 List 还写 Vec 实现、§12 停在 100 任务、EFF001 位置 9:1/20:1 实为 10:1/21:1、changelog 停在 v0.2.2）；④ 本文 §2.2/§9 基线数字再次滞后（教训复发了：M1-M4 每个里程碑升测试数都没回改这两处——**升测试数时要同步 §2.2/§9**）；⑤ eval/README 分类计数停在 100 时代；⑥ **eval 任务 ID 086 冲突**（09_modules 的 map 任务是 5.20 后加的，撞了 error_repair 的 086；runner 按 <id>.lom 寻址候选，LLM 评测时会互相覆盖——map 任务重编为 114，新增 eval_task_ids_globally_unique 回归测试钉住）；⑦ json_escape 四份手抄收敛为 json.rs 的 pub escape_str（json.rs 自己的 stringify_string 也委托它——实际是 5 份）；⑧ clippy 54 条存量清零 + CI 加 clippy -D warnings gate（ubuntu 单平台）；⑨ Cargo.toml 补 repository/homepage/keywords、Cargo.lock 入库、interpreter.rs contains_key+unwrap 改 if let、apply_test.lom 加"故意坏文件"头注释。**复核驳回/暂缓**：tag 类型不统一与 GPG 签名（历史不回改）；.gitattributes eol 规则（会重写本机全部工作区文件行尾，风险大于收益，CI 已有 tr -d 防线）；main.rs 下沉拆分（真问题但非本轮目标）；match Form A/B 重构（破坏全部存量代码，冻结倾向）；List 字面量语法（已知缺口，冻结）；报告的 "_todo_data.json 未确认 gitignore" 实为多虑（.gitignore:38 早已覆盖）。**评审之外自发现**（比报告更深一层）：`let x=3; x=4` 不可变重赋值**静默通过**——spec §5.1 说 compile error，实现是零校验；spec 已改为诚实描述，是否实现校验待用户裁决。
+
+---

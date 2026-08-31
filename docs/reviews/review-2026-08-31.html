@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 项目独立审查报告 — 2026-08-31</title>
+<style>
+  :root {
+    --fg: #1a1a2e;
+    --muted: #5a5a72;
+    --accent: #2563eb;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --bg-soft: #f4f5fa;
+    --border: #d9dbe7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--fg);
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    line-height: 1.75;
+  }
+  h1 { font-size: 1.8rem; border-bottom: 3px solid var(--accent); padding-bottom: .4rem; }
+  h2 { font-size: 1.35rem; margin-top: 2.8rem; border-left: 5px solid var(--accent); padding-left: .7rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.8rem; color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .45rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); }
+  code { background: var(--bg-soft); padding: .1em .35em; border-radius: 4px; font-size: .88em; }
+  blockquote { border-left: 4px solid var(--border); margin: 1rem 0; padding: .3rem 1rem; color: var(--muted); }
+  .meta { color: var(--muted); font-size: .9rem; }
+  .verdict { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 1.5rem 0; }
+  .tag { display: inline-block; padding: .05em .55em; border-radius: 999px; font-size: .78rem; font-weight: 600; color: #fff; }
+  .tag.p0 { background: var(--bad); }
+  .tag.p1 { background: var(--warn); }
+  .tag.p2 { background: var(--ok); }
+  .tag.info { background: var(--accent); }
+  ul li, ol li { margin: .25rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Lom 项目独立审查报告</h1>
+<p class="meta">审查日期：2026-08-31 · 审查范围：git 历史、核心文档、源码实现、评测体系与示例 · 审查方式：只读（未修改任何项目文件）· 审查基线：main @ <code>ad7e387</code>（v0.19.0）</p>
+
+<div class="verdict">
+  <strong>总体结论：</strong>Lom 是一个定位清晰、工程纪律远超一般个人项目的 AI 原生语言实验：100% conventional commits、零依赖零 unsafe、417 个测试全绿、三平台 CI 含 WASM 双后端 golden 比对、文档以"不撒谎"为核心纪律。真正的差异化创新在 LLM 修复闭环（<code>lom fix --apply</code> + 诊断 schema 族）。
+  主要风险集中在两点：<strong>(a) 文档腐坏呈慢性复发</strong>——尽管已有三轮清扫，本次审查仍在 README、两份 spec、eval/README、HANDOVER 中抓出多处与实现矛盾的内容，其中喂给 LLM 的核心文档 <code>SPEC_FOR_AI.md</code> 存在过时描述，恰是项目立身之本；<strong>(b) "AI 原生"的实证宣称超出证据</strong>——99% 通过率来自 1 个匿名模型 × 1 次采样 × 无对照组的开卷测试，未达到项目自订的"至少 3 个 LLM"标准。
+</div>
+
+<h2>一、项目快照</h2>
+<table>
+  <tr><th>维度</th><th>数据</th></tr>
+  <tr><td>提交历史</td><td>125 commits，2026-08-02 → 2026-08-31，整一个月；16 个版本 tag（v0.5.1 ~ v0.19.0）</td></tr>
+  <tr><td>贡献者</td><td>单人（wyty），纯线性历史，0 合并提交</td></tr>
+  <tr><td>代码规模</td><td>src/ 共 19 个文件、22,963 行 Rust；零第三方依赖、零 unsafe</td></tr>
+  <tr><td>测试</td><td>417 个 <code>#[test]</code> 全绿（1.87s）；eval 套件 113 任务参考解 113/113 通过</td></tr>
+  <tr><td>CI</td><td>GitHub Actions 三平台（ubuntu/macos/windows），含零依赖 gate、fmt 幂等 gate、eval 双后端 parity、自举 golden 比对</td></tr>
+  <tr><td>评测</td><td>113 任务 / 10 分类 LLM 生成基准；已跑 1 个模型 100 任务，99/100 通过（可复现）</td></tr>
+  <tr><td>自举</td><td><code>examples/bootstrap/stmt_interp.lom</code>（52KB）：用 Lom 写的带容错解析的解释器，接入 CI 双后端 diff 校验；Phase 8（完全自举）RFC 草稿未提交</td></tr>
+</table>
+
+<h2>二、Git 历史审查</h2>
+<h3>优点</h3>
+<ul>
+  <li><strong>提交纪律极佳</strong>：125/125（100%）使用 conventional-commit 前缀（docs 58、feat 56、fix 6、chore 3、spec 1、ci 1），无一条 "wip"/裸 "fix"。主题普遍带阶段编号 + 版本号，可追溯性极强。</li>
+  <li><strong>feat/docs 成对工作流</strong>：几乎每个 feat 跟一条 <code>docs: Phase X.Y</code> 记录，配合 <code>docs/HANDOVER.md</code> 做 AI 会话交接——本身就是"AI 原生"工作流的示范。</li>
+  <li><strong>发展脉络清晰</strong>：规范文档 → LLM-coding 核心 + eval → 修复引擎 → 自举 → 工程化（CI/社区治理）→ WASM 后端（两天 v0.7.0→v0.15.0）→ 修复引擎深化 M1–M4。</li>
+  <li><strong>产物卫生有过失误但处理得当</strong>：<code>examples/_file_demo_tmp.txt</code> 曾误入库，由专门提交 <code>b2f2deb</code> 清除并补入 .gitignore，有留痕。</li>
+</ul>
+<h3>问题</h3>
+<ul>
+  <li><span class="tag p2">P2</span> <strong>Cargo.lock 未入库</strong>（.gitignore 排除）。零依赖下无实际风险且 CI 注释说明是有意为之，但 Rust 官方惯例建议二进制项目提交 lockfile 以保证可复现构建；若未来破例引入依赖，此处会立刻变成真问题。</li>
+  <li><span class="tag p2">P2</span> <strong>.gitattributes 仅 2 行</strong>，无 eol 规则。项目自己踩过 CRLF 坑（<code>fix: lom fmt preserves CRLF — Windows CI fmt gate false positive</code>），用 gitattributes 显式约束换行符可从源头规避，目前是空白。</li>
+  <li><span class="tag p2">P2</span> tag 类型前后不统一：v0.5.1–v0.15.0 为附注 tag，v0.16.0 起改轻量 tag；所有提交无 GPG 签名。</li>
+  <li><span class="tag p2">P2</span> 提交信息语言不统一（早期英文、后期中文）。</li>
+  <li><span class="tag info">提示</span> <strong>单点风险</strong>：单人、单分支、直接推 main、无评审环节。脉冲式开发（单日最高 35 提交，间隙期 0 提交）。当前有未提交的 Phase 8 RFC 草稿（<code>docs/rfc/0003-phase8-full-selfhosting.md</code>）。</li>
+</ul>
+
+<h2>三、核心文档审查</h2>
+<h3>定位与设计</h3>
+<p>项目将"AI 原生"拆解为 AI-workload-native（已明确放弃）与 AI-coding-native，并于 2026-08-07 复盘后聚焦 <strong>LLM-repair-native</strong>：MoonBit 占"一次写对"，Lom 占"写错后原地修复"。叙事自洽，每个语法决策要求回答"是否降低 LLM 错误率"（<code>DESIGN_RATIONALE.md:17</code>），且大量决策有实测回溯（如拒绝 <code>a..=b</code> 因双 range 运算符是已知 LLM 混淆源）。修复机制的置信度分级与"猜测性修复永不自动应用"的安全策略设计成熟；M4 如实记录了 LEX001 与迭代闭环组合产生语义误修的已知限制——"不修但记账"的诚实度少见。RFC 机制实质运转（模板含强制 LLM-impact 分析节）。</p>
+<h3>优点</h3>
+<ul>
+  <li>文档间有权威层级声明（HANDOVER.md:337"与代码不符时以代码为准"），有三轮文档腐坏清扫记录。</li>
+  <li>SECURITY.md 实质可用：威胁模型明确、加固清单可验证、<strong>accepted risks 如实列出</strong>（无递归深度守卫、file 模块无路径校验等）。</li>
+  <li>CONTRIBUTING.md 非模板：零依赖需 RFC、禁虚构数据、回归三件套含具体命令、诊断码命名约定。</li>
+</ul>
+<h3>问题（文档腐坏残留，按严重度排序）</h3>
+<table>
+  <tr><th>级别</th><th>位置</th><th>问题</th></tr>
+  <tr><td><span class="tag p0">P0</span></td><td><code>SPEC_FOR_AI.md:176</code></td><td>声称 "<code>lom &lt;file&gt;</code> 运行不做类型检查"，但 v0.6.0 起默认运行即做类型检查。<strong>这是喂给 LLM 的核心文档，恰好是项目身份所系，必须与实现严格一致。</strong></td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td><code>README.md:164</code></td><td>Tech Stack 声称 "Phase 1: logos (lexer)"，与零依赖铁律（Cargo.toml、SECURITY.md:9、lexer.rs:3 注释）直接冲突，属腐坏内容。</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td><code>README.md</code> 整体</td><td>无安装/构建/快速上手指引，无 Hello World；"What is Lom" 只列到 Phase 4，Roadmap 表未覆盖 Phase 5–7（WASM 后端）；未链接已有教程 <code>docs/lom-tutorial.html</code>。对外门面滞后实际进度约两个 Phase。</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td><code>LANGUAGE_SPEC.md</code></td><td>多处结构性腐坏：§9.3 的 List "Vec 实现"描述（:1031）与同文件 §4.3（Rc cons cells）矛盾；§12 整节停在 100 任务时代；§7.3 "reserved" 表、§6 "(drafted)" 标签未摘；§3 EBNF 的 <code>fn_decl</code> 返回类型写 <code>:</code> 而实际是 <code>-&gt;</code>；EFF001 行号（:806）与 README.md:30 不一致；标题仍标 "v0.1 Draft"。</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td><code>HANDOVER.md</code></td><td>内部基线数字分裂（§1 快照 417/417 v0.19.0 vs §2.2/§9 的 395/395 v0.15.0）；§10/§11 章节物理顺序错位。</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td><code>eval/README.md</code></td><td>分类计数停在旧值（合计 100），manifest 已是 113；"101-108 未跑 LLM" 应为 101-113。</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td><code>SPEC_FOR_AI.md:697</code> 等</td><td>"108-task eval suite" 已过期（现 113）；DESIGN_RATIONALE.md 标题 v0.1、changelog 未更新。</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td>SECURITY.md ↔ CODE_OF_CONDUCT.md</td><td>漏洞报告渠道与 enforcement channel 互相指向但均无具体联系方式，形成空转引用。</td></tr>
+</table>
+<h3>语言设计层面的疑点</h3>
+<ul>
+  <li>渐进类型"类型错误只是 warning、程序照跑"与 §5.1 "Reassignment is a compile error" 表述冲突，gradual 语义下重赋值到底落到哪一级未说清。</li>
+  <li>match 双臂形态（Form A 无需 end / Form B 需要）是 HANDOVER 反复踩坑（"第三次应验"）的根源——引入这个不对称本身与"降低 LLM 错误率"的目标存在张力，值得在 RFC 层面重新评估。</li>
+  <li>List 无字面量语法（只能 <code>list_cons</code> 链）是明显表达力缺口；RFC-0003 的零新语法冻结意味着 v1.0 也不会有。</li>
+</ul>
+
+<h2>四、源码实现审查</h2>
+<h3>架构与质量数据</h3>
+<table>
+  <tr><th>指标</th><th>数据</th><th>评价</th></tr>
+  <tr><td>依赖</td><td>0 个第三方依赖，CI 有 zero-dependency gate</td><td>显式设计决策，供应链面为零，有 CI 强制兜底</td></tr>
+  <tr><td>unsafe</td><td>0 处</td><td>—</td></tr>
+  <tr><td>生产代码 <code>unwrap()</code></td><td>15 处（全库 178 处中 163 处在测试模块）</td><td>逐一核实均有前置守卫，无裸 panic 风险</td></tr>
+  <tr><td>TODO/FIXME</td><td>0 处</td><td>收尾纪律好</td></tr>
+  <tr><td>测试</td><td>417 个全绿，18/19 个模块有测试，含 WASM e2e 双后端对齐</td><td>覆盖扎实；无 tests/ 目录，全部为内联模块</td></tr>
+  <tr><td>clippy</td><td>53 条 warning（全风格级，48 条可 --fix），0 error</td><td>CI 未跑 clippy</td></tr>
+  <tr><td>rustfmt</td><td>不符合默认风格，无 rustfmt.toml</td><td>知情决策（CI 的 fmt gate 针对 .lom 文件），但偏离生态惯例</td></tr>
+  <tr><td>注释</td><td><code>///</code> 936 行 + 行注释约 1,980 行（约 12%）</td><td>多为设计决策记录而非复述代码；全中文抬高外部贡献门槛</td></tr>
+</table>
+<h3>模块规模 Top 5</h3>
+<table>
+  <tr><th>行数</th><th>文件</th><th>职责</th></tr>
+  <tr><td>4,859</td><td>wasm_codegen.rs</td><td>AST → WASM 编译器（占全部代码 21%，接近单文件可维护性上限）</td></tr>
+  <tr><td>3,459</td><td>interpreter.rs</td><td>树遍历解释器、Value/作用域/内置函数</td></tr>
+  <tr><td>2,342</td><td>typechecker.rs</td><td>渐进式类型检查器</td></tr>
+  <tr><td>1,666</td><td>parser.rs</td><td>手写递归下降 + Pratt，容错（带洞 AST）</td></tr>
+  <tr><td>1,644</td><td>fix.rs</td><td>AI 修复计划生成（lom-fix/v1）</td></tr>
+</table>
+<h3>问题清单</h3>
+<ul>
+  <li><span class="tag p1">P1</span> <strong><code>json_escape</code> 手抄了 4 份</strong>（diagnostics.rs:284 / fix.rs:878 / info.rs:188 / doc.rs:219），而 json.rs 已有通用序列化器——零依赖策略的直接代价，应收敛。</li>
+  <li><span class="tag p2">P2</span> <strong>main.rs 1,343 行承担过多</strong>：参数解析 + 7 个子命令实现（<code>run_fix</code> :803-884、<code>apply_iterative</code> :892 等），业务逻辑应下沉到 apply.rs/fix.rs 等专属模块。</li>
+  <li><span class="tag p2">P2</span> 无 lib.rs，纯二进制 crate——parser/interpreter 无法作为库复用；若属刻意，建议在 README 写明。</li>
+  <li><span class="tag p2">P2</span> Cargo.toml 缺 <code>repository</code>/<code>homepage</code>/<code>keywords</code> 等发布元数据（已填 license/description，补齐成本极低）。</li>
+  <li><span class="tag p2">P2</span> 53 条存量 clippy warning 且 CI 不跑 clippy；建议清理后加 <code>cargo clippy -- -D warnings</code> gate。</li>
+  <li><span class="tag info">提示</span> interpreter.rs:863 的 <code>contains_key</code> + <code>get().unwrap()</code> 可改 <code>if let</code>；10 处 <code>#[allow(dead_code)]</code> 可复核哪些已可删。</li>
+</ul>
+
+<h2>五、评测体系与示例审查</h2>
+<h3>优点</h3>
+<ul>
+  <li>eval 框架设计规范：113 任务 / 10 分类，prompt 由脚本从 tasks JSON + 上下文机械生成，自包含可复现；runner 有 ps1/sh/wasm 三实现，CI 三平台跑验证且 108 任务在 WASM 后端做 parity gate。</li>
+  <li><strong>数据真实可复现</strong>：本次审查实测复现了参考解 113/113 与候选集 99/100（唯一失败正是 REPORT 记录的 078）。</li>
+  <li>examples 覆盖广（30+ 示例），<code>bootstrap/stmt_interp.lom</code>（52KB 自举解释器）是最有说服力的"语言够用"证据。</li>
+</ul>
+<h3>问题</h3>
+<ul>
+  <li><span class="tag p1">P1</span> <strong>核心实证宣称超出证据</strong>：99% 通过率来自 1 个匿名模型 × 1 次采样、无温度/seed 记录、无 pass@k、无跨语言对照组；prompt 内嵌完整语言速览属开卷考试，测的是"LLM 跟随 spec 的能力"而非"语言对 LLM 友好"。项目自订标准（lom-project-guide.html §3.3："至少覆盖 3 个 LLM 才能宣告 AI 原生成色"）<strong>未达成</strong>。"60% 基线"是预期值而非实测。</li>
+  <li><span class="tag p1">P1</span> <strong>任务 ID 冲突</strong>：<code>09_modules.json</code> 最后一题与 <code>10_error_repair.json</code> 第一题都是 <code>086</code>——113 个任务只有 112 个唯一 ID；candidates 按 <code>&lt;id&gt;.lom</code> 寻址会互相覆盖。</li>
+  <li><span class="tag p2">P2</span> 13 个新任务（101-113）从未跑过 LLM；任务难度偏浅（easy/medium/hard ≈ 47/44/22，多数 solution 5–15 行，无多文件、无长上下文、无需求模糊题）。</li>
+  <li><span class="tag p2">P2</span> <code>apply_test.lom</code> 是故意写错的文件但命名无标注，易误导浏览者；<code>todo.lom</code> 运行时写 <code>examples/_todo_data.json</code>，未确认是否被 gitignore 覆盖。</li>
+</ul>
+
+<h2>六、建议（按优先级）</h2>
+<h3>P0 — 立即处理</h3>
+<ol>
+  <li><strong>修正 <code>SPEC_FOR_AI.md:176</code> 的过时描述</strong>（"运行不做类型检查"）。项目立身之本是"喂给 LLM 的文档必须与实现严格一致"，这份文档的准确性应享有最高维护优先级，建议纳入 CI 或里程碑检查单。</li>
+</ol>
+<h3>P1 — 近期处理</h3>
+<ol>
+  <li><strong>启动第四轮文档腐坏清扫</strong>，范围至少覆盖：README.md（logos 残留、安装指引缺失、Phase 5–7 未覆盖、链接教程）、LANGUAGE_SPEC.md（§9.3/§12/§7.3/§3 EBNF/EFF001 行号）、HANDOVER.md（基线数字分裂、章节错位）、eval/README.md（计数与未实测范围）。建议建立"spec 特性表与 lexer/parser 实测对账"的例行机制并文档化。</li>
+  <li><strong>修复 eval 任务 ID 086 冲突</strong>，并把"参考解自校验 + ID 唯一性检查"固化进 runner 或 CI。</li>
+  <li><strong>收敛 4 份 <code>json_escape</code> 到 json.rs</strong>。</li>
+  <li><strong>对外表述降级</strong>：在补齐证据前，README/REPORT 中"已验证 AI 原生设计有效"类措辞改为"初步证据"；如实标注单模型单次采样的局限。</li>
+</ol>
+<h3>P2 — 计划处理</h3>
+<ol>
+  <li><strong>按自订标准补齐实证</strong>：补跑 101–113；测 ≥3 个具名 LLM 并记录模型/参数/日期；加"同一批任务用 Python/JS 生成"的对照组；引入多采样 pass@k。这是把营销叙事变成科学结论的唯一路径。</li>
+  <li><strong>工程化收尾</strong>：清理 53 条 clippy warning 后加 CI gate；.gitattributes 补 eol 规则；补 Cargo.toml 发布元数据；统一 tag 类型；main.rs 子命令实现下沉拆分。</li>
+  <li><strong>治理补全</strong>：SECURITY.md 与 CODE_OF_CONDUCT.md 补上实际联系方式。</li>
+  <li><strong>设计语言再评估</strong>：在 RFC 层面讨论 match 双臂形态的不对称是否与"降低 LLM 错误率"目标冲突；澄清渐进类型下重赋值违规的级别归属。</li>
+</ol>
+
+<h2>七、结语</h2>
+<p>Lom 的一个月历史展示了一种罕见的组合：高强度的 AI 驱动开发节奏 + 严格的工程纪律 + 对已知限制的诚实记账。修复闭环（诊断 schema 族 + 置信度分级 + 迭代 apply）是真实且有前途的创新方向。当前最大的杠杆不在写更多功能，而在两件事：<strong>让 SPEC_FOR_AI.md 这份"喂给 LLM 的契约"永不过期</strong>，以及<strong>用多模型、有对照的实验把"AI 原生"从叙事变成证据</strong>。前者守住身份，后者决定成色。</p>
+
+<p class="meta">本报告由独立审查会话基于只读检查生成，所有数据均经实际命令验证（git log、cargo test、eval 复现、clippy 等）。引用格式为 <code>文件:行号</code>，基于 v0.19.0（main @ ad7e387）。</p>
+
+</body>
+</html>

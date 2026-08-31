@@ -26,6 +26,6 @@ Examples of unacceptable behavior:
 
 ## Enforcement
 
-Instances of unacceptable behavior may be reported to the project maintainers via GitHub issues (for public matters) or by contacting the repository owner directly. All complaints will be reviewed and investigated promptly and fairly.
+Instances of unacceptable behavior may be reported via [GitHub issues](https://github.com/lom-lang/lom/issues) (for public matters) or by contacting the repository owner (@wyty) via GitHub directly. All complaints will be reviewed and investigated promptly and fairly.
 
 This Code of Conduct is adapted from the Contributor Covenant, version 2.1, available at <https://www.contributor-covenant.org/version/2/1/code_of_conduct.html>.
