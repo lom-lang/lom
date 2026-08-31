@@ -45,12 +45,12 @@
     "notes": "多函数组合：upper + int_to_string + len + 字符串拼接。考察 LLM 是否记得每个 stdlib 函数的语义。"
   },
   {
-    "id": "086",
+    "id": "114",
     "category": "modules",
     "difficulty": "medium",
     "prompt": "from map import { map_empty, map_set, map_get, map_has, map_size }。main 中 let scores = map_empty()，依次 map_set(scores, \"alice\", 90)、map_set(scores, \"bob\", 85)、map_set(scores, \"alice\", 95)。然后 println(map_size(scores))、println(map_has(scores, \"bob\"))、println(map_has(scores, \"carol\"))。再 match map_get(scores, \"alice\")：Some(v) => println(v)，None => println(0)。再 match map_get(scores, \"carol\")：Some(v) => println(v)，None => println(\"missing\")。",
     "solution": "from map import { map_empty, map_set, map_get, map_has, map_size }\n\nfn main() -> Unit\n    let scores = map_empty()\n    map_set(scores, \"alice\", 90)\n    map_set(scores, \"bob\", 85)\n    map_set(scores, \"alice\", 95)\n    println(map_size(scores))\n    println(map_has(scores, \"bob\"))\n    println(map_has(scores, \"carol\"))\n    match map_get(scores, \"alice\")\n        Some(v) => println(v)\n        None => println(0)\n    end\n    match map_get(scores, \"carol\")\n        Some(v) => println(v)\n        None => println(\"missing\")\n    end\nend\n",
     "expected": "2\ntrue\nfalse\n95\nmissing\n",
-    "notes": "map 模块（Phase 5.20）：字符串键字典。覆盖已有键不增加 size；map_get 返回 Option，需 match Some/None。"
+    "notes": "map 模块（Phase 5.20）：字符串键字典。覆盖已有键不增加 size；map_get 返回 Option，需 match Some/None。（原 id 086，2026-08-31 重编为 114——与 10_error_repair 的首题 id 冲突，后者是 100 任务时代的原始占用者；candidates/086.lom 归属 error_repair 086）"
   }
 ]

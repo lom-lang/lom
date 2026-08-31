@@ -257,7 +257,7 @@ from math import { sqrt, abs as absolute }。main 中 println(sqrt(16.0)) 和 pr
 
 from string import { len, int_to_string, upper }。main 中 let name = "lom"，let msg = upper(name) + " has " + int_to_string(len(name)) + " letters"，println(msg)。
 
-### Task 086
+### Task 114
 
 from map import { map_empty, map_set, map_get, map_has, map_size }。main 中 let scores = map_empty()，依次 map_set(scores, "alice", 90)、map_set(scores, "bob", 85)、map_set(scores, "alice", 95)。然后 println(map_size(scores))、println(map_has(scores, "bob"))、println(map_has(scores, "carol"))。再 match map_get(scores, "alice")：Some(v) => println(v)，None => println(0)。再 match map_get(scores, "carol")：Some(v) => println(v)，None => println("missing")。
 

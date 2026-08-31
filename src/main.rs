@@ -188,8 +188,8 @@ fn parse_args(args: &[String]) -> CliArgs {
                     eprintln!("使用 --help 查看用法");
                     process::exit(1);
                 }
-                if out.file.is_some() {
-                    eprintln!("只能指定一个文件，但收到多个: {} {}", out.file.as_ref().unwrap(), a);
+                if let Some(f) = &out.file {
+                    eprintln!("只能指定一个文件，但收到多个: {} {}", f, a);
                     eprintln!("使用 --help 查看用法");
                     process::exit(1);
                 }
@@ -1116,17 +1116,15 @@ fn handle_lsp_method(
         }
         "textDocument/hover" => {
             let id = id?;
-            if let Some((uri, line, col)) = extract_hover_params(params) {
-                if let Some(src) = docs.get(&uri) {
-                    if let Some(hover) = lsp::handle_hover(src, line, col) {
+            if let Some((uri, line, col)) = extract_hover_params(params)
+                && let Some(src) = docs.get(&uri)
+                    && let Some(hover) = lsp::handle_hover(src, line, col) {
                         let result = format!(
                             "{{\"contents\":{{\"kind\":\"markdown\",\"value\":\"{}\"}}}}",
                             hover.content.replace('"', "\\\"").replace('\n', "\\n")
                         );
                         return Some(lsp::make_response(id, &result));
                     }
-                }
-            }
             // 无 hover 结果
             Some(lsp::make_response(id, "null"))
         }
@@ -1339,5 +1337,64 @@ mod tests {
             let (final_src, _results) = apply_iterative(&bad, &bad_path.to_string_lossy(), 5);
             assert_eq!(final_src, fixed, "语料 {:?} 修复结果不符", bad_path);
         }
+    }
+
+    /// 第四轮评审整改：eval 任务 ID 全局唯一性 + manifest 计数一致性回归
+    ///
+    /// 背景：09_modules 的 map 任务与 10_error_repair 首题曾同号 086
+    /// （runner 按 `<id>.lom` 寻址候选文件，冲突会互相覆盖）。
+    /// 该冲突存在了 12 天无人发现——必须有测试钉住。
+    #[test]
+    fn eval_task_ids_globally_unique() {
+        let eval_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("eval");
+        let mut ids: Vec<String> = Vec::new();
+        let mut total = 0usize;
+        let mut entries: Vec<_> = std::fs::read_dir(eval_dir.join("tasks"))
+            .expect("eval/tasks 目录不存在")
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|e| e == "json"))
+            .collect();
+        entries.sort();
+        for path in entries {
+            let src = std::fs::read_to_string(&path).unwrap();
+            let v = crate::json::parse(&src).expect("任务 JSON 解析失败");
+            let crate::interpreter::Value::List(items) = v else {
+                panic!("{:?} 顶层不是数组", path)
+            };
+            for item in items.iter() {
+                let crate::interpreter::Value::Record { fields } = item else {
+                    panic!("{:?} 任务不是对象", path)
+                };
+                let id = fields
+                    .iter()
+                    .find(|(k, _)| k == "id")
+                    .and_then(|(_, v)| match v {
+                        crate::interpreter::Value::Str(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .expect("任务缺 id 字段");
+                ids.push(id);
+                total += 1;
+            }
+        }
+        let mut unique = ids.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(ids.len(), unique.len(), "eval 任务 ID 存在重复");
+        // manifest 计数一致性
+        let manifest_src = std::fs::read_to_string(eval_dir.join("manifest.json")).unwrap();
+        let mv = crate::json::parse(&manifest_src).unwrap();
+        let crate::interpreter::Value::Record { fields } = &mv else {
+            panic!("manifest 顶层不是对象")
+        };
+        let declared = fields
+            .iter()
+            .find(|(k, _)| k == "total_tasks")
+            .and_then(|(_, v)| match v {
+                crate::interpreter::Value::Int(n) => Some(*n as usize),
+                _ => None,
+            })
+            .expect("manifest 缺 total_tasks");
+        assert_eq!(total, declared, "任务总数与 manifest.total_tasks 不一致");
     }
 }
