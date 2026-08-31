@@ -35,7 +35,7 @@
 | Rust 测试 | **418/418 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
 | eval 评测集 | **113/113**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
-| LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113；唯一失败 078 与基线同题（prompt 歧义）；基线 99/100（2026-08-03）见 eval/REPORT.md |
+| LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化 M1-M4 全部完成**（v0.16.0-v0.19.0）；**第四轮评审整改完成**（2026-08-31，docs/reviews/review-2026-08-31.html，记录见 §11 末条） |
 | 下一步 | 修复引擎深化收官；远期候选：LLM 复测（需真实 LLM 资源，108→113 任务包已就绪）/ 全量自举（RFC-0003 draft 已存档）/ v1.0 冻结——等用户指令 |
