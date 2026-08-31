@@ -102,7 +102,7 @@
   <p class="meta">
     读者画像:大二 · 人工智能专业 · 未修编译原理 · 面试备战向<br>
     覆盖范围:整体构建逻辑 · 设计决策动机 · 逐模块代码逻辑 · 面试攻防 · 防露馅提示<br>
-    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10
+    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10 · <strong>大版本更新 2026-08-31(对齐 v0.19.0,修复引擎深化 M1-M4 全部完成,覆盖 Phase 5/6/7 全部进展)</strong>
   </p>
   <blockquote>
     使用说明:正文中带 <span class="t">绿色虚线下划线</span> 的术语,在其右侧(窄屏为下方)配有边注,
@@ -116,10 +116,10 @@
   <strong>目录</strong>
   <ol>
     <li><a href="#part1">第一部分:先建立心智模型</a>(编译器 vs 解释器 · 整体架构图)</li>
-    <li><a href="#part2">第二部分:逐模块拆解</a>(Lexer · AST · Parser · Interpreter · Typechecker · AI 工具链 · REPL · LSP · 包管理)</li>
+    <li><a href="#part2">第二部分:逐模块拆解</a>(Lexer · AST · Parser · Interpreter · Typechecker · AI 工具链 · REPL · LSP · 包管理 · 自举 · 工程化 · WASM 后端 · 修复引擎深化)</li>
     <li><a href="#part3">第三部分:为什么这样设计</a>(AI-native 论证线)</li>
     <li><a href="#part4">第四部分:面试攻防模拟</a>(高频问答)</li>
-    <li><a href="#part5">第五部分:三个"防露馅"提示</a>(README 与代码的出入)</li>
+    <li><a href="#part5">第五部分:"防露馅"提示</a>(文档与代码的出入)</li>
     <li><a href="#appendix">附录(扩充):术语速查表 · 建议阅读路径</a></li>
   </ol>
 </nav>
@@ -149,25 +149,42 @@
 <aside class="sn"><b>token(词法单元)</b>:源代码被切碎后的最小有意义单位。比如 <code>let x = 3</code> 会切成 4 个 token:关键字 <code>let</code>、标识符 <code>x</code>、运算符 <code>=</code>、整数字面量 <code>3</code>。注意:这和 LLM 的 token 不是一个东西,只是都叫这个名字——LLM token 是子词片段,编译器 token 是带语法类别的符号。</aside>
 <aside class="sn"><b>AST(Abstract Syntax Tree,抽象语法树)</b>:把线性文本变成树形结构。表达式 <code>1 + 2 * 3</code> 变成树之后,<code>*</code> 是 <code>+</code> 的子节点,运算优先级就"长"在树的形状里了。后续所有模块(执行、类型检查、修复)都操作这棵树,不再碰原始文本。</aside>
 
-<p><strong>关键区别:编译器 vs 解释器。</strong> 编译器(如 C/Rust)把源码翻译成机器码再运行;解释器直接读源码执行。Lom 选的是<strong>解释器中最朴素的一种——树遍历解释器(tree-walking interpreter)</strong>:不生成字节码、没有虚拟机,拿到 AST 后直接递归遍历这棵树、边遍历边算结果(<code>src/interpreter.rs:1-2</code> 注释明说)。</p>
+<p><strong>关键区别:编译器 vs 解释器。</strong> 编译器(如 C/Rust)把源码翻译成机器码再运行;解释器直接读源码执行。Lom <strong>两者都有</strong>:主路径是<strong>树遍历解释器(tree-walking interpreter)</strong>——不生成字节码、没有虚拟机,拿到 AST 后直接递归遍历这棵树、边遍历边算结果;Phase 7 又加了一条<strong>WASM 编译后端</strong>(<code>lom build <file> --target wasm</code>),把同一棵 AST 翻译成 WebAssembly 二进制,交给 node 跑——同一个程序、两种载体、输出逐字一致(CI 强制比对)。</p>
 
-<aside class="sn"><b>字节码 / 虚拟机(VM)</b>:更高级解释器(如 Java、Python)会先把源码翻译成一种"中间指令集"(字节码),再由一个模拟 CPU 的程序(虚拟机)执行这些指令,比直接遍历语法树快。Lom 连这一步都没做,是最简单的实现方式。</aside>
+<aside class="sn"><b>字节码 / 虚拟机(VM)</b>:更高级解释器(如 Java、Python)会先把源码翻译成一种"中间指令集"(字节码),再由一个模拟 CPU 的程序(虚拟机)执行这些指令,比直接遍历语法树快。Lom 的 WASM 后端走的是类似思想:编译成字节码(WASM 指令),由现成的虚拟机(node/V8)执行。</aside>
 
-<p><strong>为什么选这条路线?</strong> 三个原因:</p>
+<p><strong>为什么先是树遍历?</strong> 三个原因:</p>
 <ol>
   <li>项目目标不是性能,是验证"AI 原生语言设计"这个 thesis——树遍历解释器是实现一门语言最快的方式;</li>
-  <li>语言特性还在快速迭代(半年加了 match、闭包、效应系统……),解释器改起来成本最低;</li>
-  <li>零依赖手写(<code>Cargo.toml</code> 里 <code>[dependencies]</code> 是空的),不引入 logos/crates,保持整个项目可控、可读、可被 AI 维护。</li>
+  <li>语言特性还在快速迭代(一个月加了 match、闭包、效应系统、Map……(2026-08-02 立项)),解释器改起来成本最低;</li>
+  <li>零依赖手写(<code>Cargo.toml</code> 里 <code>[dependencies]</code> 是空的,CI 有专门 gate 强制),不引入 logos/crates,保持整个项目可控、可读、可被 AI 维护。
 </ol>
 
-<aside class="sn"><b>thesis</b>:英文"论题/主张"。这里指项目想证明的核心命题——"一门专门为 LLM 编码习惯设计的语言,能让 LLM 写代码的错误率更低、修复更快"。整个项目就是在做实验验证这个主张。</aside>
-<aside class="sn"><b>零依赖(zero-dependency)</b>:Rust 项目通常在 <code>Cargo.toml</code> 里声明第三方库(叫 crate),编译时自动下载。这个项目一个都没声明,lexer/parser/JSON 解析全部手写——好处是没有供应链风险、代码完全透明,代价是一切都得自己造。</aside>
+<p><strong>那 WASM 后端算不算"又要性能了"?</strong> 是,但目标变了:Phase 7 的动机是①把递归深度天花板从解释器的 ~10⁴ 层解放到宿主栈可调(V8 <code>--stack-size</code> 下 10⁵ 层实测通过);②性能对照实测——解释器循环被编译掉后,自举式 O(n²) 负载纯计算提速约 49 倍(7.10);③为"可移植的参考实现"铺路(RFC-0003 全量自举的载体)。<strong>差异化押注没变</strong>——<code>lom fix</code> 修复闭环仍是项目身份,JIT/MLIR/AOT 原生机器码依然不做。</p>
 
-<p>面试被问"性能怎么办",标准答案在 README 里:Phase 4 明确不做 JIT/MLIR,性能路线被主动放弃,差异化押在 <code>lom fix</code> 工具链上。</p>
+<aside class="sn"><b>thesis</b>:英文"论题/主张"。这里指项目想证明的核心命题——"一门专门为 LLM 编码习惯设计的语言,能让 LLM 写代码的错误率更低、修复更快"。整个项目就是在做实验验证这个主张。</aside>
+<aside class="sn"><b>零依赖(zero-dependency)</b>:Rust 项目通常在 <code>Cargo.toml</code> 里声明第三方库(叫 crate),编译时自动下载。这个项目一个都没声明,lexer/parser/JSON 解析/WASM 二进制编码全部手写——好处是供应链攻击面为零(SECURITY.md 有正式承诺,CI 用 awk 扫 Cargo.toml 强制执行)、构建可复现,代价是一切都得自己造。</aside>
+
+<p>面试被问"性能怎么办",分两层答:短期靠 WASM 后端(编译掉解释器开销);长期明确不做 JIT/MLIR/张量——差异化在 <code>lom fix</code> 工具链,不在执行速度。</p>
+
+<p><strong>进度速览</strong>(截至 2026-08-31,v0.19.0;详细记录看 <code>docs/HANDOVER.md</code> 与项目指导文件):</p>
+
+<table>
+  <tr><th>阶段</th><th>状态</th></tr>
+  <tr><td>Phase 0-4:语言核心 + AI 工具链/REPL/LSP/包管理</td><td>已闭环</td></tr>
+  <tr><td>Phase 5:自举(迷你解释器 stmt_interp.lom)</td><td>已闭环(2026-08-19)</td></tr>
+  <tr><td>Phase 6:工程化(语义版本/三平台 CI/治理/lom doc/lom fmt)</td><td>已闭环(2026-08-22)</td></tr>
+  <tr><td>Phase 7:WASM 编译后端(7.1-7.10)</td><td>已闭环(2026-08-23,v0.15.0)</td></tr>
+  <tr><td>修复引擎深化 M1-M3(Replace 动作/迭代闭环/PARSE001)</td><td>已完成(v0.16.0-v0.18.0)</td></tr>
+  <tr><td>修复引擎深化 M4(error_repair 扩充 + 语料回归)</td><td>已完成(2026-08-31,v0.19.0)</td></tr>
+  <tr><td>Phase 8:全量自举</td><td>RFC-0003 draft(远期候选)</td></tr>
+</table>
+
+<p>量化指标:Rust 测试 <strong>417/417</strong>;CI 三平台 <strong>7 个回归 gate</strong> 全绿;eval runner <strong>113/113</strong>;LLM 实测 <strong>99/100</strong>(2026-08-03,原 100 任务——引用这个数字必须带时间和范围,见第五部分)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
-<p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 8000 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
-<p>"树遍历解释器"是翻译官里最朴实的一种:拿到信直接一边读一边做。更高级的做法(编译器)是先把整封信翻译成机器能直接执行的"密码本",以后办事就不用再读了,速度快得多,但造密码本的工程量巨大。这个项目想验证的是"这门外语本身设计得好不好",而不是"翻译官办事快不快",所以选了最快的实现方式——先让语言能跑起来,性能以后再说,或者干脆说不要了。</p></div>
+<p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
+<p>这位翻译官有两种工作模式:<strong>口译</strong>(树遍历解释器)——拿到信当场一边读一边做,信改了他随时重读;后来他又学了<strong>笔译出版</strong>(WASM 后端)——把整封信正式翻译装订成一本"机器能直接照着执行的小册子"(WASM 二进制),以后办同样的事不用再读原信,快得多。两种模式翻译出的结果逐字一致(这是 CI 每天三平台强检的)。这个项目想验证的始终是"这门外语本身设计得好不好"——所以先造口译官(迭代快),等语言稳定了再补笔译官(性能+可移植)。</p></div>
 
 <aside class="sn"><b>JIT(Just-In-Time 编译)</b>:程序运行过程中把热点代码动态编译成机器码提速的技术,Java/V8 都靠它。<b>MLIR</b>:LLVM 生态的多层中间表示框架,做编译器后端的基础设施。这两个都是"高性能语言"的标配,Lom 明确说不做。</aside>
 
@@ -181,16 +198,26 @@ Vec&lt;SpannedToken&gt;
    ▼ ② Parser (src/parser.rs)       —— 组装成 AST;出错不退出,插"洞"继续,收集全部错误
 Program (AST, src/ast.rs 定义结构)
    │
-   ├─→ ③a Typechecker (src/typechecker.rs)  —— --check 时静态检查(类型/名称/效应/match 穷尽)
-   ├─→ ③b Interpreter (src/interpreter.rs)  —— 默认:直接执行
-   └─→ ③c AI 工具链:
+   ├─→ ③a Typechecker (src/typechecker.rs)  —— 静态检查(类型/名称/效应/match 穷尽)
+   │       2026-08-22 起:默认运行路径也检查(诊断走 stderr、永不拦截执行)
+   │
+   ├─→ ③b Interpreter (src/interpreter.rs)  —— 树遍历:直接执行(默认)
+   │       执行线程包 256MB 大栈(main.rs:206-207),深递归不爆
+   │
+   ├─→ ③c WASM 后端 (wasm.rs + wasm_codegen.rs,Phase 7)
+   │       lom build &lt;file&gt; --target wasm  →  .wasm 二进制(node 执行)
+   │       语义与解释器逐字对齐,CI 双后端 parity gate 强制
+   │
+   └─→ ③d AI 工具链 + 工程工具:
         lom info  (info.rs)   → lom-info/v1   不运行代码,导出函数/类型清单
-        lom fix   (fix.rs)    → lom-fix/v1    把诊断变成"修复计划"(insert/delete/hint + 置信度)
-        --apply   (apply.rs)  → lom-apply/v1  把高置信度修复真正写回源文件
-        --history (fix_history.rs) → NDJSON 修复历史
+        lom fix   (fix.rs)    → lom-fix/v1    诊断→修复计划(insert/delete/replace/hint + 置信度)
+        --apply   (apply.rs)  → lom-apply/v1  迭代应用修复写回源文件(M2:收敛为止,上限 5 轮)
+        --history (fix_history.rs) → NDJSON 修复历史(带 round 字段)
         lom repl  (repl.rs)   → 交互式会话(Phase 4.2)
         lom lsp   (lsp.rs)    → 编辑器集成(Phase 4.3,stdio JSON-RPC 2.0)
-        lom build (package.rs)→ 项目依赖解析(Phase 4.4,lom.toml + 本地路径依赖)</code></pre>
+        lom build (package.rs)→ 项目依赖解析(Phase 4.4,lom.toml + 本地路径依赖)
+        lom doc   (doc.rs)    → API 文档生成(Phase 6.4,# 注释回捞)
+        lom fmt   (fmt.rs)    → 格式化(Phase 6.5,token 流驱动,--check 做 CI 门禁)</code></pre>
 
 <aside class="sn"><b>schema(模式)</b>:一份 JSON 数据的"格式合同",规定有哪些字段、各是什么类型。<code>lom-diag/v1</code> 里的 <code>/v1</code> 是版本号——将来格式升级成 v2 时,老消费者不会被 breaking change 打死。这是给 AI 工具对接用的工程惯例。</aside>
 
@@ -208,7 +235,7 @@ Program (AST, src/ast.rs 定义结构)
 <!-- ============================================================ -->
 <h1 id="part2">第二部分:逐模块拆解</h1>
 
-<h2>2.1 Lexer:手写分词器(<code>src/lexer.rs</code>,582 行)</h2>
+<h2>2.1 Lexer:手写分词器(<code>src/lexer.rs</code>,695 行)</h2>
 
 <aside class="sn"><b>游标(cursor)</b>:一个记录"现在读到哪了"的位置指针。Lexer 就是一个游标在源码字符数组上从左往右爬,边爬边切 token。</aside>
 
@@ -223,19 +250,19 @@ Program (AST, src/ast.rs 定义结构)
 <aside class="sn"><b>最长匹配(maximal munch)</b>:词法分析的经典规则——能合成更长的 token 就优先合成。看到 <code>-</code> 时不能急着定性,要先看下一个字符:是 <code>&gt;</code> 就合并成箭头 <code>-&gt;</code>,否则才算减号。</aside>
 
 <ul>
-  <li><strong>多字符运算符用"最长匹配"</strong>:看到 <code>-</code> 先消费,再 peek 下一个,如果是 <code>&gt;</code> 就合成 <code>Arrow</code>(-&gt;),否则是 <code>Minus</code>(lexer.rs:266-280)。<code>|&gt;</code> 和 <code>|</code>、<code>=&gt;</code> 和 <code>==</code> 同理。</li>
-  <li><strong>每个 token 携带 (line, col)</strong>(<code>SpannedToken</code>,lexer.rs:79-83)。这看似不起眼,却是后面两个重要特性的数据基础:换行敏感语法 + 所有诊断定位。</li>
+  <li><strong>多字符运算符用"最长匹配"</strong>:看到 <code>-</code> 先消费,再 peek 下一个,如果是 <code>&gt;</code> 就合成 <code>Arrow</code>(-&gt;),否则是 <code>Minus</code>(lexer.rs:291 附近)。<code>|&gt;</code> 和 <code>|</code>、<code>=&gt;</code> 和 <code>==</code> 同理。</li>
+  <li><strong>每个 token 携带 (line, col)</strong>(<code>SpannedToken</code>,lexer.rs:84)。这看似不起眼,却是后面两个重要特性的数据基础:换行敏感语法 + 所有诊断定位。</li>
 </ul>
 
-<p><strong>容错机制(重点)</strong>:lexer 有两个入口。严格版 <code>tokenize()</code> 遇到错误直接放弃;容错版 <code>tokenize_recover()</code>(lexer.rs:142-172)出错后<strong>回退到保存点、强制前进一个字节、丢弃坏字符、继续扫描</strong>,返回 <code>(tokens, errors)</code>——错误和正常 token 一起出来。这就是"AI 原生"的第一层:<strong>LLM 一次拿到全部错误,而不是修一个错再跑一次</strong>。</p>
+<p><strong>容错机制(重点)</strong>:lexer 有两个入口。严格版 <code>tokenize()</code> 遇到错误直接放弃;容错版 <code>tokenize_recover()</code>(lexer.rs:147)出错后<strong>回退到保存点、强制前进一个字节、丢弃坏字符、继续扫描</strong>,返回 <code>(tokens, errors)</code>——错误和正常 token 一起出来。这就是"AI 原生"的第一层:<strong>LLM 一次拿到全部错误,而不是修一个错再跑一次</strong>。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>对比两种批改作业的老师:严格版老师看到第一个错别字就把卷子一扔,"改完再来";容错版老师把整份卷子读完,用红笔圈出所有错别字一起还给你。哪个对 AI 友好显而易见——AI 改一遍的成本不低,当然希望一次拿到所有问题。</p>
 <p>"强制前进一个字节"是容错版不卡死的秘诀:遇到实在看不懂的字符,把它扔掉,脚往前挪一步,继续读后面的。这样无论代码多烂,lexer 保证能走到文件结尾,只是手里多了一张"错误清单"。</p></div>
 
-<div class="warn"><strong>一个容易答错的点</strong>:很多人会以为"换行敏感"意味着 lexer 会产出 Newline token。<strong>Lom 不是</strong>——换行符被当空白直接跳过(lexer.rs:203),换行信息只存在于每个 token 的行号里,由 parser 比较相邻 token 行号来判断。面试官如果深挖这里,答错就露馅。</div>
+<div class="warn"><strong>一个容易答错的点</strong>:很多人会以为"换行敏感"意味着 lexer 会产出 Newline token。<strong>Lom 不是</strong>——换行符被当空白直接跳过(lexer.rs 的 <code>skip_whitespace_and_comments</code>,205 行——next_token 根本不见空白),换行信息只存在于每个 token 的行号里,由 parser 比较相邻 token 行号来判断。面试官如果深挖这里,答错就露馅。</div>
 
-<h2>2.2 AST:中间表示(<code>src/ast.rs</code>,300 行)</h2>
+<h2>2.2 AST:中间表示(<code>src/ast.rs</code>,317 行)</h2>
 
 <p>三层结构:<code>Program { items: Vec&lt;Item&gt; }</code> → <code>Item</code> 是函数/枚举/导入三种 → 函数体是 <code>Block { stmts: Vec&lt;Stmt&gt;, tail: Option&lt;Expr&gt; }</code>。</p>
 
@@ -246,7 +273,7 @@ Program (AST, src/ast.rs 定义结构)
 
 <ul>
   <li><strong>尾表达式设计</strong>:<code>Block</code> 最后一个表达式就是块的值(和 Rust 一样),<code>return</code> 只用于提前退出。这是为 LLM 减错的设计——"忘了写 return"这个错误类型被从语言里消除了(DESIGN_RATIONALE.md §9)。</li>
-  <li><strong><code>Stmt::Hole</code>(空洞)</strong>:parser 解析失败的地方插入一个占位节点,AST 结构保持完整(ast.rs:169-171)。作用有三:收集全部错误、下游工具(lom info/fix)还能消费部分正确的 AST、执行到洞才报错(坏代码被天然隔离)。</li>
+  <li><strong><code>Stmt::Hole</code>(空洞)</strong>:parser 解析失败的地方插入一个占位节点,AST 结构保持完整(ast.rs:181)。作用有三:收集全部错误、下游工具(lom info/fix)还能消费部分正确的 AST、执行到洞才报错(坏代码被天然隔离)。</li>
   <li><strong>Span(位置信息)只挂在声明级</strong>:<code>FnDecl</code>/<code>EnumDecl</code> 记录了完整起止位置(Phase 3.2 加的),表达式节点还没有。这是务实的渐进策略——先让诊断能指到"哪个函数",表达式级定位留给将来的 LSP。</li>
   <li><code>MatchExpr.end_line</code> 单独记录 match 的 <code>end</code> 关键字行号——为了后面自动修复能在 <code>end</code> 前精准插入缺失分支。<strong>记住这个字段,它串起了 typechecker 和 fix 两个模块</strong>。</li>
 </ul>
@@ -261,7 +288,7 @@ end</code></pre>
 
 <aside class="sn"><b>LSP(Language Server Protocol)</b>:编辑器(VS Code 等)和语言工具之间的标准协议,提供悬停提示、跳转定义、自动补全。Phase 4.3 已用声明级 Span 实现了基础 LSP(<code>lom lsp</code>):悬停显示函数/枚举签名、补全候选、诊断推送。表达式级精确定位留待后续阶段。</aside>
 
-<h2>2.3 Parser:递归下降 + 三个特色机制(<code>src/parser.rs</code>,1581 行)</h2>
+<h2>2.3 Parser:递归下降 + 三个特色机制(<code>src/parser.rs</code>,1666 行)</h2>
 
 <aside class="sn"><b>递归下降(Recursive Descent)</b>:最直观的语法分析写法——语法里每种结构对应一个函数,函数之间互相调用(像顺着语法规则往下"下降"),遇到嵌套就递归。比如"解析表达式"的函数会调用"解析加法",后者又调用"解析乘法"……全是手写函数,不用任何解析器生成工具。</aside>
 
@@ -278,7 +305,7 @@ end</code></pre>
 
 <p>每个函数的模式都一样:先调下一级拿左操作数,然后 while 循环"如果当前 token 是我这级的运算符就吃掉、再调下一级拿右操作数、组装节点"——这天然实现了<strong>左结合</strong>。</p>
 
-<p>面试可能问"<code>1 + 2 |&gt; f</code> 怎么解析":因为 <code>|&gt;</code> 在链上低于 <code>+</code>,所以是 <code>(1+2) |&gt; f</code>。有测试钉死这个行为(parser.rs:1299-1319)。</p>
+<p>面试可能问"<code>1 + 2 |&gt; f</code> 怎么解析":因为 <code>|&gt;</code> 在链上低于 <code>+</code>,所以是 <code>(1+2) |&gt; f</code>。有测试钉死这个行为(parser.rs 的 pipeline 优先级测试组)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>"每个优先级一个函数、低优先级调用高优先级"听着抽象,其实就是小学数学"先乘除后加减"的代码版。看 <code>1 + 2 * 3</code> 怎么被解析:</p>
@@ -294,7 +321,7 @@ end</code></pre>
 
 <h3>机制二:换行敏感怎么实现</h3>
 
-<p><code>is_newline_before()</code>(parser.rs:172-179):比较当前 token 和前一个 token 的行号,不同就是"跨行了"。它在五处改变解析行为,最经典的两个:</p>
+<p><code>is_newline_before()</code>(parser.rs:172):比较当前 token 和前一个 token 的行号,不同就是"跨行了"。它在五处改变解析行为,最经典的两个:</p>
 
 <ul>
   <li><code>0\n-1</code> 是<strong>两条语句</strong>(0 和 -1),不是 <code>0 - 1</code>——因为 <code>-</code> 前换行了,不当二元减法;</li>
@@ -311,7 +338,7 @@ end</code></pre>
 
 <aside class="sn"><b>同步点(synchronization point)</b>:容错解析的"安全锚点"——解析出错后,解析器扔掉若干 token,跳到一个"几乎肯定能重新开始"的关键字处继续。就像你在嘈杂录音里听丢了半句话,等下一个句子的开头再接上。</aside>
 
-<p><code>parse_recover()</code> 的三级恢复:</p>
+<p><code>parse_recover()</code>(parser.rs:83)的三级恢复:</p>
 
 <ol>
   <li><strong>顶层</strong>:某个 fn/enum 解析失败 → 跳到下一个 <code>fn/enum/from</code> 关键字再续(这些叫<strong>同步点</strong>);</li>
@@ -330,21 +357,28 @@ end</code></pre>
 ③ <strong>match 级恢复</strong> = 听不清的地方正好在一处带很多"小结尾"的段落里?那就保守一点,整段跳到"大结尾"(本 match 的 <code>end</code>)再说——因为乱猜可能把大结尾也吞掉,损失更大。</p>
 <p>"防死循环保险"则是铁律:每次跳过至少往前挪一个词。不然听写卡在一个地方永远原地踏步,程序就死机了。</p></div>
 
-<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,2452 行)</h2>
+<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,3459 行)</h2>
 
 <p>主调用链四层,背下来:</p>
 
-<pre><code>run(program)          注册所有顶层函数/枚举 → 找到 main → 执行
- → exec_block         逐条执行语句,最后算尾表达式
-  → exec_stmt         let/if/while/for/return
-  → eval_expr         大 match 分发 22 种表达式
-   → eval_call        调用专用分发</code></pre>
+<pre><code>run(program)          注册所有顶层函数/枚举 → 找到 main → 执行(552 行)
+ → exec_block         逐条执行语句,最后算尾表达式(685 行)
+  → exec_stmt         let/if/while/for/return/match(707 行)
+   → eval_expr         大 match 分发全部表达式(841 行)
+    → eval_call        调用专用分发(1105 行)</code></pre>
 
 <h3>必懂概念一:Value 枚举</h3>
 
-<aside class="sn"><b>枚举(enum)类型</b>:Rust 的核心类型,表示"一个值是这几种形态之一"。<code>Value</code> 枚举的意思是:Lom 运行时的任何一个值,必然是 Int / Float / Bool / Str / Unit / 闭包 / 枚举值 / 记录 / 元组 / 列表 之一——用大 <code>match</code> 分情况处理。Lom 语言自己的 enum 语法也是向 Rust 学的。</aside>
+<aside class="sn"><b>枚举(enum)类型</b>:Rust 的核心类型,表示"一个值是这几种形态之一"。<code>Value</code> 枚举的意思是:Lom 运行时的任何一个值,必然是 Int / Float / Bool / Str / Unit / 闭包 / 枚举值 / 记录 / 元组 / 列表 / 字典 之一——用大 <code>match</code> 分情况处理。Lom 语言自己的 enum 语法也是向 Rust 学的。</aside>
 
-<p>运行时一切值都是 <code>Value</code>:<code>Int/Float/Bool/Str/Unit</code> + <code>Closure</code>(闭包)+ <code>Enum</code>(Ok/Err/用户变体)+ <code>Record</code>(结构记录)+ <code>Tuple</code> + <code>List</code>。注意 <strong>Result/Option 不是特殊类型,就是内置枚举</strong> <code>Ok/Err/Some/None</code>。</p>
+<p>运行时一切值都是 <code>Value</code>:<code>Int/Float/Bool/Str/Unit</code> + <code>Closure</code>(闭包)+ <code>Enum</code>(Ok/Err/用户变体)+ <code>Record</code>(结构记录)+ <code>Tuple</code> + <code>List</code> + <code>Map</code>(Phase 5.20 加的字典)。注意 <strong>Result/Option 不是特殊类型,就是内置枚举</strong> <code>Ok/Err/Some/None</code>。</p>
+
+<p><strong>List 和 Map 的内部表示是 Phase 5.19/5.20 两场"换心手术"的结果,面试值得讲</strong>:</p>
+
+<ul>
+  <li><strong>List = 不可变链表</strong>:<code>ListVal</code> 是 <code>Nil | Cons(Rc&lt;ConsNode&gt;)</code>(interpreter.rs:58)。头插/取头/取尾 O(1),永不整表复制——代价是随机访问 <code>list_get</code> 从 O(1) 退化为 O(n) 走查(遍历式代码无感)。换之前,"取尾"每次 <code>elems[1..].to_vec()</code> 整表复制,自举式环境查找是近立方复杂度(n=800 要 87 秒),换后同基准 1.9 秒(<strong>46 倍</strong>,Phase 5.19 实测);</li>
+  <li><strong>Map = 共享可变的字典</strong>:<code>Value::Map(Rc&lt;RefCell&lt;HashMap&gt;&gt;)</code>。查 2000 条 × 2000 次从 18.1 秒变 55 毫秒(<strong>330 倍</strong>,其中 ~48ms 是进程启动,纯计算约 2500 倍,Phase 5.20 实测)。<strong>刻意与 List 相反的语义</strong>:map_set 就地改、两个名字共享同一份——因为实践中字典就是"共享记事本";想要不可变的结构化数据应该用 Record。写代码时别指望"旧 Map 还在",要快照就用 map_keys 重建。map_keys/map_values/json_stringify 的输出按键排序(确定性)。</li>
+</ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>解释器在运行时手里只把玩一种东西:<code>Value</code>。可以把它想成"万能收纳盒",盒子上贴着类型标签。整数 42 装进去,贴"Int";字符串 "hello" 装进去,贴"Str";一个函数打包装进去,贴"Closure"。</p>
@@ -368,8 +402,8 @@ end</code></pre>
 <ul>
   <li><code>let</code> 只写当前层(所以内层同名变量自然遮蔽外层,shadowing);</li>
   <li>赋值沿链向上找已存在的变量改掉;</li>
-  <li><strong>闭包捕获</strong>:闭包创建时把<strong>当前作用域的 Rc 直接存进闭包里</strong>(interpreter.rs:748-756)——不做自由变量分析,整个环境按引用共享,O(1);</li>
-  <li><strong>闭包调用时以"定义处环境"为父</strong>创建新作用域(interpreter.rs:1134-1155),而普通函数以 <code>globals</code> 为父(interpreter.rs:1124)。</li>
+  <li><strong>闭包捕获</strong>:闭包创建时把<strong>当前作用域的 Rc 直接存进闭包里</strong>(interpreter.rs:864/986 两处闭包构造)——不做自由变量分析,整个环境按引用共享,O(1);</li>
+  <li><strong>闭包调用时以"定义处环境"为父</strong>创建新作用域(interpreter.rs:1130-1144 的 eval_call 分支),而普通函数以 <code>globals</code> 为父。</li>
 </ul>
 
 <aside class="sn"><b>闭包(closure)</b>:"函数 + 它出生时能看到的变量环境"打包在一起的值。比如 <code>let add = fn(x) x + base end</code> 里的 <code>base</code> 不是参数,是从定义处环境"捕获"来的——这就是闭包和普通函数的区别。</aside>
@@ -401,8 +435,8 @@ end</code></pre>
 <p><code>return</code> 和 <code>?</code> 都不是普通求值,怎么从深层递归里"跳出来"?</p>
 
 <ul>
-  <li><code>return</code> 把值包成 <code>ControlFlow::Return(v)</code>,一路向上冒泡到函数边界(interpreter.rs:591-597);</li>
-  <li><code>?</code> 遇到 <code>Err(e)</code>/<code>None</code> 时抛一个特殊的 <code>RuntimeError::EarlyReturn(...)</code>(interpreter.rs:792),传播到函数边界转成提前返回——<strong>复用错误通道实现控制流</strong>,是树遍历解释器的经典手法。</li>
+  <li><code>return</code> 把值包成 <code>ControlFlow::Return(v)</code>,一路向上冒泡到函数边界(exec_block/exec_stmt 的多个分支,interpreter.rs:684-698 一带集中处理);</li>
+  <li><code>?</code> 遇到 <code>Err(e)</code>/<code>None</code> 时抛一个特殊的 <code>RuntimeError::EarlyReturn(...)</code>(定义在 interpreter.rs:352),传播到函数边界转成提前返回(interpreter.rs:1019 的 <code>?</code> 求值分支)——<strong>复用错误通道实现控制流</strong>,是树遍历解释器的经典手法。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -414,9 +448,9 @@ end</code></pre>
 <h3>其他速记</h3>
 
 <ul>
-  <li><strong><code>|&gt;</code> 在哪层实现</strong>:parser 原样存 <code>Expr::Pipe</code> 节点,<strong>求值时去糖</strong>——<code>x |&gt; f(y)</code> 把 x 插到参数列表最前面变成普通调用 <code>f(x, y)</code>(interpreter.rs:803-822);</li>
-  <li><strong>效应(<code>! [IO]</code>)运行时零作用</strong>:纯静态注解,解释器根本不读这个字段(ast.rs:79-80 注释明说),检查全在 typechecker;</li>
-  <li><strong>stdlib 是硬编码的</strong>:模块表(7 个模块)+ import 白名单 + <code>call_builtin</code> 里一个巨型 match 分发到 Rust 原生实现;只有 <code>println/print</code> 是 prelude,其他必须显式 <code>from string import {len}</code>——<strong>这是防 LLM 幻觉的设计</strong>:没 import 就报"符号未导入,需 from X import {...}",错误信息本身就是修复指令(interpreter.rs:1171-1179)。</li>
+  <li><strong><code>|&gt;</code> 在哪层实现</strong>:parser 原样存 <code>Expr::Pipe</code> 节点,<strong>求值时去糖</strong>——<code>x |&gt; f(y)</code> 把 x 插到参数列表最前面变成普通调用 <code>f(x, y)</code>(interpreter.rs:1044);</li>
+  <li><strong>效应(<code>! [IO]</code>)运行时零作用</strong>:纯静态注解,解释器根本不读这个字段(ast.rs:81 注释明说),检查全在 typechecker;</li>
+  <li><strong>stdlib 是硬编码的</strong>:模块表(8 个模块:io/string/math/list/json/map/file/env,interpreter.rs:412-469)+ import 白名单 + <code>call_builtin</code> 里一个巨型 match 分发到 Rust 原生实现;只有 <code>println/print</code> 是 prelude,其他必须显式 <code>from string import {len}</code>——<strong>这是防 LLM 幻觉的设计</strong>:没 import 就报"符号未导入,需 from X import {...}",错误信息本身就是修复指令(interpreter.rs:1447)。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -426,25 +460,33 @@ end</code></pre>
 <aside class="sn"><b>去糖(desugar)/ 语法糖</b>:语言为了好写提供的便利写法叫"糖";解释器/编译器内部把它翻译成更基础的形态叫"去糖"。<code>x |&gt; f(y)</code> 是糖,<code>f(x, y)</code> 是糖化开之后的样子。</aside>
 <aside class="sn"><b>prelude(预导入集)</b>:不用 import 就能直接用的那一小撮内置符号。Lom 只放了 <code>println</code> 和 <code>print</code> 两个,其余全要显式导入——故意克制,防幻觉。</aside>
 
-<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2016 行)</h2>
+<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2342 行)</h2>
 
 <aside class="sn"><b>类型检查(type checking)</b>:在运行之前静态地核对"类型对不对"——比如字符串不能和整数相加、函数调用参数个数要对。静态语言(C/Rust)强制全查,动态语言(Python)全不查,Lom 站在中间,所以叫"渐进式"。</aside>
 
-<p>"渐进式(gradual)"在这个项目里是四个具体行为,面试要逐条说:</p>
+<p>"渐进式(gradual)"在这个项目里是四个具体行为,面试要逐条说(注意第 1 条在 2026-08-22 评审整改后<strong>变了</strong>,老版本的教程/资料还写着"默认不检查"):</p>
 
 <ol>
-  <li><strong>默认不检查</strong>——<code>lom file.lom</code> 直接跑,检查只在 <code>--check/--json</code> 时执行;</li>
-  <li><strong>类型错误是 Warning 不是 Error</strong>——退出码仍为 0,程序照跑(main.rs:249-252);只有<strong>名称解析错误</strong>(未定义变量、重复定义)才是 Error 会阻止运行。逻辑:名称错了 = 程序员笔误,必须拦;类型不匹配 = 可能是检查器推断能力不够,只提醒;</li>
-  <li><strong>推断不出就放行</strong>——内部用 <code>TypeOrUnknown::{Known, Unknown}</code>,Unknown 一律跳过不报错(typechecker.rs:84-89);</li>
+  <li><strong>默认运行路径也检查</strong>——<code>lom file.lom</code> 直接跑时照常执行类型检查,诊断输出走 stderr、<strong>永不拦截执行</strong>(main.rs:374-381,注释原文"类型检查可见化")。此前的行为是运行完全跳过检查,被外部评审指出"'渐进式类型'名不副实"后整改;<code>--check/--json</code> 则是只检查不执行;</li>
+  <li><strong>类型错误是 Warning 不是 Error</strong>——退出码仍为 0,程序照跑;只有<strong>名称解析错误</strong>(未定义变量、重复定义)才是 Error 会阻止运行。逻辑:名称错了 = 程序员笔误,必须拦;类型不匹配 = 可能是检查器推断能力不够,只提醒;</li>
+  <li><strong>推断不出就放行</strong>——内部用 <code>TypeOrUnknown::{Known, Unknown}</code>,Unknown 一律跳过不报错(typechecker.rs:94);</li>
   <li><strong>通配类型 <code>_Any</code></strong>——stdlib 函数签名用 <code>_Any</code> 兼容一切,避免误报。</li>
 </ol>
+
+<p><strong>对齐运行时语义的三处修正(第三轮评审整改,2026-08-22,各有回归测试锁定)</strong>——不知道这三条容易答出"检查器比解释器严"的旧印象,恰好是反的:</p>
+
+<ul>
+  <li><strong>Int/Float 混合算术</strong>记 Float 不报 TYPE001(解释器早就提升,检查器此前没跟上);</li>
+  <li><strong>管道 arity 假阳性修复</strong>:<code>x |&gt; add(1)</code> 的 TYPE003 现在把管道左值计入(此前误报"期望 2 得 1");</li>
+  <li><strong>包符号感知</strong>:新增 <code>check_program_with_externals</code>(main.rs:338 调用),从 lom.toml 依赖图收集包的公开符号传入,包函数不再喷 NAM003 假 error(根因:解释器 load_packages 注册包符号,检查器此前不知情)。</li>
+</ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>"渐进式"用老师改卷来对比就明白了:</p>
 <p>· <strong>Java/C 是严厉老师</strong>:类型有一个错,整份卷子零分,不许运行;<br>
 · <strong>Python 是放养老师</strong>:根本不批改,错不错跑起来才知道;<br>
-· <strong>Lom 是佛系老师</strong>:默认不改卷(直接运行);你说"帮我看看"(加 <code>--check</code>),他才批改——但类型问题只用铅笔标注(warning),不扣分;只有"写了不存在的名字"这种明显笔误才用红笔拦下(error)。看不懂的地方(Unknown),他诚实地说"我判断不了,先放过",而不是硬猜一个然后误伤。</p>
-<p>为什么对 AI 要佛系?因为 AI 的迭代模式是"快速生成 → 跑 → 看反馈"。如果类型检查动辄拦路,AI 大量时间耗在伺候检查器上;宽松一点,程序先跑起来,诊断信息照样给 AI 看,让 AI 自己决定改不改——这正是"工具服务 AI,而不是审问 AI"的设计立场。</p></div>
+· <strong>Lom 是佛系老师</strong>:每次交卷都顺手用铅笔标注(warning,走 stderr 打个招呼),但<strong>从不因批注扣分</strong>——卷子照跑、分数照给;只有"写了不存在的名字"这种明显笔误才用红笔拦下(error)。看不懂的地方(Unknown),他诚实地说"我判断不了,先放过",而不是硬猜一个然后误伤。</p>
+<p>为什么对 AI 要佛系?因为 AI 的迭代模式是"快速生成 → 跑 → 看反馈"。如果类型检查动辄拦路,AI 大量时间耗在伺候检查器上;宽松一点,程序先跑起来,诊断信息照样给 AI 看,让 AI 自己决定改不改——这正是"工具服务 AI,而不是审问 AI"的设计立场。2026-08-22 的整改只是把"铅笔标注"从"只有点名才看"改成"每次都给"——批改更勤了,但"永不拦路"的承诺一字未动。</p></div>
 
 <aside class="sn"><b>退出码(exit code)</b>:程序结束时返回给操作系统的整数,0 = 成功,非 0 = 失败。CI 脚本、AI agent 都靠它判断"这次跑没跑成"——所以"warning 退出码仍是 0"意味着类型错误不挡路,这是渐进式的关键机制。</aside>
 
@@ -455,9 +497,9 @@ end</code></pre>
 <p>三个特色检查:</p>
 
 <ul>
-  <li><strong>结构等价</strong>:记录类型按字段名递归比较,顺序不敏感——<code>{x: Int, y: Int}</code> 和 <code>{y: Int, x: Int}</code> 是同一类型(typechecker.rs:1137-1182)。这是 TypeScript 式结构类型,LLM 不用记类型名,只记"形状";</li>
+  <li><strong>结构等价</strong>:记录类型按字段名递归比较,顺序不敏感——<code>{x: Int, y: Int}</code> 和 <code>{y: Int, x: Int}</code> 是同一类型(typechecker.rs 的结构等价比较函数)。这是 TypeScript 式结构类型,LLM 不用记类型名,只记"形状";<strong>注意 7.7 修过一个坑</strong>:WASM 后端的 Record 比较曾只比较字段名不比内容,已修成逐字段内容比较,双后端一致;</li>
   <li><strong>match 穷尽性(MAT001)</strong>:收集已覆盖的变体名,没 <code>_</code> 通配就对照枚举全表,缺谁报谁;诊断行号填 match 的 <code>end</code> 行——给自动修复留的钩子;</li>
-  <li><strong>效应检查(EFF001)</strong>:规则一句话——<strong>调用方的效应声明必须是被调方的超集</strong>。纯函数(无 <code>! [...]</code>)调了 <code>println</code>(声明了 <code>[IO]</code>)就报警告。两条豁免:<code>main</code> 隐式拥有全部效应(强制 main 写注解是"给 LLM 增加无意义负担",typechecker.rs:43-46 注释原文);闭包继承外层函数的效应集。</li>
+  <li><strong>效应检查(EFF001)</strong>:规则一句话——<strong>调用方的效应声明必须是被调方的超集</strong>。纯函数(无 <code>! [...]</code>)调了 <code>println</code>(声明了 <code>[IO]</code>)就报警告。两条豁免:<code>main</code> 隐式拥有全部效应(强制 main 写注解是"给 LLM 增加无意义负担",typechecker.rs:43 注释);闭包继承外层函数的效应集。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -492,30 +534,32 @@ end</code></pre>
 
 <aside class="sn"><b>function calling / structured output</b>:让 LLM 按预定 JSON 格式输出、供程序消费的技术。Lom 的诊断设计就是这个思想的镜像:不是 LLM 输出 JSON 给人,而是工具输出 JSON 给 LLM——格式稳定、字段自包含,模型才好处理。</aside>
 
-<h3>② lom-fix/v1:修复计划(fix.rs)</h3>
+<h3>② lom-fix/v1:修复计划(fix.rs,1644 行——M1/M3 后从约 900 行长到这么大)</h3>
 
-<p>输入诊断,输出"修复计划":每条诊断挂若干 FixAction,action 有 <code>insert/delete/replace/hint</code> 四种(注意:<strong>replace 定义了但目前没有任何策略产生它</strong>——面试被问可以主动说,显得你真读过代码)。</p>
+<p>输入诊断,输出"修复计划":每条诊断挂若干 FixAction,action 有 <code>insert/delete/replace/hint</code> 四种。<strong>replace 曾经是"定义了但没人生成"的空架子,2026-08-25 修复引擎深化 M1 落地了它</strong>:NAM003/NAM004 拼写建议现在会产出真正的 Replace 动作——在源码里按"整词匹配 + 跳过字符串/注释"扫描错拼名的所有出现处,每处一个 Replace(两条规则 fix.rs:544-619)。定位有个硬约束:typechecker 诊断没有表达式级位置(line/col=0,表达式级 span 是挂账项),所以只能整源码扫描——<code>find_token_occurrences</code>(fix.rs:809)处理所有脏活:跳过字符串里的转义引号、遇 <code>#</code> 跳过行注释、记录字段场景要求名字前是 <code>.</code>(防误改同名普通变量)。</p>
 
 <p>关键是<strong>置信度分级</strong>:</p>
 
 <table>
   <tr><th>级别</th><th>含义</th><th>例子</th></tr>
-  <tr><td>High</td><td>修复唯一无歧义,可自动执行</td><td>行末补 <code>"</code>、EFF001 补效应注解、MAT001 补内置变体分支(<code>Ok(_)</code> 模式已知)</td></tr>
-  <tr><td>Medium</td><td>方向明确但需确认</td><td>用户枚举补分支(参数未知,自动插入可能引入新错误——<strong>安全边界</strong>)</td></tr>
+  <tr><td>High</td><td>修复唯一无歧义,可自动执行</td><td>行末补 <code>"</code>、EFF001 补效应注解、MAT001 补内置变体分支(<code>Ok(_)</code> 模式已知)、M3 的行末/文末补 <code>)</code></td></tr>
+  <tr><td>Medium</td><td>方向明确但需确认</td><td>用户枚举补分支(参数未知——<strong>安全边界</strong>)、M1 的拼写替换(猜"你想写的名字",猜错改错)、M3 的 match 缺 <code>end</code>(插入位置可能歧义)</td></tr>
   <tr><td>Low</td><td>只有建议</td><td>"期望 X 得到 Y"有多种修法</td></tr>
 </table>
 
 <p><code>retry</code> 字段:有具体可粘贴文本 → true(值得重试);纯文字建议 → false。</p>
 
-<h3>③ lom-apply/v1:写回源文件(apply.rs)</h3>
+<h3>③ lom-apply/v1:写回源文件(apply.rs,723 行)</h3>
 
 <p>两道安全闸:<strong>只有 High 且非 Hint 的修复才会被应用</strong>;再验坐标合法性。</p>
 
 <aside class="sn"><b>偏移漂移(offset drift)</b>:所有修复坐标都是按"原始文件"算出来的。如果先应用了第 2 行的插入(文件变长了),原本第 5 行的修复位置就错位了。经典解法:从后往前改。</aside>
 
-<p><strong>经典算法题:逆序应用。</strong> 所有修复坐标基于原始源码,如果先改前面的(第 2 行插入字符),后面的坐标就漂移了。解法:按行号降序、同行按列号降序排序,<strong>从文件末尾往前改</strong>,互不影响(apply.rs:150-154)。</p>
+<p><strong>经典算法题:逆序应用。</strong> 所有修复坐标基于原始源码,如果先改前面的(第 2 行插入字符),后面的坐标就漂移了。解法:按行号降序、同行按列号降序排序,<strong>从文件末尾往前改</strong>,互不影响(apply.rs:169-176)。</p>
 
-<p>还有一个 Unicode 细节:诊断坐标是<strong>字符列</strong>,写文件要<strong>字节偏移</strong>,中文环境下必须换算("你好\nworld" 中 (1,2) = 字节 3,因为"你"占 3 字节,apply.rs:265-325)。</p>
+<p><strong>M2(2026-08-25)把单趟应用升级成迭代闭环</strong>(main.rs:892 的 <code>apply_iterative</code>):应用一轮 → 重新诊断 → 再修,直到"无高置信度可应用项"或"源码不再变化"为止,<strong>上限 5 轮防震荡</strong>。修复历史每轮各写一条 entry(带 <code>round</code> 字段;读旧格式无 round 的按 1 处理)。为什么需要迭代?因为第一轮修复可能暴露(或引入)新的可修错误——修好缺的 <code>)</code> 之后,才看得见下一行的类型错误。这正是"LLM 反复跑修复"的机器版,只是 LLM 完全不用在场。</p>
+
+<p>还有一个 Unicode 细节:诊断坐标是<strong>字符列</strong>,写文件要<strong>字节偏移</strong>,中文环境下必须换算("你好\nworld" 中 (1,2) = 字节 3,因为"你"占 3 字节,apply.rs:285 的 <code>line_col_to_offset</code>)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>"逆序应用"用一个生活场景就懂了:你拿红笔改论文,批注上写着"第 2 段末尾加一句"、"第 5 段开头删两字"。如果你先改第 2 段——加了一句,原文变长了——那"第 5 段开头"现在还是原来那个位置吗?不是了,所有后续批注的位置都作废了。</p>
@@ -532,7 +576,7 @@ end</code></pre>
 
 <h3>一个闭环故事(面试可以直接讲)</h3>
 
-<div class="rec">LLM 写了个纯函数里调 <code>println</code> → typechecker 报 EFF001(warning,带函数签名行号)→ <code>lom fix</code> 生成 High 置信度 insert 计划("在签名行末插入 <code>! [IO]</code>")→ <code>--apply</code> 逆序写回 → 历史追加一行 NDJSON → LLM 重跑通过。<strong>诊断→计划→执行→追溯全自动,LLM 只需要读 JSON。</strong> 这就是 "LLM-repair-native" 的完整含义。</div>
+<div class="rec">LLM 写了个纯函数里调 <code>println</code> → typechecker 报 EFF001(warning,带函数签名行号)→ <code>lom fix</code> 生成 High 置信度 insert 计划("在签名行末插入 <code>! [IO]</code>")→ <code>--apply</code> 逆序写回 → <strong>M2 迭代:重新诊断,看还有没有可修的,最多 5 轮</strong> → 每轮历史追加一行带 round 的 NDJSON → LLM 重跑通过。<strong>诊断→计划→执行→再诊断→追溯全自动,LLM 只需要读 JSON。</strong> 这就是 "LLM-repair-native" 的完整含义——也是本项目与 MoonBit("让 LLM 一次写对")差异化的核心("写错后高效修复",不重生成)。</div>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>这个闭环最值得记住的一点:<strong>整个修复过程没有让 LLM 参与"猜"</strong>。传统方式是 AI 写错 → 人/AI 读报错 → 重新生成整段代码(可能引入新错);Lom 的方式是工具链自己把"哪行哪列插入什么字符"算好,AI 只需要点点头(或者连点头都不用,--apply 直接改)。</p>
@@ -544,7 +588,7 @@ end</code></pre>
 
 <ul>
   <li><strong>输入完整性判定</strong> <code>is_input_complete</code>:逐字符扫描,跟踪括号深度、字符串状态、块关键字(<code>fn/if/while/for/match</code> 需配对 <code>end</code>,只在行首识别,<code>enum</code> 单行不需要 end);全部归零才算"输入完了,可以执行";</li>
-  <li><strong>会话保持</strong>:一个长寿命 Interpreter 实例贯穿会话;<code>fn</code> 定义注册进函数表,<code>let</code> 绑定直接写进 globals 作用域(<code>exec_repl_block</code>,interpreter.rs:443-451),所以下一条输入能看到上一条的变量;</li>
+  <li><strong>会话保持</strong>:一个长寿命 Interpreter 实例贯穿会话;<code>fn</code> 定义注册进函数表,<code>let</code> 绑定直接写进 globals 作用域(<code>exec_repl_block</code>,interpreter.rs:619),所以下一条输入能看到上一条的变量;</li>
   <li>错误不退出会话——对 LLM 试错友好。</li>
 </ul>
 
@@ -619,11 +663,11 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>包管理就是给 Lom 长出"项目骨架"。之前你只能写单文件程序,现在可以拆成多个包、多个文件,像 Rust 的 cargo workspace 一样组织代码。<code>lom build</code> 相当于 <code>cargo check</code>——不跑代码,只检查依赖和类型对不对。</p>
 <p>设计上做了两个简化:① 只支持本地路径依赖(<code>path = "mathlib"</code>),不联网拉包(避免引入注册表/网络/版本锁的复杂度,留待将来);② 顶层符号自动公开(无 <code>pub</code> 关键字,降低 LLM 遗忘负担)。这两个简化让包管理在 16 个单测内完整跑通,零新依赖。</p></div>
 
-<h2 id="selfhost-2-10">2.10 自举与新语法缺口(Phase 5,进行中)</h2>
+<h2 id="selfhost-2-10">2.10 自举与新语法缺口(Phase 5,已闭环)</h2>
 
 <aside class="sn"><b>自举(self-hosting / bootstrapping)</b>:语言的"成年礼"——用 Lom 语言本身写出 Lom 的解释器/编译器,并且它能正确处理 Lom 代码。鸡生蛋、蛋生鸡:第一版解释器用 Rust 写(种子),之后语言就可以"养活自己"。</aside>
 
-<p>Phase 5 的目标是<strong>自举</strong>:证明 Lom 强大到能写出自己的解释器。目前的进展(<code>examples/bootstrap/</code>):</p>
+<p>Phase 5 的目标是<strong>自举</strong>:证明 Lom 强大到能写出自己的解释器。<strong>2026-08-19 收尾评估:阶段目标"语言能养活自己"达成</strong>——最终形态 <code>stmt_interp.lom</code>(1450 行 Lom)具备完整编译器流水线(词法→语法→静态检查→求值),14 个测试程序 39 条输出与 golden 文件逐字一致(CI 强制比对)。但要诚实:这个迷你语言只是完整 Lom 约 20% 的子集(无 Float/Record/Map/闭包/管道/?/效应/模块),<strong>全量自举(Lom 写的完整 Lom 解释器)是独立 phase 级工作量</strong>,已作为 RFC-0003(Phase 8 候选)正式立项调研。全里程碑列表(<code>examples/bootstrap/</code>):</p>
 
 <ul>
   <li><strong>5.0 可行性验证</strong>:用 Lom 写了一个迷你解释器(<code>mini_interp.lom</code>)——逐字符扫描切 token、递归下降解析、求值,正确处理运算符优先级。结论:递归 enum + match + 字符串逐字符扫描,足够表达编译器核心三阶段;</li>
@@ -656,6 +700,104 @@ mathlib = { path = "mathlib" }</code></pre>
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>Phase 5 的玩法像"让刚学会做饭的人给自己做一顿饭"——不是为了吃饱,是为了证明厨艺真的学会了。用 Lom 写 Lom 解释器的过程中,每发现一个"写不了"的地方,就是语言的一个真实缺口;补掉它(5.1 元组解构、5.3 for 遍历 List 都是这样来的),语言就长大一点。</p>
 <p>这叫<strong>狗食法(dogfooding)</strong>:自己用自己的产品,需求全来自真实踩坑,而不是坐在屋里想。5.3 的修法本身很简单——for 循环原来只认两种可迭代的东西(字符串、整数),现在多认一种(列表),像检票口原来只认身份证和护照,现在加认学生证。</p></div>
+
+<h2 id="eng-2-11">2.11 工程化:版本、CI、治理(Phase 6,已闭环)</h2>
+
+<p>Phase 6 之后语言本身不再长新特性,长的是"让项目能被长期维护"的机制——从玩具到工程的分水岭。六个里程碑:</p>
+
+<ul>
+  <li><strong>6.1 语义版本</strong>:Cargo.toml 成为版本<strong>单一事实源</strong>,<code>lom --version</code> 从 <code>CARGO_PKG_VERSION</code> 宏读取;语言/工具链变更升 minor、修复升 patch;首个 tag v0.5.1;</li>
+  <li><strong>6.2 治理三件套</strong>:CONTRIBUTING / CODE_OF_CONDUCT / RFC 流程——RFC 模板里有<strong>"LLM 影响分析"必填节</strong>(连治理文档都为 AI 协作设计);RFC 编号从 0001 起,0000 是模板;</li>
+  <li><strong>6.3 三平台 CI</strong>:每次 push 在 Linux/macOS/Windows 全量回归;</li>
+  <li><strong>6.4 lom doc</strong>:API 文档生成器,从 token 流<strong>回捞</strong> <code>#</code> 注释(AST 里没有注释,只能从 token 层拿);</li>
+  <li><strong>6.5 lom fmt</strong>:格式化器,<code>--check</code> 做 CI 门禁。关键决策:<strong>token 流驱动而非 AST 重写</strong>——AST 不存注释,基于 AST 重写一定丢注释;单行枚举 <code>enum X = A | B</code> 无 end 需特判;</li>
+  <li><strong>6.6 SECURITY.md</strong>:零依赖供应链承诺(grep 验证零 <code>unsafe</code>)+ 威胁模型。</li>
+</ul>
+
+<p><strong>CI 的 7 个回归 gate</strong>(<code>.github/workflows/ci.yml</code>,三平台各跑一遍)——记住这张清单,它是"项目工程成熟度"最直接的面试证据:</p>
+
+<table>
+  <tr><th>gate</th><th>内容</th><th>防什么</th></tr>
+  <tr><td>① 单元测试</td><td><code>cargo test --release</code>,417 个测试</td><td>代码级回归</td></tr>
+  <tr><td>② 自举 golden</td><td>stmt_interp.lom 输出与 golden 文件<strong>逐字 diff</strong>(比对前 <code>tr -d '\r'</code>)</td><td>"行数对但内容错"的静默回归(行数防线被评审指出太弱)</td></tr>
+  <tr><td>③ 零依赖</td><td>awk 状态机扫 Cargo.toml 的 [dependencies](覆盖 <code>[dependencies.foo]</code> 表形态)</td><td>供应链承诺被悄悄破坏</td></tr>
+  <tr><td>④ fmt</td><td>全部示例 <code>lom fmt --check</code> 幂等(apply_test.lom 是故意坏文件,豁免)</td><td>格式漂移</td></tr>
+  <tr><td>⑤ eval</td><td>113 个任务跑参考解,比对 stdout + 要求退出码 0</td><td>语言行为回归</td></tr>
+  <tr><td>⑥ WASM parity</td><td>同一套 113 任务用 WASM 后端再跑一遍</td><td>双后端语义漂移</td></tr>
+  <tr><td>⑦ WASM 自举 golden</td><td>stmt_interp 编译到 WASM 后与同一份 golden 逐字比对</td><td>编译器回归</td></tr>
+</table>
+
+<div class="warn"><strong>两次真实的版本纪律教训</strong>(能主动讲出来是加分项):① v0.6.0 的 tag 不慎切在两个 CI 修复之前,复审发现后只能补发 v0.6.1——从此铁律"<strong>tag 永远切在 CI 全绿之后</strong>";② 6.4/6.5 加了 lom doc/fmt 两个用户可见功能却没升 minor,被外部评审抓到"语义版本政策发布当周自我违背"——从此铁律"<strong>加了用户可见功能就升 minor,别攒</strong>"。</div>
+
+<p><strong>评审整改轮的元教训</strong>(2026-08-22 起三轮外部评审,总评 B+ 复审 A-):<strong>可见性整改会倒逼质量</strong>——类型检查推到默认路径后,检查器自身的假阳性(Int/Float 混合、管道 arity、包符号)立刻变成用户可见噪音,于是同轮全部修掉。文档侧更狠:三轮清扫抓出<strong>虚构的关键字表、从未实现的类型别名(<code>type UserId = Int</code>)、当特性写的未实现功能</strong>。两条沉淀出的规则:写"将在 Phase X 实现"的句子必须带可检索标记;spec 的特性表要定期拿 lexer/parser <strong>实测对账</strong>。<strong>文档腐坏的速度远超直觉</strong>,这是项目用三轮评审买来的认知。</p>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>Phase 6 像小店办营业执照:菜品(语言)没变,但有了发票(语义版本)、卫生公示(CI)、员工手册(治理文档)。CI 的意义是"每道菜出锅前过同一套检查",而且是<strong>三个后厨(Linux/macOS/Windows)各过一遍</strong>——历史上 Windows 的换行符(CRLF)真把"逐字比对"坑过,跨平台门禁不是仪式。</p>
+<p>"golden 逐字比对"值得单独说:早期防线只查"输出行数对不对"——39 行变 39 行但内容错乱,行数检查毫无感觉。升级成逐字 diff 后,错一个字符都过不了 CI。<strong>门禁的强度必须对齐它声称防御的风险</strong>,这是 CI 设计最容易被糊弄的一环。</p></div>
+
+<h2 id="wasm-2-12">2.12 WASM 后端(Phase 7,已闭环,v0.15.0)</h2>
+
+<aside class="sn"><b>WASM(WebAssembly)</b>:一种可移植的字节码格式——把程序编译成 WASM 二进制后,任何带 WASM 虚拟机的环境(浏览器、node)都能执行。它像"通用机器码":一次编译,处处运行,且执行速度接近原生。</aside>
+
+<p>Phase 7 把"同一棵 AST、两种载体"变成现实:<code>lom build &lt;file&gt; --target wasm</code> 输出真正的 WASM 二进制,由 node 执行。两个文件分工:</p>
+
+<ul>
+  <li><strong>wasm.rs(574 行,二进制 emitter)</strong>:LEB128 变长编码、section 拼装、模块/导入/导出/数据段的容器层——按 WebAssembly 二进制格式规范逐字节手写,零依赖(wabt/walrus/binaryen 全拒);</li>
+  <li><strong>wasm_codegen.rs(4859 行,AST→WASM 编译器)</strong>:全项目最大文件。编译的是<strong>动态语义</strong>(与树遍历解释器逐字对齐),不是静态类型特化——因为 Lom 是渐进式类型,类型信息不可靠,tag 分派必须在运行时做。</li>
+</ul>
+
+<h3>核心机制一:tagged i64 值表示</h3>
+
+<p>所有 Lom 值编译成一个 i64,低 <strong>4 位</strong>是 tag:0=Int、1=Bool、2=Unit、3=F64 盒(堆指针)、4=Str、5=Closure、6=Enum、7=Tuple、8=Record、9=List(cons)、10=Map。Int 是 <code>v&lt;&lt;4</code>;堆对象(Float/Str/Record……)走 bump allocator(arena 不释放——目标负载是短生命周期 CLI,见 RFC-0002 的取舍记录)。</p>
+
+<div class="warn"><strong>两个深坑,都有方法论价值</strong>:① <strong>tag 掩码耗尽(7.6)</strong>——7.2 设计的是低 3 位 tag(掩码 7),7.6 加 tag 8/9 后 <code>8 &amp; 7 == 0</code>,Record 被当成 Int,值表示全局迁 4 位。教训:<strong>tag 空间要预留扩展位,掩码值必须单一事实源</strong>。② <strong>opcode 表连串看错(7.4)</strong>——i32.and/or 因漏排 div/rem 整体错位,<strong>症状极具迷惑性:trim/upper 静默变成恒等函数</strong>——字节全对、验证全过、结果全错,靠"抠 helper 字节离线单测"才定位。教训:查表要看块的成对排列,调试要构造最小隔离。</div>
+
+<h3>核心机制二:helper 运行时</h3>
+
+<p>60+ 个手写 WASM helper 函数(7.2 交付 19 个,7.4-7.6 随 stdlib/复合值持续扩充;如 <code>rt_add / rt_eq / rt_print / rt_map_probe……</code>)承担全部运行时 tag 分派,codegen 只做"结构翻译 + call helper"——每个二元运算不内联展开一坨分派逻辑,编译器输出可读、可调试。闭包走 <code>call_indirect</code>(funcref 表);Map 是<strong>手写开放寻址哈希表</strong>(FNV-1a 哈希、线性探测、墓碑删除、负载 0.5 翻倍 rehash)——零依赖到连哈希表都自己写。</p>
+
+<h3>里程碑与实测</h3>
+
+<ul>
+  <li><strong>7.1</strong> emitter 骨架(LEB128 规范测试向量 + Node 真实实例化冒烟)。版本判断:<strong>无 CLI 面不升版本</strong>——第一次升 minor 留给 CLI 可用的 7.2;</li>
+  <li><strong>7.2(v0.7.0)</strong> 动态语义 codegen 落地:tagged i64 + 19 helper,8 个示例 stdout 与解释器逐字一致;</li>
+  <li><strong>7.3-7.5(v0.8.0-v0.10.0)</strong> 闭包(call_indirect;递归闭包 = 预绑定 local + 创建后 env 槽位补丁)、字符串/stdlib、枚举/match/?;</li>
+  <li><strong>7.6a/7.6b(v0.11.0/v0.12.0)</strong> Record/Tuple/List + Map——<strong>eval 108/108 双后端逐字一致,特性零排除</strong>,连 1450 行的自举解释器 stmt_interp 编译到 WASM 后 39 条输出与 golden 逐字一致;</li>
+  <li><strong>7.7(v0.13.0)</strong> json <strong>宿主中介</strong>:json_parse/stringify 走宿主导入(harness 用 JS 原生 JSON)。决策记录:"Lom 层自写 JSON 被 reflection 缺口阻塞,手写 WASM JSON 解析器性价比最低"——<strong>承认做不到、换路线,也是工程决策</strong>。同轮修掉一个真设计缺陷:Record 字段查找从"编译期偏移相等"改为内容比较(宿主物化的字段名与编译期静态串不同源);</li>
+  <li><strong>7.8(v0.14.0)</strong> file/env 宿主导入 + 包链接(lom build 自动合并 lom.toml 依赖包源码);</li>
+  <li><strong>7.9(v0.15.0)</strong> golden 总验收 + CI 两个 wasm gate(见 2.11 的⑥⑦);</li>
+  <li><strong>7.10</strong> 性能对照(同机实测):自举式 O(n²) 负载纯计算提速<strong>约 49 倍</strong>(解释器循环被编译掉);递归深度从 ~10⁴ 硬限变为"宿主栈可配"(<code>node --stack-size=60000</code> 下 10⁵ 层实测通过)。</li>
+</ul>
+
+<p><strong>与解释器的 4 处已知语义差异</strong>(如实记录在 wasm_codegen.rs 文件头与 SPEC_FOR_AI §11f;被问"双后端完全一致吗"照此答):</p>
+
+<ol>
+  <li><strong>除零/取模零</strong>:WASM 是 trap(harness 退出码 1),消息文本与解释器不同;</li>
+  <li><strong>trim</strong>:WASM 侧只去 ASCII 空白,解释器是 Unicode 空白;</li>
+  <li><strong>JSON 数字</strong>:经宿主中介后 Int/Float 由 JS 值决定,解释器按源语法判定;</li>
+  <li><strong>闭包捕获</strong>:WASM 是创建时<strong>值拷贝</strong>,解释器是 Rc <strong>共享作用域</strong>——创建后修改被捕获变量,两后端行为不同(该模式实践中罕见,如需共享语义提 issue)。</li>
+</ol>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>tagged i64 是"一物两用"的快递单号:一个 64 位数字,前 60 位装货,后 4 位是<strong>货物类型贴纸</strong>。收到 17 这个数,看贴纸(低 4 位=1)知道它是"真"这个布尔值,不是整数 17。所有运算前先撕贴纸看类型——这就是"动态语义"的运行时代价,也是 49 倍提速的来源之一:撕贴纸是几条机器指令,而解释器做同样的事要走一整层 Rust 的 match 分发和递归调用。</p>
+<p>对 4 处差异的正确心态:工程上没有"逐字一致"的免费午餐,<strong>诚实记录差异 + CI 强制 108 任务逐字一致</strong>,比嘴上说"完全一样"可信得多。闭包那条最有画面感:解释器闭包拿着出生房间的钥匙(Rc 共享),WASM 闭包只带走了出生时房间里的<strong>东西清单副本</strong>(值拷贝)——房间后来换了家具,前者看得见,后者不知道。</p></div>
+
+<h2 id="fixm-2-13">2.13 修复引擎深化(M1-M4 全部完成)</h2>
+
+<p>Phase 0-7 闭环后的新战线:把 2.6 讲的修复工具链从"能修几种错"推向"覆盖更广、全自动闭环、可度量"。每个里程碑一次版本升级,细节见 2.6,这里记进度与决策:</p>
+
+<ul>
+  <li><strong>M1 拼写修复 Replace(v0.16.0)</strong>:NAM003/NAM004 的"是否想用 X?"建议,从只写进 hint 升级为真正的 Replace 动作。定位靠<strong>整词源码扫描</strong>(跳过字符串/注释、字段要求 <code>.</code> 前缀)。置信度定 <strong>Medium</strong>——用户裁决"猜测性修复不自动改",<code>--apply</code> 只动 100% 确定的;</li>
+  <li><strong>M2 --apply 迭代闭环(v0.17.0)</strong>:单趟升级为"应用→重新诊断→再修"循环,<strong>三重刹车</strong>(无 High 可应用项 / 源码不再变化 / 上限 5 轮,防震荡);fix-history 每轮一条 entry(带 round 字段,旧记录读取时默认 1)。实测两轮收敛案例:LEX005 删坏字符 → 解析通过 → 第二轮才暴露 EFF001 → 插效应注解 → 第三轮收敛;</li>
+  <li><strong>M3 PARSE001 针对性修复(v0.18.0)</strong>:行末/文末缺 <code>)</code> 补 High、行中缺 Medium(可能是缺逗号)、match 缺 <code>end</code> Medium。<strong>方法论亮点:动手前先用 --json 探针实测 parser 真实报错形态,推翻了两个计划假设</strong>——fn/if/while 缺 end 被容错解析<strong>静默接受</strong>(ok:true 零诊断),缺 ')' 的报错位置在<strong>下一个 token</strong> 而非缺括号处。规则按实测形态写,parser 零改动;</li>
+  <li><strong>M4 error_repair 扩充 + 语料回归(v0.19.0,2026-08-31 已提交)</strong>:error_repair 评测任务 15→20(109-113;prompt 内嵌诊断 JSON 全部来自真实 lom --json 输出,参考答案全部实跑验证)+ <code>eval/fix_corpus/</code> 语料对(4 份 bad/fixed,已入库)+ 端到端回归测试 <code>fix_corpus_end_to_end</code>——每对语料跑 apply_iterative 后与 fixed <strong>逐字断言</strong>。一个巧思:04_spelling 语料的 fixed 与 bad <strong>逐字相同是有意为之</strong>——Medium 猜测性修复不被自动应用,源码必须不变,这条断言锁定的正是安全边界本身。<strong>抓到一个真问题并如实记录</strong>:LEX001 行尾补引号在"未闭合字符串吞掉行尾 )"时会把 ) 关进字符串(语法修通、语义错)——记为已知限制,不用猜测式启发式硬修。实测 eval 113/113 双后端、417/417 测试。</li>
+</ul>
+
+<p><strong>需求变更(如实记录)</strong>:路线重心已从"继续加语言特性"转向两条线——修复引擎深化(M1-M4 已完成)与全量自举(<strong>RFC-0003 draft</strong>:用完整 Lom 写完整 Lom 的前端+检查器+树遍历解释器,能解释执行它自己的源码;L2"Lom 写的 WASM 编译器"因 <code>char_from_code</code> 缺口<strong>明确不做</strong>、挂账)。挂账项:第三方 LLM 复测(需真实 LLM 资源)、栈溢出结构化诊断、包注册中心/调试器/概率类型(v1.0 后按需)。</p>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>M2 的迭代闭环就是"洗衣机多漂洗几遍":第一遍修完(应用),再检查一遍(重新诊断),还有能修的就再来一轮,直到水清(无 High 项)或程序喊停(5 轮上限)。为什么要喊停?防震荡——假如 A 修复和 B 修复互相把对方改回去,没有上限就是死循环。三重刹车分别防"没事可做""做了没效果""做不完"。</p>
+<p>M4 的 fix_corpus 则是"错题本变成考题":把真实修过的错误(缺括号、两轮才修好的复合错误、未闭合字符串、拼错名)固化成 bad/fixed 语料对,每次改修复引擎都重考一遍——<strong>修复引擎自己也被 golden 回归保护了</strong>。这和自举 golden、CI 的 108 任务是同一个思想:凡是你声称的行为,都要有逐字比对的防线钉住。</p></div>
 
 <hr>
 <!-- ============================================================ -->
@@ -704,7 +846,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>准确说法:parser 保留 Pipe 节点,求值时去糖为普通调用,把左值插到参数列表最前。</p></div>
 
 <div class="qa"><p class="q">Q:类型系统是静态还是动态的?</p>
-<p>渐进式:运行时动态;<code>--check</code> 时静态检查;类型错误只警告不阻止运行;推断不出放行。为什么:检查器能力有限,报 Error 会误伤;且类型错误的受众是 AI 修复工具,不是编译闸门。</p></div>
+<p>渐进式:默认运行路径也检查(诊断走 stderr、<strong>永不拦截执行</strong>,2026-08-22 整改后如此,别再答"默认不查");<code>--check/--json</code> 只检查不执行;类型错误只警告,名称错误才是 Error;推断不出放行。为什么:检查器能力有限,报 Error 会误伤;且类型错误的受众是 AI 修复工具,不是编译闸门。</p></div>
 
 <div class="qa"><p class="q">Q:效应系统是什么?</p>
 <p>函数签名声明副作用(<code>! [IO, Clock]</code>),调用方效应集必须是被调方超集,违例报警告;main 豁免;闭包继承;纯静态零运行时开销。类比:给函数标注"我会碰 IO",让工具链能追踪副作用边界。</p></div>
@@ -713,24 +855,36 @@ mathlib = { path = "mathlib" }</code></pre>
 <p><strong>这题要答得有分寸</strong>:100 题评测集(10 类),error_repair 15/15、0 语法错误、0 导入缺失——证明语法设计不踩 LLM 常见坑。但要主动承认局限:单一模型单次采样、评测集自建无基线对照(Python/Rust 同题对比还没做)。DESIGN_RATIONALE §12 自己就写了"只有对照实验才能坐实 AI-native 主张"——<strong>你能主动说出这个局限,比背 99% 数字更加分</strong>。</p></div>
 
 <div class="qa"><p class="q">Q:遇到过什么困难/取舍?</p>
-<p>讲 apply.rs 的逆序应用 + 字符列/字节偏移换算(Unicode 坑);讲置信度分级里"用户枚举不自动插入"的安全边界;讲 Rc 环的取舍。</p></div>
+<p>讲 apply.rs 的逆序应用 + 字符列/字节偏移换算(Unicode 坑);讲置信度分级里"用户枚举不自动插入"的安全边界;讲 Rc 环的取舍;讲 7.4 的 opcode 错位坑(<strong>字节全对、验证全过、结果全错</strong>——trim 静默变恒等函数,靠抠 helper 字节离线单测才定位)——这个坑最能体现调试方法论。</p></div>
+
+<div class="qa"><p class="q">Q:为什么做 WASM 后端?不是说性能不是目标吗?</p>
+<p>三个动机:①递归深度天花板从解释器 ~10⁴ 硬限变为宿主栈可配(<code>node --stack-size=60000</code> 下 10⁵ 层实测通过);②性能对照——自举式 O(n²) 负载纯计算提速约 49 倍;③为 RFC-0003 全量自举铺路(可移植的执行载体)。押注没变:JIT/MLIR/原生机器码依然不做,差异化仍在 <code>lom fix</code> 工具链。</p></div>
+
+<div class="qa"><p class="q">Q:双后端语义完全一致吗?怎么保证?</p>
+<p><strong>别答"完全一致"</strong>——4 处已知差异如实记录在 wasm_codegen.rs 文件头/SPEC_FOR_AI §11f:除零/取模零 trap 行为、trim 的 ASCII vs Unicode、JSON 数字的 Int/Float 判定、闭包捕获值拷贝 vs Rc 共享。保证手段是 CI 双后端 parity gate:108 个 eval 任务 + 自举 golden,双后端 stdout 逐字比对。<strong>诚实记录差异 + 强制逐字比对,比宣称"完全一样"工程上更成熟。</strong></p></div>
+
+<div class="qa"><p class="q">Q:修复引擎现在到什么程度?</p>
+<p>M1 拼写 Replace(v0.16.0,Medium 不自动应用)→ M2 --apply 迭代闭环(v0.17.0,三重刹车防震荡,上限 5 轮)→ M3 PARSE001 针对性修复(v0.18.0,<strong>动手前先 --json 探针实测,推翻了两个计划假设</strong>——缺 end 被容错解析静默接受、缺 ')' 的位置在下一个 token)。M4 已完成(v0.19.0):评测任务扩到 113 + fix_corpus 语料逐字回归。亮点是"先实测再写规则"和"凡声称的行为都有逐字防线钉住"。</p></div>
+
+<div class="qa"><p class="q">Q:项目现在什么进度?下一步做什么?</p>
+<p>v0.19.0,路线图 Phase 0-7 全部闭环,修复引擎深化 M1-M4 全部完成;远期两条线:全量自举(RFC-0003 draft,L1 解释器为目标、L2 编译器明确不做)与 v1.0 冻结。量化:417 测试、CI 三平台 7 gate、eval 113/113。答这题的分寸感:主动说清 LLM 实测 99/100 是 2026-08-03 原 100 任务的数据,101+ 任务未实测——数字都带测量条件。</p></div>
 
 <hr>
 <!-- ============================================================ -->
-<h1 id="part5">第五部分:三个"防露馅"提示</h1>
+<h1 id="part5">第五部分:"防露馅"提示(文档与代码的出入)</h1>
 
-<p>项目有几处 README/注释与代码不一致,面试官若真读过代码,你要以代码为准:</p>
+<p>项目文档与代码/数据的出入,以<strong>代码和实测为准</strong>。旧版教程列的三处旧账(拼写建议未消费、Phase 4 合入状态、Cargo.toml 停在 0.1.0)如今<strong>全部已修或不成立</strong>——M1 已让 fix.rs 消费拼写建议、语义版本管理已落地——<strong>别再拿旧账当"防露馅"素材,那才是真正的露馅</strong>。当前有效的三处:</p>
 
 <ol>
-  <li><strong>NAM003 拼写建议</strong>(README 说 <code>lom fix</code> 会给出 "Did you mean X?"):实际建议(Levenshtein ≤2,typechecker.rs:1391-1421)只写进诊断的 <code>hint</code> 字段,fix.rs 的 NAM003 分支没消费它(fix.rs:445-453)。</li>
-  <li><strong>Phase 4 工具链均已合入</strong>:<code>lom repl</code>(4.2)、<code>lom lsp</code>(4.3)、<code>lom build</code>(4.4 包管理)都已在 main.rs 分派子命令并提交,可正常启动。</li>
-  <li><strong>版本号</strong>:Cargo.toml 停在 0.1.0,版本只活在提交信息里(v0.4.1)。</li>
+  <li><strong>eval/REPORT.md 是时间胶囊</strong>:它记录的是 2026-08-03 / v0.1.3 / 100 任务时代的数据。引用"99/100"必须带时间和范围——评测集此后扩到 113,<strong>101+ 任务从未跑过 LLM 实测</strong>;runner 侧的 113/113 是"参考解通过",和"LLM 生成通过"是两回事,别混着说。</li>
+  <li><strong>工作区与 git 的边界</strong>:fix_corpus 语料与 M4 记录已提交入库(v0.19.0,HANDOVER §11 有完整记录);但 <strong>RFC-0003 全量自举草案仍未提交、未 accept</strong>——讲项目方向时别把 draft 当定案。通用规则:引用项目状态以 git log 的已提交状态为准,工作区文件不算数。</li>
+  <li><strong>注释与代码的残留不一致</strong>:parser.rs 文件头注释自称"Pratt 解析",实际是固定优先级链(面试按链式结构讲);SPEC/LANGUAGE_SPEC 的特性表历史上抓出过虚构内容(关键字表、类型别名),三清扫已修,但<strong>对任何"文档说有"的特性,引用前都值得拿 lexer/parser 实测对账一次</strong>。</li>
 </ol>
 
-<aside class="sn"><b>Levenshtein 距离(编辑距离)</b>:衡量两个字符串差几步的经典算法——每插入、删除、替换一个字符算一步。<code>printl</code> → <code>println</code> 距离是 1(插一个 n)。≤2 说明"很像",据此猜用户本来想写哪个名字。</aside>
+<aside class="sn"><b>Levenshtein 距离(编辑距离)</b>:衡量两个字符串差几步的经典算法——每插入、删除、替换一个字符算一步。<code>printl</code> → <code>println</code> 距离是 1(插一个 n)。≤2 说明"很像",据此猜用户本来想写哪个名字——M1 的拼写修复建议就来自它。</aside>
 <aside class="sn"><b>WIP(Work In Progress)</b>:半成品、进行中。说"这是 WIP"是工程圈标准说法,表示功能在开发路上、尚未合入,不是 bug。</aside>
 
-<p>被问到这些,诚实回答"这是当前中间状态,Phase 4 工具链已全部合入,下一步是 Phase 5 编译器自举"完全没问题——项目当前就处在这样的推进节点。</p>
+<p>被问到这些,诚实回答"v0.19.0 已提交,修复引擎深化 M1-M4 全部完成,远期方向是 RFC-0003 全量自举(草案阶段)"完全没问题——项目当前就处在这样的推进节点。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>这部分存在的意义:任何真实项目里,文档永远是"追赶代码"的,README 写着"已完成"的功能可能只完成了一半。面试中最大的失分点不是"不知道",而是<strong>把 README 当事实背诵、被追问时才发现与代码对不上</strong>。</p>
@@ -748,7 +902,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><th>术语</th><th>一句话解释</th><th>首现章节</th></tr>
   <tr><td>AST(抽象语法树)</td><td>源代码的树形结构化表示,所有后续处理的中间表示</td><td>1.1</td></tr>
   <tr><td>闭包(closure)</td><td>函数 + 捕获的定义处环境,打包成值</td><td>2.4</td></tr>
-  <tr><td>字节码 / VM</td><td>源码先翻译成中间指令再执行;Lom 没做这层</td><td>1.1</td></tr>
+  <tr><td>字节码 / VM</td><td>源码先翻译成中间指令再执行;Lom 的 WASM 后端即此路线(node/V8 当虚拟机)</td><td>1.1</td></tr>
   <tr><td>递归下降</td><td>每种语法结构一个函数、互相调用的解析写法</td><td>2.3</td></tr>
   <tr><td>词法作用域</td><td>变量可见性由代码书写位置(定义处)决定</td><td>2.4</td></tr>
   <tr><td>迭代/递归类</td><td>Lexer/Parser/解释器都靠"游标 + 递归"推进</td><td>2.1-2.4</td></tr>
@@ -757,7 +911,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>Rc&lt;RefCell&lt;T&gt;&gt;</td><td>Rust 的"共享 + 可变"智能指针组合</td><td>2.4</td></tr>
   <tr><td>Weak 弱引用</td><td>打破 Rc 循环引用、解决内存泄漏的标准手段</td><td>2.4</td></tr>
   <tr><td>去糖(desugar)</td><td>把便利语法翻译成基础形态,如 |&gt; → 普通调用</td><td>2.4</td></tr>
-  <tr><td>渐进式类型</td><td>默认不查、查了也只警告、推断不出就放行的类型系统</td><td>2.5</td></tr>
+  <tr><td>渐进式类型</td><td>运行路径也查(诊断走 stderr 不拦截)、类型错只警告、名称错才拦、推断不出放行</td><td>2.5</td></tr>
   <tr><td>结构类型 / 名义类型</td><td>类型相等看形状 vs 看名字</td><td>2.5</td></tr>
   <tr><td>match 穷尽性</td><td>match 必须覆盖枚举所有变体,漏了报警</td><td>2.5</td></tr>
   <tr><td>效应系统</td><td>函数签名声明副作用集合,调用方须为超集</td><td>2.5</td></tr>
@@ -772,19 +926,28 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>lom.toml</td><td>Lom 的项目清单文件,声明 name/version/dependencies,Phase 4.4 引入</td><td>2.9</td></tr>
   <tr><td>manifest(清单)</td><td>描述项目元数据的文件,Rust 用 Cargo.toml,Lom 用 lom.toml</td><td>2.9</td></tr>
   <tr><td>JIT / MLIR</td><td>高性能编译路线的代表技术,Lom 明确不做</td><td>1.1</td></tr>
+  <tr><td>WASM</td><td>可移植字节码格式,Lom 的第二后端(Phase 7),node 执行</td><td>2.12</td></tr>
+  <tr><td>LEB128</td><td>变长整数编码,WASM 二进制里数字的表示方式</td><td>2.12</td></tr>
+  <tr><td>tagged i64</td><td>WASM 后端的值表示:一个 i64,低 4 位是类型 tag</td><td>2.12</td></tr>
+  <tr><td>宿主中介</td><td>WASM 缺的能力(json/file/env)由 node 宿主代劳的架构决策</td><td>2.12</td></tr>
+  <tr><td>golden file</td><td>期望输出的逐字比对基准,CI 用它钉死行为</td><td>2.11</td></tr>
+  <tr><td>自举(self-hosting)</td><td>用 Lom 写 Lom 的实现;Phase 5 迷你版闭环,全量版是 RFC-0003</td><td>2.10</td></tr>
+  <tr><td>语义版本</td><td>Cargo.toml 为单一事实源;功能升 minor、修复升 patch</td><td>2.11</td></tr>
 </table>
 
 <h2>B. 建议阅读路径(源码顺序)</h2>
 
 <ol>
-  <li><code>SPEC_FOR_AI.md</code>(623 行)——先会用这门语言,10 分钟;</li>
-  <li><code>src/ast.rs</code>(300 行)——看懂数据结构,后面全是操作它们;</li>
-  <li><code>src/lexer.rs</code>(582 行)——第一个手写解析器,建立手感;</li>
-  <li><code>src/parser.rs</code> 只看 2.3 节提到的关键函数(优先级链 + is_newline_before + 三级恢复),不必通读;</li>
-  <li><code>src/interpreter.rs</code> 只看:Value 枚举、Scope、闭包两行核心代码、eval_call 分发;</li>
-  <li><code>src/typechecker.rs</code> 只看:check 两遍主流程、check_call_effects;</li>
-  <li><code>src/fix.rs</code> + <code>src/apply.rs</code>——差异化核心,重点读置信度分级和逆序应用;</li>
+  <li><code>SPEC_FOR_AI.md</code>(697 行)——先会用这门语言,10 分钟;</li>
+  <li><code>src/ast.rs</code>(317 行)——看懂数据结构,后面全是操作它们;</li>
+  <li><code>src/lexer.rs</code>(695 行)——第一个手写解析器,建立手感;</li>
+  <li><code>src/parser.rs</code>(1666 行) 只看 2.3 节提到的关键函数(优先级链 + is_newline_before + 三级恢复),不必通读;</li>
+  <li><code>src/interpreter.rs</code>(3459 行) 只看:Value 枚举、Scope、闭包两行核心代码、eval_call 分发;</li>
+  <li><code>src/typechecker.rs</code>(2342 行) 只看:check 两遍主流程、check_call_effects;</li>
+  <li><code>src/wasm.rs</code>(574 行)+ <code>src/wasm_codegen.rs</code>(4859 行)——Phase 7 双子星,后者是全项目最大文件;入门先读两份文件头的值表示与语义差异声明,再挑一个 helper(如 rt_add)读;</li>
+  <li><code>src/fix.rs</code>(1644 行)+ <code>src/apply.rs</code>(723 行)——差异化核心,重点读置信度分级、逆序应用和 M3 的 PARSE001 规则;</li>
   <li><code>src/repl.rs</code> + <code>src/lsp.rs</code> + <code>src/package.rs</code>——Phase 4 工具链,看多行判定/JSON-RPC/依赖图;</li>
+  <li><code>docs/HANDOVER.md</code>——进度快照、真实坑清单与三轮评审整改记录(活文档,含最新的 M1-M3 细节);</li>
   <li><code>DESIGN_RATIONALE.md</code>——最后读,把"为什么"串起来。</li>
 </ol>
 
@@ -797,7 +960,8 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td><code>SPEC_FOR_AI.md</code></td><td>给 LLM 读的精简语言规范</td></tr>
   <tr><td><code>LANGUAGE_SPEC.md</code></td><td>完整语言规范(权威定义)</td></tr>
   <tr><td><a href="lom-project-guide.html">docs/lom-project-guide.html</a></td><td>项目最高指导文件:定位、路线图、治理</td></tr>
-  <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(含失败案例分析)</td></tr>
+  <tr><td><code>docs/HANDOVER.md</code></td><td>AI 交接文档:项目快照、坑清单、评审整改(活文档)</td></tr>
+  <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(<strong>2026-08-03 快照</strong>,含失败案例分析;101+ 任务未实测,引用数字看第五部分)</td></tr>
   <tr><td><strong>本文档</strong></td><td>代码实现层的入门讲解 + 面试备战</td></tr>
 </table>
 
