@@ -327,6 +327,7 @@ end
 ## 8. 杂项备忘
 
 - `.lom/` 目录（fix-history.jsonl）是运行时产物，已 gitignore。
+- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=启动期四份调研（不再更新，DESIGN_RATIONALE 有 3 处引用作决策证据，别删）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举草案——未提交未裁决，用户裁决搁置）。
 - eval/candidates/ 里的 001-100.lom 是 LLM 实测的原始产物（99/100 那批），**保留作证据**，别清理。
 - eval/prompts/_generate.ps1 从 tasks JSON 生成 prompts，改任务后记得重跑。
 - examples/todo.lom 是 Phase 3 退出标准的标志 demo（185 行 CLI），回归时可顺带跑。

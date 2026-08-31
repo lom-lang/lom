@@ -14,7 +14,7 @@ Lom is AI-coding-native, not AI-workload-native. These are different:
 | AI-workload-native | "How do I write tensor ops / autodiff / GPU kernels?" | Phase 4+ (adjustable, not identity) |
 | AI-coding-native | "How do I make LLMs write correct code with low error rate?" | **Phase 0-3 identity** |
 
-The critique that "AI-native is marketing hype" (see `docs/ai-native-programming-languages.html` §6) is valid *when a language claims AI-nativeness without language-level design decisions that back the claim*. Lom's response is to make every syntax decision answerable to the question: **"does this reduce LLM error rate or aid recovery?"**
+The critique that "AI-native is marketing hype" (see `docs/archive/ai-native-programming-languages.html` §6) is valid *when a language claims AI-nativeness without language-level design decisions that back the claim*. Lom's response is to make every syntax decision answerable to the question: **"does this reduce LLM error rate or aid recovery?"**
 
 This document enumerates those decisions.
 
@@ -47,7 +47,7 @@ LLM code generation has three failure modes that block delimiters affect:
 
 ### Evidence
 
-This decision aligns with docs File 2 (`ai-native-lang-construction-guide.html`) recommendation and Ruby/Elixir/Ada precedent. Docs File 4 (`ai-native-programming-languages.html`) does not record any AI-native language choosing indentation sensitivity.
+This decision aligns with docs File 2 (`archive/ai-native-lang-construction-guide.html`) recommendation and Ruby/Elixir/Ada precedent. Docs File 4 (`ai-native-programming-languages.html`) does not record any AI-native language choosing indentation sensitivity.
 
 ---
 
@@ -125,7 +125,7 @@ Docs File 4 §3 "twelve design principles" lists "strong type system" and "exhau
 
 ### LLM-coding-native rationale
 
-1. **Prevents symbol fabrication**: docs File 1 (`ai-lang-project-setup-guide.html`) identifies "LLM 编造符号" as a top error source. Wildcard imports make this worse — the LLM has no list of available symbols, so it guesses.
+1. **Prevents symbol fabrication**: docs File 1 (`archive/ai-lang-project-setup-guide.html`) identifies "LLM 编造符号" as a top error source. Wildcard imports make this worse — the LLM has no list of available symbols, so it guesses.
 2. **Explicit is debuggable**: when an import is missing, the error is `NAM003: undefined 'sin'` with a `fix: "add 'sin' to import from 'math'"`. With wildcards, the LLM has no signal that `sin` was never exported.
 3. **Forces LLM to know what it uses**: this is a feature, not a bug. LLMs that must declare imports produce more predictable code.
 
