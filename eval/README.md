@@ -112,4 +112,6 @@ This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses �
 
 ## Baseline results
 
-Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/100 on the original 100-task set) is recorded in `REPORT.md`; raw candidates are preserved in `eval/candidates/`. Note: tasks 101-113 were added after that baseline run and have not yet been LLM-tested.
+Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/100 on the original 100-task set) is recorded in `REPORT.md`; raw candidates are preserved in `eval/candidates/`.
+
+**2026-08-31 multi-model retest** (`REPORT-2026-08-31-multimodel.md`, via `llm_eval.py`): deepseek-v4-pro+thinking **113/113 (100%)**, deepseek-v4-flash 112/113, glm-4.7 112/113 — the project's "≥3 LLMs" bar (guide §3.3) is now met, and tasks 101-113 have their first LLM measurements. Only task 078 fails (same prompt-ambiguity failure as the 2026-08-03 baseline).
