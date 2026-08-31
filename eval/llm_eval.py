@@ -39,7 +39,13 @@ PROVIDERS = {
     "deepseek": "https://api.deepseek.com/chat/completions",
     # https://docs.bigmodel.cn/cn/guide/develop/http/introduction —— Bearer API key 直接可用
     "glm": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    # https://docs.bigmodel.cn/cn/coding-plan/quick-start —— Coding Plan 订阅 key 的专属端点
+    "glm-coding": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
 }
+
+# Coding Plan key 与平台按量 key 不通用；glm-coding 优先读 GLM_CODING_API_KEY / keys["glm-coding"]，
+# 未单独配置时回落到 glm 的 key（个人版套餐 key 两处通用的情况）
+KEY_FALLBACK = {"glm-coding": "glm"}
 
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 TASKS_DIR = os.path.join(os.path.dirname(__file__), "tasks")
@@ -50,7 +56,7 @@ FENCE_RE = re.compile(r"^```[a-zA-Z]*\n|\n```\s*$", re.M)
 
 
 def load_key(provider: str) -> str:
-    env_name = f"{provider.upper()}_API_KEY"
+    env_name = f"{provider.upper().replace('-', '_')}_API_KEY"
     if os.environ.get(env_name):
         return os.environ[env_name]
     keys_file = os.path.join(os.path.dirname(__file__), ".api_keys.json")
@@ -59,6 +65,10 @@ def load_key(provider: str) -> str:
             keys = json.load(f)
         if keys.get(provider):
             return keys[provider]
+        # 回落（如 glm-coding → glm）
+        fallback = KEY_FALLBACK.get(provider)
+        if fallback and keys.get(fallback):
+            return keys[fallback]
     sys.exit(f"找不到 {provider} 的 API key：设环境变量 {env_name} 或写 eval/.api_keys.json")
 
 
@@ -98,7 +108,16 @@ def call_api(base_url: str, key: str, model: str, prompt: str,
         try:
             with urllib.request.urlopen(req, timeout=600) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
+            finish = data["choices"][0].get("finish_reason", "?")
+            if not content or not content.strip():
+                # 空回复实测发生（deepseek 05_match_enum 返回空 content）——按可重试处理
+                if attempt < retries:
+                    print(f"  空回复（finish_reason={finish}），重试...", file=sys.stderr)
+                    time.sleep(10)
+                    continue
+                sys.exit(f"API 反复返回空回复（finish_reason={finish}）")
+            return content
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:500]
             if attempt < retries and e.code in (429, 500, 502, 503, 504):
@@ -116,12 +135,16 @@ def call_api(base_url: str, key: str, model: str, prompt: str,
 
 
 def extract_blocks(text: str) -> dict:
-    """从回复中提取 === NNN.lom === 块；容忍块内包裹 ```lom 围栏"""
+    """从回复中提取 === NNN.lom === 块；容忍块内包裹 ```lom 围栏和尾部孤立的 === 行"""
     out = {}
     for m in BLOCK_RE.finditer(text):
         code = m.group(2).strip("\n")
         code = FENCE_RE.sub("", code).strip("\n")
-        out[m.group(1)] = code + "\n"
+        # 模型偶尔在块尾多写一个孤立的 ===（把分隔符当成成对标记）
+        lines = code.split("\n")
+        while lines and lines[-1].strip() == "===":
+            lines.pop()
+        out[m.group(1)] = "\n".join(lines).strip("\n") + "\n"
     return out
 
 
@@ -135,20 +158,47 @@ def main():
     ap.add_argument("--thinking", action="store_true",
                     help="开启思考模式（DeepSeek/GLM 的 thinking.type=enabled）")
     ap.add_argument("--only", default=None, help="只跑某个分类（如 05_match_enum），调试用")
+    ap.add_argument("--from-raw", action="store_true",
+                    help="不调 API，从已有 raw/ 回复重新提取（提取器修复后复用，零成本）")
     ap.add_argument("--out-root", default=os.path.join(os.path.dirname(__file__), "candidates_rerun"))
+    ap.add_argument("--out-name", default=None,
+                    help="覆盖输出目录名（默认 <provider>_<model>；断点续跑时对齐已有目录）")
     args = ap.parse_args()
 
-    key = load_key(args.provider)
-    out_dir = os.path.join(args.out_root, f"{args.provider}_{args.model}")
+    out_dir = os.path.join(args.out_root, args.out_name or f"{args.provider}_{args.model}")
     raw_dir = os.path.join(out_dir, "raw")
     os.makedirs(raw_dir, exist_ok=True)
 
     want = expected_ids()
+
+    if args.from_raw:
+        # 离线重提取：raw/*.md → 候选文件
+        total_e = total_x = 0
+        for fn in sorted(os.listdir(raw_dir)):
+            if not fn.endswith(".md"):
+                continue
+            cat = fn[:-3]
+            with open(os.path.join(raw_dir, fn), encoding="utf-8") as f:
+                reply = f.read()
+            blocks = extract_blocks(reply)
+            for tid, code in blocks.items():
+                with open(os.path.join(out_dir, f"{tid}.lom"), "w", encoding="utf-8") as f:
+                    f.write(code)
+            missing = [i for i in want.get(cat, []) if i not in blocks]
+            total_e += len(want.get(cat, []))
+            total_x += len(blocks)
+            print(f"[{cat}] 重提取 {len(blocks)}/{len(want.get(cat, []))}"
+                  + ("" if not missing else f" 缺 {missing}"))
+        print(f"\n重提取完成：{total_x}/{total_e}")
+        return
+
+    key = load_key(args.provider)
+
     stats = {}
     t0 = datetime.datetime.now(datetime.timezone.utc)
 
     for fn in sorted(os.listdir(PROMPTS_DIR)):
-        if not fn.endswith(".md") or fn.startswith("_"):
+        if not fn.endswith(".md") or fn.startswith("_") or fn == "README.md":
             continue
         cat = fn[:-3]
         if args.only and cat != args.only:
