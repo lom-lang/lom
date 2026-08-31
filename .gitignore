@@ -38,3 +38,7 @@ _file_demo_tmp.txt
 examples/_todo_data.json
 # Lom 运行时产物（fix-history.jsonl 等）
 .lom/
+
+# LLM 复测管线（2026-08-31）：密钥与复测产物
+eval/.api_keys.json
+eval/candidates_rerun/
