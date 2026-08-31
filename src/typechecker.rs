@@ -463,9 +463,9 @@ impl TypeChecker {
         // 检查函数体
         let body_ty = self.check_block(&f.body, &mut env);
         // 检查返回类型匹配
-        if let Some(ret_ty) = &f.ret_type {
-            if let TypeOrUnknown::Known(bt) = &body_ty {
-                if !self.types_compatible(bt, ret_ty) {
+        if let Some(ret_ty) = &f.ret_type
+            && let TypeOrUnknown::Known(bt) = &body_ty
+                && !self.types_compatible(bt, ret_ty) {
                     self.push_diag(
                         Severity::Warning,
                         "TYPE010".into(),
@@ -477,8 +477,6 @@ impl TypeChecker {
                         self.current_fn_span.col,
                     );
                 }
-            }
-        }
         self.current_ret = None;
         self.current_effects.clear();
         self.current_fn_is_main = false;
@@ -500,8 +498,8 @@ impl TypeChecker {
         match stmt {
             Stmt::Let { name, ty, value, .. } => {
                 let val_ty = self.check_expr(value, env);
-                if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty) {
-                    if !self.types_compatible(vt, annot) {
+                if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty)
+                    && !self.types_compatible(vt, annot) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE001".into(),
@@ -513,7 +511,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
                 let final_ty = if let Some(annot) = ty {
                     TypeOrUnknown::Known(annot.clone())
                 } else {
@@ -555,8 +552,7 @@ impl TypeChecker {
                 let val_ty = self.check_expr(value, env);
                 if let Some(expected) = env.get(target) {
                     if let (TypeOrUnknown::Known(e), TypeOrUnknown::Known(v)) = (&expected, &val_ty)
-                    {
-                        if !self.types_compatible(v, e) {
+                        && !self.types_compatible(v, e) {
                             self.push_diag(
                                 Severity::Warning,
                                 "TYPE001".into(),
@@ -568,7 +564,6 @@ impl TypeChecker {
                                 0,
                             );
                         }
-                    }
                 } else {
                     self.push_diag(
                         Severity::Error,
@@ -582,8 +577,8 @@ impl TypeChecker {
             Stmt::If(if_stmt) => {
                 for (cond, body) in &if_stmt.branches {
                     let cond_ty = self.check_expr(cond, env);
-                    if let TypeOrUnknown::Known(t) = &cond_ty {
-                        if !matches!(t, Type::Bool) {
+                    if let TypeOrUnknown::Known(t) = &cond_ty
+                        && !matches!(t, Type::Bool) {
                             self.push_diag(
                                 Severity::Warning,
                                 "TYPE002".into(),
@@ -592,7 +587,6 @@ impl TypeChecker {
                                 0,
                             );
                         }
-                    }
                     self.check_block(body, env);
                 }
                 if let Some(else_b) = &if_stmt.else_branch {
@@ -601,8 +595,8 @@ impl TypeChecker {
             }
             Stmt::While { cond, body } => {
                 let cond_ty = self.check_expr(cond, env);
-                if let TypeOrUnknown::Known(t) = &cond_ty {
-                    if !matches!(t, Type::Bool) {
+                if let TypeOrUnknown::Known(t) = &cond_ty
+                    && !matches!(t, Type::Bool) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE002".into(),
@@ -611,7 +605,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
                 self.check_block(body, env);
             }
             Stmt::For { var, iter, body } => {
@@ -637,8 +630,7 @@ impl TypeChecker {
                     None => TypeOrUnknown::known(Type::Unit),
                 };
                 if let (Some(expected), TypeOrUnknown::Known(actual)) = (&self.current_ret, &ret_ty)
-                {
-                    if !self.types_compatible(actual, expected) {
+                    && !self.types_compatible(actual, expected) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE010".into(),
@@ -650,7 +642,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
             }
             Stmt::Expr(e) => {
                 self.check_expr(e, env);
@@ -781,8 +772,8 @@ impl TypeChecker {
                 let mut branch_tys = Vec::new();
                 for (cond, body) in &if_stmt.branches {
                     let cond_ty = self.check_expr(cond, env);
-                    if let TypeOrUnknown::Known(t) = &cond_ty {
-                        if !matches!(t, Type::Bool) {
+                    if let TypeOrUnknown::Known(t) = &cond_ty
+                        && !matches!(t, Type::Bool) {
                             self.push_diag(
                                 Severity::Warning,
                                 "TYPE002".into(),
@@ -791,7 +782,6 @@ impl TypeChecker {
                                 0,
                             );
                         }
-                    }
                     branch_tys.push(self.check_block(body, env));
                 }
                 if let Some(else_b) = &if_stmt.else_branch {
@@ -811,8 +801,8 @@ impl TypeChecker {
                 let body_ty = self.check_block(body, &mut closure_env);
                 self.current_ret = saved_ret;
                 // 检查返回类型匹配
-                if let (Some(ret), TypeOrUnknown::Known(bt)) = (ret_type, &body_ty) {
-                    if !self.types_compatible(bt, ret) {
+                if let (Some(ret), TypeOrUnknown::Known(bt)) = (ret_type, &body_ty)
+                    && !self.types_compatible(bt, ret) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE010".into(),
@@ -821,7 +811,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
                 TypeOrUnknown::unknown()
             }
             Expr::Match(m) => self.check_match(m, env),
@@ -830,8 +819,8 @@ impl TypeChecker {
                 match &inner_ty {
                     TypeOrUnknown::Known(Type::Result(ok_t, err_t)) => {
                         // ? on Result<T, E> yields T; requires enclosing fn to return Result<_, E>
-                        if let Some(ret) = &self.current_ret {
-                            if !self.result_compatible(ret, ok_t, err_t) {
+                        if let Some(ret) = &self.current_ret
+                            && !self.result_compatible(ret, ok_t, err_t) {
                                 self.push_diag(
                                     Severity::Warning,
                                     "TYPE020".into(),
@@ -843,12 +832,11 @@ impl TypeChecker {
                                     0,
                                 );
                             }
-                        }
                         TypeOrUnknown::Known((**ok_t).clone())
                     }
                     TypeOrUnknown::Known(Type::Option(t)) => {
-                        if let Some(ret) = &self.current_ret {
-                            if !self.option_compatible(ret, t) {
+                        if let Some(ret) = &self.current_ret
+                            && !self.option_compatible(ret, t) {
                                 self.push_diag(
                                     Severity::Warning,
                                     "TYPE020".into(),
@@ -860,7 +848,6 @@ impl TypeChecker {
                                     0,
                                 );
                             }
-                        }
                         TypeOrUnknown::Known((**t).clone())
                     }
                     TypeOrUnknown::Known(other) => {
@@ -930,8 +917,8 @@ impl TypeChecker {
             Expr::Range { start, end } => {
                 // v0.4.2 P1-1: a..b → List<Int>;两端已知且非 Int 报 TYPE001
                 for e in [start, end] {
-                    if let TypeOrUnknown::Known(t) = self.check_expr(e, env) {
-                        if !matches!(t, Type::Int) && !self.is_any_type(&t) {
+                    if let TypeOrUnknown::Known(t) = self.check_expr(e, env)
+                        && !matches!(t, Type::Int) && !self.is_any_type(&t) {
                             self.push_diag(
                                 Severity::Warning,
                                 "TYPE001".into(),
@@ -940,7 +927,6 @@ impl TypeChecker {
                                 0,
                             );
                         }
-                    }
                 }
                 TypeOrUnknown::known(Type::Generic("List".to_string(), vec![Type::Int]))
             }
@@ -981,8 +967,8 @@ impl TypeChecker {
                         for (i, ((pname, pty), arg_ty)) in
                             sig.params.iter().zip(arg_tys.iter()).enumerate()
                         {
-                            if let TypeOrUnknown::Known(at) = arg_ty {
-                                if !self.types_compatible(at, pty) {
+                            if let TypeOrUnknown::Known(at) = arg_ty
+                                && !self.types_compatible(at, pty) {
                                     self.push_diag(
                                         Severity::Warning,
                                         "TYPE003".into(),
@@ -994,7 +980,6 @@ impl TypeChecker {
                                         0,
                                     );
                                 }
-                            }
                             let _ = pname;
                         }
                     }
@@ -1082,9 +1067,9 @@ impl TypeChecker {
             let variant_name = self.check_pattern(&arm.pattern, &scrut_ty, &mut arm_env);
             // v0.4.2 P1-2: guard —— 检查类型为 Bool;带 guard 的臂不计入穷尽性(Rust 语义:
             // guard 运行时才知真假,不能证明覆盖)
-            if let Some(g) = &arm.guard {
-                if let TypeOrUnknown::Known(gt) = self.check_expr(g, &mut arm_env) {
-                    if !matches!(gt, Type::Bool) && !self.is_any_type(&gt) {
+            if let Some(g) = &arm.guard
+                && let TypeOrUnknown::Known(gt) = self.check_expr(g, &mut arm_env)
+                    && !matches!(gt, Type::Bool) && !self.is_any_type(&gt) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE002".into(),
@@ -1093,8 +1078,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
-            }
             if arm.guard.is_none() {
                 if let Some(vn) = variant_name {
                     matched_variants.insert(vn);
@@ -1112,8 +1095,8 @@ impl TypeChecker {
         // 穷尽性检查
         if !has_wildcard {
             if let TypeOrUnknown::Known(Type::Named(name)) = &scrut_ty {
-                if let Some(info) = self.enums.get(name).cloned() {
-                    if !info.is_builtin {
+                if let Some(info) = self.enums.get(name).cloned()
+                    && !info.is_builtin {
                         // 用户枚举：必须覆盖所有变体
                         // Phase 4.1.2: line 填 match 的 end 行，供 fix 精确定位插入点
                         for (vn, _) in &info.variants {
@@ -1131,7 +1114,6 @@ impl TypeChecker {
                             }
                         }
                     }
-                }
             } else if let TypeOrUnknown::Known(Type::Result(_, _)) = &scrut_ty {
                 // Result 必须覆盖 Ok 和 Err
                 if !matched_variants.contains("Ok") {
@@ -1418,8 +1400,8 @@ impl TypeChecker {
             }
             BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
                 // 比较运算返回 Bool；检查操作数类型一致（渐进式：不强制）
-                if let (TypeOrUnknown::Known(a), TypeOrUnknown::Known(b)) = (lt, rt) {
-                    if !self.types_compatible(a, b) {
+                if let (TypeOrUnknown::Known(a), TypeOrUnknown::Known(b)) = (lt, rt)
+                    && !self.types_compatible(a, b) {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE001".into(),
@@ -1428,7 +1410,6 @@ impl TypeChecker {
                             0,
                         );
                     }
-                }
                 TypeOrUnknown::known(Type::Bool)
             }
         }
@@ -1469,20 +1450,13 @@ impl TypeChecker {
             for (vn, fields) in &info.variants {
                 if vn == name {
                     if info.is_builtin {
-                        // Ok/Some 返回 Result/Option，Err 返回 Result，None 返回 Option
+                        // Ok/Err 都返回 Result<T, E>，Some/None 都返回 Option<T>
                         match enum_name.as_str() {
                             "Result" => {
-                                if name == "Ok" {
-                                    return TypeOrUnknown::known(Type::Result(
-                                        Box::new(Type::Named("T".to_string())),
-                                        Box::new(Type::Named("E".to_string())),
-                                    ));
-                                } else {
-                                    return TypeOrUnknown::known(Type::Result(
-                                        Box::new(Type::Named("T".to_string())),
-                                        Box::new(Type::Named("E".to_string())),
-                                    ));
-                                }
+                                return TypeOrUnknown::known(Type::Result(
+                                    Box::new(Type::Named("T".to_string())),
+                                    Box::new(Type::Named("E".to_string())),
+                                ));
                             }
                             "Option" => {
                                 return TypeOrUnknown::known(Type::Option(Box::new(Type::Named(

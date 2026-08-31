@@ -229,6 +229,7 @@ pub enum Expr {
     /// 语义：把 left 求值后作为 right 的第一个参数
     /// - left |> f       => f(left)
     /// - left |> f(args) => f(left, args...)
+    ///
     /// 左结合，优先级介于比较和算术之间（高于比较、低于 + -）
     Pipe { left: Box<Expr>, right: Box<Expr> },
     /// `..` range 表达式：start..end（v0.4.2 P1-1）

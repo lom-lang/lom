@@ -258,12 +258,11 @@ impl ReplSession {
         // 临时注册 main，执行，然后保留上下文
         // 但 program 可能只含 main，我们需要把 main 加入 interpreter.functions
         for item in &program.items {
-            if let Item::Fn(f) = item {
-                if f.name == "main" {
+            if let Item::Fn(f) = item
+                && f.name == "main" {
                     // 检查 main body：如果是单条 let 或表达式，需要在全局环境执行并保留绑定
                     return self.exec_repl_stmt(&f.body, original_input);
                 }
-            }
         }
         Ok(ReplResult {
             should_continue: true,
@@ -356,7 +355,7 @@ fn help_text() -> String {
     s.push_str("  :reset   重置会话（清空已定义的函数/变量）\n");
     s.push_str("  :show    显示累积的源码\n");
     s.push_str("  :q       退出 REPL\n");
-    s.push_str("\n");
+    s.push('\n');
     s.push_str("用法：\n");
     s.push_str("  fn add(a: Int, b: Int) -> Int\n    a + b\n  end\n");
     s.push_str("  let x = 5\n");

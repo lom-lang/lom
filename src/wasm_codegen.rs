@@ -53,7 +53,7 @@ const IMP_ENV_ARGS: u32 = 12; // () -> i64 List<String>（宿主物化：argv=[w
 const N_IMPORTS: u32 = 13;
 
 // ===== 运行时 helper 函数索引 =====
-const RT_BOX_F64: u32 = N_IMPORTS + 0; // (f64) -> i64      动态装盒（bump alloc 8 字节）
+const RT_BOX_F64: u32 = N_IMPORTS; // (f64) -> i64      动态装盒（bump alloc 8 字节）
 const RT_UNBOX_F64: u32 = N_IMPORTS + 1; // (i64) -> f64    拆盒
 const RT_PROMOTE_F64: u32 = N_IMPORTS + 2; // (i64) -> f64  Int→convert / F64→unbox / 其他 trap
 const RT_STR_EQ: u32 = N_IMPORTS + 3; // (i64, i64) -> i32 字符串按字节相等
@@ -1470,7 +1470,7 @@ impl Codegen {
                             // 字段名内容比较（7.7 修正：宿主物化的记录与编译期 intern 偏移不同源，必须比内容）
                             a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
                             a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
-                            a.i64c(target as i64).call(RT_STR_EQ).if_();
+                            a.i64c(target).call(RT_STR_EQ).if_();
                             ctx.labels.push(Label::If);
                             {
                                 a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
@@ -1511,14 +1511,13 @@ impl Codegen {
             let real: String = self.import_aliases.get(orig).cloned().unwrap_or_else(|| orig.to_string());
             // 顺序对齐解释器 eval_call：变体（未被遮蔽）→ 内建 → 用户函数 → 闭包变量
             // 枚举变体构造（未被局部变量遮蔽时）
-            if let Some(&(vidx, arity)) = self.variant_idx.get(orig) {
-                if ctx.lookup(orig).is_none() && ctx.capture_slot(orig).is_none() {
+            if let Some(&(vidx, arity)) = self.variant_idx.get(orig)
+                && ctx.lookup(orig).is_none() && ctx.capture_slot(orig).is_none() {
                     if arity != args.len() {
                         return Err(format!("WASM 编译：变体 '{}' 期望 {} 个参数，得到 {} 个", orig, arity, args.len()));
                     }
                     return self.emit_enum_construct(ctx, a, vidx, args);
                 }
-            }
             // println / print（prelude）
             if real == "println" || real == "print" {
                 if args.len() != 1 {
@@ -1765,9 +1764,9 @@ impl Codegen {
             }
             "file_write" | "file_append" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
-                for i in 0..2 {
-                    a.lget(s[i]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
-                    a.lget(s[i]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+                for &si in s.iter().take(2) {
+                    a.lget(si).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
+                    a.lget(si).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
                 }
                 a.call(if name == "file_write" { IMP_FILE_WRITE } else { IMP_FILE_APPEND });
             }

@@ -479,11 +479,10 @@ impl<'a> JsonParser<'a> {
             return false;
         }
         // 确保关键字后是分隔符（避免 trueX 被误匹配）
-        if let Some(c) = self.src.get(self.pos + kw.len()) {
-            if c.is_ascii_alphanumeric() || *c == b'_' {
+        if let Some(c) = self.src.get(self.pos + kw.len())
+            && (c.is_ascii_alphanumeric() || *c == b'_') {
                 return false;
             }
-        }
         for _ in 0..kw.len() {
             self.advance();
         }
@@ -610,6 +609,16 @@ fn stringify_into(v: &Value, out: &mut String) {
 /// 序列化字符串（含转义）
 fn stringify_string(s: &str, out: &mut String) {
     out.push('"');
+    out.push_str(&escape_str(s));
+    out.push('"');
+}
+
+/// JSON 字符串内容转义（不含外层引号）
+///
+/// 全库唯一实现（2026-08-31 第四轮评审整改收敛：diagnostics/fix/info/doc
+/// 曾各手抄一份，加上这里共 5 份重复实现）。
+pub fn escape_str(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
     for c in s.chars() {
         match c {
             '"' => out.push_str("\\\""),
@@ -619,13 +628,11 @@ fn stringify_string(s: &str, out: &mut String) {
             '\t' => out.push_str("\\t"),
             '\u{0008}' => out.push_str("\\b"),
             '\u{000C}' => out.push_str("\\f"),
-            c if (c as u32) < 0x20 => {
-                out.push_str(&format!("\\u{:04x}", c as u32));
-            }
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
             c => out.push(c),
         }
     }
-    out.push('"');
+    out
 }
 
 #[cfg(test)]

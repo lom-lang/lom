@@ -109,7 +109,7 @@ fn epoch_to_utc(secs: u64) -> String {
 }
 
 fn is_leap_year(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 // ===== 序列化 =====
@@ -289,11 +289,10 @@ fn parse_change(obj: &str) -> Option<HistoryChange> {
 /// 若父目录不存在则自动创建（如 .lom/）。
 pub fn append_history(entry: &FixHistoryEntry, path: &Path) -> io::Result<()> {
     // 确保父目录存在
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent)?;
         }
-    }
 
     let line = entry_to_json(entry) + "\n";
     let mut file = OpenOptions::new()
@@ -322,7 +321,7 @@ pub fn read_history(path: &Path) -> io::Result<Vec<FixHistoryEntry>> {
     let entries: Vec<FixHistoryEntry> = content
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .filter_map(|line| parse_entry(line))
+        .filter_map(parse_entry)
         .collect();
     Ok(entries)
 }

@@ -732,7 +732,7 @@ impl Interpreter {
                         elems.len()
                     )));
                 }
-                for (name, elem) in names.iter().zip(elems.into_iter()) {
+                for (name, elem) in names.iter().zip(elems) {
                     env.borrow_mut().define(name.clone(), elem);
                 }
                 Ok(ControlFlow::Normal(Value::Unit))
@@ -855,12 +855,11 @@ impl Interpreter {
                         variant: name.clone(),
                         args: Vec::new(),
                     })
-                } else if self.functions.contains_key(name) {
+                } else if let Some(f) = self.functions.get(name) {
                     // 函数引用（转为闭包）
                     // v0.4.2 P1-3: 具名函数作为一等值 —— 包装为闭包值
                     // 环境取 globals（与 call_function 的父环境一致），行为与直接调用完全等价；
                     // 递归不受影响（函数体内按名调用仍走 functions 表）
-                    let f = self.functions.get(name).unwrap();
                     Ok(Value::Closure {
                         params: f.params.clone(),
                         body: f.body.clone(),
@@ -1380,7 +1379,7 @@ impl Interpreter {
                 m1.len() == m2.len()
                     && m1
                         .iter()
-                        .all(|(k, v)| m2.get(k).map_or(false, |v2| self.values_eq(v, v2)))
+                        .all(|(k, v)| m2.get(k).is_some_and(|v2| self.values_eq(v, v2)))
             }
             _ => false,
         }
@@ -1654,7 +1653,7 @@ impl Interpreter {
                     ) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            out.push(self.call_closure(params, body, env.clone(), &[e.clone()])?);
+                            out.push(self.call_closure(params, body, env.clone(), std::slice::from_ref(e))?);
                         }
                         Ok(Some(Value::List(ListVal::from_vec(out))))
                     }
@@ -1678,7 +1677,7 @@ impl Interpreter {
                     ) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            let keep = self.call_closure(params, body, env.clone(), &[e.clone()])?;
+                            let keep = self.call_closure(params, body, env.clone(), std::slice::from_ref(e))?;
                             if keep.is_truthy()? {
                                 out.push(e.clone());
                             }

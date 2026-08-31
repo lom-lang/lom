@@ -30,6 +30,7 @@
 //     ]
 //   }
 
+use crate::json::escape_str;
 use crate::ast::*;
 
 /// 类型信息（lom-info/v1 schema 的 Rust 表示）
@@ -103,7 +104,7 @@ pub fn collect_info(program: &Program, file: &str) -> ProgramInfo {
                 functions.push(FnInfo {
                     name: f.name.clone(),
                     params,
-                    ret_type: f.ret_type.as_ref().map(|t| type_to_string(t)),
+                    ret_type: f.ret_type.as_ref().map(type_to_string),
                     effects: f.effects.clone(),
                     is_main: f.name == "main",
                 });
@@ -114,7 +115,7 @@ pub fn collect_info(program: &Program, file: &str) -> ProgramInfo {
                     .iter()
                     .map(|v| VariantInfo {
                         name: v.name.clone(),
-                        fields: v.fields.iter().map(|t| type_to_string(t)).collect(),
+                        fields: v.fields.iter().map(type_to_string).collect(),
                     })
                     .collect();
                 enums.push(EnumInfo {
@@ -166,7 +167,7 @@ pub fn type_to_string(t: &Type) -> String {
             if args.is_empty() {
                 name.clone()
             } else {
-                let args_str: Vec<String> = args.iter().map(|a| type_to_string(a)).collect();
+                let args_str: Vec<String> = args.iter().map(type_to_string).collect();
                 format!("{}<{}>", name, args_str.join(", "))
             }
         }
@@ -178,35 +179,19 @@ pub fn type_to_string(t: &Type) -> String {
             format!("{{ {} }}", fs.join(", "))
         }
         Type::Tuple(tys) => {
-            let ts: Vec<String> = tys.iter().map(|t| type_to_string(t)).collect();
+            let ts: Vec<String> = tys.iter().map(type_to_string).collect();
             format!("({})", ts.join(", "))
         }
     }
 }
 
-/// JSON 字符串转义（与 diagnostics::json_escape 保持一致）
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out
-}
 
 /// 将 ProgramInfo 序列化为 lom-info/v1 JSON
 pub fn to_json(info: &ProgramInfo) -> String {
     let mut out = String::new();
     out.push_str("{\n");
     out.push_str("  \"schema\": \"lom-info/v1\",\n");
-    out.push_str(&format!("  \"file\": \"{}\",\n", json_escape(&info.file)));
+    out.push_str(&format!("  \"file\": \"{}\",\n", escape_str(&info.file)));
     out.push_str(&format!("  \"ok\": {},\n", info.ok));
 
     // functions
@@ -217,7 +202,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
         out.push('\n');
         for (i, f) in info.functions.iter().enumerate() {
             out.push_str("    {\n");
-            out.push_str(&format!("      \"name\": \"{}\",\n", json_escape(&f.name)));
+            out.push_str(&format!("      \"name\": \"{}\",\n", escape_str(&f.name)));
             // params
             out.push_str("      \"params\": [");
             if f.params.is_empty() {
@@ -226,8 +211,8 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, p) in f.params.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", json_escape(&p.name)));
-                    out.push_str(&format!("          \"type\": \"{}\"\n", json_escape(&p.ty)));
+                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&p.name)));
+                    out.push_str(&format!("          \"type\": \"{}\"\n", escape_str(&p.ty)));
                     out.push_str("        }");
                     if j + 1 < f.params.len() {
                         out.push(',');
@@ -238,7 +223,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
             }
             // ret_type
             match &f.ret_type {
-                Some(rt) => out.push_str(&format!("      \"ret_type\": \"{}\",\n", json_escape(rt))),
+                Some(rt) => out.push_str(&format!("      \"ret_type\": \"{}\",\n", escape_str(rt))),
                 None => out.push_str("      \"ret_type\": null,\n"),
             }
             // effects
@@ -248,7 +233,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
                     out.push_str(", ");
                 }
                 out.push('"');
-                out.push_str(&json_escape(e));
+                out.push_str(&escape_str(e));
                 out.push('"');
             }
             out.push_str("],\n");
@@ -271,7 +256,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
         out.push('\n');
         for (i, e) in info.enums.iter().enumerate() {
             out.push_str("    {\n");
-            out.push_str(&format!("      \"name\": \"{}\",\n", json_escape(&e.name)));
+            out.push_str(&format!("      \"name\": \"{}\",\n", escape_str(&e.name)));
             // type_params
             out.push_str("      \"type_params\": [");
             for (j, tp) in e.type_params.iter().enumerate() {
@@ -279,7 +264,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
                     out.push_str(", ");
                 }
                 out.push('"');
-                out.push_str(&json_escape(tp));
+                out.push_str(&escape_str(tp));
                 out.push('"');
             }
             out.push_str("],\n");
@@ -291,14 +276,14 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, v) in e.variants.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", json_escape(&v.name)));
+                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&v.name)));
                     out.push_str("          \"fields\": [");
                     for (k, fld) in v.fields.iter().enumerate() {
                         if k > 0 {
                             out.push_str(", ");
                         }
                         out.push('"');
-                        out.push_str(&json_escape(fld));
+                        out.push_str(&escape_str(fld));
                         out.push('"');
                     }
                     out.push_str("]\n");
@@ -327,7 +312,7 @@ pub fn to_json(info: &ProgramInfo) -> String {
         out.push('\n');
         for (i, imp) in info.imports.iter().enumerate() {
             out.push_str("    {\n");
-            out.push_str(&format!("      \"module\": \"{}\",\n", json_escape(&imp.module)));
+            out.push_str(&format!("      \"module\": \"{}\",\n", escape_str(&imp.module)));
             out.push_str("      \"items\": [");
             if imp.items.is_empty() {
                 out.push_str("]\n");
@@ -335,8 +320,8 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, it) in imp.items.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", json_escape(&it.name)));
-                    out.push_str(&format!("          \"alias\": \"{}\"\n", json_escape(&it.alias)));
+                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&it.name)));
+                    out.push_str(&format!("          \"alias\": \"{}\"\n", escape_str(&it.alias)));
                     out.push_str("        }");
                     if j + 1 < imp.items.len() {
                         out.push(',');

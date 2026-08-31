@@ -98,7 +98,7 @@ fn make_fn_hover(f: &FnDecl) -> HoverResult {
     let ret = f
         .ret_type
         .as_ref()
-        .map(|t| type_to_string(t))
+        .map(type_to_string)
         .unwrap_or_else(|| "Unit".to_string());
     let effects = if f.effects.is_empty() {
         String::new()
@@ -124,7 +124,7 @@ fn make_enum_hover(e: &EnumDecl) -> HoverResult {
             if v.fields.is_empty() {
                 format!("  {}", v.name)
             } else {
-                let fields: Vec<String> = v.fields.iter().map(|t| type_to_string(t)).collect();
+                let fields: Vec<String> = v.fields.iter().map(type_to_string).collect();
                 format!("  {}({})", v.name, fields.join(", "))
             }
         })
@@ -155,7 +155,7 @@ fn type_to_string(t: &Type) -> String {
             if args.is_empty() {
                 name.clone()
             } else {
-                let args_str: Vec<String> = args.iter().map(|a| type_to_string(a)).collect();
+                let args_str: Vec<String> = args.iter().map(type_to_string).collect();
                 format!("{}<{}>", name, args_str.join(", "))
             }
         }
@@ -167,7 +167,7 @@ fn type_to_string(t: &Type) -> String {
             format!("{{ {} }}", fs.join(", "))
         }
         Type::Tuple(tys) => {
-            let ts: Vec<String> = tys.iter().map(|t| type_to_string(t)).collect();
+            let ts: Vec<String> = tys.iter().map(type_to_string).collect();
             format!("({})", ts.join(", "))
         }
     }
@@ -228,7 +228,7 @@ pub fn handle_completion(src: &str) -> Vec<CompletionItem> {
             let ret = f
                 .ret_type
                 .as_ref()
-                .map(|t| type_to_string(t))
+                .map(type_to_string)
                 .unwrap_or_else(|| "Unit".to_string());
             items.push(CompletionItem {
                 label: f.name.clone(),
@@ -250,7 +250,7 @@ pub fn handle_completion(src: &str) -> Vec<CompletionItem> {
                 let detail = if v.fields.is_empty() {
                     v.name.clone()
                 } else {
-                    let fields: Vec<String> = v.fields.iter().map(|t| type_to_string(t)).collect();
+                    let fields: Vec<String> = v.fields.iter().map(type_to_string).collect();
                     format!("{}({})", v.name, fields.join(", "))
                 };
                 items.push(CompletionItem {
@@ -327,7 +327,7 @@ pub fn compute_diagnostics(src: &str, file: &str) -> Vec<Diagnostic> {
 /// id 为 None 表示通知（无 id 字段）
 pub fn parse_rpc_message(json: &str) -> Option<(Option<u64>, String, String)> {
     // 简单提取 "id", "method", "params" 字段
-    let id = extract_json_number_field(json, "id").map(|n| n as u64);
+    let id = extract_json_number_field(json, "id");
     let method = extract_json_string_field(json, "method")?;
     // params 可能是对象或数组，提取整个值
     let params = extract_json_object_field(json, "params").unwrap_or_default();

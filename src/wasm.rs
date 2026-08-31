@@ -406,12 +406,11 @@ impl Module {
                 // locals 分组编码：同类型连排合并
                 let mut groups: Vec<(u32, ValType)> = Vec::new();
                 for &l in &f.locals {
-                    if let Some(last) = groups.last_mut() {
-                        if last.1 == l {
+                    if let Some(last) = groups.last_mut()
+                        && last.1 == l {
                             last.0 += 1;
                             continue;
                         }
-                    }
                     groups.push((1, l));
                 }
                 let mut body = leb_u(groups.len() as u64);

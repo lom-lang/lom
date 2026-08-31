@@ -37,6 +37,7 @@
 //   TYPE001-099  类型错误（Phase 2.4 预留）
 //   RUNTIME001-099 运行时错误
 
+use crate::json::escape_str;
 use crate::lexer::LexError;
 use crate::parser::ParseError;
 use crate::interpreter::RuntimeError;
@@ -280,22 +281,6 @@ fn runtime_hint(code: &str) -> Option<String> {
 
 // ===== JSON 序列化（手写，零依赖）=====
 
-/// JSON 字符串转义
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out
-}
 
 // ===== 诊断集合 =====
 
@@ -366,7 +351,7 @@ impl Diagnostics {
         let mut out = String::new();
         out.push_str("{\n");
         out.push_str(&format!("  \"schema\": \"{}\",\n", self.schema));
-        out.push_str(&format!("  \"file\": \"{}\",\n", json_escape(&self.file)));
+        out.push_str(&format!("  \"file\": \"{}\",\n", escape_str(&self.file)));
         out.push_str(&format!("  \"ok\": {},\n", self.ok));
         out.push_str("  \"summary\": {\n");
         out.push_str(&format!("    \"total\": {},\n", total));
@@ -386,22 +371,22 @@ impl Diagnostics {
                 out.push_str(&format!("      \"code\": \"{}\",\n", d.code));
                 out.push_str(&format!(
                     "      \"message\": \"{}\",\n",
-                    json_escape(&d.message)
+                    escape_str(&d.message)
                 ));
-                out.push_str(&format!("      \"file\": \"{}\",\n", json_escape(&d.file)));
+                out.push_str(&format!("      \"file\": \"{}\",\n", escape_str(&d.file)));
                 out.push_str(&format!("      \"line\": {},\n", d.line));
                 out.push_str(&format!("      \"col\": {},\n", d.col));
                 match &d.source_line {
                     Some(s) => out.push_str(&format!(
                         "      \"source_line\": \"{}\",\n",
-                        json_escape(s)
+                        escape_str(s)
                     )),
                     None => out.push_str("      \"source_line\": null,\n"),
                 }
                 out.push_str(&format!("      \"is_hole\": {},\n", d.is_hole));
                 match &d.hint {
                     Some(h) => {
-                        out.push_str(&format!("      \"hint\": \"{}\"\n", json_escape(h)))
+                        out.push_str(&format!("      \"hint\": \"{}\"\n", escape_str(h)))
                     }
                     None => out.push_str("      \"hint\": null\n"),
                 }
@@ -573,11 +558,11 @@ mod tests {
 
     #[test]
     fn json_escape_handles_special_chars() {
-        assert_eq!(json_escape("hello"), "hello");
-        assert_eq!(json_escape("a\"b"), "a\\\"b");
-        assert_eq!(json_escape("a\\b"), "a\\\\b");
-        assert_eq!(json_escape("a\nb"), "a\\nb");
-        assert_eq!(json_escape("a\tb"), "a\\tb");
+        assert_eq!(escape_str("hello"), "hello");
+        assert_eq!(escape_str("a\"b"), "a\\\"b");
+        assert_eq!(escape_str("a\\b"), "a\\\\b");
+        assert_eq!(escape_str("a\nb"), "a\\nb");
+        assert_eq!(escape_str("a\tb"), "a\\tb");
     }
 
     #[test]

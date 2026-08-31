@@ -65,6 +65,7 @@
 //   true  — 至少有一个 fix 提供了可应用的修复（非 hint 动作，或 hint 带具体 text）
 //   false — 仅纯文字 hint，LLM 需自己理解后修复（retry 价值不大）
 
+use crate::json::escape_str;
 use crate::diagnostics::{Diagnostic, Diagnostics, Severity, Stage};
 
 // ===== 数据结构 =====
@@ -712,10 +713,13 @@ fn find_effect_close_bracket(line: &str) -> Option<usize> {
             }
             if j < chars.len() && chars[j] == '[' {
                 // 找到 `! [`，现在找 `]`
-                for k in j + 1..chars.len() {
-                    if chars[k] == ']' {
-                        return Some(k);
-                    }
+                if let Some((k, _)) = chars
+                    .iter()
+                    .enumerate()
+                    .skip(j + 1)
+                    .find(|(_, c)| **c == ']')
+                {
+                    return Some(k);
                 }
             }
         }
@@ -875,21 +879,6 @@ fn extract_second_bracketed(msg: &str) -> Option<String> {
 
 // ===== JSON 序列化 =====
 
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out
-}
 
 /// 将 FixPlan 序列化为 lom-fix/v1 JSON
 pub fn to_json(plan: &FixPlan) -> String {
@@ -904,7 +893,7 @@ pub fn to_json(plan: &FixPlan) -> String {
     let mut out = String::new();
     out.push_str("{\n");
     out.push_str("  \"schema\": \"lom-fix/v1\",\n");
-    out.push_str(&format!("  \"file\": \"{}\",\n", json_escape(&plan.file)));
+    out.push_str(&format!("  \"file\": \"{}\",\n", escape_str(&plan.file)));
     out.push_str(&format!("  \"ok\": {},\n", plan.ok));
     out.push_str("  \"summary\": {\n");
     out.push_str(&format!("    \"total\": {},\n", total));
@@ -921,12 +910,12 @@ pub fn to_json(plan: &FixPlan) -> String {
             // diagnostic
             out.push_str("    {\n");
             out.push_str("      \"diagnostic\": {\n");
-            out.push_str(&format!("        \"code\": \"{}\",\n", json_escape(&p.diagnostic.code)));
+            out.push_str(&format!("        \"code\": \"{}\",\n", escape_str(&p.diagnostic.code)));
             out.push_str(&format!("        \"severity\": \"{}\",\n", p.diagnostic.severity.as_str()));
             out.push_str(&format!("        \"stage\": \"{}\",\n", p.diagnostic.stage.as_str()));
             out.push_str(&format!("        \"line\": {},\n", p.diagnostic.line));
             out.push_str(&format!("        \"col\": {},\n", p.diagnostic.col));
-            out.push_str(&format!("        \"message\": \"{}\"\n", json_escape(&p.diagnostic.message)));
+            out.push_str(&format!("        \"message\": \"{}\"\n", escape_str(&p.diagnostic.message)));
             out.push_str("      },\n");
 
             // fixes
@@ -937,7 +926,7 @@ pub fn to_json(plan: &FixPlan) -> String {
                 out.push('\n');
                 for (j, f) in p.fixes.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"description\": \"{}\",\n", json_escape(&f.description)));
+                    out.push_str(&format!("          \"description\": \"{}\",\n", escape_str(&f.description)));
                     out.push_str(&format!("          \"action\": \"{}\",\n", f.action.as_str()));
                     out.push_str(&format!("          \"line\": {},\n", f.line));
                     out.push_str(&format!("          \"col\": {},\n", f.col));
@@ -950,7 +939,7 @@ pub fn to_json(plan: &FixPlan) -> String {
                         None => out.push_str("          \"end_col\": null,\n"),
                     }
                     match &f.text {
-                        Some(t) => out.push_str(&format!("          \"text\": \"{}\",\n", json_escape(t))),
+                        Some(t) => out.push_str(&format!("          \"text\": \"{}\",\n", escape_str(t))),
                         None => out.push_str("          \"text\": null,\n"),
                     }
                     out.push_str(&format!("          \"confidence\": \"{}\"\n", f.confidence.as_str()));

@@ -27,6 +27,7 @@
 //     ]
 //   }
 
+use crate::json::escape_str;
 use crate::ast::*;
 use crate::info::type_to_string;
 
@@ -117,7 +118,7 @@ pub fn collect_doc(program: &Program, source: &str, file: &str) -> DocModule {
                     .map(|v| {
                         (
                             v.name.clone(),
-                            v.fields.iter().map(|t| type_to_string(t)).collect(),
+                            v.fields.iter().map(type_to_string).collect(),
                         )
                     })
                     .collect();
@@ -173,7 +174,7 @@ pub fn to_json(module: &DocModule) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "{{\"schema\":\"lom-doc/v1\",\"file\":\"{}\",\"ok\":{},\"items\":[",
-        json_escape(&module.file),
+        escape_str(&module.file),
         module.ok
     ));
     for (i, item) in module.items.iter().enumerate() {
@@ -183,12 +184,12 @@ pub fn to_json(module: &DocModule) -> String {
         out.push_str(&format!(
             "{{\"kind\":\"{}\",\"name\":\"{}\",\"line\":{},\"signature\":\"{}\",\"doc\":",
             item.kind,
-            json_escape(&item.name),
+            escape_str(&item.name),
             item.line,
-            json_escape(&item.signature)
+            escape_str(&item.signature)
         ));
         match &item.doc {
-            Some(d) => out.push_str(&format!("\"{}\"", json_escape(d))),
+            Some(d) => out.push_str(&format!("\"{}\"", escape_str(d))),
             None => out.push_str("null"),
         }
         if !item.variants.is_empty() {
@@ -199,11 +200,11 @@ pub fn to_json(module: &DocModule) -> String {
                 }
                 let fs: Vec<String> = fields
                     .iter()
-                    .map(|f| format!("\"{}\"", json_escape(f)))
+                    .map(|f| format!("\"{}\"", escape_str(f)))
                     .collect();
                 out.push_str(&format!(
                     "{{\"name\":\"{}\",\"fields\":[{}]}}",
-                    json_escape(vname),
+                    escape_str(vname),
                     fs.join(",")
                 ));
             }
@@ -215,22 +216,6 @@ pub fn to_json(module: &DocModule) -> String {
     out
 }
 
-/// JSON 字符串转义（与 diagnostics/info 同风格的手写实现）
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out
-}
 
 #[cfg(test)]
 mod tests {

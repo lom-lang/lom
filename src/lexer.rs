@@ -480,7 +480,7 @@ impl<'a> Lexer<'a> {
             }
         }
         // 浮点数
-        if self.peek() == Some(b'.') && self.peek_next().map_or(false, |c| c.is_ascii_digit()) {
+        if self.peek() == Some(b'.') && self.peek_next().is_some_and(|c| c.is_ascii_digit()) {
             self.advance(); // .
             while let Some(c) = self.peek() {
                 if c.is_ascii_digit() {
