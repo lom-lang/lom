@@ -42,3 +42,4 @@ examples/_todo_data.json
 # LLM 复测管线（2026-08-31）：密钥与复测产物
 eval/.api_keys.json
 eval/candidates_rerun/
+eval/__pycache__/

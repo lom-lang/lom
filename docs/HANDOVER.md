@@ -37,7 +37,7 @@
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环；**修复引擎深化 M1-M4 全部完成**（v0.16.0-v0.19.0）；**第四轮评审整改完成**（2026-08-31，docs/reviews/review-2026-08-31.html，记录见 §11 末条） |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；修复引擎深化 M1-M4 完成（v0.16.0-v0.19.0）；第四轮评审整改完成；**多模型复测达成**（4 模型 99.1%-100%，eval/REPORT-2026-08-31-multimodel.md） |
 | 下一步 | 修复引擎深化收官；远期候选：LLM 复测（需真实 LLM 资源，108→113 任务包已就绪）/ 全量自举（RFC-0003 draft 已存档）/ v1.0 冻结——等用户指令 |
 | 遗留挂账 | **不可变重赋值无任何校验**（`let x=3; x=4` 静默通过，spec §5.1 已诚实化，是否实现 warning 级校验待用户裁决——第四轮评审复核自发现）；表达式级 span（Phase 3.2b 挂账，M1 拼写修复因此只能整词扫描定位）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举（RFC-0003 草案搁置中） |
 
@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 417/417（2026-08-31 基线）
+cargo test --release                                    # 期望 418/418（2026-08-31 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 113/113
 ```
@@ -272,7 +272,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 417/417、零 warning、`./target/release/lom.exe --version` 显示 0.19.1
+2. `cargo build --release && cargo test --release` 确认 418/418、零 warning、`./target/release/lom.exe --version` 显示 0.19.1
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（全量自举 Phase 8 / v1.0 冻结 / 其他）

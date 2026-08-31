@@ -1,6 +1,6 @@
-# Lom Design Rationale (v0.1)
+# Lom Design Rationale (v0.2)
 
-> **Status**: Phase 0 Draft · 2026-08-02
+> **Status**: Living document · updated 2026-08-31
 > **Purpose**: Explain *why* Lom is AI-native, decision by decision. This document is the defense against the critique that "AI-native language" is marketing hype without language-level substance.
 
 ---

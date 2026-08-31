@@ -180,7 +180,7 @@
   <tr><td>Phase 8:全量自举</td><td>RFC-0003 draft(远期候选)</td></tr>
 </table>
 
-<p>量化指标:Rust 测试 <strong>417/417</strong>;CI 三平台 <strong>7 个回归 gate</strong> 全绿;eval runner <strong>113/113</strong>;LLM 实测 <strong>99/100</strong>(2026-08-03,原 100 任务——引用这个数字必须带时间和范围,见第五部分)。</p>
+<p>量化指标:Rust 测试 <strong>418/418</strong>;CI 三平台 <strong>8 个回归 gate</strong> 全绿;eval runner <strong>113/113</strong>;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
@@ -718,7 +718,7 @@ mathlib = { path = "mathlib" }</code></pre>
 
 <table>
   <tr><th>gate</th><th>内容</th><th>防什么</th></tr>
-  <tr><td>① 单元测试</td><td><code>cargo test --release</code>,417 个测试</td><td>代码级回归</td></tr>
+  <tr><td>① 单元测试</td><td><code>cargo test --release</code>,418 个测试</td><td>代码级回归</td></tr>
   <tr><td>② 自举 golden</td><td>stmt_interp.lom 输出与 golden 文件<strong>逐字 diff</strong>(比对前 <code>tr -d '\r'</code>)</td><td>"行数对但内容错"的静默回归(行数防线被评审指出太弱)</td></tr>
   <tr><td>③ 零依赖</td><td>awk 状态机扫 Cargo.toml 的 [dependencies](覆盖 <code>[dependencies.foo]</code> 表形态)</td><td>供应链承诺被悄悄破坏</td></tr>
   <tr><td>④ fmt</td><td>全部示例 <code>lom fmt --check</code> 幂等(apply_test.lom 是故意坏文件,豁免)</td><td>格式漂移</td></tr>
@@ -868,7 +868,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>M1 拼写 Replace(v0.16.0,Medium 不自动应用)→ M2 --apply 迭代闭环(v0.17.0,三重刹车防震荡,上限 5 轮)→ M3 PARSE001 针对性修复(v0.18.0,<strong>动手前先 --json 探针实测,推翻了两个计划假设</strong>——缺 end 被容错解析静默接受、缺 ')' 的位置在下一个 token)。M4 已完成(v0.19.0):评测任务扩到 113 + fix_corpus 语料逐字回归。亮点是"先实测再写规则"和"凡声称的行为都有逐字防线钉住"。</p></div>
 
 <div class="qa"><p class="q">Q:项目现在什么进度?下一步做什么?</p>
-<p>v0.19.0,路线图 Phase 0-7 全部闭环,修复引擎深化 M1-M4 全部完成;远期两条线:全量自举(RFC-0003 draft,L1 解释器为目标、L2 编译器明确不做)与 v1.0 冻结。量化:417 测试、CI 三平台 7 gate、eval 113/113。答这题的分寸感:主动说清 LLM 实测 99/100 是 2026-08-03 原 100 任务的数据,101+ 任务未实测——数字都带测量条件。</p></div>
+<p>v0.19.0,路线图 Phase 0-7 全部闭环,修复引擎深化 M1-M4 全部完成;远期两条线:全量自举(RFC-0003 draft,L1 解释器为目标、L2 编译器明确不做)与 v1.0 冻结。量化:418 测试、CI 三平台 8 gate、eval 113/113。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
 
 <hr>
 <!-- ============================================================ -->
@@ -877,7 +877,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>项目文档与代码/数据的出入,以<strong>代码和实测为准</strong>。旧版教程列的三处旧账(拼写建议未消费、Phase 4 合入状态、Cargo.toml 停在 0.1.0)如今<strong>全部已修或不成立</strong>——M1 已让 fix.rs 消费拼写建议、语义版本管理已落地——<strong>别再拿旧账当"防露馅"素材,那才是真正的露馅</strong>。当前有效的三处:</p>
 
 <ol>
-  <li><strong>eval/REPORT.md 是时间胶囊</strong>:它记录的是 2026-08-03 / v0.1.3 / 100 任务时代的数据。引用"99/100"必须带时间和范围——评测集此后扩到 113,<strong>101+ 任务从未跑过 LLM 实测</strong>;runner 侧的 113/113 是"参考解通过",和"LLM 生成通过"是两回事,别混着说。</li>
+  <li><strong>eval/REPORT.md 是时间胶囊</strong>:它记录的是 2026-08-03 / v0.1.3 / 100 任务时代的数据。引用"99/100"必须带时间和范围——<strong>2026-08-31 的四模型复测(REPORT-2026-08-31-multimodel.md,99.1%-100% 全 113 任务)才是当前主证据</strong>;runner 侧的 113/113 是"参考解通过",和"LLM 生成通过"是两回事,别混着说。</li>
   <li><strong>工作区与 git 的边界</strong>:fix_corpus 语料与 M4 记录已提交入库(v0.19.0,HANDOVER §11 有完整记录);但 <strong>RFC-0003 全量自举草案仍未提交、未 accept</strong>——讲项目方向时别把 draft 当定案。通用规则:引用项目状态以 git log 的已提交状态为准,工作区文件不算数。</li>
   <li><strong>注释与代码的残留不一致</strong>:parser.rs 文件头注释自称"Pratt 解析",实际是固定优先级链(面试按链式结构讲);SPEC/LANGUAGE_SPEC 的特性表历史上抓出过虚构内容(关键字表、类型别名),三清扫已修,但<strong>对任何"文档说有"的特性,引用前都值得拿 lexer/parser 实测对账一次</strong>。</li>
 </ol>
@@ -962,7 +962,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td><code>LANGUAGE_SPEC.md</code></td><td>完整语言规范(权威定义)</td></tr>
   <tr><td><a href="lom-project-guide.html">docs/lom-project-guide.html</a></td><td>项目最高指导文件:定位、路线图、治理</td></tr>
   <tr><td><code>docs/HANDOVER.md</code></td><td>AI 交接文档:项目快照、坑清单、评审整改(活文档)</td></tr>
-  <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(<strong>2026-08-03 快照</strong>,含失败案例分析;101+ 任务未实测,引用数字看第五部分)</td></tr>
+  <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(<strong>2026-08-03 快照</strong>,含失败案例分析);<strong>当前主证据是 2026-08-31 四模型复测</strong>(eval/REPORT-2026-08-31-multimodel.md)</td></tr>
   <tr><td><strong>本文档</strong></td><td>代码实现层的入门讲解 + 面试备战</td></tr>
 </table>
 
