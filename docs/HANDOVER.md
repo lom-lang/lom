@@ -64,7 +64,7 @@ cargo build --release                    # 构建应零 warning（2026-08-22 已
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 直接传文件运行
 ```
 
-**坑 1：没有 `lom run` 子命令**。运行就是 `lom.exe <file>`。子命令有 `info` / `fix` / `repl` / `lsp` / `build` / `doc` / `fmt`（见 src/main.rs）。另有 `--check` / `--json` / `--version`。**注意：默认运行模式也会执行类型检查**（诊断走 stderr，不拦截执行）——示例程序 stderr 应保持干净。
+**坑 1：没有 `lom run` 子命令**。运行就是 `lom.exe <file>`。子命令有 `info` / `fix` / `repl` / `lsp` / `build` / `doc` / `fmt`（见 src/main.rs）。另有 `--check` / `--json` / `--dump-ast` / `--version`。**注意：默认运行模式也会执行类型检查**（诊断走 stderr，不拦截执行）——示例程序 stderr 应保持干净。
 
 **坑 2：lom.exe 不在 PATH**。跑 eval runner 必须指定路径：
 
@@ -208,7 +208,7 @@ end
 
 ## 6. 已排期项历史档案（P0/P1/P2 全部关闭，仅作考古参考）
 
-> **2026-08-23 注**：本节所有排期项（P0 三件套、P1 三件套、P2 三项）已全部完成，下面的清单是历史记录。当前无已排期待办——编译器阶段方向已定案并闭环（Phase 7 WASM，RFC-0002，v0.15.0）；下一步候选：全量自举（Phase 8）/ v1.0 冻结 / 其他，等用户指令。评审整改的两轮记录见 §1。
+> **2026-08-23 注**：本节所有排期项（P0 三件套、P1 三件套、P2 三项）已全部完成，下面的清单是历史记录。**2026-08-31 更新**：方向已裁决——Phase 8 全量自举（RFC-0003 accepted，见 §1 下一步）；评审整改的两轮记录见 §1。
 
 2026-08-17 实测确认的缺口清单，按优先级（完整版含 P1/P2 见对话记录，核心是这三个）：
 

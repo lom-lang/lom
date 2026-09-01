@@ -180,7 +180,7 @@
   <tr><td>Phase 8:全量自举</td><td>RFC-0003 draft(远期候选)</td></tr>
 </table>
 
-<p>量化指标:Rust 测试 <strong>418/418</strong>;CI 三平台 <strong>8 个回归 gate</strong> 全绿;eval runner <strong>113/113</strong>;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
+<p>量化指标:Rust 测试 <strong>442/442</strong>;CI 三平台 <strong>9 个回归 gate</strong> 全绿（含 clippy）;eval runner <strong>113/113</strong>;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
