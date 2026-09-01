@@ -342,6 +342,112 @@ mod tests {
         dump_program(&r.program)
     }
 
+    // ===== Phase 8.1 自举前端的前提钉子 =====
+    // 自举侧（examples/selfhost/self_interp.lom）的 Float dump 用"字面量规范化"实现
+    // （去小数尾零 / .0 全零只留整数 / 整数部分去前导零），其与 Rust Display 等价的
+    // 前提是：验收集的 float 字面量规范化后恰为最短 round-trip 形式。本测试对
+    // examples 全量 + eval 参考解字面量样本断言这一前提——前提被破坏（出现
+    // 17 位以上有效数字等病态字面量）时，自举 dump 将与宿主分叉，此测试会先红。
+    fn selfhost_norm_float(lit: &str) -> String {
+        let (ip, fp) = lit.split_once('.').unwrap();
+        let ip = ip.trim_start_matches('0');
+        let ip = if ip.is_empty() { "0" } else { ip };
+        let fp = fp.trim_end_matches('0');
+        if fp.is_empty() {
+            ip.to_string()
+        } else {
+            format!("{ip}.{fp}")
+        }
+    }
+
+    #[test]
+    fn selfhost_float_norm_matches_rust_display_on_examples() {
+        let mut checked = 0;
+        for f in std::fs::read_dir("examples")
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "lom"))
+            .filter(|e| e.path() != std::path::Path::new("examples/apply_test.lom"))
+        {
+            let src = std::fs::read_to_string(f.path()).unwrap();
+            for (i, line) in src.lines().enumerate() {
+                let bare = line.split('#').next().unwrap_or("");
+                let bytes = bare.as_bytes();
+                let mut j = 0;
+                while j < bytes.len() {
+                    if bytes[j].is_ascii_digit() {
+                        let start = j;
+                        while j < bytes.len() && bytes[j].is_ascii_digit() {
+                            j += 1;
+                        }
+                        // 后跟 .digit 才是 float（1..10 中 1 是 Int）
+                        if j + 1 < bytes.len()
+                            && bytes[j] == b'.'
+                            && bytes[j + 1].is_ascii_digit()
+                        {
+                            j += 1;
+                            while j < bytes.len() && bytes[j].is_ascii_digit() {
+                                j += 1;
+                            }
+                            let lit = &bare[start..j];
+                            let parsed: f64 = lit.parse().unwrap();
+                            assert_eq!(
+                                selfhost_norm_float(lit),
+                                format!("{parsed}"),
+                                "自举 Float 规范化前提被破坏: {}:{} 字面量 {lit}",
+                                f.path().display(),
+                                i + 1
+                            );
+                            checked += 1;
+                        }
+                    } else {
+                        j += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 20, "扫描到的 float 字面量异常少: {checked}");
+    }
+
+    // 字符串值域前提：自举 dump 的 Rust Debug 转义只处理 \" \\ \n \r \t 五个，
+    // 其余可打印字符原样——验收集的字符串值（unescape 后）不得含其他控制字符。
+    #[test]
+    fn selfhost_string_value_domain_on_examples() {
+        let mut checked = 0;
+        for f in std::fs::read_dir("examples")
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "lom"))
+        {
+            let src = std::fs::read_to_string(f.path()).unwrap();
+            let bytes = src.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                if bytes[i] == b'"' {
+                    i += 1;
+                    while i < bytes.len() && bytes[i] != b'"' {
+                        let c = bytes[i];
+                        if c == b'\\' {
+                            i += 1; // 转义对：宿主 \c 归一为 c，合法集由下一字符的判定覆盖
+                        } else {
+                            assert!(
+                                c == b'\n' || c >= 0x20,
+                                "字符串值含非预期控制字符 0x{:02X}（{}:{}）——自举 dump 转义不覆盖",
+                                c,
+                                f.path().display(),
+                                i + 1
+                            );
+                        }
+                        i += 1;
+                    }
+                    checked += 1;
+                }
+                i += 1;
+            }
+        }
+        assert!(checked > 50, "扫描到的字符串字面量异常少: {checked}");
+    }
+
     #[test]
     fn dump_simple_fn_golden() {
         let src = "fn add(x: Int, y: Int) -> Int\n    x + y\nend\n";

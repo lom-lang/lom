@@ -960,19 +960,26 @@ impl Interpreter {
             }
             ExprKind::Group(e) => self.eval_expr(e, env),
             ExprKind::If(if_stmt) => {
+                // 2026-09-01 修复（Phase 8.1 自举开发中发现）：分支块内的提前返回
+                // （`?` 的 EarlyReturn 或显式 return，exec_block 统一转为 ControlFlow::Return）
+                // 必须继续向外传播到函数边界——此前 `Return(v) | Normal(v) => Ok(v)` 把
+                // 提前返回当成 if 表达式的值消费掉，导致块尾 if 表达式内的 `?`/return
+                // 静默失效（WASM 后端的 br $ret 穿透语义才是正确的，两后端就此对齐）。
                 for (cond, body) in &if_stmt.branches {
                     let c = self.eval_expr(cond, env.clone())?;
                     if c.is_truthy()? {
                         let block_env = Scope::new(Some(env));
                         return match self.exec_block(body, block_env)? {
-                            ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+                            ControlFlow::Normal(v) => Ok(v),
+                            ControlFlow::Return(v) => Err(RuntimeError::EarlyReturn(v)),
                         };
                     }
                 }
                 if let Some(else_body) = &if_stmt.else_branch {
                     let block_env = Scope::new(Some(env));
                     match self.exec_block(else_body, block_env)? {
-                        ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+                        ControlFlow::Normal(v) => Ok(v),
+                        ControlFlow::Return(v) => Err(RuntimeError::EarlyReturn(v)),
                     }
                 } else {
                     Ok(Value::Unit)
@@ -1003,8 +1010,10 @@ impl Interpreter {
                         return match &arm.body {
                             MatchArmBody::Expr(e) => self.eval_expr(e, arm_env),
                             MatchArmBody::Block(b) => {
+                                // 同 ExprKind::If 修复：Form B 臂块内的提前返回穿透到函数边界
                                 match self.exec_block(b, arm_env)? {
-                                    ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+                                    ControlFlow::Normal(v) => Ok(v),
+                                    ControlFlow::Return(v) => Err(RuntimeError::EarlyReturn(v)),
                                 }
                             }
                         };
@@ -2116,6 +2125,77 @@ mod tests {
     #[test]
     fn test_arithmetic() {
         let src = "fn main() -> Unit\n    println(1 + 2 * 3)\nend";
+        run_src(src).unwrap();
+    }
+
+    // 2026-09-01（Phase 8.1）：`?`/return 在块尾 if 表达式与 match Form B 臂块内的
+    // 提前返回穿透修复的回归测试（此前 ControlFlow::Return 被当作块值消费，静默失效）
+    // 断言方式：probe() 若错误地返回 Ok，main 的 Ok 分支触发 list_get 越界使 run_src 报错
+    #[test]
+    fn test_try_in_tail_if_expr_propagates() {
+        let src = r#"
+fn might_fail(x: Int) -> Result<Int, String>
+    if x > 0
+        Ok(x)
+    else
+        Err("neg")
+    end
+end
+fn probe() -> Result<Int, String>
+    let mut t = 0
+    if True
+        if True
+            let v = might_fail(-1)?
+            t = v
+        end
+    end
+    Ok(t)
+end
+from list import { list_empty, list_get }
+fn main() -> Unit
+    match probe()
+        Ok(v) =>
+            let boom = list_get(list_empty(), v)
+            println("unexpected ok")
+        end
+        Err(_) => println("propagated")
+    end
+end
+"#;
+        run_src(src).unwrap();
+    }
+
+    #[test]
+    fn test_try_in_match_form_b_block_propagates() {
+        let src = r#"
+fn might_fail(x: Int) -> Result<Int, String>
+    if x > 0
+        Ok(x)
+    else
+        Err("neg")
+    end
+end
+fn probe() -> Result<Int, String>
+    let mut t = 0
+    match 1
+        1 =>
+            let v = might_fail(-1)?
+            t = v
+        end
+    end
+    Ok(t)
+end
+from list import { list_empty, list_get }
+fn main() -> Unit
+    match probe()
+        Ok(v) =>
+            let boom = list_get(list_empty(), v)
+            println("unexpected ok")
+        end
+        Err(_) => println("propagated")
+    end
+end
+"#;
         run_src(src).unwrap();
     }
 

@@ -57,6 +57,8 @@ struct CliArgs {
     output: Option<String>,
     /// Phase 8 前置（RFC-0003 §8.1）: --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查）
     dump_ast: bool,
+    /// Phase 8.1（RFC-0003）: --dump-tokens 打印容错词法的 token 流到 stdout（自举 lexer 对账工具）
+    dump_tokens: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     program_args: Vec<String>,
 }
@@ -101,6 +103,7 @@ fn print_help(prog: &str) {
     eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
     eprintln!("  --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查；Phase 8 自举验收工具）");
+    eprintln!("  --dump-tokens 打印 token 流到 stdout（Phase 8.1 自举 lexer 对账工具）");
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
@@ -162,6 +165,7 @@ fn parse_args(args: &[String]) -> CliArgs {
             "--json" => out.json = true,
             "--check" => out.check = true,
             "--dump-ast" => out.dump_ast = true,
+            "--dump-tokens" => out.dump_tokens = true,
             "--plan" => out.plan = true,
             "--apply" => out.apply = true,
             "--dry-run" => out.dry_run = true,
@@ -329,6 +333,20 @@ fn main_inner() {
     // ===== 子命令：fix（Phase 2.7 修复计划 / Phase 3.1 应用修复）=====
     if cli.subcommand.as_deref() == Some("fix") {
         run_fix(&src, path, &cli);
+        return;
+    }
+
+    // ===== --dump-tokens（Phase 8.1，RFC-0003 自举 lexer 对账工具）=====
+    // 格式即契约：每行 "<Token Debug 名> @<line>:<col>"，与自举 --tokens 模式逐字比对。
+    // 词法错误摘要走 stderr（不污染 token 流比对）。
+    if cli.dump_tokens {
+        let (tokens, lex_errors) = lexer::Lexer::new(&src).tokenize_recover();
+        for t in &tokens {
+            println!("{:?} @{}:{}", t.token, t.line, t.col);
+        }
+        if !lex_errors.is_empty() {
+            eprintln!("（词法含 {} 个错误）", lex_errors.len());
+        }
         return;
     }
 
