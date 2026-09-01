@@ -11,6 +11,13 @@
 > 3. **坐标系注意（8.1 验收必读）**：宿主 lexer 的列是 1-based **字节列**，自举 lexer（Lom 字符串逐字符语义）天然产出**字符列**——含非 ASCII 的源文件行两者会分叉。8.1 的诊断位置比对要么验收集源文件保持纯 ASCII，要么比对前统一换算；AST dump 因不含 span 天然规避此问题。
 > 4. **CI 三层 golden 基建对账结论**：逐字 golden gate（解释器 + WASM 载体）与 eval 双后端 parity gate 已在位（ci.yml，Phase 7.9 起）——8.4 只需照既有模式加一个三层 golden step，无需提前新建基建。
 > 5. 数字更新：eval 现为 113 任务（原文 108 是草案撰写时口径）；8.1 验收集 = examples/ 全部 .lom + eval 113 参考解。
+>
+> **修订记录（2026-09-01，8.1 完成时）**：
+> 6. **8.1 交付**：`examples/selfhost/self_interp.lom`（~2670 行）——完整 lexer（20 保留字/全运算符/转义/两种注释/容错恢复）+ 完整 parser（Pratt 链 12 层/全语法形态/容错 Hole 三同步点）+ AST dump + token 流/诊断输出。架构：token 流与解析器游标存 Map（引用语义跨函数共享，对齐宿主 Vec+pos 模型）；主循环全部 while+滑动窗口（避开 ~10^4 栈深天花板）。
+> 7. **验收结果（tools/verify_selfhost.py）**：dump 模式 146/146（examples 33 + eval 参考解 113；todo.lom 的 18 处 Str 为 Latin-1 折叠等价，结构零差异）；tokens 模式 146/146（todo.lom 列分叉记为坐标系已知差异，行号+载荷全一致）；diags 模式 5/5（fix_corpus 坏文件 + apply_test，LEX/PARSE 码+位置逐字一致、消息折叠等价）。
+> 8. **宿主工具面新增**：`lom <file> --dump-tokens`（token 流调试输出，自举 lexer 对账工具；格式 = Rust Token Debug 形态 + @ln:cl）。
+> 9. **宿主 bug 修复（8.1 开发中发现）**：树遍历解释器的 `?`/return 提前返回在**块尾 if 表达式**与 **match Form B 臂块**内被当作块值消费、静默失效（ExprKind::If / Match 臂的 ControlFlow::Return 处理）——已修复为穿透到函数边界，与 WASM 后端的 br $ret 语义对齐；+2 回归测试。既有 442 测试无一依赖错误语义。
+> 10. **已知差异（如实记录）**：自举诊断消息经宿主解释器读入时被 Latin-1 化，输出乱码形态——验收脚本按 Latin-1 折叠后与宿主消息逐字等价（换算在工具层，不动语言面）；string_to_int 的裸 Int/Unit 返回约定（非 Option）由自举侧 `"" + x == "()"` 判定绕开——冻结声明未被违反（零新语法/关键字/诊断码/内建）。
 
 ## Motivation
 
