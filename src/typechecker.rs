@@ -458,7 +458,8 @@ impl TypeChecker {
         // 构建初始环境：参数 + 预导入符号
         let mut env = TypeEnv::new();
         for p in &f.params {
-            env.define(p.name.clone(), TypeOrUnknown::Known(p.ty.clone()));
+            // 函数参数恒不可变（spec §5.1：无 mut 参数）
+            env.define(p.name.clone(), TypeOrUnknown::Known(p.ty.clone()), false);
         }
         // 检查函数体
         let body_ty = self.check_block(&f.body, &mut env);
@@ -496,7 +497,7 @@ impl TypeChecker {
 
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
         match stmt {
-            Stmt::Let { name, ty, value, .. } => {
+            Stmt::Let { name, ty, value, mutable } => {
                 let val_ty = self.check_expr(value, env);
                 if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty)
                     && !self.types_compatible(vt, annot) {
@@ -516,7 +517,7 @@ impl TypeChecker {
                 } else {
                     val_ty
                 };
-                env.define(name.clone(), final_ty);
+                env.define(name.clone(), final_ty, *mutable);
             }
             Stmt::LetDestruct { names, value } => {
                 // Phase 5.1: 元组解构绑定 let (a, b) = expr
@@ -537,13 +538,13 @@ impl TypeChecker {
                             );
                         }
                         for (name, ety) in names.iter().zip(elem_tys.iter()) {
-                            env.define(name.clone(), TypeOrUnknown::Known(ety.clone()));
+                            env.define(name.clone(), TypeOrUnknown::Known(ety.clone()), false);
                         }
                     }
                     // 未知类型（动态值/函数调用返回）：绑 Unknown，运行时检查兜底
                     _ => {
                         for name in names {
-                            env.define(name.clone(), TypeOrUnknown::Unknown);
+                            env.define(name.clone(), TypeOrUnknown::Unknown, false);
                         }
                     }
                 }
@@ -551,6 +552,18 @@ impl TypeChecker {
             Stmt::Assign { target, value } => {
                 let val_ty = self.check_expr(value, env);
                 if let Some(expected) = env.get(target) {
+                    // 不可变重赋值校验（MUT001）：let 默认不可变，重赋值报 warning。
+                    // 渐进式承诺：warning 不拦截执行，解释器仍照常赋值。
+                    // 复合赋值（x += 1）在 parser 去糖为 Assign，自然覆盖。
+                    if env.is_mutable(target) == Some(false) {
+                        self.push_diag(
+                            Severity::Warning,
+                            "MUT001".into(),
+                            format!("赋值给不可变变量 '{}'（声明时未标 mut）", target),
+                            0,
+                            0,
+                        );
+                    }
                     if let (TypeOrUnknown::Known(e), TypeOrUnknown::Known(v)) = (&expected, &val_ty)
                         && !self.types_compatible(v, e) {
                             self.push_diag(
@@ -621,7 +634,8 @@ impl TypeChecker {
                     }
                     _ => TypeOrUnknown::unknown(),
                 };
-                env.define(var.clone(), elem_ty);
+                // for 循环变量是每轮迭代的新鲜绑定，不可变（重赋值无意义）
+                env.define(var.clone(), elem_ty, false);
                 self.check_block(body, env);
             }
             Stmt::Return(expr) => {
@@ -794,7 +808,7 @@ impl TypeChecker {
                 // 闭包捕获外部环境：closure_env 继承当前 env，使闭包内可引用外部变量
                 let mut closure_env = env.child();
                 for p in params {
-                    closure_env.define(p.name.clone(), TypeOrUnknown::Known(p.ty.clone()));
+                    closure_env.define(p.name.clone(), TypeOrUnknown::Known(p.ty.clone()), false);
                 }
                 let saved_ret = self.current_ret.clone();
                 self.current_ret = ret_type.clone();
@@ -1165,7 +1179,7 @@ impl TypeChecker {
                     TypeOrUnknown::Known(t) => TypeOrUnknown::Known(t.clone()),
                     TypeOrUnknown::Unknown => TypeOrUnknown::Unknown,
                 };
-                env.define(name.clone(), ty);
+                env.define(name.clone(), ty, false);
                 None
             }
             Pattern::Wildcard => None,
@@ -1560,10 +1574,13 @@ impl TypeChecker {
     }
 }
 
-/// 类型环境：变量名 → 类型
+/// 类型环境：变量名 → 类型 + 可变性（MUT001 校验用）
 #[derive(Clone)]
 struct TypeEnv {
     vars: HashMap<String, TypeOrUnknown>,
+    /// 与 vars 同步写入：true = let mut 声明，false = 不可变绑定
+    /// （let/参数/for 变量/match 绑定/闭包参数均为 false）
+    mutables: HashMap<String, bool>,
     parent: Option<Box<TypeEnv>>,
 }
 
@@ -1571,6 +1588,7 @@ impl TypeEnv {
     fn new() -> Self {
         TypeEnv {
             vars: HashMap::new(),
+            mutables: HashMap::new(),
             parent: None,
         }
     }
@@ -1578,12 +1596,14 @@ impl TypeEnv {
     fn child(&self) -> Self {
         TypeEnv {
             vars: HashMap::new(),
+            mutables: HashMap::new(),
             parent: Some(Box::new(self.clone())),
         }
     }
 
-    fn define(&mut self, name: String, ty: TypeOrUnknown) {
-        self.vars.insert(name, ty);
+    fn define(&mut self, name: String, ty: TypeOrUnknown, mutable: bool) {
+        self.vars.insert(name.clone(), ty);
+        self.mutables.insert(name, mutable);
     }
 
     fn get(&self, name: &str) -> Option<TypeOrUnknown> {
@@ -1591,6 +1611,17 @@ impl TypeEnv {
             Some(t.clone())
         } else if let Some(p) = &self.parent {
             p.get(name)
+        } else {
+            None
+        }
+    }
+
+    /// 查询变量可变性（沿作用域链向上）；None = 未定义
+    fn is_mutable(&self, name: &str) -> Option<bool> {
+        if let Some(m) = self.mutables.get(name) {
+            Some(*m)
+        } else if let Some(p) = &self.parent {
+            p.is_mutable(name)
         } else {
             None
         }
@@ -1611,6 +1642,7 @@ impl TypeEnv {
 fn type_hint(code: &str) -> Option<String> {
     match code {
         "NAM002" => Some("重命名重复的函数/枚举".into()),
+        "MUT001" => Some("局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本".into()),
         "NAM003" => Some("确认变量/函数已声明，拼写无误".into()),
         "NAM004" => Some("检查字段/变体名是否存在".into()),
         "TYPE001" => Some("检查运算符两侧类型是否一致".into()),
@@ -2312,5 +2344,80 @@ mod tests {
         let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
         // c 内调用 println 报 1 次 EFF001；b 调用 c 不报（c 未声明效应）
         assert_eq!(eff_diags.len(), 1, "只有 c 内调用 println 报 EFF001");
+    }
+
+    // ===== MUT001 不可变重赋值校验（2026-08-31，用户裁决实现 warning 级）=====
+
+    fn mut001_diags(diags: &Diagnostics) -> Vec<&Diagnostic> {
+        diags.diagnostics.iter().filter(|d| d.code == "MUT001").collect()
+    }
+
+    #[test]
+    fn mut001_immutable_let_reassign_warns() {
+        // let x = 3; x = 4 —— 此前静默通过（第四轮评审自发现），现报 MUT001 warning
+        let src = "fn main() -> Unit\n    let x = 3\n    x = 4\nend\n";
+        let diags = check_src(src);
+        let d = mut001_diags(&diags);
+        assert_eq!(d.len(), 1, "不可变 let 重赋值应报 1 条 MUT001");
+        assert_eq!(d[0].severity, Severity::Warning, "MUT001 必须是 warning 级");
+        assert!(d[0].message.contains("'x'"));
+        assert!(d[0].hint.is_some(), "MUT001 应带修复提示");
+        // 渐进式承诺：warning 不置 ok=false（不拦截执行）
+        assert!(diags.ok, "纯 warning 不应让 diags.ok 变 false");
+    }
+
+    #[test]
+    fn mut001_mut_let_reassign_no_warn() {
+        let src = "fn main() -> Unit\n    let mut x = 3\n    x = 4\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 0, "let mut 重赋值不应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_param_reassign_warns() {
+        // spec §5.1：函数参数恒不可变（无 mut 参数）
+        let src = "fn f(x: Int) -> Int\n    x = x + 1\n    x\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 1, "参数重赋值应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_shadowing_let_no_warn() {
+        // 同名 let 是新绑定（遮蔽），不是重赋值
+        let src = "fn main() -> Unit\n    let x = 3\n    let x = 4\n    println(x)\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 0, "同名 let 遮蔽不应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_compound_assign_warns() {
+        // x += 1 在 parser 去糖为 x = x + 1，同样命中 MUT001
+        let src = "fn main() -> Unit\n    let x = 3\n    x += 1\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 1, "不可变变量复合赋值应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_for_var_reassign_warns() {
+        // for 循环变量是每轮迭代的新鲜绑定，不可变
+        let src = "fn main() -> Unit\n    for i in 1..3\n        i = 5\n    end\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 1, "for 循环变量重赋值应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_match_binder_reassign_warns() {
+        // match 臂绑定变量不可变
+        let src = "fn f(n: Int) -> Unit\n    match n\n        m =>\n            m = 5\n        end\n    end\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 1, "match 绑定变量重赋值应报 MUT001");
+    }
+
+    #[test]
+    fn mut001_mut_compound_assign_no_warn() {
+        // 对照组：let mut + += 合法（既有 for_list_element_type_ok 类场景不能回归）
+        let src = "fn main() -> Unit\n    let mut total = 0\n    for i in 1..10\n        total += i\n    end\nend\n";
+        let diags = check_src(src);
+        assert_eq!(mut001_diags(&diags).len(), 0, "let mut 复合赋值不应报 MUT001");
     }
 }

@@ -151,8 +151,7 @@ pub struct Block {
 pub enum Stmt {
     /// let [mut] name [: type] = expr
     Let {
-        /// 可变性标记（解释器经环境另行判定；字段为 AST 完整性保留）
-        #[allow(dead_code)]
+        /// 可变性标记：typechecker 的 MUT001 校验消费（解释器保持宽容，见 spec §5.1）
         mutable: bool,
         name: String,
         ty: Option<Type>,
@@ -164,7 +163,7 @@ pub enum Stmt {
         names: Vec<String>,
         value: Expr,
     },
-    /// 赋值：name = expr（name 必须是已声明的 mut 变量）
+    /// 赋值：name = expr（name 必须已声明，否则 NAM003；目标为不可变 let 时 typechecker 报 MUT001 warning）
     Assign { target: String, value: Expr },
     /// if/elif/else 块（作为语句；也可是表达式）
     If(IfStmt),
