@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-31（**交接首日两个里程碑**：MUT001 不可变重赋值校验（v0.20.0）+ Phase 3.2b 表达式级 span（v0.21.0）；CI 三平台全绿。新会话先读 §1 快照与 §11 最新坑）
+> 最后更新：2026-08-31（**Phase 8 就绪态**：MUT001（v0.20.0）+ 表达式级 span（v0.21.0）+ Phase 8 前置清账（v0.22.0：RFC-0003 裁决入库 + `--dump-ast` 基建）。CI 三平台全绿。新会话开工 Phase 8 先读 docs/rfc/0003-phase8-full-selfhosting.md，再读 §1 快照与 §11 最新坑）
 
 ---
 
@@ -31,15 +31,15 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.21.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.20.0） |
-| Rust 测试 | **437/437 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
+| 版本 | **v0.22.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.21.0） |
+| Rust 测试 | **442/442 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
 | eval 评测集 | **113/113**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环；修复引擎深化 M1-M4 完成（v0.16.0-v0.19.0）；第四轮评审整改完成；多模型复测达成；**MUT001（v0.20.0）+ Phase 3.2b 表达式级 span（v0.21.0）落地**（2026-08-31，用户当日裁决） |
-| 下一步 | 远期候选：全量自举（RFC-0003 draft 已存档）/ v1.0 冻结 / LSP 吃 span 地基（hover 定位升级）——等用户指令 |
-| 遗留挂账 | ~~表达式级 span~~（✅ v0.21.0 已做；残留：Pattern 无 span——match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举（RFC-0003 草案搁置中，用户裁决"都先不动"） |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；修复引擎深化 M1-M4 完成；第四轮评审整改完成；多模型复测达成；MUT001（v0.20.0）+ 表达式级 span（v0.21.0）落地；**Phase 8 全量自举已裁决启动（RFC-0003 accepted 入库）+ 前置基建 `--dump-ast` 就绪（v0.22.0）** |
+| 下一步 | **Phase 8 全量自举**——从 docs/rfc/0003-phase8-full-selfhosting.md 开工（8.1 完整前端 in Lom 是最大一块；两个子问题已定案，验收集=examples 全量 + eval 113）；之后 v1.0 冻结（清单见 RFC-0003 动机节 3 + 2026-08-31 会话的冻结前置分析） |
+| 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；L2 自举编译器（post-Phase-8，`char_from_code` 待裁决）；v1.0 冻结时待裁决：Phase 6 北极星"第三方生产使用"是否作 v1.0 门禁 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 437/437（2026-08-31 v0.21.0 基线）
+cargo test --release                                    # 期望 442/442（2026-08-31 v0.22.0 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 113/113
 ```
@@ -194,6 +194,7 @@ end
 | src/typechecker.rs | 类型检查 | **103KB 大文件**，Read 会被 100KB 限制拒，用 offset/limit 分段读或 Grep 定位 |
 | src/interpreter.rs | 树遍历求值器 | 内置函数全在这（42 个，见 `module_of` 的模块分派），`Value::List` 不可变 |
 | src/fix.rs + apply.rs + fix_history.rs | AI 修复闭环 | `lom fix --plan/--apply/--dry-run/--history`；历史写 `.lom/fix-history.jsonl`（NDJSON） |
+| src/dump.rs | AST dump（Phase 8 前置） | `lom <file> --dump-ast`；确定性缩进树、**不含 span**（格式即契约，8.1 验收逐字比对的基准） |
 | src/repl.rs | REPL | `:q/:help/:reset/:show` 特殊命令；`is_input_complete()` 多行判定 |
 | src/lsp.rs | LSP | stdio JSON-RPC 2.0，**手写的**，无 serde/tower-lsp 依赖 |
 | src/package.rs | 包管理雏形 | lom.toml，见 examples/pkg_demo/ |
@@ -257,7 +258,7 @@ end
 ## 8. 杂项备忘
 
 - `.lom/` 目录（fix-history.jsonl）是运行时产物，已 gitignore。
-- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=启动期四份调研（不再更新，DESIGN_RATIONALE 有 3 处引用作决策证据，别删）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举草案——未提交未裁决，用户裁决搁置）。
+- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=启动期四份调研（不再更新，DESIGN_RATIONALE 有 3 处引用作决策证据，别删）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**）。
 - eval/candidates/ 里的 001-100.lom 是 LLM 实测的原始产物（99/100 那批），**保留作证据**，别清理。
 - eval/prompts/_generate.ps1 从 tasks JSON 生成 prompts，改任务后记得重跑。
 - examples/todo.lom 是 Phase 3 退出标准的标志 demo（185 行 CLI），回归时可顺带跑。
@@ -272,10 +273,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 437/437、零 warning、`./target/release/lom.exe --version` 显示 0.21.0
+2. `cargo build --release && cargo test --release` 确认 442/442、零 warning、`./target/release/lom.exe --version` 显示 0.22.0
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（全量自举 Phase 8 / v1.0 冻结 / 其他）
+5. **当前方向已定：Phase 8 全量自举**（RFC-0003 accepted，2026-08-31 用户裁决）——开工先读 RFC-0003 全文（含顶部修订记录：两个子问题已定案、坐标系坑、CI 对账结论），8.1 是最大一块
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -349,5 +350,6 @@ end
 - **LLM 复测管线落地（2026-08-31）**：`eval/llm_eval.py`（OpenAI 兼容端点 + `--thinking` + `--from-raw` 离线重提取）。坑三个（都有 run_meta/raw 留档）：① DeepSeek 端点**无 /v1 前缀**（官方文档为准，别照抄 OpenAI 惯例）；② GLM 模型名与账号资源包绑定——不存在的模型报 1113"余额不足"（误导性错误码，实为模型不可用；glm-4.7 是当前可用旗舰，glm-5.3 是文档前瞻）；③ 模型回复尾部可能多一个孤立 `===` 污染提取（extract_blocks 已剥）。**中断续跑**：`--only <分类>` + `--out-name` 对齐已有目录。078 在三个模型上两挂一过（pro+thinking 过）——它是 prompt 歧义锚点题，别改。
 - **MUT001 不可变重赋值校验（2026-08-31，v0.20.0，新会话首个里程碑）**：第四轮评审自发现的挂账（`let x=3; x=4` 静默通过）经用户裁决后落地。TypeEnv 加平行 `mutables: HashMap<String, bool>` 表，`define` 签名带 mutable 标志（7 个定义点全部显式：Let 用 AST 的 `mutable` 字段——它终于摘掉挂了 19 个版本的 `#[allow(dead_code)]`；参数/for 变量/match 绑定/解构绑定恒 false）。`Stmt::Assign` 里 `is_mutable == Some(false)` 报 **warning**（渐进式承诺不变：stderr、不拦截、解释器零改动；warning 不置 diags.ok=false，`--check` 退出码仍 0）。复合赋值 `+=` 走 parser 去糖自然覆盖。**坑一个**：消息文案初版写死"let 声明未带 mut"，但参数也会命中 MUT001 而 Lom 没有 mut 参数——hint 若诱导 LLM 写 `fn f(mut x)` 就是诊断误导（AI 原生语言的诊断文案是给 LLM 看的），改为中性表述 + 分场景 hint（局部变量改 let mut / 参数循环变量引入局部副本）。测试 +8（426/426）。未做（如实记录）：MUT001 无 fix 动作（修复点在声明处，诊断定位在赋值处——反向索引暂无机制，保持 hint 级）。
 - **Phase 3.2b 表达式级 span（2026-08-31，v0.21.0，当日第二个里程碑）**：最后一个定位挂账清账。**结构变更**：`Expr` 从枚举改为 `struct Expr { kind: ExprKind, span: Span }`（原枚举改名 `ExprKind`），`Stmt::Let`/`Stmt::Assign` 补 span 字段；span 在枚举**外面**——取位置不用匹配，消费方改动收敛为 `match expr` → `match &expr.kind`（interpreter 27 + typechecker 23 + wasm_codegen 45 处模式，全局 `Expr::`→`ExprKind::` 文本替换 + 6 个匹配目标手改，rustc 驱动清扫）。**惯例**：start = 首 token 位置，end = 末 token 的**起始**位置（lexer 只记 token 起点，与 3.2 签名 span 一致）；左结合链组合节点取左操作数起点（`span_from(left.span)`）；去糖合成节点复用目标标识符 span。**接线**：NAM003/NAM004-字段/MUT001/TYPE001/002/003/020 全部离开 (0,0)；NAM004 字段诊断定位用 Field span 的 **end**（= 字段名 token，不是对象起点）；fix.rs 新增 `precise_occurrence`——诊断带位置就单点 Replace，**字节列→字符列换算**（lexer col 按字节走，fix 约定字符列，含中文的行会分叉）+ 内容防呆校验（位置与源码不符回退整词扫描）。**坑**：① cargo test 不更新 lom.exe 的老坑又踩一次（CLI 验证前必须 cargo build --release）；② 块末尾的裸表达式归 `Block.tail` 不是 stmts（测试因此挂一次）；③ `Pattern` 仍无 span——match 模式内变体名诊断保持 (0,0)，fix 走扫描兜底（已知残留）。解释器/WASM 行为中性。测试 +11（437/437），回归三件套全绿。
+- **Phase 8 前置清账（2026-08-31，v0.22.0）**：用户指令"完成 Phase 8 之前的所有任务"。① **RFC-0003 了结入库**：status draft→accepted（用户当日裁决启动 Phase 8），两个 8.1/8.2 前置子问题提前定案（AST dump 形态=`--dump-ast`；静态检查深度=NAM/arity/EFF/MAT 子集），顶部加修订记录，eval 计数 108→113 对齐。② **`src/dump.rs` + `lom <file> --dump-ast`**：确定性缩进树 dump（Program/Fn/Block/Stmt/Expr/Pattern/Type 全覆盖，格式即契约写进文件头——8.1 验收的逐字比对基准）。**关键设计决策：dump 不含 span**——宿主 lexer 字节列 vs 自举 lexer（Lom 逐字符）字符列在含非 ASCII 的行必然分叉，结构比对不需要位置，诊断位置比对走 --json（坐标系问题已写进 RFC 修订记录 3，8.1 验收集要么纯 ASCII 要么先换算）。③ **CI 三层 golden 对账结论**：golden 逐字 gate（双载体）+ eval parity 自 7.9 起在位，8.4 只需照抄模式加一个 step，无需提前新建。测试 +5（442/442）。clippy 抓了两个 redundant closure（`.map(|t| type_str(t))` → `.map(type_str)`），即改。
 
 ---

@@ -176,6 +176,7 @@ Type annotations are **optional**. Type errors are **non-fatal warnings** — th
 - `lom <file>` — runs the program. Type checking also runs (since v0.6.0): diagnostics go to stderr and **never block execution**.
 - `lom <file> --check` — type check only (no execution), prints human-readable diagnostics. Exit 1 only on Error-level; warnings exit 0.
 - `lom <file> --json` — emits `lom-diag/v1` JSON including `stage: "type"` diagnostics.
+- `lom <file> --dump-ast` — prints the AST as a deterministic indentation tree (no execution, no type check; spans excluded). Debug/verification tool — Phase 8.1's verbatim-diff baseline.
 
 Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
 

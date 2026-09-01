@@ -915,6 +915,7 @@ lom fix <file.lom> --plan     Explicit --plan flag (default)
 lom fix <file.lom> --apply    Apply high-confidence fixes to source (lom-apply/v1) — Phase 3.1
 lom fix <file.lom> --apply --dry-run   Preview apply without writing file — Phase 3.1
 lom fix <file.lom> --apply --json      Apply with JSON output (lom-apply/v1) — Phase 3.1
+lom <file.lom> --dump-ast    Print the AST as a deterministic indentation tree (spans excluded) — Phase 8 prerequisite (RFC-0003 §8.1 acceptance baseline)
 lom --help | -h               Show help
 ```
 
@@ -1355,3 +1356,4 @@ Each task is a JSON object:
   - §7.3: `MUT` namespace added (and the long-stale "reserved" table folded into implemented).
 - **v0.21.0 (2026-08-31)**: Phase 3.2b — expression-level spans.
   - Added §6.9.7: `Expr` is now `struct { kind: ExprKind, span: Span }`; `Stmt::Let`/`Stmt::Assign` carry spans; NAM003/NAM004-field/MUT001/TYPE001/TYPE002/TYPE003/TYPE020 diagnostics report precise positions; `lom fix` spelling repairs become single-point `replace` (scan fallback retained). §6.9.6 scope note and §7.6 limitations updated.
+- **v0.22.0 (2026-08-31)**: Phase 8 readiness — RFC-0003 (full self-hosting) accepted; `lom <file> --dump-ast` added (deterministic AST indentation tree, spans excluded — §7.5). Language surface unchanged.
