@@ -177,7 +177,7 @@ Type annotations are **optional**. Type errors are **non-fatal warnings** — th
 - `lom <file> --check` — type check only (no execution), prints human-readable diagnostics. Exit 1 only on Error-level; warnings exit 0.
 - `lom <file> --json` — emits `lom-diag/v1` JSON including `stage: "type"` diagnostics.
 
-Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
+Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
 
 When you write Lom: annotate function params and return types — the checker will flag mismatches in `--check`/`--json`, helping you fix errors before running. Missing annotations are fine (inferred as `Unknown`, no error).
 
@@ -516,6 +516,7 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 - `MAT001`-`MAT099`: match exhaustiveness (Phase 2.4 — `MAT001` non-exhaustive)
 - `NAM001`-`NAM099`: name resolution (Phase 2.4 — `NAM002` duplicate, `NAM003` undefined, `NAM004` no such field/variant)
 - `EFF001`-`EFF099`: effect errors (Phase 2.5 — `EFF001` pure function calls effectful)
+- `MUT001`-`MUT099`: mutability (v0.20.0 — `MUT001` reassigning an immutable binding: `let` without `mut`, function parameter, `for` loop variable, or `match` binding)
 
 **Tolerant parsing & holes**: when the parser cannot parse a statement, it inserts a `Stmt::Hole` placeholder and continues. The hole is reported as `PARSE099` / `RUNTIME003` (if executed). This means LLMs get **all** errors in one round, not just the first — repair them all at once.
 

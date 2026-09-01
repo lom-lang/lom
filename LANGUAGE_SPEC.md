@@ -302,7 +302,7 @@ Prelude (`println`, `print`) and stdlib modules (`io`, `string`, `math`) functio
 
 ### 5.1 Immutability
 
-- `let x = 3` — `x` is immutable. Reassignment is intended to be rejected. **Known gap (verified 2026-08-31)**: neither the typechecker nor the interpreter currently enforces this — `x = 4` after `let x = 3` runs silently. Enforcement (warning-level, per the gradual-typing philosophy) is tracked as a pending decision in docs/HANDOVER.md.
+- `let x = 3` — `x` is immutable. Reassigning it makes the typechecker emit a **`MUT001` warning** (since v0.20.0; warning-level per the gradual-typing philosophy — diagnostics go to stderr and never block execution, and the interpreter stays permissive). The check also covers function parameters, `for` loop variables, `match` pattern bindings, and compound assignments (`+=` etc., which desugar to `=`), since all of those are immutable bindings.
 - `let mut x = 3` — `x` is mutable. `x = 4` is allowed.
 - Compound assignment (v0.4.1, Phase 5.5): `x += e` / `x -= e` / `x *= e` / `x /= e` desugar to `x = x + e` etc. Target must be mutable. `+=` composes with string concat promotion.
 - Function parameters are always immutable (no `mut` param in Phase 1).

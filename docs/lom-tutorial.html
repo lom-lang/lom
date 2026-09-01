@@ -460,7 +460,7 @@ end</code></pre>
 <aside class="sn"><b>去糖(desugar)/ 语法糖</b>:语言为了好写提供的便利写法叫"糖";解释器/编译器内部把它翻译成更基础的形态叫"去糖"。<code>x |&gt; f(y)</code> 是糖,<code>f(x, y)</code> 是糖化开之后的样子。</aside>
 <aside class="sn"><b>prelude(预导入集)</b>:不用 import 就能直接用的那一小撮内置符号。Lom 只放了 <code>println</code> 和 <code>print</code> 两个,其余全要显式导入——故意克制,防幻觉。</aside>
 
-<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2342 行)</h2>
+<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2423 行)</h2>
 
 <aside class="sn"><b>类型检查(type checking)</b>:在运行之前静态地核对"类型对不对"——比如字符串不能和整数相加、函数调用参数个数要对。静态语言(C/Rust)强制全查,动态语言(Python)全不查,Lom 站在中间,所以叫"渐进式"。</aside>
 
@@ -501,6 +501,8 @@ end</code></pre>
   <li><strong>match 穷尽性(MAT001)</strong>:收集已覆盖的变体名,没 <code>_</code> 通配就对照枚举全表,缺谁报谁;诊断行号填 match 的 <code>end</code> 行——给自动修复留的钩子;</li>
   <li><strong>效应检查(EFF001)</strong>:规则一句话——<strong>调用方的效应声明必须是被调方的超集</strong>。纯函数(无 <code>! [...]</code>)调了 <code>println</code>(声明了 <code>[IO]</code>)就报警告。两条豁免:<code>main</code> 隐式拥有全部效应(强制 main 写注解是"给 LLM 增加无意义负担",typechecker.rs:43 注释);闭包继承外层函数的效应集。</li>
 </ul>
+
+<p><strong>2026-08-31 新增第四个检查:不可变重赋值(MUT001,v0.20.0)</strong>——此前 <code>let x = 3; x = 4</code> 静默通过(spec 说"应被拒绝",实现零校验,第四轮评审自查抓出,用户裁决按 warning 级落地)。现在 TypeEnv 多了一张与 vars 平行的 <code>mutables</code> 表,<code>define</code> 时显式记录可变性:<code>let</code> 不带 mut、函数参数、for 循环变量、match 绑定、元组解构绑定全部不可变,对它们重赋值(含 <code>+=</code> 去糖后的形式)报 MUT001 warning。仍是佛系老师:只批注、不拦路,解释器零改动。有一个文案细节值得记住:诊断消息不能写死"let 声明未带 mut"——参数也会命中,而 Lom 没有 mut 参数,hint 若诱导 LLM 写 <code>fn f(mut x)</code> 就是诊断在误导它唯一的读者。<strong>AI 原生语言的诊断文案是给 LLM 看的,准确性要求和编译器正确性同级。</strong></p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把效应想成"门禁权限"。每个函数签名上的 <code>! [IO, Clock]</code> 就是它的门禁卡清单:IO = 能碰外部世界(打印、读写文件),Clock = 能读时钟。规则是:<strong>你调用的函数拥有的每张卡,你自己也得有</strong>。一个"纯函数"(没有卡)调了带 IO 卡的 println,就像没卡的人想蹭别人的卡进后厨——检查器报警:"你想用 IO,先在自己签名上声明"。</p>

@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-08-31（**交接就绪态**：修复引擎深化 M1-M4 完成（v0.19.1）+ 第四轮评审整改落地；CI 三平台全绿。新会话先读 §1 快照与 §11 最新坑）
+> 最后更新：2026-08-31（**交接后首个里程碑**：MUT001 不可变重赋值校验落地（v0.20.0）；此前状态：修复引擎深化 M1-M4 完成（v0.19.1）+ 第四轮评审整改落地；CI 三平台全绿。新会话先读 §1 快照与 §11 最新坑）
 
 ---
 
@@ -31,15 +31,15 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.19.1**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.19.0） |
-| Rust 测试 | **418/418 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
+| 版本 | **v0.20.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.19.1） |
+| Rust 测试 | **426/426 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性），构建零 warning、**clippy 零 warning**（第四轮评审整改后转 CI gate） |
 | eval 评测集 | **113/113**（runner 只比对 stdout + 要求退出码 0） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
-| 当前进度 | 路线图 Phase 0-7 全部闭环；修复引擎深化 M1-M4 完成（v0.16.0-v0.19.0）；第四轮评审整改完成；**多模型复测达成**（4 模型 99.1%-100%，eval/REPORT-2026-08-31-multimodel.md） |
+| 当前进度 | 路线图 Phase 0-7 全部闭环；修复引擎深化 M1-M4 完成（v0.16.0-v0.19.0）；第四轮评审整改完成；**多模型复测达成**（4 模型 99.1%-100%，eval/REPORT-2026-08-31-multimodel.md）；**MUT001 不可变重赋值校验**（v0.20.0，2026-08-31，用户裁决后落地） |
 | 下一步 | 修复引擎深化收官；远期候选：LLM 复测（需真实 LLM 资源，108→113 任务包已就绪）/ 全量自举（RFC-0003 draft 已存档）/ v1.0 冻结——等用户指令 |
-| 遗留挂账 | **不可变重赋值无任何校验**（`let x=3; x=4` 静默通过，spec §5.1 已诚实化，是否实现 warning 级校验待用户裁决——第四轮评审复核自发现）；表达式级 span（Phase 3.2b 挂账，M1 拼写修复因此只能整词扫描定位）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举（RFC-0003 草案搁置中） |
+| 遗留挂账 | 表达式级 span（Phase 3.2b 挂账，M1 拼写修复因此只能整词扫描定位；MUT001 诊断位置同样停在 (0,0)）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；全量自举（RFC-0003 草案搁置中，用户裁决"都先不动"） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 418/418（2026-08-31 基线）
+cargo test --release                                    # 期望 426/426（2026-08-31 v0.20.0 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 113/113
 ```
@@ -272,7 +272,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 418/418、零 warning、`./target/release/lom.exe --version` 显示 0.19.1
+2. `cargo build --release && cargo test --release` 确认 426/426、零 warning、`./target/release/lom.exe --version` 显示 0.20.0
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. 当前无已排期待办（§6 已全关闭）——开工前先问用户方向（全量自举 Phase 8 / v1.0 冻结 / 其他）
@@ -347,5 +347,6 @@ end
 - **修复引擎深化 M4 error_repair 扩充 + fix_corpus（2026-08-25，v0.19.0）**：eval error_repair 15→20 任务（109 多错误/110 NAM003 拼写/111 NAM004 字段/112 效应链×2/113 match 未闭合）；**prompt 内嵌诊断 JSON 全部来自真实 `lom --json` 输出**（严禁虚构纪律），参考答案全部实跑验证。新增 `eval/fix_corpus/`（*.bad.lom + *.fixed.lom 配对，main.rs 测试驱动 apply_iterative 逐字比对）——repair-native 的回归网。语料即覆盖率：4 例 3 例全自动、1 例按设计仅建议。**抓到真问题（如实记录为已知限制）**：`println("hello, world)` 这类"未闭合字符串吞掉行尾 )"的场景，LEX001 行尾补引号会把 ) 关进字符串——语法修通、语义错（多打印一个 )）。M2 的迭代闭环会接着补 ')' 让语法通过，放大了这个误修。不修（启发式太猜），corpus 03 改用干净案例。**教训：修复规则的组合会产生单规则时看不到的语义误修，语料回归网就是为此建的**。另注意 apply 同位置多个 insert 都去重豁免——LEX001 与 PARSE001 同列插入会发生（顺序依赖稳定排序），本次碰巧正确，后续若改排序要小心。eval 113/113 双后端，417/417。prompts 已用 _generate.ps1 重生成（10_error_repair.md 20 任务）。
 - **第四轮评审整改（2026-08-31，docs/reviews/review-2026-08-31.html，独立审查 agent，基线 v0.19.0）**：逐条复核后执行。**采纳并修复**：① P0 SPEC_FOR_AI §4 "运行不做类型检查"（v0.6.0 整改时漏改了这处——同一轮整改的涟漪没扫全）；② README：logos 残留（与零依赖铁律直接冲突）、补 Quick Start、Roadmap 表补 Phase 7、"What is Lom" 补 Phase 5-7、99% 宣称加限定词（单模型单次采样，初步证据）；③ LANGUAGE_SPEC 一批腐坏（标题 v0.1 Draft、EBNF item 只有 fn_decl 且返回类型写成冒号、§4.3/§6 "drafted" 标签、§9.3 List 还写 Vec 实现、§12 停在 100 任务、EFF001 位置 9:1/20:1 实为 10:1/21:1、changelog 停在 v0.2.2）；④ 本文 §2.2/§9 基线数字再次滞后（教训复发了：M1-M4 每个里程碑升测试数都没回改这两处——**升测试数时要同步 §2.2/§9**）；⑤ eval/README 分类计数停在 100 时代；⑥ **eval 任务 ID 086 冲突**（09_modules 的 map 任务是 5.20 后加的，撞了 error_repair 的 086；runner 按 <id>.lom 寻址候选，LLM 评测时会互相覆盖——map 任务重编为 114，新增 eval_task_ids_globally_unique 回归测试钉住）；⑦ json_escape 四份手抄收敛为 json.rs 的 pub escape_str（json.rs 自己的 stringify_string 也委托它——实际是 5 份）；⑧ clippy 54 条存量清零 + CI 加 clippy -D warnings gate（ubuntu 单平台）；⑨ Cargo.toml 补 repository/homepage/keywords、Cargo.lock 入库、interpreter.rs contains_key+unwrap 改 if let、apply_test.lom 加"故意坏文件"头注释。**复核驳回/暂缓**：tag 类型不统一与 GPG 签名（历史不回改）；.gitattributes eol 规则（会重写本机全部工作区文件行尾，风险大于收益，CI 已有 tr -d 防线）；main.rs 下沉拆分（真问题但非本轮目标）；match Form A/B 重构（破坏全部存量代码，冻结倾向）；List 字面量语法（已知缺口，冻结）；报告的 "_todo_data.json 未确认 gitignore" 实为多虑（.gitignore:38 早已覆盖）。**评审之外自发现**（比报告更深一层）：`let x=3; x=4` 不可变重赋值**静默通过**——spec §5.1 说 compile error，实现是零校验；spec 已改为诚实描述，是否实现校验待用户裁决。
 - **LLM 复测管线落地（2026-08-31）**：`eval/llm_eval.py`（OpenAI 兼容端点 + `--thinking` + `--from-raw` 离线重提取）。坑三个（都有 run_meta/raw 留档）：① DeepSeek 端点**无 /v1 前缀**（官方文档为准，别照抄 OpenAI 惯例）；② GLM 模型名与账号资源包绑定——不存在的模型报 1113"余额不足"（误导性错误码，实为模型不可用；glm-4.7 是当前可用旗舰，glm-5.3 是文档前瞻）；③ 模型回复尾部可能多一个孤立 `===` 污染提取（extract_blocks 已剥）。**中断续跑**：`--only <分类>` + `--out-name` 对齐已有目录。078 在三个模型上两挂一过（pro+thinking 过）——它是 prompt 歧义锚点题，别改。
+- **MUT001 不可变重赋值校验（2026-08-31，v0.20.0，新会话首个里程碑）**：第四轮评审自发现的挂账（`let x=3; x=4` 静默通过）经用户裁决后落地。TypeEnv 加平行 `mutables: HashMap<String, bool>` 表，`define` 签名带 mutable 标志（7 个定义点全部显式：Let 用 AST 的 `mutable` 字段——它终于摘掉挂了 19 个版本的 `#[allow(dead_code)]`；参数/for 变量/match 绑定/解构绑定恒 false）。`Stmt::Assign` 里 `is_mutable == Some(false)` 报 **warning**（渐进式承诺不变：stderr、不拦截、解释器零改动；warning 不置 diags.ok=false，`--check` 退出码仍 0）。复合赋值 `+=` 走 parser 去糖自然覆盖。**坑一个**：消息文案初版写死"let 声明未带 mut"，但参数也会命中 MUT001 而 Lom 没有 mut 参数——hint 若诱导 LLM 写 `fn f(mut x)` 就是诊断误导（AI 原生语言的诊断文案是给 LLM 看的），改为中性表述 + 分场景 hint（局部变量改 let mut / 参数循环变量引入局部副本）。测试 +8（426/426）。未做（如实记录）：MUT001 无 fix 动作（Stmt 级无 span，定位声明点靠整词扫描太猜，与 M1 同一根因——表达式级 span 挂账的又一受害者）；解释器运行时不校验（warning 级是刻意设计）。
 
 ---
