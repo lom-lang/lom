@@ -24,7 +24,7 @@ import subprocess
 import sys
 import tempfile
 
-LOM = './target/release/lom.exe'
+LOM = './target/release/lom.exe' if sys.platform == 'win32' else './target/release/lom'
 SELF = 'examples/selfhost/self_interp.lom'
 STR_RE = re.compile(r'^(\s*)Str "(.*)"$')
 # token 行形态：Str("...") @ln:cl（--dump-tokens 的载荷）
