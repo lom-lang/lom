@@ -805,7 +805,16 @@ Phase 3.1 used `find_fn_line` (a source-line scanner in the typechecker) to loca
 - **Typechecker consumes spans**: `FnSig` now stores `span: Span` (replacing `sig_line: usize`). `check_fn_body` sets `current_fn_span = f.span`; EFF001/TYPE010 diagnostics use `current_fn_span.line/col` instead of `(0,0)`. `collect_fn_sig` uses `f.span` for NAM002 (duplicate function). The `find_fn_line` source-scanning hack is removed.
 - **End-to-end verified**: `lom examples/effects_bad.lom --check` reports `EFF001` at `(10:1)` and `(21:1)` (the `fn` keyword positions of `helper` and `bad_helper`), previously `(0:0)`; `lom fix --plan` produces inserts at `[10:25]` and `[21:35]` (re-verified 2026-08-31).
 
-> **Scope**: Only `FnDecl`/`EnumDecl` carry spans. Statement/expression-level diagnostics (TYPE001, NAM003, etc.) still report `(0,0)`; runtime errors still report `(0,0)`. Full expression-level spans are deferred to Phase 3 LSP work.
+> **Scope**: Only `FnDecl`/`EnumDecl` carry spans in Phase 3.2. Superseded by §6.9.7 (Phase 3.2b, v0.21.0) — expressions and `let`/assignment statements now carry spans too.
+
+#### 6.9.7 Phase 3.2b expression-level spans (v0.21.0)
+
+Expression-level spans — the pending item from Phase 3.2 — are now implemented:
+
+- **AST shape**: `Expr` changed from an enum to `struct Expr { kind: ExprKind, span: Span }` (the former enum is now `ExprKind`); `Stmt::Let` / `Stmt::Assign` each gained a `span` field. `Pattern` still carries no span (variant-name diagnostics in `match` patterns remain `(0,0)`).
+- **Convention**: `start` = the node's first token position; `end` = the **start** of the node's last token (the lexer only records token starts — same convention as Phase 3.2 signature spans). All positions are 1-based **byte columns** (the lexer advances per byte); `lom fix` converts to char columns internally when building `replace` actions.
+- **Parser fills**: `span_since(line, col)` / `span_from(parent_span)` helpers; left-associative combinators (binary/logical/pipe/range/call chains) take the left operand's start. Desugared synthetic nodes (e.g. `x += 1` → `x = x + 1`) reuse the target identifier's span.
+- **Consumers**: NAM003 (undefined variable/call target), NAM004 (record field — positioned at the **field-name token** via the `Field` span's `end`), MUT001 (assignment target), TYPE001/TYPE002/TYPE003/TYPE020 now report precise positions instead of `(0,0)`. `lom fix` NAM003/NAM004 spelling repairs use the diagnostic position for a single-point `replace` and fall back to whole-token scanning only when the position is missing or fails a content sanity check. The interpreter and WASM codegen are behavior-neutral (they match on `expr.kind`); runtime errors still report `(0,0)`.
 
 ---
 
@@ -861,7 +870,7 @@ Per-diagnostic fields (Phase 2.3):
 - `hint`: optional fix suggestion
 
 Reserved for future phases (not in v1):
-- `span`: `{ "start": [line, col], "end": [line, col] }` — partially implemented (Phase 3.2: `FnDecl`/`EnumDecl` carry `Span`; expression-level spans deferred to Phase 3 LSP work)
+- `span`: `{ "start": [line, col], "end": [line, col] }` — the AST carries spans (Phase 3.2 declarations, Phase 3.2b/v0.21.0 expressions + `let`/assignment statements), but the `lom-diag/v1` JSON still surfaces only the flat `line`/`col` pair (the node's start; NAM004 on record fields uses the field-name token instead); the span's `end` is not serialized.
 - ~~`fix`: `{ "description", "suggestion", "start", "end" }` — machine-actionable repair (Phase 2.7)~~ Moved to `lom-fix/v1` (Phase 2.7 implemented; see §6.9). Kept out of `lom-diag/v1` so the diagnostic schema stays a pure error report.
 - ~~`retry`: whether LLM should retry generation after applying `fix` (Phase 2.7)~~ Likewise in `lom-fix/v1` per-plan field (Phase 2.7 implemented; see §6.9).
 
@@ -874,15 +883,11 @@ Reserved for future phases (not in v1):
 | `LEX` | lex | LEX001-099 | `LEX001` unclosed string, `LEX005` unexpected char |
 | `PARSE` | parse | PARSE001-099 | `PARSE001` expected token, `PARSE099` hole (tolerant parser) |
 | `RUNTIME` | runtime | RUNTIME001-099 | `RUNTIME001` type mismatch, `RUNTIME002` undefined, `RUNTIME003` hole execution |
-
-**Reserved for future phases**:
-
-| Prefix | Stage | Phase | Example |
-|---|---|---|---|
-| `TYPE` | type | 2.4 | `TYPE002` expected Int, got Float |
-| `EFF` | type | 2.5 | `EFF001` pure function calls effectful |
-| `MAT` | type | 2.4 | `MAT001` non-exhaustive match |
-| `NAM` | type | 2.4 | `NAM003` undefined variable (compile-time) |
+| `TYPE` | type | TYPE001-099 (since Phase 2.4) | `TYPE001` mismatch, `TYPE003` arg count, `TYPE020` `?` misuse |
+| `EFF` | type | EFF001-099 (since Phase 2.5) | `EFF001` pure function calls effectful |
+| `MAT` | type | MAT001-099 (since Phase 2.4) | `MAT001` non-exhaustive match |
+| `NAM` | type | NAM001-099 (since Phase 2.4) | `NAM003` undefined variable (compile-time) |
+| `MUT` | type | MUT001-099 (since v0.20.0) | `MUT001` reassigning an immutable binding |
 
 Note: in Phase 2.3 (no static type checker), name resolution errors were caught at runtime and classified as `RUNTIME002`. Phase 2.4 introduces `NAM` codes at compile time (via the gradual type checker); runtime `RUNTIME002` is still emitted when a dynamically-run program hits an undefined name that the type checker flagged as `NAM003`.
 
@@ -923,7 +928,7 @@ Output streams:
 
 ### 7.6 Limitations in Phase 2.3
 
-- **Runtime error positions**: AST nodes do not yet carry source positions at the expression level (planned for Phase 3 LSP work). Runtime diagnostics report `line=0, col=0`; the message itself carries enough context to identify the failure. Lex/parse diagnostics are fully positioned; typecheck diagnostics for EFF001/TYPE010/NAM002 are positioned via `FnDecl.span` (Phase 3.2). Statement/expression-level typecheck diagnostics (TYPE001, NAM003, etc.) still report `(0,0)`.
+- **Runtime error positions**: runtime diagnostics still report `line=0, col=0`; the message itself carries enough context to identify the failure (the interpreter does not thread spans through evaluation). Lex/parse diagnostics are fully positioned; typecheck diagnostics are positioned via `FnDecl.span` (Phase 3.2: EFF001/TYPE010/NAM002) and expression-level spans (Phase 3.2b / v0.21.0: NAM003/NAM004-field/MUT001/TYPE001/TYPE002/TYPE003/TYPE020).
 - ~~**No `fix` / `retry` fields**: reserved for Phase 2.7 `lom fix --plan --json`.~~ **Implemented in Phase 2.7** — see §6.9. `fix` / `retry` live in the `lom-fix/v1` schema (separate from `lom-diag/v1`), not as fields of individual diagnostics.
 - **Single-file only**: cross-file diagnostics arrive with the module system (Phase 3).
 
@@ -1345,3 +1350,8 @@ Each task is a JSON object:
   - §8.2 stdlib table extended with `env` module (`args`); added §9.6 `env` module (pure function, returns `List<_Any>`, `argv[0]` = .lom path).
   - CLI `--` separator: `lom <file.lom> -- <args...>` passes trailing args to the Lom program via `env::args()`.
   - Added [examples/todo.lom](examples/todo.lom) — complete todo list CLI (add/list/done/remove/help) with JSON persistence, recursive list traversal, effect-correct `! [IO]` annotations. End-to-end verified all commands.
+- **v0.20.0 (2026-08-31)**: MUT001 immutable-reassignment warning.
+  - §5.1 rewritten: `let` without `mut` / function parameters / `for` loop variables / `match` bindings are immutable; reassignment (including `+=` desugars) now yields a `MUT001` warning — stderr, non-blocking, interpreter unchanged (gradual-typing philosophy).
+  - §7.3: `MUT` namespace added (and the long-stale "reserved" table folded into implemented).
+- **v0.21.0 (2026-08-31)**: Phase 3.2b — expression-level spans.
+  - Added §6.9.7: `Expr` is now `struct { kind: ExprKind, span: Span }`; `Stmt::Let`/`Stmt::Assign` carry spans; NAM003/NAM004-field/MUT001/TYPE001/TYPE002/TYPE003/TYPE020 diagnostics report precise positions; `lom fix` spelling repairs become single-point `replace` (scan fallback retained). §6.9.6 scope note and §7.6 limitations updated.

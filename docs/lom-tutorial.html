@@ -262,7 +262,7 @@ Program (AST, src/ast.rs 定义结构)
 
 <div class="warn"><strong>一个容易答错的点</strong>:很多人会以为"换行敏感"意味着 lexer 会产出 Newline token。<strong>Lom 不是</strong>——换行符被当空白直接跳过(lexer.rs 的 <code>skip_whitespace_and_comments</code>,205 行——next_token 根本不见空白),换行信息只存在于每个 token 的行号里,由 parser 比较相邻 token 行号来判断。面试官如果深挖这里,答错就露馅。</div>
 
-<h2>2.2 AST:中间表示(<code>src/ast.rs</code>,317 行)</h2>
+<h2>2.2 AST:中间表示(<code>src/ast.rs</code>,352 行)</h2>
 
 <p>三层结构:<code>Program { items: Vec&lt;Item&gt; }</code> → <code>Item</code> 是函数/枚举/导入三种 → 函数体是 <code>Block { stmts: Vec&lt;Stmt&gt;, tail: Option&lt;Expr&gt; }</code>。</p>
 
@@ -288,7 +288,7 @@ end</code></pre>
 
 <aside class="sn"><b>LSP(Language Server Protocol)</b>:编辑器(VS Code 等)和语言工具之间的标准协议,提供悬停提示、跳转定义、自动补全。Phase 4.3 已用声明级 Span 实现了基础 LSP(<code>lom lsp</code>):悬停显示函数/枚举签名、补全候选、诊断推送。表达式级精确定位留待后续阶段。</aside>
 
-<h2>2.3 Parser:递归下降 + 三个特色机制(<code>src/parser.rs</code>,1666 行)</h2>
+<h2>2.3 Parser:递归下降 + 三个特色机制(<code>src/parser.rs</code>,1820 行)</h2>
 
 <aside class="sn"><b>递归下降(Recursive Descent)</b>:最直观的语法分析写法——语法里每种结构对应一个函数,函数之间互相调用(像顺着语法规则往下"下降"),遇到嵌套就递归。比如"解析表达式"的函数会调用"解析加法",后者又调用"解析乘法"……全是手写函数,不用任何解析器生成工具。</aside>
 
@@ -357,7 +357,7 @@ end</code></pre>
 ③ <strong>match 级恢复</strong> = 听不清的地方正好在一处带很多"小结尾"的段落里?那就保守一点,整段跳到"大结尾"(本 match 的 <code>end</code>)再说——因为乱猜可能把大结尾也吞掉,损失更大。</p>
 <p>"防死循环保险"则是铁律:每次跳过至少往前挪一个词。不然听写卡在一个地方永远原地踏步,程序就死机了。</p></div>
 
-<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,3459 行)</h2>
+<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,3458 行)</h2>
 
 <p>主调用链四层,背下来:</p>
 
@@ -460,7 +460,7 @@ end</code></pre>
 <aside class="sn"><b>去糖(desugar)/ 语法糖</b>:语言为了好写提供的便利写法叫"糖";解释器/编译器内部把它翻译成更基础的形态叫"去糖"。<code>x |&gt; f(y)</code> 是糖,<code>f(x, y)</code> 是糖化开之后的样子。</aside>
 <aside class="sn"><b>prelude(预导入集)</b>:不用 import 就能直接用的那一小撮内置符号。Lom 只放了 <code>println</code> 和 <code>print</code> 两个,其余全要显式导入——故意克制,防幻觉。</aside>
 
-<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2423 行)</h2>
+<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2472 行)</h2>
 
 <aside class="sn"><b>类型检查(type checking)</b>:在运行之前静态地核对"类型对不对"——比如字符串不能和整数相加、函数调用参数个数要对。静态语言(C/Rust)强制全查,动态语言(Python)全不查,Lom 站在中间,所以叫"渐进式"。</aside>
 
@@ -536,9 +536,9 @@ end</code></pre>
 
 <aside class="sn"><b>function calling / structured output</b>:让 LLM 按预定 JSON 格式输出、供程序消费的技术。Lom 的诊断设计就是这个思想的镜像:不是 LLM 输出 JSON 给人,而是工具输出 JSON 给 LLM——格式稳定、字段自包含,模型才好处理。</aside>
 
-<h3>② lom-fix/v1:修复计划(fix.rs,1644 行——M1/M3 后从约 900 行长到这么大)</h3>
+<h3>② lom-fix/v1:修复计划(fix.rs,1749 行——M1/M3 + 3.2b span 接线后从约 900 行长到这么大)</h3>
 
-<p>输入诊断,输出"修复计划":每条诊断挂若干 FixAction,action 有 <code>insert/delete/replace/hint</code> 四种。<strong>replace 曾经是"定义了但没人生成"的空架子,2026-08-25 修复引擎深化 M1 落地了它</strong>:NAM003/NAM004 拼写建议现在会产出真正的 Replace 动作——在源码里按"整词匹配 + 跳过字符串/注释"扫描错拼名的所有出现处,每处一个 Replace(两条规则 fix.rs:544-619)。定位有个硬约束:typechecker 诊断没有表达式级位置(line/col=0,表达式级 span 是挂账项),所以只能整源码扫描——<code>find_token_occurrences</code>(fix.rs:809)处理所有脏活:跳过字符串里的转义引号、遇 <code>#</code> 跳过行注释、记录字段场景要求名字前是 <code>.</code>(防误改同名普通变量)。</p>
+<p>输入诊断,输出"修复计划":每条诊断挂若干 FixAction,action 有 <code>insert/delete/replace/hint</code> 四种。<strong>replace 曾经是"定义了但没人生成"的空架子,2026-08-25 修复引擎深化 M1 落地了它</strong>:NAM003/NAM004 拼写建议现在会产出真正的 Replace 动作(两条规则 fix.rs:553-649)。<strong>定位方式在 2026-08-31(Phase 3.2b)升过级</strong>:此前 typechecker 诊断没有表达式级位置(line/col=0),只能靠 <code>find_token_occurrences</code>(fix.rs:866) 整词扫描源码(跳过字符串里的转义引号、遇 <code>#</code> 跳过行注释、记录字段场景要求名字前是 <code>.</code>);现在表达式节点全带 span,诊断自带精确位置,<code>precise_occurrence</code>(fix.rs:830) 直接产出<strong>单点</strong> Replace——但留了两道防呆:字节列→字符列换算(lexer 按字节记列,含中文的行会分叉),以及"诊断位置的字节内容必须真的是那个名字"的校验,不符才回退扫描。</p>
 
 <p>关键是<strong>置信度分级</strong>:</p>
 
