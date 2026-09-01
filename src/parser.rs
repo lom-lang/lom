@@ -188,6 +188,18 @@ impl Parser {
         (prev.line, prev.col)
     }
 
+    /// Phase 3.2b: span = 给定起点 .. 前一个已消费 token 的起始位置
+    /// （end 是末 token 的"起始"而非"之后"——lexer 只记 token 起点，与签名 span 惯例一致）
+    fn span_since(&self, line: usize, col: usize) -> Span {
+        let (el, ec) = self.prev_token_pos();
+        Span { line, col, end_line: el, end_col: ec }
+    }
+
+    /// Phase 3.2b: 以已有节点的 span 起点为起点（左结合链组合节点：a + b 的起点是 a 的起点）
+    fn span_from(&self, start: Span) -> Span {
+        self.span_since(start.line, start.col)
+    }
+
     /// v0.4.1 P0-3: 若当前 token 是复合赋值运算符（+= -= *= /=），消费并返回对应的二元运算符
     /// 换行守卫：复合赋值必须与左侧标识符同行（与跨行 `-` 不当二元减法的规则一致，
     /// 防止 `x\n+= 1` 被静默合并成一条语句）
@@ -598,6 +610,7 @@ impl Parser {
         }
         if matches!(self.peek(), Token::If) {
             // if 可能是语句或 tail 表达式
+            let (il, ic) = (self.current().line, self.current().col);
             let if_stmt = self.parse_if()?;
             if if_can_be_tail
                 && matches!(
@@ -605,7 +618,10 @@ impl Parser {
                     Token::End | Token::Elif | Token::Else | Token::Eof
                 ) {
                 // if 是块最后一个元素，作为 tail
-                return Ok(BlockEl::Tail(Expr::If(Box::new(if_stmt))));
+                return Ok(BlockEl::Tail(Expr::new(
+                    ExprKind::If(Box::new(if_stmt)),
+                    self.span_since(il, ic),
+                )));
             }
             return Ok(BlockEl::Stmt(Stmt::If(if_stmt)));
         }
@@ -615,10 +631,13 @@ impl Parser {
         if self.check(&Token::Assign) {
             self.advance(); // =
             let value = self.parse_expr()?;
-            match e {
-                Expr::Ident(name) => Ok(BlockEl::Stmt(Stmt::Assign {
+            let espan = e.span;
+            match e.kind {
+                ExprKind::Ident(name) => Ok(BlockEl::Stmt(Stmt::Assign {
                     target: name,
                     value,
+                    // 赋值诊断（NAM003/MUT001）定位到目标标识符
+                    span: espan,
                 })),
                 _ => Err(self.err("赋值目标必须是变量".to_string())),
             }
@@ -626,15 +645,20 @@ impl Parser {
             // v0.4.1 P0-3：复合赋值 ident += expr —— 去糖为 ident = ident op expr
             // 解释器/类型检查器复用 Assign + Binary 的现有检查(可变性、NAM003、TYPE001),无需改动
             let rhs = self.parse_expr()?;
-            match e {
-                Expr::Ident(name) => Ok(BlockEl::Stmt(Stmt::Assign {
-                    value: Expr::Binary {
-                        op,
-                        left: Box::new(Expr::Ident(name.clone())),
-                        right: Box::new(rhs),
-                    },
-                    target: name,
-                })),
+            let espan = e.span;
+            match e.kind {
+                ExprKind::Ident(name) => {
+                    // 去糖产生的合成节点：span 复用目标标识符/整句范围，无对应源码字面
+                    let value = Expr::new(
+                        ExprKind::Binary {
+                            op,
+                            left: Box::new(Expr::new(ExprKind::Ident(name.clone()), espan)),
+                            right: Box::new(rhs),
+                        },
+                        self.span_from(espan),
+                    );
+                    Ok(BlockEl::Stmt(Stmt::Assign { value, target: name, span: espan }))
+                }
                 _ => Err(self.err("复合赋值目标必须是变量".to_string())),
             }
         } else if matches!(
@@ -701,7 +725,7 @@ impl Parser {
     }
 
     fn parse_let(&mut self) -> Result<Stmt, ParseError> {
-        self.advance(); // let
+        let let_tok = self.advance(); // let
         let mutable = self.matches(&Token::Mut);
         // Phase 5.1: let (a, b, ...) = expr 元组解构（不支持 mut 组合）
         if self.check(&Token::LParen) {
@@ -723,6 +747,12 @@ impl Parser {
             name,
             ty,
             value,
+            span: Span {
+                line: let_tok.line,
+                col: let_tok.col,
+                end_line: let_tok.line,
+                end_col: let_tok.col,
+            },
         })
     }
 
@@ -806,11 +836,15 @@ impl Parser {
     fn parse_range(&mut self) -> Result<Expr, ParseError> {
         let start = self.parse_or()?;
         if !self.is_newline_before() && self.matches(&Token::DotDot) {
+            let span = self.span_from(start.span);
             let end = self.parse_or()?;
-            return Ok(Expr::Range {
-                start: Box::new(start),
-                end: Box::new(end),
-            });
+            return Ok(Expr::new(
+                ExprKind::Range {
+                    start: Box::new(start),
+                    end: Box::new(end),
+                },
+                self.span_from(span),
+            ));
         }
         Ok(start)
     }
@@ -818,12 +852,16 @@ impl Parser {
     fn parse_or(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.parse_and()?;
         while self.matches(&Token::Or) {
+            let span = self.span_from(left.span);
             let right = self.parse_and()?;
-            left = Expr::Logical {
-                op: LogicalOp::Or,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Logical {
+                    op: LogicalOp::Or,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -831,12 +869,16 @@ impl Parser {
     fn parse_and(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.parse_comparison()?;
         while self.matches(&Token::And) {
+            let span = self.span_from(left.span);
             let right = self.parse_comparison()?;
-            left = Expr::Logical {
-                op: LogicalOp::And,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Logical {
+                    op: LogicalOp::And,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -854,12 +896,16 @@ impl Parser {
                 _ => break,
             };
             self.advance();
+            let span = self.span_from(left.span);
             let right = self.parse_pipeline()?;
-            left = Expr::Binary {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Binary {
+                    op,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -872,11 +918,15 @@ impl Parser {
     fn parse_pipeline(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.parse_addition()?;
         while self.matches(&Token::Pipe) {
+            let span = self.span_from(left.span);
             let right = self.parse_addition()?;
-            left = Expr::Pipe {
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Pipe {
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -897,12 +947,16 @@ impl Parser {
                 _ => break,
             };
             self.advance();
+            let span = self.span_from(left.span);
             let right = self.parse_multiplication()?;
-            left = Expr::Binary {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Binary {
+                    op,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -917,12 +971,16 @@ impl Parser {
                 _ => break,
             };
             self.advance();
+            let span = self.span_from(left.span);
             let right = self.parse_unary()?;
-            left = Expr::Binary {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            left = Expr::new(
+                ExprKind::Binary {
+                    op,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                self.span_from(span),
+            );
         }
         Ok(left)
     }
@@ -930,20 +988,26 @@ impl Parser {
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Token::Bang => {
-                self.advance();
+                let op_tok = self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr::Unary {
-                    op: UnaryOp::Not,
-                    expr: Box::new(expr),
-                })
+                Ok(Expr::new(
+                    ExprKind::Unary {
+                        op: UnaryOp::Not,
+                        expr: Box::new(expr),
+                    },
+                    self.span_since(op_tok.line, op_tok.col),
+                ))
             }
             Token::Minus => {
-                self.advance();
+                let op_tok = self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr::Unary {
-                    op: UnaryOp::Neg,
-                    expr: Box::new(expr),
-                })
+                Ok(Expr::new(
+                    ExprKind::Unary {
+                        op: UnaryOp::Neg,
+                        expr: Box::new(expr),
+                    },
+                    self.span_since(op_tok.line, op_tok.col),
+                ))
             }
             _ => self.parse_question(),
         }
@@ -954,7 +1018,8 @@ impl Parser {
     fn parse_question(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_postfix()?;
         while self.matches(&Token::Question) {
-            expr = Expr::Try(Box::new(expr));
+            let span = self.span_from(expr.span);
+            expr = Expr::new(ExprKind::Try(Box::new(expr)), span);
         }
         Ok(expr)
     }
@@ -971,10 +1036,14 @@ impl Parser {
                     }
                     self.advance();
                     let args = self.parse_args()?;
-                    expr = Expr::Call {
-                        callee: Box::new(expr),
-                        args,
-                    };
+                    let span = self.span_from(expr.span);
+                    expr = Expr::new(
+                        ExprKind::Call {
+                            callee: Box::new(expr),
+                            args,
+                        },
+                        span,
+                    );
                 }
                 Token::LBracket => {
                     // 跨行的 [ 不视为索引
@@ -984,10 +1053,14 @@ impl Parser {
                     self.advance();
                     let index = self.parse_expr()?;
                     self.expect(&Token::RBracket, "']'")?;
-                    expr = Expr::Index {
-                        expr: Box::new(expr),
-                        index: Box::new(index),
-                    };
+                    let span = self.span_from(expr.span);
+                    expr = Expr::new(
+                        ExprKind::Index {
+                            expr: Box::new(expr),
+                            index: Box::new(index),
+                        },
+                        span,
+                    );
                 }
                 Token::Dot => {
                     self.advance();
@@ -1003,10 +1076,14 @@ impl Parser {
                         }
                         _ => self.parse_ident()?,
                     };
-                    expr = Expr::Field {
-                        expr: Box::new(expr),
-                        name,
-                    };
+                    let span = self.span_from(expr.span);
+                    expr = Expr::new(
+                        ExprKind::Field {
+                            expr: Box::new(expr),
+                            name,
+                        },
+                        span,
+                    );
                 }
                 _ => break,
             }
@@ -1030,36 +1107,38 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         let tok = self.current().clone();
+        // Phase 3.2b: 字面量/标识符的 span = 单 token 位置（end=start）
+        let tok_span = Span::at(tok.line, tok.col);
         match &tok.token {
             Token::Int(n) => {
                 self.advance();
-                Ok(Expr::Int(*n))
+                Ok(Expr::new(ExprKind::Int(*n), tok_span))
             }
             Token::Float(f) => {
                 self.advance();
-                Ok(Expr::Float(*f))
+                Ok(Expr::new(ExprKind::Float(*f), tok_span))
             }
             Token::True => {
                 self.advance();
-                Ok(Expr::Bool(true))
+                Ok(Expr::new(ExprKind::Bool(true), tok_span))
             }
             Token::False => {
                 self.advance();
-                Ok(Expr::Bool(false))
+                Ok(Expr::new(ExprKind::Bool(false), tok_span))
             }
             Token::Str(s) => {
                 self.advance();
-                Ok(Expr::Str(s.clone()))
+                Ok(Expr::new(ExprKind::Str(s.clone()), tok_span))
             }
             Token::Ident(s) => {
                 self.advance();
-                Ok(Expr::Ident(s.clone()))
+                Ok(Expr::new(ExprKind::Ident(s.clone()), tok_span))
             }
             Token::LParen => {
                 self.advance();
                 if self.matches(&Token::RParen) {
                     // () = Unit
-                    Ok(Expr::Unit)
+                    Ok(Expr::new(ExprKind::Unit, self.span_since(tok.line, tok.col)))
                 } else {
                     let first = self.parse_expr()?;
                     if self.matches(&Token::Comma) {
@@ -1076,10 +1155,16 @@ impl Parser {
                             }
                         }
                         self.expect(&Token::RParen, "')' (闭合元组)")?;
-                        Ok(Expr::Tuple { elems })
+                        Ok(Expr::new(
+                            ExprKind::Tuple { elems },
+                            self.span_since(tok.line, tok.col),
+                        ))
                     } else {
                         self.expect(&Token::RParen, "')'")?;
-                        Ok(Expr::Group(Box::new(first)))
+                        Ok(Expr::new(
+                            ExprKind::Group(Box::new(first)),
+                            self.span_since(tok.line, tok.col),
+                        ))
                     }
                 }
             }
@@ -1087,7 +1172,10 @@ impl Parser {
             Token::Fn => self.parse_closure(),
             Token::If => {
                 let if_stmt = self.parse_if()?;
-                Ok(Expr::If(Box::new(if_stmt)))
+                Ok(Expr::new(
+                    ExprKind::If(Box::new(if_stmt)),
+                    self.span_since(tok.line, tok.col),
+                ))
             }
             Token::Match => self.parse_match(),
             _ => Err(self.err(format!(
@@ -1098,7 +1186,7 @@ impl Parser {
     }
 
     fn parse_closure(&mut self) -> Result<Expr, ParseError> {
-        self.advance(); // fn
+        let fn_tok = self.advance(); // fn
         self.expect(&Token::LParen, "'('")?;
         let params = self.parse_params()?;
         let ret_type = if self.matches(&Token::Arrow) {
@@ -1107,17 +1195,20 @@ impl Parser {
             None
         };
         let body = self.parse_block()?;
-        Ok(Expr::Closure {
-            params,
-            ret_type,
-            body: Box::new(body),
-        })
+        Ok(Expr::new(
+            ExprKind::Closure {
+                params,
+                ret_type,
+                body: Box::new(body),
+            },
+            self.span_since(fn_tok.line, fn_tok.col),
+        ))
     }
 
     /// 解析结构记录字面量：{x: 3, y: 4}
     /// 字段以逗号分隔，允许尾随逗号
     fn parse_record(&mut self) -> Result<Expr, ParseError> {
-        self.advance(); // {
+        let brace_tok = self.advance(); // {
         let mut fields = Vec::new();
         if !self.check(&Token::RBrace) {
             loop {
@@ -1135,13 +1226,16 @@ impl Parser {
             }
         }
         self.expect(&Token::RBrace, "'}' (闭合记录)")?;
-        Ok(Expr::Record { fields })
+        Ok(Expr::new(
+            ExprKind::Record { fields },
+            self.span_since(brace_tok.line, brace_tok.col),
+        ))
     }
 
     /// 解析 match 表达式：match SCRUTINEE \n PATTERN => BODY \n ... end
     /// match 自身消费 end（不像 if 那样由 parse_block 消费）
     fn parse_match(&mut self) -> Result<Expr, ParseError> {
-        self.advance(); // match
+        let match_tok = self.advance(); // match
         let scrutinee = self.parse_expr()?;
         let mut arms = Vec::new();
         // arms 直到 end / eof
@@ -1177,11 +1271,14 @@ impl Parser {
         } else {
             return Err(self.err("期望 'end' 闭合 match".to_string()));
         };
-        Ok(Expr::Match(Box::new(MatchExpr {
-            scrutinee: Box::new(scrutinee),
-            arms,
-            end_line,
-        })))
+        Ok(Expr::new(
+            ExprKind::Match(Box::new(MatchExpr {
+                scrutinee: Box::new(scrutinee),
+                arms,
+                end_line,
+            })),
+            self.span_since(match_tok.line, match_tok.col),
+        ))
     }
 
     /// 解析 match 分支：PATTERN => BODY
@@ -1214,26 +1311,28 @@ impl Parser {
     /// Pattern := Literal | _ | Binder | Variant '(' Patterns ')'
     fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
         let tok = self.current().clone();
+        // 字面量模式的 span = 单 token 位置
+        let tok_span = Span::at(tok.line, tok.col);
         match &tok.token {
             Token::Int(n) => {
                 self.advance();
-                Ok(Pattern::Lit(Expr::Int(*n)))
+                Ok(Pattern::Lit(Expr::new(ExprKind::Int(*n), tok_span)))
             }
             Token::Float(f) => {
                 self.advance();
-                Ok(Pattern::Lit(Expr::Float(*f)))
+                Ok(Pattern::Lit(Expr::new(ExprKind::Float(*f), tok_span)))
             }
             Token::Str(s) => {
                 self.advance();
-                Ok(Pattern::Lit(Expr::Str(s.clone())))
+                Ok(Pattern::Lit(Expr::new(ExprKind::Str(s.clone()), tok_span)))
             }
             Token::True => {
                 self.advance();
-                Ok(Pattern::Lit(Expr::Bool(true)))
+                Ok(Pattern::Lit(Expr::new(ExprKind::Bool(true), tok_span)))
             }
             Token::False => {
                 self.advance();
-                Ok(Pattern::Lit(Expr::Bool(false)))
+                Ok(Pattern::Lit(Expr::new(ExprKind::Bool(false), tok_span)))
             }
             Token::Ident(s) => {
                 self.advance();
@@ -1388,10 +1487,10 @@ mod tests {
         // main 的 body tail 应为 Pipe { left: Binary(1+2), right: Ident(f) }
         if let Item::Fn(main) = &p.items[1] {
             if let Some(tail) = &main.body.tail {
-                match tail.as_ref() {
-                    Expr::Pipe { left, right } => {
-                        assert!(matches!(left.as_ref(), Expr::Binary { op: BinOp::Add, .. }));
-                        assert!(matches!(right.as_ref(), Expr::Ident(_)));
+                match &tail.kind {
+                    ExprKind::Pipe { left, right } => {
+                        assert!(matches!(&left.kind, ExprKind::Binary { op: BinOp::Add, .. }));
+                        assert!(matches!(&right.kind, ExprKind::Ident(_)));
                     }
                     other => panic!("期望 Pipe，得到 {:?}", other),
                 }
@@ -1410,9 +1509,9 @@ mod tests {
         let p = parse_ok(src);
         if let Item::Fn(main) = &p.items[1] {
             if let Some(tail) = &main.body.tail {
-                match tail.as_ref() {
-                    Expr::Binary { op: BinOp::Eq, left, .. } => {
-                        assert!(matches!(left.as_ref(), Expr::Pipe { .. }));
+                match &tail.kind {
+                    ExprKind::Binary { op: BinOp::Eq, left, .. } => {
+                        assert!(matches!(&left.kind, ExprKind::Pipe { .. }));
                     }
                     other => panic!("期望 Binary(Eq, Pipe, ...)，得到 {:?}", other),
                 }
@@ -1572,11 +1671,11 @@ mod tests {
                 assert!(has_hole, "应在错误处插入 Stmt::Hole，stmts={:?}", f.body.stmts);
                 // println(1) 应被恢复（作为语句或 tail）
                 let has_println_stmt = f.body.stmts.iter().any(|s| {
-                    matches!(s, Stmt::Expr(Expr::Call { .. }))
+                    matches!(s, Stmt::Expr(e) if matches!(&e.kind, ExprKind::Call { .. }))
                 });
                 let tail_is_call = matches!(
-                    f.body.tail.as_ref().map(|t| t.as_ref()),
-                    Some(Expr::Call { .. })
+                    f.body.tail.as_ref().map(|t| &t.kind),
+                    Some(ExprKind::Call { .. })
                 );
                 assert!(
                     has_println_stmt || tail_is_call,
@@ -1650,7 +1749,7 @@ mod tests {
                 let has_after = f.body.stmts.iter().any(|s| {
                     matches!(
                         s,
-                        Stmt::Expr(Expr::Call { .. })
+                        Stmt::Expr(e) if matches!(&e.kind, ExprKind::Call { .. })
                     )
                 });
                 assert!(
@@ -1662,5 +1761,60 @@ mod tests {
             }
             other => panic!("期望 Item::Fn，得到 {:?}", other),
         }
+    }
+
+    // ===== Phase 3.2b：表达式级 span =====
+
+    #[test]
+    fn test_expr_span_binary_and_ident() {
+        // 行 2: `    let x = abc + 24`——let 在 col 5，abc 在 col 13，24 在 col 19
+        let src = "fn main() -> Unit\n    let x = abc + 24\nend";
+        let p = parse_ok(src);
+        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
+        let Stmt::Let { value, span: let_span, .. } = &f.body.stmts[0] else {
+            panic!("期望 let 语句")
+        };
+        // let 语句的 span = let 关键字位置
+        assert_eq!((let_span.line, let_span.col), (2, 5));
+        // Binary span = 左操作数起点 .. 右操作数（末 token）起点
+        assert_eq!((value.span.line, value.span.col), (2, 13));
+        assert_eq!((value.span.end_line, value.span.end_col), (2, 19));
+        let ExprKind::Binary { left, right, .. } = &value.kind else {
+            panic!("期望 Binary")
+        };
+        assert_eq!((left.span.line, left.span.col), (2, 13));
+        assert_eq!((right.span.line, right.span.col), (2, 19));
+    }
+
+    #[test]
+    fn test_expr_span_call_and_field() {
+        // 行 2: `    println(x)`——println 在 col 5，) 在 col 14
+        // 行 3: `    p.z`——p 在 col 5，z 在 col 7（Field span 的 end = 字段名 token）
+        let src = "fn main() -> Unit\n    println(x)\n    p.z\nend";
+        let p = parse_ok(src);
+        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
+        let Stmt::Expr(call) = &f.body.stmts[0] else { panic!("期望表达式语句") };
+        assert_eq!((call.span.line, call.span.col), (2, 5));
+        assert_eq!((call.span.end_line, call.span.end_col), (2, 14));
+        let ExprKind::Call { callee, .. } = &call.kind else { panic!("期望 Call") };
+        assert_eq!((callee.span.line, callee.span.col), (2, 5));
+        // Field：start = 对象起点，end = 字段名 token 起点
+        // （p.z 是块内最后一条表达式，归 Block.tail 而非 stmts）
+        let field = f.body.tail.as_ref().expect("期望 tail 表达式");
+        assert!(matches!(&field.kind, ExprKind::Field { .. }));
+        assert_eq!((field.span.line, field.span.col), (3, 5));
+        assert_eq!((field.span.end_line, field.span.end_col), (3, 7));
+    }
+
+    #[test]
+    fn test_assign_span_points_at_target() {
+        // 行 3: `    x = 4`——赋值目标 x 在 col 5
+        let src = "fn main() -> Unit\n    let mut x = 1\n    x = 4\nend";
+        let p = parse_ok(src);
+        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
+        let Stmt::Assign { span, .. } = &f.body.stmts[1] else {
+            panic!("期望 Assign 语句")
+        };
+        assert_eq!((span.line, span.col), (3, 5));
     }
 }

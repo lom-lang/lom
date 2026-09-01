@@ -260,6 +260,14 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
         // ===== 效应系统（Phase 2.5）=====
         "EFF001" => fix_eff_undeclared(d, source_lines),
 
+        // ===== 可变性（v0.20.0）=====
+        // 修复点是不可变变量的"声明处"，但诊断定位在赋值处；声明点定位需要
+        // 反向索引（诊断 → 声明），暂无机制——保持 hint 级，不猜。
+        "MUT001" => vec![hint_only(
+            "不可变重赋值：局部变量把声明改为 let mut；函数参数/for 循环变量请引入局部 let mut 副本",
+            Confidence::Medium,
+        )],
+
         // ===== 运行时错误 =====
         "RUNTIME001" => vec![hint_only(
             "运行时类型不匹配：检查值与操作期望",
@@ -538,8 +546,8 @@ fn fix_mat_non_exhaustive(d: &Diagnostic) -> Vec<FixAction> {
 
 /// NAM003 未定义变量/函数：有拼写建议时产出 Replace 动作（修复引擎深化 M1）
 ///
-/// typechecker 的 NAM003 诊断无表达式级位置（line/col = 0，表达式 span 是挂账项），
-/// 因此在源码中按"整词 + 跳过字符串/注释"扫描该名的所有出现处，每处一个 Replace。
+/// Phase 3.2b 起诊断带表达式级 span：优先用诊断位置产出**单点** Replace；
+/// 位置缺失/不符（如旧管线产物）回退为"整词 + 跳过字符串/注释"全量扫描。
 /// 置信度 Medium——猜测性修复不自动应用（用户裁决：--apply 只动 100% 确定的修复），
 /// 只进 --plan 供 LLM/人确认。无建议时保持原 hint。
 fn fix_nam_undefined(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
@@ -547,7 +555,11 @@ fn fix_nam_undefined(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
     let suggestion = extract_suggestion(&d.hint);
     match (name, suggestion) {
         (Some(name), Some(sugg)) => {
-            let occ = find_token_occurrences(source_lines, &name, false);
+            let occ: Vec<(usize, usize, usize)> =
+                match precise_occurrence(d, source_lines, &name, false) {
+                    Some(o) => vec![o],
+                    None => find_token_occurrences(source_lines, &name, false),
+                };
             if occ.is_empty() {
                 return vec![hint_only(
                     &format!(
@@ -583,16 +595,21 @@ fn fix_nam_undefined(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
 /// NAM004 无此字段/变体：有拼写建议时产出 Replace 动作（修复引擎深化 M1）
 ///
 /// message 两种形态：
-///   "记录无字段 'X'"   —— 只扫描 `.X`（点前缀）出现处，避免误改同名变量
-///   "枚举 E 无变体 'V'" —— 整词扫描 V（未定义变体出现的每一处都是错的）
-/// 与 NAM003 同：typechecker 诊断无位置，靠源码扫描定位；置信度 Medium。
+///   "记录无字段 'X'"   —— 精确位置 = 字段名 token（Field span 的 end，Phase 3.2b）；
+///                        扫描回退要求 `.X` 点前缀，避免误改同名变量
+///   "枚举 E 无变体 'V'" —— 诊断无位置（模式无 span），整词扫描 V（未定义变体出现的每一处都是错的）
+/// 与 NAM003 同：优先诊断精确位置，缺失才回退扫描；置信度 Medium。
 fn fix_nam_unknown_member(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
     let is_field = d.message.contains("无字段");
     let name = extract_last_quoted(&d.message);
     let suggestion = extract_suggestion(&d.hint);
     match (name, suggestion) {
         (Some(name), Some(sugg)) => {
-            let occ = find_token_occurrences(source_lines, &name, is_field);
+            let occ: Vec<(usize, usize, usize)> =
+                match precise_occurrence(d, source_lines, &name, is_field) {
+                    Some(o) => vec![o],
+                    None => find_token_occurrences(source_lines, &name, is_field),
+                };
             if occ.is_empty() {
                 return vec![hint_only(
                     &format!("'{}' 不存在：是否想用 '{}'？（未能定位出现位置）", name, sugg),
@@ -803,10 +820,46 @@ fn is_ident_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
+/// Phase 3.2b: 诊断带精确 span（line > 0）时，直接把诊断位置转为 Replace 位置，
+/// 跳过整词扫描。返回 (line, col, end_col)（1-based 字符位置，end 左闭右开，
+/// 与 find_token_occurrences 约定一致）；位置缺失或与源码不符时返回 None（调用方回退扫描）。
+///
+/// 注意坐标系换算：诊断的 col 来自 lexer，是 **1-based 字节列**（lexer 按字节推进），
+/// 而 fix 动作约定 **1-based 字符列**（含非 ASCII 的行两者会分叉）——此处换算。
+/// 防呆：校验该位置的字节内容确实是 `name`，不符一律回退扫描。
+fn precise_occurrence(
+    d: &Diagnostic,
+    source_lines: &[&str],
+    name: &str,
+    dot_prefix: bool,
+) -> Option<(usize, usize, usize)> {
+    if d.line == 0 || d.col == 0 {
+        return None;
+    }
+    let line_str = (*source_lines.get(d.line - 1)?).as_bytes();
+    let byte_start = d.col - 1;
+    // 字节内容必须逐字节等于 name（否则说明诊断位置与源码不同步，回退扫描）
+    if line_str.len() < byte_start + name.len()
+        || &line_str[byte_start..byte_start + name.len()] != name.as_bytes()
+    {
+        return None;
+    }
+    // 字节列 → 字符列：col-1 之前有多少个 char
+    let char_col = std::str::from_utf8(&line_str[..byte_start]).ok()?.chars().count() + 1;
+    if dot_prefix {
+        // 字段场景：字段名前一个字符必须是 '.'
+        let before = std::str::from_utf8(&line_str[..byte_start]).ok()?;
+        if !before.ends_with('.') {
+            return None;
+        }
+    }
+    Some((d.line, char_col, char_col + name.chars().count()))
+}
+
 /// 在源码中整词扫描 `name` 的所有出现处（跳过字符串字面量与 `#` 注释）
 ///
-/// 用于 NAM003/NAM004 的 Replace 定位——typechecker 诊断无表达式级位置（line/col=0），
-/// 只能靠扫描。`dot_prefix` = true 时要求名字前一个字符是 `.`
+/// NAM003/NAM004 Replace 定位的**回退路径**：诊断无精确位置（line=0，
+/// 如模式内的变体名——Pattern 无 span）时才扫描。`dot_prefix` = true 时要求名字前一个字符是 `.`
 /// （记录字段场景，避免误改同名的普通变量）。
 /// 返回 (line, col, end_col)：1-based 字符位置，end_col = col + 名字字符数
 /// （与 LEX005 delete 的 col..col+1 约定一致，为左闭右开）。
@@ -1574,6 +1627,69 @@ mod tests {
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].line, 2);
         assert_eq!(fixes[0].col, 9);
+    }
+
+    // ===== Phase 3.2b：诊断精确位置（表达式 span）驱动的单点 Replace =====
+
+    #[test]
+    fn nam003_precise_span_produces_single_replace() {
+        // 诊断带精确位置（line/col > 0）→ 单点 Replace，不再整词扫描
+        let src = "fn main() -> Unit\n    let total = 1\n    let x = toatl + 1\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let mut d = make_nam_diag("NAM003", "未定义变量 'toatl'", Some("是否想用 'total'？"));
+        d.line = 3;
+        d.col = 13; // lexer 字节列（纯 ASCII 行与字符列一致）
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1, "精确位置应只产出单点 Replace");
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 3);
+        assert_eq!(fixes[0].col, 13);
+        assert_eq!(fixes[0].end_col, Some(18));
+        assert_eq!(fixes[0].text.as_deref(), Some("total"));
+    }
+
+    #[test]
+    fn nam003_precise_span_byte_col_converts_to_char_col() {
+        // lexer col 是 1-based 字节列，fix 约定字符列——含非 ASCII 的行两者分叉。
+        // 行 `    let x = "中文" + toatl`：toatl 字节列 24，字符列 20
+        let src = "    let x = \"中文\" + toatl";
+        let lines: Vec<&str> = vec![src];
+        let mut d = make_nam_diag("NAM003", "未定义变量 'toatl'", Some("是否想用 'total'？"));
+        d.line = 1;
+        d.col = 24;
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].col, 20, "字节列 24 应换算为字符列 20");
+        assert_eq!(fixes[0].end_col, Some(25));
+    }
+
+    #[test]
+    fn nam003_stale_position_falls_back_to_scan() {
+        // 防呆：诊断位置的字节内容与名字不符（过期诊断/旧管线产物）→ 回退整词扫描
+        let src = "fn main() -> Unit\n    println(lenght + 1)\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let mut d = make_nam_diag("NAM003", "未定义变量 'lenght'", Some("是否想用 'length'？"));
+        d.line = 2;
+        d.col = 5; // 该位置是 println，不是 lenght —— 校验失败，回退扫描
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!((fixes[0].line, fixes[0].col), (2, 13), "应回退扫描找到真实位置");
+    }
+
+    #[test]
+    fn nam004_field_precise_span_at_field_name() {
+        // NAM004 字段：诊断位置 = 字段名 token（Field span 的 end），单点 Replace
+        let src = "fn main() -> Unit\n    let p = {x: 3}\n    println(p.nam)\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let mut d = make_nam_diag("NAM004", "记录无字段 'nam'", Some("是否想用 'name'？"));
+        d.line = 3;
+        d.col = 15; // println(p.nam)：p 在 13，. 在 14，nam 在 15
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!((fixes[0].line, fixes[0].col), (3, 15));
+        assert_eq!(fixes[0].end_col, Some(18));
     }
 
     #[test]

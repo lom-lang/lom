@@ -497,7 +497,7 @@ impl TypeChecker {
 
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
         match stmt {
-            Stmt::Let { name, ty, value, mutable } => {
+            Stmt::Let { name, ty, value, mutable, span } => {
                 let val_ty = self.check_expr(value, env);
                 if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty)
                     && !self.types_compatible(vt, annot) {
@@ -508,8 +508,8 @@ impl TypeChecker {
                                 "let {} 声明类型 {:?}，但值类型 {:?}",
                                 name, annot, vt
                             ),
-                            0,
-                            0,
+                            span.line,
+                            span.col,
                         );
                     }
                 let final_ty = if let Some(annot) = ty {
@@ -549,19 +549,20 @@ impl TypeChecker {
                     }
                 }
             }
-            Stmt::Assign { target, value } => {
+            Stmt::Assign { target, value, span } => {
                 let val_ty = self.check_expr(value, env);
                 if let Some(expected) = env.get(target) {
                     // 不可变重赋值校验（MUT001）：let 默认不可变，重赋值报 warning。
                     // 渐进式承诺：warning 不拦截执行，解释器仍照常赋值。
                     // 复合赋值（x += 1）在 parser 去糖为 Assign，自然覆盖。
+                    // Phase 3.2b：定位到赋值目标标识符（span 由 parser 填充）
                     if env.is_mutable(target) == Some(false) {
                         self.push_diag(
                             Severity::Warning,
                             "MUT001".into(),
                             format!("赋值给不可变变量 '{}'（声明时未标 mut）", target),
-                            0,
-                            0,
+                            span.line,
+                            span.col,
                         );
                     }
                     if let (TypeOrUnknown::Known(e), TypeOrUnknown::Known(v)) = (&expected, &val_ty)
@@ -573,8 +574,8 @@ impl TypeChecker {
                                     "赋值给 '{}': 期望 {:?}，得到 {:?}",
                                     target, e, v
                                 ),
-                                0,
-                                0,
+                                span.line,
+                                span.col,
                             );
                         }
                 } else {
@@ -582,8 +583,8 @@ impl TypeChecker {
                         Severity::Error,
                         "NAM003".into(),
                         format!("赋值给未定义变量 '{}'", target),
-                        0,
-                        0,
+                        span.line,
+                        span.col,
                     );
                 }
             }
@@ -596,8 +597,8 @@ impl TypeChecker {
                                 Severity::Warning,
                                 "TYPE002".into(),
                                 format!("if 条件应为 Bool，得到 {:?}", t),
-                                0,
-                                0,
+                                cond.span.line,
+                                cond.span.col,
                             );
                         }
                     self.check_block(body, env);
@@ -614,8 +615,8 @@ impl TypeChecker {
                             Severity::Warning,
                             "TYPE002".into(),
                             format!("while 条件应为 Bool，得到 {:?}", t),
-                            0,
-                            0,
+                            cond.span.line,
+                            cond.span.col,
                         );
                     }
                 self.check_block(body, env);
@@ -639,9 +640,9 @@ impl TypeChecker {
                 self.check_block(body, env);
             }
             Stmt::Return(expr) => {
-                let ret_ty = match expr {
-                    Some(e) => self.check_expr(e, env),
-                    None => TypeOrUnknown::known(Type::Unit),
+                let (ret_ty, rspan) = match expr {
+                    Some(e) => (self.check_expr(e, env), e.span),
+                    None => (TypeOrUnknown::known(Type::Unit), Span::default()),
                 };
                 if let (Some(expected), TypeOrUnknown::Known(actual)) = (&self.current_ret, &ret_ty)
                     && !self.types_compatible(actual, expected) {
@@ -652,8 +653,8 @@ impl TypeChecker {
                                 "return 返回 {:?}，但函数声明返回 {:?}",
                                 actual, expected
                             ),
-                            0,
-                            0,
+                            rspan.line,
+                            rspan.col,
                         );
                     }
             }
@@ -669,13 +670,15 @@ impl TypeChecker {
 
     /// 检查表达式，返回其类型
     fn check_expr(&mut self, expr: &Expr, env: &mut TypeEnv) -> TypeOrUnknown {
-        match expr {
-            Expr::Int(_) => TypeOrUnknown::known(Type::Int),
-            Expr::Float(_) => TypeOrUnknown::known(Type::Float),
-            Expr::Bool(_) => TypeOrUnknown::known(Type::Bool),
-            Expr::Str(_) => TypeOrUnknown::known(Type::String),
-            Expr::Unit => TypeOrUnknown::known(Type::Unit),
-            Expr::Ident(name) => {
+        // Phase 3.2b: 整个表达式的 span（各分支诊断定位用；分支内同名绑定会遮蔽 expr，故先取出）
+        let espan = expr.span;
+        match &expr.kind {
+            ExprKind::Int(_) => TypeOrUnknown::known(Type::Int),
+            ExprKind::Float(_) => TypeOrUnknown::known(Type::Float),
+            ExprKind::Bool(_) => TypeOrUnknown::known(Type::Bool),
+            ExprKind::Str(_) => TypeOrUnknown::known(Type::String),
+            ExprKind::Unit => TypeOrUnknown::known(Type::Unit),
+            ExprKind::Ident(name) => {
                 if let Some(ty) = env.get(name) {
                     ty
                 } else if self.functions.contains_key(name) {
@@ -689,19 +692,19 @@ impl TypeChecker {
                         Severity::Error,
                         "NAM003".into(),
                         format!("未定义变量 '{}'", name),
-                        0,
-                        0,
+                        espan.line,
+                        espan.col,
                     );
                     self.patch_nam003_hint(name, &*env);
                     TypeOrUnknown::unknown()
                 }
             }
-            Expr::Binary { op, left, right } => {
+            ExprKind::Binary { op, left, right } => {
                 let lt = self.check_expr(left, env);
                 let rt = self.check_expr(right, env);
                 self.binary_result_type(op, &lt, &rt)
             }
-            Expr::Unary { op, expr } => {
+            ExprKind::Unary { op, expr } => {
                 let t = self.check_expr(expr, env);
                 match op {
                     UnaryOp::Neg => match &t {
@@ -712,8 +715,8 @@ impl TypeChecker {
                                 Severity::Warning,
                                 "TYPE001".into(),
                                 format!("一元负号要求 Int/Float，得到 {:?}", other),
-                                0,
-                                0,
+                                espan.line,
+                                espan.col,
                             );
                             TypeOrUnknown::unknown()
                         }
@@ -726,8 +729,8 @@ impl TypeChecker {
                                 Severity::Warning,
                                 "TYPE001".into(),
                                 format!("一元非要求 Bool，得到 {:?}", other),
-                                0,
-                                0,
+                                espan.line,
+                                espan.col,
                             );
                             TypeOrUnknown::unknown()
                         }
@@ -735,20 +738,20 @@ impl TypeChecker {
                     },
                 }
             }
-            Expr::Logical { .. } => {
+            ExprKind::Logical { .. } => {
                 // and/or 短路求值，结果为 Bool；不强制检查操作数（渐进式）
                 TypeOrUnknown::known(Type::Bool)
             }
-            Expr::Call { callee, args } => {
+            ExprKind::Call { callee, args } => {
                 self.check_call(callee, args, env)
             }
-            Expr::Index { expr, index } => {
+            ExprKind::Index { expr, index } => {
                 let _ = self.check_expr(expr, env);
                 let _ = self.check_expr(index, env);
                 // 元组索引在 Phase 2.4 暂不精确推断（Index 节点未在解释器实现）
                 TypeOrUnknown::unknown()
             }
-            Expr::Field { expr, name: field } => {
+            ExprKind::Field { expr, name: field } => {
                 let t = self.check_expr(expr, env);
                 match &t {
                     TypeOrUnknown::Known(Type::Record(fields)) => {
@@ -757,12 +760,14 @@ impl TypeChecker {
                                 return TypeOrUnknown::Known(fty.clone());
                             }
                         }
+                        // NAM004 定位到字段名 token（Field span 的 end = 最后一个 token = 字段名），
+                        // 而非对象起点——fix 的 Replace 需要字段名位置
                         self.push_diag(
                             Severity::Error,
                             "NAM004".into(),
                             format!("记录无字段 '{}'", field),
-                            0,
-                            0,
+                            espan.end_line,
+                            espan.end_col,
                         );
                         // 字段名拼写建议（候选 = 该记录的字段名），供 fix 产出 Replace
                         let candidates: Vec<String> =
@@ -781,8 +786,8 @@ impl TypeChecker {
                     _ => TypeOrUnknown::unknown(),
                 }
             }
-            Expr::Group(e) => self.check_expr(e, env),
-            Expr::If(if_stmt) => {
+            ExprKind::Group(e) => self.check_expr(e, env),
+            ExprKind::If(if_stmt) => {
                 let mut branch_tys = Vec::new();
                 for (cond, body) in &if_stmt.branches {
                     let cond_ty = self.check_expr(cond, env);
@@ -792,8 +797,8 @@ impl TypeChecker {
                                 Severity::Warning,
                                 "TYPE002".into(),
                                 format!("if 条件应为 Bool，得到 {:?}", t),
-                                0,
-                                0,
+                                cond.span.line,
+                                cond.span.col,
                             );
                         }
                     branch_tys.push(self.check_block(body, env));
@@ -804,7 +809,7 @@ impl TypeChecker {
                 // 取所有分支的公共类型（若一致）
                 self.unify_types(&branch_tys)
             }
-            Expr::Closure { params, ret_type, body } => {
+            ExprKind::Closure { params, ret_type, body } => {
                 // 闭包捕获外部环境：closure_env 继承当前 env，使闭包内可引用外部变量
                 let mut closure_env = env.child();
                 for p in params {
@@ -821,14 +826,14 @@ impl TypeChecker {
                             Severity::Warning,
                             "TYPE010".into(),
                             format!("闭包返回 {:?}，但声明返回 {:?}", bt, ret),
-                            0,
-                            0,
+                            espan.line,
+                            espan.col,
                         );
                     }
                 TypeOrUnknown::unknown()
             }
-            Expr::Match(m) => self.check_match(m, env),
-            Expr::Try(e) => {
+            ExprKind::Match(m) => self.check_match(m, env),
+            ExprKind::Try(e) => {
                 let inner_ty = self.check_expr(e, env);
                 match &inner_ty {
                     TypeOrUnknown::Known(Type::Result(ok_t, err_t)) => {
@@ -842,8 +847,8 @@ impl TypeChecker {
                                         "`?` 用于 Result<{:?}, {:?}>，但所在函数返回 {:?}",
                                         ok_t, err_t, ret
                                     ),
-                                    0,
-                                    0,
+                                    espan.line,
+                                    espan.col,
                                 );
                             }
                         TypeOrUnknown::Known((**ok_t).clone())
@@ -858,8 +863,8 @@ impl TypeChecker {
                                         "`?` 用于 Option<{:?}>，但所在函数返回 {:?}",
                                         t, ret
                                     ),
-                                    0,
-                                    0,
+                                    espan.line,
+                                    espan.col,
                                 );
                             }
                         TypeOrUnknown::Known((**t).clone())
@@ -869,17 +874,17 @@ impl TypeChecker {
                             Severity::Warning,
                             "TYPE020".into(),
                             format!("`?` 要求 Result/Option，得到 {:?}", other),
-                            0,
-                            0,
+                            espan.line,
+                            espan.col,
                         );
                         TypeOrUnknown::unknown()
                     }
                     TypeOrUnknown::Unknown => TypeOrUnknown::unknown(),
                 }
             }
-            Expr::Pipe { left, right } => {
+            ExprKind::Pipe { left, right } => {
                 // right 应该是 callee（Ident 或 Call）；left 作为第一个参数
-                if let Expr::Call { callee, args } = right.as_ref() {
+                if let ExprKind::Call { callee, args } = &right.kind {
                     // 2026-08-22 修复 TYPE003 假阳性：arity 检查必须把管道传入的 left 计入
                     // （此前只传显式 args，`x |> add(1)` 被误报"期望 2 个参数，得到 1 个"）
                     let mut full_args: Vec<Expr> = vec![left.as_ref().clone()];
@@ -890,7 +895,7 @@ impl TypeChecker {
                     self.check_call(right, std::slice::from_ref(left), env)
                 }
             }
-            Expr::Record { fields } => {
+            ExprKind::Record { fields } => {
                 let mut field_tys = Vec::new();
                 for (name, e) in fields {
                     let t = self.check_expr(e, env);
@@ -910,7 +915,7 @@ impl TypeChecker {
                     TypeOrUnknown::unknown()
                 }
             }
-            Expr::Tuple { elems } => {
+            ExprKind::Tuple { elems } => {
                 let mut elem_tys = Vec::new();
                 for e in elems {
                     elem_tys.push(self.check_expr(e, env));
@@ -928,7 +933,7 @@ impl TypeChecker {
                     TypeOrUnknown::unknown()
                 }
             }
-            Expr::Range { start, end } => {
+            ExprKind::Range { start, end } => {
                 // v0.4.2 P1-1: a..b → List<Int>;两端已知且非 Int 报 TYPE001
                 for e in [start, end] {
                     if let TypeOrUnknown::Known(t) = self.check_expr(e, env)
@@ -937,8 +942,8 @@ impl TypeChecker {
                                 Severity::Warning,
                                 "TYPE001".into(),
                                 format!("range 两端应为 Int，得到 {:?}", t),
-                                0,
-                                0,
+                                e.span.line,
+                                e.span.col,
                             );
                         }
                 }
@@ -954,9 +959,11 @@ impl TypeChecker {
         for a in args {
             arg_tys.push(self.check_expr(a, env));
         }
+        // Phase 3.2b: callee 位置（NAM003/TYPE003 诊断定位到调用点函数名）
+        let cspan = callee.span;
         // 解析 callee
-        match callee {
-            Expr::Ident(name) => {
+        match &callee.kind {
+            ExprKind::Ident(name) => {
                 // 顶层函数？
                 if let Some(sig) = self.functions.get(name).cloned() {
                     // Phase 2.5: 效应检查
@@ -973,8 +980,8 @@ impl TypeChecker {
                                 sig.params.len(),
                                 args.len()
                             ),
-                            0,
-                            0,
+                            cspan.line,
+                            cspan.col,
                         );
                     } else {
                         // 参数类型检查
@@ -990,8 +997,8 @@ impl TypeChecker {
                                             "函数 '{}' 参数 {}: 期望 {:?}，得到 {:?}",
                                             name, i, pty, at
                                         ),
-                                        0,
-                                        0,
+                                        cspan.line,
+                                        cspan.col,
                                     );
                                 }
                             let _ = pname;
@@ -1009,8 +1016,8 @@ impl TypeChecker {
                                 "变体 '{}' 期望 {} 个参数，得到 {} 个",
                                 name, expected_arity, args.len()
                             ),
-                            0,
-                            0,
+                            cspan.line,
+                            cspan.col,
                         );
                     }
                     ret_ty
@@ -1025,8 +1032,8 @@ impl TypeChecker {
                         Severity::Error,
                         "NAM003".into(),
                         format!("调用未定义函数 '{}'", name),
-                        0,
-                        0,
+                        cspan.line,
+                        cspan.col,
                     );
                     self.patch_nam003_hint(name, &*env);
                     TypeOrUnknown::unknown()
@@ -2419,5 +2426,47 @@ mod tests {
         let src = "fn main() -> Unit\n    let mut total = 0\n    for i in 1..10\n        total += i\n    end\nend\n";
         let diags = check_src(src);
         assert_eq!(mut001_diags(&diags).len(), 0, "let mut 复合赋值不应报 MUT001");
+    }
+
+    // ===== Phase 3.2b：表达式级 span —— 诊断精确位置 =====
+
+    #[test]
+    fn span_nam003_points_at_ident_use() {
+        // 行 3: `    let x = toatl + 1`——toatl 在 col 13（此前 NAM003 钉在 (0,0)）
+        let src = "fn main() -> Unit\n    let total = 1\n    let x = toatl + 1\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+        assert_eq!(d.len(), 1);
+        assert_eq!((d[0].line, d[0].col), (3, 13), "NAM003 应定位到标识符使用处");
+    }
+
+    #[test]
+    fn span_mut001_points_at_assign_target() {
+        // 行 4: `    c = 2`——目标 c 在 col 5
+        let src = "fn main() -> Unit\n    let c = 1\n    println(c)\n    c = 2\nend\n";
+        let diags = check_src(src);
+        let d = mut001_diags(&diags);
+        assert_eq!(d.len(), 1);
+        assert_eq!((d[0].line, d[0].col), (4, 5), "MUT001 应定位到赋值目标");
+    }
+
+    #[test]
+    fn span_nam004_points_at_field_name() {
+        // 行 3: `    println(p.z)`——z 在 col 15（Field span 的 end），不是对象 p 的 col 13
+        let src = "fn main() -> Unit\n    let p = {x: 3, y: 4}\n    println(p.z)\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM004").collect();
+        assert_eq!(d.len(), 1);
+        assert_eq!((d[0].line, d[0].col), (3, 15), "NAM004 应定位到字段名 token");
+    }
+
+    #[test]
+    fn span_type002_points_at_condition() {
+        // 行 2: `    if 1 + 1`——条件表达式起点在 col 8
+        let src = "fn main() -> Unit\n    if 1 + 1\n        println(1)\n    end\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE002").collect();
+        assert_eq!(d.len(), 1);
+        assert_eq!((d[0].line, d[0].col), (2, 8), "TYPE002 应定位到条件表达式");
     }
 }

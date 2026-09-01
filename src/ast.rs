@@ -2,12 +2,15 @@
 // Phase 2 新增：match, enum, Result/Option, 模式匹配, ?, |>, 结构记录, 元组, 显式导入
 // Phase 2.2 新增：Hole 节点（容错解析器在错误处插入的占位符）
 // Phase 3.2 新增：Span 类型 + FnDecl/EnumDecl span 字段（函数/枚举级诊断精确定位）
-// Phase 2 仍不含：多文件模块（Phase 3）、表达式级 span（Phase 3.2b）
+// Phase 3.2b（v0.21.0）：表达式级 span —— Expr 改为 struct { kind: ExprKind, span }，
+//   Stmt::Let/Assign 补 span；typechecker 诊断（NAM003/MUT001 等）从 (0,0) 升级为精确位置
 
 /// 源码位置跨度（1-based，与 lexer 的 SpannedToken 一致）
 ///
-/// Phase 3.2a：仅 FnDecl/EnumDecl 携带 span（函数/枚举级诊断定位）。
-/// Phase 3.2b：Expr 各变体将携带 span（表达式级诊断 + LSP）。
+/// 惯例：start = 节点首个 token 的 (line, col)；end = 节点最后一个 token 的
+/// 起始位置（不是末尾之后——lexer 只记 token 起点，与 Phase 3.2 签名 span 一致）。
+/// Phase 3.2a：FnDecl/EnumDecl 携带 span（函数/枚举级诊断定位）。
+/// Phase 3.2b：Expr 全部节点 + Stmt::Let/Assign 携带 span（表达式级诊断 + LSP 地基）。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Span {
     pub line: usize,
@@ -156,6 +159,8 @@ pub enum Stmt {
         name: String,
         ty: Option<Type>,
         value: Expr,
+        /// Phase 3.2b: `let` 关键字位置（声明级定位，供诊断/修复引用声明点）
+        span: Span,
     },
     /// Phase 5.1: 元组解构绑定 let (a, b, ...) = expr
     /// value 必须求值为元组，数量须与 names 一致；不支持 mut 与类型注解
@@ -164,7 +169,12 @@ pub enum Stmt {
         value: Expr,
     },
     /// 赋值：name = expr（name 必须已声明，否则 NAM003；目标为不可变 let 时 typechecker 报 MUT001 warning）
-    Assign { target: String, value: Expr },
+    Assign {
+        target: String,
+        value: Expr,
+        /// Phase 3.2b: 赋值目标标识符的位置（MUT001/NAM003 诊断定位）
+        span: Span,
+    },
     /// if/elif/else 块（作为语句；也可是表达式）
     If(IfStmt),
     /// while expr block end
@@ -187,9 +197,34 @@ pub struct IfStmt {
     pub else_branch: Option<Block>,
 }
 
-/// 表达式
+/// 表达式节点（Phase 3.2b）：kind + span
+///
+/// span 由 parser 填充：start = 首个 token 位置，end = 末 token 起始位置。
+/// 消费方匹配时用 `&expr.kind`；取位置直接用 `expr.span`，无需匹配。
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+impl Expr {
+    /// 构造带 span 的表达式节点
+    pub fn new(kind: ExprKind, span: Span) -> Expr {
+        Expr { kind, span }
+    }
+
+    /// 构造占位 span 的表达式节点（容错恢复/程序合成节点用，span 为 (0,0)）
+    /// 当前主路径未用——合成节点（如复合赋值去糖）都复用既有节点的真实 span；
+    /// 保留给将来需要凭空造节点的工具链（LSP 补全、fix 动作展开）
+    #[allow(dead_code)]
+    pub fn placeholder(kind: ExprKind) -> Expr {
+        Expr { kind, span: Span::default() }
+    }
+}
+
+/// 表达式种类（Phase 3.2b 前名为 Expr；位置信息已上移到 Expr.span）
+#[derive(Debug, Clone)]
+pub enum ExprKind {
     /// 整数字面量
     Int(i64),
     /// 浮点字面量

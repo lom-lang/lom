@@ -891,18 +891,18 @@ impl Codegen {
             }
             Pattern::Lit(e) => {
                 // 字面量模式：值相等（rt_eq；Int/Float/Bool/Str 四种子集，对齐解释器）
-                match e {
-                    Expr::Int(n) => {
+                match &e.kind {
+                    ExprKind::Int(n) => {
                         a.i64c(n << 4);
                     }
-                    Expr::Float(f) => {
+                    ExprKind::Float(f) => {
                         let v = self.intern_f64(*f);
                         a.i64c(v);
                     }
-                    Expr::Bool(bv) => {
+                    ExprKind::Bool(bv) => {
                         a.i64c(if *bv { V_TRUE } else { V_FALSE });
                     }
-                    Expr::Str(txt) => {
+                    ExprKind::Str(txt) => {
                         let v = self.intern_str(txt);
                         a.i64c(v);
                     }
@@ -1015,7 +1015,7 @@ impl Codegen {
                 // 递归闭包特例（对齐解释器的共享作用域语义）：
                 // `let f = fn(...) ... f ... end` 在创建时引用自己——值拷贝捕获此刻拿不到
                 // 真值，故预绑定 local，创建后把闭包值补丁进 env 的自身槽位。
-                if let Expr::Closure { params, body, .. } = value {
+                if let ExprKind::Closure { params, body, .. } = &value.kind {
                     let frees = free_vars_block(body, &param_names(params));
                     if frees.iter().any(|n| n == name) {
                         let idx = ctx.bind(name); // 预绑定（值稍后填）
@@ -1046,7 +1046,7 @@ impl Codegen {
                 }
                 Ok(())
             }
-            Stmt::Assign { target, value } => {
+            Stmt::Assign { target, value, .. } => {
                 let idx = match ctx.lookup(target) {
                     Some(i) => i,
                     None => return Err(format!("WASM 编译：赋值给未定义变量 '{}'", target)),
@@ -1249,30 +1249,30 @@ impl Codegen {
     }
 
     fn compile_expr(&mut self, ctx: &mut FnCtx, a: &mut Asm, expr: &Expr) -> Result<(), String> {
-        match expr {
-            Expr::Int(n) => {
+        match &expr.kind {
+            ExprKind::Int(n) => {
                 a.i64c(n << 4); // tag 0
                 Ok(())
             }
-            Expr::Float(f) => {
+            ExprKind::Float(f) => {
                 let v = self.intern_f64(*f);
                 a.i64c(v);
                 Ok(())
             }
-            Expr::Bool(bv) => {
+            ExprKind::Bool(bv) => {
                 a.i64c(if *bv { V_TRUE } else { V_FALSE });
                 Ok(())
             }
-            Expr::Str(s) => {
+            ExprKind::Str(s) => {
                 let v = self.intern_str(s);
                 a.i64c(v);
                 Ok(())
             }
-            Expr::Unit => {
+            ExprKind::Unit => {
                 a.i64c(V_UNIT);
                 Ok(())
             }
-            Expr::Ident(name) => {
+            ExprKind::Ident(name) => {
                 if let Some(idx) = ctx.lookup(name) {
                     a.lget(idx);
                     return Ok(());
@@ -1295,7 +1295,7 @@ impl Codegen {
                 }
                 Err(format!("WASM 编译：未定义变量 '{}'", name))
             }
-            Expr::Binary { op: bop, left, right } => {
+            ExprKind::Binary { op: bop, left, right } => {
                 let helper = match bop {
                     BinOp::Add => RT_ADD,
                     BinOp::Sub => RT_SUB,
@@ -1314,7 +1314,7 @@ impl Codegen {
                 a.call(helper);
                 Ok(())
             }
-            Expr::Unary { op: uop, expr: inner } => {
+            ExprKind::Unary { op: uop, expr: inner } => {
                 self.compile_expr(ctx, a, inner)?;
                 a.call(match uop {
                     UnaryOp::Neg => RT_NEG,
@@ -1322,7 +1322,7 @@ impl Codegen {
                 });
                 Ok(())
             }
-            Expr::Logical { op: lop, left, right } => {
+            ExprKind::Logical { op: lop, left, right } => {
                 // 解释器语义：and/or 的结果是 Bool（对右侧取真值），不是右侧原值
                 let sc = ctx.alloc();
                 self.compile_expr(ctx, a, left)?;
@@ -1344,17 +1344,17 @@ impl Codegen {
                 a.end();
                 Ok(())
             }
-            Expr::Call { callee, args } => self.compile_call(ctx, a, callee, args),
-            Expr::Group(inner) => self.compile_expr(ctx, a, inner),
-            Expr::If(if_stmt) => self.compile_if(ctx, a, if_stmt, true),
-            Expr::Pipe { left, right } => {
+            ExprKind::Call { callee, args } => self.compile_call(ctx, a, callee, args),
+            ExprKind::Group(inner) => self.compile_expr(ctx, a, inner),
+            ExprKind::If(if_stmt) => self.compile_if(ctx, a, if_stmt, true),
+            ExprKind::Pipe { left, right } => {
                 // 去糖：x |> f → f(x)；x |> f(args) → f(x, args...)
-                match right.as_ref() {
-                    Expr::Ident(name) => {
+                match &right.kind {
+                    ExprKind::Ident(_) => {
                         let args = vec![left.as_ref().clone()];
-                        self.compile_call(ctx, a, &Expr::Ident(name.clone()), &args)
+                        self.compile_call(ctx, a, right, &args)
                     }
-                    Expr::Call { callee, args } => {
+                    ExprKind::Call { callee, args } => {
                         let mut new_args = vec![left.as_ref().clone()];
                         new_args.extend(args.iter().cloned());
                         self.compile_call(ctx, a, callee, &new_args)
@@ -1362,12 +1362,12 @@ impl Codegen {
                     _ => Err("WASM 编译：管道右侧必须是函数名或调用".to_string()),
                 }
             }
-            Expr::Closure { params, body, .. } => {
+            ExprKind::Closure { params, body, .. } => {
                 self.compile_closure(ctx, a, params, body)?;
                 Ok(())
             }
-            Expr::Match(m) => self.compile_match(ctx, a, m),
-            Expr::Try(inner) => {
+            ExprKind::Match(m) => self.compile_match(ctx, a, m),
+            ExprKind::Try(inner) => {
                 // `?`：Ok(v)/Some(v) → 解包；Err(e)/None → 整个值 br $ret（对齐解释器 EarlyReturn）
                 self.compile_expr(ctx, a, inner)?;
                 let t = ctx.alloc();
@@ -1392,7 +1392,7 @@ impl Codegen {
                 ctx.labels.pop();
                 Ok(())
             }
-            Expr::Tuple { elems } => {
+            ExprKind::Tuple { elems } => {
                 // 元组：[n: i32][elems: i64×n]（tag 7）
                 let mut scratches = Vec::new();
                 for e in elems {
@@ -1410,7 +1410,7 @@ impl Codegen {
                 a.lget(p).tag_int().i64c(TAG_TUPLE).op(op::I64_OR);
                 Ok(())
             }
-            Expr::Record { fields } => {
+            ExprKind::Record { fields } => {
                 // 记录：[n: i32][(name_off: i32, val: i64)×n]（tag 8）；name_off 编译期 intern
                 let mut scratches = Vec::new();
                 for (_, e) in fields {
@@ -1430,7 +1430,7 @@ impl Codegen {
                 a.lget(p).tag_int().i64c(TAG_RECORD).op(op::I64_OR);
                 Ok(())
             }
-            Expr::Field { expr: obj, name } => {
+            ExprKind::Field { expr: obj, name } => {
                 // 元组 .N / 记录 .name（运行时按 tag 分派）
                 self.compile_expr(ctx, a, obj)?;
                 let s = ctx.alloc();
@@ -1492,19 +1492,19 @@ impl Codegen {
                 a.end();
                 Ok(())
             }
-            Expr::Range { start, end } => {
+            ExprKind::Range { start, end } => {
                 // a..b → List<Int>（左闭右开，对齐解释器：两端须 Int）
                 self.compile_expr(ctx, a, start)?;
                 self.compile_expr(ctx, a, end)?;
                 a.call(RT_RANGE);
                 Ok(())
             }
-            Expr::Index { .. } => Err("WASM 编译：索引操作 xs[i] 在解释器侧也未实现（用 list_get）".to_string()),
+            ExprKind::Index { .. } => Err("WASM 编译：索引操作 xs[i] 在解释器侧也未实现（用 list_get）".to_string()),
         }
     }
 
     fn compile_call(&mut self, ctx: &mut FnCtx, a: &mut Asm, callee: &Expr, args: &[Expr]) -> Result<(), String> {
-        if let Expr::Ident(name) = callee {
+        if let ExprKind::Ident(name) = &callee.kind {
             let orig: &str = name;
             // 导入别名解析（log → println 等）；变体/用户函数/闭包判断用 orig，内建分派用真名 real
             // real 用 owned String 避免借用 self 卡住后续可变调用
@@ -4366,34 +4366,34 @@ fn fv_pattern(p: &Pattern, bound: &mut std::collections::HashSet<String>) {
 }
 
 fn fv_expr(e: &Expr, bound: &mut std::collections::HashSet<String>, st: &mut FvState) {
-    match e {
-        Expr::Ident(n) => st.note(n, bound),
-        Expr::Binary { left, right, .. } | Expr::Logical { left, right, .. } | Expr::Pipe { left, right } => {
+    match &e.kind {
+        ExprKind::Ident(n) => st.note(n, bound),
+        ExprKind::Binary { left, right, .. } | ExprKind::Logical { left, right, .. } | ExprKind::Pipe { left, right } => {
             fv_expr(left, bound, st);
             fv_expr(right, bound, st);
         }
-        Expr::Unary { expr, .. } => fv_expr(expr, bound, st),
-        Expr::Call { callee, args } => {
+        ExprKind::Unary { expr, .. } => fv_expr(expr, bound, st),
+        ExprKind::Call { callee, args } => {
             fv_expr(callee, bound, st);
             for arg in args {
                 fv_expr(arg, bound, st);
             }
         }
-        Expr::Index { expr, index } => {
+        ExprKind::Index { expr, index } => {
             fv_expr(expr, bound, st);
             fv_expr(index, bound, st);
         }
-        Expr::Field { expr, .. } => fv_expr(expr, bound, st),
-        Expr::Group(inner) => fv_expr(inner, bound, st),
-        Expr::If(i) => fv_if(i, bound, st),
-        Expr::Closure { params, body, .. } => {
+        ExprKind::Field { expr, .. } => fv_expr(expr, bound, st),
+        ExprKind::Group(inner) => fv_expr(inner, bound, st),
+        ExprKind::If(i) => fv_if(i, bound, st),
+        ExprKind::Closure { params, body, .. } => {
             let mut b2 = bound.clone();
             for p in params {
                 b2.insert(p.name.clone());
             }
             fv_block(body, &mut b2, st);
         }
-        Expr::Match(m) => {
+        ExprKind::Match(m) => {
             fv_expr(&m.scrutinee, bound, st);
             for arm in &m.arms {
                 let mut b2 = bound.clone();
@@ -4407,22 +4407,22 @@ fn fv_expr(e: &Expr, bound: &mut std::collections::HashSet<String>, st: &mut FvS
                 }
             }
         }
-        Expr::Try(inner) => fv_expr(inner, bound, st),
-        Expr::Range { start, end } => {
+        ExprKind::Try(inner) => fv_expr(inner, bound, st),
+        ExprKind::Range { start, end } => {
             fv_expr(start, bound, st);
             fv_expr(end, bound, st);
         }
-        Expr::Record { fields } => {
+        ExprKind::Record { fields } => {
             for (_, v) in fields {
                 fv_expr(v, bound, st);
             }
         }
-        Expr::Tuple { elems } => {
+        ExprKind::Tuple { elems } => {
             for e in elems {
                 fv_expr(e, bound, st);
             }
         }
-        Expr::Int(_) | Expr::Float(_) | Expr::Bool(_) | Expr::Str(_) | Expr::Unit => {}
+        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) | ExprKind::Str(_) | ExprKind::Unit => {}
     }
 }
 

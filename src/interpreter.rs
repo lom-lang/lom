@@ -737,7 +737,7 @@ impl Interpreter {
                 }
                 Ok(ControlFlow::Normal(Value::Unit))
             }
-            Stmt::Assign { target, value } => {
+            Stmt::Assign { target, value, .. } => {
                 let v = self.eval_expr(value, env.clone())?;
                 if !env.borrow_mut().set_existing(target, v) {
                     return Err(RuntimeError::Msg(format!(
@@ -839,13 +839,13 @@ impl Interpreter {
 
     /// 求值表达式
     fn eval_expr(&mut self, expr: &Expr, env: ScopeRef) -> Result<Value, RuntimeError> {
-        match expr {
-            Expr::Int(n) => Ok(Value::Int(*n)),
-            Expr::Float(f) => Ok(Value::Float(*f)),
-            Expr::Bool(b) => Ok(Value::Bool(*b)),
-            Expr::Str(s) => Ok(Value::Str(s.clone())),
-            Expr::Unit => Ok(Value::Unit),
-            Expr::Ident(name) => {
+        match &expr.kind {
+            ExprKind::Int(n) => Ok(Value::Int(*n)),
+            ExprKind::Float(f) => Ok(Value::Float(*f)),
+            ExprKind::Bool(b) => Ok(Value::Bool(*b)),
+            ExprKind::Str(s) => Ok(Value::Str(s.clone())),
+            ExprKind::Unit => Ok(Value::Unit),
+            ExprKind::Ident(name) => {
                 // 先查变量
                 if let Some(v) = env.borrow().get(name) {
                     Ok(v)
@@ -869,12 +869,12 @@ impl Interpreter {
                     Err(RuntimeError::Msg(format!("未定义变量: '{}'", name)))
                 }
             }
-            Expr::Binary { op, left, right } => {
+            ExprKind::Binary { op, left, right } => {
                 let l = self.eval_expr(left, env.clone())?;
                 let r = self.eval_expr(right, env)?;
                 self.eval_binary(op, l, r)
             }
-            Expr::Unary { op, expr } => {
+            ExprKind::Unary { op, expr } => {
                 let v = self.eval_expr(expr, env)?;
                 match op {
                     UnaryOp::Neg => match v {
@@ -888,7 +888,7 @@ impl Interpreter {
                     },
                 }
             }
-            Expr::Logical { op, left, right } => {
+            ExprKind::Logical { op, left, right } => {
                 let l = self.eval_expr(left, env.clone())?;
                 let l_truthy = l.is_truthy()?;
                 match op {
@@ -910,7 +910,7 @@ impl Interpreter {
                     }
                 }
             }
-            Expr::Call { callee, args } => {
+            ExprKind::Call { callee, args } => {
                 // 评估参数
                 let mut arg_vals = Vec::with_capacity(args.len());
                 for a in args {
@@ -918,8 +918,8 @@ impl Interpreter {
                 }
                 self.eval_call(callee, &arg_vals, env)
             }
-            Expr::Index { .. } => Err(RuntimeError::Msg("索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）".to_string())),
-            Expr::Field { expr, name } => {
+            ExprKind::Index { .. } => Err(RuntimeError::Msg("索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）".to_string())),
+            ExprKind::Field { expr, name } => {
                 let v = self.eval_expr(expr, env)?;
                 match &v {
                     Value::Record { fields } => {
@@ -958,8 +958,8 @@ impl Interpreter {
                     ))),
                 }
             }
-            Expr::Group(e) => self.eval_expr(e, env),
-            Expr::If(if_stmt) => {
+            ExprKind::Group(e) => self.eval_expr(e, env),
+            ExprKind::If(if_stmt) => {
                 for (cond, body) in &if_stmt.branches {
                     let c = self.eval_expr(cond, env.clone())?;
                     if c.is_truthy()? {
@@ -978,7 +978,7 @@ impl Interpreter {
                     Ok(Value::Unit)
                 }
             }
-            Expr::Closure {
+            ExprKind::Closure {
                 params,
                 body,
                 ..
@@ -987,7 +987,7 @@ impl Interpreter {
                 body: (**body).clone(),
                 env,
             }),
-            Expr::Match(m) => {
+            ExprKind::Match(m) => {
                 let scrutinee_val = self.eval_expr(&m.scrutinee, env.clone())?;
                 for arm in &m.arms {
                     // 每个分支独立作用域，绑定模式变量
@@ -1015,7 +1015,7 @@ impl Interpreter {
                     scrutinee_val.to_display()
                 )))
             }
-            Expr::Try(e) => {
+            ExprKind::Try(e) => {
                 let v = self.eval_expr(e, env)?;
                 match v {
                     Value::Enum { variant, args } if variant == "Ok" && args.len() == 1 => {
@@ -1040,11 +1040,11 @@ impl Interpreter {
                     ))),
                 }
             }
-            Expr::Pipe { left, right } => {
+            ExprKind::Pipe { left, right } => {
                 // 求值左侧，作为右侧函数的第一个参数
                 let lv = self.eval_expr(left, env.clone())?;
-                match right.as_ref() {
-                    Expr::Call { callee, args } => {
+                match &right.kind {
+                    ExprKind::Call { callee, args } => {
                         // x |> f(y, z) => f(x, y, z)
                         let mut arg_vals = Vec::with_capacity(args.len() + 1);
                         arg_vals.push(lv);
@@ -1060,7 +1060,7 @@ impl Interpreter {
                     }
                 }
             }
-            Expr::Record { fields } => {
+            ExprKind::Record { fields } => {
                 let mut vals = Vec::with_capacity(fields.len());
                 for (name, e) in fields {
                     let v = self.eval_expr(e, env.clone())?;
@@ -1068,14 +1068,14 @@ impl Interpreter {
                 }
                 Ok(Value::Record { fields: vals })
             }
-            Expr::Tuple { elems } => {
+            ExprKind::Tuple { elems } => {
                 let mut vals = Vec::with_capacity(elems.len());
                 for e in elems {
                     vals.push(self.eval_expr(e, env.clone())?);
                 }
                 Ok(Value::Tuple { elems: vals })
             }
-            Expr::Range { start, end } => {
+            ExprKind::Range { start, end } => {
                 // v0.4.2 P1-1: a..b → List<Int>（左闭右开，与 for i in n 的 0..n 语义一致）
                 // 求值为 List 使得 range 可以直接复用 for-in-List（Phase 5.3）与 list 模块
                 let sv = self.eval_expr(start, env.clone())?;
@@ -1107,8 +1107,8 @@ impl Interpreter {
         arg_vals: &[Value],
         env: ScopeRef,
     ) -> Result<Value, RuntimeError> {
-        match callee {
-            Expr::Ident(name) => {
+        match &callee.kind {
+            ExprKind::Ident(name) => {
                 // 枚举变体构造：Ok(v), Err(e), Some(v), 用户带参变体
                 // 注意：变体名不能与变量/函数同名（变量优先已在前面 eval，这里 name 是 callee Ident）
                 if self.variants.contains(name) && !env.borrow().get(name).is_some() {
@@ -1179,11 +1179,11 @@ impl Interpreter {
             }
             Pattern::Lit(e) => {
                 // 字面量模式：仅支持 Int/Float/Bool/Str
-                let lit_val = match e {
-                    Expr::Int(n) => Value::Int(*n),
-                    Expr::Float(f) => Value::Float(*f),
-                    Expr::Bool(b) => Value::Bool(*b),
-                    Expr::Str(s) => Value::Str(s.clone()),
+                let lit_val = match &e.kind {
+                    ExprKind::Int(n) => Value::Int(*n),
+                    ExprKind::Float(f) => Value::Float(*f),
+                    ExprKind::Bool(b) => Value::Bool(*b),
+                    ExprKind::Str(s) => Value::Str(s.clone()),
                     _ => {
                         return Err(RuntimeError::Msg(format!(
                             "不支持的字面量模式: {:?}",
