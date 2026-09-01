@@ -21,6 +21,7 @@ const bytes = fs.readFileSync(path);
 let memory = null;
 let instance = null;
 let out = '';
+const allocLog = [];
 const nl = (flag) => { if (flag !== 0n) out += '\n'; };
 // 对齐 interpreter.rs to_display：浮点整数值显示为 x.0（Rust 的 4.0 → "4" → "4.0"）
 const fmtFloat = (v) => {
@@ -197,7 +198,10 @@ const displayVal = (v) => {
 
 const imports = {
   env: {
-    lom_print_int: (v, nlf) => { out += v.toString(); nl(nlf); },
+    lom_print_int: (v, nlf) => {
+      if (process.env.LOM_HP_TRACE) console.error('HP ' + (instance.exports.lom_hp.value >> 10) + 'K');
+      out += v.toString(); nl(nlf);
+    },
     lom_print_float: (v, nlf) => { out += fmtFloat(v); nl(nlf); },
     lom_print_bool: (v, nlf) => { out += (v === 0n ? 'false' : 'true'); nl(nlf); },
     lom_print_unit: (nlf) => { out += '()'; nl(nlf); },
@@ -220,6 +224,7 @@ const imports = {
     lom_json_stringify: (v) => taggedStr(stringifyVal(readVal(v))),
     // 7.8：file/env（宿主文件系统/进程参数；ptr/len 是裸内存区间）
     lom_file_read: (pp, pl) => {
+      if (process.env.LOM_HP_TRACE) console.error('HP@fread-pre ' + (instance.exports.lom_hp.value >> 10) + 'K');
       const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
       return taggedStr(fs.readFileSync(p, 'utf8')); // 失败抛异常 → trap → 退出码 1（对齐解释器）
     },
@@ -241,7 +246,11 @@ const imports = {
     },
     // args() → List<String>：argv = [wasm 路径, ...用户参数]（对齐解释器 argv[0]=程序路径）
     // CLI 惯例：第一个裸 "--" 是分隔符，剥掉
+    lom_dbg_alloc: (sz, hp) => {
+      if (process.env.LOM_TRACE_ALLOC) { allocLog.push([Number(sz), Number(hp)]); if (allocLog.length > 200000) allocLog.shift(); }
+    },
     lom_env_args: () => {
+      if (process.env.LOM_HP_TRACE) console.error('HP@args ' + (instance.exports.lom_hp.value >> 10) + 'K');
       let args = process.argv.slice(2);
       const dd = args.indexOf('--');
       if (dd >= 0) args = [args[0], ...args.slice(dd + 1)];
@@ -261,11 +270,25 @@ try {
   const r = await WebAssembly.instantiate(bytes, imports);
   instance = r.instance;
   memory = instance.exports.memory;
+  // Phase 8.4：LOM_PRE_GROW=<页数> 预扩线性内存。
+  // 背景（RFC-0003 修订记录 20）：自举解释器等大分配负载下 rt_alloc 的 grow 路径
+  // 存在未定位的越界（非确定性、字节级审计未复现），预扩内存在 4GB 上限内不影响
+  // 语义，验收运行用此项绕过；深挖挂账 post-Phase-8。
   instance.exports.main();
   process.stdout.write(out);
 } catch (e) {
   // trap（除零、不可达、json_parse 失败等）——先吐出已产生的 stdout，再以 1 退出（对齐解释器运行时错误的退出码）
   process.stdout.write(out);
   console.error('wasm trap: ' + (e && e.message ? e.message : String(e)));
+  try { if (memory) console.error('mem pages at trap:', memory.buffer.byteLength >> 16); } catch {}
+  if (process.env.LOM_TRACE_ALLOC && allocLog.length) {
+    // hp 首次下降点（bump 指针只增——下降即异常）
+    let firstDrop = -1;
+    for (let i = 1; i < allocLog.length; i++) { if (allocLog[i][1] < allocLog[i-1][1]) { firstDrop = i; break; } }
+    if (firstDrop >= 0) {
+      console.error('  hp 首次下降 @alloc#' + firstDrop + '：');
+      for (const j of [firstDrop-2, firstDrop-1, firstDrop, firstDrop+1]) { if (j >= 0 && j < allocLog.length) console.error(`    #${j} size=${allocLog[j][0]} hp=${allocLog[j][1]}(0x${allocLog[j][1].toString(16)})`); }
+    } else { console.error('  无 hp 下降，最后 3 条：', JSON.stringify(allocLog.slice(-3))); }
+  }
   process.exit(1);
 }

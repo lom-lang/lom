@@ -5,6 +5,7 @@
 #   python tools/verify_selfhost.py --tokens   # token 流比对（lexer 对账，宿主 --dump-tokens）
 #   python tools/verify_selfhost.py --diags    # 诊断比对（LEX/PARSE 码|行|列 + 消息折叠，坏文件集）
 #   python tools/verify_selfhost.py --static   # 8.2 静态检查对齐（NAM003/TYPE003/EFF001/MAT001：坏文件 + 干净集误报检查）
+#   python tools/verify_selfhost.py --wasm     # 8.4 第二层：wasm 载体跑自举解释器（限内 ≤2.1KB 文件，stdout 对齐）
 #
 # 验收口径（RFC-0003 修订记录 3 + 8.1 节）：
 #   - dump / token：逐字一致；
@@ -17,9 +18,11 @@
 
 import glob
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 
 LOM = './target/release/lom.exe'
 SELF = 'examples/selfhost/self_interp.lom'
@@ -314,6 +317,55 @@ def mode_static(files):
     return fail == 0 and clean_bad == 0
 
 
+
+# 8.4 第二层：wasm 载体跑自举解释器。
+# 规模上限（RFC-0003 修订记录 20）：目标程序 > ~6.7KB（约 2500 token）时触发
+# 未定位的 wasm 内存越界（挂账）；hof/try_operator 类深调用形态另受 V8 栈深限制。
+# 清单 = 全部实测通过的限内 examples。
+WASM_LAYER2_FILES = [
+    'examples/fib.lom', 'examples/match_basic.lom', 'examples/arithmetic.lom',
+    'examples/bootstrap/char_scan.lom', 'examples/bootstrap/recursive_enum.lom',
+    'examples/nested_calls.lom', 'examples/strings.lom', 'examples/factorial.lom',
+    'examples/match_enum.lom', 'examples/closures.lom', 'examples/float_ops.lom',
+    'examples/logical.lom', 'examples/control_flow.lom', 'examples/if_expression.lom',
+    'examples/match_result.lom', 'examples/list_demo.lom',
+    'examples/pipeline.lom', 'examples/record_tuple.lom', 'examples/string_demo.lom',
+]
+
+
+def mode_wasm():
+    """编译 self_interp → wasm，宿主(wasm)跑自举解释器执行限内文件，stdout 与宿主直接运行对齐。"""
+    wasm_path = os.path.join(tempfile.gettempdir(), 'self_interp_84.wasm')
+    try:
+        r = subprocess.run([LOM, 'build', SELF, '--target', 'wasm', '-o', wasm_path],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
+        if not os.path.exists(wasm_path):
+            print(f'wasm 编译失败: {r.stdout} {r.stderr}')
+            return False
+    except subprocess.TimeoutExpired:
+        print('wasm 编译 TIMEOUT')
+        return False
+    ok = fail = 0
+    fails = []
+    for f in WASM_LAYER2_FILES:
+        host = run_lom([f])
+        try:
+            r = subprocess.run(['node', 'eval/runner/run_wasm.mjs', wasm_path, '--', f, '--run'],
+                               capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=900)
+            self_out = r.stdout
+        except subprocess.TimeoutExpired:
+            fails.append((f, 'TIMEOUT')); fail += 1; continue
+        if host == self_out:
+            ok += 1
+        else:
+            fails.append((f, f'host={len(host)}B self={len(self_out)}B rc={r.returncode}'))
+            fail += 1
+    print(f'wasm-layer2: PASS {ok} / FAIL {fail}（限内 {len(WASM_LAYER2_FILES)} 文件；规模上限与挂账见 RFC-0003 修订记录 20）')
+    for f, why in fails:
+        print(f'  FAIL {f}: {why}')
+    return fail == 0
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else '--dump'
     files = sorted(
@@ -339,6 +391,8 @@ def main():
             all_ok = mode_tokens(real_files)
         elif mode == '--diags':
             all_ok = mode_diags()
+        elif mode == '--wasm':
+            all_ok = mode_wasm()
         elif mode == '--static':
             all_ok = mode_static(real_files)
         else:

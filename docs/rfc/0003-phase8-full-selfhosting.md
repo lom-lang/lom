@@ -31,6 +31,12 @@
 > 17. **json 挂账（冻结条款触发）**：json 自实现需 unicode 转义构造字符（char_from_code 缺口）、透传需反射（type_of 缺口）——双冻结缺口，按 RFC 程序挂账待裁决不自作主张；自举解释器中调用 json 内建返回明确挂账错误；8.3 验收集排除 json 程序（json_demo/todo 的运行验收挂账）。
 > 18. **8.3 验收**：examples 运行 30/30（豁免：apply_test 故意坏文件、bench 的 args 驱动方式差异、json×2 挂账）；**三层自证达成**——自举解释器跑 stmt_interp.lom（1450 行迷你解释器）39 条输出与 golden 逐字一致（宿主→自举→自举→程序）；eval 113/113 stdout+退出码对齐；8.1 dump/8.2 static 模式回归不倒；`3.14159265` 等 Float 字面量位级一致（单次 IEEE 除法 = Rust parse 的正确舍入，两步加除会差 1 ulp）。
 > 19. **语义平移要点**：nullary 变体运行时仅内建 None 走变体匹配（用户无参变体按 Binder 绑定——宿主语义）；`expr[index]` 宿主未实现（自举同款报错）；`?` 的 ERet 与宿主 EarlyReturn 传播路径等价；闭包捕获=当前 Env 记录（record 拷贝但 vars Map 共享引用 = Rc 共享语义）。
+>
+> **修订记录（2026-09-02，8.4 部分完成——阻塞于 WASM 后端 bug，如实记录）**：
+> 20. **8.4 定性：部分完成**。已达成：self_interp.lom 编译到 WASM（220KB）且**小文件语义正确**（首跑 fib/recursive_enum/float_ops/string_demo/list_demo 等与宿主逐字一致）；harness 增 `LOM_PRE_GROW`（预扩线性内存）；verify_selfhost.py 增 `--wasm` 模式。**未达成（退出标准 3/4 的 wasm 部分）**：三层 golden——第二层（wasm→自举→golden）被**未定位的非确定性内存越界**阻塞：目标程序约 >6.7KB（约 2500 token）必崩；限内文件**间歇性通过**（同一文件两轮 19/21 与 15/19 不同，rc=1 部分输出或 0xC0000409 栈溢出）；预扩内存只部分缓解；第三层（自举跑自身 4890 行源码）不可行。CI 不接 wasm 层（不稳定会随机红）。
+> 21. **bug 技术档案**（供 post-Phase-8 深挖）：trap 栈顶 tok_disc（读 Tok 枚举载荷 i64 为野值）← parse_multiplication/addition/pipeline 链；已排除——Map rehash（cap 与桶一致的绕过仍崩）、JS 栈深（--stack-size 无效且引另一种崩）、内存耗尽（trap 时仅 2.3-4.5MB/36-69 页）、build_alloc 字节级错误（dump 全字节逐条解码正确）、静态串去重（无查重直插，无碰撞面）、独立最小复现（map+List+枚举+record 全组合 7000 元素均过——bug 依赖 self_interp 这个 220KB 大模块自身的某结构）；rt_alloc 探针（lom_dbg_alloc 上报）显示 hp 递增正常。怀疑面收窄至：大模块特有的某条堆对象指针链或静态数据布局交互。
+> 22. **规模上限实测**（退出标准口径，含解释器载体的对照）：第一层（宿主→自举）不限规模（examples 33 + eval 113 全过，1450 行 stmt_interp 解析 1.9s）；第二层限 ~6.7KB/约 2500 token（且间歇）；第三层不可行。**对照 8.3：解释器载体的三层自证已全量达成**（宿主→自举→stmt_interp 39 条 golden 逐字）——8.4 缺的是 wasm 载体的同构验证。
+> 23. **Phase 8 关账**：退出标准 1（8.1 全绿）✅；2（8.3 语义对齐）✅（解释器载体）；3（三层 golden）⚠️ **部分**——wasm 载体被 21 号 bug 阻塞；4（CI gate）⚠️ **部分**——8.1/8.2 验收（dump/tokens/diags/static）接入 CI，wasm 层未接（不稳定）；5（零依赖/零 unsafe/冻结声明）✅。json 双内建挂账（修订 17）与 wasm 越界挂账移交 post-Phase-8；v1.0 冻结裁决前置条件已齐。
 
 ## Motivation
 
