@@ -3,7 +3,8 @@
 # 用法：
 #   python tools/verify_selfhost.py            # 默认：dump 比对（examples + bootstrap + eval 113 参考解）
 #   python tools/verify_selfhost.py --tokens   # token 流比对（lexer 对账，宿主 --dump-tokens）
-#   python tools/verify_selfhost.py --diags    # 诊断比对（码|行|列 + 消息 Latin-1 折叠，用坏文件集）
+#   python tools/verify_selfhost.py --diags    # 诊断比对（LEX/PARSE 码|行|列 + 消息折叠，坏文件集）
+#   python tools/verify_selfhost.py --static   # 8.2 静态检查对齐（NAM003/TYPE003/EFF001/MAT001：坏文件 + 干净集误报检查）
 #
 # 验收口径（RFC-0003 修订记录 3 + 8.1 节）：
 #   - dump / token：逐字一致；
@@ -242,6 +243,77 @@ def mode_diags():
     return fail == 0
 
 
+FOUR_CODES = ('NAM003', 'TYPE003', 'EFF001', 'MAT001')
+
+
+def mode_static(files):
+    """8.2 口径：四类静态检查诊断对齐。
+    - 坏文件集（tools/selfhost_cases + effects_bad + apply_test + fix_corpus）：
+      宿主 --json 过滤四类码 vs 自举 --check 过滤四类码——码+位置+消息（折叠）逐字；
+      注意双方对 parse 有错的文件都不产四类（宿主 diags.ok 才 typecheck，自举同款）。
+    - 干净集（files 参数）：双方四类诊断都应为空（误报检查）。
+    """
+    bad_files = sorted(glob.glob('tools/selfhost_cases/*.bad.lom')) \
+        + ['examples/effects_bad.lom', 'examples/apply_test.lom'] \
+        + sorted(glob.glob('eval/fix_corpus/*.bad.lom'))
+    ok = fail = 0
+    fails = []
+    for path in bad_files:
+        host_json = run_lom([path, '--json'])
+        try:
+            diags = [d for d in json.loads(host_json)['diagnostics'] if d['code'] in FOUR_CODES]
+        except (json.JSONDecodeError, KeyError):
+            fails.append((path, '宿主 --json 解析失败'))
+            fail += 1
+            continue
+        host_list = [(d['code'], str(d['line']), str(d['col'])) for d in diags]
+        host_msgs = [fold_latin1(d['message']) or d['message'] for d in diags]
+        try:
+            self_txt = run_lom([SELF, '--', path, '--check'])
+        except subprocess.TimeoutExpired:
+            fails.append((path, 'TIMEOUT'))
+            fail += 1
+            continue
+        self_list = []
+        self_msgs = []
+        for line in self_txt.splitlines():
+            parts = line.split('|', 3)
+            if len(parts) == 4 and parts[0] in FOUR_CODES:
+                self_list.append((parts[0], parts[1], parts[2]))
+                self_msgs.append(parts[3])
+        if host_list == self_list and all(
+            hm == sm or fold_latin1(sm) == hm for hm, sm in zip(host_msgs, self_msgs)
+        ):
+            ok += 1
+        else:
+            fails.append((path, f'不一致\n    宿主: {host_list}\n    自举: {self_list}'))
+            fail += 1
+
+    clean_ok = clean_bad = 0
+    for path, _ in files:
+        host_json = run_lom([path, '--json'])
+        try:
+            h = [(d['code'], str(d['line']), str(d['col']))
+                 for d in json.loads(host_json)['diagnostics'] if d['code'] in FOUR_CODES]
+        except (json.JSONDecodeError, KeyError):
+            h = ['?']
+        try:
+            self_txt = run_lom([SELF, '--', path, '--check'])
+            s2 = [tuple(line.split('|', 3)[:3]) for line in self_txt.splitlines()
+                  if line.split('|', 3)[0] in FOUR_CODES]
+        except subprocess.TimeoutExpired:
+            s2 = ['TIMEOUT']
+        if h == s2:
+            clean_ok += 1
+        else:
+            clean_bad += 1
+            fails.append((path, f'干净集误报 host={h} self={s2}'))
+    print(f'static: 坏文件 PASS {ok} / FAIL {fail}；干净集 ALIGNED {clean_ok} / DIFF {clean_bad}')
+    for f, why in fails:
+        print(f'  FAIL {f}: {why}')
+    return fail == 0 and clean_bad == 0
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else '--dump'
     files = sorted(
@@ -267,6 +339,8 @@ def main():
             all_ok = mode_tokens(real_files)
         elif mode == '--diags':
             all_ok = mode_diags()
+        elif mode == '--static':
+            all_ok = mode_static(real_files)
         else:
             all_ok = mode_dump(real_files)
     finally:

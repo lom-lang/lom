@@ -1,0 +1,6 @@
+from map import { map_empty, map_get }
+fn f(m: Map<String, Int>) -> Int
+    match map_get(m, "k")
+        Some(v) => v
+    end
+end

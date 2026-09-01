@@ -1,0 +1,7 @@
+enum Color = Red | Green | Blue
+fn f(c: Color) -> Int
+    match c
+        Red => 1
+        Green => 2
+    end
+end

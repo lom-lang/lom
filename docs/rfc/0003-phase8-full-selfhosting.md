@@ -18,6 +18,12 @@
 > 8. **宿主工具面新增**：`lom <file> --dump-tokens`（token 流调试输出，自举 lexer 对账工具；格式 = Rust Token Debug 形态 + @ln:cl）。
 > 9. **宿主 bug 修复（8.1 开发中发现）**：树遍历解释器的 `?`/return 提前返回在**块尾 if 表达式**与 **match Form B 臂块**内被当作块值消费、静默失效（ExprKind::If / Match 臂的 ControlFlow::Return 处理）——已修复为穿透到函数边界，与 WASM 后端的 br $ret 语义对齐；+2 回归测试。既有 442 测试无一依赖错误语义。
 > 10. **已知差异（如实记录）**：自举诊断消息经宿主解释器读入时被 Latin-1 化，输出乱码形态——验收脚本按 Latin-1 折叠后与宿主消息逐字等价（换算在工具层，不动语言面）；string_to_int 的裸 Int/Unit 返回约定（非 Option）由自举侧 `"" + x == "()"` 判定绕开——冻结声明未被违反（零新语法/关键字/诊断码/内建）。
+>
+> **修订记录（2026-09-02，8.2 完成时）**：
+> 11. **8.2 交付**：`self_interp.lom` 追加静态检查器（Part E，~580 行）——NAM003（未定义变量/调用未定义函数/赋值未定义变量）+ TYPE003-arity（函数与变体构造器；管道左值计入实参）+ EFF001（效应传播，main 豁免，定位到函数签名）+ MAT001（用户枚举/Result/Option 穷尽性；guard 臂不计、Binder 无参变体计覆盖）；`lom self_interp.lom -- <file> --check` 模式；42 内建签名表（宿主 `export_builtin_table_for_selfhost` 测试导出对账）。作用域/容错对齐宿主：仅闭包与 match 臂开子作用域、parse 有错跳过检查（diags.ok 条件）。
+> 12. **验收结果（tools/verify_selfhost.py --static）**：坏文件 15/15（tools/selfhost_cases/ 9 个专项案例 + effects_bad/apply_test + fix_corpus 5 个；四类码+位置+消息折叠逐字一致）；干净集 146/146 零误报（examples + bootstrap + self_interp 自身 + eval 113）。8.1 三模式回归不倒（dump 146/tokens 146）。
+> 13. **范围差异（如实记录）**：8.2 检查器无类型推断的表达式返回 Unknown（MAT001 的 scrutinee 覆盖 Ident 注解/Call ret/字面量/Group/变体构造——宿主全量类型流在此之外）；TYPE001/002/010/020/MUT001/NAM004 等 8.2 范围外不产出。这些是 RFC 定案"子集方案"的实现面，非语言面变更。
+> 14. **自举开发发现的宿主行为确认**（非 bug）：`map_get` 返回 `Some(存储值)` 包装——存储 Option 值时读出双层 `Some(Some(...))`，解包一次方可匹配；42 内建签名/效应标注从 typechecker 实测导出而非文档转抄（手抄必然漂移）。
 
 ## Motivation
 

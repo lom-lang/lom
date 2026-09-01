@@ -1,0 +1,4 @@
+from string import { len }
+fn f() -> Int
+    len()
+end

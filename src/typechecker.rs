@@ -1750,6 +1750,35 @@ mod tests {
     use super::*;
     use crate::diagnostics::Diagnostics;
 
+    /// Phase 8.2：导出内建签名表（自举静态检查器的数据源）。
+    /// 跑法：cargo test export_builtin_table -- --nocapture
+    /// 自举侧（examples/selfhost/self_interp.lom 的 reg_builtins）必须与此表同步——
+    /// 表变化时重跑本测试更新自举侧。
+    #[test]
+    fn export_builtin_table_for_selfhost() {
+        let tc = TypeChecker::new("export.lom", vec![]);
+        let mut fns: Vec<(&String, &FnSig)> = tc.functions.iter().collect();
+        fns.sort_by_key(|(n, _)| n.to_string());
+        for (name, sig) in fns {
+            let effs = sig.effects.join(",");
+            let ret = match &sig.ret {
+                Some(t) => format!("{t:?}"),
+                None => "None".to_string(),
+            };
+            println!("FN|{name}|{}|{effs}|{ret}", sig.params.len());
+        }
+        let mut enums: Vec<(&String, &EnumInfo)> = tc.enums.iter().collect();
+        enums.sort_by_key(|(n, _)| n.to_string());
+        for (name, info) in enums {
+            let vs: Vec<String> = info
+                .variants
+                .iter()
+                .map(|(vn, fs)| format!("{vn}:{}", fs.len()))
+                .collect();
+            println!("ENUM|{name}|{}|{}", info.is_builtin, vs.join(","));
+        }
+    }
+
     fn check_src(src: &str) -> Diagnostics {
         let result = crate::parser::Parser::parse_recover(src);
         let mut diags = Diagnostics::new("test.lom");

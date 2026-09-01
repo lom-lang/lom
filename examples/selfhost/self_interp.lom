@@ -1,13 +1,14 @@
 # ============================================================================
 # self_interp.lom — Lom 全量自举（RFC-0003，Phase 8）
 #
-# 当前阶段：8.1 完整前端 —— lexer + parser + AST dump（用 Lom 写的完整 Lom 前端）
-# 后续阶段：8.2 静态检查 / 8.3 树遍历求值器 / 8.4 WASM 载体自证闭环
+# 当前阶段：8.1 完整前端 + 8.2 静态检查（NAM003/TYPE003-arity/EFF001/MAT001 子集，RFC-0003）
+# 后续阶段：8.3 树遍历求值器 / 8.4 WASM 载体自证闭环
 #
 # 用法：
 #   lom self_interp.lom -- <file>          # 解析 <file> 并打印 AST dump（对齐宿主 --dump-ast 格式）
 #   lom self_interp.lom -- <file> --diags  # 只打印词法+语法诊断（行|列|消息，供与宿主 --json 对账）
 #   lom self_interp.lom -- <file> --tokens # 打印 token 流（对齐宿主 --dump-tokens，lexer 对账）
+#   lom self_interp.lom -- <file> --check  # 词法+语法+静态检查（8.2：NAM003/TYPE003/EFF001/MAT001）
 #
 # 契约（RFC-0003 §8.1，格式基准 = src/dump.rs 文件头注释）：
 #   - dump 不含 span（宿主字节列 vs 本实现字符列在非 ASCII 行分叉，结构比对不需要位置；
@@ -29,7 +30,7 @@
 
 from string import { split, contains, len, string_to_int, int_to_string, starts_with }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_get }
-from map import { map_empty, map_set, map_get, map_has, map_size }
+from map import { map_empty, map_set, map_get, map_has, map_size, map_keys }
 from file import { file_read, file_exists }
 from env import { args }
 
@@ -666,7 +667,7 @@ end
 enum St
     | StLet(Bool, String, Option<Ty>, Ex)
     | StDestruct(List<String>, Ex)
-    | StAssign(String, Ex)
+    | StAssign(String, Int, Int, Ex)
     | StIf(IfR)
     | StWhile(Ex, Blk)
     | StFor(String, Ex, Blk)
@@ -685,7 +686,7 @@ enum Ex
     | ExBool(Bool)
     | ExStr(String)
     | ExUnit
-    | ExIdent(String)
+    | ExIdent(String, Int, Int)
     | ExBinary(String, Ex, Ex)
     | ExUnary(String, Ex)
     | ExLogical(String, Ex, Ex)
@@ -695,7 +696,7 @@ enum Ex
     | ExGroup(Ex)
     | ExIf(IfR)
     | ExClosure(List<Prm>, Option<Ty>, Blk)
-    | ExMatch(Ex, List<ArmR>)
+    | ExMatch(Ex, List<ArmR>, Int)
     | ExTry(Ex)
     | ExPipe(Ex, Ex)
     | ExRange(Ex, Ex)
@@ -724,7 +725,7 @@ enum Pat
 end
 
 enum Itm
-    | ItFn(String, List<Prm>, Option<Ty>, List<String>, Blk)
+    | ItFn(String, List<Prm>, Option<Ty>, List<String>, Blk, Int, Int)
     | ItEnum(String, List<String>, List<VarR>)
     | ItImport(String, List<ImpI>)
 end
@@ -1338,6 +1339,7 @@ end
 
 # 函数声明（宿主 parse_fn_decl；span 省略）
 fn parse_fn_decl(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Itm, String>
+    let fn_rec = tok_at(ts, n, get_pos(pm))
     adv(ts, n, pm)
     let name = parse_ident(ts, n, pm)?
     expt(ts, n, pm, TkLParen, "'('")?
@@ -1350,7 +1352,7 @@ fn parse_fn_decl(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<St
     end
     let effs = parse_effects(ts, n, pm)?
     let body = parse_block(ts, n, pm, em)?
-    Ok(ItFn(name, params, ret, effs, body))
+    Ok(ItFn(name, params, ret, effs, body, fn_rec.ln, fn_rec.cl))
 end
 
 # 标识符 → 基础类型（宿主 Type::from_name）
@@ -1603,7 +1605,7 @@ fn parse_block_el(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<S
             adv(ts, n, pm)
             let value = parse_expr(ts, n, pm, em)?
             match e
-                ExIdent(name) => Ok(BStmt(StAssign(name, value)))
+                ExIdent(name, tln, tcl) => Ok(BStmt(StAssign(name, tln, tcl, value)))
                 _ => Err(err_here(ts, n, pm, "赋值目标必须是变量"))
             end
         else
@@ -1611,7 +1613,7 @@ fn parse_block_el(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<S
                 Some(op) =>
                     let rhs = parse_expr(ts, n, pm, em)?
                     match e
-                        ExIdent(name) => Ok(BStmt(StAssign(name, ExBinary(op, ExIdent(name), rhs))))
+                        ExIdent(name, tln, tcl) => Ok(BStmt(StAssign(name, tln, tcl, ExBinary(op, ExIdent(name, tln, tcl), rhs))))
                         _ => Err(err_here(ts, n, pm, "复合赋值目标必须是变量"))
                     end
                 end
@@ -2023,8 +2025,9 @@ fn parse_primary(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<St
             Ok(ExStr(s))
         end
         TkIdent(s) =>
+            let tpos = tok_at(ts, n, get_pos(pm))
             adv(ts, n, pm)
-            Ok(ExIdent(s))
+            Ok(ExIdent(s, tpos.ln, tpos.cl))
         end
         TkLParen =>
             let _ = adv(ts, n, pm)
@@ -2128,8 +2131,9 @@ fn parse_match(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<Stri
         end
     end
     if chk(ts, n, pm, TkEnd)
+        let end_rec = tok_at(ts, n, get_pos(pm))
         adv(ts, n, pm)
-        Ok(ExMatch(scrutinee, rev_arm(arms)))
+        Ok(ExMatch(scrutinee, rev_arm(arms), end_rec.ln))
     else
         Err(err_here(ts, n, pm, "期望 'end' 闭合 match"))
     end
@@ -2326,7 +2330,7 @@ end
 
 fn dump_item(it: Itm, d: Int) -> Unit ! [IO]
     match it
-        ItFn(name, params, ret, effs, body) =>
+        ItFn(name, params, ret, effs, body, _, _) =>
             let eff_str =
             if list_length(effs) == 0
                 ""
@@ -2443,7 +2447,7 @@ fn dump_st(s: St, d: Int) -> Unit ! [IO]
             pl(d, "LetDestruct (" + join_str(names, ", ") + ")")
             dump_ex(value, d + 1)
         end
-        StAssign(name, value) =>
+        StAssign(name, _, _, value) =>
             pl(d, "Assign " + name)
             dump_ex(value, d + 1)
         end
@@ -2508,7 +2512,7 @@ fn dump_ex(e: Ex, d: Int) -> Unit ! [IO]
         end
         ExStr(s) => pl(d, "Str " + debug_str(s))
         ExUnit => pl(d, "Unit")
-        ExIdent(x) => pl(d, "Ident " + x)
+        ExIdent(x, _, _) => pl(d, "Ident " + x)
         ExBinary(op, l, r) =>
             pl(d, "Binary " + op)
             dump_ex(l, d + 1)
@@ -2548,7 +2552,7 @@ fn dump_ex(e: Ex, d: Int) -> Unit ! [IO]
             pl(d, "Closure (" + join_str(prm_strs(params), ", ") + ") -> " + ret_str(ret))
             dump_blk(body, d + 1)
         end
-        ExMatch(scrut, arms) =>
+        ExMatch(scrut, arms, _) =>
             pl(d, "Match")
             dump_ex(scrut, d + 1)
             for arm in arms
@@ -2678,9 +2682,638 @@ fn main() -> Unit
                 dump_tokens(r.toks, r.n)
             elif mode == "--diags"
                 dump_diags(em)
+            elif mode == "--check"
+                # 8.2：词法+语法诊断之上叠加静态检查（四类码）。
+                # 对齐宿主 --json：parse 有错时跳过 typecheck（diags.ok 才检查）——
+                # 带洞 AST 的静态检查会多报（容错恢复后的碎片被当正常代码查）
+                if map_size(em) > 0
+                    dump_diags(em)
+                else
+                    let fns = map_empty()
+                    reg_builtins_fns(fns)
+                    let enums = map_empty()
+                    reg_builtins_enums(enums)
+                    collect_items(prg, fns, enums)
+                    check_program2(prg, fns, enums, em)
+                    dump_diags(em)
+                end
             else
                 dump_program(prg)
             end
+        end
+    end
+end
+
+# ============================================================================
+# Part E：8.2 静态检查（RFC-0003 §8.2 子集：NAM003 / TYPE003-arity / EFF001 / MAT001）
+#   对齐宿主 src/typechecker.rs 的四类检查（类型检查全量移植维持挂账）：
+#   - NAM003：未定义变量（Ident 位置）/ 调用未定义函数（callee 位置）/ 赋值未定义变量
+#   - TYPE003：函数与变体构造器的参数个数（管道左值计入实参，2026-08-22 宿主同款）
+#   - EFF001：被调函数声明的每个效应须在当前函数效应集中（main 豁免；闭包继承外层）
+#   - MAT001：用户枚举变体 / Result(Ok,Err) / Option(Some,None) 穷尽性
+#     （guard 臂不计入；Binder 模式命中无参变体名时计为已覆盖——宿主语义）
+#   已知限制（与宿主的差异面，验收按四类码过滤比对）：
+#   - Binary/Range/Tuple/Record 等复杂表达式的类型推断返回 Unknown（MAT001 依赖
+#     scrutinee 可推：Ident（env 注解）/ Call（签名 ret）/ 字面量 / Group / 变体构造）
+#   - 嵌套变体模式（Ok(Some(x))）的内层绑定类型 Unknown（宿主按字段类型传播）
+#   - NAM004/TYPE001/002/010/020/MUT001 等类型层诊断不产出（8.2 范围外）
+#   作用域语义（平移宿主 TypeEnv）：仅闭包与 match 臂开子作用域（child=拷贝），
+#   if/while/for 块共享当前环境（绑定向外泄漏——宿主的简化作用域，不"修正"）
+# ============================================================================
+
+# 检查器状态（fns/enums 走 Map 引用共享；cur_effs/is_main 按函数重建）
+# fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>
+# enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>
+
+fn reg_builtins_fns(fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>) -> Unit
+    let io = list_cons("IO", list_empty())
+    let pure = list_empty()
+    # prelude（IO 效应）
+    map_set(fns, "println", {ar: 1, effs: io, ret: Some(TyUnit)})
+    map_set(fns, "print", {ar: 1, effs: io, ret: Some(TyUnit)})
+    # string（纯）
+    map_set(fns, "len", {ar: 1, effs: pure, ret: Some(TyInt)})
+    map_set(fns, "int_to_string", {ar: 1, effs: pure, ret: Some(TyString)})
+    map_set(fns, "string_to_int", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "trim", {ar: 1, effs: pure, ret: Some(TyString)})
+    map_set(fns, "upper", {ar: 1, effs: pure, ret: Some(TyString)})
+    map_set(fns, "lower", {ar: 1, effs: pure, ret: Some(TyString)})
+    map_set(fns, "split", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "contains", {ar: 2, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "replace", {ar: 3, effs: pure, ret: Some(TyString)})
+    map_set(fns, "starts_with", {ar: 2, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "ends_with", {ar: 2, effs: pure, ret: Some(TyBool)})
+    # math（纯）
+    map_set(fns, "sqrt", {ar: 1, effs: pure, ret: Some(TyFloat)})
+    map_set(fns, "abs", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "min", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "max", {ar: 2, effs: pure, ret: None})
+    # list（纯）
+    map_set(fns, "list_empty", {ar: 0, effs: pure, ret: None})
+    map_set(fns, "list_length", {ar: 1, effs: pure, ret: Some(TyInt)})
+    map_set(fns, "list_get", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "list_is_empty", {ar: 1, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "list_head", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "list_tail", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "list_cons", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "list_map", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "list_filter", {ar: 2, effs: pure, ret: None})
+    map_set(fns, "list_fold", {ar: 3, effs: pure, ret: None})
+    # json（纯）
+    map_set(fns, "json_parse", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "json_stringify", {ar: 1, effs: pure, ret: Some(TyString)})
+    # map（纯）
+    map_set(fns, "map_empty", {ar: 0, effs: pure, ret: None})
+    map_set(fns, "map_set", {ar: 3, effs: pure, ret: Some(TyUnit)})
+    map_set(fns, "map_get", {ar: 2, effs: pure, ret: Some(TyOption(TyNamed("T")))})
+    map_set(fns, "map_has", {ar: 2, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "map_remove", {ar: 2, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "map_keys", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "map_values", {ar: 1, effs: pure, ret: None})
+    map_set(fns, "map_size", {ar: 1, effs: pure, ret: Some(TyInt)})
+    # file（IO）
+    map_set(fns, "file_read", {ar: 1, effs: io, ret: Some(TyString)})
+    map_set(fns, "file_write", {ar: 2, effs: io, ret: Some(TyUnit)})
+    map_set(fns, "file_append", {ar: 2, effs: io, ret: Some(TyUnit)})
+    map_set(fns, "file_exists", {ar: 1, effs: io, ret: Some(TyBool)})
+    # env（纯）
+    map_set(fns, "args", {ar: 0, effs: pure, ret: None})
+end
+
+fn reg_builtins_enums(enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>) -> Unit
+    map_set(enums, "Result", {vs: list_cons(("Ok", 1), list_cons(("Err", 1), list_empty())), blt: True})
+    map_set(enums, "Option", {vs: list_cons(("Some", 1), list_cons(("None", 0), list_empty())), blt: True})
+end
+
+# 作用域 child：宿主 TypeEnv::child 是整链值拷贝——这里等价拷贝当前 vars
+fn env_child(env: Map<String, Option<Ty>>) -> Map<String, Option<Ty>>
+    let child = map_empty()
+    for k in map_keys(env)
+        match map_get(env, k)
+            Some(t) => map_set(child, k, t)
+            None => ()
+        end
+    end
+    child
+end
+
+# 变体名 → (所属枚举名, arity, 是否内建)；宿主遍历 enums 取首个命中（变体名全局唯一时无歧义）
+fn enum_of_variant(enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, vname: String) -> Option<(String, Int, Bool)>
+    let mut result = None
+    for ename in map_keys(enums)
+        match map_get(enums, ename)
+            Some(info) =>
+                for v in info.vs
+                    if v.0 == vname and result == None
+                        result = Some((ename, v.1, info.blt))
+                    end
+                end
+            end
+            None => ()
+        end
+    end
+    result
+end
+
+# 变体构造器的返回类型（宿主 variant_return_type：内建 Result/Option 泛型形态，用户 Named）
+fn variant_ret_ty(enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, vname: String) -> Option<Ty>
+    match enum_of_variant(enums, vname)
+        Some(t) =>
+            let ename = t.0
+            let blt = t.2
+            if blt
+                if ename == "Result"
+                    Some(TResult(TyNamed("T"), TyNamed("E")))
+                elif ename == "Option"
+                    Some(TyOption(TyNamed("T")))
+                else
+                    None
+                end
+            else
+                Some(TyNamed(ename))
+            end
+        end
+        None => None
+    end
+end
+
+# 效应是否已声明
+fn eff_declared(effs: List<String>, e: String) -> Bool
+    let mut cur = effs
+    let mut found = False
+    while !list_is_empty(cur) and found == False
+        if list_head(cur) == e
+            found = True
+        else
+            cur = list_tail(cur)
+        end
+    end
+    found
+end
+
+# ---- 收集遍（宿主 check_program 第一遍；不产诊断——NAM002 范围外）----
+
+fn rev_pair(xs: List<(String, Int)>) -> List<(String, Int)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn collect_items(prg: Prg, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>) -> Unit
+    match prg
+        Prg(items) =>
+            for it in items
+                match it
+                    ItFn(name, params, ret, effs, body, _, _) =>
+                        map_set(fns, name, {ar: list_length(params), effs: effs, ret: ret})
+                    end
+                    ItEnum(name, _, variants) =>
+                        let mut vs = list_empty()
+                        for v in variants
+                            match v
+                                VarR(vname, fields) =>
+                                    vs = list_cons((vname, list_length(fields)), vs)
+                                end
+                            end
+                        end
+                        map_set(enums, name, {vs: rev_pair(vs), blt: False})
+                    end
+                    ItImport(_, imp_items) =>
+                        # 别名继承真名签名（仅真名已注册时——宿主语义）
+                        for i in imp_items
+                            match i
+                                ImpI(iname, alias) =>
+                                    match map_get(fns, iname)
+                                        Some(sig) => map_set(fns, alias, sig)
+                                        None => ()
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# ---- 检查遍（宿主第二遍）----
+# st: Map 持 "effs"（当前函数效应 List）与 "is_main"（1/0）——Map 引用共享
+
+fn check_program2(prg: Prg, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Unit
+    match prg
+        Prg(items) =>
+            for it in items
+                match it
+                    ItFn(name, params, _, effs, body, fln, fcl) =>
+                        let st = {effs: effs, is_main: name == "main", fln: fln, fcl: fcl}
+                        let env = map_empty()
+                        for p in params
+                            match p
+                                Prm(pname, pty) => map_set(env, pname, Some(pty))
+                            end
+                        end
+                        chk_blk(body, env, st, fns, enums, em)
+                    end
+                    _ => ()
+                end
+            end
+        end
+    end
+end
+
+# 块检查（宿主 check_block：stmts 逐个 + tail；类型返回值 8.2 不消费，Unit）
+fn chk_blk(b: Blk, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Unit
+    match b
+        BlkOf(stmts, tail) =>
+            for s in stmts
+                chk_stmt(s, env, st, fns, enums, em)
+            end
+            match tail
+                Some(t) => chk_expr(t, env, st, fns, enums, em)
+                None => ()
+            end
+        end
+    end
+end
+
+# 语句检查（四类诊断；类型层诊断 TYPE001/002/010/MUT001 不产——8.2 范围外）
+fn chk_stmt(s: St, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Unit
+    match s
+        StLet(_, name, ty, value) =>
+            let vt = chk_expr(value, env, st, fns, enums, em)
+            match ty
+                Some(t) => map_set(env, name, Some(t))
+                None => map_set(env, name, vt)
+            end
+        end
+        StDestruct(names, value) =>
+            chk_expr(value, env, st, fns, enums, em)
+            for nm in names
+                map_set(env, nm, None)
+            end
+        end
+        StAssign(name, aln, acl, value) =>
+            chk_expr(value, env, st, fns, enums, em)
+            if map_has(env, name) == False
+                em_add(em, "NAM003", aln, acl, "赋值给未定义变量 '" + name + "'")
+            end
+        end
+        StIf(ifr) =>
+            match ifr
+                IfR(branches, els) =>
+                    for br in branches
+                        chk_expr(br.0, env, st, fns, enums, em)
+                        chk_blk(br.1, env, st, fns, enums, em)
+                    end
+                    match els
+                        Some(b) => chk_blk(b, env, st, fns, enums, em)
+                        None => ()
+                    end
+                end
+            end
+        end
+        StWhile(cond, body) =>
+            chk_expr(cond, env, st, fns, enums, em)
+            chk_blk(body, env, st, fns, enums, em)
+        end
+        StFor(var, iter, body) =>
+            let it_ty = chk_expr(iter, env, st, fns, enums, em)
+            # 宿主元素类型：String→String / Int→Int / Generic List 1 参→arg / 其他 Unknown
+            let elem =
+            match it_ty
+                Some(TyString) => Some(TyString)
+                Some(TyInt) => Some(TyInt)
+                Some(TyGeneric(gname, gargs)) =>
+                    if gname == "List" and list_length(gargs) == 1
+                        list_get(gargs, 0)
+                    else
+                        None
+                    end
+                end
+                _ => None
+            end
+            map_set(env, var, elem)
+            chk_blk(body, env, st, fns, enums, em)
+        end
+        StReturn(opt) =>
+            match opt
+                Some(e) => chk_expr(e, env, st, fns, enums, em)
+                None => ()
+            end
+        end
+        StExpr(e) =>
+            chk_expr(e, env, st, fns, enums, em)
+        end
+        StHole(_, _) => ()
+    end
+end
+
+# 表达式检查：遍历产四类诊断 + 返回推断类型（MAT001 的 scrutinee 用）
+fn chk_expr(e: Ex, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Option<Ty>
+    match e
+        ExInt(_) => Some(TyInt)
+        ExFloat(_) => Some(TyFloat)
+        ExBool(_) => Some(TyBool)
+        ExStr(_) => Some(TyString)
+        ExUnit => Some(TyUnit)
+        ExIdent(name, iln, icl) =>
+            if map_has(env, name)
+                # map_get 返回 Some(存储值) 包装：存储值本身是 Option<Ty>，解一层
+                match map_get(env, name)
+                    Some(stored) => stored
+                    None => None
+                end
+            elif map_has(fns, name)
+                # 顶层函数引用作为值（宿主：不深入检查）
+                None
+            else
+                match enum_of_variant(enums, name)
+                    Some(_) => variant_ret_ty(enums, name)
+                    None =>
+                        em_add(em, "NAM003", iln, icl, "未定义变量 '" + name + "'")
+                        None
+                    end
+                end
+            end
+        end
+        ExBinary(_, l, r) =>
+            chk_expr(l, env, st, fns, enums, em)
+            chk_expr(r, env, st, fns, enums, em)
+            None
+        end
+        ExUnary(_, inner) =>
+            chk_expr(inner, env, st, fns, enums, em)
+            None
+        end
+        ExLogical(_, l, r) =>
+            chk_expr(l, env, st, fns, enums, em)
+            chk_expr(r, env, st, fns, enums, em)
+            None
+        end
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(cname, cln, ccl) =>
+                    chk_call(cname, cln, ccl, args, env, st, fns, enums, em)
+                end
+                _ =>
+                    # 复杂 callee（闭包字面量等）：宿主只 check_expr(callee)——args 也已查
+                    chk_expr(callee, env, st, fns, enums, em)
+                    for a in args
+                        chk_expr(a, env, st, fns, enums, em)
+                    end
+                    None
+                end
+            end
+        end
+        ExIndex(x, i) =>
+            chk_expr(x, env, st, fns, enums, em)
+            chk_expr(i, env, st, fns, enums, em)
+            None
+        end
+        ExField(x, _) =>
+            chk_expr(x, env, st, fns, enums, em)
+            None
+        end
+        ExGroup(inner) => chk_expr(inner, env, st, fns, enums, em)
+        ExIf(ifr) =>
+            match ifr
+                IfR(branches, els) =>
+                    for br in branches
+                        chk_expr(br.0, env, st, fns, enums, em)
+                        chk_blk(br.1, env, st, fns, enums, em)
+                    end
+                    match els
+                        Some(b) => chk_blk(b, env, st, fns, enums, em)
+                        None => ()
+                    end
+                end
+            end
+            None
+        end
+        ExClosure(params, _, body) =>
+            # 宿主：闭包捕获外部环境（child 作用域）+ 参数注入
+            let cenv = env_child(env)
+            for p in params
+                match p
+                    Prm(pname, pty) => map_set(cenv, pname, Some(pty))
+                end
+            end
+            chk_blk(body, cenv, st, fns, enums, em)
+            None
+        end
+        ExMatch(scrut, arms, end_ln) => chk_match(scrut, arms, end_ln, env, st, fns, enums, em)
+        ExTry(inner) =>
+            chk_expr(inner, env, st, fns, enums, em)
+            None
+        end
+        ExPipe(left, right) =>
+            chk_expr(left, env, st, fns, enums, em)
+            # 宿主：right 是 Call → check_call(callee, [left]+args)；right 是 Ident → check_call(right, [left])
+            match right
+                ExCall(ExIdent(cname, cln, ccl), args) =>
+                    let mut full = list_cons(left, list_empty())
+                    for a in args
+                        full = list_cons(a, full)
+                    end
+                    chk_call(cname, cln, ccl, rev_ex(full), env, st, fns, enums, em)
+                end
+                ExIdent(cname, cln, ccl) =>
+                    chk_call(cname, cln, ccl, list_cons(left, list_empty()), env, st, fns, enums, em)
+                end
+                _ =>
+                    chk_expr(right, env, st, fns, enums, em)
+                    None
+                end
+            end
+        end
+        ExRange(a, b) =>
+            chk_expr(a, env, st, fns, enums, em)
+            chk_expr(b, env, st, fns, enums, em)
+            None
+        end
+        ExRecord(fields) =>
+            for f in fields
+                chk_expr(f.1, env, st, fns, enums, em)
+            end
+            None
+        end
+        ExTuple(elems) =>
+            for x in elems
+                chk_expr(x, env, st, fns, enums, em)
+            end
+            None
+        end
+    end
+end
+
+# 调用检查（宿主 check_call 的 Ident callee 路径；参数表达式先查——副作用顺序对齐）
+fn chk_call(cname: String, cln: Int, ccl: Int, args: List<Ex>, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Option<Ty>
+    for a in args
+        chk_expr(a, env, st, fns, enums, em)
+    end
+    if map_has(fns, cname)
+        match map_get(fns, cname)
+            Some(sig) =>
+                # EFF001：被调效应须在当前函数效应集中（main 豁免）
+                if st.is_main == False
+                    for eff in sig.effs
+                        if eff_declared(st.effs, eff) == False
+                            em_add(em, "EFF001", st.fln, st.fcl, "纯函数或未声明效应 [" + join_str(st.effs, ", ") + "] 的函数调用了带效应 [" + eff + "] 的函数 '" + cname + "'")
+                        end
+                    end
+                end
+                # TYPE003 arity
+                if sig.ar != list_length(args)
+                    em_add(em, "TYPE003", cln, ccl, "函数 '" + cname + "' 期望 " + int_to_string(sig.ar) + " 个参数，得到 " + int_to_string(list_length(args)) + " 个")
+                end
+                sig.ret
+            end
+            None => None
+        end
+    else
+        match enum_of_variant(enums, cname)
+            Some(vt) =>
+                let varity = vt.1
+                if varity != list_length(args)
+                    em_add(em, "TYPE003", cln, ccl, "变体 '" + cname + "' 期望 " + int_to_string(varity) + " 个参数，得到 " + int_to_string(list_length(args)) + " 个")
+                end
+                variant_ret_ty(enums, cname)
+            end
+            None =>
+                if map_has(env, cname)
+                    # 局部变量（可能是闭包）——宿主不深入检查
+                    None
+                else
+                    em_add(em, "NAM003", cln, ccl, "调用未定义函数 '" + cname + "'")
+                    None
+                end
+            end
+        end
+    end
+end
+
+# match 检查（宿主 check_match：臂 child 作用域 + guard 不计穷尽 + Binder 无参变体计覆盖）
+fn chk_match(scrut: Ex, arms: List<ArmR>, end_ln: Int, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Option<Ty>
+    let scrut_ty = chk_expr(scrut, env, st, fns, enums, em)
+    let mut has_wild = False
+    let mut covered = list_empty()
+    for arm in arms
+        match arm
+            ArmR(pat, guard, body) =>
+                let aenv = env_child(env)
+                let vn = chk_pattern(pat, scrut_ty, aenv, enums)
+                match guard
+                    Some(g) =>
+                        # guard 臂不计入穷尽性（宿主 Rust 语义）
+                        chk_expr(g, aenv, st, fns, enums, em)
+                    end
+                    None =>
+                        match vn
+                            Some(v) =>
+                                covered = list_cons(v, covered)
+                            end
+                            None => ()
+                        end
+                        match pat
+                            PatWildcard =>
+                                has_wild = True
+                            end
+                            _ => ()
+                        end
+                    end
+                end
+                match body
+                    ABExpr(e2) => chk_expr(e2, aenv, st, fns, enums, em)
+                    ABBlock(b) => chk_blk(b, aenv, st, fns, enums, em)
+                end
+            end
+        end
+    end
+    # 穷尽性（宿主：用户枚举逐变体 / Result→Ok,Err / Option→Some,None；位置 = end 行 col 1）
+    if has_wild == False
+        match scrut_ty
+            Some(TyNamed(ename)) =>
+                match map_get(enums, ename)
+                    Some(info) =>
+                        if info.blt == False
+                            for v in info.vs
+                                if list_contains(covered, v.0) == False
+                                    em_add(em, "MAT001", end_ln, 1, "match 非穷尽：未覆盖变体 '" + v.0 + "'（枚举 " + ename + "）")
+                                end
+                            end
+                        end
+                    end
+                    None => ()
+                end
+            end
+            Some(TResult(_, _)) =>
+                if list_contains(covered, "Ok") == False
+                    em_add(em, "MAT001", end_ln, 1, "match 非穷尽：未覆盖 Ok")
+                end
+                if list_contains(covered, "Err") == False
+                    em_add(em, "MAT001", end_ln, 1, "match 非穷尽：未覆盖 Err")
+                end
+            end
+            Some(TyOption(_)) =>
+                if list_contains(covered, "Some") == False
+                    em_add(em, "MAT001", end_ln, 1, "match 非穷尽：未覆盖 Some")
+                end
+                if list_contains(covered, "None") == False
+                    em_add(em, "MAT001", end_ln, 1, "match 非穷尽：未覆盖 None")
+                end
+            end
+            _ => ()
+        end
+    end
+    None
+end
+
+fn ty_str_or(t: Option<Ty>) -> String
+    match t
+        Some(x) => ty_str(x)
+        None => "None"
+    end
+end
+
+# 列表包含（covered 查重）
+fn list_contains(xs: List<String>, x: String) -> Bool
+    let mut cur = xs
+    let mut found = False
+    while !list_is_empty(cur) and found == False
+        if list_head(cur) == x
+            found = True
+        else
+            cur = list_tail(cur)
+        end
+    end
+    found
+end
+
+# 模式检查：注入绑定到 aenv；返回命中的变体名（Binder 命中无参变体时——宿主语义）
+fn chk_pattern(p: Pat, scrut_ty: Option<Ty>, aenv: Map<String, Option<Ty>>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>) -> Option<String>
+    match p
+        PatLit(_) => None
+        PatBinder(name) =>
+            match enum_of_variant(enums, name)
+                Some(_) => Some(name)
+                None =>
+                    map_set(aenv, name, scrut_ty)
+                    None
+                end
+            end
+        end
+        PatWildcard => None
+        PatVariant(vname, subs) =>
+            # NAM004（变体不存在）与字段类型传播是 8.2 范围外；只递归注入绑定（类型 Unknown）
+            for sp in subs
+                chk_pattern(sp, None, aenv, enums)
+            end
+            Some(vname)
         end
     end
 end

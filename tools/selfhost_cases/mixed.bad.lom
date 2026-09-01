@@ -1,0 +1,7 @@
+enum Light = On | Off
+fn describe(l: Light) -> String ! [Log]
+    println("checking")
+    match l
+        On => "on"
+    end
+end

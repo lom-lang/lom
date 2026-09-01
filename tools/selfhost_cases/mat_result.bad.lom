@@ -1,0 +1,5 @@
+fn f(r: Result<Int, String>) -> Int
+    match r
+        Ok(v) => v
+    end
+end

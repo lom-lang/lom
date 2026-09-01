@@ -1,0 +1,4 @@
+enum Shape = Circle(Float) | Square(Float)
+fn f() -> Shape
+    Circle()
+end
