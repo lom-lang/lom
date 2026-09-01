@@ -24,6 +24,13 @@
 > 12. **验收结果（tools/verify_selfhost.py --static）**：坏文件 15/15（tools/selfhost_cases/ 9 个专项案例 + effects_bad/apply_test + fix_corpus 5 个；四类码+位置+消息折叠逐字一致）；干净集 146/146 零误报（examples + bootstrap + self_interp 自身 + eval 113）。8.1 三模式回归不倒（dump 146/tokens 146）。
 > 13. **范围差异（如实记录）**：8.2 检查器无类型推断的表达式返回 Unknown（MAT001 的 scrutinee 覆盖 Ident 注解/Call ret/字面量/Group/变体构造——宿主全量类型流在此之外）；TYPE001/002/010/020/MUT001/NAM004 等 8.2 范围外不产出。这些是 RFC 定案"子集方案"的实现面，非语言面变更。
 > 14. **自举开发发现的宿主行为确认**（非 bug）：`map_get` 返回 `Some(存储值)` 包装——存储 Option 值时读出双层 `Some(Some(...))`，解包一次方可匹配；42 内建签名/效应标注从 typechecker 实测导出而非文档转抄（手抄必然漂移）。
+>
+> **修订记录（2026-09-02，8.3 完成时）**：
+> 15. **8.3 交付**：`self_interp.lom` 追加树遍历求值器（Part F/G，~1560 行，全文 4890 行）——值系统 11 变体（Val 对齐宿主 Value，VList/VMap 直接承载宿主载体）、环境链（EnvOf{vars, par}，Map 引用语义 = 闭包捕获共享语义对齐宿主 Rc）、错误通道 E2=EMsg|ERet（镜像宿主 RuntimeError::EarlyReturn，`?` 自动传播到调用边界）、调用分派（变体构造→内建→用户函数→闭包变量）、import 别名表、`--run` 模式。
+> 16. **42 内建逐案决策定案**（原则"宿主内建即硬件指令"）：透传 38 个（IO 五件套+args、sqrt 浮点硬件、字符串原语 12、数值原语 3、list 载体 7、map 载体 8、int_to_string 拼接提升、string_to_int 解析原语）+ 强制自实现 5 个（list_map/list_filter/list_fold——回调是自举闭包宿主无法调用；json_parse/json_stringify——随后降级挂账，见 17）。
+> 17. **json 挂账（冻结条款触发）**：json 自实现需 unicode 转义构造字符（char_from_code 缺口）、透传需反射（type_of 缺口）——双冻结缺口，按 RFC 程序挂账待裁决不自作主张；自举解释器中调用 json 内建返回明确挂账错误；8.3 验收集排除 json 程序（json_demo/todo 的运行验收挂账）。
+> 18. **8.3 验收**：examples 运行 30/30（豁免：apply_test 故意坏文件、bench 的 args 驱动方式差异、json×2 挂账）；**三层自证达成**——自举解释器跑 stmt_interp.lom（1450 行迷你解释器）39 条输出与 golden 逐字一致（宿主→自举→自举→程序）；eval 113/113 stdout+退出码对齐；8.1 dump/8.2 static 模式回归不倒；`3.14159265` 等 Float 字面量位级一致（单次 IEEE 除法 = Rust parse 的正确舍入，两步加除会差 1 ulp）。
+> 19. **语义平移要点**：nullary 变体运行时仅内建 None 走变体匹配（用户无参变体按 Binder 绑定——宿主语义）；`expr[index]` 宿主未实现（自举同款报错）；`?` 的 ERet 与宿主 EarlyReturn 传播路径等价；闭包捕获=当前 Env 记录（record 拷贝但 vars Map 共享引用 = Rc 共享语义）。
 
 ## Motivation
 

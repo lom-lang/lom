@@ -28,10 +28,11 @@
 #   - 位置：ln 从 1，cl 从 1（字符列；纯 ASCII 下与宿主字节列一致）
 # ============================================================================
 
-from string import { split, contains, len, string_to_int, int_to_string, starts_with }
+from string import { split, contains, len, string_to_int, int_to_string, starts_with, ends_with, trim, upper, lower, replace }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_get }
-from map import { map_empty, map_set, map_get, map_has, map_size, map_keys }
-from file import { file_read, file_exists }
+from map import { map_empty, map_set, map_get, map_has, map_size, map_keys, map_remove }
+from file import { file_read, file_exists, file_write, file_append }
+from math import { sqrt }
 from env import { args }
 
 # ============================================================================
@@ -2682,6 +2683,16 @@ fn main() -> Unit
                 dump_tokens(r.toks, r.n)
             elif mode == "--diags"
                 dump_diags(em)
+            elif mode == "--run"
+                match run_program(prg)
+                    Ok(_) => ()
+                    Err(e) =>
+                        match e
+                            EMsg(m) => println("[self-runtime] " + m)
+                            ERet(_) => println("[self-runtime] main 提前返回")
+                        end
+                    end
+                end
             elif mode == "--check"
                 # 8.2：词法+语法诊断之上叠加静态检查（四类码）。
                 # 对齐宿主 --json：parse 有错时跳过 typecheck（diags.ok 才检查）——
@@ -3316,4 +3327,1564 @@ fn chk_pattern(p: Pat, scrut_ty: Option<Ty>, aenv: Map<String, Option<Ty>>, enum
             Some(vname)
         end
     end
+end
+
+# ============================================================================
+# Part F：8.3 求值器 in Lom（RFC-0003 §8.3）
+#   语义基准 = 宿主树遍历解释器（RFC-0002 定其"参考实现"地位）
+#
+# 值系统（对齐宿主 Value 11 变体）：
+#   VInt/VFloat/VBool/VStr/VUnit/VEnum/VRecord/VTuple/VList/VMap/VCl
+#   VList 直接存宿主 List（宿主 cons 链即自举载体——透传决策，见 Part G 头注）
+#   VMap 直接存宿主 Map（引用语义原样继承——map_set 就地改、别名共享）
+#   VCl 闭包 {ps: 参数名, body: Blk, env: Env}
+#
+# 环境（对齐宿主 Scope 链）：
+#   Env = EnvOf({vars: Map<String,Val>, par: Option<Env>})
+#   Map 引用语义保证闭包捕获后仍可见后续突变（对齐宿主 Rc 共享作用域）
+#   lookup 沿链查；define 只写当前层；set_existing 沿链找到并就地改（Assign 语义）
+#   块/for 每轮/match 臂 = 新子作用域（宿主同款）
+#
+# 错误通道（镜像宿主 RuntimeError）：
+#   Result<Val, E2>，E2 = EMsg(String) | ERet(Val)
+#   ERet 由 ? 自动传播到函数调用边界解包（对齐宿主 Err(EarlyReturn) 传播路径）
+#
+# Form A/B 纪律（本部分开发中踩坑的沉淀）：
+#   - Form A = 臂体首 token 与 => 同行；=> 行尾 + 次行表达式 = Form B（需要 end）
+#   - Form B 臂块内嵌套 match 作尾表达式时的 end 错位：每层 Form B 臂块 + 尾 match
+#     组合按"match end + 臂块 end"两个 end 计，fn 层用 --check 收敛兜底
+# ============================================================================
+
+enum Val
+    | VInt(Int)
+    | VFloat(Float)
+    | VBool(Bool)
+    | VStr(String)
+    | VUnit
+    | VEnum(String, List<Val>)
+    | VRecord(List<(String, Val)>)
+    | VTuple(List<Val>)
+    | VList(List<Val>)
+    | VMap(Map<String, Val>)
+    | VCl(List<String>, Blk, Env)
+end
+
+enum Env
+    | EnvOf({vars: Map<String, Val>, par: Option<Env>})
+end
+
+enum E2
+    | EMsg(String)
+    | ERet(Val)
+end
+
+# 具名函数表条目（collect 后不可变）
+enum FnD
+    | FnD(List<String>, Blk)
+end
+
+# ---- 环境操作 ----
+
+fn mk_env(par: Option<Env>) -> Env
+    EnvOf({vars: map_empty(), par: par})
+end
+
+fn env_lookup(env: Env, name: String) -> Option<Val>
+    match env
+        EnvOf(rec) =>
+            match map_get(rec.vars, name)
+                Some(v) => Some(v)
+                None =>
+                    match rec.par
+                        Some(p) => env_lookup(p, name)
+                        None => None
+                    end
+                end
+            end
+        end
+    end
+end
+
+fn env_define(env: Env, name: String, v: Val) -> Unit
+    match env
+        EnvOf(rec) => map_set(rec.vars, name, v)
+    end
+end
+
+# Assign 语义：沿链找到持有该名的层就地改（宿主 set_existing）
+fn env_set_existing(env: Env, name: String, v: Val) -> Bool
+    match env
+        EnvOf(rec) =>
+            if map_has(rec.vars, name)
+                map_set(rec.vars, name, v)
+                True
+            else
+                match rec.par
+                    Some(p) => env_set_existing(p, name, v)
+                    None => False
+                end
+            end
+        end
+    end
+end
+
+# ---- 显示（宿主 to_display 对齐）----
+
+fn vdisplay(v: Val) -> String
+    match v
+        VInt(n) => int_to_string(n)
+        VFloat(f) => "" + f
+        VBool(b) =>
+            if b
+                "true"
+            else
+                "false"
+            end
+        end
+        VStr(s) => s
+        VUnit => "()"
+        VEnum(vname, args) =>
+            if list_length(args) == 0
+                vname
+            else
+                vname + "(" + join_str(vdisplay_list(args), ", ") + ")"
+            end
+        end
+        VRecord(fields) => "{" + join_str(vdisp_fields(fields), ", ") + "}"
+        VTuple(elems) =>
+            let parts = vdisplay_list(elems)
+            if list_length(elems) == 1
+                "(" + join_str(parts, ", ") + ",)"
+            else
+                "(" + join_str(parts, ", ") + ")"
+            end
+        end
+        VList(l) => "[" + join_str(vdisplay_list(l), ", ") + "]"
+        VMap(m) => "{" + join_str(vdisp_map(m, map_keys(m)), ", ") + "}"
+        VCl(_, _, _) => "<闭包>"
+    end
+end
+
+fn vdisplay_list(xs: List<Val>) -> List<String>
+    let mut acc = list_empty()
+    for x in xs
+        acc = list_cons(vdisplay(x), acc)
+    end
+    rev_str(acc)
+end
+
+fn vdisp_fields(fields: List<(String, Val)>) -> List<String>
+    let mut acc = list_empty()
+    for f in fields
+        acc = list_cons(f.0 + ": " + vdisplay(f.1), acc)
+    end
+    rev_str(acc)
+end
+
+# 宿主：keys 排序后逐键 "k: v"
+fn vdisp_map(m: Map<String, Val>, keys: List<String>) -> List<String>
+    let mut acc = list_empty()
+    for k in keys
+        match map_get(m, k)
+            Some(v) =>
+                acc = list_cons(k + ": " + vdisplay(v), acc)
+            end
+            None => ()
+        end
+    end
+    rev_str(acc)
+end
+
+fn vtype_name(v: Val) -> String
+    match v
+        VInt(_) => "Int"
+        VFloat(_) => "Float"
+        VBool(_) => "Bool"
+        VStr(_) => "String"
+        VUnit => "Unit"
+        VEnum(_, _) => "枚举变体"
+        VRecord(_) => "记录"
+        VTuple(_) => "元组"
+        VList(_) => "List"
+        VMap(_) => "Map"
+        VCl(_, _, _) => "闭包"
+    end
+end
+
+# 宿主 values_eq（结构递归；Record 字段集顺序不敏感；Map 键集+递归值）
+fn veq(l: Val, r: Val) -> Bool
+    match l
+        VInt(a) =>
+            match r
+                VInt(b) => a == b
+                _ => False
+            end
+        end
+        VFloat(a) =>
+            match r
+                VFloat(b) => a == b
+                _ => False
+            end
+        end
+        VBool(a) =>
+            match r
+                VBool(b) => a == b
+                _ => False
+            end
+        end
+        VStr(a) =>
+            match r
+                VStr(b) => a == b
+                _ => False
+            end
+        end
+        VUnit =>
+            match r
+                VUnit => True
+                _ => False
+            end
+        end
+        VEnum(v1, a1) =>
+            match r
+                VEnum(v2, a2) =>
+                    if v1 != v2 or list_length(a1) != list_length(a2)
+                        False
+                    else
+                        veq_list(a1, a2)
+                    end
+                end
+                _ => False
+            end
+        end
+        VTuple(e1) =>
+            match r
+                VTuple(e2) =>
+                    if list_length(e1) != list_length(e2)
+                        False
+                    else
+                        veq_list(e1, e2)
+                    end
+                end
+                _ => False
+            end
+        end
+        VRecord(f1) =>
+            match r
+                VRecord(f2) =>
+                    if list_length(f1) != list_length(f2)
+                        False
+                    else
+                        veq_fields(f1, f2)
+                    end
+                end
+                _ => False
+            end
+        end
+        VList(a1) =>
+            match r
+                VList(a2) =>
+                    if list_length(a1) != list_length(a2)
+                        False
+                    else
+                        veq_list(a1, a2)
+                    end
+                end
+                _ => False
+            end
+        end
+        VMap(m1) =>
+            match r
+                VMap(m2) =>
+                    if map_size(m1) != map_size(m2)
+                        False
+                    else
+                        veq_map(m1, m2, map_keys(m1))
+                    end
+                end
+                _ => False
+            end
+        end
+        VCl(_, _, _) => False
+    end
+end
+
+fn veq_list(a: List<Val>, b: List<Val>) -> Bool
+    if list_is_empty(a)
+        list_is_empty(b)
+    else
+        if list_is_empty(b)
+            False
+        else
+            if veq(list_head(a), list_head(b))
+                veq_list(list_tail(a), list_tail(b))
+            else
+                False
+            end
+        end
+    end
+end
+
+fn veq_fields(f1: List<(String, Val)>, f2: List<(String, Val)>) -> Bool
+    if list_is_empty(f1)
+        True
+    else
+        let h = list_head(f1)
+        let mut found = False
+        for f in f2
+            if f.0 == h.0 and veq(h.1, f.1)
+                found = True
+            end
+        end
+        if found
+            veq_fields(list_tail(f1), f2)
+        else
+            False
+        end
+    end
+end
+
+fn veq_map(m1: Map<String, Val>, m2: Map<String, Val>, keys: List<String>) -> Bool
+    if list_is_empty(keys)
+        True
+    else
+        let k = list_head(keys)
+        match map_get(m2, k)
+            Some(v2) =>
+                match map_get(m1, k)
+                    Some(v1) =>
+                        if veq(v1, v2)
+                            veq_map(m1, m2, list_tail(keys))
+                        else
+                            False
+                        end
+                    end
+                    None => False
+                end
+            end
+            None => False
+        end
+    end
+end
+
+# ---- 具名函数收集（宿主 collect_functions：前向引用/互递归支持）----
+
+fn collect_fns(prg: Prg, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, al: Map<String, String>) -> Unit
+    match prg
+        Prg(items) =>
+            for it in items
+                match it
+                    ItFn(name, params, _, _, body, _, _) =>
+                        let mut ps = list_empty()
+                        for p in params
+                            match p
+                                Prm(pname, _) =>
+                                    ps = list_cons(pname, ps)
+                                end
+                            end
+                        end
+                        map_set(fns, name, FnD(rev_str(ps), body))
+                    end
+                    ItEnum(_, _, vlist) =>
+                        for v in vlist
+                            match v
+                                VarR(vname, fields) =>
+                                    map_set(variants, vname, list_length(fields))
+                                    if list_length(fields) == 0
+                                        map_set(nullaries, vname, True)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    ItImport(_, imp_items) =>
+                        for i in imp_items
+                            match i
+                                ImpI(iname, alias) =>
+                                    map_set(al, alias, iname)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# ---- 求值器主体（ev_ 前缀；对齐宿主 eval_expr / exec_stmt / exec_block）----
+# 所有求值返回 Result<Val, E2>；ERet 由 ? 自动传播到调用边界（镜像宿主 EarlyReturn）
+
+fn ev(e: Ex, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    match e
+        ExInt(n) => Ok(VInt(n))
+        ExFloat(s) => float_from_parts(s)
+        ExBool(b) => Ok(VBool(b))
+        ExStr(s) => Ok(VStr(s))
+        ExUnit => Ok(VUnit)
+        ExIdent(name, _, _) =>
+            match env_lookup(env, name)
+                Some(v) => Ok(v)
+                None =>
+                    if map_has(nullaries, name)
+                        Ok(VEnum(name, list_empty()))
+                    elif map_has(fns, name)
+                        match map_get(fns, name)
+                            Some(fd) =>
+                                match fd
+                                    FnD(ps, body) => Ok(VCl(ps, body, globals))
+                                end
+                            end
+                            None => Err(EMsg("内部错误"))
+                        end
+                    else
+                        Err(EMsg("未定义变量: '" + name + "'"))
+                    end
+                end
+            end
+        end
+        ExBinary(op, l, r) =>
+            let lv = ev(l, env, fns, variants, nullaries, globals, al)?
+            let rv = ev(r, env, fns, variants, nullaries, globals, al)?
+            ev_binary(op, lv, rv)
+        end
+        ExUnary(op, inner) =>
+            let v = ev(inner, env, fns, variants, nullaries, globals, al)?
+            if op == "Not"
+                match v
+                    VBool(b) => Ok(VBool(b == False))
+                    _ => Err(EMsg("! 不支持 " + vtype_name(v)))
+                end
+            else
+                match v
+                    VInt(n) => Ok(VInt(0 - n))
+                    VFloat(f) => Ok(VFloat(0.0 - f))
+                    _ => Err(EMsg("负号不支持 " + vtype_name(v)))
+                end
+            end
+        end
+        ExLogical(op, l, r) =>
+            let lv = ev(l, env, fns, variants, nullaries, globals, al)?
+            let lt = truthy(lv)?
+            if op == "And"
+                if lt == False
+                    Ok(VBool(False))
+                else
+                    let rv = ev(r, env, fns, variants, nullaries, globals, al)?
+                    Ok(VBool(truthy(rv)?))
+                end
+            else
+                if lt
+                    Ok(VBool(True))
+                else
+                    let rv = ev(r, env, fns, variants, nullaries, globals, al)?
+                    Ok(VBool(truthy(rv)?))
+                end
+            end
+        end
+        ExCall(callee, args) =>
+            let mut avals = list_empty()
+            for a in args
+                avals = list_cons(ev(a, env, fns, variants, nullaries, globals, al)?, avals)
+            end
+            ev_call(callee, rev_val(avals), env, fns, variants, nullaries, globals, al)
+        end
+        ExIndex(_, _) => Err(EMsg("索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）"))
+        ExField(x, name) =>
+            let v = ev(x, env, fns, variants, nullaries, globals, al)?
+            match v
+                VRecord(fields) =>
+                    let mut found = None
+                    for f in fields
+                        if f.0 == name and found == None
+                            found = Some(f.1)
+                        end
+                    end
+                    match found
+                        Some(fv) => Ok(fv)
+                        None => Err(EMsg("记录没有字段 '" + name + "'"))
+                    end
+                end
+                VTuple(elems) =>
+                    match try_sti(name)
+                        Some(idx) =>
+                            if idx >= 0 and idx < list_length(elems)
+                                Ok(list_get(elems, idx))
+                            else
+                                Err(EMsg("元组索引 " + int_to_string(idx) + " 越界（长度 " + int_to_string(list_length(elems)) + "）"))
+                            end
+                        end
+                        None => Err(EMsg("元组索引必须是数字，得到 '" + name + "'"))
+                    end
+                end
+                _ => Err(EMsg("不能对 " + vtype_name(v) + " 使用字段访问 '." + name + "'"))
+            end
+        end
+        ExGroup(inner) => ev(inner, env, fns, variants, nullaries, globals, al)
+        ExIf(ifr) =>
+            match ifr
+                IfR(branches, els) =>
+                    let mut result = Ok(VUnit)
+                    let mut go = True
+                    for br in branches
+                        if go
+                            let c = ev(br.0, env, fns, variants, nullaries, globals, al)?
+                            if truthy(c)?
+                                let benv = mk_env(Some(env))
+                                result = ex_blk(br.1, benv, fns, variants, nullaries, globals, al)
+                                go = False
+                            end
+                        end
+                    end
+                    if go
+                        match els
+                            Some(b) =>
+                                let benv = mk_env(Some(env))
+                                result = ex_blk(b, benv, fns, variants, nullaries, globals, al)
+                            end
+                            None => ()
+                        end
+                    end
+                    result
+                end
+            end
+        end
+        ExClosure(params, _, body) =>
+            let mut ps = list_empty()
+            for p in params
+                match p
+                    Prm(pname, _) =>
+                        ps = list_cons(pname, ps)
+                    end
+                end
+            end
+            Ok(VCl(rev_str(ps), body, env))
+        end
+        ExMatch(scrut, arms, _) => ev_match2(scrut, arms, env, fns, variants, nullaries, globals, al)
+        ExTry(inner) =>
+            let v = ev(inner, env, fns, variants, nullaries, globals, al)?
+            match v
+                VEnum(vname, args) =>
+                    if vname == "Ok" and list_length(args) == 1
+                        Ok(list_get(args, 0))
+                    elif vname == "Some" and list_length(args) == 1
+                        Ok(list_get(args, 0))
+                    elif (vname == "Err" and list_length(args) == 1) or (vname == "None" and list_length(args) == 0)
+                        Err(ERet(v))
+                    else
+                        Err(EMsg("`?` 只能用于 Result/Option，得到 " + vdisplay(v)))
+                    end
+                end
+                _ => Err(EMsg("`?` 只能用于 Result/Option，得到 " + vdisplay(v)))
+            end
+        end
+        ExPipe(left, right) =>
+            let lv = ev(left, env, fns, variants, nullaries, globals, al)?
+            match right
+                ExCall(rc, rargs) =>
+                    let mut avals = list_cons(lv, list_empty())
+                    for a in rargs
+                        avals = list_cons(ev(a, env, fns, variants, nullaries, globals, al)?, avals)
+                    end
+                    ev_call(rc, rev_val(avals), env, fns, variants, nullaries, globals, al)
+                end
+                _ => ev_call(right, list_cons(lv, list_empty()), env, fns, variants, nullaries, globals, al)
+            end
+        end
+        ExRange(a, b) =>
+            let av = ev(a, env, fns, variants, nullaries, globals, al)?
+            let bv = ev(b, env, fns, variants, nullaries, globals, al)?
+            match av
+                VInt(s2) =>
+                    match bv
+                        VInt(e2) =>
+                            let mut acc = list_empty()
+                            let mut i = e2 - 1
+                            while i >= s2
+                                acc = list_cons(VInt(i), acc)
+                                i -= 1
+                            end
+                            Ok(VList(acc))
+                        end
+                        _ => Err(EMsg("range 端点必须是 Int，得到 " + vtype_name(bv)))
+                    end
+                end
+                _ => Err(EMsg("range 端点必须是 Int，得到 " + vtype_name(av)))
+            end
+        end
+        ExRecord(fields) =>
+            let mut acc = list_empty()
+            for f in fields
+                let fv = ev(f.1, env, fns, variants, nullaries, globals, al)?
+                acc = list_cons((f.0, fv), acc)
+            end
+            Ok(VRecord(rev_pair2(acc)))
+        end
+        ExTuple(elems) =>
+            let mut acc = list_empty()
+            for x in elems
+                acc = list_cons(ev(x, env, fns, variants, nullaries, globals, al)?, acc)
+            end
+            Ok(VTuple(rev_val(acc)))
+        end
+    end
+end
+
+# truthy（宿主 is_truthy：非 Bool 即错）
+fn truthy(v: Val) -> Result<Bool, E2>
+    match v
+        VBool(b) => Ok(b)
+        _ => Err(EMsg("期望 Bool，得到 " + vtype_name(v)))
+    end
+end
+
+fn rev_val(xs: List<Val>) -> List<Val>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_pair2(xs: List<(String, Val)>) -> List<(String, Val)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+# Float 字面量还原：ip + fp/10^len(fp)（验收集字面量位级一致，前提由钉子测试覆盖）
+fn float_from_parts(lit: String) -> Result<Val, E2>
+    let parts = split(lit, ".")
+    let ip = list_get(parts, 0)
+    # 无小数点形态（"2"——TkFloat 规范化去掉 .0 的整数浮点）
+    if list_length(parts) == 1
+        match try_sti(ip)
+            Some(iv) => Ok(VFloat(iv * 1.0))
+            None => Err(EMsg("无效浮点数: " + lit))
+        end
+    else
+        let fp = list_get(parts, 1)
+        match try_sti(ip)
+            Some(iv) =>
+                match try_sti(fp)
+                    Some(fv) =>
+                        # 位级精确：单次 IEEE 除法（正确舍入）== Rust parse 的正确舍入
+                        let mut scale = 1
+                        let fl = len(fp)
+                        let mut i = 0
+                        while i < fl
+                            scale = scale * 10
+                            i += 1
+                        end
+                        let numer = (iv * scale + fv) * 1.0
+                        let denom = scale * 1.0
+                        Ok(VFloat(numer / denom))
+                    end
+                    None => Err(EMsg("无效浮点数: " + lit))
+                end
+            end
+            None => Err(EMsg("无效浮点数: " + lit))
+        end
+    end
+end
+
+# 二元运算（宿主 eval_binary 全语义）
+fn ev_binary(op: String, l: Val, r: Val) -> Result<Val, E2>
+    if op == "Add"
+        match l
+            VStr(a) =>
+                match r
+                    VStr(b) => Ok(VStr(a + b))
+                    _ => Ok(VStr(a + vdisplay(r)))
+                end
+            end
+            _ =>
+                match r
+                    VStr(b) => Ok(VStr(vdisplay(l) + b))
+                    _ => ev_arith(op, l, r)
+                end
+            end
+        end
+    elif op == "Eq"
+        Ok(VBool(veq(l, r)))
+    elif op == "NotEq"
+        Ok(VBool(veq(l, r) == False))
+    elif op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
+        ev_compare(op, l, r)
+    else
+        ev_arith(op, l, r)
+    end
+end
+
+fn ev_arith(op: String, l: Val, r: Val) -> Result<Val, E2>
+    match l
+        VInt(a) =>
+            match r
+                VInt(b) =>
+                    if op == "Add"
+                        Ok(VInt(a + b))
+                    elif op == "Sub"
+                        Ok(VInt(a - b))
+                    elif op == "Mul"
+                        Ok(VInt(a * b))
+                    elif op == "Div"
+                        if b == 0
+                            Err(EMsg("整数除以零"))
+                        else
+                            Ok(VInt(a / b))
+                        end
+                    else
+                        if b == 0
+                            Err(EMsg("整数取模零"))
+                        else
+                            Ok(VInt(a % b))
+                        end
+                    end
+                end
+                VFloat(b) => ev_arith_f(op, a * 1.0, b)
+                _ => Err(EMsg("运算 " + op + " 不支持 " + vtype_name(l) + " 和 " + vtype_name(r)))
+            end
+        end
+        VFloat(a) =>
+            match r
+                VFloat(b) => ev_arith_f(op, a, b)
+                VInt(b) => ev_arith_f(op, a, b * 1.0)
+                _ => Err(EMsg("运算 " + op + " 不支持 " + vtype_name(l) + " 和 " + vtype_name(r)))
+            end
+        end
+        _ => Err(EMsg("运算 " + op + " 不支持 " + vtype_name(l) + " 和 " + vtype_name(r)))
+    end
+end
+
+fn ev_arith_f(op: String, a: Float, b: Float) -> Result<Val, E2>
+    if op == "Add"
+        Ok(VFloat(a + b))
+    elif op == "Sub"
+        Ok(VFloat(a - b))
+    elif op == "Mul"
+        Ok(VFloat(a * b))
+    elif op == "Div"
+        Ok(VFloat(a / b))
+    else
+        Ok(VFloat(a % b))
+    end
+end
+
+fn ev_compare(op: String, l: Val, r: Val) -> Result<Val, E2>
+    let cmp =
+    match l
+        VInt(a) =>
+            match r
+                VInt(b) =>
+                    if a < b
+                        0 - 1
+                    elif a > b
+                        1
+                    else
+                        0
+                    end
+                end
+                _ => 0 - 2
+            end
+        end
+        VStr(a) =>
+            match r
+                VStr(b) => str_cmp2(a, b)
+                _ => 0 - 2
+            end
+        end
+        VBool(a) =>
+            match r
+                VBool(b) =>
+                    if a == b
+                        0
+                    elif a == False
+                        0 - 1
+                    else
+                        1
+                    end
+                end
+                _ => 0 - 2
+            end
+        end
+        VFloat(a) =>
+            match r
+                VFloat(b) =>
+                    if a < b
+                        0 - 1
+                    elif a > b
+                        1
+                    else
+                        0
+                    end
+                end
+                _ => 0 - 2
+            end
+        end
+        _ => 0 - 2
+    end
+    if cmp == 0 - 2
+        Err(EMsg("比较 " + op + " 不支持 " + vtype_name(l) + " 和 " + vtype_name(r)))
+    else
+        if op == "Lt"
+            Ok(VBool(cmp < 0))
+        elif op == "Gt"
+            Ok(VBool(cmp > 0))
+        elif op == "LtEq"
+            Ok(VBool(cmp <= 0))
+        else
+            Ok(VBool(cmp >= 0))
+        end
+    end
+end
+
+fn str_cmp2(a: String, b: String) -> Int
+    if a == b
+        0
+    elif a < b
+        0 - 1
+    else
+        1
+    end
+end
+
+# 调用分派（宿主 eval_call：变体构造 → 内建 → 用户函数 → 闭包变量 → 未定义）
+fn ev_call(callee: Ex, avals: List<Val>, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    match callee
+        ExIdent(name, _, _) =>
+            let rname =
+            if map_has(al, name)
+                match map_get(al, name)
+                    Some(r2) => r2
+                    None => name
+                end
+            else
+                name
+            end
+            if map_has(variants, name) and env_lookup(env, name) == None
+                Ok(VEnum(name, avals))
+            elif list_contains_str(bltins_list(), rname)
+                bltin(rname, avals, fns, variants, nullaries, globals, al)
+            elif map_has(fns, rname)
+                match map_get(fns, name)
+                    Some(fd) =>
+                        match fd
+                            FnD(ps, body) => call_cl(ps, body, globals, avals, name, fns, variants, nullaries, globals, al)
+                        end
+                    end
+                    None => Err(EMsg("内部错误"))
+                end
+            elif env_lookup(env, name) != None
+                match env_lookup(env, name)
+                    Some(v) =>
+                        match v
+                            VCl(ps, body, cenv) => call_cl(ps, body, cenv, avals, "<闭包>", fns, variants, nullaries, globals, al)
+                            _ => Err(EMsg("未定义函数: '" + name + "'"))
+                        end
+                    end
+                    None => Err(EMsg("未定义函数: '" + name + "'"))
+                end
+            else
+                Err(EMsg("未定义函数: '" + name + "'"))
+            end
+        end
+        _ =>
+            let c = ev(callee, env, fns, variants, nullaries, globals, al)?
+            match c
+                VCl(ps, body, cenv) => call_cl(ps, body, cenv, avals, "<闭包>", fns, variants, nullaries, globals, al)
+                _ => Err(EMsg("未定义函数: '<expr>'"))
+            end
+        end
+    end
+end
+
+# 闭包/函数调用（宿主 call_closure + call_function 的 ERet 解包）
+fn call_cl(ps: List<String>, body: Blk, cenv: Env, avals: List<Val>, name: String, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    if list_length(ps) != list_length(avals)
+        Err(EMsg("函数 '" + name + "' 期望 " + int_to_string(list_length(ps)) + " 个参数，得到 " + int_to_string(list_length(avals)) + " 个"))
+    else
+        let env = mk_env(Some(cenv))
+        let mut curp = ps
+        let mut cura = avals
+        while !list_is_empty(curp)
+            env_define(env, list_head(curp), list_head(cura))
+            curp = list_tail(curp)
+            cura = list_tail(cura)
+        end
+        match ex_blk(body, env, fns, variants, nullaries, globals, al)
+            Ok(v) => Ok(v)
+            Err(ERet(v)) => Ok(v)
+            Err(e) => Err(e)
+        end
+    end
+end
+
+# match 求值（宿主 ExprKind::Match：臂独立作用域 + guard 穿透 + 无匹配报错）
+fn ev_match2(scrut: Ex, arms: List<ArmR>, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    let sv = ev(scrut, env, fns, variants, nullaries, globals, al)?
+    let mut cur = arms
+    let mut go = True
+    let mut result = Err(EMsg("match 无匹配分支（值: " + vdisplay(sv) + "）"))
+    while go and !list_is_empty(cur)
+        let arm = list_head(cur)
+        match arm
+            ArmR(pat, guard, body) =>
+                let aenv = mk_env(Some(env))
+                match m_pattern(pat, sv, aenv, nullaries)
+                    True =>
+                        let mut arm_ok = True
+                        match guard
+                            Some(g) =>
+                                let gv = ev(g, aenv, fns, variants, nullaries, globals, al)?
+                                if truthy(gv)? == False
+                                    arm_ok = False
+                                end
+                            end
+                            None => ()
+                        end
+                        if arm_ok
+                            result =
+                            match body
+                                ABExpr(e2) => ev(e2, aenv, fns, variants, nullaries, globals, al)
+                                ABBlock(b) => ex_blk(b, aenv, fns, variants, nullaries, globals, al)
+                            end
+                            go = False
+                        end
+                    end
+                    False => ()
+                end
+            end
+        end
+        cur = list_tail(cur)
+    end
+    result
+end
+
+# 模式匹配（宿主 match_pattern：Binder 对内建无参变体按变体匹配，用户无参变体按绑定）
+fn m_pattern(p: Pat, v: Val, env: Env, nullaries: Map<String, Bool>) -> Bool
+    match p
+        PatWildcard => True
+        PatBinder(name) =>
+            if map_has(nullaries, name)
+                match v
+                    VEnum(vname, args) => vname == name and list_length(args) == 0
+                    _ => False
+                end
+            else
+                env_define(env, name, v)
+                True
+            end
+        end
+        PatLit(lit) =>
+            match lit
+                ExInt(n) => veq(VInt(n), v)
+                ExFloat(s) =>
+                    match float_from_parts(s)
+                        Ok(fv) => veq(fv, v)
+                        Err(_) => False
+                    end
+                end
+                ExBool(b) => veq(VBool(b), v)
+                ExStr(s) => veq(VStr(s), v)
+                _ => False
+            end
+        end
+        PatVariant(name, subs) =>
+            match v
+                VEnum(vname, args) =>
+                    if vname != name
+                        False
+                    elif list_length(args) != list_length(subs)
+                        False
+                    else
+                        m_pattern_subs(subs, args, env, nullaries)
+                    end
+                end
+                _ => False
+            end
+        end
+    end
+end
+
+fn m_pattern_subs(subs: List<Pat>, args: List<Val>, env: Env, nullaries: Map<String, Bool>) -> Bool
+    if list_is_empty(subs)
+        list_is_empty(args)
+    else
+        if list_is_empty(args)
+            False
+        else
+            if m_pattern(list_head(subs), list_head(args), env, nullaries)
+                m_pattern_subs(list_tail(subs), list_tail(args), env, nullaries)
+            else
+                False
+            end
+        end
+    end
+end
+
+# ---- 语句与块 ----
+
+fn ex_blk(b: Blk, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    match b
+        BlkOf(stmts, tail) =>
+            for s in stmts
+                ex_stmt(s, env, fns, variants, nullaries, globals, al)?
+            end
+            match tail
+                Some(t) => ev(t, env, fns, variants, nullaries, globals, al)
+                None => Ok(VUnit)
+            end
+        end
+    end
+end
+
+fn ex_stmt(s: St, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    match s
+        StLet(_, name, _, value) =>
+            let v = ev(value, env, fns, variants, nullaries, globals, al)?
+            env_define(env, name, v)
+            Ok(VUnit)
+        end
+        StDestruct(names, value) =>
+            let v = ev(value, env, fns, variants, nullaries, globals, al)?
+            match v
+                VTuple(elems) =>
+                    if list_length(elems) != list_length(names)
+                        Err(EMsg("解构数量不匹配：模式含 " + int_to_string(list_length(names)) + " 个名字，值含 " + int_to_string(list_length(elems)) + " 个元素"))
+                    else
+                        let mut curn = names
+                        let mut cure = elems
+                        while !list_is_empty(curn)
+                            env_define(env, list_head(curn), list_head(cure))
+                            curn = list_tail(curn)
+                            cure = list_tail(cure)
+                        end
+                        Ok(VUnit)
+                    end
+                end
+                _ => Err(EMsg("解构期望元组，得到 " + vtype_name(v)))
+            end
+        end
+        StAssign(name, _, _, value) =>
+            let v = ev(value, env, fns, variants, nullaries, globals, al)?
+            if env_set_existing(env, name, v)
+                Ok(VUnit)
+            else
+                Err(EMsg("赋值给未定义变量: '" + name + "'"))
+            end
+        end
+        StIf(ifr) =>
+            match ifr
+                IfR(branches, els) =>
+                    let mut result = Ok(VUnit)
+                    let mut go = True
+                    for br in branches
+                        if go
+                            let c = ev(br.0, env, fns, variants, nullaries, globals, al)?
+                            if truthy(c)?
+                                let benv = mk_env(Some(env))
+                                result = ex_blk(br.1, benv, fns, variants, nullaries, globals, al)
+                                go = False
+                            end
+                        end
+                    end
+                    if go
+                        match els
+                            Some(b) =>
+                                let benv = mk_env(Some(env))
+                                result = ex_blk(b, benv, fns, variants, nullaries, globals, al)
+                            end
+                            None => ()
+                        end
+                    end
+                    result
+                end
+            end
+        end
+        StWhile(cond, body) =>
+            let mut go = True
+            while go
+                let c = ev(cond, env, fns, variants, nullaries, globals, al)?
+                if truthy(c)?
+                    let benv = mk_env(Some(env))
+                    ex_blk(body, benv, fns, variants, nullaries, globals, al)?
+                else
+                    go = False
+                end
+            end
+            Ok(VUnit)
+        end
+        StFor(var, iter, body) =>
+            let iv = ev(iter, env, fns, variants, nullaries, globals, al)?
+            match iv
+                VStr(s2) =>
+                    for ch in split(s2, "")
+                        let benv = mk_env(Some(env))
+                        env_define(benv, var, VStr(ch))
+                        ex_blk(body, benv, fns, variants, nullaries, globals, al)?
+                    end
+                    Ok(VUnit)
+                end
+                VInt(n) =>
+                    let mut i = 0
+                    while i < n
+                        let benv = mk_env(Some(env))
+                        env_define(benv, var, VInt(i))
+                        ex_blk(body, benv, fns, variants, nullaries, globals, al)?
+                        i += 1
+                    end
+                    Ok(VUnit)
+                end
+                VList(l) =>
+                    for elem in l
+                        let benv = mk_env(Some(env))
+                        env_define(benv, var, elem)
+                        ex_blk(body, benv, fns, variants, nullaries, globals, al)?
+                    end
+                    Ok(VUnit)
+                end
+                _ => Err(EMsg("for 循环不支持迭代 " + vtype_name(iv)))
+            end
+        end
+        StReturn(opt) =>
+            match opt
+                Some(e) =>
+                    let v = ev(e, env, fns, variants, nullaries, globals, al)?
+                    Err(ERet(v))
+                end
+                None => Err(ERet(VUnit))
+            end
+        end
+        StExpr(e) => ev(e, env, fns, variants, nullaries, globals, al)
+        StHole(l, c) =>
+            Err(EMsg("代码洞 @" + int_to_string(l) + ":" + int_to_string(c) + "（源文件解析失败处，不可执行）"))
+        end
+    end
+end
+
+# ---- 内建分派（Part G）----
+# bltins()：40 个透传/自实现 + json 双内建挂账（\uXXXX 需 char_from_code、透传需
+# type_of——双冻结缺口，RFC-0003 修订记录挂账，8.3 验收集排除 json 程序）
+
+fn bltins_list() -> List<String> ! [IO]
+    let mut acc = list_empty()
+    for n in split("println print len int_to_string string_to_int trim upper lower split contains replace starts_with ends_with sqrt abs min max list_empty list_length list_get list_is_empty list_head list_tail list_cons list_map list_filter list_fold map_empty map_set map_get map_has map_remove map_keys map_values map_size file_read file_write file_append file_exists args json_parse json_stringify", " ")
+        acc = list_cons(n, acc)
+    end
+    rev_str(acc)
+end
+
+fn list_contains_str(xs: List<String>, x: String) -> Bool
+    let mut cur = xs
+    let mut found = False
+    while !list_is_empty(cur) and found == False
+        if list_head(cur) == x
+            found = True
+        else
+            cur = list_tail(cur)
+        end
+    end
+    found
+end
+
+# 参数解包辅助（类型错误消息对齐宿主内建实现）
+fn vstr(v: Val, who: String) -> Result<String, E2>
+    match v
+        VStr(s) => Ok(s)
+        _ => Err(EMsg(who + " 期望 String"))
+    end
+end
+
+fn vint(v: Val, who: String) -> Result<Int, E2>
+    match v
+        VInt(n) => Ok(n)
+        _ => Err(EMsg(who + " 期望 Int"))
+    end
+end
+
+fn vlistv(v: Val, who: String) -> Result<List<Val>, E2>
+    match v
+        VList(l) => Ok(l)
+        _ => Err(EMsg(who + " 期望 List"))
+    end
+end
+
+fn vmapv(v: Val, who: String) -> Result<Map<String, Val>, E2>
+    match v
+        VMap(m) => Ok(m)
+        _ => Err(EMsg(who + " 期望 Map"))
+    end
+end
+
+fn want_arity(who: String, want: Int, args: List<Val>) -> Result<Unit, E2>
+    if list_length(args) != want
+        Err(EMsg(who + " 期望 " + int_to_string(want) + " 个参数，得到 " + int_to_string(list_length(args)) + " 个"))
+    else
+        Ok(())
+    end
+end
+
+# 内建分派（宿主 call_builtin 语义）
+fn bltin(name: String, args: List<Val>, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    if name == "println"
+        let _ = want_arity(name, 1, args)?
+        println(vdisplay(list_get(args, 0)))
+        Ok(VUnit)
+    elif name == "print"
+        let _ = want_arity(name, 1, args)?
+        print(vdisplay(list_get(args, 0)))
+        Ok(VUnit)
+    elif name == "len"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VStr(s) => Ok(VInt(len(s)))
+            _ => Err(EMsg("len 期望 String"))
+        end
+    elif name == "int_to_string"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VInt(n) => Ok(VStr("" + n))
+            _ => Err(EMsg("int_to_string 期望 Int"))
+        end
+    elif name == "string_to_int"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VStr(s) =>
+                match try_sti(s)
+                    Some(n) => Ok(VInt(n))
+                    None => Ok(VUnit)
+                end
+            end
+            _ => Err(EMsg("string_to_int 期望 String"))
+        end
+    elif name == "trim"
+        let _ = want_arity(name, 1, args)?
+        Ok(VStr(trim(vstr(list_get(args, 0), name)?)))
+    elif name == "upper"
+        let _ = want_arity(name, 1, args)?
+        Ok(VStr(upper(vstr(list_get(args, 0), name)?)))
+    elif name == "lower"
+        let _ = want_arity(name, 1, args)?
+        Ok(VStr(lower(vstr(list_get(args, 0), name)?)))
+    elif name == "split"
+        let _ = want_arity(name, 2, args)?
+        let s = vstr(list_get(args, 0), name)?
+        let sep = vstr(list_get(args, 1), name)?
+        let mut acc = list_empty()
+        for piece in split(s, sep)
+            acc = list_cons(VStr(piece), acc)
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "contains"
+        let _ = want_arity(name, 2, args)?
+        Ok(VBool(contains(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?)))
+    elif name == "replace"
+        let _ = want_arity(name, 3, args)?
+        Ok(VStr(replace(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?, vstr(list_get(args, 2), name)?)))
+    elif name == "starts_with"
+        let _ = want_arity(name, 2, args)?
+        Ok(VBool(starts_with(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?)))
+    elif name == "ends_with"
+        let _ = want_arity(name, 2, args)?
+        Ok(VBool(ends_with(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?)))
+    elif name == "sqrt"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VFloat(f) => Ok(VFloat(sqrt(f)))
+            VInt(n) => Ok(VFloat(sqrt(n * 1.0)))
+            _ => Err(EMsg("sqrt 期望 Float"))
+        end
+    elif name == "abs"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VInt(n) =>
+                if n < 0
+                    Ok(VInt(0 - n))
+                else
+                    Ok(VInt(n))
+                end
+            end
+            VFloat(f) =>
+                if f < 0.0
+                    Ok(VFloat(0.0 - f))
+                else
+                    Ok(VFloat(f))
+                end
+            end
+            _ => Err(EMsg("abs 期望数值"))
+        end
+    elif name == "min" or name == "max"
+        let _ = want_arity(name, 2, args)?
+        let a = list_get(args, 0)
+        let b = list_get(args, 1)
+        let c = ev_compare_for_minmax(a, b)
+        if name == "min"
+            if c <= 0
+                Ok(a)
+            else
+                Ok(b)
+            end
+        else
+            if c >= 0
+                Ok(a)
+            else
+                Ok(b)
+            end
+        end
+    elif name == "list_empty"
+        let _ = want_arity(name, 0, args)?
+        Ok(VList(list_empty()))
+    elif name == "list_length"
+        let _ = want_arity(name, 1, args)?
+        Ok(VInt(list_length(vlistv(list_get(args, 0), name)?)))
+    elif name == "list_get"
+        let _ = want_arity(name, 2, args)?
+        let l = vlistv(list_get(args, 0), name)?
+        let idx = vint(list_get(args, 1), name)?
+        if idx < 0 or idx >= list_length(l)
+            Err(EMsg("list_get 索引 " + int_to_string(idx) + " 越界（列表长度 " + int_to_string(list_length(l)) + "）"))
+        else
+            Ok(list_get(l, idx))
+        end
+    elif name == "list_is_empty"
+        let _ = want_arity(name, 1, args)?
+        Ok(VBool(list_is_empty(vlistv(list_get(args, 0), name)?)))
+    elif name == "list_head"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VList(l) =>
+                if list_is_empty(l)
+                    Err(EMsg("list_head：空列表"))
+                else
+                    Ok(list_head(l))
+                end
+            end
+            _ => Err(EMsg("list_head 期望 List"))
+        end
+    elif name == "list_tail"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VList(l) =>
+                if list_is_empty(l)
+                    Err(EMsg("list_tail：空列表"))
+                else
+                    Ok(VList(list_tail(l)))
+                end
+            end
+            _ => Err(EMsg("list_tail 期望 List"))
+        end
+    elif name == "list_cons"
+        let _ = want_arity(name, 2, args)?
+        Ok(VList(list_cons(list_get(args, 0), vlistv(list_get(args, 1), name)?)))
+    elif name == "list_map"
+        let _ = want_arity(name, 2, args)?
+        let f = list_get(args, 0)
+        let l = vlistv(list_get(args, 1), name)?
+        let mut acc = list_empty()
+        for x in l
+            acc = list_cons(call_val(f, list_cons(x, list_empty()), fns, variants, nullaries, globals, al)?, acc)
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "list_filter"
+        let _ = want_arity(name, 2, args)?
+        let f = list_get(args, 0)
+        let l = vlistv(list_get(args, 1), name)?
+        let mut acc = list_empty()
+        for x in l
+            let keep = call_val(f, list_cons(x, list_empty()), fns, variants, nullaries, globals, al)?
+            if truthy(keep)?
+                acc = list_cons(x, acc)
+            end
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "list_fold"
+        let _ = want_arity(name, 3, args)?
+        let f = list_get(args, 0)
+        let mut acc = list_get(args, 1)
+        let l = vlistv(list_get(args, 2), name)?
+        for x in l
+            acc = call_val(f, list_cons(acc, list_cons(x, list_empty())), fns, variants, nullaries, globals, al)?
+        end
+        Ok(acc)
+    elif name == "map_empty"
+        let _ = want_arity(name, 0, args)?
+        Ok(VMap(map_empty()))
+    elif name == "map_set"
+        let _ = want_arity(name, 3, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let k = vstr(list_get(args, 1), name)?
+        map_set(m, k, list_get(args, 2))
+        Ok(VUnit)
+    elif name == "map_get"
+        let _ = want_arity(name, 2, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let k = vstr(list_get(args, 1), name)?
+        match map_get(m, k)
+            Some(v) => Ok(VEnum("Some", list_cons(v, list_empty())))
+            None => Ok(VEnum("None", list_empty()))
+        end
+    elif name == "map_has"
+        let _ = want_arity(name, 2, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let k = vstr(list_get(args, 1), name)?
+        Ok(VBool(map_has(m, k)))
+    elif name == "map_remove"
+        let _ = want_arity(name, 2, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let k = vstr(list_get(args, 1), name)?
+        Ok(VBool(map_remove(m, k)))
+    elif name == "map_keys"
+        let _ = want_arity(name, 1, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let mut acc = list_empty()
+        for k in map_keys(m)
+            acc = list_cons(VStr(k), acc)
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "map_values"
+        let _ = want_arity(name, 1, args)?
+        let m = vmapv(list_get(args, 0), name)?
+        let mut acc = list_empty()
+        for k in map_keys(m)
+            match map_get(m, k)
+                Some(v) =>
+                    acc = list_cons(v, acc)
+                end
+                None => ()
+            end
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "map_size"
+        let _ = want_arity(name, 1, args)?
+        Ok(VInt(map_size(vmapv(list_get(args, 0), name)?)))
+    elif name == "file_read"
+        let _ = want_arity(name, 1, args)?
+        Ok(VStr(file_read(vstr(list_get(args, 0), name)?)))
+    elif name == "file_write"
+        let _ = want_arity(name, 2, args)?
+        file_write(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?)
+        Ok(VUnit)
+    elif name == "file_append"
+        let _ = want_arity(name, 2, args)?
+        file_append(vstr(list_get(args, 0), name)?, vstr(list_get(args, 1), name)?)
+        Ok(VUnit)
+    elif name == "file_exists"
+        let _ = want_arity(name, 1, args)?
+        Ok(VBool(file_exists(vstr(list_get(args, 0), name)?)))
+    elif name == "args"
+        let _ = want_arity(name, 0, args)?
+        let mut acc = list_empty()
+        for a in args()
+            acc = list_cons(VStr(a), acc)
+        end
+        Ok(VList(rev_val(acc)))
+    elif name == "json_parse" or name == "json_stringify"
+        Err(EMsg("内建 '" + name + "' 在自举解释器中挂账（RFC-0003 修订记录：\\uXXXX 转义需 char_from_code、透传需 type_of——双冻结缺口，待裁决）"))
+    else
+        Err(EMsg("未定义函数: '" + name + "'"))
+    end
+end
+
+# 闭包值调用（list_map/filter/fold 的回调路径）
+fn call_val(f: Val, avals: List<Val>, fns: Map<String, FnD>, variants: Map<String, Int>, nullaries: Map<String, Bool>, globals: Env, al: Map<String, String>) -> Result<Val, E2> ! [IO]
+    match f
+        VCl(ps, body, cenv) => call_cl(ps, body, cenv, avals, "<闭包>", fns, variants, nullaries, globals, al)
+        _ => Err(EMsg("期望闭包，得到 " + vtype_name(f)))
+    end
+end
+
+# min/max 的数值比较
+fn ev_compare_for_minmax(a: Val, b: Val) -> Int
+    match a
+        VInt(x) =>
+            match b
+                VInt(y) =>
+                    if x < y
+                        0 - 1
+                    elif x > y
+                        1
+                    else
+                        0
+                    end
+                end
+                VFloat(y) =>
+                    let xf = x * 1.0
+                    if xf < y
+                        0 - 1
+                    elif xf > y
+                        1
+                    else
+                        0
+                    end
+                end
+                _ => 0
+            end
+        end
+        VFloat(x) =>
+            match b
+                VFloat(y) =>
+                    if x < y
+                        0 - 1
+                    elif x > y
+                        1
+                    else
+                        0
+                    end
+                end
+                VInt(y) =>
+                    let yf = y * 1.0
+                    if x < yf
+                        0 - 1
+                    elif x > yf
+                        1
+                    else
+                        0
+                    end
+                end
+                _ => 0
+            end
+        end
+        _ => 0
+    end
+end
+
+# ---- run 入口（--run 模式）：收集 → 执行 main → 输出由 println 透传产生 ----
+
+fn run_program(prg: Prg) -> Result<Val, E2> ! [IO]
+    let fns = map_empty()
+    let variants = map_empty()
+    let nullaries = map_empty()
+    let al = map_empty()
+    collect_fns(prg, fns, variants, nullaries, al)
+    # 内建变体（Ok/Err/Some/None）——宿主 BUILTIN_VARIANTS
+    map_set(variants, "Ok", 1)
+    map_set(variants, "Err", 1)
+    map_set(variants, "Some", 1)
+    map_set(variants, "None", 0)
+    map_set(nullaries, "None", True)
+    let globals = mk_env(None)
+    match prg
+        Prg(items) =>
+            for it in items
+                match it
+                    ItFn(name, params, _, _, body, _, _) =>
+                        if name == "main"
+                            if list_length(params) == 0
+                                return ex_blk(body, mk_env(Some(globals)), fns, variants, nullaries, globals, al)
+                            else
+                                return Err(EMsg("main 期望 0 个参数"))
+                            end
+                        end
+                    end
+                    _ => ()
+                end
+            end
+        end
+    end
+    Ok(VUnit)
 end
