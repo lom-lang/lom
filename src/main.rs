@@ -17,6 +17,7 @@ mod apply;
 mod ast;
 mod diagnostics;
 mod doc;
+mod dump;
 mod fix;
 mod fmt;
 mod fix_history;
@@ -54,6 +55,8 @@ struct CliArgs {
     target: Option<String>,
     /// Phase 7.2: -o/--output <path>（编译产物输出路径，默认 <file> 换 .wasm 后缀）
     output: Option<String>,
+    /// Phase 8 前置（RFC-0003 §8.1）: --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查）
+    dump_ast: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     program_args: Vec<String>,
 }
@@ -97,6 +100,7 @@ fn print_help(prog: &str) {
     eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
     eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
+    eprintln!("  --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查；Phase 8 自举验收工具）");
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
@@ -157,6 +161,7 @@ fn parse_args(args: &[String]) -> CliArgs {
         match a.as_str() {
             "--json" => out.json = true,
             "--check" => out.check = true,
+            "--dump-ast" => out.dump_ast = true,
             "--plan" => out.plan = true,
             "--apply" => out.apply = true,
             "--dry-run" => out.dry_run = true,
@@ -324,6 +329,18 @@ fn main_inner() {
     // ===== 子命令：fix（Phase 2.7 修复计划 / Phase 3.1 应用修复）=====
     if cli.subcommand.as_deref() == Some("fix") {
         run_fix(&src, path, &cli);
+        return;
+    }
+
+    // ===== --dump-ast（Phase 8 前置，RFC-0003 §8.1 验收工具）=====
+    // dump 是调试/验收产品：打印到 stdout，恒退出 0；
+    // 容错解析的 Hole 节点照常输出，解析错误摘要走 stderr。
+    if cli.dump_ast {
+        let result = parser::Parser::parse_recover(&src);
+        print!("{}", dump::dump_program(&result.program));
+        if !result.errors.is_empty() {
+            eprintln!("（解析含 {} 个错误，AST 中带 Hole 节点）", result.errors.len());
+        }
         return;
     }
 
