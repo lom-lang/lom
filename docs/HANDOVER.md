@@ -364,6 +364,7 @@ end
   - **PS 5.1 无控制台句柄下 [Console]::OutputEncoding 赋值静默失败**（try/catch 吞掉）——原生命令输出捕获要 UTF-8 一律走 `System.Diagnostics.Process` 显式 StandardOutputEncoding（run.ps1 的 Invoke-CaptureUtf8，三平台/5.1/pwsh 等价）。触发场景：eval 任务 115 是首个非 ASCII expected。
   - **.ps1 加中文注释必须带 BOM**：PS 5.1 对无 BOM 文件按 ANSI 读，UTF-8 注释字节偶发吞掉换行导致解析断裂（报错位置在很远的 `}`）——run.ps1 已加 BOM（utf-8-sig）。
   - **json 分派对象/数组的空白跳过点**：宿主在 `:` 后与 `,` 后各有一次 skip_ws（值解析前）——字符式平移时最容易漏的就是这两处（json_demo 偏移 8 的空格就是它）。
+  - **有状态示例的验收污染（CI 首跑抓到的真问题）**：file_demo.lom 首行输出 `file_exists` 的 False——宿主先跑会留下 `_file_demo_tmp.txt`，自举侧再跑就打 True。**本地曾因陈旧文件假通过**（两侧都看到 True→True 一致）；CI 全新 checkout 才暴露。修法：verify --run 每侧运行前清理已知运行时产物（RUN_ARTIFACTS）。教训：**跑两遍对比的验收必须保证两侧同起点，本地"过"要先问状态是否干净**。
 
 ### 11.1 Phase 8.1 会话新增坑（2026-09-01，写自举代码踩的）
 

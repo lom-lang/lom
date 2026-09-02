@@ -324,6 +324,19 @@ def mode_static(files):
 #   `lom self_interp.lom -- bench.lom --run <bench> <n>` 验证，不进默认集控时长）。
 RUN_EXCLUDE = {'apply_test.lom', 'bench.lom'}
 
+# 有状态示例的运行时产物——每侧运行前清理，保证宿主/自举两次运行同起点
+# （file_demo 首行输出 file_exists 的 False：不清理则宿主留下的文件让自举侧
+#   打印 True——首跑 CI 抓到，本地曾因陈旧文件假通过）。
+RUN_ARTIFACTS = ['examples/_file_demo_tmp.txt', 'examples/_todo_data.json']
+
+
+def _clean_run_artifacts():
+    for a in RUN_ARTIFACTS:
+        try:
+            os.remove(a)
+        except FileNotFoundError:
+            pass
+
 
 def mode_run(files):
     ok = fail = folded = 0
@@ -334,7 +347,9 @@ def mode_run(files):
             continue
         if os.path.basename(p) in RUN_EXCLUDE:
             continue
+        _clean_run_artifacts()
         host = run_lom([path])
+        _clean_run_artifacts()
         try:
             self_out = run_lom([SELF, '--', path, '--run'])
         except subprocess.TimeoutExpired:
