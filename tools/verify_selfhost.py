@@ -5,6 +5,7 @@
 #   python tools/verify_selfhost.py --tokens   # token 流比对（lexer 对账，宿主 --dump-tokens）
 #   python tools/verify_selfhost.py --diags    # 诊断比对（LEX/PARSE 码|行|列 + 消息折叠，坏文件集）
 #   python tools/verify_selfhost.py --static   # 8.2 静态检查对齐（NAM003/TYPE003/EFF001/MAT001：坏文件 + 干净集误报检查）
+#   python tools/verify_selfhost.py --run      # 8.3 examples 运行验收（stdout 对齐；v0.27.0 起 json×2 解除豁免，RFC-0003 修订 24）
 #   python tools/verify_selfhost.py --wasm     # 8.4 第二层：wasm 载体跑自举解释器（限内 ≤2.1KB 文件，stdout 对齐）
 #
 # 验收口径（RFC-0003 修订记录 3 + 8.1 节）：
@@ -318,6 +319,48 @@ def mode_static(files):
 
 
 
+# --run 模式：examples 运行验收（8.3 口径固化 + v0.27.0 json×2 解除豁免）。
+# 排除：apply_test（故意坏文件）；bench（args 驱动——argv 透传已落地，可手动
+#   `lom self_interp.lom -- bench.lom --run <bench> <n>` 验证，不进默认集控时长）。
+RUN_EXCLUDE = {'apply_test.lom', 'bench.lom'}
+
+
+def mode_run(files):
+    ok = fail = folded = 0
+    fails = []
+    for path, _ in files:
+        p = path.replace('\\', '/')
+        if not p.startswith('examples/'):
+            continue
+        if os.path.basename(p) in RUN_EXCLUDE:
+            continue
+        host = run_lom([path])
+        try:
+            self_out = run_lom([SELF, '--', path, '--run'])
+        except subprocess.TimeoutExpired:
+            fails.append((path, 'TIMEOUT'))
+            fail += 1
+            continue
+        if host == self_out:
+            ok += 1
+        else:
+            # todo.lom：宿主 lexer 对非 ASCII 字面量按字节 Latin-1 展开（历史行为），
+            # 自举按字符读源码——宿主行折叠后应与自举逐字等价（dump/tokens 模式同款折叠）
+            hl, sl = host.splitlines(), self_out.splitlines()
+            if len(hl) == len(sl) and all(
+                h == s or fold_latin1(h) == s for h, s in zip(hl, sl)
+            ):
+                ok += 1
+                folded += 1
+            else:
+                fails.append((path, f'输出不一致 host={len(host)}B self={len(self_out)}B'))
+                fail += 1
+    print(f'run: PASS {ok} / FAIL {fail}（examples+bootstrap 运行验收，含 stmt_interp 三层自证；Latin-1 折叠等价 {folded}）')
+    for f, why in fails:
+        print(f'  FAIL {f}: {why}')
+    return fail == 0
+
+
 # 8.4 第二层：wasm 载体跑自举解释器。
 # 规模上限（RFC-0003 修订记录 20）：目标程序 > ~6.7KB（约 2500 token）时触发
 # 未定位的 wasm 内存越界（挂账）；hof/try_operator 类深调用形态另受 V8 栈深限制。
@@ -395,6 +438,8 @@ def main():
             all_ok = mode_wasm()
         elif mode == '--static':
             all_ok = mode_static(real_files)
+        elif mode == '--run':
+            all_ok = mode_run(real_files)
         else:
             all_ok = mode_dump(real_files)
     finally:

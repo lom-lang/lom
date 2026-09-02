@@ -430,6 +430,7 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
             "replace",
             "starts_with",
             "ends_with",
+            "char_from_code",
         ],
     ),
     ("math", &["sqrt", "abs", "min", "max"]),
@@ -1532,6 +1533,20 @@ impl Interpreter {
                     _ => Err(RuntimeError::Msg("lower 期望 String".to_string())),
                 }
             }
+            // v0.27.0: 码点→单字符 String（json \uXXXX 与 L2 编译器的字节构造原语）
+            "char_from_code" => {
+                expect_arity("char_from_code", 1, args)?;
+                match &args[0] {
+                    Value::Int(cp) => match char::from_u32(*cp as u32) {
+                        Some(c) => Ok(Some(Value::Str(c.to_string()))),
+                        None => Err(RuntimeError::Msg(format!(
+                            "char_from_code 码点无效: {}（有效范围 0..0x10FFFF，不含代理区 D800-DFFF）",
+                            cp
+                        ))),
+                    },
+                    _ => Err(RuntimeError::Msg("char_from_code 期望 Int".to_string())),
+                }
+            }
             // math 模块
             "sqrt" => {
                 expect_arity("sqrt", 1, args)?;
@@ -2045,6 +2060,7 @@ fn is_known_builtin(name: &str) -> bool {
             | "replace"
             | "starts_with"
             | "ends_with"
+            | "char_from_code"
             | "sqrt"
             | "abs"
             | "min"
@@ -2082,7 +2098,9 @@ fn module_of(name: &str) -> Option<&'static str> {
     match name {
         "println" | "print" => Some("io"),
         "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" | "split"
-        | "contains" | "replace" | "starts_with" | "ends_with" => Some("string"),
+        | "contains" | "replace" | "starts_with" | "ends_with" | "char_from_code" => {
+            Some("string")
+        }
         "sqrt" | "abs" | "min" | "max" => Some("math"),
         "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" | "list_map" | "list_filter" | "list_fold" => {
             Some("list")
@@ -2867,6 +2885,36 @@ end
             Value::Str(s) => assert_eq!(s, "42"),
             other => panic!("期望 Str(\"42\")，得到 {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_import_string_char_from_code() {
+        // ASCII / BMP / 增补平面（代理对合并后的码点）三类形态
+        let src = "from string import { char_from_code }\nfn main() -> String\n    char_from_code(65) + char_from_code(20013) + char_from_code(128512)\nend";
+        let v = eval_main_tail(src);
+        match v {
+            Value::Str(s) => assert_eq!(s, "A中😀"),
+            other => panic!("期望 Str(\"A中😀\")，得到 {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_import_string_char_from_code_surrogate_rejected() {
+        // 代理区码点不可构造为标量值——运行时错误（与 json.rs 的代理对校验同口径）
+        let src = "from string import { char_from_code }\nfn main() -> Unit\n    println(char_from_code(55296))\nend";
+        let result = run_src(src);
+        assert!(result.is_err(), "代理区码点应报运行时错误");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("码点无效"), "期望提及码点无效，得到: {}", msg);
+    }
+
+    #[test]
+    fn test_import_string_char_from_code_out_of_range_rejected() {
+        let src = "from string import { char_from_code }\nfn main() -> Unit\n    println(char_from_code(1114112))\nend";
+        let result = run_src(src);
+        assert!(result.is_err(), "超上限码点应报运行时错误");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("码点无效"), "期望提及码点无效，得到: {}", msg);
     }
 
     #[test]

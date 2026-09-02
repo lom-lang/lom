@@ -281,6 +281,10 @@ end
 
 写函数 describe(name: String, score: Int) -> String 返回 name + " scored " + score(直接用 + 拼接字符串和整数)。main 调用 println(describe("Alice", 95)) 和 println("1 + 1 = " + (1 + 1))。
 
+### Task 115
+
+写函数 pair_chars(a: Int, b: Int) -> String 返回 char_from_code(a) + char_from_code(b)(码点转单字符,需 from string import { char_from_code })。main 调用 println(pair_chars(72, 105)) 和 println(char_from_code(20013) + char_from_code(25991))。
+
 
 ---
 

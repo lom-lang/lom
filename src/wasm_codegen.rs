@@ -120,8 +120,9 @@ const RT_MAP_KEYS: u32 = N_IMPORTS + 59; // (i64) -> i64 List（str_cmp 插入�
 const RT_MAP_VALUES: u32 = N_IMPORTS + 60; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
 const RT_MAP_STR: u32 = N_IMPORTS + 61; // (i64) -> i64 Str（排序 "{k: v}"）
 const RT_MAP_EQ: u32 = N_IMPORTS + 62; // (i64, i64) -> i32
+const RT_CHAR_FROM_CODE: u32 = N_IMPORTS + 63; // (i64 tagged Int) -> i64 Str  码点→UTF-8 单字符（无效码点 trap）
 /// 第一个用户函数的 funcidx
-const FIRST_USER_FN: u32 = N_IMPORTS + 63;
+const FIRST_USER_FN: u32 = N_IMPORTS + 64;
 
 /// 闭包值 tag：堆对象布局 [table_idx: i32][env: i32]（env 指向 [n: i32][v0..vn: i64]）
 const TAG_CLOSURE: i64 = 5;
@@ -470,6 +471,7 @@ pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Re
                 const STRING_BUILTINS: &[&str] = &[
                     "len", "int_to_string", "string_to_int", "trim", "upper", "lower",
                     "contains", "replace", "starts_with", "ends_with", "split",
+                    "char_from_code",
                 ];
                 const MATH_BUILTINS: &[&str] = &["sqrt", "abs", "min", "max"];
                 const LIST_BUILTINS: &[&str] = &[
@@ -748,6 +750,8 @@ impl Codegen {
                 v
             }, build_map_str(&statics)),
             (ty_ii_i32, vec![ValType::I32; 6], build_map_eq()),
+            // ===== v0.27.0：char_from_code（码点→UTF-8 单字符 Str）=====
+            (ty_i64_i64, vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32], build_char_from_code()),
         ];
         for (ty, locals, body) in helpers {
             m.funcs.push(Function { type_idx: ty, locals, body });
@@ -1607,6 +1611,13 @@ impl Codegen {
             "trim" => str_unary(self, ctx, a, args, RT_TRIM, "trim")?,
             "upper" => str_unary(self, ctx, a, args, RT_UPPER, "upper")?,
             "lower" => str_unary(self, ctx, a, args, RT_LOWER, "lower")?,
+            "char_from_code" => {
+                if args.len() != 1 {
+                    return Err(format!("WASM 编译：char_from_code 期望 1 个参数，得到 {} 个", args.len()));
+                }
+                self.compile_expr(ctx, a, &args[0])?;
+                a.call(RT_CHAR_FROM_CODE);
+            }
             "contains" | "starts_with" | "ends_with" | "replace" => {
                 let (want, helper) = match name {
                     "contains" => (2, RT_CONTAINS),
@@ -3628,6 +3639,103 @@ fn build_map_eq() -> Vec<u8> {
     a.b
 }
 
+/// rt_char_from_code: (i64 tagged Int) -> i64 tagged Str
+/// 码点 → UTF-8 单字符（1-4 字节）；负数/超上限/代理区 trap（对齐解释器的运行时错误口径，
+/// 消息文本差异与除零同属已记录的后端差异）
+/// locals: 1=cp(i64 解包后码点), 2=cpi(i32), 3=n(字节数), 4=p(堆指针)
+fn build_char_from_code() -> Vec<u8> {
+    let mut a = Asm::new();
+    // tag 校验：非 Int trap
+    a.tag_is(0, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
+    a.lget(0).untag().lset(1);
+    // 码点校验：0 <= cp <= 0x10FFFF 且不在代理区 D800-DFFF
+    a.lget(1).i64c(0).op(op::I64_LT_S).if_().op(op::UNREACHABLE).end();
+    a.lget(1).i64c(0x10FFFF).op(op::I64_GT_S).if_().op(op::UNREACHABLE).end();
+    a.lget(1).i64c(0xD800).op(op::I64_GE_S);
+    a.lget(1).i64c(0xDFFF).op(op::I64_LE_S);
+    a.op(op::I32_AND).if_().op(op::UNREACHABLE).end();
+    a.lget(1).op(op::I32_WRAP_I64).lset(2);
+    // 字节数 n：cp>=0x10000→4，cp>=0x800→3，cp>=0x80→2，否则 1
+    a.i32c(1).lset(3);
+    a.lget(2).i32c(0x80).op(op::I32_GE_U).if_();
+    {
+        a.i32c(2).lset(3);
+        a.lget(2).i32c(0x800).op(op::I32_GE_U).if_();
+        {
+            a.i32c(3).lset(3);
+            a.lget(2).i32c(0x10000).op(op::I32_GE_U).if_();
+            {
+                a.i32c(4).lset(3);
+            }
+            a.end();
+        }
+        a.end();
+    }
+    a.end();
+    // p = alloc(4 + n)；写 len 头
+    a.lget(3).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(4);
+    a.lget(4).lget(3).i32_store(0);
+    // 按宽度写 UTF-8 编码字节
+    a.lget(3).i32c(1).op(op::I32_EQ).if_();
+    {
+        // 1B: [cp]
+        a.lget(4).i32c(4).op(op::I32_ADD);
+        a.lget(2);
+        a.i32_store8(0);
+    }
+    a.else_();
+    {
+        a.lget(3).i32c(2).op(op::I32_EQ).if_();
+        {
+            // 2B: [0xC0|cp>>6][0x80|cp&0x3F]
+            a.lget(4).i32c(4).op(op::I32_ADD);
+            a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0xC0).op(op::I32_OR);
+            a.i32_store8(0);
+            a.lget(4).i32c(5).op(op::I32_ADD);
+            a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+            a.i32_store8(0);
+        }
+        a.else_();
+        {
+            a.lget(3).i32c(3).op(op::I32_EQ).if_();
+            {
+                // 3B: [0xE0|cp>>12][0x80|(cp>>6)&0x3F][0x80|cp&0x3F]
+                a.lget(4).i32c(4).op(op::I32_ADD);
+                a.lget(2).i32c(12).op(op::I32_SHR_U).i32c(0xE0).op(op::I32_OR);
+                a.i32_store8(0);
+                a.lget(4).i32c(5).op(op::I32_ADD);
+                a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.i32_store8(0);
+                a.lget(4).i32c(6).op(op::I32_ADD);
+                a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.i32_store8(0);
+            }
+            a.else_();
+            {
+                // 4B: [0xF0|cp>>18][0x80|(cp>>12)&0x3F][0x80|(cp>>6)&0x3F][0x80|cp&0x3F]
+                a.lget(4).i32c(4).op(op::I32_ADD);
+                a.lget(2).i32c(18).op(op::I32_SHR_U).i32c(0xF0).op(op::I32_OR);
+                a.i32_store8(0);
+                a.lget(4).i32c(5).op(op::I32_ADD);
+                a.lget(2).i32c(12).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.i32_store8(0);
+                a.lget(4).i32c(6).op(op::I32_ADD);
+                a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.i32_store8(0);
+                a.lget(4).i32c(7).op(op::I32_ADD);
+                a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.i32_store8(0);
+            }
+            a.end();
+        }
+        a.end();
+    }
+    a.end();
+    // 返回 tagged Str（ptr 左移 4 位 | TAG_STR）
+    a.lget(4).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.b
+}
+
 // ===== 7.6a：Record/Tuple/List helper =====
 
 /// 闭包调用序列（在 helper 里）：env + 参数 + 表索引，call_indirect
@@ -4699,6 +4807,16 @@ mod e2e {
             "from math import { sqrt, abs, min, max }\nfn main() -> Unit\n    println(sqrt(16.0))\n    println(sqrt(9))\n    println(abs(-7))\n    println(abs(-7.5))\n    println(min(3, 7))\n    println(max(3.5, 1.5))\nend",
             "math",
             "4.0\n3.0\n7\n7.5\n3\n3.5\n",
+        );
+    }
+
+    #[test]
+    fn e2e_char_from_code() {
+        // 1B ASCII / 2B（0xDF 拉丁扩展）/ 3B BMP / 4B 增补平面；len 验证 UTF-8 编码正确性
+        check(
+            "from string import { char_from_code, len }\nfn main() -> Unit\n    println(char_from_code(65))\n    println(char_from_code(223))\n    println(char_from_code(20013))\n    println(char_from_code(128512))\n    println(len(char_from_code(128512)))\n    println(char_from_code(65) + char_from_code(66))\nend",
+            "cfc",
+            "A\nß\n中\n😀\n1\nAB\n",
         );
     }
 

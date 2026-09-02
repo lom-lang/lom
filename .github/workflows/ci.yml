@@ -101,7 +101,7 @@ jobs:
           diff <(tr -d '\r' < examples/bootstrap/stmt_interp.expected.txt) <(tr -d '\r' < _ci_stmt_wasm.txt)
           rm -f _ci_stmt_interp.wasm _ci_stmt_wasm.txt
 
-  # Phase 8.4（RFC-0003 修订 20-23）：自举验收 CI gate——稳定模式（8.1 dump/tokens/diags + 8.2 static）
+  # Phase 8.4（RFC-0003 修订 20-24）：自举验收 CI gate——稳定模式（8.1 dump/tokens/diags + 8.2 static + 8.3 run）
   # wasm 层（--wasm）因未定位的非确定性越界不接（会随机红，详见 RFC 修订 21）
   # 只跑 ubuntu（自举验收与平台无关；CRLF 场景由其他 gate 覆盖）
   selfhost:
@@ -113,7 +113,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --release
-      - name: Selfhost dump (146 文件逐字, Phase 8.1)
+      - name: Selfhost dump (147 文件逐字, Phase 8.1)
         run: python3 tools/verify_selfhost.py
       - name: Selfhost tokens (Phase 8.1 lexer 对账)
         run: python3 tools/verify_selfhost.py --tokens
@@ -121,6 +121,8 @@ jobs:
         run: python3 tools/verify_selfhost.py --diags
       - name: Selfhost static (Phase 8.2 四类检查)
         run: python3 tools/verify_selfhost.py --static
+      - name: Selfhost run (8.3 运行验收 + json 双内建, v0.27.0)
+        run: python3 tools/verify_selfhost.py --run
 
   # 第四轮评审整改（2026-08-31）：clippy 存量清零后转 gate（只跑 ubuntu，风格 lint 与平台无关）
   # 注意：clippy 随 stable 演进，未来新版新增 lint 可能让旧代码报错——届时修掉或按需 allow，别降 gate

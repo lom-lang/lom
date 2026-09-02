@@ -1,8 +1,8 @@
 # ============================================================================
 # self_interp.lom — Lom 全量自举（RFC-0003，Phase 8）
 #
-# 当前阶段：8.1 完整前端 + 8.2 静态检查（NAM003/TYPE003-arity/EFF001/MAT001 子集，RFC-0003）
-# 后续阶段：8.3 树遍历求值器 / 8.4 WASM 载体自证闭环
+# 当前阶段：Phase 8 关账后维护期（8.1-8.3 完成、8.4 部分完成；v0.27.0 增 Part H：
+# char_from_code 透传 + json 双内建自实现，RFC-0003 修订 24 挂账解除）
 #
 # 用法：
 #   lom self_interp.lom -- <file>          # 解析 <file> 并打印 AST dump（对齐宿主 --dump-ast 格式）
@@ -28,7 +28,7 @@
 #   - 位置：ln 从 1，cl 从 1（字符列；纯 ASCII 下与宿主字节列一致）
 # ============================================================================
 
-from string import { split, contains, len, string_to_int, int_to_string, starts_with, ends_with, trim, upper, lower, replace }
+from string import { split, contains, len, string_to_int, int_to_string, starts_with, ends_with, trim, upper, lower, replace, char_from_code }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_get }
 from map import { map_empty, map_set, map_get, map_has, map_size, map_keys, map_remove }
 from file import { file_read, file_exists, file_write, file_append }
@@ -2754,6 +2754,7 @@ fn reg_builtins_fns(fns: Map<String, {ar: Int, effs: List<String>, ret: Option<T
     map_set(fns, "replace", {ar: 3, effs: pure, ret: Some(TyString)})
     map_set(fns, "starts_with", {ar: 2, effs: pure, ret: Some(TyBool)})
     map_set(fns, "ends_with", {ar: 2, effs: pure, ret: Some(TyBool)})
+    map_set(fns, "char_from_code", {ar: 1, effs: pure, ret: Some(TyString)})
     # math（纯）
     map_set(fns, "sqrt", {ar: 1, effs: pure, ret: Some(TyFloat)})
     map_set(fns, "abs", {ar: 1, effs: pure, ret: None})
@@ -4467,13 +4468,787 @@ fn ex_stmt(s: St, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, n
     end
 end
 
+# ============================================================================
+# Part H：json 双内建自实现（v0.27.0，RFC-0003 修订 24——char_from_code 落地后挂账解除）
+#   - json_parse：字符式递归下降（宿主 src/json.rs 是字节式；字符式天然处理
+#     多字节 UTF-8，无需宿主的字节序列拷贝分支）
+#   - json_stringify：Val 11 变体逐分支镜像宿主 stringify_into
+#     （Float 用 Rust to_string 形态=无 .0 尾，与 println 的 to_display 补 .0 不同；
+#       Enum 带参走 Rust Debug 形态镜像，见 jdbg）
+#   已知差异（错误路径/极端值，验收面之外，如实记录）：
+#   - 解析错误消息的"偏移 N"是字符偏移（宿主是字节偏移）——纯 ASCII 输入一致
+#   - 意外字符显示：宿主对非可打印字符显示 0xNN 十六进制，本实现统一显示字符本身
+#   - Float 解析：尾数按 Horner 浮点累进 + 单次乘/除 10^k——≤15 位有效数字且
+#     |净指数| ≤ 22 时与 Rust parse 位级一致（双方都正确舍入到同一最近值）；
+#     超出该范围可能有 1 ulp 差异（10^k > 2^53 后不再精确可表示）
+#   - "-0.0" 解析丢失负零符号（Lom 无 -0.0 构造路径：0.0 - 0.0 = +0.0）
+# ============================================================================
+
+# 十六进制数字 → 数值（大小写都收；非十六进制返回 -1）
+fn hex_val(c: String) -> Int
+    let lo = split("0123456789abcdef", "")
+    let hi = split("0123456789ABCDEF", "")
+    let mut i = 0
+    let mut v = 0 - 1
+    while i < 16 and v < 0
+        if c == list_get(lo, i) or c == list_get(hi, i)
+            v = i
+        else
+            i += 1
+        end
+    end
+    v
+end
+
+# 错误消息用的 4 位大写十六进制（对齐宿主 \u{:04X} / U+{:04X}）
+fn jhex4(n: Int) -> String
+    let digs = split("0123456789ABCDEF", "")
+    list_get(digs, n / 4096) + list_get(digs, (n / 256) % 16) + list_get(digs, (n / 16) % 16) + list_get(digs, n % 16)
+end
+
+# 码点 < 32 的控制字符 → 2 位小写十六进制（对齐宿主 \u{:04x} 的低 2 位）
+fn jhex_lo(cp: Int) -> String
+    let digs = split("0123456789abcdef", "")
+    list_get(digs, cp / 16) + list_get(digs, cp % 16)
+end
+
+# 剩余窗口的当前位置（字符偏移；st 持总字符数）
+fn jp_pos(rest: List<String>, st: Map<String, Int>) -> Int
+    match map_get(st, "n")
+        Some(n) => n - list_length(rest)
+        None => 0
+    end
+end
+
+fn jp_err(rest: List<String>, st: Map<String, Int>, msg: String) -> String
+    "JSON 解析错误 (偏移 " + int_to_string(jp_pos(rest, st)) + "): " + msg
+end
+
+# 当前字符的错误显示（宿主对非可打印字符走 0xNN——本实现统一字符形态，见头注释）
+fn jp_peekd(rest: List<String>) -> String
+    if list_is_empty(rest)
+        "EOF"
+    else
+        "'" + list_head(rest) + "'"
+    end
+end
+
+# 跳过空白（空格/制表/换行/回车）
+fn jp_ws(rest: List<String>) -> List<String>
+    let mut r = rest
+    let mut go = True
+    while go and !list_is_empty(r)
+        let c = list_head(r)
+        if c == " " or c == "\t" or c == "\n" or c == "\r"
+            r = list_tail(r)
+        else
+            go = False
+        end
+    end
+    r
+end
+
+# 关键字匹配（对齐宿主 match_keyword：长度前缀 + 后随字符须为分隔符）
+fn jp_kw(rest: List<String>, kw: String) -> Option<List<String>>
+    let kws = split(kw, "")
+    let mut r = rest
+    let mut ks = kws
+    let mut ok = True
+    while ok and !list_is_empty(ks)
+        if list_is_empty(r) or list_head(r) != list_head(ks)
+            ok = False
+        else
+            r = list_tail(r)
+            ks = list_tail(ks)
+        end
+    end
+    if ok == False
+        None
+    elif list_is_empty(r)
+        Some(r)
+    elif is_alnum(list_head(r))
+        None
+    else
+        Some(r)
+    end
+end
+
+# 读 4 个十六进制数字 → 码点（\u 转义的数值段）
+fn jp_hex4(rest: List<String>, st: Map<String, Int>) -> Result<(Int, List<String>), String>
+    let mut r = rest
+    let mut acc = 0
+    let mut i = 0
+    let mut err = ""
+    while i < 4 and err == ""
+        if list_is_empty(r)
+            err = jp_err(r, st, "\\u 转义需要 4 个十六进制数字")
+        else
+            let hv = hex_val(list_head(r))
+            if hv < 0
+                err = jp_err(r, st, "无效 \\u 转义 '" + list_head(r) + "'")
+            else
+                acc = acc * 16 + hv
+                r = list_tail(r)
+            end
+            i += 1
+        end
+    end
+    if err == ""
+        Ok((acc, r))
+    else
+        Err(err)
+    end
+end
+
+# \uXXXX 转义（含代理对合并；\u 已消费，rest 从第一个十六进制数字起）
+fn jp_unicode(rest: List<String>, st: Map<String, Int>) -> Result<(String, List<String>), String>
+    let (cp, r2) = jp_hex4(rest, st)?
+    if cp >= 55296 and cp <= 56319
+        # 高代理：期望紧跟 \uXXXX 低代理
+        let rmid = list_tail(r2)
+        if list_is_empty(r2) or list_is_empty(rmid) or list_head(r2) != "\\" or list_head(rmid) != "u"
+            Err(jp_err(r2, st, "高代理后缺少低代理 \\uXXXX"))
+        else
+            let (low, r3) = jp_hex4(list_tail(rmid), st)?
+            if low >= 56320 and low <= 57343
+                let combined = 65536 + (cp - 55296) * 1024 + (low - 56320)
+                Ok((char_from_code(combined), r3))
+            else
+                Err(jp_err(r3, st, "期望低代理，得到 \\u" + jhex4(low)))
+            end
+        end
+    elif cp >= 56320 and cp <= 57343
+        # 孤立低代理：宿主 char::from_u32 失败口径
+        Err(jp_err(r2, st, "无效 Unicode 码点 U+" + jhex4(cp)))
+    else
+        Ok((char_from_code(cp), r2))
+    end
+end
+
+# JSON 字符串体（开头 " 已消费；返回内容与剩余窗口）
+fn jp_string(rest: List<String>, st: Map<String, Int>) -> Result<(String, List<String>), String>
+    let bs = char_from_code(8)
+    let ff = char_from_code(12)
+    let mut r = rest
+    let mut s = ""
+    let mut done = False
+    let mut err = ""
+    while done == False and err == ""
+        if list_is_empty(r)
+            err = jp_err(r, st, "未闭合的字符串")
+        else
+            let c = list_head(r)
+            if c == "\""
+                r = list_tail(r)
+                done = True
+            elif c == "\\"
+                let r2 = list_tail(r)
+                if list_is_empty(r2)
+                    err = jp_err(r2, st, "转义序列意外结束")
+                else
+                    let nc = list_head(r2)
+                    if nc == "\""
+                        s = s + "\""
+                        r = list_tail(r2)
+                    elif nc == "\\"
+                        s = s + "\\"
+                        r = list_tail(r2)
+                    elif nc == "/"
+                        s = s + "/"
+                        r = list_tail(r2)
+                    elif nc == "n"
+                        s = s + "\n"
+                        r = list_tail(r2)
+                    elif nc == "r"
+                        s = s + "\r"
+                        r = list_tail(r2)
+                    elif nc == "t"
+                        s = s + "\t"
+                        r = list_tail(r2)
+                    elif nc == "b"
+                        s = s + bs
+                        r = list_tail(r2)
+                    elif nc == "f"
+                        s = s + ff
+                        r = list_tail(r2)
+                    elif nc == "u"
+                        match jp_unicode(list_tail(r2), st)
+                            Ok(p) =>
+                                let (ch, r3) = p
+                                s = s + ch
+                                r = r3
+                            end
+                            Err(m) =>
+                                err = m
+                            end
+                        end
+                    else
+                        err = jp_err(r2, st, "无效转义 '\\" + nc + "'")
+                    end
+                end
+            else
+                s = s + c
+                r = list_tail(r)
+            end
+        end
+    end
+    if err == ""
+        Ok((s, r))
+    else
+        Err(err)
+    end
+end
+
+# 数字（Int/Float 二分：小数或指数即 Float；'0' 后不续读数字——宿主口径，"01" 的 '1' 留给上层报错）
+fn jp_number(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    let mut r = rest
+    let mut neg = False
+    let mut txt = ""
+    if !list_is_empty(r) and list_head(r) == "-"
+        neg = True
+        r = list_tail(r)
+    end
+    # 整数部分
+    if list_is_empty(r)
+        Err(jp_err(r, st, "数字缺少整数部分"))
+    else
+        let c0 = list_head(r)
+        if c0 == "0"
+            txt = txt + "0"
+            r = list_tail(r)
+        elif is_digit(c0) == False
+            Err(jp_err(r, st, "数字缺少整数部分"))
+        else
+            while !list_is_empty(r) and is_digit(list_head(r))
+                txt = txt + list_head(r)
+                r = list_tail(r)
+            end
+            jp_number_tail(r, st, neg, txt, False, 0)
+        end
+    end
+end
+
+# 数字的尾段（小数+指数）；is_float 初值 False、expo 初值 0
+fn jp_number_tail(rest: List<String>, st: Map<String, Int>, neg: Bool, itxt: String, ifloat: Bool, iexpo: Int) -> Result<(Val, List<String>), String>
+    let mut r = rest
+    let mut txt = itxt
+    let mut is_float = ifloat
+    let mut frac = 0
+    let mut expo = iexpo
+    let mut err = ""
+    # 小数部分
+    if err == "" and !list_is_empty(r) and list_head(r) == "."
+        is_float = True
+        r = list_tail(r)
+        if list_is_empty(r) or is_digit(list_head(r)) == False
+            err = jp_err(r, st, "小数点后缺少数字")
+        else
+            while !list_is_empty(r) and is_digit(list_head(r))
+                txt = txt + list_head(r)
+                frac += 1
+                r = list_tail(r)
+            end
+        end
+    end
+    # 指数部分
+    if err == "" and !list_is_empty(r) and (list_head(r) == "e" or list_head(r) == "E")
+        is_float = True
+        r = list_tail(r)
+        let mut esign = 1
+        if !list_is_empty(r) and (list_head(r) == "+" or list_head(r) == "-")
+            if list_head(r) == "-"
+                esign = 0 - 1
+            end
+            r = list_tail(r)
+        end
+        if list_is_empty(r) or is_digit(list_head(r)) == False
+            err = jp_err(r, st, "指数缺少数字")
+        else
+            let mut ev = 0
+            while !list_is_empty(r) and is_digit(list_head(r))
+                ev = ev * 10 + string_to_int(list_head(r))
+                r = list_tail(r)
+            end
+            expo = esign * ev
+        end
+    end
+    if err != ""
+        Err(err)
+    elif is_float == False
+        # 整数：i64 范围外报错（对齐宿主 parse::<i64> 失败）
+        let signed =
+        if neg
+            "-" + txt
+        else
+            txt
+        end
+        match try_sti(signed)
+            Some(n) => Ok((VInt(n), r))
+            None => Err(jp_err(r, st, "无效整数 '" + signed + "'（可能溢出 i64）"))
+        end
+    else
+        # 浮点：尾数 Horner 累进（≤15 位精确）+ 单次乘/除 10^net（正确舍入，见头注释）
+        let mut m = 0.0
+        for d in split(txt, "")
+            m = m * 10.0 + string_to_int(d) * 1.0
+        end
+        let net = expo - frac
+        if net >= 0
+            m = m * jpow10(net)
+        else
+            m = m / jpow10(0 - net)
+        end
+        if neg
+            m = 0.0 - m
+        end
+        Ok((VFloat(m), r))
+    end
+end
+
+# 10 的非负整数幂（浮点累乘；k ≤ 22 精确）
+fn jpow10(k: Int) -> Float
+    let mut r = 1.0
+    let mut i = 0
+    while i < k
+        r = r * 10.0
+        i += 1
+    end
+    r
+end
+
+# true/false
+fn jp_bool(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    match jp_kw(rest, "true")
+        Some(r) => Ok((VBool(True), r))
+        None =>
+            match jp_kw(rest, "false")
+                Some(r) => Ok((VBool(False), r))
+                None => Err(jp_err(rest, st, "期望 'true' 或 'false'，得到 '" + jp_peekd(rest) + "'"))
+            end
+        end
+    end
+end
+
+# null → Unit
+fn jp_null(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    match jp_kw(rest, "null")
+        Some(r) => Ok((VUnit, r))
+        None => Err(jp_err(rest, st, "期望 'null'，得到 '" + jp_peekd(rest) + "'"))
+    end
+end
+
+# 值分派（不跳过前导空白——调用方负责）
+fn jp_value(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    if list_is_empty(rest)
+        Err(jp_err(rest, st, "意外的输入结束"))
+    else
+        let c = list_head(rest)
+        if c == "{"
+            jp_object(list_tail(rest), st)
+        elif c == "["
+            jp_array(list_tail(rest), st)
+        elif c == "\""
+            let (s, r2) = jp_string(list_tail(rest), st)?
+            Ok((VStr(s), r2))
+        elif c == "t" or c == "f"
+            jp_bool(rest, st)
+        elif c == "n"
+            jp_null(rest, st)
+        elif c == "-" or is_digit(c)
+            jp_number(rest, st)
+        else
+            Err(jp_err(rest, st, "意外字符 '" + c + "'"))
+        end
+    end
+end
+
+# 对象（'{' 已消费）：成员倒序收集 + 一次反转（字段保插入序）
+fn jp_object(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    let r0 = jp_ws(rest)
+    if !list_is_empty(r0) and list_head(r0) == "}"
+        Ok((VRecord(list_empty()), list_tail(r0)))
+    else
+        let mut r = r0
+        let mut acc = list_empty()
+        let mut done = False
+        let mut err = ""
+        while done == False and err == ""
+            let r1 = jp_ws(r)
+            if list_is_empty(r1) or list_head(r1) != "\""
+                err = jp_err(r1, st, "期望 '\"'，得到 '" + jp_peekd(r1) + "'")
+            else
+                match jp_string(list_tail(r1), st)
+                    Err(m) =>
+                        err = m
+                    end
+                    Ok(pkey) =>
+                        let (key, r2) = pkey
+                        let r3 = jp_ws(r2)
+                        if list_is_empty(r3) or list_head(r3) != ":"
+                            err = jp_err(r3, st, "期望 ':'，得到 '" + jp_peekd(r3) + "'")
+                        else
+                            match jp_value(jp_ws(list_tail(r3)), st)
+                                Err(m) =>
+                                    err = m
+                                end
+                                Ok(pv) =>
+                                    let (v, r4) = pv
+                                    acc = list_cons((key, v), acc)
+                                    let r5 = jp_ws(r4)
+                                    if !list_is_empty(r5) and list_head(r5) == ","
+                                        r = list_tail(r5)
+                                    elif !list_is_empty(r5) and list_head(r5) == "}"
+                                        r = r5
+                                        done = True
+                                    else
+                                        err = jp_err(r5, st, "期望 ',' 或 '}'，得到 '" + jp_peekd(r5) + "'")
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if err == ""
+            Ok((VRecord(rev_pairs(acc)), list_tail(r)))
+        else
+            Err(err)
+        end
+    end
+end
+
+# (String, Val) 对反转（list 构建头插的配套反转器）
+fn rev_pairs(xs: List<(String, Val)>) -> List<(String, Val)>
+    let mut cur = xs
+    let mut acc = list_empty()
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+# 数组（'[' 已消费）
+fn jp_array(rest: List<String>, st: Map<String, Int>) -> Result<(Val, List<String>), String>
+    let r0 = jp_ws(rest)
+    if !list_is_empty(r0) and list_head(r0) == "]"
+        Ok((VList(list_empty()), list_tail(r0)))
+    else
+        let mut r = r0
+        let mut acc = list_empty()
+        let mut done = False
+        let mut err = ""
+        while done == False and err == ""
+            match jp_value(jp_ws(r), st)
+                Err(m) =>
+                    err = m
+                end
+                Ok(pv) =>
+                    let (v, r2) = pv
+                    acc = list_cons(v, acc)
+                    let r3 = jp_ws(r2)
+                    if !list_is_empty(r3) and list_head(r3) == ","
+                        r = list_tail(r3)
+                    elif !list_is_empty(r3) and list_head(r3) == "]"
+                        r = r3
+                        done = True
+                    else
+                        err = jp_err(r3, st, "期望 ',' 或 ']'，得到 '" + jp_peekd(r3) + "'")
+                    end
+                end
+            end
+        end
+        if err == ""
+            Ok((VList(rev_val(acc)), list_tail(r)))
+        else
+            Err(err)
+        end
+    end
+end
+
+# json_parse 入口（对齐宿主 parse：跳前导空白 → 值 → 跳尾随空白 → 须 EOF）
+fn json_parse_impl(src: String) -> Result<Val, String>
+    let st = map_empty()
+    let _ = map_set(st, "n", len(src))
+    let r1 = jp_ws(split(src, ""))
+    let (v, r2) = jp_value(r1, st)?
+    let r3 = jp_ws(r2)
+    if list_is_empty(r3)
+        Ok(v)
+    else
+        Err(jp_err(r3, st, "JSON 值后有多余内容: '" + jp_take10(r3) + "'"))
+    end
+end
+
+# 上下文片段（对齐宿主 peek_context 的 ±10 字符；此处取向后 10 字符）
+fn jp_take10(rest: List<String>) -> String
+    let mut acc = ""
+    let mut r = rest
+    let mut i = 0
+    while i < 10 and !list_is_empty(r)
+        acc = acc + list_head(r)
+        r = list_tail(r)
+        i += 1
+    end
+    acc
+end
+
+# ---- stringify 侧 ----
+
+# Float → Rust to_string 形态（无 .0 尾）；NaN/±inf → "null"（宿主 json_stringify 口径）
+fn jfloat_out(f: Float) -> String
+    if f != f
+        "null"
+    else
+        let d = "" + f
+        if starts_with(d, "inf") or starts_with(d, "-inf")
+            "null"
+        elif ends_with(d, ".0")
+            jstrip2(d)
+        else
+            d
+        end
+    end
+end
+
+# Float → Rust Debug/Display 形态（NaN→"NaN"、inf→"inf"、-inf→"-inf"）
+fn jfloat_dbg(f: Float) -> String
+    let d = "" + f
+    if f != f
+        "NaN"
+    elif starts_with(d, "inf")
+        "inf"
+    elif starts_with(d, "-inf")
+        "-inf"
+    elif ends_with(d, ".0")
+        jstrip2(d)
+    else
+        d
+    end
+end
+
+# 剥末尾 2 字符（".0"）——to_display 补的 .0 还原为 to_string 形态
+fn jstrip2(s: String) -> String
+    let cs = split(s, "")
+    let n = len(s) - 2
+    let mut acc = ""
+    let mut i = 0
+    while i < n
+        acc = acc + list_get(cs, i)
+        i += 1
+    end
+    acc
+end
+
+# 控制字符（码点 < 0x20）→ 码点；非控制字符返回 -1
+fn jctl_cp(c: String) -> Int
+    let mut i = 0
+    let mut cp = 0 - 1
+    while i < 32 and cp < 0
+        if c == char_from_code(i)
+            cp = i
+        else
+            i += 1
+        end
+    end
+    cp
+end
+
+# JSON 字符串内容转义（对齐宿主 escape_str：\" \\ \n \r \t \b \f 具名 + 控制字符 \u00xx 小写）
+fn jesc(s: String) -> String
+    let bs = char_from_code(8)
+    let ff = char_from_code(12)
+    let mut acc = ""
+    for c in s
+        if c == "\""
+            acc = acc + "\\\""
+        elif c == "\\"
+            acc = acc + "\\\\"
+        elif c == "\n"
+            acc = acc + "\\n"
+        elif c == "\r"
+            acc = acc + "\\r"
+        elif c == "\t"
+            acc = acc + "\\t"
+        elif c == bs
+            acc = acc + "\\b"
+        elif c == ff
+            acc = acc + "\\f"
+        else
+            let cp = jctl_cp(c)
+            if cp >= 0
+                acc = acc + "\\u00" + jhex_lo(cp)
+            else
+                acc = acc + c
+            end
+        end
+    end
+    acc
+end
+
+# Rust Debug 形态镜像（宿主 impl Debug for Value——仅 Enum 带参 stringify 使用；
+# 分隔符 ", "，Str 引号包裹无转义，单元素元组尾随逗号）
+fn jdbg(v: Val) -> String
+    match v
+        VInt(n) => "" + n
+        VFloat(f) => jfloat_dbg(f)
+        VBool(b) => "" + b
+        VStr(s) => "\"" + s + "\""
+        VUnit => "()"
+        VCl(_, _, _) => "<闭包>"
+        VEnum(name, args) =>
+            if list_is_empty(args)
+                name
+            else
+                name + "(" + jdbg_join(args) + ")"
+            end
+        end
+        VRecord(fields) => "{" + jdbg_fields(fields) + "}"
+        VTuple(xs) =>
+            if list_length(xs) == 1
+                "(" + jdbg_join(xs) + ",)"
+            else
+                "(" + jdbg_join(xs) + ")"
+            end
+        end
+        VList(xs) => "[" + jdbg_join(xs) + "]"
+        VMap(m) => "{" + jdbg_map(m) + "}"
+    end
+end
+
+fn jdbg_join(xs: List<Val>) -> String
+    let mut acc = ""
+    let mut first = True
+    for x in xs
+        if first
+            acc = jdbg(x)
+            first = False
+        else
+            acc = acc + ", " + jdbg(x)
+        end
+    end
+    acc
+end
+
+fn jdbg_fields(fields: List<(String, Val)>) -> String
+    let mut acc = ""
+    let mut first = True
+    for kv in fields
+        let (k, v) = kv
+        if first
+            acc = k + ": " + jdbg(v)
+            first = False
+        else
+            acc = acc + ", " + k + ": " + jdbg(v)
+        end
+    end
+    acc
+end
+
+fn jdbg_map(m: Map<String, Val>) -> String
+    let mut acc = ""
+    let mut first = True
+    for k in map_keys(m)
+        let v = jmap_v(m, k)
+        if first
+            acc = k + ": " + jdbg(v)
+            first = False
+        else
+            acc = acc + ", " + k + ": " + jdbg(v)
+        end
+    end
+    acc
+end
+
+# map 取值（存储的是 Val 非 Option——map_get 单层 Some 解包）
+fn jmap_v(m: Map<String, Val>, k: String) -> Val
+    match map_get(m, k)
+        Some(v) => v
+        None => VUnit
+    end
+end
+
+# 宿主 stringify_into 镜像（json_stringify 主体；分隔符 ","、键排序、Unit→null）
+fn jstr(v: Val) -> String
+    match v
+        VRecord(fields) => "{" + jfields(fields) + "}"
+        VList(xs) => "[" + jjoin(xs) + "]"
+        VTuple(xs) => "[" + jjoin(xs) + "]"
+        VStr(s) => "\"" + jesc(s) + "\""
+        VMap(m) => "{" + jmap_body(m) + "}"
+        VInt(n) => "" + n
+        VFloat(f) => jfloat_out(f)
+        VBool(b) =>
+            if b
+                "true"
+            else
+                "false"
+            end
+        end
+        VUnit => "null"
+        VEnum(name, args) =>
+            if list_is_empty(args)
+                "\"" + jesc(name) + "\""
+            else
+                "\"" + jesc(jdbg(v)) + "\""
+            end
+        end
+        VCl(_, _, _) => "null"
+    end
+end
+
+fn jjoin(xs: List<Val>) -> String
+    let mut acc = ""
+    let mut first = True
+    for x in xs
+        if first
+            acc = jstr(x)
+            first = False
+        else
+            acc = acc + "," + jstr(x)
+        end
+    end
+    acc
+end
+
+fn jfields(fields: List<(String, Val)>) -> String
+    let mut acc = ""
+    let mut first = True
+    for kv in fields
+        let (k, v) = kv
+        if first
+            acc = "\"" + jesc(k) + "\":" + jstr(v)
+            first = False
+        else
+            acc = acc + ",\"" + jesc(k) + "\":" + jstr(v)
+        end
+    end
+    acc
+end
+
+fn jmap_body(m: Map<String, Val>) -> String
+    let mut acc = ""
+    let mut first = True
+    for k in map_keys(m)
+        let v = jmap_v(m, k)
+        if first
+            acc = "\"" + jesc(k) + "\":" + jstr(v)
+            first = False
+        else
+            acc = acc + ",\"" + jesc(k) + "\":" + jstr(v)
+        end
+    end
+    acc
+end
+
 # ---- 内建分派（Part G）----
-# bltins()：40 个透传/自实现 + json 双内建挂账（\uXXXX 需 char_from_code、透传需
-# type_of——双冻结缺口，RFC-0003 修订记录挂账，8.3 验收集排除 json 程序）
+# bltins()：41 个透传/自实现（v0.27.0：+char_from_code 透传；json 双内建 Part H 自实现，
+# RFC-0003 修订 24 挂账解除）
 
 fn bltins_list() -> List<String> ! [IO]
     let mut acc = list_empty()
-    for n in split("println print len int_to_string string_to_int trim upper lower split contains replace starts_with ends_with sqrt abs min max list_empty list_length list_get list_is_empty list_head list_tail list_cons list_map list_filter list_fold map_empty map_set map_get map_has map_remove map_keys map_values map_size file_read file_write file_append file_exists args json_parse json_stringify", " ")
+    for n in split("println print len int_to_string string_to_int trim upper lower split contains replace starts_with ends_with char_from_code sqrt abs min max list_empty list_length list_get list_is_empty list_head list_tail list_cons list_map list_filter list_fold map_empty map_set map_get map_has map_remove map_keys map_values map_size file_read file_write file_append file_exists args json_parse json_stringify", " ")
         acc = list_cons(n, acc)
     end
     rev_str(acc)
@@ -4571,6 +5346,12 @@ fn bltin(name: String, args: List<Val>, fns: Map<String, FnD>, variants: Map<Str
     elif name == "lower"
         let _ = want_arity(name, 1, args)?
         Ok(VStr(lower(vstr(list_get(args, 0), name)?)))
+    elif name == "char_from_code"
+        let _ = want_arity(name, 1, args)?
+        match list_get(args, 0)
+            VInt(n) => Ok(VStr(char_from_code(n)))
+            _ => Err(EMsg("char_from_code 期望 Int"))
+        end
     elif name == "split"
         let _ = want_arity(name, 2, args)?
         let s = vstr(list_get(args, 0), name)?
@@ -4777,14 +5558,39 @@ fn bltin(name: String, args: List<Val>, fns: Map<String, FnD>, variants: Map<Str
         let _ = want_arity(name, 1, args)?
         Ok(VBool(file_exists(vstr(list_get(args, 0), name)?)))
     elif name == "args"
+        # 目标程序的 argv 透传（v0.27.0）：进程 args 形如 [self, file, --run, ...extra]，
+        # 剥前三个 + 可选一个前导 "--"，以目标文件路径为 argv[0] 重组——对齐宿主
+        # `lom <file> -- <args...>` 的 args() 语义（todo/bench 的 CLI 驱动依赖它）
         let _ = want_arity(name, 0, args)?
-        let mut acc = list_empty()
-        for a in args()
-            acc = list_cons(VStr(a), acc)
+        let pa = args()
+        let mut r = pa
+        let mut i = 0
+        while i < 3 and !list_is_empty(r)
+            r = list_tail(r)
+            i += 1
         end
-        Ok(VList(rev_val(acc)))
-    elif name == "json_parse" or name == "json_stringify"
-        Err(EMsg("内建 '" + name + "' 在自举解释器中挂账（RFC-0003 修订记录：\\uXXXX 转义需 char_from_code、透传需 type_of——双冻结缺口，待裁决）"))
+        if !list_is_empty(r) and list_head(r) == "--"
+            r = list_tail(r)
+        end
+        let mut acc = r
+        if list_length(pa) >= 2
+            acc = list_cons(list_get(pa, 1), acc)
+        end
+        let mut vacc = list_empty()
+        for a in acc
+            vacc = list_cons(VStr(a), vacc)
+        end
+        Ok(VList(rev_val(vacc)))
+    elif name == "json_parse"
+        # Part H 自实现（RFC-0003 修订 24：char_from_code 落地后挂账解除）
+        let _ = want_arity(name, 1, args)?
+        match json_parse_impl(vstr(list_get(args, 0), name)?)
+            Err(m) => Err(EMsg("json_parse 失败: " + m))
+            Ok(v) => Ok(v)
+        end
+    elif name == "json_stringify"
+        let _ = want_arity(name, 1, args)?
+        Ok(VStr(jstr(list_get(args, 0))))
     else
         Err(EMsg("未定义函数: '" + name + "'"))
     end

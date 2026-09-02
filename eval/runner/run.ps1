@@ -1,4 +1,4 @@
-# Lom Eval Runner (PowerShell)
+﻿# Lom Eval Runner (PowerShell)
 #
 # Usage:
 #   ./run.ps1 -Verify                        # Verify reference solutions (smoke test eval set)
@@ -70,6 +70,26 @@ $stats = [ordered]@{
     byCategory = @{}
 }
 
+# 捕获原生命令 stdout（显式 UTF-8 解码，stderr 丢弃）。
+# 不用 `& $exe ... | Out-String`——它按 [Console]::OutputEncoding 解码，Windows
+# PowerShell 5.1 在无控制台句柄（重定向宿主）下改不了该编码，GBK 解码 UTF-8 中文
+# 必乱码（eval 任务 115 首个非 ASCII expected 触发）。Process 重定向三平台等价。
+function Invoke-CaptureUtf8([string]$exe, [string[]]$exeArgs) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    foreach ($a in $exeArgs) { $psi.Arguments += ' "' + $a + '"' }
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    $psi.StandardErrorEncoding = New-Object System.Text.UTF8Encoding($false)
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $null = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    return [pscustomobject]@{ Stdout = $stdout; ExitCode = $proc.ExitCode }
+}
+
 function Test-OneTask($task, $src) {
     # Write source to temp file
     $tmp = New-TemporaryFile
@@ -82,17 +102,19 @@ function Test-OneTask($task, $src) {
         if ($Backend -eq "wasm") {
             # Phase 7.9：wasm 后端——先编译再经 node harness 运行
             $wasmPath = $tmpPath -replace '\.lom$', '.wasm'
-            & $LomBin build $tmpPath --target wasm -o $wasmPath 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
+            $build = Invoke-CaptureUtf8 $LomBin @('build', $tmpPath, '--target', 'wasm', '-o', $wasmPath)
+            if ($build.ExitCode -ne 0) {
                 return [pscustomobject]@{ Pass = $false; Expected = $task.expected; Actual = "<wasm 编译失败>" }
             }
             $harness = Join-Path $PSScriptRoot "run_wasm.mjs"
-            $actual = & $NodeBin $harness $wasmPath 2>$null | Out-String
-            $exitCode = $LASTEXITCODE
+            $r = Invoke-CaptureUtf8 $NodeBin @($harness, $wasmPath)
+            $actual = $r.Stdout
+            $exitCode = $r.ExitCode
             Remove-Item $wasmPath -Force -ErrorAction SilentlyContinue
         } else {
-            $actual = & $LomBin $tmpPath 2>$null | Out-String
-            $exitCode = $LASTEXITCODE
+            $r = Invoke-CaptureUtf8 $LomBin @($tmpPath)
+            $actual = $r.Stdout
+            $exitCode = $r.ExitCode
         }
         # Normalize line endings; use -ceq for case-sensitive comparison
         $expected = $task.expected -replace "`r`n", "`n"

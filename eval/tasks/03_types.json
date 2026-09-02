@@ -97,5 +97,14 @@
     "solution": "fn describe(name: String, score: Int) -> String\n    name + \" scored \" + score\nend\n\nfn main() -> Unit\n    println(describe(\"Alice\", 95))\n    println(\"1 + 1 = \" + (1 + 1))\nend\n",
     "expected": "Alice scored 95\n1 + 1 = 2\n",
     "notes": "字符串拼接提升(v0.4.1 P0-2):String + 非 String 自动 to_display(),无需 int_to_string。考察 LLM 最自然的拼接写法。"
+  },
+  {
+    "id": "115",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "写函数 pair_chars(a: Int, b: Int) -> String 返回 char_from_code(a) + char_from_code(b)(码点转单字符,需 from string import { char_from_code })。main 调用 println(pair_chars(72, 105)) 和 println(char_from_code(20013) + char_from_code(25991))。",
+    "solution": "from string import { char_from_code }\n\nfn pair_chars(a: Int, b: Int) -> String\n    char_from_code(a) + char_from_code(b)\nend\n\nfn main() -> Unit\n    println(pair_chars(72, 105))\n    println(char_from_code(20013) + char_from_code(25991))\nend\n",
+    "expected": "Hi\n中文\n",
+    "notes": "char_from_code(v0.27.0):码点到单字符 String,Unicode 全平面(含增补平面);无效码点(负数/超上限/代理区)是运行时错误。json 的 unicode 转义与 L2 编译器的字符构造原语。"
   }
 ]

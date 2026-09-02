@@ -190,6 +190,11 @@ impl TypeChecker {
             "lower".to_string(),
             FnSig { params: vec![("s".to_string(), Type::String)], ret: Some(Type::String), effects: vec![], span: Span::default() },
         );
+        // v0.27.0: 码点→单字符 String（纯函数；无效码点是运行时错误，签名层不体现）
+        self.functions.insert(
+            "char_from_code".to_string(),
+            FnSig { params: vec![("cp".to_string(), Type::Int)], ret: Some(Type::String), effects: vec![], span: Span::default() },
+        );
         // math 模块（纯函数）
         self.functions.insert(
             "sqrt".to_string(),

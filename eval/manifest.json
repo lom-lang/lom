@@ -2,7 +2,7 @@
   "schema": "lom-eval/v1",
   "version": "0.1.0",
   "phase": "2.8",
-  "total_tasks": 113,
+  "total_tasks": 114,
   "categories": [
     {
       "id": "01_arithmetic",
@@ -21,7 +21,7 @@
     {
       "id": "03_types",
       "name": "Types & Inference",
-      "task_count": 11,
+      "task_count": 12,
       "description": "Int/Float/Bool/String/Unit literals, annotations, inference, Float promotion, String concat.",
       "file": "tasks/03_types.json"
     },
