@@ -1256,7 +1256,7 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 
 ## 12. Evaluation Suite (Phase 2.8 — implemented)
 
-Lom ships a 113-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+Lom ships a 114-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
 
