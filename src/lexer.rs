@@ -103,6 +103,19 @@ impl fmt::Display for LexError {
 
 impl std::error::Error for LexError {}
 
+/// UTF-8 前导字节 → 序列长度（含 ASCII 的 1；非法前导按 1 字节防御处理）
+fn utf8_seq_len(c: u8) -> usize {
+    if c >= 0xF0 {
+        4
+    } else if c >= 0xE0 {
+        3
+    } else if c >= 0xC0 {
+        2
+    } else {
+        1
+    }
+}
+
 /// 词法分析器
 pub struct Lexer<'a> {
     src: &'a [u8],
@@ -165,11 +178,16 @@ impl<'a> Lexer<'a> {
                 Ok(tok) => tokens.push(tok),
                 Err(e) => {
                     errors.push(e);
-                    // 回退到 next_token 调用前的状态，再前进一字节，保证进度
+                    // 回退到 next_token 调用前的状态，再前进一个完整 UTF-8 字符
+                    // （多字节前导字节整段跳过——v1.0.0 前逐字节跳导致一个汉字报 3 次错）
                     self.pos = saved_pos;
                     self.line = saved_line;
                     self.col = saved_col;
-                    self.advance();
+                    if self.peek().is_some_and(|c| c >= 0x80) {
+                        let _ = self.take_utf8_char();
+                    } else {
+                        self.advance();
+                    }
                 }
             }
         }
@@ -200,6 +218,23 @@ impl<'a> Lexer<'a> {
             }
         }
         c
+    }
+
+    /// 消费当前位置的完整 UTF-8 字符（多字节按前导字节定长取整段解码）。
+    /// v1.0.0：此前字符串字面量逐字节 `c as char`（Latin-1 展开）损坏非 ASCII——
+    /// todo.lom 的中文字面量自 Phase 3 起在宿主侧输出乱码。源经 `Lexer::new(&str)`
+    /// 保证合法 UTF-8，解码失败分支仅为防御回退。EOF 返回 None。
+    fn take_utf8_char(&mut self) -> Option<String> {
+        let c = self.peek()?;
+        let len = utf8_seq_len(c);
+        let start = self.pos;
+        for _ in 0..len {
+            self.advance();
+        }
+        match std::str::from_utf8(&self.src[start..self.pos]) {
+            Ok(s) => Some(s.to_string()),
+            Err(_) => Some((c as char).to_string()),
+        }
     }
 
     fn skip_whitespace_and_comments(&mut self) {
@@ -455,8 +490,17 @@ impl<'a> Lexer<'a> {
             }
             b';' => Token::Semi,
             _ => {
+                // 非 ASCII：消息按完整 UTF-8 字符显示（不消费——recover 负责整段跳过）
+                let disp = if c >= 0x80 {
+                    let end = (self.pos + utf8_seq_len(c)).min(self.src.len());
+                    std::str::from_utf8(&self.src[self.pos..end])
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|_| (c as char).to_string())
+                } else {
+                    (c as char).to_string()
+                };
                 return Err(LexError {
-                    message: format!("意外字符 '{}'", c as char),
+                    message: format!("意外字符 '{}'", disp),
                     line,
                     col,
                 });
@@ -538,6 +582,20 @@ impl<'a> Lexer<'a> {
                         Some(b'r') => s.push('\r'),
                         Some(b'"') => s.push('"'),
                         Some(b'\\') => s.push('\\'),
+                        // \ 后的非 ASCII：泛化规则按完整字符原样入串（v1.0.0 与主路径同修）
+                        Some(c) if c >= 0x80 => {
+                            match self.take_utf8_char() {
+                                Some(ch) => s.push_str(&ch),
+                                None => {
+                                    return Err(LexError {
+                                        message: "未闭合的字符串转义".to_string(),
+                                        line,
+                                        col,
+                                    });
+                                }
+                            }
+                            continue;
+                        }
                         Some(c) => s.push(c as char),
                         None => {
                             return Err(LexError {
@@ -550,8 +608,22 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
                 Some(c) => {
-                    s.push(c as char);
-                    self.advance();
+                    if c < 0x80 {
+                        s.push(c as char);
+                        self.advance();
+                    } else {
+                        // 多字节 UTF-8 整体解码（v1.0.0 修复点）
+                        match self.take_utf8_char() {
+                            Some(ch) => s.push_str(&ch),
+                            None => {
+                                return Err(LexError {
+                                    message: "未闭合的字符串".to_string(),
+                                    line,
+                                    col,
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -672,6 +744,40 @@ mod tests {
         let src = "\"hello\\nworld\"";
         let tokens = Lexer::new(src).tokenize().unwrap();
         assert_eq!(tokens[0].token, Token::Str("hello\nworld".to_string()));
+    }
+
+    #[test]
+    fn test_string_multibyte_utf8_decoded_whole() {
+        // v1.0.0 修复回归：非 ASCII 字面量按完整 UTF-8 字符入串——
+        // 此前逐字节 Latin-1 展开导致宿主侧中文/emoji 字面量损坏
+        let src = "\"中文字面量\"";
+        let tokens = Lexer::new(src).tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Str("中文字面量".to_string()));
+        // 4 字节增补平面
+        let src2 = "\"A😀B\"";
+        let tokens2 = Lexer::new(src2).tokenize().unwrap();
+        assert_eq!(tokens2[0].token, Token::Str("A😀B".to_string()));
+    }
+
+    #[test]
+    fn test_string_escape_generalized_non_ascii() {
+        // \ 后跟非 ASCII：泛化转义规则按完整字符原样入串
+        let src = "\"a\\中b\"";
+        let tokens = Lexer::new(src).tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Str("a中b".to_string()));
+    }
+
+    #[test]
+    fn test_unknown_multibyte_char_reported_once() {
+        // 容错词法：每个多字节字符只报一次"意外字符"（消息含完整字符，整段跳过）——
+        // "中文"是两个连续未知字符 → 2 条错误（v1.0.0 前会按字节报 6 条）
+        let src = "let 中文 = 1";
+        let (_, errors) = Lexer::new(src).tokenize_recover();
+        assert_eq!(errors.len(), 2, "两个汉字应各报一次错，得到: {:?}", errors);
+        assert!(errors[0].message.contains("中"), "消息应含完整字符: {}", errors[0].message);
+        assert!(errors[1].message.contains("文"), "消息应含完整字符: {}", errors[1].message);
+        assert_eq!(errors[0].col, 5);
+        assert_eq!(errors[1].col, 8, "列坐标按字节（中占 3 字节：5,6,7）");
     }
 
     #[test]
