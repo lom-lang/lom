@@ -169,6 +169,8 @@ Lom takes the **differentiated route**: occupy the empty LLM-repair-native lane 
 | 5 | Ecosystem & Bootstrapping | done 2026-08-19 | Bootstrap feasibility proven (mini-interpreter in Lom; full self-hosting = RFC-0003 draft, parked) |
 | 6 | Production engineering | done 2026-08-22 | Semver, 3-platform CI, governance, `lom doc`/`fmt`, SECURITY.md |
 | 7 | WASM compiler backend | done 2026-08-23 (v0.15.0) | `lom build --target wasm`; dual-backend byte-identical golden + eval 113/113×2 |
+| 8 | Full self-hosting | done 2026-09-02 (v0.23-v0.26) | Frontend + static checks + evaluator in Lom (self_interp.lom); interpreter-carrier three-layer self-certification; wasm-carrier golden blocked by an unresolved OOB bug (RFC-0003 rev 21, post-1.0 ledger) |
+| **v1.0** | **Language-surface freeze** | **2026-09-02 (v1.0.0)** | **Frozen: syntax / 20 reserved words / diagnostic codes / 43 builtins** (spec §14). Post-1.0 ledger: wasm OOB deep-dive, L2 self-hosted compiler (blocker resolved), Pattern spans, package registry, debugger. Long-term north star: third-party production use — explicitly **not** a v1.0 gate |
 
 See the [project guide](docs/lom-project-guide.html) for details.
 

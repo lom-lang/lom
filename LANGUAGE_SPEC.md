@@ -1,8 +1,8 @@
-# Lom Language Specification (v0.2)
+# Lom Language Specification (v1.0)
 
-> **Status**: Living document · updated 2026-08-31
-> **Stability**: Unstable — syntax and semantics may change before v1.0 freeze.
-> **Scope**: This spec covers the Phase 1 minimal subset (interpreter-runnable) and drafts the Phase 2 LLM-coding-native features. ~~Workload-native features (tensor, autodiff, MLIR) are out of scope and will be specified in Phase 4.~~ **Update (2026-08-07 retrospective)**: Phase 4 direction changed from "workload-native" to "LLM-repair-native + toolchain" — `lom fix` auto-repair expansion, REPL, LSP, package manager. Workload-native (tensor/autodiff/MLIR) is dropped (Mojo acquired by Qualcomm saturates the AI-compute lane). See [§2.5 retrospective](docs/lom-project-guide.html).
+> **Status**: **FROZEN (v1.0, 2026-09-02)** — 语言面冻结生效。冻结范围与程序见 §14。
+> **Stability**: Stable — 语法、语义、保留字、诊断码、内建集在 v1.x 内保持稳定；任何语言面变更须走新 RFC 解冻程序。
+> **Scope**: 完整语言规范（Phase 1-8 实现对齐；解释器为参考实现，WASM 后端与自举实现为交叉验证载体）。Phase 4 方向为 "LLM-repair-native + toolchain"（`lom fix` 自动修复、REPL、LSP、包管理；workload-native 已放弃）。见 [§2.5 retrospective](docs/lom-project-guide.html)。
 
 ---
 
@@ -1230,7 +1230,7 @@ end
 
 ---
 
-## 11. Open Questions (to resolve before Phase 1 freeze)
+## 11. Open Questions (all closed — RFC-0001, 2026-08-23; see per-item adjudication)
 
 1. **Range syntax**: `a..b` (Rust) vs `range(a, b)` (function) vs `a..=b` (inclusive)? Affects `for` loops.
    - **Resolved (v0.4.2, Phase 5.6)**: `a..b` (Rust-style, left-inclusive right-exclusive). It evaluates to `List<Int>`, so it reuses the for-in-List semantics (Phase 5.3) and the whole list module with zero new runtime machinery. `a..=b` rejected: two range operators are a known LLM confusion source; `1..(n+1)` is the explicit inclusive idiom.
@@ -1359,3 +1359,23 @@ Each task is a JSON object:
   - Added §6.9.7: `Expr` is now `struct { kind: ExprKind, span: Span }`; `Stmt::Let`/`Stmt::Assign` carry spans; NAM003/NAM004-field/MUT001/TYPE001/TYPE002/TYPE003/TYPE020 diagnostics report precise positions; `lom fix` spelling repairs become single-point `replace` (scan fallback retained). §6.9.6 scope note and §7.6 limitations updated.
 - **v0.22.0 (2026-08-31)**: Phase 8 readiness — RFC-0003 (full self-hosting) accepted; `lom <file> --dump-ast` added (deterministic AST indentation tree, spans excluded — §7.5). Language surface unchanged.
 - **v0.27.0 (2026-09-02)**: `string.char_from_code(cp)` added (§9.2) — Unicode code point → single-char String. The only language-surface change of the pre-v1.0-freeze json adjudication (RFC-0003 revision 24): it unblocks the self-hosted interpreter's `json_parse`/`json_stringify` (Unicode escapes) and removes the L2 self-hosted compiler's byte-construction blocker. Invalid code points (negative / > 0x10FFFF / surrogate D800-DFFF) are runtime errors. Builtin count 42 → 43.
+- **v1.0.0 (2026-09-02)**: **Language-surface freeze** (§14). Shipped in the freeze cut: the lexer's non-ASCII string-literal repair — string literals (and generalized `\` escapes) now decode complete UTF-8 characters instead of per-byte Latin-1 expansion, which had corrupted non-ASCII literals on the reference implementation since Phase 3 (todo.lom's Chinese literals printed mojibake; the self-hosted lexer was already correct). ASCII-only programs are byte-identical. The tolerant lexer now reports one error per character (full character in the message) for non-ASCII identifier positions instead of one per byte. Regression: 454 tests; eval 114/114 dual backend; self-host six-mode acceptance with the Latin-1 fold logic now a zero-count defensive net.
+
+---
+
+## 14. v1.0 Freeze Declaration (2026-09-02)
+
+The language surface below is **frozen for the v1.x line**. Any change requires a new numbered RFC (with LLM-impact analysis, per the governance docs) that explicitly supersedes this section — no silent additions.
+
+1. **Syntax**: the grammar of §3 in its entirety — statement separation semantics (§2.4.1), match Form A/B with guards and binders, closures, pipeline, `?` propagation, effect annotations, enums, structural records, tuples, ranges, compound assignment, `for` over Int/String/List, explicit imports with per-item aliasing. No new syntax forms in v1.x.
+2. **Reserved words**: exactly 20 — `fn let mut if else elif while for in return match end and or True False from import as enum` (§2, verified against the lexer). No new keywords.
+3. **Diagnostic codes**: the implemented namespaces of §7.3 (`LEX` / `PARSE` / `TYPE` / `NAM` / `EFF` / `MAT` / `MUT` / `RUNTIME` / `PKG`). New warning-only codes for new checks may be added (they cannot alter the semantics of existing programs); existing codes are not removed, renumbered, or reclassified from warning to error.
+4. **Builtins**: exactly 43 — the §9 tables (`io` 2, `string` 12, `math` 4, `list` 10, `json` 2, `map` 8, `file` 4, `env` 1). `char_from_code` (v0.27.0) is the last builtin added before the freeze; `type_of` was adjudicated **not** added (RFC-0003 revision 24).
+
+Adjudications leading to this freeze (user, 2026-09-02):
+
+- **①** Phase 6's north star "third-party production use" is **not** a v1.0 gate — retained as a long-term north star. v1.0 certifies engineering completeness, not market validation; public claims must keep that qualification.
+- **②** Freeze scope = the language surface above. Engineering debts remain in the post-1.0 ledger and do not block the freeze: the wasm OOB bug (RFC-0003 revision 21 — affects only the self-hosted-interpreter-compiled-to-wasm scenario; the wasm backend passes 114/114 on regular programs), Pattern spans, structured stack-overflow diagnostics, package registry, debugger, and the L2 self-hosted compiler (its `char_from_code` blocker is resolved; starting it is a workload decision).
+- **③** The json dual-builtin gap was resolved pre-freeze by adding `char_from_code` only (42→43; §9.2), closing RFC-0003 revision 17's ledger item.
+
+Non-goals reaffirmed at freeze (RFC-0001): no `self`/methods, no traits, no `pub`, no out-params, no type aliases, no independent `Char` type, no wildcard imports, no `break`/`continue`, no mutable closure captures.
