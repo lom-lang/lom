@@ -958,7 +958,7 @@ from io import { println as log }            # per-item alias
 | Module | Exports | Notes |
 |---|---|---|
 | `io` | `println`, `print` | Also in prelude (auto-available); explicit import only needed for aliasing |
-| `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with` | Phase 3.4 adds `split`/`contains`/`replace`/`starts_with`/`ends_with` (§9.2) |
+| `string` | `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with`, `char_from_code` | Phase 3.4 adds `split`/`contains`/`replace`/`starts_with`/`ends_with` (§9.2); v0.27.0 adds `char_from_code` |
 | `math` | `sqrt`, `abs`, `min`, `max` | Must be imported to use |
 | `list` | `list_empty`, `list_length`, `list_get`, `list_is_empty`, `list_head`, `list_tail`, `list_cons`, `list_map`, `list_filter`, `list_fold` | Phase 3.3 — immutable list ops (§9.3); v0.4.3 adds higher-order ops |
 | `json` | `json_parse`, `json_stringify` | Phase 3.3 — zero-dependency JSON parser + serializer (§9.4) |
@@ -1024,6 +1024,7 @@ Require explicit `from <module> import { ... }`:
 | `string` | `replace(s, from, to)` | `(String, String, String) -> String` | Phase 3.4 — replace all occurrences |
 | `string` | `starts_with(s, prefix)` | `(String, String) -> Bool` | Phase 3.4 — prefix test |
 | `string` | `ends_with(s, suffix)` | `(String, String) -> Bool` | Phase 3.4 — suffix test |
+| `string` | `char_from_code(cp)` | `Int -> String` | v0.27.0 — Unicode code point → single-char String (full planes incl. surrogate-pair range); invalid code points (negative, > 0x10FFFF, surrogate D800-DFFF) are runtime errors |
 | `math` | `sqrt(x)` | `Float -> Float` (also accepts `Int`) | Square root |
 | `math` | `abs(x)` | `Int -> Int \| Float -> Float` | Absolute value |
 | `math` | `min(a, b)` | `(Int, Int) -> Int \| (Float, Float) -> Float` | Minimum |
@@ -1357,3 +1358,4 @@ Each task is a JSON object:
 - **v0.21.0 (2026-08-31)**: Phase 3.2b — expression-level spans.
   - Added §6.9.7: `Expr` is now `struct { kind: ExprKind, span: Span }`; `Stmt::Let`/`Stmt::Assign` carry spans; NAM003/NAM004-field/MUT001/TYPE001/TYPE002/TYPE003/TYPE020 diagnostics report precise positions; `lom fix` spelling repairs become single-point `replace` (scan fallback retained). §6.9.6 scope note and §7.6 limitations updated.
 - **v0.22.0 (2026-08-31)**: Phase 8 readiness — RFC-0003 (full self-hosting) accepted; `lom <file> --dump-ast` added (deterministic AST indentation tree, spans excluded — §7.5). Language surface unchanged.
+- **v0.27.0 (2026-09-02)**: `string.char_from_code(cp)` added (§9.2) — Unicode code point → single-char String. The only language-surface change of the pre-v1.0-freeze json adjudication (RFC-0003 revision 24): it unblocks the self-hosted interpreter's `json_parse`/`json_stringify` (Unicode escapes) and removes the L2 self-hosted compiler's byte-construction blocker. Invalid code points (negative / > 0x10FFFF / surrogate D800-DFFF) are runtime errors. Builtin count 42 → 43.

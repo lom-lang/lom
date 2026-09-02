@@ -37,6 +37,9 @@
 > 21. **bug 技术档案**（供 post-Phase-8 深挖）：trap 栈顶 tok_disc（读 Tok 枚举载荷 i64 为野值）← parse_multiplication/addition/pipeline 链；已排除——Map rehash（cap 与桶一致的绕过仍崩）、JS 栈深（--stack-size 无效且引另一种崩）、内存耗尽（trap 时仅 2.3-4.5MB/36-69 页）、build_alloc 字节级错误（dump 全字节逐条解码正确）、静态串去重（无查重直插，无碰撞面）、独立最小复现（map+List+枚举+record 全组合 7000 元素均过——bug 依赖 self_interp 这个 220KB 大模块自身的某结构）；rt_alloc 探针（lom_dbg_alloc 上报）显示 hp 递增正常。怀疑面收窄至：大模块特有的某条堆对象指针链或静态数据布局交互。
 > 22. **规模上限实测**（退出标准口径，含解释器载体的对照）：第一层（宿主→自举）不限规模（examples 33 + eval 113 全过，1450 行 stmt_interp 解析 1.9s）；第二层限 ~6.7KB/约 2500 token（且间歇）；第三层不可行。**对照 8.3：解释器载体的三层自证已全量达成**（宿主→自举→stmt_interp 39 条 golden 逐字）——8.4 缺的是 wasm 载体的同构验证。
 > 23. **Phase 8 关账**：退出标准 1（8.1 全绿）✅；2（8.3 语义对齐）✅（解释器载体）；3（三层 golden）⚠️ **部分**——wasm 载体被 21 号 bug 阻塞；4（CI gate）⚠️ **部分**——8.1/8.2 验收（dump/tokens/diags/static）接入 CI，wasm 层未接（不稳定）；5（零依赖/零 unsafe/冻结声明）✅。json 双内建挂账（修订 17）与 wasm 越界挂账移交 post-Phase-8；v1.0 冻结裁决前置条件已齐。
+>
+> **修订记录（2026-09-02，v0.27.0——json 双内建裁决落地，冻结声明按 RFC 程序回档修订）**：
+> 24. **json 双内建裁决执行**（用户裁决：语言面 42→43，只加 `char_from_code`，不加 `type_of`——自实现路线不需要 reflection，透传路线才需要；`char_from_code` 同时解除 L2 自举编译器唯一硬阻塞）。宿主 interpreter/typechecker 注册（码点→单字符 String；负数/超 0x10FFFF/代理区 D800-DFFF 运行时错误）；WASM 后端 rt_char_from_code helper（1-4 字节 UTF-8 编码，无效码点 trap）+ e2e；自举 self_interp.lom 新增 Part H（~340 行）：json_parse 字符式递归下降（含 \uXXXX 代理对、数字 Int/Float 二分、对象/数组/转义全形态）+ json_stringify 11 变体逐分支镜像宿主（Float 走 Rust to_string 无 .0 尾；Enum 带参走 Debug 形态；Map 键排序）；`args` 内建 argv 透传（目标程序在自举载体下获得与宿主一致的 args()）。验收：verify_selfhost 新增 `--run` 模式 31/31（examples 27 + bootstrap 4，含 stmt_interp 三层自证 39 条 golden；todo.lom 走 Latin-1 折叠——宿主 lexer 字节展开使宿主侧字面量反而是乱码方）；json_demo/todo 自举运行与宿主逐字一致（修订 18 的 json×2 豁免解除）；eval 任务 115（char_from_code 双后端）+ runner 输出捕获 UTF-8 修复（Process 重定向，PS 5.1 无控制台句柄下 [Console]::OutputEncoding 不可靠）。已知差异（Part H 头注释如实记录）：解析错误"偏移 N"是字符偏移（宿主字节偏移）；非可打印字符的错误显示形态；Float 尾数 >15 位有效数字或 |净指数|>22 可能 1 ulp 差异（10^k 浮点表示超出精确区）；"-0.0" 丢失负零。json 挂账（修订 17）就此关闭。
 
 ## Motivation
 
@@ -116,7 +119,7 @@ RFC-0002 把全量自举正式列为 Phase 8 候选，并指出其硬阻塞项�
 2. 42 个内建"自实现 vs 透传"的逐案清单：8.3 开工时定（原则已定：纯计算自实现，IO 透传）。
 3. ~~宿主 AST dump 的形态~~ → **已定案（2026-08-31 修订）**：`lom <file> --dump-ast`（已实现，src/dump.rs）。
 4. 自证闭环的测试程序规模上限：8.4 实测三层常数因子后定。
-5. L2（自举 WASM emitter）立项时机与 `char_from_code` 裁决：post-Phase-8。
+5. ~~L2（自举 WASM emitter）立项时机与 `char_from_code` 裁决~~ → **char_from_code 已裁决落地（2026-09-02 修订 24：加入，语言面 42→43）**；L2 立项时机仍为 post-Phase-8（字节构造阻塞已解除，剩余为工作量决策）。
 
 ---
 

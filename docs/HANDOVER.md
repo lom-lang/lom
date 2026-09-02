@@ -8,7 +8,7 @@
 > - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-09-02（**Phase 8 关账：8.1/8.2/8.3 完成，8.4 部分完成**——wasm 载体被未定位的非确定性内存越界阻塞（RFC 修订 20-23 完整档案）；解释器载体的三层自证已全量达成（8.3）；CI 新增 selfhost gate（8.1/8.2 四模式）。v0.26.0。**下一步：v1.0 冻结裁决**（含两项 post-Phase-8 挂账：wasm 越界深挖、json 双内建）。交接必读 RFC-0003 全部修订记录 + §1 快照 + §11）
+> 最后更新：2026-09-02（**v0.27.0：json 双内建裁决落地——语言面 42→43（char_from_code），自举解释器 json 自实现全量达成（RFC-0003 修订 24），json 挂账关闭**。同轮：verify_selfhost 新增 --run 模式（31/31 含三层自证）并接入 CI；eval 113→114 任务；runner 输出捕获 UTF-8 修复。**v1.0 冻结三项裁决已定（见 §1 下一步），冻结执行是唯一待办**。交接必读 RFC-0003 全部修订记录 + §1 快照 + §11）
 
 ---
 
@@ -31,18 +31,19 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v0.26.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.25.0） |
-| Rust 测试 | **447/447 通过**（含 wasm 单测 + 33 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
-| eval 评测集 | **113/113**（runner 只比对 stdout + 要求退出码 0） |
+| 版本 | **v0.27.0**（Cargo.toml 一致；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.26.0） |
+| Rust 测试 | **451/451 通过**（含 wasm 单测 + 33+1 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| eval 评测集 | **114/114**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code，v0.27.0 加） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |
 | **Phase 8.2** | **完成（2026-09-02）**：静态检查自举（RFC 子集方案）——NAM003（变量/调用/赋值）+ TYPE003-arity（管道左值计入）+ EFF001（效应传播，main 豁免，签名定位）+ MAT001（枚举/Result/Option 穷尽性，guard/Binder 语义对齐）；`self_interp.lom -- <file> --check` 模式；42 内建签名表由宿主测试导出对账。验收 --static：坏文件 15/15 + 干净集 146/146 零误报；8.1 三模式回归不倒 |
 | **Phase 8.3** | **完成（2026-09-02）**：求值器自举——Val 11 变体/Env 链（Map 引用=闭包共享语义）/E2 错误通道（ERet 镜像 EarlyReturn）/调用分派/import 别名表/`--run` 模式；42 内建逐案定案（38 透传宿主硬件 + list_map/filter/fold 强制自实现 + json 双缺口挂账）；Float 位级一致（单次 IEEE 除法）。验收：examples 30/30 + stmt_interp 39 条 golden（三层自证）+ eval 113/113 |
-| **Phase 8.4** | **部分完成（2026-09-02，如实记录）**：self_interp 编译 WASM ✓（220KB）+ 小文件语义正确 ✓ + harness `LOM_PRE_GROW` + verify `--wasm` 模式；**三层 golden 的 wasm 载体未达成**——目标程序 >~6.7KB（约 2500 token）触发未定位的非确定性越界（限内文件两轮 19/21 与 15/19 不同；预扩内存只部分缓解；第三层不可行）——完整技术档案见 RFC 修订 21（已排除 rehash/JS 栈/内存耗尽/build_alloc 字节/静态串去重/独立最小复现全组合）。CI 接入 8.1/8.2 四模式 selfhost gate（wasm 层不接——不稳定会随机红） |
-| 下一步 | **v1.0 冻结裁决（用户决策点）**：① Phase 6 北极星"第三方生产使用"是否作 v1.0 门禁；② 冻结清单执行（RFC-0003 动机节 3）。post-Phase-8 挂账：wasm 越界深挖（RFC 修订 21 档案）、json 双内建（char_from_code/type_of 双缺口）、L2 自举编译器、Pattern 无 span |
-| 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；L2 自举编译器（post-Phase-8，`char_from_code` 待裁决）；8.2+：自举诊断消息 Latin-1 化的长期方案（当前验收脚本折叠换算）；v1.0 冻结时待裁决：Phase 6 北极星"第三方生产使用"是否作 v1.0 门禁 |
+| **Phase 8.4** | **部分完成（2026-09-02，如实记录）**：self_interp 编译 WASM ✓（220KB）+ 小文件语义正确 ✓ + harness `LOM_PRE_GROW` + verify `--wasm` 模式；**三层 golden 的 wasm 载体未达成**——目标程序 >~6.7KB（约 2500 token）触发未定位的非确定性越界（限内文件两轮 19/21 与 15/19 不同；预扩内存只部分缓解；第三层不可行）——完整技术档案见 RFC 修订 21（已排除 rehash/JS 栈/内存耗尽/build_alloc 字节/静态串去重/独立最小复现全组合）。CI 接入 selfhost gate（8.1/8.2 四模式 + 8.3 run 模式，v0.27.0 起；wasm 层不接——不稳定会随机红） |
+| **v0.27.0 json 裁决** | **完成（2026-09-02，RFC-0003 修订 24）**：语言面 42→43（`string.char_from_code`，唯一新增；`type_of` 不加——自实现路线不需要）。宿主+WASM+自举三实现齐；self_interp.lom Part H（~340 行）json_parse/json_stringify 自实现（字符式递归下降 + 11 变体镜像 stringify）；`args` argv 透传；verify `--run` 模式 31/31（json_demo/todo 豁免解除，todo 走 Latin-1 折叠）；eval 任务 115；runner UTF-8 捕获修复。修订 18 的 json 挂账关闭 |
+| 下一步 | **v1.0 冻结执行（裁决已定 2026-09-02）**：① 北极星"第三方生产使用"**不作** v1.0 门禁、保留长期北极星；② 冻结范围 = 语言面（语法/关键字/诊断码/43 内建），json 双内建已按③裁决落地；③ 只加 char_from_code。剩余动作：冻结声明文档（spec 标记 1.0 + 冻结清单）+ v1.0.0 版本/tag。post-Phase-8 挂账：wasm 越界深挖（RFC 修订 21 档案）、L2 自举编译器（char_from_code 阻塞已解除，纯工作量决策）、Pattern 无 span |
+| 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（v1.0 后按需）；L2 自举编译器（post-Phase-8，`char_from_code` 已落地解锁）；8.2+：自举诊断消息 Latin-1 化的长期方案（当前验收脚本折叠换算）；~~v1.0 冻结时待裁决：Phase 6 北极星~~（已裁决 2026-09-02：不作门禁） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -79,10 +80,10 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 447/447（2026-09-02 v0.24.0 基线）
+cargo test --release                                    # 期望 451/451（2026-09-02 v0.27.0 基线）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
-powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 113/113
-python tools\verify_selfhost.py                         # 自举验收：dump 146/146（另 --tokens / --diags / --static 模式）
+powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 114/114
+python tools\verify_selfhost.py                         # 自举验收：dump 147/147（另 --tokens / --diags / --static / --run 模式）
 ```
 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
@@ -277,10 +278,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 447/447、零 warning、`./target/release/lom.exe --version` 显示 0.24.0
+2. `cargo build --release && cargo test --release` 确认 451/451、零 warning、`./target/release/lom.exe --version` 显示 0.27.0
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. **当前状态：Phase 8 关账（8.1/8.2/8.3 完成 + 8.4 部分完成），等待用户 v1.0 冻结裁决**——任何新会话先读 RFC-0003 全文修订记录（1-23 条全读），自举代码 examples/selfhost/self_interp.lom（4890 行：Part A-D 前端+dump / E 检查器 / F-G 求值器），验收 tools/verify_selfhost.py 五模式
+5. **当前状态：Phase 8 关账 + v0.27.0 json 裁决落地，v1.0 冻结三项裁决已定、冻结执行是唯一待办**——任何新会话先读 RFC-0003 全文修订记录（1-24 条全读），自举代码 examples/selfhost/self_interp.lom（5696 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -356,6 +357,13 @@ end
 - **Phase 3.2b 表达式级 span（2026-08-31，v0.21.0，当日第二个里程碑）**：最后一个定位挂账清账。**结构变更**：`Expr` 从枚举改为 `struct Expr { kind: ExprKind, span: Span }`（原枚举改名 `ExprKind`），`Stmt::Let`/`Stmt::Assign` 补 span 字段；span 在枚举**外面**——取位置不用匹配，消费方改动收敛为 `match expr` → `match &expr.kind`（interpreter 27 + typechecker 23 + wasm_codegen 45 处模式，全局 `Expr::`→`ExprKind::` 文本替换 + 6 个匹配目标手改，rustc 驱动清扫）。**惯例**：start = 首 token 位置，end = 末 token 的**起始**位置（lexer 只记 token 起点，与 3.2 签名 span 一致）；左结合链组合节点取左操作数起点（`span_from(left.span)`）；去糖合成节点复用目标标识符 span。**接线**：NAM003/NAM004-字段/MUT001/TYPE001/002/003/020 全部离开 (0,0)；NAM004 字段诊断定位用 Field span 的 **end**（= 字段名 token，不是对象起点）；fix.rs 新增 `precise_occurrence`——诊断带位置就单点 Replace，**字节列→字符列换算**（lexer col 按字节走，fix 约定字符列，含中文的行会分叉）+ 内容防呆校验（位置与源码不符回退整词扫描）。**坑**：① cargo test 不更新 lom.exe 的老坑又踩一次（CLI 验证前必须 cargo build --release）；② 块末尾的裸表达式归 `Block.tail` 不是 stmts（测试因此挂一次）；③ `Pattern` 仍无 span——match 模式内变体名诊断保持 (0,0)，fix 走扫描兜底（已知残留）。解释器/WASM 行为中性。测试 +11（437/437），回归三件套全绿。
 - **Phase 8 前置清账（2026-08-31，v0.22.0）**：用户指令"完成 Phase 8 之前的所有任务"。① **RFC-0003 了结入库**：status draft→accepted（用户当日裁决启动 Phase 8），两个 8.1/8.2 前置子问题提前定案（AST dump 形态=`--dump-ast`；静态检查深度=NAM/arity/EFF/MAT 子集），顶部加修订记录，eval 计数 108→113 对齐。② **`src/dump.rs` + `lom <file> --dump-ast`**：确定性缩进树 dump（Program/Fn/Block/Stmt/Expr/Pattern/Type 全覆盖，格式即契约写进文件头——8.1 验收的逐字比对基准）。**关键设计决策：dump 不含 span**——宿主 lexer 字节列 vs 自举 lexer（Lom 逐字符）字符列在含非 ASCII 的行必然分叉，结构比对不需要位置，诊断位置比对走 --json（坐标系问题已写进 RFC 修订记录 3，8.1 验收集要么纯 ASCII 要么先换算）。③ **CI 三层 golden 对账结论**：golden 逐字 gate（双载体）+ eval parity 自 7.9 起在位，8.4 只需照抄模式加一个 step，无需提前新建。测试 +5（442/442）。clippy 抓了两个 redundant closure（`.map(|t| type_str(t))` → `.map(type_str)`），即改。
 - **Phase 8.1 完整前端自举（2026-09-01，v0.23.0）**：`examples/selfhost/self_interp.lom` 落地（~2670 行）。验收全过（tools/verify_selfhost.py 三模式）。**宿主侧三件交付**：① `--dump-tokens`（lexer 对账工具）；② **`?` 提前返回穿透 bug 修复**——树遍历解释器 `ExprKind::If`/match Form B 臂把 `ControlFlow::Return` 当块值消费，`?`/return 在"块尾 if 表达式"内静默失效（WASM 后端 br $ret 语义才对，两后端就此分叉对齐），+2 回归测试，442 存量无一依赖错误语义；③ dump.rs +2 前提钉子测试（Float 规范化/字符串值域）。**语言面零变化**（冻结声明保持）。详见 RFC-0003 修订记录 6-10。
+- **v0.27.0 json 裁决会话新增坑（2026-09-02，写 Part H 踩的）**：
+  - **变体模式内嵌元组模式不支持**：`Ok((a, b)) =>` 报 PARSE001"期望模式，得到 LParen"——正确写法 `Ok(p) =>` 绑定 + `let (a, b) = p` 解构（Part H 四处全中）。`let (a, b) = f()?` 的 let 层解构 + `?` 组合则没问题。
+  - **Form B 臂内嵌 match 的 end 计数**（§4.1 老坑新变体）：`None =>` 臂里放 match，需要 臂内 match 的 end + 臂的 end + 外 match 的 end + fn 的 end 共 4 个——少一个就"期望 '('，得到下一个函数名"。
+  - **宿主 lexer 的 Latin-1 字面量展开方向反转利用**：todo.lom 的中文字面量在**宿主**侧就是乱码（lexer 按字节展开），自举侧按字符读反而干净——--run 验收的折叠方向是 fold(host) == self（与 dump 模式同向），别搞反。
+  - **PS 5.1 无控制台句柄下 [Console]::OutputEncoding 赋值静默失败**（try/catch 吞掉）——原生命令输出捕获要 UTF-8 一律走 `System.Diagnostics.Process` 显式 StandardOutputEncoding（run.ps1 的 Invoke-CaptureUtf8，三平台/5.1/pwsh 等价）。触发场景：eval 任务 115 是首个非 ASCII expected。
+  - **.ps1 加中文注释必须带 BOM**：PS 5.1 对无 BOM 文件按 ANSI 读，UTF-8 注释字节偶发吞掉换行导致解析断裂（报错位置在很远的 `}`）——run.ps1 已加 BOM（utf-8-sig）。
+  - **json 分派对象/数组的空白跳过点**：宿主在 `:` 后与 `,` 后各有一次 skip_ws（值解析前）——字符式平移时最容易漏的就是这两处（json_demo 偏移 8 的空格就是它）。
 
 ### 11.1 Phase 8.1 会话新增坑（2026-09-01，写自举代码踩的）
 

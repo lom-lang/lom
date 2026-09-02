@@ -324,7 +324,7 @@ from io import { println as log }    # per-item alias: name as alias
 - **Per-item alias**: `name as alias` (Python/Rust-style).
 - **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 - **Non-prelude builtins must be imported** or you get an error:
-  - `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower` → `from string import {...}`
+  - `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with`, `char_from_code` → `from string import {...}`
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
 - **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Example: `examples/pkg_demo/`.
@@ -428,6 +428,12 @@ end
 | `trim(s)` | `String -> String` | Strip leading/trailing whitespace |
 | `upper(s)` | `String -> String` | Uppercase |
 | `lower(s)` | `String -> String` | Lowercase |
+| `split(s, sep)` | `(String, String) -> List<String>` | Split; empty separator splits into characters |
+| `contains(s, sub)` | `(String, String) -> Bool` | Substring test |
+| `replace(s, from, to)` | `(String, String, String) -> String` | Replace all occurrences |
+| `starts_with(s, prefix)` | `(String, String) -> Bool` | Prefix test |
+| `ends_with(s, suffix)` | `(String, String) -> Bool` | Suffix test |
+| `char_from_code(cp)` | `Int -> String` | Unicode code point → single-char String (v0.27.0; invalid code points are runtime errors) |
 
 **`math` module** (requires `from math import {...}`):
 
