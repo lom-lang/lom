@@ -246,9 +246,10 @@ impl Value {
         match self {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => {
-                // 整数浮点显示为 x.0
+                // 整数浮点显示为 x.0；非有限值（inf/-inf/NaN）原样输出不补 .0
+                // （T4：与 WASM 侧逐字对齐）
                 let s = n.to_string();
-                if s.contains('.') {
+                if s.contains('.') || !n.is_finite() {
                     s
                 } else {
                     format!("{}.0", s)

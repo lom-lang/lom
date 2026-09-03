@@ -84,7 +84,7 @@ jobs:
           $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
           ./eval/runner/run.ps1 -Verify -LomBin $bin
 
-      - name: WASM eval parity (113 tasks via node, Phase 7.9)
+      - name: WASM eval parity (116 tasks via node, Phase 7.9)
         # 双后端对齐 gate：eval 全套在 WASM 后端跑一遍（node 在三平台 runner 均预装）
         shell: pwsh
         run: |

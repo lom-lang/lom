@@ -285,6 +285,10 @@ main 中直接定义闭包 let double = fn(x: Int) -> Int 返回 x * 2 end。然
 
 用 list 模块的高阶函数(需 from list import {list_map, list_filter, list_fold}):写具名函数 double(x: Int) -> Int 返回 x * 2;main 里 let xs = 1..6,然后 println(list_map(double, xs))、println(list_filter(fn(x: Int) -> Bool x % 2 == 0 end, xs))、println(list_fold(fn(acc: Int, x: Int) -> Int acc + x end, 0, xs))。
 
+### Task 116
+
+写 let 绑定的递归闭包:main 里 let fact = fn(n: Int) -> Int,若 n <= 1 返回 1,否则返回 n * fact(n - 1)(闭包体内自引用,fact 尚未绑定完成时引用自身),end 闭合;然后 println(fact(5)) 和 println(fact(10))。
+
 
 ---
 

@@ -23,8 +23,11 @@ let instance = null;
 let out = '';
 const allocLog = [];
 const nl = (flag) => { if (flag !== 0n) out += '\n'; };
-// 对齐 interpreter.rs to_display：浮点整数值显示为 x.0（Rust 的 4.0 → "4" → "4.0"）
+// 对齐 interpreter.rs to_display：浮点整数值显示为 x.0（Rust 的 4.0 → "4" → "4.0"）；
+// 非有限值映射为 Rust Display 口径 inf/-inf/NaN（T4：与解释器逐字一致，不补 .0）
 const fmtFloat = (v) => {
+  if (Number.isNaN(v)) return 'NaN';
+  if (!Number.isFinite(v)) return v > 0 ? 'inf' : '-inf';
   const s = String(v);
   return s.includes('.') ? s : s + '.0';
 };

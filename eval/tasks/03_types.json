@@ -106,5 +106,14 @@
     "solution": "from string import { char_from_code }\n\nfn pair_chars(a: Int, b: Int) -> String\n    char_from_code(a) + char_from_code(b)\nend\n\nfn main() -> Unit\n    println(pair_chars(72, 105))\n    println(char_from_code(20013) + char_from_code(25991))\nend\n",
     "expected": "Hi\n中文\n",
     "notes": "char_from_code(v0.27.0):码点到单字符 String,Unicode 全平面(含增补平面);无效码点(负数/超上限/代理区)是运行时错误。json 的 unicode 转义与 L2 编译器的字符构造原语。"
+  },
+  {
+    "id": "117",
+    "category": "types",
+    "difficulty": "easy",
+    "prompt": "浮点非有限值的显示:println(1.0 / 0.0)、println(0.0 / 0.0)、println(-1.0 / 0.0),再用有限值对照 println(2.5)、println(4.0)。要求输出字面恰为 inf/NaN/-inf(小写 inf,NaN 首字母大写),整数值浮点显示为 x.0。",
+    "solution": "fn main() -> Unit\n    println(1.0 / 0.0)\n    println(0.0 / 0.0)\n    println(-1.0 / 0.0)\n    println(2.5)\n    println(4.0)\nend\n",
+    "expected": "inf\nNaN\n-inf\n2.5\n4.0\n",
+    "notes": "浮点非有限值显示(v1.1.0 双后端统一为 inf/-inf/NaN,修前解释器打 inf.0、WASM 打 Infinity.0)。有限值口径不变(整数值浮点补 .0)。"
   }
 ]

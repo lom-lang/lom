@@ -2957,6 +2957,13 @@ end
 fn chk_stmt(s: St, env: Map<String, Option<Ty>>, st: {effs: List<String>, is_main: Bool, fln: Int, fcl: Int}, fns: Map<String, {ar: Int, effs: List<String>, ret: Option<Ty>}>, enums: Map<String, {vs: List<(String, Int)>, blt: Bool}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Unit
     match s
         StLet(_, name, ty, value) =>
+            # T2：闭包字面量初始化器先预绑（镜像宿主 typechecker Stmt::Let 的
+            # Unknown 预绑）——递归闭包自引用不报 NAM003；非闭包（let x = x + 1）
+            # 不预绑，照报。最终绑定在下方 map_set 覆盖预绑值。
+            match value
+                ExClosure(_, _, _) => map_set(env, name, None)
+                _ => ()
+            end
             let vt = chk_expr(value, env, st, fns, enums, em)
             match ty
                 Some(t) => map_set(env, name, Some(t))

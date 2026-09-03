@@ -106,5 +106,14 @@
     "solution": "from list import {list_map, list_filter, list_fold}\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let xs = 1..6\n    println(list_map(double, xs))\n    println(list_filter(fn(x: Int) -> Bool\n        x % 2 == 0\n    end, xs))\n    println(list_fold(fn(acc: Int, x: Int) -> Int\n        acc + x\n    end, 0, xs))\nend\n",
     "expected": "[2, 4, 6, 8, 10]\n[2, 4]\n15\n",
     "notes": "高阶标准库(v0.4.3 新增):list_map/list_filter/list_fold。组合 range(1..6)与具名函数值。1+2+3+4+5=15。考察 LLM 对函数式三件套的自然写法。"
+  },
+  {
+    "id": "116",
+    "category": "closures",
+    "difficulty": "easy",
+    "prompt": "写 let 绑定的递归闭包:main 里 let fact = fn(n: Int) -> Int,若 n <= 1 返回 1,否则返回 n * fact(n - 1)(闭包体内自引用,fact 尚未绑定完成时引用自身),end 闭合;然后 println(fact(5)) 和 println(fact(10))。",
+    "solution": "fn main() -> Unit\n    let fact = fn(n: Int) -> Int\n        if n <= 1\n            1\n        else\n            n * fact(n - 1)\n        end\n    end\n    println(fact(5))\n    println(fact(10))\nend\n",
+    "expected": "120\n3628800\n",
+    "notes": "let 绑定递归闭包(v1.1.0 修复 NAM003 假阳性后 --check 零诊断;解释器按引用捕获作用域/WASM pre-bind+槽位补丁,双后端行为一致)。5!=120,10!=3628800。考察 LLM 对闭包自引用的自然写法。"
   }
 ]

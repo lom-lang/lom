@@ -503,6 +503,14 @@ impl TypeChecker {
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
         match stmt {
             Stmt::Let { name, ty, value, mutable, span } => {
+                // T2：闭包字面量初始化器的自引用（递归闭包）是设计支持的功能——
+                // 运行时解释器按引用捕获作用域（调用时查找，名字已绑定），
+                // WASM 侧为 pre-bind + env 槽位补丁。静态检查镜像该语义：
+                // 先以 Unknown 预绑名字再查体。非闭包初始化器（如 let x = x + 1）
+                // 不预绑，NAM003 照报（T2 回归测试钉住）。
+                if matches!(value.kind, ExprKind::Closure { .. }) {
+                    env.define(name.clone(), TypeOrUnknown::Unknown, *mutable);
+                }
                 let val_ty = self.check_expr(value, env);
                 if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty)
                     && !self.types_compatible(vt, annot) {
@@ -685,6 +693,22 @@ impl TypeChecker {
             ExprKind::Unit => TypeOrUnknown::known(Type::Unit),
             ExprKind::Ident(name) => {
                 if let Some(ty) = env.get(name) {
+                    // T3/MUT002：闭包体内引用捕获的外层 mut 绑定——双后端捕获语义
+                    // 相反（解释器=共享作用域 / WASM=创建时值拷贝），发 warning 提示
+                    // 避免。与 MUT001 同为渐进式口径：stderr、不拦截、不置 ok:false。
+                    let (mutable, crossed) = env.resolve_capture(name);
+                    if crossed && mutable == Some(true) {
+                        self.push_diag(
+                            Severity::Warning,
+                            "MUT002".into(),
+                            format!(
+                                "闭包捕获了可变绑定 '{}'：双后端语义相反（解释器=共享作用域，WASM=创建时值拷贝），建议避免依赖",
+                                name
+                            ),
+                            espan.line,
+                            espan.col,
+                        );
+                    }
                     ty
                 } else if self.functions.contains_key(name) {
                     // 顶层函数引用（作为值，Phase 2.4 暂不深入检查函数类型）
@@ -816,7 +840,8 @@ impl TypeChecker {
             }
             ExprKind::Closure { params, ret_type, body } => {
                 // 闭包捕获外部环境：closure_env 继承当前 env，使闭包内可引用外部变量
-                let mut closure_env = env.child();
+                // T3/MUT002：closure_child 标记闭包边界（Ident 解析据此判捕获）
+                let mut closure_env = env.closure_child();
                 for p in params {
                     closure_env.define(p.name.clone(), TypeOrUnknown::Known(p.ty.clone()), false);
                 }
@@ -1594,6 +1619,9 @@ struct TypeEnv {
     /// （let/参数/for 变量/match 绑定/闭包参数均为 false）
     mutables: HashMap<String, bool>,
     parent: Option<Box<TypeEnv>>,
+    /// T3/MUT002：本环境是否为闭包体作用域（离开此层向外解析 = 捕获外层绑定）。
+    /// match 臂子作用域用普通 child()，boundary=false。
+    is_closure_boundary: bool,
 }
 
 impl TypeEnv {
@@ -1602,6 +1630,7 @@ impl TypeEnv {
             vars: HashMap::new(),
             mutables: HashMap::new(),
             parent: None,
+            is_closure_boundary: false,
         }
     }
 
@@ -1610,7 +1639,15 @@ impl TypeEnv {
             vars: HashMap::new(),
             mutables: HashMap::new(),
             parent: Some(Box::new(self.clone())),
+            is_closure_boundary: false,
         }
+    }
+
+    /// T3/MUT002：闭包体专用 child——标记闭包边界
+    fn closure_child(&self) -> Self {
+        let mut c = self.child();
+        c.is_closure_boundary = true;
+        c
     }
 
     fn define(&mut self, name: String, ty: TypeOrUnknown, mutable: bool) {
@@ -1636,6 +1673,26 @@ impl TypeEnv {
             p.is_mutable(name)
         } else {
             None
+        }
+    }
+
+    /// T3/MUT002：解析名字绑定，报告是否跨闭包边界捕获。
+    /// 返回 (可变性, 是否捕获)。查找命中当前层 vars 先于边界判定——
+    /// 闭包参数/体内局部 let 不算捕获；命中点在闭包边界层之外才置 crossed。
+    fn resolve_capture(&self, name: &str) -> (Option<bool>, bool) {
+        let mut crossed = false;
+        let mut e = self;
+        loop {
+            if e.vars.contains_key(name) {
+                return (e.mutables.get(name).copied(), crossed);
+            }
+            if e.is_closure_boundary {
+                crossed = true;
+            }
+            match &e.parent {
+                Some(p) => e = p,
+                None => return (None, crossed),
+            }
         }
     }
 
@@ -2502,5 +2559,24 @@ mod tests {
         let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE002").collect();
         assert_eq!(d.len(), 1);
         assert_eq!((d[0].line, d[0].col), (2, 8), "TYPE002 应定位到条件表达式");
+    }
+
+    #[test]
+    fn let_closure_self_reference_no_nam003() {
+        // T2：let 绑定递归闭包是设计支持的功能（解释器按引用捕获作用域、
+        // WASM pre-bind + 槽位补丁），静态检查不应报 NAM003（此前先查后绑导致假阳性）
+        let src = "fn main() -> Unit\n    let f = fn(n: Int) -> Int\n        if n <= 1\n            1\n        else\n            n * f(n - 1)\n        end\n    end\n    println(f(5))\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+        assert_eq!(d.len(), 0, "递归闭包 let 自引用不应报 NAM003");
+    }
+
+    #[test]
+    fn let_non_closure_self_reference_still_nam003() {
+        // T2 对照组：非闭包初始化器（let x = x + 1）不预绑，NAM003 照报
+        let src = "fn main() -> Unit\n    let x = x + 1\n    println(x)\nend\n";
+        let diags = check_src(src);
+        let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+        assert_eq!(d.len(), 1, "非闭包自引用仍应报 NAM003");
     }
 }

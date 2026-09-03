@@ -359,8 +359,9 @@ def mode_run(files):
         if host == self_out:
             ok += 1
         else:
-            # todo.lom：宿主 lexer 对非 ASCII 字面量按字节 Latin-1 展开（历史行为），
-            # 自举按字符读源码——宿主行折叠后应与自举逐字等价（dump/tokens 模式同款折叠）
+            # 防御网：v1.0.0 修复宿主 lexer 非 ASCII 解码后，正常应为 0 计数折叠等价
+            # （两侧逐字一致直接走上面分支）；若此路径再次命中，说明宿主/自举的
+            # 非 ASCII 处理又分叉了——按 dump/tokens 模式同款 Latin-1 折叠判定等价
             hl, sl = host.splitlines(), self_out.splitlines()
             if len(hl) == len(sl) and all(
                 h == s or fold_latin1(h) == s for h, s in zip(hl, sl)

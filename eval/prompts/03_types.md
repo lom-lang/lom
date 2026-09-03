@@ -285,6 +285,10 @@ end
 
 写函数 pair_chars(a: Int, b: Int) -> String 返回 char_from_code(a) + char_from_code(b)(码点转单字符,需 from string import { char_from_code })。main 调用 println(pair_chars(72, 105)) 和 println(char_from_code(20013) + char_from_code(25991))。
 
+### Task 117
+
+浮点非有限值的显示:println(1.0 / 0.0)、println(0.0 / 0.0)、println(-1.0 / 0.0),再用有限值对照 println(2.5)、println(4.0)。要求输出字面恰为 inf/NaN/-inf(小写 inf,NaN 首字母大写),整数值浮点显示为 x.0。
+
 
 ---
 
