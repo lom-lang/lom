@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 项目独立审查报告 — 2026-09-03</title>
+<style>
+  :root {
+    --fg: #1a1a2e;
+    --muted: #5a5a72;
+    --accent: #2563eb;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --bg-soft: #f4f5fa;
+    --border: #d9dbe7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--fg);
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    line-height: 1.75;
+  }
+  h1 { font-size: 1.8rem; border-bottom: 3px solid var(--accent); padding-bottom: .4rem; }
+  h2 { font-size: 1.35rem; margin-top: 2.8rem; border-left: 5px solid var(--accent); padding-left: .7rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.8rem; color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .45rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); }
+  code { background: var(--bg-soft); padding: .1em .35em; border-radius: 4px; font-size: .88em; }
+  pre { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: .8rem 1rem; overflow-x: auto; font-size: .84rem; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid var(--border); margin: 1rem 0; padding: .3rem 1rem; color: var(--muted); }
+  .meta { color: var(--muted); font-size: .9rem; }
+  .verdict { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 1.5rem 0; }
+  .tag { display: inline-block; padding: .05em .55em; border-radius: 999px; font-size: .78rem; font-weight: 600; color: #fff; }
+  .tag.p0 { background: var(--bad); }
+  .tag.p1 { background: var(--warn); }
+  .tag.p2 { background: #7c3aed; }
+  .tag.p3 { background: #64748b; }
+  .tag.info { background: var(--accent); }
+  .tag.ok { background: var(--ok); }
+  ul li, ol li { margin: .3rem 0; }
+  .ev { font-size: .88rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Lom 项目独立审查报告</h1>
+<p class="meta">审查日期：2026-09-03 · 审查基线：main @ <code>6a5f667</code>（v1.0.0，语言面冻结次日） · 审查方式：只读（除本报告文件外未修改任何项目文件）；在 Windows 11 / Git Bash 环境实际运行了构建、全部测试与验证脚本 · 前序报告：<a href="review-2026-08-31.html">review-2026-08-31</a>（基线 v0.19.0）</p>
+
+<div class="verdict">
+<strong>总体结论：</strong>v1.0 冻结时点的工程状态是真实的、可复现的——本次审查对 README/HANDOVER/spec 中所有可机械验证的量化声称逐项复核，<strong>全部通过</strong>（454/454 单测、eval 114/114 双后端、自举 6 模式验收、零依赖、零 unsafe、clippy 零告警、fmt 幂等、fix 语料 4/4、随机 fuzz 0 崩溃）；上轮审查（08-31）的问题清单整改完成度极高。但本次发现一处 <span class="tag p0">P0</span>：<strong>SECURITY.md 声称"所有 Int 算术均为 checked"，实测 release 二进制中 <code>i64::MAX + 1</code> 静默回绕</strong>（README 6.6 节同款声称）——对一个以"文档不撒谎"为核心纪律的项目，这是出现在安全审计文档里的实证性失实。另有三组 P1：浮点 inf/NaN/大数显示在两后端不一致且未列入已知分歧清单；<code>let</code> 绑定递归闭包被类型检查误报 Error 级 NAM003（运行时两后端均正确）；闭包捕获 <code>mut</code> 变量的跨后端行为分歧（2 vs 1）在 <code>--check</code> 下零诊断。总体评价：高质量的单人研究型工程，差异化主张（repair-native）有可复现实证支撑；剩余风险集中在"声称与实现的边缘摩擦"，而非工程能力本身。
+</div>
+
+<h2>一、审查方法与验证矩阵</h2>
+<p>审查方式：阅读全部核心文档（README / LANGUAGE_SPEC / SPEC_FOR_AI / HANDOVER / SECURITY / RFC-0003 / eval 报告）与源码抽样（lexer 全文、interpreter/typechecker/parser/wasm_codegen 关键路径、生产代码 panic 面全量清点），并实际运行以下命令取证。环境为 Windows 单平台；未能在本地复现的项在 §六 如实标注。</p>
+
+<table>
+<tr><th>项目声称</th><th>本次实测</th><th>证据</th></tr>
+<tr><td>454/454 Rust 单测通过</td><td><span class="tag ok">✓</span></td><td><code>cargo test --release</code> → <code>454 passed; 0 failed; finished in 2.04s</code>；源码 <code>#[test]</code> 计数恰为 454（逐文件求和）</td></tr>
+<tr><td>eval 114/114 参考解双后端通过</td><td><span class="tag ok">✓</span></td><td><code>run.ps1 -Verify</code> → Passed 114 / Failed 0；<code>-Backend wasm</code> → 同为 114/0/100%</td></tr>
+<tr><td>自举验收（dump/tokens/diags/static/run/wasm）</td><td><span class="tag ok">✓</span></td><td><code>tools/verify_selfhost.py</code> 六模式全 PASS：dump 147/147（Latin-1 折叠 0）、tokens 147/147（已知列坐标系差异 1）、diags 5/5、static 坏 15 + 干净 147 全对齐、run 31/31、wasm-layer2 19/19</td></tr>
+<tr><td>零第三方依赖</td><td><span class="tag ok">✓</span></td><td><code>Cargo.lock</code> 仅含 <code>lom 1.0.0</code> 自身；Cargo.toml <code>[dependencies]</code> 为空且带说明注释</td></tr>
+<tr><td>零 unsafe</td><td><span class="tag ok">✓</span></td><td><code>grep -rn "unsafe" src/</code> 零命中</td></tr>
+<tr><td>构建零 warning / clippy 零告警</td><td><span class="tag ok">✓</span></td><td>touch 后重编 <code>grep -c "^warning"</code> = 0；<code>cargo clippy --release -- -D warnings</code> 通过</td></tr>
+<tr><td>冻结清单：20 保留字 / 43 内建</td><td><span class="tag ok">✓</span></td><td>lexer.rs 关键字分支恰 20 个；interpreter.rs <code>is_known_builtin</code>（:2047）恰 43 个，与 spec §14 模块分解 2+12+4+10+2+8+4+1 吻合</td></tr>
+<tr><td>fix_corpus 端到端闭环</td><td><span class="tag ok">✓</span></td><td>4 个 <code>*.bad.lom</code> 逐个跑 <code>lom fix --apply</code>，结果与 <code>*.fixed.lom</code> 逐字一致（含 2 轮迭代收敛案例）</td></tr>
+<tr><td>total parser（畸形输入不 panic）</td><td><span class="tag ok">✓</span></td><td>80 轮随机 UTF-8 垃圾 + 破坏性尾缀冲击 <code>--check</code>，退出码全部 ∈ {0,1}，0 崩溃</td></tr>
+<tr><td>fmt 幂等 CI gate</td><td><span class="tag ok">✓</span></td><td>对全部 examples（含 bootstrap/selfhost，豁免 apply_test）跑 <code>fmt --check</code> 全过</td></tr>
+<tr><td>EFF001 指向 10:1 / 21:1</td><td><span class="tag ok">✓</span></td><td><code>lom --check examples/effects_bad.lom</code> 输出两处 EFF001 恰为 (10:1)/(21:1)</td></tr>
+<tr><td>155/155 规范提交、单人</td><td><span class="tag ok">✓</span></td><td><code>git log --format='%an'</code> 唯一作者 wyty；155 条主题行全部匹配 conventional 前缀，0 合并提交</td></tr>
+<tr><td>wasm OOB 仅影响自举场景（§14 裁决 ②）</td><td><span class="tag info">部分支持</span></td><td>自造 13.8KB / 200 函数普通程序编译 WASM 运行正常（尾输出正确）——单一形态证据，支持"OOB 依赖 self_interp 特定结构"的限定，但不构成排除性证明</td></tr>
+</table>
+
+<h2>二、问题清单（按优先级排序）</h2>
+
+<h3><span class="tag p0">P0-1</span> SECURITY.md「checked arithmetic」声称与实现不符 —— release 下整数算术静默回绕</h3>
+<p><strong>声称</strong>：<code>SECURITY.md:17</code>："*Integer handling: all arithmetic on Lom <code>Int</code> is checked (<code>i64</code>); division by zero is a runtime error, not a trap.*"；<code>README.md:105</code>（Phase 6.6）重复了该条并把整份清单称为 "hardening inventory (grep-verified … checked arithmetic)"。</p>
+<p><strong>实现</strong>：<code>src/interpreter.rs:1267-1284</code> 的 <code>eval_arith</code> 对 Int 使用裸运算 <code>a + b</code> / <code>a - b</code> / <code>a * b</code>（无任何 <code>checked_*</code>；全库 <code>grep "checked_"</code> 零命中）。只有除零/取模零被拦截（这部分属实）。WASM 后端为 i64 wrap（WebAssembly 标准语义），同样不是"checked"。</p>
+<p><strong>实测</strong>（release 二进制，2026-09-03）：</p>
+<pre><code>$ lom ovf.lom          # println(9223372036854775807 + 1) 等
+9223372036854775807
+-9223372036854775808    ← MAX + 1 静默回绕，无任何诊断，退出码 0
+9223372036854775807     ← (0 - MAX) - 2 回绕
+-2                      ← MAX * 2 回绕
+[runtime] error: 整数除以零  ← 除零确有 RUNTIME000（此条属实）</code></pre>
+<p><strong>为何定 P0</strong>：这不是普通的文档滞后，而是<strong>安全审计文档中的加固清单条目失实</strong>，且 README 把它标为"grep-verified"——恰好该条目无法用 grep 验证，说明 6.6 的验证程序本身有漏洞。项目的立身纪律是"文档不撒谎"（上轮审查引用的 HANDOVER 治理原则），安全文档是其中可信度权重最高的一层。溢出回绕本身在"受信程序"威胁模型下危害有限（定 P0 的依据是宣称失实，不是攻击面）。</p>
+<p><strong>修复建议（二选一）</strong>：① 改文档——如实记录"Int 算术为 i64 回绕语义（release）／debug 构建 panic；仅除零/模零为运行时诊断"，并把 §Interpreter hardening 该条移入 Known limitations；② 改实现——<code>checked_add/sub/mul</code> 溢出时发 RUNTIME 诊断（属运行时行为变化，按冻结裁决 §14-3 的精神应过一次 RFC；仅改文档则无冻结冲突）。同时建议 README:105 删去或限定 "grep-verified" 的范围。</p>
+
+<h3><span class="tag p1">P1-1</span> 浮点 inf/NaN/大数显示：格式化 bug + 跨后端分歧，且未列入已知分歧清单</h3>
+<p><strong>事实一（显示 bug）</strong>：<code>interpreter.rs:248-255</code> 的 <code>to_display</code> 对无小数点的 Float 一律补 <code>".0"</code>，而 Rust f64 的 <code>to_string()</code> 对特殊值产出 <code>"inf"</code>/<code>"NaN"</code>（不含点），于是：</p>
+<pre><code>$ lom flt.lom           # println(1.0 / 0.0); println(0.0 / 0.0)
+inf.0                   ← 解释器
+NaN.0
+$ lom build flt.lom --target wasm && node run_wasm.mjs flt.wasm
+Infinity.0              ← WASM 后端（JS String() 再补 ".0"）
+NaN.0</code></pre>
+<p><strong>事实二（跨后端分歧）</strong>：同一程序两后端 stdout 不同（<code>inf.0</code> vs <code>Infinity.0</code>）；大数同样分歧——<code>println(100000.0^6)</code> 解释器输出 <code>1000000000000000200000000000000.0</code>（Rust Display 全展开），WASM 输出 <code>1.0000000000000002e+30</code>（JS 科学计数法）。实测均于 2026-09-03。</p>
+<p><strong>为何定 P1</strong>：SPEC_FOR_AI:675 的"已知分歧"清单只列了闭包捕获语义与 JSON 数字拆分两条，<strong>浮点显示分歧不在其中</strong>——"byte-identical dual-backend" 的宣称存在未记录的边界例外；eval 套件没有 inf/NaN/大数用例，所以 114/114 无法暴露它。对以"两后端逐字节一致"为卖点的项目，这是主张的边界漏洞；显示语义不属冻结的语言面，可修。建议：统一 Float 显示规则（含 inf/NaN/科学计数法阈值），补入 SPEC_FOR_AI 已知分歧清单（若不统一）并加 eval 用例。</p>
+
+<h3><span class="tag p1">P1-2</span> <code>let</code> 绑定递归闭包被误报 Error 级 NAM003 —— 静态拒绝、动态合法</h3>
+<p><strong>复现</strong>：</p>
+<pre><code>fn main() -> Unit
+    let f = fn(x: Int) -> Int
+        if x == 0
+            0
+        else
+            f(x - 1)      ← 此行被报 NAM003 "调用未定义函数 'f'"（Error）
+        end
+    end
+    println(f(5))
+end</code></pre>
+<p class="ev">实测（2026-09-03）：解释器与 WASM 两后端都<strong>正确运行输出 0</strong>；但 <code>--check</code> 退出码 1、<code>--json</code> 报 <code>ok: false</code>、severity 为 error。README:113 明确声称 WASM 支持 "recursive closures via pre-bind + env slot patch"——即递归闭包是被设计支持的功能，静态检查与动态语义、与文档三方不一致。</p>
+<p><strong>根因</strong>：<code>typechecker.rs:505-526</code>——<code>Stmt::Let</code> 先 <code>check_expr(value, env)</code>（:506）后 <code>env.define(name, ...)</code>（:525），闭包字面量体内自引用时名字尚不在作用域。修法现成：初始化器为闭包字面量时先预绑 <code>Unknown</code>（Rust 对 <code>let f = || f()</code> 同样报错，但 Lom 的动态语义选择支持它，静态侧应当跟随）。</p>
+<p><strong>为何定 P1</strong>：误报是 Error 级——把 <code>--check</code> 当 CI 门禁的用户会被误杀合法程序；对"LLM 写代码、诊断导引修复"的核心场景，Error 级假阳性是最伤信任的缺陷类型（LLM 会徒劳地"修"一个正确的程序）。eval 套件无此类用例（category 04 closures 的递归都走命名函数）。</p>
+
+<h3><span class="tag p1">P1-3</span> 闭包捕获 <code>mut</code> 变量：两后端行为相反（2 vs 1）且零诊断</h3>
+<p><strong>复现</strong>（实测 2026-09-03）：<code>let mut x = 1; let f = fn() -> Int { x } end; x = 2; println(f())</code> —— 解释器输出 <strong>2</strong>（共享作用域），WASM 输出 <strong>1</strong>（创建时值拷贝）。</p>
+<p><strong>记录状态</strong>：SPEC_FOR_AI:675 已如实记录该分歧并警告 "do not rely on either side's behavior"——文档没撒谎。但 <code>--check</code> 对该程序输出"诊断通过，无错误"（退出码 0）：已知陷阱<strong>没有任何诊断防线</strong>。MUT001（v0.20.0）已建立 <code>TypeEnv.mutables</code> 可变性跟踪，"闭包体引用 mut 绑定"加一条警告的机制是现成的。按项目"诊断先行"的哲学，这是明显的防线缺口：一个 LLM 完全可能写出这种代码，在不同后端得到相反结果且全程无提示。建议：EFF/MUT 家族加 warning 级代码（冻结裁决允许新增 warning-only 代码，§14-3），或至少在教程/SPEC_FOR_AI 高亮区重复警示。</p>
+
+<h3><span class="tag p2">P2-1</span> 深递归栈溢出为裸 Rust panic，无结构化诊断</h3>
+<p>实测：5 万层递归 → <code>thread has overflowed its stack</code>、退出码 127，无 RUNTIME 诊断。SECURITY.md:14 与冻结裁决 §14-②（"structured stack-overflow diagnostics" 在 post-1.0 挂账）均已如实记录，约 10⁴ 安全深度与实测相符（本条为已挂账项，列出供完整性）。</p>
+
+<h3><span class="tag p2">P2-2</span> 浮点字面量不支持科学计数法 —— spec 如实，但与"LLM 自然写法"目标相悖</h3>
+<p>实测：<code>println(1e300 * 1e5)</code> → PARSE001（期望 ')' 得到标识符 'e300'）。SPEC_FOR_AI:28 只定义 <code>3.14</code> 形态，行为与 spec 一致（非失实）；且语言面已冻结，v1.x 内无法补。但 Python/JS/Rust 背景的 LLM 写 <code>1e9</code> 是高概率自然形态——这与 5.4 节为 <code>"n = " + 42</code> 专门做拼接提升的动机（"LLM 自然写法被拒的缺口"）属于同类问题，却留在了冻结面外。建议：教程/SPEC_FOR_AI 显著标注此差异（若未标注），错误修复侧可考虑把"1e300 → PARSE001"识别为高置信度改写建议（<code>1000000000.0</code> 等价形式），不改语法即可缓解。</p>
+
+<h3><span class="tag p2">P2-3</span> 注释级文档腐坏（两处，均为陈旧计数/描述）</h3>
+<ul>
+<li><code>.github/workflows/ci.yml:87</code> 步骤名 "WASM eval parity (113 tasks via node…)" —— 实为 114 任务（步骤本身跑全集，功能无恙）。</li>
+<li><code>tools/verify_selfhost.py:362-363</code> <code>mode_run</code> 内注释仍称"宿主 lexer 对非 ASCII 字面量按字节 Latin-1 展开（历史行为）"——v1.0.0 已修复，且本次实测 run 模式折叠计数为 0；与同文件头注（:13-15，已更新为"降级为防御网"）自相矛盾。纯注释腐坏。</li>
+<li>同属此类：README Roadmap Phase 7 行的 "eval 113/113×2" 是完成时点的历史快照（与 v1.0 行的现行数字并存），可读性上易混淆，可加"（时点值，现 114）"字样。</li>
+</ul>
+
+<h3><span class="tag p2">P2-4</span> eval 任务 ID 存在永久空洞 108（外观问题）</h3>
+<p>实测清点：114 任务、ID 全局唯一（有回归测试钉住）、无重复；但 101-115 区间缺 108（历史沿革：map 任务曾误编 086，上轮整改重编为 114，见 HANDOVER:354-⑥）。纯编号美观问题，不建议改动（改号成本大于收益），记录在案即可。</p>
+
+<h3><span class="tag p3">P3</span> 次要观察</h3>
+<ul>
+<li><code>SECURITY.md:16</code> "Unknown characters become explicit <code>TUnknown</code> tokens" —— <code>TUnknown</code> 是自举 mini 语言（stmt_interp.lom）的机制；宿主 lexer 的实际路径是 LexError 诊断（容错模式逐字符跳过）。行为描述（不静默丢弃）正确，机制归属写串了层。</li>
+<li><code>SECURITY.md:9</code> "There is no <code>Cargo.lock</code> dependency surface to audit" —— Cargo.lock 已于上轮整改入库（147 字节、仅含自身），句面易读成"无 lockfile"。技术上仍真（无依赖面），建议改写为"lockfile 中无第三方依赖"。</li>
+<li>仓库根存在未跟踪文件 <code>_t_fib.wasm</code>（9.4KB，8 月 24 日）——已被 gitignore 覆盖、未入库，仅本地工作区杂物，无卫生问题。</li>
+<li>README "Phase 1" 段落（13/13 示例、20/20 测试）为历史里程碑记录，与现状（36 个 .lom、454 测试）并列存在——项目一贯以时点快照记录里程碑，非腐坏，但对外读者可能误读为现状。</li>
+</ul>
+
+<h2>三、最重要的几个发现（展开）</h2>
+
+<h3>发现 1：「不撒谎」纪律在最敏感的一份文档上出现审计型失实（P0-1）</h3>
+<p>这个项目的差异化资本之一就是文档可信度：三轮文档腐坏清扫、"严禁虚构数据"写进 CONTRIBUTING、上轮审查的 P0 也是"喂给 LLM 的 spec 与实现矛盾"。本次的 <code>checked arithmetic</code> 失实比普通腐坏更重一档：它位于<strong>安全加固清单</strong>（安全边界的正式声称），且被 README 标注为 "grep-verified"——一个实际未执行的验证标注。冰山提示：6.6 清单的验证程序是"抽查 grep"，凡 grep 验证不了的条目（语义行为类）都可能是下一个失实点。建议把"安全清单条目必须附可执行验证命令"写入 SECURITY.md 的 Audit procedure 一节——这恰是该节已有的思路（第 34 条已写 <code>grep -rn "unsafe" src/</code> 必须为空），只需推广到每一条。</p>
+
+<h3>发现 2：静态/动态语义的两处分歧，直击 repair-native 主张的软肋（P1-2 / P1-3）</h3>
+<p>Lom 的核心卖点是"LLM 写错 → 诊断指路 → 原地修复"。这个闭环的隐含前提是<strong>诊断永远不说谎</strong>：Error 意味着真的错，干净意味着真的对。本次发现恰好各打破一半：递归闭包案例里诊断"错怪好人"（Error 级假阳性，LLM 会去"修"正确的代码）；mut 捕获案例里诊断"纵容真凶"（两后端结果相反、全程零警告，违反 "byte-identical" 的用户预期）。两条的修复机制都是现成的（预绑 Unknown / mutables 警告），成本低于收益。冻结裁决允许新增 warning-only 诊断代码，不动语言面——法律层面无障碍。</p>
+
+<h3>发现 3：工程底座经受住了独立复核 —— v1.0 冻结的底气是真实的</h3>
+<p>验证矩阵（§一）的每一行都是本次亲手复跑的命令，无一失败。特别值得指出的是这类项目少见的几项：<strong>生产代码 panic 面全量清点后 21 处全部有构造性守卫</strong>（list_get 先边界检查后 unwrap、lexer 在 is_at_end 后 peek、WASM 浮点 % 走 trunc 公式使 unreachable 真不可达——逐条核过）；<strong>80 轮随机 fuzz 零崩溃</strong>支撑 "total parser" 声称；上轮审查整改清单 9 项抽查全部落地且 HANDOVER:354 记录了"驳回/暂缓"及理由（治理成熟度罕见的部分）。相比之下，两个月的单人项目能把自举验证做到 147 文件六模式逐字对齐，这份冻结声明背后的工程是硬的。</p>
+
+<h3>发现 4：eval 套件的覆盖盲区有一个共同形状——"边界值不进集合"</h3>
+<p>本次三个跨后端分歧（inf/NaN 显示、大数显示、mut 捕获）全部是 114 个 eval 任务覆盖不到的：任务集由"典型形态"构成，而分歧恰恰住在边界值里（IEEE 特殊值、量级极端、别名/可变性交互）。fix_corpus 的思路（成对坏/好文件 + 逐字比对）已经证明"语料即覆盖"的方法有效，建议给 eval 增加一个 <em>backend-parity edge</em> 小分类（inf/NaN/大数/-0.0/空串/空表/单元素元组/mut 捕获/递归闭包），双后端跑同一任务即可把这类分歧变成 CI 可见的回归。</p>
+
+<h2>四、与上轮审查（2026-08-31）的对照</h2>
+<table>
+<tr><th>上轮问题</th><th>本次状态</th><th>证据</th></tr>
+<tr><td>P0：SPEC_FOR_AI "运行不做类型检查"</td><td><span class="tag ok">已修复</span></td><td>SPEC_FOR_AI:705 现为 "type checking visible on the default run path (diagnostics on stderr, never blocking execution)"，实测 <code>lom file</code> 确实打类型诊断且不阻断</td></tr>
+<tr><td>P1：README logos 残留 / 无快速上手</td><td><span class="tag ok">已修复</span></td><td>全库 grep "logos" 零命中（Cargo.toml:12 注释还主动记录了这段历史）；README:9-24 有 Quick Start</td></tr>
+<tr><td>P1：LANGUAGE_SPEC 结构性腐坏（标题/EBNF/§9.3 Vec 等）</td><td><span class="tag ok">已修复</span></td><td>spec 头部 "FROZEN (v1.0)"；§14 冻结声明与实现逐项核对一致（20 词/43 内建）</td></tr>
+<tr><td>P1：HANDOVER 基线数字分裂</td><td><span class="tag ok">已修复</span></td><td>§1/§2/§9 全部 454/454 一致（HANDOVER:35/83/281）</td></tr>
+<tr><td>P2：eval/README 计数停留、Cargo.lock 未入库、.gitattributes</td><td><span class="tag ok">前两项已修复</span>；.gitattributes 明确驳回（风险大于收益，记录在案）</td><td>eval/README.md:3 "114-task"；Cargo.lock 已入库；HANDOVER:354 记录裁决理由</td></tr>
+<tr><td>P2：eval ID 086 冲突</td><td><span class="tag ok">已修复</span></td><td>本次清点 114 ID 全局唯一；重编为 114（遗留空洞 108 见 P2-4）</td></tr>
+<tr><td>「AI 原生」宣称超出证据（单模型单采样）</td><td><span class="tag ok">已补齐</span></td><td>四模型 113 任务复测（REPORT-2026-08-31-multimodel.md），方法学/留档/失败分析完整；README:158 保留"单采样、pass@k 与对照组仍缺"的限定语</td></tr>
+<tr><td>MUT001（不可变重赋值零校验，当时自发现）</td><td><span class="tag ok">已实现</span></td><td>v0.20.0 落地（README:129）</td></tr>
+</table>
+<p>结论：上轮清单在本轮抽查中<strong>未发现未整改的存活项</strong>（除明确记录驳回/暂缓的）。文档腐坏从上轮的"系统性"降级为本轮的"注释级零星"（P2-3），治理趋势向好。</p>
+
+<h2>五、积极面记录（有证据的）</h2>
+<ul>
+<li><strong>声称-实现一致性整体极佳</strong>：§一矩阵 14 项可机械验证声称 100% 通过——这在"AI 原生"叙事项目中是罕见的。</li>
+<li><strong>安全设计取舍诚实</strong>：SECURITY.md 的威胁模型（受信程序、非沙箱）与 accepted risks 三条均与实现相符（本次逐条核过，除 P0-1 外）；RefCell 重入不可达的论证与代码现状一致（高阶内建确都只操作 List）。</li>
+<li><strong>修复引擎配得上旗舰定位</strong>：fix_corpus 4/4 逐字复现（含两轮迭代收敛、中置信度永不自动应用的安全策略路径）。</li>
+<li><strong>提交与版本纪律</strong>：155/155 conventional、单人线性历史、版本 tag 与里程碑对齐、<code>lom --version</code> → 1.0.0 与 Cargo.toml 一致。</li>
+<li><strong>Latin-1 修复质量</strong>：v1.0.0 冻结切片的非 ASCII 词法修复带 3 个回归测试，自举 run 模式折叠计数实测归零，且容忍旧行为的折叠等价逻辑保留为防御网——典型的"修 bug 不烧桥"。</li>
+</ul>
+
+<h2>六、方法局限（未验证项，如实声明）</h2>
+<ul>
+<li><strong>单平台</strong>：全部运行验证在 Windows 11 / Git Bash 完成；Linux/macOS CI 三平台绿为 README+CI 配置声称，本次未复跑（CI 配置文件本身已审阅，gate 集合与文档描述一致）。</li>
+<li><strong>LLM 评测不可重放</strong>：99.1-100% 多模型通过率依赖外部模型端点，本次仅审阅报告方法学与留档结构（prompt/原始回复/run_meta 是否齐备），未重新生成。</li>
+<li><strong>wasm OOB 未深挖</strong>：仅审阅 RFC-0003 修订 20/21 的实验档案并做了大普通程序回归（通过）；未尝试复现该 OOB 本身。</li>
+<li><strong>大文件抽样</strong>：wasm_codegen.rs（4,976 行）、interpreter.rs（3,586 行）、typechecker.rs（2,506 行）为关键路径 + panic 面全量 + 语义探针式审查，非逐行通读。</li>
+<li><strong>fuzz 为快速冲击</strong>：80 轮随机 UTF-8 属冒烟级，非系统化模糊测试（无覆盖率引导、无语法感知变异）。</li>
+<li><strong>LSP/REPL/package 仅冒烟或依赖内联测试</strong>：REPL/doc 冒烟通过；LSP 走其 19 项内联测试背书，未做真实编辑器端到端。</li>
+</ul>
+
+<h2>七、结论</h2>
+<p>这是一个在"声称的可验证性"上达到罕见标准的单人语言工程：本次独立复跑的全部量化声称无一失败，自举与双后端一致性的验收基础设施（六模式脚本、golden 逐字比对、fix 语料回归网）是同类项目中的上乘之作。v1.0 冻结的工程基础成立。</p>
+<p>冻结之后的优先事项，按本报告的证据排序：<strong>①</strong> 修正 SECURITY.md/README 的 checked-arithmetic 失实（P0，纯文档修复即可闭环）；<strong>②</strong> 为递归闭包假阳性与 mut 捕获静默分歧补诊断防线（两条 P1，机制现成，符合冻结裁决对 warning-only 代码的许可）；<strong>③</strong> 统一或记录浮点显示的跨后端规则并补 eval 边界值分类（P1-1 + 发现 4）。这三件事共同指向同一个主题：让"诊断与文档永远不说谎"这句 Implicit slogan，在边界值上也成立。</p>
+
+<p class="meta">审查人：独立审查 agent（只读模式）· 报告生成：2026-09-03 · 本报告为唯一写入的文件（docs/reviews/review-2026-09-03.html）</p>
+
+</body>
+</html>
