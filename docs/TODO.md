@@ -15,7 +15,14 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
 
 ---
 
-## T1｜P0：SECURITY.md "checked arithmetic" 失实修正（纯文档）
+## T1｜P0：SECURITY.md "checked arithmetic" 失实修正（纯文档）✅ done 2026-09-03
+
+- **证据**：`grep -n -i checked SECURITY.md` 仅剩否定/更正语境（"not checked"）；
+  溢出/除零/模零/grep 计数均实测后写入（`println(9223372036854775807 + 1)` → `-9223372036854775808`；
+  `1/0`→RUNTIME000 整数除以零；`5%0`→RUNTIME000 整数取模零；
+  `grep -rn "checked_add\|checked_sub\|checked_mul\|checked_div" src/` 零命中——
+  注意裸 `grep -c "checked_"` 会命中 wasm_codegen.rs:4586 的测试名 `arity_checked_at_compile_time`，故用精确模式）；
+  回归电池 7/7 PASS（cargo test 454、clippy 0 告警、golden 逐字、fmt 幂等、eval 双后端 114/114、selfhost 五模式）。
 
 - **审查出处**：P0-1。SECURITY.md:17 声称 "all arithmetic on Lom Int is checked (i64)"，
   实现是裸 `a + b`（interpreter.rs eval_arith），release 下 `i64::MAX + 1` 静默回绕；
@@ -35,7 +42,13 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
   范围与事实相符；audit 节每条有命令。
 - **明确不做**：不改实现上 checked_add（运行时行为变化，按冻结 §14 须 RFC——见驳回登记）。
 
-## T2｜P1：let 绑定递归闭包的 NAM003 假阳性修复（双侧）
+## T2｜P1：let 绑定递归闭包的 NAM003 假阳性修复（双侧）✅ done 2026-09-03
+
+- **证据**：复现程序 `--check` 退出码 0、输出"诊断通过，无错误"；
+  对照组（`let x = x + 1`）宿主与自举各仍报 1 条 NAM003；
+  新增测试 `let_closure_self_reference_no_nam003` / `let_non_closure_self_reference_still_nam003` 通过（456/456）；
+  `verify_selfhost.py --static`："坏文件 PASS 15 / FAIL 0；干净集 ALIGNED 147 / DIFF 0"；
+  回归电池 7/7 PASS（eval 双后端 114/114）。
 
 - **审查出处**：P1-2。`let f = fn ... f(x-1) ... end` 静态报 Error 级 NAM003、--check 退出码 1，
   但两后端运行动态均正确（递归闭包是被设计支持的功能）。根因：typechecker.rs `Stmt::Let`
@@ -50,7 +63,14 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
 - **验收**：审查报告的复现程序 `--check` 退出码 0、ok:true；全量回归电池绿（含
   verify_selfhost --static 147 干净集对齐）。
 
-## T3｜P1：闭包捕获 mut 绑定的 warning 诊断（新增 MUT002，warning-only 合法）
+## T3｜P1：闭包捕获 mut 绑定的 warning 诊断（新增 MUT002，warning-only 合法）✅ done 2026-09-03
+
+- **证据**：复现程序 `--check` 退出码 0、恰好 1 条 `[MUT002] 闭包捕获了可变绑定 'x'`（4:9）；
+  `--json` severity=warning、ok:true（与 MUT001 同发射路径）；examples 全部 +
+  eval 下 560 个 .lom 扫描零 MUT002 触发（干净程序零新增诊断）；
+  边界用例：不可变捕获/闭包内同名遮蔽不报，嵌套闭包捕获外层闭包 mut 局部在引用点报；
+  `fix --plan` 对 MUT002 走未知码 hint-only 兜底（不自动应用）；
+  自举侧未动（FOUR_CODES 过滤不受影响）；回归电池 7/7 PASS。
 
 - **审查出处**：P1-3。`let mut x = 1; let f = fn() -> Int { x } end; x = 2; f()` 解释器输出 2、
   WASM 输出 1——分歧本身已文档化，但 --check 零诊断。MUT001 已建 TypeEnv.mutables 跟踪，
@@ -64,7 +84,14 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
   --json 的 severity=warning 与 MUT001 同形。
 - **明确不做**：不统一两后端捕获语义（设计取舍，已文档化）。
 
-## T4｜P1：浮点 inf/NaN 显示统一（修 bug）+ 大数分歧入清单（只记录）
+## T4｜P1：浮点 inf/NaN 显示统一（修 bug）+ 大数分歧入清单（只记录）✅ done 2026-09-03
+
+- **证据**：双后端实测 `println(1.0/0.0)`/`(0.0/0.0)`/`(-1.0/0.0)` 逐字一致输出
+  `inf`/`NaN`/`-inf`（修前为 `inf.0` vs `Infinity.0`）；有限值 4.0/3.14/-0.5 双后端不变；
+  SPEC_FOR_AI §11f 分歧清单 5 条全部当日实测（除零：RUNTIME000 vs `wasm trap: divide by zero`；
+  trim：NBSP 解释器 trim→1 / WASM 不 trim→3；大数：`1000000000000000200000000000000.0` vs
+  `1.0000000000000002e+30`）；字面量行已加"无科学计数法字面量"警示；
+  回归电池 7/7 PASS（golden/eval 零变化，114/114 双后端）。
 
 - **审查出处**：P1-1。①显示 bug：`println(1.0/0.0)` 解释器打 `inf.0`（to_display 给
   "inf" 补 ".0"）、WASM 打 `Infinity.0`（JS String）——双后不一致且都难看。
@@ -83,7 +110,19 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
 - **验收**：inf/-inf/NaN 三值双后端 stdout 逐字一致（`inf`/`-inf`/`NaN`）；有限值显示与
   全部存量 golden/eval 零变化；SPEC_FOR_AI 分歧清单含 5 条且与实现相符。
 
-## T5｜eval 新任务 ×2 + 全量计数簿记（依赖 T2/T4）
+## T5｜eval 新任务 ×2 + 全量计数簿记（依赖 T2/T4）✅ done 2026-09-03
+
+- **证据**：任务 116（closures）/117（types）solution 双后端实跑逐字一致后定稿
+  （116：`120/3628800`；117：`inf/NaN/-inf/2.5/4.0`）；
+  run.ps1 双后端 **116/116**（Total: 116 / Passed: 116 / Failed: 0）；
+  `tests::eval_task_ids_globally_unique` ok（456/456 通过）；
+  簿记逐一更新：manifest（total 116 + types/closures 13）＋ prompts 重跑（仅 03/04 变更，
+  其余 8 文件字节不变）＋ eval/README 三处＋README 状态段（114/114→116/116，
+  同段 454→456 一并如实更新）＋LANGUAGE_SPEC §12（116/116 + 布局注释 11/12→13/13
+  顺手修陈旧值）＋HANDOVER §1 快照/§2.2 基线/§11.1 操作注记＋tutorial 量化面板/gate
+  ⑤⑥/进度答案/871 差异清单 4→5 处＋ci.yml:87（113→116）＋SPEC_FOR_AI §11f 残留
+  "all 108"（陈旧计数顺手修 116）；grep 复查现值声称无旧计数残留；
+  回归电池 7/7 PASS（eval 双后端 116/116）。
 
 - **审查出处**：发现 4（"边界值不进集合"）的**部分采纳**：只把修复后收敛的行为做成
   parity 任务；设计性分歧（mut 捕获）走 T3 诊断不走 parity——否则 gate 永久红。
@@ -105,7 +144,16 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
 - **验收**：run.ps1 双后端 116/116；cargo test 的 eval ID 唯一性测试绿；
   上列簿记位置逐一 grep 无残留旧计数。
 
-## T6｜P3 杂项清理
+## T6｜P3 杂项清理 ✅ done 2026-09-03
+
+- **证据**：六项逐一落实——①verify_selfhost.py mode_run 注释改写为"防御网（正常 0 计数）"
+  口径（与文件头 13-14 行一致，行为不变）；②SECURITY.md TUnknown 句改写为宿主实际机制
+  （实测 `@` → LEX005 + 容错续解析；src/lexer.rs 无 TUnknown——那是自举侧机制）；
+  ③Cargo.lock 句改为 "the lockfile is in-tree and contains no third-party packages"；
+  ④README Roadmap Phase 7 行加"（时点值，2026-08-23；现值见 eval/README）"；
+  ⑤`_t_fib.wasm` 已删除（未跟踪+gitignore，`ls` 确认不存在）；
+  ⑥README Phase 1 段加"（历史里程碑快照，非现状……）"（执行者判断：加）；
+  回归电池 7/7 PASS。
 
 - tools/verify_selfhost.py:362-363：mode_run 内旧注释（"宿主 lexer 按字节 Latin-1 展开"）
   与文件头新注释矛盾——改写为"防御网（v1.0.0 修复后正常 0 计数）"口径（审查 P2-3）。
@@ -117,7 +165,14 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
 - 删除工作区杂物 `_t_fib.wasm`（未跟踪、已 gitignore，本地清理即可）。
 - README "Phase 1" 段落加半句"（历史里程碑快照，非现状）"（审查 P3，可选项——执行者判断）。
 
-## T7｜收尾：升版 1.1.0
+## T7｜收尾：升版 1.1.0 ✅ done 2026-09-03
+
+- **证据**：Cargo.toml/lock 升 1.1.0（`cargo build --release` 刷新），`lom --version` → `lom 1.1.0`；
+  T7 后全量回归电池重跑 8 项全绿：cargo test 456/456、clippy -D warnings 零告警、
+  stmt_interp golden 逐字、fmt --check 幂等、eval 双后端 116/116、verify_selfhost 五模式 PASS、
+  --version 显示 1.1.0。未打 tag、未 commit、未 push（全部改动留工作区待维护会话验证）。
+  配套登记：LANGUAGE_SPEC §13 v1.1.0 变更记录 + §7.3 MUT 行登记 MUT002 +
+  SPEC_FOR_AI 码表/家族行登记 MUT002 + HANDOVER 版本行/tutorial 进度答案同步 1.1.0。
 
 - 依据：MUT002（新 warning 诊断能力）+ NAM003 假阳性修复 + inf/NaN 显示修复 = 用户可见
   变更，minor 语义版本纪律。
@@ -134,6 +189,19 @@ T1（纯文档）→ T2 → T3 → T4 → T5（含两个新 eval 任务，依赖
   8. `lom --version` 显示 1.1.0（T7 后）
 
 ---
+
+## 维护会话复核记录（2026-09-03，交付验收）
+
+整改会话交付后由维护会话独立复核：① 逐行审阅全部代码/文档 diff（typechecker 的
+边界判定次序、嵌套闭包与非 mut 捕获语义均推演确认）；② 亲自复跑全量电池——
+456/456、clippy 零告警、golden 逐字、fmt 幂等、eval 116/116 双后端、selfhost
+五模式全 PASS（dump/tokens 149）；③ T2/T3/T4 复现程序逐个实测（递归闭包 --check
+零诊断 / `let x = x + 1` 仍报 NAM003 / MUT002 恰 1 条且 ok:true / inf-NaN 双后端
+逐字一致）；④ 整改会话的五项超出台账裁量项**全部接受**（T1 计数器口径修正是
+对台账原始建议缺陷的如实纠偏——原 grep 模式会误命中测试函数名；456 计数连带、
+顺手陈旧计数、v1.1.0 配套登记均符合项目惯例；历史快照不动正确）。
+
+本工作包就此关闭；后续新待办重新登记于本文件。
 
 ## 驳回/挂起登记（2026-09-03 维护会话裁决，勿重新翻案）
 

@@ -183,7 +183,7 @@
   <tr><td><strong>v1.0 语言面冻结</strong></td><td><strong>已生效(2026-09-02,v1.0.0,spec §14)</strong></td></tr>
 </table>
 
-<p>量化指标:Rust 测试 <strong>454/454</strong>;CI 三平台 <strong>9 个回归 gate</strong> 全绿（含 clippy 与 selfhost 五模式）;eval runner <strong>114/114</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
+<p>量化指标:Rust 测试 <strong>456/456</strong>;CI 三平台 <strong>9 个回归 gate</strong> 全绿（含 clippy 与 selfhost 五模式）;eval runner <strong>116/116</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
@@ -727,8 +727,8 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>② 自举 golden</td><td>stmt_interp.lom 输出与 golden 文件<strong>逐字 diff</strong>(比对前 <code>tr -d '\r'</code>)</td><td>"行数对但内容错"的静默回归(行数防线被评审指出太弱)</td></tr>
   <tr><td>③ 零依赖</td><td>awk 状态机扫 Cargo.toml 的 [dependencies](覆盖 <code>[dependencies.foo]</code> 表形态)</td><td>供应链承诺被悄悄破坏</td></tr>
   <tr><td>④ fmt</td><td>全部示例 <code>lom fmt --check</code> 幂等(apply_test.lom 是故意坏文件,豁免)</td><td>格式漂移</td></tr>
-  <tr><td>⑤ eval</td><td>114 个任务跑参考解,比对 stdout + 要求退出码 0</td><td>语言行为回归</td></tr>
-  <tr><td>⑥ WASM parity</td><td>同一套 114 任务用 WASM 后端再跑一遍</td><td>双后端语义漂移</td></tr>
+  <tr><td>⑤ eval</td><td>116 个任务跑参考解,比对 stdout + 要求退出码 0</td><td>语言行为回归</td></tr>
+  <tr><td>⑥ WASM parity</td><td>同一套 116 任务用 WASM 后端再跑一遍</td><td>双后端语义漂移</td></tr>
   <tr><td>⑦ WASM 自举 golden</td><td>stmt_interp 编译到 WASM 后与同一份 golden 逐字比对</td><td>编译器回归</td></tr>
   <tr><td>⑧ clippy</td><td><code>cargo clippy --release -- -D warnings</code>(2026-08-31 第四轮评审整改新增,存量 54 条清零后转 gate,只跑 ubuntu)</td><td>风格/惯用法腐坏</td></tr>
   <tr><td>⑨ selfhost 自举验收</td><td>自举解释器五模式对账宿主(dump/tokens 147 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
@@ -868,13 +868,13 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>三个动机:①递归深度天花板从解释器 ~10⁴ 硬限变为宿主栈可配(<code>node --stack-size=60000</code> 下 10⁵ 层实测通过);②性能对照——自举式 O(n²) 负载纯计算提速约 49 倍;③为 RFC-0003 全量自举铺路(可移植的执行载体)。押注没变:JIT/MLIR/原生机器码依然不做,差异化仍在 <code>lom fix</code> 工具链。</p></div>
 
 <div class="qa"><p class="q">Q:双后端语义完全一致吗?怎么保证?</p>
-<p><strong>别答"完全一致"</strong>——4 处已知差异如实记录在 wasm_codegen.rs 文件头/SPEC_FOR_AI §11f:除零/取模零 trap 行为、trim 的 ASCII vs Unicode、JSON 数字的 Int/Float 判定、闭包捕获值拷贝 vs Rc 共享。保证手段是 CI 双后端 parity gate:114 个 eval 任务 + 自举 golden,双后端 stdout 逐字比对。<strong>诚实记录差异 + 强制逐字比对,比宣称"完全一样"工程上更成熟。</strong></p></div>
+<p><strong>别答"完全一致"</strong>——5 处已知差异如实记录在 wasm_codegen.rs 文件头/SPEC_FOR_AI §11f:除零/取模零 trap 行为、trim 的 ASCII vs Unicode、JSON 数字的 Int/Float 判定、闭包捕获值拷贝、大数浮点显示(全展开 vs 科学计数法;inf/NaN/-inf 已于 v1.1.0 统一)。保证手段是 CI 双后端 parity gate:116 个 eval 任务 + 自举 golden,双后端 stdout 逐字比对。<strong>诚实记录差异 + 强制逐字比对,比宣称"完全一样"工程上更成熟。</strong></p></div>
 
 <div class="qa"><p class="q">Q:修复引擎现在到什么程度?</p>
 <p>M1 拼写 Replace(v0.16.0,Medium 不自动应用)→ M2 --apply 迭代闭环(v0.17.0,三重刹车防震荡,上限 5 轮)→ M3 PARSE001 针对性修复(v0.18.0,<strong>动手前先 --json 探针实测,推翻了两个计划假设</strong>——缺 end 被容错解析静默接受、缺 ')' 的位置在下一个 token)。M4 已完成(v0.19.0):评测任务扩到 113 + fix_corpus 语料逐字回归。亮点是"先实测再写规则"和"凡声称的行为都有逐字防线钉住"。</p></div>
 
 <div class="qa"><p class="q">Q:项目现在什么进度?下一步做什么?</p>
-<p>v1.0.0,路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:454 测试、CI 三平台 9 gate(含 selfhost 五模式)、eval 114/114 双后端。post-1.0 挂账:wasm 越界深挖、L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
+<p>v1.1.0(v1.0.0 冻结后的整改版:新增 MUT002 warning、修 NAM003 递归闭包假阳性、统一 inf/NaN 显示;语言面不变),路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:456 测试、CI 三平台 9 gate(含 selfhost 五模式)、eval 116/116 双后端。post-1.0 挂账:wasm 越界深挖、L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
 
 <hr>
 <!-- ============================================================ -->
@@ -883,7 +883,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>项目文档与代码/数据的出入,以<strong>代码和实测为准</strong>。旧版教程列的三处旧账(拼写建议未消费、Phase 4 合入状态、Cargo.toml 停在 0.1.0)如今<strong>全部已修或不成立</strong>——M1 已让 fix.rs 消费拼写建议、语义版本管理已落地——<strong>别再拿旧账当"防露馅"素材,那才是真正的露馅</strong>。当前有效的三处:</p>
 
 <ol>
-  <li><strong>eval/REPORT.md 是时间胶囊</strong>:它记录的是 2026-08-03 / v0.1.3 / 100 任务时代的数据。引用"99/100"必须带时间和范围——<strong>2026-08-31 的四模型复测(REPORT-2026-08-31-multimodel.md,99.1%-100% 全 113 任务)才是当前主证据</strong>;runner 侧的 113/113 是"参考解通过",和"LLM 生成通过"是两回事,别混着说。</li>
+  <li><strong>eval/REPORT.md 是时间胶囊</strong>:它记录的是 2026-08-03 / v0.1.3 / 100 任务时代的数据。引用"99/100"必须带时间和范围——<strong>2026-08-31 的四模型复测(REPORT-2026-08-31-multimodel.md,99.1%-100% 全 113 任务)才是当前主证据</strong>;runner 侧的 116/116 是"参考解通过",和"LLM 生成通过"是两回事,别混着说。</li>
   <li><strong>工作区与 git 的边界</strong>:fix_corpus 语料与 M4 记录已提交入库(v0.19.0,HANDOVER §11 有完整记录);但 <strong>RFC-0003 全量自举草案仍未提交、未 accept</strong>——讲项目方向时别把 draft 当定案。通用规则:引用项目状态以 git log 的已提交状态为准,工作区文件不算数。</li>
   <li><strong>注释与代码的残留不一致</strong>:parser.rs 文件头注释自称"Pratt 解析",实际是固定优先级链(面试按链式结构讲);SPEC/LANGUAGE_SPEC 的特性表历史上抓出过虚构内容(关键字表、类型别名),三清扫已修,但<strong>对任何"文档说有"的特性,引用前都值得拿 lexer/parser 实测对账一次</strong>。</li>
 </ol>

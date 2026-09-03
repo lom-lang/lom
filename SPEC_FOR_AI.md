@@ -25,7 +25,7 @@
 - **Comments**: `# line` and `#- block -#`
 - **Keywords**: `fn let mut if elif else while for in return match end and or True False from import as enum` — the complete reserved set (verified against the v0.6.1 lexer). Type names (`Int Float Bool String Unit Result Ok Err Some None`) are ordinary identifiers recognized in type position; `struct trait impl type pub` are NOT keywords.
 - **Operators** (low → high precedence): `or`, `and`, `== != < > <= >=`, `|>`, `+ -`, `* / %`, `! -` (prefix), `?` (postfix), call/index/field
-- **Literals**: `42` (Int), `3.14` (Float), `True`/`False` (Bool), `"hi"` (String), `()` (Unit)
+- **Literals**: `42` (Int), `3.14` (Float), `True`/`False` (Bool), `"hi"` (String), `()` (Unit). **No scientific-notation float literals** — write `1000000000.0`, not `1e9` (the lexer reads `1` then the identifier `e9`, so `1e9` is a parse error)
 
 ---
 
@@ -178,7 +178,7 @@ Type annotations are **optional**. Type errors are **non-fatal warnings** — th
 - `lom <file> --json` — emits `lom-diag/v1` JSON including `stage: "type"` diagnostics.
 - `lom <file> --dump-ast` — prints the AST as a deterministic indentation tree (no execution, no type check; spans excluded). Debug/verification tool — Phase 8.1's verbatim-diff baseline.
 
-Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
+Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars), `MUT002` (a closure body references a captured outer `mut` binding — interpreter and WASM disagree on capture semantics; fix: avoid relying on captured `mut` state). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
 
 When you write Lom: annotate function params and return types — the checker will flag mismatches in `--check`/`--json`, helping you fix errors before running. Missing annotations are fine (inferred as `Unknown`, no error).
 
@@ -523,7 +523,7 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 - `MAT001`-`MAT099`: match exhaustiveness (Phase 2.4 — `MAT001` non-exhaustive)
 - `NAM001`-`NAM099`: name resolution (Phase 2.4 — `NAM002` duplicate, `NAM003` undefined, `NAM004` no such field/variant)
 - `EFF001`-`EFF099`: effect errors (Phase 2.5 — `EFF001` pure function calls effectful)
-- `MUT001`-`MUT099`: mutability (v0.20.0 — `MUT001` reassigning an immutable binding: `let` without `mut`, function parameter, `for` loop variable, or `match` binding)
+- `MUT001`-`MUT099`: mutability (v0.20.0 — `MUT001` reassigning an immutable binding: `let` without `mut`, function parameter, `for` loop variable, or `match` binding; v1.1.0 — `MUT002` closure references a captured `mut` binding, warning-only, both-backend divergence flag)
 
 **Tolerant parsing & holes**: when the parser cannot parse a statement, it inserts a `Stmt::Hole` placeholder and continues. The hole is reported as `PARSE099` / `RUNTIME003` (if executed). This means LLMs get **all** errors in one round, not just the first — repair them all at once.
 
@@ -668,11 +668,16 @@ Key points:
 
 ## 11f. Compiling to WebAssembly (Phase 7, v0.15.0)
 
-`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 108 eval tasks.
+`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 116 eval tasks (the five known divergences are listed below).
 
 - Type checking runs before compilation (diagnostics on stderr, never blocking — the same gradual-typing promise as the interpreter).
 - Running the `.wasm` requires a host providing the `env.lom_*` imports (print / file / env / json); the repo ships a Node.js harness at `eval/runner/run_wasm.mjs`.
-- Known divergences (documented; do not rely on either side's behavior): closure capture is value-copy at creation in WASM vs shared-scope in the interpreter; JSON numbers are split Int/Float by the JS host value, not by source syntax.
+- Known divergences (documented, each verified 2026-09-03; do not rely on either side's behavior):
+  1. **Closure capture of `mut` bindings** — value-copy at creation in WASM vs shared-scope in the interpreter (the typechecker flags this with a `MUT002` warning since v1.1.0).
+  2. **JSON numbers** — split Int/Float by the JS host value, not by source syntax.
+  3. **Div/mod by zero** — interpreter reports `RUNTIME000` (整数除以零/取模零); WASM traps with a different message text (`wasm trap: divide by zero`). Exit code 1 on both.
+  4. **`trim` whitespace set** — interpreter strips Unicode whitespace (e.g. U+00A0); WASM strips ASCII whitespace only.
+  5. **Large-float display** — interpreter prints the full decimal expansion (Rust `Display`), WASM prints JS scientific notation (e.g. 1e30-scale: `1000000000000000200000000000000.0` vs `1.0000000000000002e+30`). Recorded divergence, not unified. (`inf`/`-inf`/`NaN` **are** unified — both backends print them verbatim since v1.1.0.)
 - Recursion depth is bounded by the host stack (~10k–30k frames under Node's default stack; `node --stack-size=60000` reaches 10⁵).
 
 ---

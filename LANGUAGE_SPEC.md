@@ -887,7 +887,7 @@ Reserved for future phases (not in v1):
 | `EFF` | type | EFF001-099 (since Phase 2.5) | `EFF001` pure function calls effectful |
 | `MAT` | type | MAT001-099 (since Phase 2.4) | `MAT001` non-exhaustive match |
 | `NAM` | type | NAM001-099 (since Phase 2.4) | `NAM003` undefined variable (compile-time) |
-| `MUT` | type | MUT001-099 (since v0.20.0) | `MUT001` reassigning an immutable binding |
+| `MUT` | type | MUT001-099 (since v0.20.0) | `MUT001` reassigning an immutable binding; `MUT002` (v1.1.0, warning) closure body references a captured outer `mut` binding — interpreter/WASM capture semantics diverge |
 
 Note: in Phase 2.3 (no static type checker), name resolution errors were caught at runtime and classified as `RUNTIME002`. Phase 2.4 introduces `NAM` codes at compile time (via the gradual type checker); runtime `RUNTIME002` is still emitted when a dynamically-run program hits an undefined name that the type checker flagged as `NAM003`.
 
@@ -1256,7 +1256,7 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 
 ## 12. Evaluation Suite (Phase 2.8 — implemented)
 
-Lom ships a 114-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+Lom ships a 116-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
 
@@ -1267,8 +1267,8 @@ eval/
   tasks/
     01_arithmetic.json        # 10 — §3 grammar, §4 types, §5 semantics
     02_control_flow.json      # 13 — §5 if/while/for/return, short-circuit
-    03_types.json             # 11 — §4 Int/Float/Bool/String/Unit
-    04_closures.json          # 12 — §6.3 first-class closures
+    03_types.json             # 13 — §4 Int/Float/Bool/String/Unit
+    04_closures.json          # 13 — §6.3 first-class closures
     05_match_enum.json        # 16 — §6.4 match/enum, §6.5 Result/Option
     06_pipeline.json          # 10 — §6.6 `|>` linear pipeline
     07_records_tuples.json    # 10 — §6.7 structural records/tuples
@@ -1299,7 +1299,7 @@ Each task is a JSON object:
 
 ### 12.3 Runner
 
-- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **100/100 pass.**
+- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **116/116 pass on both backends (interpreter and WASM).**
 - `./run.ps1 -CandidatesDir <dir>` — evaluate LLM-generated code. Reads `<id>.lom` from `<dir>`, runs each, compares stdout to `expected`. Reports per-category and overall pass-rate. Exit code 1 on any failure (CI-friendly).
 - The runner only runs `lom` + compares stdout; it does **not** call any LLM API. LLM candidates are produced out-of-band (e.g. DeepSeek API batch) into a `candidates/` directory.
 
@@ -1360,6 +1360,11 @@ Each task is a JSON object:
 - **v0.22.0 (2026-08-31)**: Phase 8 readiness — RFC-0003 (full self-hosting) accepted; `lom <file> --dump-ast` added (deterministic AST indentation tree, spans excluded — §7.5). Language surface unchanged.
 - **v0.27.0 (2026-09-02)**: `string.char_from_code(cp)` added (§9.2) — Unicode code point → single-char String. The only language-surface change of the pre-v1.0-freeze json adjudication (RFC-0003 revision 24): it unblocks the self-hosted interpreter's `json_parse`/`json_stringify` (Unicode escapes) and removes the L2 self-hosted compiler's byte-construction blocker. Invalid code points (negative / > 0x10FFFF / surrogate D800-DFFF) are runtime errors. Builtin count 42 → 43.
 - **v1.0.0 (2026-09-02)**: **Language-surface freeze** (§14). Shipped in the freeze cut: the lexer's non-ASCII string-literal repair — string literals (and generalized `\` escapes) now decode complete UTF-8 characters instead of per-byte Latin-1 expansion, which had corrupted non-ASCII literals on the reference implementation since Phase 3 (todo.lom's Chinese literals printed mojibake; the self-hosted lexer was already correct). ASCII-only programs are byte-identical. The tolerant lexer now reports one error per character (full character in the message) for non-ASCII identifier positions instead of one per byte. Regression: 454 tests; eval 114/114 dual backend; self-host six-mode acceptance with the Latin-1 fold logic now a zero-count defensive net.
+- **v1.1.0 (2026-09-03)**: post-1.0 review-rectification release (docs/TODO.md T1-T7). Language surface unchanged (freeze §14 intact; the one new diagnostic code is warning-only, as §14-③ permits):
+  - **MUT002** (warning): a closure body referencing a captured outer `mut` binding — the interpreter (shared scope) and WASM (value-copy at creation) disagree on this pattern, so the check flags it. Non-blocking, stderr-only, same shape as MUT001. The self-hosted checker (§8.2 subset) does not produce MUT-family codes.
+  - **NAM003 false-positive fix**: `let f = fn ... f(...) ... end` (self-referencing let-bound closure — a designed feature; the interpreter captures the scope by reference and WASM pre-binds + patches the env slot) no longer reports NAM003. Both host and self-hosted checkers fixed symmetrically; non-closure self-references (`let x = x + 1`) still report.
+  - **Float non-finite display unified**: `inf`/`-inf`/`NaN` print verbatim (no `.0` appended) on both backends; finite-float display unchanged. The interpreter's `1000000000000000200000000000000.0` vs WASM's `1.0000000000000002e+30` large-float divergence is recorded (not unified) in SPEC_FOR_AI §11f.
+  - Regression: 456 tests; eval 116/116 dual backend (tasks 116 recursive-closure-let, 117 float inf/NaN added); self-host five-mode acceptance green.
 
 ---
 
