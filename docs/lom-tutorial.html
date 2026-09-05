@@ -102,7 +102,7 @@
   <p class="meta">
     读者画像:大二 · 人工智能专业 · 未修编译原理 · 面试备战向<br>
     覆盖范围:整体构建逻辑 · 设计决策动机 · 逐模块代码逻辑 · 面试攻防 · 防露馅提示<br>
-    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10 · <strong>大版本更新 2026-09-02(对齐 v1.0.0:Phase 8 全量自举 + json 双内建裁决 + 语言面冻结,全部进展已覆盖)</strong>
+    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10 · <strong>大版本更新 2026-09-03(对齐 v1.1.0:Phase 8 全量自举 + json 双内建裁决 + v1.0 冻结 + 审查整改,全部进展已覆盖;新增 2.14 节)</strong>
   </p>
   <blockquote>
     使用说明:正文中带 <span class="t">绿色虚线下划线</span> 的术语,在其右侧(窄屏为下方)配有边注,
@@ -205,7 +205,7 @@ Program (AST, src/ast.rs 定义结构)
    │       2026-08-22 起:默认运行路径也检查(诊断走 stderr、永不拦截执行)
    │
    ├─→ ③b Interpreter (src/interpreter.rs)  —— 树遍历:直接执行(默认)
-   │       执行线程包 256MB 大栈(main.rs:206-207),深递归不爆
+   │       执行线程包 256MB 大栈(main.rs:215-216),深递归不爆
    │
    ├─→ ③c WASM 后端 (wasm.rs + wasm_codegen.rs,Phase 7)
    │       lom build &lt;file&gt; --target wasm  →  .wasm 二进制(node 执行)
@@ -238,7 +238,7 @@ Program (AST, src/ast.rs 定义结构)
 <!-- ============================================================ -->
 <h1 id="part2">第二部分:逐模块拆解</h1>
 
-<h2>2.1 Lexer:手写分词器(<code>src/lexer.rs</code>,695 行)</h2>
+<h2>2.1 Lexer:手写分词器(<code>src/lexer.rs</code>,801 行)</h2>
 
 <aside class="sn"><b>游标(cursor)</b>:一个记录"现在读到哪了"的位置指针。Lexer 就是一个游标在源码字符数组上从左往右爬,边爬边切 token。</aside>
 
@@ -253,11 +253,11 @@ Program (AST, src/ast.rs 定义结构)
 <aside class="sn"><b>最长匹配(maximal munch)</b>:词法分析的经典规则——能合成更长的 token 就优先合成。看到 <code>-</code> 时不能急着定性,要先看下一个字符:是 <code>&gt;</code> 就合并成箭头 <code>-&gt;</code>,否则才算减号。</aside>
 
 <ul>
-  <li><strong>多字符运算符用"最长匹配"</strong>:看到 <code>-</code> 先消费,再 peek 下一个,如果是 <code>&gt;</code> 就合成 <code>Arrow</code>(-&gt;),否则是 <code>Minus</code>(lexer.rs:291 附近)。<code>|&gt;</code> 和 <code>|</code>、<code>=&gt;</code> 和 <code>==</code> 同理。</li>
+  <li><strong>多字符运算符用"最长匹配"</strong>:看到 <code>-</code> 先消费,再 peek 下一个,如果是 <code>&gt;</code> 就合成 <code>Arrow</code>(-&gt;),否则是 <code>Minus</code>(lexer.rs:322 附近)。<code>|&gt;</code> 和 <code>|</code>、<code>=&gt;</code> 和 <code>==</code> 同理。</li>
   <li><strong>每个 token 携带 (line, col)</strong>(<code>SpannedToken</code>,lexer.rs:84)。这看似不起眼,却是后面两个重要特性的数据基础:换行敏感语法 + 所有诊断定位。</li>
 </ul>
 
-<p><strong>容错机制(重点)</strong>:lexer 有两个入口。严格版 <code>tokenize()</code> 遇到错误直接放弃;容错版 <code>tokenize_recover()</code>(lexer.rs:147)出错后<strong>回退到保存点、强制前进一个字节、丢弃坏字符、继续扫描</strong>,返回 <code>(tokens, errors)</code>——错误和正常 token 一起出来。这就是"AI 原生"的第一层:<strong>LLM 一次拿到全部错误,而不是修一个错再跑一次</strong>。</p>
+<p><strong>容错机制(重点)</strong>:lexer 有两个入口。严格版 <code>tokenize()</code> 遇到错误直接放弃;容错版 <code>tokenize_recover()</code>(lexer.rs:160)出错后<strong>回退到保存点、强制前进一个字节、丢弃坏字符、继续扫描</strong>,返回 <code>(tokens, errors)</code>——错误和正常 token 一起出来。这就是"AI 原生"的第一层:<strong>LLM 一次拿到全部错误,而不是修一个错再跑一次</strong>。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>对比两种批改作业的老师:严格版老师看到第一个错别字就把卷子一扔,"改完再来";容错版老师把整份卷子读完,用红笔圈出所有错别字一起还给你。哪个对 AI 友好显而易见——AI 改一遍的成本不低,当然希望一次拿到所有问题。</p>
@@ -360,7 +360,7 @@ end</code></pre>
 ③ <strong>match 级恢复</strong> = 听不清的地方正好在一处带很多"小结尾"的段落里?那就保守一点,整段跳到"大结尾"(本 match 的 <code>end</code>)再说——因为乱猜可能把大结尾也吞掉,损失更大。</p>
 <p>"防死循环保险"则是铁律:每次跳过至少往前挪一个词。不然听写卡在一个地方永远原地踏步,程序就死机了。</p></div>
 
-<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,3458 行)</h2>
+<h2>2.4 Interpreter:树遍历求值(<code>src/interpreter.rs</code>,3587 行)</h2>
 
 <p>主调用链四层,背下来:</p>
 
@@ -405,8 +405,10 @@ end</code></pre>
 <ul>
   <li><code>let</code> 只写当前层(所以内层同名变量自然遮蔽外层,shadowing);</li>
   <li>赋值沿链向上找已存在的变量改掉;</li>
-  <li><strong>闭包捕获</strong>:闭包创建时把<strong>当前作用域的 Rc 直接存进闭包里</strong>(interpreter.rs:864/986 两处闭包构造)——不做自由变量分析,整个环境按引用共享,O(1);</li>
-  <li><strong>闭包调用时以"定义处环境"为父</strong>创建新作用域(interpreter.rs:1130-1144 的 eval_call 分支),而普通函数以 <code>globals</code> 为父。</li>
+  <li><strong>闭包捕获</strong>:闭包创建时把<strong>当前作用域的 Rc 直接存进闭包里</strong>(interpreter.rs:865/994 两处闭包构造)——不做自由变量分析,整个环境按引用共享,O(1);</li>
+  <li><strong>闭包调用时以"定义处环境"为父</strong>创建新作用域(interpreter.rs:1140-1149 的闭包调用分支),而普通函数以 <code>globals</code> 为父;</li>
+  <li><strong>双后端捕获分歧(重要)</strong>:WASM 后端做自由变量分析、创建时<strong>值拷贝</strong>捕获,解释器是整环境 Rc 共享——<code>let mut x = 1</code> 被闭包捕获后再改 x,解释器的闭包看到新值、WASM 的看到旧值。v1.1.0 起检查器对"闭包体引用捕获的外层 mut 绑定"发 <strong>MUT002 warning</strong>(非 mut 捕获不会分叉,不警告);</li>
+  <li><strong>递归闭包是设计支持的功能</strong>:<code>let f = fn(n: Int) -> Int ... n * f(n - 1) ... end</code> 合法且双后端一致(解释器按引用捕获作用域;WASM 用"预绑定局部 + 创建后补 env 槽位"实现自引用)。v1.1.0 修复了检查器曾把它误报成 Error 级 NAM003 的假阳性——修法是镜像运行时语义:初始化器为闭包字面量时先以 Unknown 预绑名字再查体;<code>let x = x + 1</code> 这类非闭包自引用照报。</li>
 </ul>
 
 <aside class="sn"><b>闭包(closure)</b>:"函数 + 它出生时能看到的变量环境"打包在一起的值。比如 <code>let add = fn(x) x + base end</code> 里的 <code>base</code> 不是参数,是从定义处环境"捕获"来的——这就是闭包和普通函数的区别。</aside>
@@ -439,7 +441,7 @@ end</code></pre>
 
 <ul>
   <li><code>return</code> 把值包成 <code>ControlFlow::Return(v)</code>,一路向上冒泡到函数边界(exec_block/exec_stmt 的多个分支,interpreter.rs:684-698 一带集中处理);</li>
-  <li><code>?</code> 遇到 <code>Err(e)</code>/<code>None</code> 时抛一个特殊的 <code>RuntimeError::EarlyReturn(...)</code>(定义在 interpreter.rs:352),传播到函数边界转成提前返回(interpreter.rs:1019 的 <code>?</code> 求值分支)——<strong>复用错误通道实现控制流</strong>,是树遍历解释器的经典手法。</li>
+  <li><code>?</code> 遇到 <code>Err(e)</code>/<code>None</code> 时抛一个特殊的 <code>RuntimeError::EarlyReturn(...)</code>(定义在 interpreter.rs:353),传播到函数边界转成提前返回(interpreter.rs:1029 的 <code>?</code> 求值分支)——<strong>复用错误通道实现控制流</strong>,是树遍历解释器的经典手法。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -451,9 +453,10 @@ end</code></pre>
 <h3>其他速记</h3>
 
 <ul>
-  <li><strong><code>|&gt;</code> 在哪层实现</strong>:parser 原样存 <code>Expr::Pipe</code> 节点,<strong>求值时去糖</strong>——<code>x |&gt; f(y)</code> 把 x 插到参数列表最前面变成普通调用 <code>f(x, y)</code>(interpreter.rs:1044);</li>
+  <li><strong><code>|&gt;</code> 在哪层实现</strong>:parser 原样存 <code>Expr::Pipe</code> 节点,<strong>求值时去糖</strong>——<code>x |&gt; f(y)</code> 把 x 插到参数列表最前面变成普通调用 <code>f(x, y)</code>(interpreter.rs:1054);</li>
   <li><strong>效应(<code>! [IO]</code>)运行时零作用</strong>:纯静态注解,解释器根本不读这个字段(ast.rs:81 注释明说),检查全在 typechecker;</li>
-  <li><strong>stdlib 是硬编码的</strong>:模块表(8 个模块:io/string/math/list/json/map/file/env,interpreter.rs:412-469)+ import 白名单 + <code>call_builtin</code> 里一个巨型 match 分发到 Rust 原生实现;只有 <code>println/print</code> 是 prelude,其他必须显式 <code>from string import {len}</code>——<strong>这是防 LLM 幻觉的设计</strong>:没 import 就报"符号未导入,需 from X import {...}",错误信息本身就是修复指令(interpreter.rs:1447)。</li>
+  <li><strong>Float 显示口径</strong>:有限值整数值补 .0(<code>println(4.0)</code> 打 <code>4.0</code>);非有限值 v1.1.0 起双后端统一原样输出 <code>inf</code>/<code>-inf</code>/<code>NaN</code>(修前解释器打 <code>inf.0</code>、WASM 打 <code>Infinity.0</code>);超大数仍有已知分歧(全展开 vs 科学计数法,SPEC_FOR_AI §11f 清单第 5 条);</li>
+  <li><strong>stdlib 是硬编码的</strong>:模块表(8 个模块:io/string/math/list/json/map/file/env,interpreter.rs:412-470)+ import 白名单 + <code>call_builtin</code> 里一个巨型 match 分发到 Rust 原生实现;只有 <code>println/print</code> 是 prelude,其他必须显式 <code>from string import {len}</code>——<strong>这是防 LLM 幻觉的设计</strong>:没 import 就报"符号未导入,需 from X import {...}",错误信息本身就是修复指令(interpreter.rs:1457)。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -463,7 +466,7 @@ end</code></pre>
 <aside class="sn"><b>去糖(desugar)/ 语法糖</b>:语言为了好写提供的便利写法叫"糖";解释器/编译器内部把它翻译成更基础的形态叫"去糖"。<code>x |&gt; f(y)</code> 是糖,<code>f(x, y)</code> 是糖化开之后的样子。</aside>
 <aside class="sn"><b>prelude(预导入集)</b>:不用 import 就能直接用的那一小撮内置符号。Lom 只放了 <code>println</code> 和 <code>print</code> 两个,其余全要显式导入——故意克制,防幻觉。</aside>
 
-<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2472 行)</h2>
+<h2>2.5 Typechecker:渐进式类型检查(<code>src/typechecker.rs</code>,2582 行)</h2>
 
 <aside class="sn"><b>类型检查(type checking)</b>:在运行之前静态地核对"类型对不对"——比如字符串不能和整数相加、函数调用参数个数要对。静态语言(C/Rust)强制全查,动态语言(Python)全不查,Lom 站在中间,所以叫"渐进式"。</aside>
 
@@ -481,7 +484,7 @@ end</code></pre>
 <ul>
   <li><strong>Int/Float 混合算术</strong>记 Float 不报 TYPE001(解释器早就提升,检查器此前没跟上);</li>
   <li><strong>管道 arity 假阳性修复</strong>:<code>x |&gt; add(1)</code> 的 TYPE003 现在把管道左值计入(此前误报"期望 2 得 1");</li>
-  <li><strong>包符号感知</strong>:新增 <code>check_program_with_externals</code>(main.rs:338 调用),从 lom.toml 依赖图收集包的公开符号传入,包函数不再喷 NAM003 假 error(根因:解释器 load_packages 注册包符号,检查器此前不知情)。</li>
+  <li><strong>包符号感知</strong>:新增 <code>check_program_with_externals</code>(main.rs:373 调用),从 lom.toml 依赖图收集包的公开符号传入,包函数不再喷 NAM003 假 error(根因:解释器 load_packages 注册包符号,检查器此前不知情)。</li>
 </ul>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
@@ -506,6 +509,8 @@ end</code></pre>
 </ul>
 
 <p><strong>2026-08-31 新增第四个检查:不可变重赋值(MUT001,v0.20.0)</strong>——此前 <code>let x = 3; x = 4</code> 静默通过(spec 说"应被拒绝",实现零校验,第四轮评审自查抓出,用户裁决按 warning 级落地)。现在 TypeEnv 多了一张与 vars 平行的 <code>mutables</code> 表,<code>define</code> 时显式记录可变性:<code>let</code> 不带 mut、函数参数、for 循环变量、match 绑定、元组解构绑定全部不可变,对它们重赋值(含 <code>+=</code> 去糖后的形式)报 MUT001 warning。仍是佛系老师:只批注、不拦路,解释器零改动。有一个文案细节值得记住:诊断消息不能写死"let 声明未带 mut"——参数也会命中,而 Lom 没有 mut 参数,hint 若诱导 LLM 写 <code>fn f(mut x)</code> 就是诊断在误导它唯一的读者。<strong>AI 原生语言的诊断文案是给 LLM 看的,准确性要求和编译器正确性同级。</strong></p>
+
+<p><strong>2026-09-03 新增第五个检查:MUT002(v1.1.0,独立审查整改)</strong>——闭包体引用了捕获的外层 mut 绑定时发 warning。动机不是风格洁癖,而是<strong>双后端语义分歧</strong>:解释器闭包按引用共享作用域(外面改了,闭包看得到新值),WASM 后端创建时值拷贝(外面改了,闭包还是旧值)——同一程序两个后端输出可能不同,而此前全程零提示。实现是 MUT001 建好的 mutables 表再加一个"闭包边界"标记:<code>resolve_capture</code> 沿作用域链向上找名字,命中当前层不算捕获,跨过闭包边界才算(嵌套闭包、非 mut 捕获都不误报)。同轮还修了一个反向问题:<strong>NAM003 假阳性</strong>——检查器先查初始化器后绑定名字,把合法的递归闭包 <code>let f = fn ... f(...) ... end</code> 报成 Error 级"调用未定义函数";修法是初始化器为闭包字面量时先以 Unknown 预绑(镜像运行时 pre-bind 语义),自举检查器同步修。两条整改指向同一原则:<strong>诊断的公信力是修复闭环的地基——Error 必须意味着真的错,干净必须意味着真的对。</strong></p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把效应想成"门禁权限"。每个函数签名上的 <code>! [IO, Clock]</code> 就是它的门禁卡清单:IO = 能碰外部世界(打印、读写文件),Clock = 能读时钟。规则是:<strong>你调用的函数拥有的每张卡,你自己也得有</strong>。一个"纯函数"(没有卡)调了带 IO 卡的 println,就像没卡的人想蹭别人的卡进后厨——检查器报警:"你想用 IO,先在自己签名上声明"。</p>
@@ -593,7 +598,7 @@ end</code></pre>
 
 <ul>
   <li><strong>输入完整性判定</strong> <code>is_input_complete</code>:逐字符扫描,跟踪括号深度、字符串状态、块关键字(<code>fn/if/while/for/match</code> 需配对 <code>end</code>,只在行首识别,<code>enum</code> 单行不需要 end);全部归零才算"输入完了,可以执行";</li>
-  <li><strong>会话保持</strong>:一个长寿命 Interpreter 实例贯穿会话;<code>fn</code> 定义注册进函数表,<code>let</code> 绑定直接写进 globals 作用域(<code>exec_repl_block</code>,interpreter.rs:619),所以下一条输入能看到上一条的变量;</li>
+  <li><strong>会话保持</strong>:一个长寿命 Interpreter 实例贯穿会话;<code>fn</code> 定义注册进函数表,<code>let</code> 绑定直接写进 globals 作用域(<code>exec_repl_block</code>,interpreter.rs:621),所以下一条输入能看到上一条的变量;</li>
   <li>错误不退出会话——对 LLM 试错友好。</li>
 </ul>
 
@@ -672,7 +677,7 @@ mathlib = { path = "mathlib" }</code></pre>
 
 <aside class="sn"><b>自举(self-hosting / bootstrapping)</b>:语言的"成年礼"——用 Lom 语言本身写出 Lom 的解释器/编译器,并且它能正确处理 Lom 代码。鸡生蛋、蛋生鸡:第一版解释器用 Rust 写(种子),之后语言就可以"养活自己"。</aside>
 
-<p>Phase 5 的目标是<strong>自举</strong>:证明 Lom 强大到能写出自己的解释器。<strong>2026-08-19 收尾评估:阶段目标"语言能养活自己"达成</strong>——最终形态 <code>stmt_interp.lom</code>(1450 行 Lom)具备完整编译器流水线(词法→语法→静态检查→求值),14 个测试程序 39 条输出与 golden 文件逐字一致(CI 强制比对)。但要诚实:这个迷你语言只是完整 Lom 约 20% 的子集(无 Float/Record/Map/闭包/管道/?/效应/模块),<strong>全量自举(Lom 写的完整 Lom 解释器)是独立 phase 级工作量</strong>,已作为 RFC-0003(Phase 8 候选)正式立项调研。全里程碑列表(<code>examples/bootstrap/</code>):</p>
+<p>Phase 5 的目标是<strong>自举</strong>:证明 Lom 强大到能写出自己的解释器。<strong>2026-08-19 收尾评估:阶段目标"语言能养活自己"达成</strong>——最终形态 <code>stmt_interp.lom</code>(1450 行 Lom)具备完整编译器流水线(词法→语法→静态检查→求值),14 个测试程序 39 条输出与 golden 文件逐字一致(CI 强制比对)。但要诚实:这个迷你语言只是完整 Lom 约 20% 的子集(无 Float/Record/Map/闭包/管道/?/效应/模块),<strong>全量自举(Lom 写的完整 Lom 解释器)是独立 phase 级工作量</strong>,已由 Phase 8 全量落地(2026-09-02 关账,新教学章见 2.14 节)。全里程碑列表(<code>examples/bootstrap/</code>):</p>
 
 <ul>
   <li><strong>5.0 可行性验证</strong>:用 Lom 写了一个迷你解释器(<code>mini_interp.lom</code>)——逐字符扫描切 token、递归下降解析、求值,正确处理运算符优先级。结论:递归 enum + match + 字符串逐字符扫描,足够表达编译器核心三阶段;</li>
@@ -731,7 +736,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>⑥ WASM parity</td><td>同一套 116 任务用 WASM 后端再跑一遍</td><td>双后端语义漂移</td></tr>
   <tr><td>⑦ WASM 自举 golden</td><td>stmt_interp 编译到 WASM 后与同一份 golden 逐字比对</td><td>编译器回归</td></tr>
   <tr><td>⑧ clippy</td><td><code>cargo clippy --release -- -D warnings</code>(2026-08-31 第四轮评审整改新增,存量 54 条清零后转 gate,只跑 ubuntu)</td><td>风格/惯用法腐坏</td></tr>
-  <tr><td>⑨ selfhost 自举验收</td><td>自举解释器五模式对账宿主(dump/tokens 147 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
+  <tr><td>⑨ selfhost 自举验收</td><td>自举解释器五模式对账宿主(dump/tokens 149 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
 </table>
 
 <div class="warn"><strong>两次真实的版本纪律教训</strong>(能主动讲出来是加分项):① v0.6.0 的 tag 不慎切在两个 CI 修复之前,复审发现后只能补发 v0.6.1——从此铁律"<strong>tag 永远切在 CI 全绿之后</strong>";② 6.4/6.5 加了 lom doc/fmt 两个用户可见功能却没升 minor,被外部评审抓到"语义版本政策发布当周自我违背"——从此铁律"<strong>加了用户可见功能就升 minor,别攒</strong>"。</div>
@@ -899,6 +904,27 @@ mathlib = { path = "mathlib" }</code></pre>
 
 <hr>
 <!-- ============================================================ -->
+<h2 id="selfhost8-2-14">2.14 全量自举、v1.0 冻结与审查整改(Phase 8 → v1.1.0,已闭环)</h2>
+
+<p>Phase 8 回答了 2.10 节留下的悬案:<strong>Lom 能不能养活一个完整的自己?</strong>答案落在 <code>examples/selfhost/self_interp.lom</code>(5703 行纯 Lom)——完整 lexer + Pratt parser + 静态检查子集 + 树遍历求值器,能解释执行任意合法 Lom 程序,包括它自己的源码。分步走,每步都有"逐字对账"验收:</p>
+
+<ul>
+  <li><strong>8.1 前端自举(v0.23.0)</strong>:自举 lexer/parser 与宿主在全部示例 + eval 参考解(现 149 个文件)上 AST dump <strong>逐字一致</strong>——格式即契约、不含 span(宿主字节列 vs 自举字符列在非 ASCII 行必然分叉,结构比对不需要位置)。开发中顺手抓出宿主真 bug:<code>?</code> 提前返回在"块尾 if 表达式/match Form B 臂"内被当块值静默吞掉;</li>
+  <li><strong>8.2 检查自举(v0.24.0)</strong>:NAM003/TYPE003-arity/EFF001/MAT001 四类检查 in Lom;43 个内建签名表由宿主测试导出对账(手抄必漂移——"签名表要实测导出"是本项目反复验证的教训);</li>
+  <li><strong>8.3 求值器自举(v0.25.0)</strong>:<strong>三层自证</strong>——自举解释器跑 stmt_interp.lom,39 条输出与 golden 逐字一致(宿主→自举→自举→程序,quine 式验证);Float 位级一致的关键是单次 IEEE 除法(正确舍入 = Rust parse 的结果,两步加除会差 1 ulp);</li>
+  <li><strong>8.4 wasm 载体(部分,如实记录)</strong>:self_interp 编译到 220KB WASM 后被一个<strong>未定位的非确定性越界</strong>阻塞(目标程序 &gt;6.7KB 必崩;六类决定性实验的排除清单见 RFC-0003 修订 21)——常规程序的 WASM 后端不受影响(eval 全量 parity 全绿),深挖挂账 post-1.0;</li>
+  <li><strong>json 双内建裁决(v0.27.0)</strong>:自举解释器的 json_parse/json_stringify 曾因缺 <code>char_from_code</code> 挂账;裁决只加这一个内建(42→43),自举侧用它把完整 json 在 Lom 里自实现(含 unicode 转义与代理对、Int/Float 二分、11 变体镜像 stringify)——"宿主内建即硬件指令"原则的典型应用。</li>
+</ul>
+
+<p><strong>v1.0 冻结(2026-09-02)</strong>:语言面(语法/20 保留字/诊断码/43 内建)进入冻结,任何变更须新 RFC(spec §14;新增仅限 warning 级诊断码)。三项裁决值得记:① 北极星"第三方生产使用"<strong>不作</strong> v1.0 门禁——v1.0 认证工程完成度,不认证市场验证;② 冻结范围=语言面,工程挂账不阻塞;③ json 缺口只加 char_from_code。冻结切片顺手修了宿主 lexer 自 Phase 3 起损坏非 ASCII 字面量的真 bug(逐字节 Latin-1 展开 → 按完整 UTF-8 字符解码;ASCII 程序零影响)。</p>
+
+<p><strong>v1.1.0 审查整改(2026-09-03)</strong>:冻结后第一轮独立审查抓出"声称与实现的边缘摩擦"——SECURITY.md 曾声称 checked arithmetic 而实现是裸 i64 回绕(文档失实,已改并给每条加固声称配上可执行验证命令);递归闭包被 NAM003 误报(假阳性,双侧修);闭包捕获 mut 的双后端分歧零提示(新增 MUT002 warning);inf/NaN 显示两后端不一致(统一为 inf/-inf/NaN)。整改台账在 docs/TODO.md(T1-T7 全 done 含证据与复核记录),审查报告在 docs/reviews/。这轮的元教训:<strong>eval 任务集由"典型形态"构成,而分歧住在边界值里</strong>(IEEE 特殊值、量级极端、别名/可变性交互)——新 eval 任务(116 递归闭包/117 inf-NaN)就是专门钉边界的。</p>
+
+<div class="easy"><span class="tag-easy">通俗解读</span>
+<p>2.10 的迷你解释器像"孩子学会了煮泡面",Phase 8 是"孩子开了一家完整餐厅":菜单(全部语法)、质检(静态检查)、后厨(求值器)全用 Lom 自己写。验收方式也很妙——不问"像不像",而是让<strong>它做的菜和老师做的菜逐字一样</strong>(149 文件 dump 逐字比对、39 条 golden 三层自证)。至于 8.4 那个没抓到的越界 bug:如实写进档案挂账,比假装完成更符合这个项目的性格——毕竟它的立身之本就是"文档不撒谎"。</p></div>
+
+<hr>
+<!-- ============================================================ -->
 <h1 id="appendix">附录(扩充内容)</h1>
 
 <blockquote>以下为本文档相对原始讲解的扩充:术语速查表与建议阅读路径,供零基础复习用。</blockquote>
@@ -947,12 +973,12 @@ mathlib = { path = "mathlib" }</code></pre>
 <ol>
   <li><code>SPEC_FOR_AI.md</code>(697 行)——先会用这门语言,10 分钟;</li>
   <li><code>src/ast.rs</code>(317 行)——看懂数据结构,后面全是操作它们;</li>
-  <li><code>src/lexer.rs</code>(695 行)——第一个手写解析器,建立手感;</li>
+  <li><code>src/lexer.rs</code>(801 行)——第一个手写解析器,建立手感;</li>
   <li><code>src/parser.rs</code>(1666 行) 只看 2.3 节提到的关键函数(优先级链 + is_newline_before + 三级恢复),不必通读;</li>
   <li><code>src/interpreter.rs</code>(3459 行) 只看:Value 枚举、Scope、闭包两行核心代码、eval_call 分发;</li>
   <li><code>src/typechecker.rs</code>(2342 行) 只看:check 两遍主流程、check_call_effects;</li>
   <li><code>src/wasm.rs</code>(574 行)+ <code>src/wasm_codegen.rs</code>(4859 行)——Phase 7 双子星,后者是全项目最大文件;入门先读两份文件头的值表示与语义差异声明,再挑一个 helper(如 rt_add)读;</li>
-  <li><code>src/fix.rs</code>(1644 行)+ <code>src/apply.rs</code>(723 行)——差异化核心,重点读置信度分级、逆序应用和 M3 的 PARSE001 规则;</li>
+  <li><code>src/fix.rs</code>(1749 行)+ <code>src/apply.rs</code>(723 行)——差异化核心,重点读置信度分级、逆序应用和 M3 的 PARSE001 规则;</li>
   <li><code>src/repl.rs</code> + <code>src/lsp.rs</code> + <code>src/package.rs</code>——Phase 4 工具链,看多行判定/JSON-RPC/依赖图;</li>
   <li><code>docs/HANDOVER.md</code>——进度快照、真实坑清单与三轮评审整改记录(活文档,含最新的 M1-M3 细节);</li>
   <li><code>DESIGN_RATIONALE.md</code>——最后读,把"为什么"串起来。</li>
@@ -968,6 +994,8 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td><code>LANGUAGE_SPEC.md</code></td><td>完整语言规范(权威定义)</td></tr>
   <tr><td><a href="lom-project-guide.html">docs/lom-project-guide.html</a></td><td>项目最高指导文件:定位、路线图、治理</td></tr>
   <tr><td><code>docs/HANDOVER.md</code></td><td>AI 交接文档:项目快照、坑清单、评审整改(活文档)</td></tr>
+  <tr><td><code>docs/TODO.md</code></td><td>整改待办台账:跨会话待办唯一事实源(含审查裁决的驳回/挂起登记)</td></tr>
+  <tr><td><code>docs/reviews/</code></td><td>独立审查报告存档(2026-08-31 / 2026-09-03 两轮,后者的整改即 v1.1.0)</td></tr>
   <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(<strong>2026-08-03 快照</strong>,含失败案例分析);<strong>当前主证据是 2026-08-31 四模型复测</strong>(eval/REPORT-2026-08-31-multimodel.md)</td></tr>
   <tr><td><strong>本文档</strong></td><td>代码实现层的入门讲解 + 面试备战</td></tr>
 </table>
