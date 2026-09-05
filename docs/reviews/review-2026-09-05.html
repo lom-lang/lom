@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-05（基线 v1.1.0 / commit 470670d）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  pre .c { color:#7ee787; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--ok); border:3px solid var(--ok); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-05）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>470670d08ae04a86acc36abc4c88058182009d79</code>（<code>470670d</code>，"docs: 教程对齐 v1.1.0"，2026-09-05 14:39:32 +0800；工作树干净，与 origin/main 一致；tag <code>v1.1.0</code> → <code>31772de</code>）</p>
+<p><strong>宣称版本</strong>：v1.1.0（Cargo.toml:3 = 1.1.0，Cargo.lock 同步，<code>lom --version</code> 实测输出 <code>lom 1.1.0</code>）</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行构建/测试/全部验收脚本。除本报告文件外未修改任何代码或文档；未执行任何 git commit/push/tag。</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 1.97.1 / cargo 1.97.1 / node v24.15.0 / Python 3.13.2</p>
+<p><strong>审查重点</strong>：项目立身纪律"文档不撒谎"（宣称与实现逐字对账、验收逐字比对）在 v1.1.0 时点是否仍然成立——覆盖 README / LANGUAGE_SPEC / SPEC_FOR_AI / SECURITY / HANDOVER / TODO / eval 文档 / 教程 / CI 配置的一切现值声称。</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A-</span></p>
+
+<p><strong>结论</strong>：项目全部<strong>可机械验证的硬指标实测全部复现</strong>——456/456 测试、eval 116/116 双后端、stmt_interp golden 双载体逐字比对、自举验收六模式（dump/tokens/diags/static/run/wasm）全 PASS、冷构建与 clippy 零 warning、零依赖、零 unsafe、43 内建 / 20 保留字与源码逐一相符、v1.1.0 三项整改行为（NAM003 假阳性修复 / MUT002 / inf-NaN 双后端统一）逐条实测成立、CI 在 HEAD 上三平台全绿（GitHub API 实查）。上一轮审查（review-2026-09-03）的整改（TODO.md T1-T7）经抽查属实且有复核记录。工程实质与验收纪律在同类项目中属于罕见的严格。</p>
+
+<p><strong>未给 A/A+ 的原因</strong>：按项目自己立下的"逐字对账"标准衡量，v1.1.0 时点仍存在一处 P1 与一组 P2 级文档腐坏——最重的一条是 <strong>SPEC_FOR_AI（喂给 LLM 的规范）§5 至今把从未实现的"type alias"当特性教</strong>（实测 <code>type UserId = Int</code> → PARSE001），而这恰是项目宣称已"三轮清扫抓出并修正"的谎言类别（教程 §2.13 明文自述已清理）；另有 LLM 规范核心规则示例引用不存在的 stdlib 符号（<code>sin</code>/<code>cos</code>，实测 RUNTIME005）。以及一批陈旧数字集中在次要位置（HANDOVER §9、spec §12.4/§12.5、eval/README、ci.yml 注释、README 文件数拆分），其中两处是项目自己文档过的教训复发（§9 测试数不同步、旧计数残留）。这些都不动摇硬指标，但按本项目自己的纪律口径必须如实记录。</p>
+
+<p><strong>按普通开源项目标准</strong>：本项目的宣称-实现一致性和验收基础设施（golden 逐字门禁、三实现互证、可执行验证命令写进 SECURITY.md）远超平均水平，接近满分。<strong>按本项目自设的"文档不撒谎"标准</strong>：主指标全真，边缘文档有可复现的假话/旧话——总评 A-。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>测试 456/456（README:66、HANDOVER §1/§2.2）</td><td><code>cargo test --release</code> → <code>test result: ok. 456 passed; 0 failed; 0 ignored</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>2</td><td>构建零 warning（HANDOVER §1/§2.1）</td><td>touch src/*.rs 触发冷重建，<code>cargo build --release</code> 输出无任何 warning/error 行</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>3</td><td>clippy 零 warning，CI 口径 <code>-D warnings</code>（HANDOVER §1、ci.yml:139）</td><td><code>cargo clippy --release -- -D warnings</code> 通过（冷缓存后重跑，无告警输出，退出 0）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>4</td><td>eval 116/116 参考解通过，解释器后端（README:66、HANDOVER §1、spec §12.3）</td><td><code>run.ps1 -Verify</code> → <code>Total: 116 / Passed: 116 / Failed: 0 / Rate: 100%</code>（十个分类逐一全对）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>5</td><td>eval 116/116，WASM 后端（同上）</td><td><code>run.ps1 -Verify -Backend wasm</code> → <code>Passed: 116 / Failed: 0 / Rate: 100%</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>6</td><td>eval 任务计数与 ID 唯一性（eval/README、manifest）</td><td>实测 tasks/*.json 合计 116，ID 116 个全唯一（001-117，无重复；manifest total_tasks=116）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>7</td><td>stmt_interp golden 逐字一致（39 条），解释器（HANDOVER §2.2、ci.yml:45-52）</td><td><code>lom stmt_interp.lom</code> 输出 39 行，与 <code>stmt_interp.expected.txt</code> diff 零差异，退出 0</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>8</td><td>stmt_interp golden 逐字一致，WASM 载体（README:117、ci.yml:94-102）</td><td>编译 52530 字节 wasm → node 运行 → 与 golden diff 零差异</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>9</td><td>自举验收 dump 模式（HANDOVER §2.2 写"147/147"）</td><td>实测 <code>dump: PASS 149 / FAIL 0（Latin-1 折叠等价 0）</code>——<strong>通过但计数为 149</strong>（29 examples + 4 bootstrap + 116 参考解；TODO.md 维护复核自己也记 149）</td><td class="warn">△ 结果真、数字旧</td></tr>
+
+<tr><td>10</td><td>自举 tokens 模式</td><td><code>tokens: PASS 149 / FAIL 0（列坐标系已知差异 1）</code>（todo.lom 已知差异，符合文档）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>11</td><td>自举 diags 模式（HANDOVER §1 写 5/5）</td><td><code>diags: PASS 5 / FAIL 0（坏文件 5 个）</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>12</td><td>自举 static 模式（HANDOVER §1 写 15/15 + 干净集）</td><td><code>static: 坏文件 PASS 15 / FAIL 0；干净集 ALIGNED 149 / DIFF 0</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>13</td><td>自举 run 模式（31/31，含三层自证）</td><td><code>run: PASS 31 / FAIL 0（含 stmt_interp 三层自证；Latin-1 折叠等价 0）</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>14</td><td>自举 wasm 第二层（8.4 部分完成的限内 19 文件清单）</td><td><code>wasm-layer2: PASS 19 / FAIL 0</code>（本机当日稳定；该模式文档明示非确定性、不接 CI）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>15</td><td>版本 1.1.0，Cargo.toml/lock 一致（HANDOVER §1）</td><td>Cargo.toml:3 与 Cargo.lock 均 1.1.0；<code>lom --version</code> → <code>lom 1.1.0</code></td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>16</td><td>零第三方依赖（README:12/203、SECURITY.md:9、CI 零依赖 gate）</td><td>Cargo.toml 无 [dependencies] 条目；Cargo.lock 仅含 lom 1.1.0 一个包</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>17</td><td>src/ 零 unsafe（SECURITY.md:17，附 grep 验证命令）</td><td><code>grep -rn "unsafe" src/</code> 零命中（退出码 1）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>18</td><td>checked 算术从未实现、溢出静默回绕、除零 RUNTIME000（SECURITY.md:25 更正口径，v1.1.0 整改 T1）</td><td><code>grep -rnE "checked_(add|sub|mul|div)" src/</code> 零命中；<code>println(9223372036854775807 + 1)</code> → 输出 <code>-9223372036854775808</code> 无诊断；<code>println(1 / 0)</code> → RUNTIME000 整数除以零，退出 1</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>19</td><td>256MB 栈线程，recurse 10000 完成（SECURITY.md:16）</td><td><code>lom bench.lom -- recurse 10000</code> 退出 0</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>20</td><td>解析器 total，坏输入出诊断不 panic、退出 1（SECURITY.md:18）</td><td><code>fn f( -> Int</code> → PARSE001 诊断、无 panic、退出码 1</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>21</td><td>内建恰好 43（spec §14-4：io 2/string 12/math 4/list 10/json 2/map 8/file 4/env 1）</td><td>src/interpreter.rs:418-472 STDL_MODULES 逐项清点：2+12+4+10+2+8+4+1 = <strong>43</strong>，模块拆分与 spec §14 逐字一致</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>22</td><td>保留字恰好 20（spec §14-2 列出 20 个）</td><td>src/lexer.rs:648-667 关键字 match 恰好 20 个分支，与 spec §14 列表逐字一致</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>23</td><td>v1.1.0 T2：let 递归闭包不再误报 NAM003；<code>let x = x + 1</code> 仍报（spec changelog、TODO T2）</td><td>递归闭包 factorial <code>--check</code> → "诊断通过，无错误"退出 0；对照组仍报 NAM003（2:13）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>24</td><td>v1.1.0 T3：MUT002 warning 恰好一条、不拦截（TODO T3、spec §7.3:890）</td><td>捕获 mut 的闭包 → 恰 1 条 <code>[MUT002]（4:9）</code> warning，运行照常退出 0</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>25</td><td>v1.1.0 T4：inf/NaN/-inf 双后端逐字一致（TODO T4）</td><td>解释器与 WASM 均输出 <code>inf / NaN / -inf / 2.5 / 4.0</code>，逐字一致</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>26</td><td>CI 三平台全绿（README:66、HANDOVER §1）</td><td>GitHub API 实查：run #59（head_sha=470670d，2026-09-05）conclusion=success（3 平台矩阵 + selfhost + clippy）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>27</td><td>CI 含 5 模式 selfhost gate：dump/tokens/diags/static/run（README:66）</td><td>ci.yml:104-125 五步逐一存在，wasm 层按文档明示不接（稳定性原因如实记录）</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>28</td><td>fmt gate：全部示例 fmt 幂等（ci.yml:66-77）</td><td>本地对 examples 树全部 .lom（除 apply_test）跑 <code>fmt --check</code>：全部通过</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>29</td><td>36 个 .lom 文件（README:66："29 examples + 4 bootstrap + 3 pkg_demo"）</td><td>总数 36 ✓，但<strong>拆分有误</strong>：pkg_demo 实际 2 个 .lom（main.lom + mathlib/math.lom），selfhost/self_interp.lom 1 个未计——29+4+2+1=36，总数碰巧正确</td><td class="warn">△ 总数对、拆分错</td></tr>
+
+<tr><td>30</td><td>self_interp.lom "5696 行"（HANDOVER §1:285）</td><td>实测 <code>wc -l</code> = <strong>5703</strong>（v1.1.0 提交 ae10523 增 7 行后未同步；教程已是正确的 5703）</td><td class="warn">△ 陈旧</td></tr>
+
+<tr><td>31</td><td>多模型复测 99.1%-100%，4 模型 × 113 任务（README:66、HANDOVER §1）</td><td>eval/REPORT-2026-08-31-multimodel.md 记载一致（pro 113/113、flash/glm-4.7/glm-5.3 各 112/113，失败均 078）；4 个模型原始留档目录存在。LLM 评测本身未重跑（见方法局限）</td><td class="ok">✓ 文档-档案一致（未重跑）</td></tr>
+
+<tr><td>32</td><td>性能量级宣称（HANDOVER §10：map_lookup 2000 ≈55ms、list_build 8000 ≈39ms 等）</td><td>本机抽查：map_lookup 2000 = 69ms、list_build 8000 = 74ms——同量级（历史数据为同机单次运行，量级吻合）</td><td class="ok">✓ 量级吻合</td></tr>
+
+<tr><td>33</td><td>self_interp 编译 WASM "220KB"（HANDOVER §1 8.4 行）</td><td>v0.26.0 时点源实测 218,021 字节（≈220KB，时点值吻合）；当前 HEAD 为 238,597 字节（时点快照口径可接受）</td><td class="ok">✓ 时点值吻合</td></tr>
+
+<tr><td>34</td><td>"无科学计数法字面量，1e9 是 parse error"（SPEC_FOR_AI §2:28）</td><td><code>println(1e9)</code> → PARSE001 "期望 ')'，得到 标识符 'e9'"，退出 1</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>35</td><td>README Quick Start 可用（README:11-13）</td><td><code>cargo build --release</code> → <code>lom examples/fib.lom</code> 输出 0..34 正确；repl/doc/info/build 子命令抽查均工作</td><td class="ok">✓ 相符</td></tr>
+
+<tr><td>36</td><td>fix_corpus 4 对语料（README M4 行）</td><td>eval/fix_corpus/ 恰好 4 对 .bad/.fixed</td><td class="ok">✓ 相符</td></tr>
+</table>
+
+<h2>3. 问题清单</h2>
+
+<p>优先级定义：P0 = 宣称与实现相反且影响核心主张；P1 = 宣称与实现不一致且会误导使用者（含 LLM）；P2 = 现值声称陈旧/内部矛盾，损伤"逐字对账"纪律；P3 = 轻微不准确或可读性问题。<strong>本次未发现 P0。</strong></p>
+
+<h3><span class="tag p1">P1-1</span> SPEC_FOR_AI §5 把从未实现的 Type alias 当特性教给 LLM</h3>
+<p><strong>证据</strong>：SPEC_FOR_AI.md:166-170 存在 "<code>### Type alias (Phase 2)</code>" 小节，示例 <code>type UserId = Int</code> / <code>type Point = {x: Float, y: Float}</code>，无任何"未实现"标注。实测（本机，基线二进制）：</p>
+<pre>printf 'type UserId = Int\n...' > t.lom && lom t.lom
+[parse] error (1:1): [PARSE001] 期望函数声明 'fn'、枚举声明 'enum' 或导入声明 'from'，得到 标识符 'type'
+exit=1</pre>
+<p>而 LANGUAGE_SPEC.md:235/467-469 已如实标注 "never implemented（PARSE001, verified）"，spec §14 冻结非目标也重申 no type aliases。更严重的是<strong>项目自己的教程（docs/lom-tutorial.html:744）明文宣称"三轮清扫抓出虚构的关键字表、从未实现的类型别名(type UserId = Int)、当特性写的未实现功能"已修正</strong>——同一谎言在喂给 LLM 的那份文档里活着。SPEC_FOR_AI 是 eval 时唯一随 prompt 提供给 LLM 的规范（eval/README:59），LLM 照 §5 写代码必然首次接触即失败。</p>
+
+<h3><span class="tag p2">P2-1</span> SPEC_FOR_AI 核心规则 6 示例导入不存在的 stdlib 符号 sin/cos</h3>
+<p><strong>证据</strong>：SPEC_FOR_AI.md:15（Core Rules，"memorize these"）：<code>from math import {sin, cos}</code>。math 模块实际导出仅 sqrt/abs/min/max（src/interpreter.rs:437，SPEC_FOR_AI §11b 自己的表格也只有这 4 个）。实测：</p>
+<pre>printf 'from math import {sin, cos}\n...' > m.lom && lom m.lom
+[runtime] error (0:0): [RUNTIME005] 模块 'math' 不导出符号 'sin'
+exit=1</pre>
+<p>对照：SPEC_FOR_AI.md:319（§8）写的是正确的 <code>from math import { sqrt, abs, min, max }</code>——同一文档内自相矛盾。</p>
+
+<h3><span class="tag p2">P2-2</span> HANDOVER §9 快速上手检查单数字陈旧，且系项目自己文档过的教训复发</h3>
+<p><strong>证据</strong>：HANDOVER.md:282 "确认 <strong>454/454</strong>、零 warning、<code>--version</code> 显示 <strong>1.0.0</strong>"。实测 456 passed、版本 1.1.0。HANDOVER.md:355 自己记录的教训原文："本文 §2.2/§9 基线数字再次滞后（教训复发了……<strong>升测试数时要同步 §2.2/§9</strong>）"——v1.1.0 整改同步了 §2.2（456/456）却再次漏掉 §9，同一坑第三次踩。</p>
+
+<h3><span class="tag p2">P2-3</span> HANDOVER §2.2 与 ci.yml 注释的自举 dump 计数停在 147（实际 149）</h3>
+<p><strong>证据</strong>：HANDOVER.md:87 "自举验收：dump <strong>147/147</strong>"；.github/workflows/ci.yml:116 步骤名 "Selfhost dump (<strong>147 文件</strong>逐字)"。实测 <code>python tools/verify_selfhost.py</code> → <code>dump: PASS 149 / FAIL 0</code>（eval 114→116 后应为 29+4+116=149；TODO.md:198 维护复核自己也写 "dump/tokens 149"）。T5 簿记清单更新了 HANDOVER §2.2 的 eval 数字却漏了同一行的自举计数。</p>
+
+<h3><span class="tag p2">P2-4</span> LANGUAGE_SPEC §12 同节内自相矛盾的旧计数（§12.4 "15 tasks"、§12.5 "100/100"）</h3>
+<p><strong>证据</strong>：LANGUAGE_SPEC.md:1308 "10_error_repair.json (<strong>15 tasks, 15%</strong> of the suite)"——实际 20 个任务（§12.1:1277 同文件自己写 20）；LANGUAGE_SPEC.md:1312 "Reference solutions: <strong>100/100</strong> pass"——§12.3:1302 同节写 116/116。TODO.md T5 验收标准声称 "grep 复查现值声称无旧计数残留"，这两处正是现值位置的旧计数残留。</p>
+
+<h3><span class="tag p2">P2-5</span> eval/README.md 三处陈旧：error_repair "(15)"、ID 范围 "001-115"、分类计数合计 113≠116</h3>
+<p><strong>证据</strong>：eval/README.md:97 标题 "Error-repair category (<strong>15</strong>)"（实际 20，目录布局注释:30 自己写 20）；:56 "zero-padded 3-digit task id (<strong>001-115</strong>)"（实际 ID 覆盖到 117，共 116 个唯一 ID）；:23-24 布局注释 "03_types.json # <strong>11</strong> tasks / 04_closures.json # <strong>12</strong> tasks"（实际均 13/13；布局注释合计 113，与同文件 :3/:9/:80 的 116 冲突）。</p>
+
+<h3><span class="tag p3">P3-1</span> README 示例文件数拆分错误（pkg_demo 写 3，实际 2；selfhost 1 个未计）</h3>
+<p><strong>证据</strong>：README.md:66 "36 .lom files (29 examples + 4 bootstrap self-hosting files + <strong>3 in the pkg_demo</strong> package)"。实测 git ls-files / find：examples 树共 36 个 .lom = 29（顶层）+ 4（bootstrap）+ <strong>2</strong>（pkg_demo：main.lom、mathlib/math.lom）+ <strong>1</strong>（selfhost/self_interp.lom）。总数碰巧正确，拆分两处不准。</p>
+
+<h3><span class="tag p3">P3-2</span> HANDOVER §1/§9 self_interp 行数陈旧（5696 → 实际 5703）</h3>
+<p><strong>证据</strong>：HANDOVER.md:285 "self_interp.lom（<strong>5696 行</strong>…）"。实测 <code>wc -l</code> = 5703；5696 是 v0.27.0（da3fc98）时点值，v1.1.0 提交 ae10523 增加 7 行后未同步。教程（470670d 同轮更新）已写正确的 5703——两文档现值口径分叉。</p>
+
+<h3><span class="tag p3">P3-3</span> README 状态横幅与正文未反映 v1.1.0 的存在</h3>
+<p><strong>证据</strong>：README.md:7 "Status: <strong>v1.0</strong> — language surface FROZEN (2026-09-02)"；全文 grep 无 "1.1.0"。当前版本 v1.1.0 已在 Cargo.toml、spec §13 changelog、HANDOVER、TODO、教程登记，唯独项目门面 README 无一处提及（含 MUT002/NAM003 修复/inf-NaN 三项用户可见变更）。冻结信息本身仍真（v1.1.0 未动语言面），但"Status: v1.0"对读者构成版本误导。</p>
+
+<h3><span class="tag p3">P3-4</span> SPEC_FOR_AI §10-4 "Reassigning immutable … is an error" 措辞与实际（warning、照常运行）不符</h3>
+<p><strong>证据</strong>：SPEC_FOR_AI.md:363。实测 <code>let x = 3; x = 4; println(x)</code> → MUT001 <strong>warning</strong>（stderr）、输出 4、退出 0——重赋值实际发生。LANGUAGE_SPEC §5.1:305 已改为准确的 "MUT001 warning" 口径，SPEC_FOR_AI 未跟上。</p>
+
+<h3><span class="tag p3">P3-5</span> 主进度文档 lom-project-guide.html 未收录 2026-09-03 审查与 v1.1.0 整改</h3>
+<p><strong>证据</strong>：grep 全文无 "v1.1"/"review-2026-09-03"/"MUT002"；最后条目停在 v1.0.0（2026-09-02）。HANDOVER §8 将该文档定位为"主进度文档"且惯例是里程碑后更新。整改会话更新了 HANDOVER/TODO/spec/教程五处，漏了 guide。另：guide 中 454、114/114、113/113 等数字均位于带日期/版本标签的时点快照条目内（如 :1068 v1.0.0 行），符合项目"时点快照"惯例，不另计问题。</p>
+
+<h3><span class="tag p3">P3-6</span> SPEC_FOR_AI §8 pub 示例块展示已否决语法且无 ❌ 标记</h3>
+<p><strong>证据</strong>：SPEC_FOR_AI.md:331-340。文字部分明确写了 "rejected for v1.0 / pub is an ordinary identifier"，但紧随的代码块把 <code>pub fn greet(...)</code> 与 "# private" 注释当作可用示例呈现（无 ❌ 前缀，不同于 §10 的错误示例风格）。照抄即 PARSE001。文字不撒谎，排版会误导。</p>
+
+<h2>4. 最重要的几个发现（展开）</h2>
+
+<h3>发现一：全部硬指标零假——"文档不撒谎"在可执行层面成立</h3>
+<p>本次审查实际执行了项目自述的全部验收口径（HANDOVER §2.2 回归三件套 + verify_selfhost 六模式 + 双后端 eval + clippy + fmt gate + CI 状态 API 实查），<strong>没有一条硬宣称落空</strong>。特别值得肯定的三点：</p>
+<ul>
+<li><strong>验收脚本本身可信</strong>：verify_selfhost.py 的比对是逐字的（Latin-1 折叠逻辑当前命中 0 次，纯防御网），eval runner 只比 stdout 且要求退出码 0，golden 是 diff 而非行数——这些口径都是历次评审倒逼出来的，当前形态没有"宽口径放水"。</li>
+<li><strong>SECURITY.md 的每条声称都附可执行验证命令，且全部复现</strong>（unsafe 零命中、checked 算术零命中、i64 回绕、除零诊断、万层递归、解析器 total）。v1.1.0 对上一轮 P0（checked 失实）的修正是真修正而非话术——README:105 还保留了带日期的更正标注。</li>
+<li><strong>v1.1.0 整改（TODO T1-T7）逐条实测为真</strong>：T2 的递归闭包不再误报且对照组仍报、T3 的 MUT002 恰好一条且不拦截、T4 的 inf/NaN 双后端逐字一致。台账纪律（每项带证据+维护会话独立复核记录）在小型项目中极为罕见。</li>
+</ul>
+
+<h3>发现二：谎言的残余集中在"喂给 LLM 的那份文档"——恰是最不该出假话的地方</h3>
+<p>Lom 的核心主张是"LLM 写 Lom 低错误率"，而 SPEC_FOR_AI.md 是 eval 时提供给 LLM 的唯一规范（eval/README:59："The LLM only sees this field (plus SPEC_FOR_AI.md)"）。本次在 SPEC_FOR_AI 里实测到两处会直接让照做者失败的内容：§5 的 type alias（整节假特性，P1-1）与 §1 核心规则的 sin/cos 导入（P2-1）。具有讽刺意味的是：教程 §2.13 把"从未实现的类型别名被抓出"当作本项目"文档腐坏速度远超直觉"的元教训来宣讲，LANGUAGE_SPEC 也已如实标注 never implemented——说明清扫做过，但清在了人读的 spec 上，漏了 LLM 读的那份。这暴露的流程缺口是：<strong>历次"文档腐坏清扫"以 LANGUAGE_SPEC/README 为主战场，SPEC_FOR_AI 只在评审点名时才被扫</strong>。建议把"lexer/parser 实测对账"扩展到 SPEC_FOR_AI 的每个代码示例（一个下午的脚本工作量：抽取 fenced code 逐个跑 <code>--check</code>）。</p>
+
+<h3>发现三：数字腐坏的模式——"总账更新、边角漏网"，且两处是已文档教训的复发</h3>
+<p>本次抓到的陈旧数字（HANDOVER §9 的 454/1.0.0、§2.2 的 147、ci.yml 注释的 147、spec §12.4/§12.5、eval/README 三处、README 的 pkg_demo 拆分、HANDOVER 的 5696 行）呈现清晰共性：T5 整改做了一次大规模"计数簿记（114→116，一处不漏）"，其清单列了 9 个位置并声称 grep 复查无残留——但漏掉的位置恰恰是清单外或同行的相邻数字（§12.4 的"15"是 error_repair 计数不是 eval 总数、§2.2 同一行里的 selfhost 计数、§9 整节）。其中 §9 不同步与"旧计数残留"两者都是 HANDOVER:355 白纸黑字记录过的复发教训。结论：<strong>人工簿记清单天然漏项，这类数字应该由 CI 的 grep 门禁或单一常量源收敛</strong>（例如把"文件数/测试数/dump 计数"变成验收脚本输出与文档数字的自动对账）。这与项目已把"LLM 影响分析""零依赖 gate"制度化的做法同构，是当前纪律体系里唯一还靠人肉记忆支撑的一环。</p>
+
+<h3>发现四：自举与三实现一致性是真材实料，8.4 的"部分完成"披露诚实</h3>
+<p>自举六模式当日全绿（含未接 CI 的 wasm 第二层 19/19）。8.4 的 wasm 载体越界按 RFC-0003 修订 21 如实挂账（非确定性、六类实验排除、不接 CI 的理由写明）——"未达成"的披露方式与"达成"的披露方式同样严谨，这是"文档不撒谎"纪律最有力的一致性证明。三层自证（宿主→自举→stmt_interp golden）在 dump/tokens/static/run 四个维度都是 149/149 规模的全量逐字比对，不是抽样。</p>
+
+<h2>5. 方法局限（未验证/无法验证项，如实声明）</h2>
+<ul>
+<li><strong>LLM 评测未重跑</strong>：README/HANDOVER 的"4 模型 99.1%-100%（2026-08-31）"与"99/100（2026-08-03）"基于真实 API 调用，本次未消耗 API 资源复测。已做替代核查：报告内部数字一致、4 个模型的原始回复留档（eval/candidates_rerun/*/raw/）与 run_meta 存在、失败任务 078 的跨模型一致性描述自洽。<strong>这些数字的真实性判定为"档案一致、未独立复现"</strong>。</li>
+<li><strong>性能数据未系统复测</strong>：HANDOVER §10 的 13-46×、~330×、~49×、递归深度等历史基准为"同机单次运行"口径，本次仅抽查两个数据点确认量级（见矩阵 #32），未重跑全表、未在多平台交叉。</li>
+<li><strong>CI 仅验证最新 run 的结论</strong>：通过公开 API 确认 HEAD（470670d）run #59 success；未逐一检查 59 个历史 run 的每个 job 日志（结论字段为 workflow 级 success，矩阵内任一 job 失败会置 failure，故三平台+selfhost+clippy 全过可推定）。</li>
+<li><strong>WASM 越界 bug 未深挖</strong>：8.4 挂账的非确定性越界（&gt;~6.7KB 目标程序）仅通过"限内 19 文件当日全过"间接验证其边界描述合理，未尝试复现越界本身。</li>
+<li><strong>文档覆盖为抽查+定点全查</strong>：README/HANDOVER/SECURITY/TODO/eval-README/spec §12-§14/SPEC_FOR_AI 全文或关键节精读；LANGUAGE_SPEC（77KB）§1-§11 与 lom-project-guide.html（157KB）、lom-tutorial.html（125KB）为重点抽查（数字/版本/特性声称 grep + 定位阅读），不排除残留未发现的同类陈旧点。RFC 文档（0002/0003 修订记录）未逐条核对其技术档案与代码的对应关系。</li>
+<li><strong>run.sh（Bash runner）未验证</strong>：本机无 jq（与 HANDOVER §11 记录一致），其行为以推理为准。</li>
+<li>审查中产生的临时文件（_review_*.lom/.wasm、自举脚本的临时目录）均即时删除，<code>git status</code> 保持与基线一致（clean，main 与 origin/main 同步）；未执行任何写操作于既有文件。</li>
+</ul>
+
+<hr>
+<p class="small">报告生成：2026-09-05 · 独立只读审查 · 基线 commit <code>470670d08ae04a86acc36abc4c88058182009d79</code>（v1.1.0）· 本文件是本次审查对仓库的唯一写入。</p>
+
+</div>
+</body>
+</html>
