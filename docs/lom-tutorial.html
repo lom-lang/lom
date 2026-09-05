@@ -102,7 +102,7 @@
   <p class="meta">
     读者画像:大二 · 人工智能专业 · 未修编译原理 · 面试备战向<br>
     覆盖范围:整体构建逻辑 · 设计决策动机 · 逐模块代码逻辑 · 面试攻防 · 防露馅提示<br>
-    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10 · <strong>大版本更新 2026-09-03(对齐 v1.1.0:Phase 8 全量自举 + json 双内建裁决 + v1.0 冻结 + 审查整改,全部进展已覆盖;新增 2.14 节)</strong>
+    所有结论均附 <code>文件:行号</code> 依据,可在仓库中直接核对 · 生成日期 2026-08-10 · <strong>大版本更新 2026-09-05(对齐第二轮审查闭环:R1-R8 整改 + 对账工具双件进 CI doc-gates,"文档不撒谎"升级为机器 gate;此前 v1.1.0/Phase 8/冻结均已覆盖)</strong>
   </p>
   <blockquote>
     使用说明:正文中带 <span class="t">绿色虚线下划线</span> 的术语,在其右侧(窄屏为下方)配有边注,
@@ -183,7 +183,7 @@
   <tr><td><strong>v1.0 语言面冻结</strong></td><td><strong>已生效(2026-09-02,v1.0.0,spec §14)</strong></td></tr>
 </table>
 
-<p>量化指标:Rust 测试 <strong>456/456</strong>;CI 三平台 <strong>9 个回归 gate</strong> 全绿（含 clippy 与 selfhost 五模式）;eval runner <strong>116/116</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
+<p>量化指标:Rust 测试 <strong>456/456</strong>;CI 三平台 <strong>10 个回归 gate</strong> 全绿（含 clippy、selfhost 五模式与 doc-gates 对账双件）;eval runner <strong>116/116</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
@@ -724,7 +724,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>6.6 SECURITY.md</strong>:零依赖供应链承诺(grep 验证零 <code>unsafe</code>)+ 威胁模型。</li>
 </ul>
 
-<p><strong>CI 的 9 个回归 gate</strong>(<code>.github/workflows/ci.yml</code>,三平台各跑一遍;selfhost 只跑 ubuntu)——记住这张清单,它是"项目工程成熟度"最直接的面试证据:</p>
+<p><strong>CI 的 10 个回归 gate</strong>(<code>.github/workflows/ci.yml</code>,三平台各跑一遍;selfhost 与 doc-gates 只跑 ubuntu)——记住这张清单,它是"项目工程成熟度"最直接的面试证据:</p>
 
 <table>
   <tr><th>gate</th><th>内容</th><th>防什么</th></tr>
@@ -737,6 +737,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>⑦ WASM 自举 golden</td><td>stmt_interp 编译到 WASM 后与同一份 golden 逐字比对</td><td>编译器回归</td></tr>
   <tr><td>⑧ clippy</td><td><code>cargo clippy --release -- -D warnings</code>(2026-08-31 第四轮评审整改新增,存量 54 条清零后转 gate,只跑 ubuntu)</td><td>风格/惯用法腐坏</td></tr>
   <tr><td>⑨ selfhost 自举验收</td><td>自举解释器五模式对账宿主(dump/tokens 149 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
+  <tr><td>⑩ doc-gates 文档对账</td><td>对账双件:<code>spec_examples_check.py</code> 把 SPEC_FOR_AI 全部代码示例逐个跑 <code>--check</code>(正例必须零 Error、反例必须产诊断);<code>doc_audit.py</code> 把五类易腐数字(eval 总数/自举计数/文件拆分/行数/版本号)对 16 处文档现值自动比对(第二轮审查后接入,只跑 ubuntu)</td><td>文档腐坏——计数簿记漏项与 LLM 规范假特性</td></tr>
 </table>
 
 <div class="warn"><strong>两次真实的版本纪律教训</strong>(能主动讲出来是加分项):① v0.6.0 的 tag 不慎切在两个 CI 修复之前,复审发现后只能补发 v0.6.1——从此铁律"<strong>tag 永远切在 CI 全绿之后</strong>";② 6.4/6.5 加了 lom doc/fmt 两个用户可见功能却没升 minor,被外部评审抓到"语义版本政策发布当周自我违背"——从此铁律"<strong>加了用户可见功能就升 minor,别攒</strong>"。</div>
@@ -879,7 +880,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>M1 拼写 Replace(v0.16.0,Medium 不自动应用)→ M2 --apply 迭代闭环(v0.17.0,三重刹车防震荡,上限 5 轮)→ M3 PARSE001 针对性修复(v0.18.0,<strong>动手前先 --json 探针实测,推翻了两个计划假设</strong>——缺 end 被容错解析静默接受、缺 ')' 的位置在下一个 token)。M4 已完成(v0.19.0):评测任务扩到 113 + fix_corpus 语料逐字回归。亮点是"先实测再写规则"和"凡声称的行为都有逐字防线钉住"。</p></div>
 
 <div class="qa"><p class="q">Q:项目现在什么进度?下一步做什么?</p>
-<p>v1.1.0(v1.0.0 冻结后的整改版:新增 MUT002 warning、修 NAM003 递归闭包假阳性、统一 inf/NaN 显示;语言面不变),路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:456 测试、CI 三平台 9 gate(含 selfhost 五模式)、eval 116/116 双后端。post-1.0 挂账:wasm 越界深挖、L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
+<p>v1.1.0 + 第二轮审查整改闭环(v1.0 冻结后两轮独立审查:A-/12 条边缘腐坏全部清零,对账工具双件进 CI 把"文档不撒谎"升级为机器 gate;语言面自冻结后零变化),路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:456 测试、CI 三平台 10 gate(含 selfhost 五模式与 doc-gates)、eval 116/116 双后端。post-1.0 挂账:wasm 越界深挖、L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
 
 <hr>
 <!-- ============================================================ -->
@@ -919,6 +920,8 @@ mathlib = { path = "mathlib" }</code></pre>
 <p><strong>v1.0 冻结(2026-09-02)</strong>:语言面(语法/20 保留字/诊断码/43 内建)进入冻结,任何变更须新 RFC(spec §14;新增仅限 warning 级诊断码)。三项裁决值得记:① 北极星"第三方生产使用"<strong>不作</strong> v1.0 门禁——v1.0 认证工程完成度,不认证市场验证;② 冻结范围=语言面,工程挂账不阻塞;③ json 缺口只加 char_from_code。冻结切片顺手修了宿主 lexer 自 Phase 3 起损坏非 ASCII 字面量的真 bug(逐字节 Latin-1 展开 → 按完整 UTF-8 字符解码;ASCII 程序零影响)。</p>
 
 <p><strong>v1.1.0 审查整改(2026-09-03)</strong>:冻结后第一轮独立审查抓出"声称与实现的边缘摩擦"——SECURITY.md 曾声称 checked arithmetic 而实现是裸 i64 回绕(文档失实,已改并给每条加固声称配上可执行验证命令);递归闭包被 NAM003 误报(假阳性,双侧修);闭包捕获 mut 的双后端分歧零提示(新增 MUT002 warning);inf/NaN 显示两后端不一致(统一为 inf/-inf/NaN)。整改台账在 docs/TODO.md(T1-T7 全 done 含证据与复核记录),审查报告在 docs/reviews/。这轮的元教训:<strong>eval 任务集由"典型形态"构成,而分歧住在边界值里</strong>(IEEE 特殊值、量级极端、别名/可变性交互)——新 eval 任务(116 递归闭包/117 inf-NaN)就是专门钉边界的。</p>
+
+<p><strong>第二轮独立审查与 R1-R8 整改(2026-09-05,已闭环)</strong>:复审总评 A-——36 项硬指标全部实测复现,但按"文档不撒谎"的自设标准抓出 12 条边缘腐坏,最有代表性的一条颇具讽刺意味:<strong>type alias 假特性活在了喂给 LLM 的那份规范里</strong>(SPEC_FOR_AI §5 教 <code>type UserId = Int</code>,实测 PARSE001)——而 LANGUAGE_SPEC 早已标 never implemented、教程还宣讲过"此类谎言已清扫"。清扫清在了人读的 spec,漏了 LLM 读的那份。整改 R1-R6 清掉全部假话与旧计数;R7/R8 则把教训制度化:<strong>对账工具双件进 CI</strong>(gate ⑩)——SPEC_FOR_AI 的每个代码示例从今往后被机器逐个验证,五类易腐数字(eval 总数/自举计数/文件拆分/行数/版本)由 <code>doc_audit.py</code> 自动对账,改错一个数字 CI 就红(负测试实测过)。<strong>文档腐坏的速度远超直觉,而人肉清单天然漏项——最终的解法不是更仔细的人,是机器 gate。</strong>这呼应了 2.13 节的元教训,也把它推向了终点:三轮评审买来的认知,最终变成了两段 Python。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>2.10 的迷你解释器像"孩子学会了煮泡面",Phase 8 是"孩子开了一家完整餐厅":菜单(全部语法)、质检(静态检查)、后厨(求值器)全用 Lom 自己写。验收方式也很妙——不问"像不像",而是让<strong>它做的菜和老师做的菜逐字一样</strong>(149 文件 dump 逐字比对、39 条 golden 三层自证)。至于 8.4 那个没抓到的越界 bug:如实写进档案挂账,比假装完成更符合这个项目的性格——毕竟它的立身之本就是"文档不撒谎"。</p></div>
@@ -995,7 +998,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td><a href="lom-project-guide.html">docs/lom-project-guide.html</a></td><td>项目最高指导文件:定位、路线图、治理</td></tr>
   <tr><td><code>docs/HANDOVER.md</code></td><td>AI 交接文档:项目快照、坑清单、评审整改(活文档)</td></tr>
   <tr><td><code>docs/TODO.md</code></td><td>整改待办台账:跨会话待办唯一事实源(含审查裁决的驳回/挂起登记)</td></tr>
-  <tr><td><code>docs/reviews/</code></td><td>独立审查报告存档(2026-08-31 / 2026-09-03 两轮,后者的整改即 v1.1.0)</td></tr>
+  <tr><td><code>docs/reviews/</code></td><td>独立审查报告存档(2026-08-31 / 09-03 / 09-05 三轮;后两轮的整改即 v1.1.0 与 R1-R8,台账见 docs/TODO.md)</td></tr>
   <tr><td><code>eval/REPORT.md</code></td><td>99/100 LLM 实测报告(<strong>2026-08-03 快照</strong>,含失败案例分析);<strong>当前主证据是 2026-08-31 四模型复测</strong>(eval/REPORT-2026-08-31-multimodel.md)</td></tr>
   <tr><td><strong>本文档</strong></td><td>代码实现层的入门讲解 + 面试备战</td></tr>
 </table>
