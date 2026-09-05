@@ -381,7 +381,7 @@ let r = { x: 3, y: 4 }
 # p and r have the same structural type; interchangeable
 ```
 
-Field access: `p.x`, mutation (if `mut`): `p.x = 5`.
+Field access: `p.x`. **Field assignment is not implemented** — `p.x = 5` is a parse error (PARSE000, verified; the assignment target must be a plain variable, and `let mut` does not enable field assignment). Records are immutable (§11: "for immutable structured data use records"); to change a field, construct a new record (`let p2 = {x: 5, y: p.y}`), or use the `map` module for mutable shared structures.
 
 ### 6.3 Tuples
 
@@ -1305,11 +1305,11 @@ Each task is a JSON object:
 
 ### 12.4 AI-native focus
 
-`10_error_repair.json` (15 tasks, 15% of the suite) is Lom's differentiator: instead of "can the LLM write code", it tests "can the LLM repair code given `lom-diag/v1` + `lom-fix/v1`" — directly validating the §7 / §6.9 toolchain that Phases 2.2–2.7 built.
+`10_error_repair.json` (20 tasks, ~17% of the suite) is Lom's differentiator: instead of "can the LLM write code", it tests "can the LLM repair code given `lom-diag/v1` + `lom-fix/v1`" — directly validating the §7 / §6.9 toolchain that Phases 2.2–2.7 built.
 
 ### 12.5 Status
 
-- Reference solutions: 100/100 pass (`./eval/runner/run.ps1 -Verify`).
+- Reference solutions: 116/116 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
 - LLM pass-rate: **99/100 (99%)** — measured 2026-08-03 with expert model + thinking mode. 9/10 categories at 100%; sole failure (task 078) was output-format misunderstanding, not a language-feature error. See `eval/REPORT.md` for full analysis. **Phase 2 exit criterion met.**
 
 ---

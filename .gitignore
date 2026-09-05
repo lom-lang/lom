@@ -43,3 +43,6 @@ examples/_todo_data.json
 eval/.api_keys.json
 eval/candidates_rerun/
 eval/__pycache__/
+
+# SPEC_FOR_AI 示例对账工具（R7）的临时目录（正常退出即删，此处防御崩溃残留）
+.spec_check_tmp/

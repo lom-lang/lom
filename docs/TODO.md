@@ -4,52 +4,125 @@
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：第二轮审查工作包 R1-R8（2026-09-05 开立，见下）；T1-T7 已全部关闭（档案保留下文）。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——第二轮审查工作包
+> R1-R8 已全部关闭（2026-09-05，档案保留下文）；T1-T7 同样已关闭。
+> 新待办重新登记于本文件。
 > **纪律**：语言面冻结（LANGUAGE_SPEC §14）不破——只允许新增 warning 级诊断码；
 > 其余行为修复均为 bug 修复性质且不动语法/保留字/内建表。
 
-## 第二轮审查工作包（2026-09-05 开立，活跃）
+## 第二轮审查工作包（2026-09-05 开立，已关闭）
 
 **来源**：第二轮独立审查 [review-2026-09-05.html](reviews/review-2026-09-05.html)（总评 A-，无 P0；基线 470670d / v1.1.0）。
 **验证状态**：12 条发现已由维护会话逐条亲手复现（两条行为性发现实测：`type UserId = Int` → PARSE001、`from math import {sin}` → RUNTIME005；十条文档定位 grep/wc 证实），零失实，全部采纳。交接关键项（HANDOVER §9/§2.2 的 456/1.1.0/149、§9-5 的 5703、guide 两条目补录）已由维护会话即时修复；其余按 R1-R6 执行，R7/R8 为采纳审查结构性建议的加强项。
 **通用纪律**：顺序执行（R1→R8）；每项完成在本文件标 done 附一行证据并跑全量回归电池（同 T7 清单）；语言面冻结不破；**无需升版**（纯文档 + 仓库工具 + CI 配置，无 CLI 面变化）。
 
-### R1｜P1：SPEC_FOR_AI §5 Type alias 假特性清除
+### R1｜P1：SPEC_FOR_AI §5 Type alias 假特性清除 ✅ done 2026-09-05
+
+- **证据**：小节改写为负面示例（❌ `type UserId = Int` 标注 PARSE001 verified + 冻结非目标
+  RFC-0001/LANGUAGE_SPEC §14 + 结构类型正面替代示例）；实测复现 `type UserId = Int` → 
+  `[PARSE001] 期望函数声明 'fn'…得到 标识符 'type'` 退出 1；`grep "type [A-Z][A-Za-z]* = " SPEC_FOR_AI.md`
+  仅剩 167/168 两行且均带 ❌（只以反知识形态出现）；新正面替代示例包 main 后 `--check`
+  零诊断、运行输出 42；回归电池 8/8 PASS（456/golden/eval 双后端 116/selfhost 五模式）。
 
 - 事实：SPEC_FOR_AI.md:166-170 存在 "Type alias (Phase 2)" 小节，把从未实现的 `type UserId = Int` 当特性教——实测 PARSE001；LANGUAGE_SPEC:235 已标 never implemented、§14 冻结非目标重申 no type aliases；教程 :744 还宣称此类谎言已清扫（清在了人读的 spec，漏了 LLM 读的这份）。
 - 范围：删除该小节，或（推荐）改写为负面示例——"**不要写** `type X = Y`（未实现且 v1.x 冻结非目标，实测 PARSE001；类型语义用结构类型直接表达）"。修后教程 :744 的宣称恢复成立。
 - 验收：SPEC_FOR_AI 中 `type` 别名只以反知识形态出现；R7 工具上线后 §5 零失败示例。
 
-### R2｜P2/P3：SPEC_FOR_AI 其余三处内容修正
+### R2｜P2/P3：SPEC_FOR_AI 其余三处内容修正 ✅ done 2026-09-05
+
+- **证据**：三处落实——①:15 核心规则 6 改 `from math import {sqrt, abs}` 并注明 math 恰好
+  导出四符号（实测 `sqrt(16.0)`/`abs(-5)` 输出 4.0/5；`grep sin\|cos` 仅剩 since/enclosing
+  等子串误匹配，无真实残留）；②§10-4 改 MUT001 **warning** 口径（实测 `let x = 3; x = 4`
+  → 1 条 MUT001 warning、输出 4、退出 0）；③§8 pub 块加 ❌ + "Do not write" + PARSE001
+  verified 标注、块内 `# private` 注释改"# NOT private"（实测 `pub fn` → PARSE001 退出 1）。
+  **顺手（台账外，按 T5"顺手陈旧计数"惯例）**：结尾段 "the 114-task eval suite" → 116-task
+  （审查方法局限声明过的漏网同类项，grep 时暴露，现值实测 116/116）。
+  回归电池 8/8 PASS。
 
 - :15 核心规则 6 示例 `from math import {sin, cos}` → 改为真实符号（如 `{sqrt, abs}`；math 仅导出 sqrt/abs/min/max，§11b/§8 已是正确口径）——实测 `sin` 报 RUNTIME005；
 - :363 §10-4 "Reassigning immutable … is an error" → 改为 MUT001 **warning** 口径（实测 `let x = 3; x = 4` 照常运行输出 4、退出 0；LANGUAGE_SPEC §5.1 已准确）；
 - :331-340 pub 示例块加 ❌/反例标记（文字已声明 rejected，但代码块无标记、照抄即 PARSE001——对齐 §10 错误示例的排版风格）。
 
-### R3｜P2：LANGUAGE_SPEC §12 同节自相矛盾旧计数
+### R3｜P2：LANGUAGE_SPEC §12 同节自相矛盾旧计数 ✅ done 2026-09-05
+
+- **证据**：§12.4 "(15 tasks, 15% of the suite)" → "(20 tasks, ~17%)"（实测
+  `len(eval/tasks/10_error_repair.json)` = 20；20/116 = 17.2%）；§12.5
+  "Reference solutions: 100/100 pass" → "116/116 pass on both backends"
+  （实测 run.ps1 双后端各 116/116）；`grep "15 tasks\|100/100" LANGUAGE_SPEC.md`
+  零命中（§12.3 原本就正确）；回归电池 8/8 PASS。
 
 - :1308 "`10_error_repair.json` (15 tasks, 15% …)" → 20；:1312 "Reference solutions: 100/100 pass" → 116/116（§12.1/§12.3 同节已写正确值）。
 
-### R4｜P2：eval/README.md 三处陈旧
+### R4｜P2：eval/README.md 三处陈旧 ✅ done 2026-09-05
+
+- **证据**：布局注释 03_types 11→13、04_closures 12→13（实测 tasks JSON 逐文件计数
+  10/13/13/13/16/10/10/5/6/20，合计 116 与 manifest total_tasks=116 一致）；
+  "001-115" → "001-117, 116 unique ids — 108 is a known, accepted gap"（实测 ID
+  min=001 max=117 unique=116）；"Error-repair category (15)" → (20)；
+  `grep "001-115\|(15)\|11 tasks\|12 tasks" eval/README.md` 零命中；
+  回归电池 8/8 PASS。
 
 - :97 "Error-repair category (15)" → (20)；:56 "001-115" → 001-117；:23-24 布局注释 03_types=11/04_closures=12 → 13/13（合计与 116 对齐）。
 
-### R5｜P3：README 两处
+### R5｜P3：README 两处 ✅ done 2026-09-05
+
+- **证据**：:66 拆分改 "29 examples + 4 bootstrap + 2 in the pkg_demo package + 1
+  self-hosted interpreter examples/selfhost/self_interp.lom"（实测 git ls-files 逐目录
+  计数 29/4/2/1，合计 36 不变）；状态横幅追加 v1.1.0 行（FROZEN 事实保持原文，
+  列 MUT002 warning / NAM003 假阳性修复 / inf-NaN 双后端统一三项，链接 spec §13）；
+  `grep "1\.1\.0" README.md` 命中 :8（全文此前零命中）；回归电池 8/8 PASS。
 
 - :66 文件拆分 "3 in the pkg_demo package" → 2（main.lom + mathlib/math.lom），并补 selfhost 1（29+4+2+1=36，总数原本碰巧正确）；
 - 状态横幅（:7，保持 FROZEN 事实）追加一行 v1.1.0 整改说明（MUT002 warning / NAM003 递归闭包假阳性修复 / inf-NaN 显示统一三项用户可见变更；全文现无任何 1.1.0 痕迹）。
 
-### R6｜P2（半）：ci.yml 步骤名自举计数
+### R6｜P2（半）：ci.yml 步骤名自举计数 ✅ done 2026-09-05
+
+- **证据**：ci.yml:116 步骤名 "Selfhost dump (147 文件逐字, Phase 8.1)" → 149
+  （149 = 29 examples + 4 bootstrap + 116 eval 参考解，基线实测 verify_selfhost dump
+  PASS 149/FAIL 0）；`grep "147" .github/workflows/ci.yml` 零命中；
+  回归电池 8/8 PASS。
 
 - .github/workflows/ci.yml:116 "Selfhost dump (147 文件逐字, Phase 8.1)" → 149（HANDOVER §2.2 的另一半已由维护会话即时修复）。
 
-### R7｜加强：SPEC_FOR_AI 代码示例实测对账工具（审查发现二的建议）
+### R7｜加强：SPEC_FOR_AI 代码示例实测对账工具（审查发现二的建议）✅ done 2026-09-05
+
+- **证据**：新 tools/spec_examples_check.py（零第三方依赖，纯标准库）——34 个 fenced 块
+  全量对账：正例 27（解析层 `--check --json` 零 parse Error + 导入层实跑无 RUNTIME005 +
+  自含块运行退出 0；教学片段仅 NAM003 散文名放行）/ 反例 2（pub PARSE001、字段赋值
+  PARSE000——均实测产诊断）/ skip 5（3 JSON schema + 1 诊断输出示例 + 1 marker），
+  RESULT: PASS。**锁定测试四组全红**：①改回 type alias 假特性 → "值位置出现大写名
+  [Float, Int, Point, UserId]" FAIL；②插入 `from math import {sin}` → RUNTIME005 FAIL；
+  ③字段赋值还原成正例教法 → PARSE000 FAIL；④pub 反例去 ❌ 变正例 → PARSE001 FAIL。
+  回归电池 8/8 PASS。CI 接入见 R8（同一 doc-gates job，首跑结果 R8 登记）。
+- **顺手发现并修复（台账外，R7 调查中工具暴露——审查漏网的第三个假特性）**：
+  **记录字段赋值 `p.x = 5` 从未实现**（parser.rs:642 赋值目标必须是普通变量；实测
+  PARSE000 退出 1），但 SPEC_FOR_AI §5 "Field mutation requires `let mut`" 与
+  LANGUAGE_SPEC:384 "mutation (if `mut`): `p.x = 5`" 都当特性教（v0.1.1 起带病至今，
+  spec §11 "for immutable structured data use records" 与之自相矛盾）。修法镜像 R1：
+  SPEC_FOR_AI 改 ❌ 反例（PARSE000 verified + 重建新记录替代 + map 指路，工具锁定）；
+  LANGUAGE_SPEC:384 改如实口径（不可变、重建、或用 map）。另：§6/§9 两处无函数体
+  签名示例块补最小函数体使其可实测（print 撞内置改名 print_msg——实测 NAM002）；
+  §11 `enum Result` 概念性定义块加 `spec-check: skip` 标记（真实代码重定义是 NAM002）；
+  §7 管道示例 main 的 `-> Unit` 注解去掉（实测 TYPE010 warning，示例 stderr 应干净）。
 
 - 事实：历次文档清扫以 LANGUAGE_SPEC/README 为主战场，SPEC_FOR_AI 只在评审点名时被扫——本次 P1 正是漏网结果。
 - 范围：新 tools/spec_examples_check.py（零第三方依赖）——抽取 SPEC_FOR_AI 的 fenced code 块逐个写临时 .lom 跑 `lom --check`；反例（❌/「不要写」标注的块）断言其确实产诊断，正例断言零 Error。存量反例先手工标注（R1/R2 完成后应只剩 pub 一处）。接入 CI（可与 R8 同一 step）。
 - 验收：脚本对全量示例跑通且分类全符合；R1/R2 的修复被工具锁定（故意改回假特性能红）。
 
-### R8｜加强：文档数字自动对账 gate（审查发现三的建议——根治第三次复发）
+### R8｜加强：文档数字自动对账 gate（审查发现三的建议——根治第三次复发）✅ done 2026-09-05
+
+- **证据**：新 tools/doc_audit.py（零第三方依赖）——五类真值自动计算（eval 总数=任务
+  JSON 求和 116；dump=29+4+116=149；.lom 拆分 glob 实数 36=29+4+2+1；self_interp
+  行数 wc 口径 5703；版本 Cargo.toml 1.1.0+lock 一致），16 项文档现值逐处比对
+  **16/16 PASS**；**锁定测试五组全红**（eval/README 116→115 / ci.yml 149→147 /
+  README 拆分 36→35 / HANDOVER 5703→5696 / HANDOVER 版本 1.1.0→1.0.0，各改一处
+  即 FAIL，恢复后复绿）。CI 新增 doc-gates job（ubuntu，R7/R8 同 job：build +
+  spec_examples_check + doc_audit，YAML 本地校验合法）；回归电池 8/8 PASS。
+  **CI 首跑：待推送后观测补记（见下方收尾登记）。**
+- 设计口径：模式找不到也算 FAIL（措辞重构必须同步更新对账清单）；历史时点值
+  （changelog 的 v1.0.0 "eval 114/114" 等带日期快照）不在监控范围——spec 现值位置
+  是 §12.3/§12.5；HANDOVER §2.2 的 eval 行锚定 run.ps1 上下文（同文件 "期望 456/456"
+  是测试行，测试数不在本轮五类监控清单内）。
 
 - 事实：本次陈旧数字（§9 的 454/147、spec §12.4/12.5、eval/README 三处、README 拆分）呈现"总账更新、边角漏网"模式，其中两处是 HANDOVER:355 白纸黑字记录过的复发教训——人工簿记清单天然漏项。
 - 范围：新 tools/doc_audit.py（零第三方依赖）——机械可核的现值数字自动对账：eval 总数（manifest vs README/HANDOVER/spec §12/eval-README 四处）、自举 dump 计数（由 examples/bootstrap+manifest 计算出的期望值 vs HANDOVER §2.2 与 ci.yml 步骤名）、.lom 文件拆分（find vs README）、self_interp 行数（wc vs HANDOVER §9）、版本号（Cargo.toml vs HANDOVER §1/§9）。CI 加 gate step（ubuntu 即可）。

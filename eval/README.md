@@ -20,8 +20,8 @@ eval/
   tasks/
     01_arithmetic.json       # 10 tasks — basic math, let, fn
     02_control_flow.json     # 13 tasks — if/elif/else, while, for, return
-    03_types.json            # 11 tasks — annotations, inference, casts
-    04_closures.json         # 12 tasks — closures, HOF, capture
+    03_types.json            # 13 tasks — annotations, inference, casts
+    04_closures.json         # 13 tasks — closures, HOF, capture
     05_match_enum.json       # 16 tasks — match, enum, Result, Option
     06_pipeline.json         # 10 tasks — |> operator
     07_records_tuples.json   # 10 tasks — records, tuples, field access
@@ -53,7 +53,7 @@ Each `tasks/NN_<category>.json` file is an array of task objects:
 ```
 
 Fields:
-- **`id`** — zero-padded 3-digit task id (001-115, ids globally unique), globally unique
+- **`id`** — zero-padded 3-digit task id (001-117, 116 unique ids — 108 is a known, accepted gap), globally unique
 - **`category`** — one of the 10 categories (matches filename suffix)
 - **`difficulty`** — `easy` / `medium` / `hard`
 - **`prompt`** — Chinese natural-language description of what the LLM should generate. Mentions required functions, expected behavior, and any constraints. **The LLM only sees this field** (plus `SPEC_FOR_AI.md`); it does not see `solution` or `expected`.
@@ -94,7 +94,7 @@ eval/runner/run.sh --candidates-dir eval/candidates
 
 The runner runs `lom eval/candidates/<id>.lom` for each task, compares stdout to `expected`, and reports pass-rate by category and overall.
 
-### Error-repair category (15)
+### Error-repair category (20)
 
 Tasks in `10_error_repair.json` have a different flow:
 1. The prompt contains **broken `.lom` code** and the **`lom-diag/v1` JSON** for that code.

@@ -113,7 +113,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --release
-      - name: Selfhost dump (147 文件逐字, Phase 8.1)
+      - name: Selfhost dump (149 文件逐字, Phase 8.1)
         run: python3 tools/verify_selfhost.py
       - name: Selfhost tokens (Phase 8.1 lexer 对账)
         run: python3 tools/verify_selfhost.py --tokens
@@ -137,3 +137,23 @@ jobs:
           components: clippy
       - name: Clippy (deny warnings)
         run: cargo clippy --release -- -D warnings
+
+  # 第二轮审查整改 R7/R8（2026-09-05）：文档对账 gate——
+  # R7: SPEC_FOR_AI 代码示例实测对账（正例解析/导入/运行三层断言，反例必产诊断——
+  #     根治"喂给 LLM 的文档教假特性"；type alias/字段赋值/pub 均已被锁定）
+  # R8: 文档数字自动对账（eval 总数/自举 dump 计数/.lom 拆分/self_interp 行数/版本号
+  #     vs 各文档现值——根治"总账更新、边角漏网"的计数腐坏复发，人工簿记清单天然漏项）
+  # 只跑 ubuntu（文本对账与平台无关；R7 需要 lom 二进制故先构建）
+  doc-gates:
+    name: doc gates (spec examples + numbers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release
+      - name: SPEC_FOR_AI example check (R7)
+        run: python3 tools/spec_examples_check.py
+      - name: Doc numbers audit (R8)
+        run: python3 tools/doc_audit.py

@@ -12,7 +12,7 @@
 3. **Postfix types** — `let x: Int = 3`. Types come after `:`. Inference is default; annotation is optional.
 4. **Errors are values** — no `try/catch`. Use `Result<T, E>` + `match` + `?` operator.
 5. **Pipeline with `|>`** — `x |> f |> g` means `g(f(x))`. Prefer linear flow over nesting.
-6. **Explicit imports only** — `from math import {sin, cos}`. Never `import *`.
+6. **Explicit imports only** — `from math import {sqrt, abs}`. Never `import *`. (math exports exactly `sqrt`/`abs`/`min`/`max` — see §8.)
 7. **Structural types** — records are shapes: `{x: Int, y: Int}`. No class names needed.
 8. **Last expression = return value** — blocks evaluate to their last expression. Use `return` only for early exit.
 9. **One statement per line** — Lom is newline-sensitive (statements separated by newlines) but NOT indentation-sensitive (blocks delimited by `end`, not by indentation level). Like Go/Swift/Kotlin, not Python. A `-` or `(` at the start of a new line is NOT a binary operator or function call — it starts a new expression.
@@ -151,10 +151,12 @@ let q = {x: 3.0, y: 4.0}    # type: {x: Float, y: Float}
 println(p.x)                # field access: 3
 ```
 - Two records with the same fields have the **same type** (structural).
-- Field mutation requires `let mut`:
+- ❌ Field assignment — NOT implemented (do not write). Records are immutable; `p.x = 5` is a parse error (PARSE000, verified: the assignment target must be a plain variable — `let mut` does NOT enable field assignment). To change a field, build a new record; for mutable shared structures use the `map` module:
 ```
 let mut p = {x: 3, y: 4}
-p.x = 5
+p.x = 5                  # ❌ PARSE000
+
+let p2 = {x: 5, y: p.y}  # rebuild instead
 ```
 
 ### Tuples (Phase 2)
@@ -163,10 +165,13 @@ let pair: (Int, String) = (1, "hello")
 let (n, s) = pair           # destructuring
 ```
 
-### Type alias (Phase 2)
+### Type alias — NOT implemented (do not write)
+- ❌ `type UserId = Int` — parse error (PARSE001, verified): `type` is an ordinary identifier, not a keyword.
+- ❌ `type Point = {x: Float, y: Float}`
+- Type aliases are a **frozen non-goal** for v1.x (RFC-0001; LANGUAGE_SPEC §14). Express type intent with structural types directly:
 ```
-type UserId = Int
-type Point = {x: Float, y: Float}
+let user_id: Int = 42
+let point: {x: Float, y: Float} = {x: 1.0, y: 2.0}
 ```
 
 ### Gradual type checking (Phase 2.4 — implemented)
@@ -188,8 +193,16 @@ Declare side effects in the function signature with `! [Effect1, Effect2]` after
 
 ```
 fn read_file(path: String) -> Result<String, String> ! [IO]
+    Ok("contents")
+end
+
 fn now() -> Int ! [Clock]
+    0
+end
+
 fn log(msg: String) -> Unit ! [IO, Clock]
+    println(msg)
+end
 ```
 
 Rules (LLMs must follow these):
@@ -214,6 +227,7 @@ If you forget, `--check` reports: `[EFF001] 纯函数或未声明效应 [] 的�
 ## 6. Errors: Result, Option, ?, match
 
 ### Result type
+<!-- spec-check: skip: conceptual definition of builtin types — redefining Result/Ok/Err in real code is NAM002 -->
 ```
 enum Result<T, E> = Ok(T) | Err(E)
 enum Option<T> = Some(T) | None
@@ -299,7 +313,7 @@ fn add(x: Int, y: Int) -> Int
     x + y
 end
 
-fn main() -> Unit
+fn main()
     5 |> double |> println        # prints 10
     10 |> add(3) |> println       # prints 13  (add(10, 3))
     5 |> double == 10             # True  — `|>` binds tighter than `==`
@@ -328,13 +342,13 @@ from io import { println as log }    # per-item alias: name as alias
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env`.
 - **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Example: `examples/pkg_demo/`.
-- `pub` marks exportable items (**rejected for v1.0** — RFC-0001; `pub` is an ordinary identifier, all top-level items are public, no privacy is planned):
+- ❌ `pub` marks exportable items — **rejected for v1.0** (RFC-0001). `pub` is an ordinary identifier, and writing it is a parse error (PARSE001, verified). All top-level items are public; no privacy is planned. Do not write:
 ```
 pub fn greet(name: String) -> String
     "Hello, " + name
 end
 
-fn helper() -> Unit    # private
+fn helper() -> Unit    # NOT private — no visibility modifiers exist
     ...
 end
 ```
@@ -345,8 +359,16 @@ end
 
 ```
 fn read_file(path: String) -> Result<String, IoError> ! [IO]
-fn print(s: String) -> Unit ! [IO]
+    Ok("contents")
+end
+
+fn print_msg(s: String) -> Unit ! [IO]
+    println(s)
+end
+
 fn now() -> Int ! [Clock]
+    0
+end
 ```
 - `! [Effect1, Effect2]` declares side effects.
 - Pure functions (no `!`) cannot call effectful functions.
@@ -360,7 +382,7 @@ fn now() -> Int ! [Clock]
    - ✅ `fn f() ... end`
 2. **Indentation blocks** — Lom is not indentation-sensitive.
 3. **Missing `end`** — every `fn`/`if`/`while`/`for`/`match` must close with `end`.
-4. **Reassigning immutable** — `let x = 3; x = 4` is an error. Use `let mut`.
+4. **Reassigning immutable** — `let x = 3; x = 4` produces a `MUT001` **warning** (diagnostics go to stderr; execution is NOT blocked — the program still runs, since v0.6.0). Use `let mut` to reassign cleanly.
 5. **try/catch** — Lom uses `Result` + `?`. No exceptions.
 6. **Wildcard import** — `import math.*` is forbidden. Use `from math import {sqrt, abs}`.
 7. **Nominal classes** — Lom uses structural records `{x: Int, y: Int}`, not `class Point`.
@@ -707,4 +729,4 @@ Key points:
 
 ---
 
-*End of Lom Spec for AI v1.0. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parser with holey AST (`Stmt::Hole` on parse error, all errors collected, sync-point recovery). Phase 2.3 adds: structured JSON diagnostics (`lom-diag/v1` schema), `--json` / `--check` / `--help` CLI flags, error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved for 2.4-2.5). Phase 2.4 adds: gradual type checker (`--check` / `--json` emits TYPE/MAT/NAM diagnostics; warnings are non-fatal — the program still runs). Phase 2.5 adds: explicit effect system (`! [IO, Clock]` annotation, `EFF001` warning when a pure function calls an effectful one; `main` is exempt). Phase 2.6 adds: `lom info <file> [--json]` type info export (`lom-info/v1` schema — functions/enums/imports; no type-check, no run; parse failure falls back to `lom-diag/v1`). Since then: MAT001 non-exhaustive-match compile warnings, the `fix`/`retry` diagnostic fields with `lom fix --plan` / `--apply` / `--history` (Phases 2.7 / 3.1 / 4.1.3), the 114-task eval suite (`eval/`), the `list` / `json` / `map` / `file` / `env` stdlib modules, user packages via `lom.toml` path dependencies (Phase 4.4), `lom doc` / `lom fmt` / `lom repl` / `lom lsp`, and type checking visible on the default run path (diagnostics on stderr, never blocking execution). Phase 7 (v0.7.0–v0.15.0) adds the WASM compiler backend (`lom build --target wasm`, §11f) — the interpreter remains the reference implementation and default run path. Phase 8 (v0.23.0–v0.26.0) delivers full self-hosting: a complete Lom frontend, checker subset, and tree-walking interpreter written in Lom (`examples/selfhost/self_interp.lom`, ~5700 lines — the largest LLM-readable Lom codebase in existence and the best reference for real-world Lom style). v0.27.0 adds `string.char_from_code` (§4). **v1.0 (2026-09-02): the language surface is frozen** — syntax / 20 reserved words / diagnostic codes / 43 builtins; nothing in this spec will change within v1.x without a new RFC. When unsure, prefer the explicit form (annotate types, handle all match cases with `_`).*
+*End of Lom Spec for AI v1.0. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parser with holey AST (`Stmt::Hole` on parse error, all errors collected, sync-point recovery). Phase 2.3 adds: structured JSON diagnostics (`lom-diag/v1` schema), `--json` / `--check` / `--help` CLI flags, error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved for 2.4-2.5). Phase 2.4 adds: gradual type checker (`--check` / `--json` emits TYPE/MAT/NAM diagnostics; warnings are non-fatal — the program still runs). Phase 2.5 adds: explicit effect system (`! [IO, Clock]` annotation, `EFF001` warning when a pure function calls an effectful one; `main` is exempt). Phase 2.6 adds: `lom info <file> [--json]` type info export (`lom-info/v1` schema — functions/enums/imports; no type-check, no run; parse failure falls back to `lom-diag/v1`). Since then: MAT001 non-exhaustive-match compile warnings, the `fix`/`retry` diagnostic fields with `lom fix --plan` / `--apply` / `--history` (Phases 2.7 / 3.1 / 4.1.3), the 116-task eval suite (`eval/`), the `list` / `json` / `map` / `file` / `env` stdlib modules, user packages via `lom.toml` path dependencies (Phase 4.4), `lom doc` / `lom fmt` / `lom repl` / `lom lsp`, and type checking visible on the default run path (diagnostics on stderr, never blocking execution). Phase 7 (v0.7.0–v0.15.0) adds the WASM compiler backend (`lom build --target wasm`, §11f) — the interpreter remains the reference implementation and default run path. Phase 8 (v0.23.0–v0.26.0) delivers full self-hosting: a complete Lom frontend, checker subset, and tree-walking interpreter written in Lom (`examples/selfhost/self_interp.lom`, ~5700 lines — the largest LLM-readable Lom codebase in existence and the best reference for real-world Lom style). v0.27.0 adds `string.char_from_code` (§4). **v1.0 (2026-09-02): the language surface is frozen** — syntax / 20 reserved words / diagnostic codes / 43 builtins; nothing in this spec will change within v1.x without a new RFC. When unsure, prefer the explicit form (annotate types, handle all match cases with `_`).*
