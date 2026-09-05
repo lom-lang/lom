@@ -9,7 +9,7 @@
 > - [docs/TODO.md](TODO.md) — **整改待办台账**（跨会话待办唯一事实源；含审查裁决的驳回/挂起登记）
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-09-03（**v1.1.0：审查整改 T1-T7 全部完成并经维护会话复核**——独立审查 review-2026-09-03 的 1×P0（SECURITY.md checked 失实，纯文档修正）+ 3×P1（NAM003 递归闭包假阳性双侧修 / MUT002 mut 捕获 warning / inf-NaN 显示双后端统一）落地；eval 114→116（任务 116/117）；测试 456/456。台账 docs/TODO.md 全项 done 含证据。v1.0.0：语言面冻结生效——spec FROZEN + §14 冻结清单。**语言面变更须新 RFC 解冻**。交接必读 RFC-0003 全部修订记录 + §1 快照 + §11 + docs/TODO.md）
+> 最后更新：2026-09-05（**第二轮独立审查入库（A-，无 P0）：硬指标全部实测复现；抓出 1×P1（SPEC_FOR_AI 仍教从未实现的 type alias）+ 6×P2 + 6×P3 文档腐坏**——报告 docs/reviews/review-2026-09-05.html，整改工作包 **R1-R8 活跃（docs/TODO.md）**，交接后第一件事就是执行它。v1.1.0（2026-09-03）：第一轮审查整改 T1-T7 全部完成并复核。v1.0.0：语言面冻结生效。**语言面变更须新 RFC 解冻**。交接必读 RFC-0003 修订记录 + §1 快照 + §11 + docs/TODO.md）
 
 ---
 
@@ -43,7 +43,8 @@
 | **Phase 8.3** | **完成（2026-09-02）**：求值器自举——Val 11 变体/Env 链（Map 引用=闭包共享语义）/E2 错误通道（ERet 镜像 EarlyReturn）/调用分派/import 别名表/`--run` 模式；42 内建逐案定案（38 透传宿主硬件 + list_map/filter/fold 强制自实现 + json 双缺口挂账）；Float 位级一致（单次 IEEE 除法）。验收：examples 30/30 + stmt_interp 39 条 golden（三层自证）+ eval 113/113 |
 | **Phase 8.4** | **部分完成（2026-09-02，如实记录）**：self_interp 编译 WASM ✓（220KB）+ 小文件语义正确 ✓ + harness `LOM_PRE_GROW` + verify `--wasm` 模式；**三层 golden 的 wasm 载体未达成**——目标程序 >~6.7KB（约 2500 token）触发未定位的非确定性越界（限内文件两轮 19/21 与 15/19 不同；预扩内存只部分缓解；第三层不可行）——完整技术档案见 RFC 修订 21（已排除 rehash/JS 栈/内存耗尽/build_alloc 字节/静态串去重/独立最小复现全组合）。CI 接入 selfhost gate（8.1/8.2 四模式 + 8.3 run 模式，v0.27.0 起；wasm 层不接——不稳定会随机红） |
 | **v0.27.0 json 裁决** | **完成（2026-09-02，RFC-0003 修订 24）**：语言面 42→43（`string.char_from_code`，唯一新增；`type_of` 不加——自实现路线不需要）。宿主+WASM+自举三实现齐；self_interp.lom Part H（~340 行）json_parse/json_stringify 自实现（字符式递归下降 + 11 变体镜像 stringify）；`args` argv 透传；verify `--run` 模式 31/31（json_demo/todo 豁免解除，todo 走 Latin-1 折叠）；eval 任务 115；runner UTF-8 捕获修复。修订 18 的 json 挂账关闭 |
-| 下一步 | **审查整改已完成（2026-09-03，v1.1.0）**：TODO.md T1-T7 全项 done 并经维护会话逐项复核（复核证据见台账）；驳回/挂起登记继续有效。当前无活跃待办——回到 post-1.0 挂账按需模式：wasm 越界深挖（RFC 修订 21 档案）、L2 自举编译器（char_from_code 已解锁，纯工作量决策）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型；新增待办一律登记进 docs/TODO.md |
+| **第二轮审查** | **完成（2026-09-05，A-，无 P0）**：独立审查 agent 报告 docs/reviews/review-2026-09-05.html（基线 470670d）——硬指标全部实测复现（36 项验证矩阵）；发现 1×P1（SPEC_FOR_AI §5 教从未实现的 type alias）+ 6×P2 + 6×P3 文档腐坏，全部经维护会话亲手复现证实。整改工作包 **R1-R8 开立（docs/TODO.md，交接后执行）**，含两个加强项（SPEC_FOR_AI 代码示例实测对账工具 + 文档数字自动对账 gate——根治"计数簿记漏项"的第三次复发） |
+| 下一步 | **整改工作包 R1-R8（2026-09-05 起，活跃）**：见 docs/TODO.md 第二轮审查工作包——R1（P1）SPEC_FOR_AI §5 type alias 假特性；R2 SPEC_FOR_AI 其余三处（sin/cos 示例、MUT001 措辞、pub 块标注）；R3/R4 spec §12 与 eval/README 旧计数；R5 README 拆分与 v1.1.0 痕迹；R6 ci.yml 步骤名；R7/R8 加强项（对账工具 + CI gate）。方向级 post-1.0 挂账（按需）：wasm 越界深挖（RFC 修订 21 档案）、L2 自举编译器（char_from_code 已解锁）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型 |
 | 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；自举诊断消息 Latin-1 化的长期方案（验收脚本折叠换算；v1.0.0 lexer 修复后 dump/run 侧折叠计数已归零，仅诊断消息侧仍需） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
@@ -84,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 cargo test --release                                    # 期望 456/456（2026-09-03 整改基线；v1.0.0 时为 454，T2 +2）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
-python tools\verify_selfhost.py                         # 自举验收：dump 147/147（另 --tokens / --diags / --static / --run 模式）
+python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run 模式）
 ```
 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
@@ -279,10 +280,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 454/454、零 warning、`./target/release/lom.exe --version` 显示 1.0.0
+2. `cargo build --release && cargo test --release` 确认 456/456、零 warning、`./target/release/lom.exe --version` 显示 1.1.0
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. **当前状态：v1.0 已冻结（2026-09-02，spec §14 冻结清单）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-24 条全读）+ LANGUAGE_SPEC §14，自举代码 examples/selfhost/self_interp.lom（5696 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）
+5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮独立审查（2026-09-05，A-，工作包 R1-R8 活跃见 docs/TODO.md）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-24 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
