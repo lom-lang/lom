@@ -118,7 +118,9 @@
   README 拆分 36→35 / HANDOVER 5703→5696 / HANDOVER 版本 1.1.0→1.0.0，各改一处
   即 FAIL，恢复后复绿）。CI 新增 doc-gates job（ubuntu，R7/R8 同 job：build +
   spec_examples_check + doc_audit，YAML 本地校验合法）；回归电池 8/8 PASS。
-  **CI 首跑：待推送后观测补记（见下方收尾登记）。**
+  **CI 首跑：绿（2026-09-05 实测观测，commit 31fd26d，run #33963153689——doc-gates job
+  的 "SPEC_FOR_AI example check (R7)" 与 "Doc numbers audit (R8)" 两 step 均 success；
+  同 run 三平台矩阵/selfhost 五模式/clippy 全绿）。**
 - 设计口径：模式找不到也算 FAIL（措辞重构必须同步更新对账清单）；历史时点值
   （changelog 的 v1.0.0 "eval 114/114" 等带日期快照）不在监控范围——spec 现值位置
   是 §12.3/§12.5；HANDOVER §2.2 的 eval 行锚定 run.ps1 上下文（同文件 "期望 456/456"
