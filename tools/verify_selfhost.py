@@ -6,7 +6,7 @@
 #   python tools/verify_selfhost.py --diags    # 诊断比对（LEX/PARSE 码|行|列 + 消息折叠，坏文件集）
 #   python tools/verify_selfhost.py --static   # 8.2 静态检查对齐（NAM003/TYPE003/EFF001/MAT001：坏文件 + 干净集误报检查）
 #   python tools/verify_selfhost.py --run      # 8.3 examples 运行验收（stdout 对齐；v0.27.0 起 json×2 解除豁免，RFC-0003 修订 24）
-#   python tools/verify_selfhost.py --wasm     # 8.4 第二层：wasm 载体跑自举解释器（限内 ≤2.1KB 文件，stdout 对齐）
+#   python tools/verify_selfhost.py --wasm     # 8.4 wasm 载体三段验收：第二层全量 stdout 对齐 / 第三层 stmt_interp golden / 自施加 dump（v1.1.1 起规模限制解除，RFC-0003 修订 25）
 #
 # 验收口径（RFC-0003 修订记录 3 + 8.1 节）：
 #   - dump / token：逐字一致；
@@ -378,22 +378,23 @@ def mode_run(files):
 
 
 # 8.4 第二层：wasm 载体跑自举解释器。
-# 规模上限（RFC-0003 修订记录 20）：目标程序 > ~6.7KB（约 2500 token）时触发
-# 未定位的 wasm 内存越界（挂账）；hof/try_operator 类深调用形态另受 V8 栈深限制。
-# 清单 = 全部实测通过的限内 examples。
-WASM_LAYER2_FILES = [
-    'examples/fib.lom', 'examples/match_basic.lom', 'examples/arithmetic.lom',
-    'examples/bootstrap/char_scan.lom', 'examples/bootstrap/recursive_enum.lom',
-    'examples/nested_calls.lom', 'examples/strings.lom', 'examples/factorial.lom',
-    'examples/match_enum.lom', 'examples/closures.lom', 'examples/float_ops.lom',
-    'examples/logical.lom', 'examples/control_flow.lom', 'examples/if_expression.lom',
-    'examples/match_result.lom', 'examples/list_demo.lom',
-    'examples/pipeline.lom', 'examples/record_tuple.lom', 'examples/string_demo.lom',
-]
+# v1.1.1（W 工作包）起规模限制解除：根治两处 codegen bug——
+#   ① 变体 Binder 臂的载荷 i64.load 与臂测试平铺急切求值，0 参枚举贴线性内存
+#     末尾时越界（8.4 挂账的 tok_disc 野值真相，RFC-0003 修订 25）；
+#   ② for 三个分派 if 未压 Label::If → for 体内 return/? 的 br $ret 深度少算、
+#     提前返回被吞（eval 020 在自举层暴露；7.6 起潜伏）。
+# 第二层 = examples+bootstrap 全量（RUN_EXCLUDE 豁免；stmt_interp 走第三层）+ eval 参考解。
+# 深链形态（长表达式链/深嵌套 parse 递归）仍受 V8 默认栈限制——已知、可
+# --stack-size 调（RFC-0002 退出标准 4 口径），非本层验收面。
+WASM_NODE_STACK = 60000  # 第三层/自施加用的 V8 栈深（KB；自举套自举递归深度相乘）
 
 
-def mode_wasm():
-    """编译 self_interp → wasm，宿主(wasm)跑自举解释器执行限内文件，stdout 与宿主直接运行对齐。"""
+def mode_wasm(files):
+    """编译 self_interp → wasm；三段验收：
+    ① 第二层：wasm 载体自举解释器执行全量文件，stdout 与宿主直接运行对齐；
+    ② 第三层：stmt_interp 39 条 golden 逐字（--stack-size）；
+    ③ 自施加：self_interp --dump-ast 自身源码，与宿主原生 dump 逐字一致。
+    """
     wasm_path = os.path.join(tempfile.gettempdir(), 'self_interp_84.wasm')
     try:
         r = subprocess.run([LOM, 'build', SELF, '--target', 'wasm', '-o', wasm_path],
@@ -404,25 +405,79 @@ def mode_wasm():
     except subprocess.TimeoutExpired:
         print('wasm 编译 TIMEOUT')
         return False
-    ok = fail = 0
+
+    def run_wasm_self(args, stack=None, timeout=900):
+        cmd = ['node'] + ([f'--stack-size={stack}'] if stack else []) \
+            + ['eval/runner/run_wasm.mjs', wasm_path, '--'] + args
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              encoding='utf-8', errors='replace', timeout=timeout)
+
+    # ---- ① 第二层：examples+bootstrap（豁免 apply_test/bench；stmt_interp 走 ②）+ eval 参考解 ----
+    ok = fail = folded = 0
     fails = []
-    for f in WASM_LAYER2_FILES:
-        host = run_lom([f])
+    for path, _ in files:
+        p = path.replace('\\', '/')
+        base = os.path.basename(p)
+        if base in RUN_EXCLUDE or base == 'stmt_interp.lom':
+            continue
+        _clean_run_artifacts()
+        host = run_lom([path])
+        _clean_run_artifacts()
         try:
-            r = subprocess.run(['node', 'eval/runner/run_wasm.mjs', wasm_path, '--', f, '--run'],
-                               capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=900)
-            self_out = r.stdout
+            r = run_wasm_self([path, '--run'])
         except subprocess.TimeoutExpired:
-            fails.append((f, 'TIMEOUT')); fail += 1; continue
-        if host == self_out:
+            fails.append((p, 'TIMEOUT')); fail += 1; continue
+        if host == r.stdout:
             ok += 1
         else:
-            fails.append((f, f'host={len(host)}B self={len(self_out)}B rc={r.returncode}'))
-            fail += 1
-    print(f'wasm-layer2: PASS {ok} / FAIL {fail}（限内 {len(WASM_LAYER2_FILES)} 文件；规模上限与挂账见 RFC-0003 修订记录 20）')
+            # 防御网：todo.lom 的非 ASCII 输出走 Latin-1 折叠（宿主 lexer 字节展开，
+            # wasm 侧经 harness utf-8 解码是干净侧）——同 mode_run 口径
+            hl, wl = host.splitlines(), r.stdout.splitlines()
+            if len(hl) == len(wl) and all(
+                h == w or fold_latin1(h) == w for h, w in zip(hl, wl)
+            ):
+                ok += 1
+                folded += 1
+            else:
+                fails.append((p, f'host={len(host)}B wasm={len(r.stdout)}B rc={r.returncode}'))
+                fail += 1
+    print(f'wasm-layer2: PASS {ok} / FAIL {fail}（examples+bootstrap+eval 参考解全量，'
+          f'规模限制已解除；Latin-1 折叠等价 {folded}；RFC-0003 修订 25）')
     for f, why in fails:
         print(f'  FAIL {f}: {why}')
-    return fail == 0
+
+    # ---- ② 第三层：stmt_interp golden（V8 栈深可调的已知限制）----
+    l3_ok = False
+    l3_why = ''
+    try:
+        r = run_wasm_self(['examples/bootstrap/stmt_interp.lom', '--run'], stack=WASM_NODE_STACK)
+        with open('examples/bootstrap/stmt_interp.expected.txt', encoding='utf-8') as f:
+            golden = f.read().replace('\r\n', '\n')
+        if r.returncode == 0 and r.stdout == golden:
+            l3_ok = True
+        else:
+            l3_why = f'rc={r.returncode} wasm={len(r.stdout)}B golden={len(golden)}B'
+    except subprocess.TimeoutExpired:
+        l3_why = 'TIMEOUT'
+    print(f"wasm-layer3: {'PASS' if l3_ok else 'FAIL ' + l3_why}"
+          f'（wasm 自举跑 stmt_interp，39 条 golden 逐字；--stack-size={WASM_NODE_STACK}）')
+
+    # ---- ③ 自施加：self_interp --dump-ast 自身 5703 行源码 ----
+    sa_ok = False
+    sa_why = ''
+    try:
+        host_dump = run_lom([SELF, '--dump-ast'], timeout=600)
+        r = run_wasm_self([SELF, '--dump-ast'], stack=WASM_NODE_STACK, timeout=600)
+        if r.returncode == 0 and r.stdout == host_dump:
+            sa_ok = True
+        else:
+            sa_why = f'rc={r.returncode} wasm={len(r.stdout)}B host={len(host_dump)}B'
+    except subprocess.TimeoutExpired:
+        sa_why = 'TIMEOUT'
+    print(f"wasm-selfapply: {'PASS' if sa_ok else 'FAIL ' + sa_why}"
+          f'（wasm 自举解析自身源码 dump，与宿主原生逐字一致）')
+
+    return fail == 0 and l3_ok and sa_ok
 
 
 def main():
@@ -451,7 +506,7 @@ def main():
         elif mode == '--diags':
             all_ok = mode_diags()
         elif mode == '--wasm':
-            all_ok = mode_wasm()
+            all_ok = mode_wasm(real_files)
         elif mode == '--static':
             all_ok = mode_static(real_files)
         elif mode == '--run':

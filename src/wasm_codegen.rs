@@ -927,23 +927,43 @@ impl Codegen {
                     ));
                 }
                 self.emit_variant_test(a, s, vidx);
-                for (k, sp) in sub.iter().enumerate() {
-                    // arg_k 装入新 local 再递归测试
-                    let arg_l = ctx.alloc();
-                    a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
-                    self.compile_pattern_test(ctx, a, sp, arg_l)?;
-                    a.op(op::I32_AND);
+                if !sub.is_empty() {
+                    // W1 修复（RFC-0003 修订 25）：载荷提取必须推迟到变体测试通过之后——
+                    // 旧实现把 i64.load(s>>4 + 8+8k) 与测试条件平铺 AND，急切求值下
+                    // 0 参枚举（8 字节头对象）贴线性内存末尾时载荷读越界 →
+                    // "memory access out of bounds"（8.4 挂账的 tok_disc 野值真相）。
+                    a.if_i32();
+                    let mut first = true;
+                    for (k, sp) in sub.iter().enumerate() {
+                        // arg_k 装入新 local 再递归测试（此时 tag/idx 已确认，读载荷安全）
+                        let arg_l = ctx.alloc();
+                        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
+                        self.compile_pattern_test(ctx, a, sp, arg_l)?;
+                        if !first {
+                            a.op(op::I32_AND);
+                        }
+                        first = false;
+                    }
+                    a.else_();
+                    a.i32c(0);
+                    a.end();
                 }
                 Ok(())
             }
         }
     }
 
-    /// 变体测试（tag6 且 variant_idx 相等）→ i32
+    /// 变体测试（tag6 且 variant_idx 相等）→ i32。
+    /// W1 修复（RFC-0003 修订 25）：idx 读必须受 tag 守卫——WASM 急切求值下
+    /// 旧实现"tag==6 AND load(s>>4)"的 load 无条件执行，非枚举 scrutinee（大 Int）
+    /// 的 >>4 是野地址 → OOB。tag 不符时给不可能的 idx（-1），语义等价且无盲读。
     fn emit_variant_test(&mut self, a: &mut Asm, s: u32, vidx: u32) {
-        a.lget(s).tag().i64c(TAG_ENUM).op(op::I64_EQ);
-        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(vidx as i32).op(op::I32_EQ);
-        a.op(op::I32_AND);
+        a.lget(s).tag().i64c(TAG_ENUM).op(op::I64_EQ).if_i32();
+        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+        a.else_();
+        a.i32c(-1);
+        a.end();
+        a.i32c(vidx as i32).op(op::I32_EQ);
     }
 
     /// 变体名表：按 idx 顺序把变体名 intern 进数据段，再写 [name_off: i32] 数组；返回表偏移
@@ -1087,6 +1107,7 @@ impl Codegen {
                 self.compile_expr(ctx, a, iter)?;
                 a.lset(it);
                 a.tag_is(it, TAG_INT).if_();
+                ctx.labels.push(Label::If); // 分派 if 也是 label——for 体内 br $ret 深度必须计入（W2：漏计会吞掉 for 内 return/? 的提前返回）
                 {
                     // Int 迭代：0..n
                     a.lget(it).untag().lset(limit);
@@ -1118,6 +1139,7 @@ impl Codegen {
                 a.else_();
                 {
                     a.tag_is(it, TAG_STR).if_();
+                    ctx.labels.push(Label::If);
                     {
                         // String 迭代：按 UTF-8 字符（cnt = 字节偏移；步进 = 当前字符字节数）
                         a.lget(it).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(limit);
@@ -1151,6 +1173,7 @@ impl Codegen {
                     a.else_();
                     {
                         a.tag_is(it, TAG_LIST).if_();
+                        ctx.labels.push(Label::If);
                         {
                             // List 迭代（7.6）：cnt 复用为当前 cons 指针；Nil（值 9）终止
                             a.lget(it).lset(cnt);
@@ -1183,10 +1206,13 @@ impl Codegen {
                             a.op(op::UNREACHABLE); // Map/其他不可迭代
                         }
                         a.end();
+                        ctx.labels.pop(); // if(List) 分派
                     }
                     a.end();
+                    ctx.labels.pop(); // if(Str) 分派
                 }
                 a.end();
+                ctx.labels.pop(); // if(Int) 分派
                 Ok(())
             }
             Stmt::Return(expr) => {
@@ -4959,6 +4985,41 @@ mod e2e {
             "fn main() -> Unit\n    let p = {x: 1, y: 2}\n    println(p.x + p.y)\n    println(p)\nend",
             "tag4bit",
             "3\n{x: 1, y: 2}\n",
+        );
+    }
+
+    // ===== W 工作包（v1.1.1）：for 体标签深度 + 变体臂急切载荷读 =====
+
+    /// 回归 W-2：for 的三个分派 if 未压 Label::If → for 体内 return 的 br $ret
+    /// 深度少算、提前返回被吞（eval 任务 020 在自举层的失败根因；7.6 起潜伏）
+    #[test]
+    fn e2e_return_inside_for() {
+        check(
+            "fn find(xs: List<Int>) -> Int\n    for x in xs\n        if x > 1\n            return x\n        end\n    end\n    -1\nend\nfn main() -> Unit\n    let a = 1..5\n    let b = 7..9\n    println(find(a))\n    println(find(b))\nend",
+            "ret_in_for",
+            "2\n7\n",
+        );
+    }
+
+    /// 回归 W-2 同根：`?` 在 for 体内的 EarlyReturn 同样被吞
+    #[test]
+    fn e2e_try_inside_for() {
+        check(
+            "fn g(i: Int) -> Result<Int, String>\n    if i == 2\n        Err(\"boom\")\n    else\n        Ok(i)\n    end\nend\nfn sum(xs: List<Int>) -> Result<Int, String>\n    let mut acc = 0\n    for x in xs\n        let v = g(x)?\n        acc = acc + v\n    end\n    Ok(acc)\nend\nfn main() -> Unit\n    let xs = 1..4\n    match sum(xs)\n        Ok(v) => println(v)\n        Err(e) => println(\"err: \" + e)\n    end\nend",
+            "try_in_for",
+            "err: boom\n",
+        );
+    }
+
+    /// 回归 W-1：变体 Binder 臂的载荷提取曾与臂测试平铺急切求值——0 参枚举贴
+    /// 线性内存末尾时 i64.load(ptr+8) 越界（8.4 挂账的 tok_disc 野值真相）。
+    /// 此处锁定语义：Binder 臂对 0 参 scrutinee 必须不命中、落到正确臂。
+    #[test]
+    fn e2e_binder_arm_vs_nullary_scrutinee() {
+        check(
+            "enum Tok = A | B(Int)\nfn disc(t: Tok) -> Int\n    match t\n        B(v) => v\n        A => 0\n        _ => -1\n    end\nend\nfn main() -> Unit\n    println(disc(A))\n    println(disc(B(7)))\nend",
+            "binder_nullary",
+            "0\n7\n",
         );
     }
 
