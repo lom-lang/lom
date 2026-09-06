@@ -5,7 +5,8 @@
 LLM-coding-native first, workloads later. Built in Rust.
 
 > **Status: v1.0 — language surface FROZEN (2026-09-02)**. Frozen: syntax / 20 reserved words / diagnostic codes / 43 builtins ([spec §14](LANGUAGE_SPEC.md)). Changes require a new RFC.
-> **Current release: v1.1.0 (2026-09-03)** — remediation release, frozen surface unchanged: new `MUT002` warning (closure capturing a `mut` binding — interpreter/WASM capture semantics differ), `NAM003` false-positive fix (self-referential `let` closures), `inf`/`NaN` display unified across both backends ([spec §13 changelog](LANGUAGE_SPEC.md)).
+> **Current release: v1.1.1 (2026-09-07)** — WASM backend bug-fix release, frozen surface unchanged: root-caused and fixed the Phase 8.4 self-hosting OOB (variant-arm eager payload load past the end of linear memory — the old "non-deterministic threshold" was heap-layout sensitivity), plus a latent `return`/`?`-inside-`for` swallow bug (since v0.12.0). With these, the wasm-carrier self-proof completes (layer-3 golden + self-application) and re-enters CI ([spec §13 changelog](LANGUAGE_SPEC.md)).
+> **v1.1.0 (2026-09-03)** — remediation release: new `MUT002` warning (closure capturing a `mut` binding — interpreter/WASM capture semantics differ), `NAM003` false-positive fix (self-referential `let` closures), `inf`/`NaN` display unified across both backends.
 
 ## Quick Start
 

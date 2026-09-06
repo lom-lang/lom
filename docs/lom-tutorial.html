@@ -178,7 +178,7 @@
   <tr><td>修复引擎深化 M1-M3(Replace 动作/迭代闭环/PARSE001)</td><td>已完成(v0.16.0-v0.18.0)</td></tr>
   <tr><td>修复引擎深化 M4(error_repair 扩充 + 语料回归)</td><td>已完成(2026-08-31,v0.19.0)</td></tr>
   <tr><td>Phase 8:全量自举(8.1 前端/8.2 检查/8.3 求值器 in Lom)</td><td>已闭环(2026-09-02,v0.23.0-v0.26.0)</td></tr>
-  <tr><td>8.4 WASM 载体自证</td><td>部分完成(未定位越界挂账,RFC-0003 修订 21 完整档案)</td></tr>
+  <tr><td>8.4 WASM 载体自证</td><td>完成(2026-09-07 越界根治:变体臂急切载荷读×0 参枚举贴内存尾,wasm 层回流 CI;RFC-0003 修订 25-29)</td></tr>
   <tr><td>json 双内建裁决(char_from_code,42→43 内建)</td><td>已完成(2026-09-02,v0.27.0)</td></tr>
   <tr><td><strong>v1.0 语言面冻结</strong></td><td><strong>已生效(2026-09-02,v1.0.0,spec §14)</strong></td></tr>
 </table>
@@ -736,7 +736,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>⑥ WASM parity</td><td>同一套 116 任务用 WASM 后端再跑一遍</td><td>双后端语义漂移</td></tr>
   <tr><td>⑦ WASM 自举 golden</td><td>stmt_interp 编译到 WASM 后与同一份 golden 逐字比对</td><td>编译器回归</td></tr>
   <tr><td>⑧ clippy</td><td><code>cargo clippy --release -- -D warnings</code>(2026-08-31 第四轮评审整改新增,存量 54 条清零后转 gate,只跑 ubuntu)</td><td>风格/惯用法腐坏</td></tr>
-  <tr><td>⑨ selfhost 自举验收</td><td>自举解释器五模式对账宿主(dump/tokens 149 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
+  <tr><td>⑨ selfhost 自举验收</td><td>自举解释器六模式对账宿主(dump/tokens 149 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;v1.1.1 起 --wasm 三段验收:第二层全量 147 文件/第三层 stmt_interp golden/自施加 dump 逐字;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
   <tr><td>⑩ doc-gates 文档对账</td><td>对账双件:<code>spec_examples_check.py</code> 把 SPEC_FOR_AI 全部代码示例逐个跑 <code>--check</code>(正例必须零 Error、反例必须产诊断);<code>doc_audit.py</code> 把五类易腐数字(eval 总数/自举计数/文件拆分/行数/版本号)对 16 处文档现值自动比对(第二轮审查后接入,只跑 ubuntu)</td><td>文档腐坏——计数簿记漏项与 LLM 规范假特性</td></tr>
 </table>
 
@@ -880,7 +880,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p>M1 拼写 Replace(v0.16.0,Medium 不自动应用)→ M2 --apply 迭代闭环(v0.17.0,三重刹车防震荡,上限 5 轮)→ M3 PARSE001 针对性修复(v0.18.0,<strong>动手前先 --json 探针实测,推翻了两个计划假设</strong>——缺 end 被容错解析静默接受、缺 ')' 的位置在下一个 token)。M4 已完成(v0.19.0):评测任务扩到 113 + fix_corpus 语料逐字回归。亮点是"先实测再写规则"和"凡声称的行为都有逐字防线钉住"。</p></div>
 
 <div class="qa"><p class="q">Q:项目现在什么进度?下一步做什么?</p>
-<p>v1.1.0 + 第二轮审查整改闭环(v1.0 冻结后两轮独立审查:A-/12 条边缘腐坏全部清零,对账工具双件进 CI 把"文档不撒谎"升级为机器 gate;语言面自冻结后零变化),路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:456 测试、CI 三平台 10 gate(含 selfhost 五模式与 doc-gates)、eval 116/116 双后端。post-1.0 挂账:wasm 越界深挖、L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
+<p>v1.1.0 + 第二轮审查整改闭环(v1.0 冻结后两轮独立审查:A-/12 条边缘腐坏全部清零,对账工具双件进 CI 把"文档不撒谎"升级为机器 gate;语言面自冻结后零变化),路线图 Phase 0-8 全部闭环(json 双内建裁决落地,char_from_code 使内建 42→43),<strong>语言面已冻结</strong>(spec §14:语法/20 保留字/诊断码/43 内建,变更须新 RFC)。量化:459 测试、CI 三平台 11 gate(含 selfhost 六模式与 doc-gates)、eval 116/116 双后端、8.4 wasm 载体三层自证全绿(v1.1.1 越界根治)。post-1.0 挂账:L2 自举编译器(阻塞已解除)、Pattern span。答这题的分寸感:LLM 实测有两个数据层——2026-08-31 四模型复测 99.1%-100%(全 113 任务)是主证据;2026-08-03 的 99/100 是单模型基线。仍缺多采样 pass@k 与跨语言对照组——主动说出来。</p></div>
 
 <hr>
 <!-- ============================================================ -->
@@ -913,7 +913,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>8.1 前端自举(v0.23.0)</strong>:自举 lexer/parser 与宿主在全部示例 + eval 参考解(现 149 个文件)上 AST dump <strong>逐字一致</strong>——格式即契约、不含 span(宿主字节列 vs 自举字符列在非 ASCII 行必然分叉,结构比对不需要位置)。开发中顺手抓出宿主真 bug:<code>?</code> 提前返回在"块尾 if 表达式/match Form B 臂"内被当块值静默吞掉;</li>
   <li><strong>8.2 检查自举(v0.24.0)</strong>:NAM003/TYPE003-arity/EFF001/MAT001 四类检查 in Lom;43 个内建签名表由宿主测试导出对账(手抄必漂移——"签名表要实测导出"是本项目反复验证的教训);</li>
   <li><strong>8.3 求值器自举(v0.25.0)</strong>:<strong>三层自证</strong>——自举解释器跑 stmt_interp.lom,39 条输出与 golden 逐字一致(宿主→自举→自举→程序,quine 式验证);Float 位级一致的关键是单次 IEEE 除法(正确舍入 = Rust parse 的结果,两步加除会差 1 ulp);</li>
-  <li><strong>8.4 wasm 载体(部分,如实记录)</strong>:self_interp 编译到 220KB WASM 后被一个<strong>未定位的非确定性越界</strong>阻塞(目标程序 &gt;6.7KB 必崩;六类决定性实验的排除清单见 RFC-0003 修订 21)——常规程序的 WASM 后端不受影响(eval 全量 parity 全绿),深挖挂账 post-1.0;</li>
+  <li><strong>8.4 wasm 载体(2026-09-07 收官,v1.1.1)</strong>:self_interp 编译到 WASM 后曾遭未定位越界阻塞(如实挂账两年内档案)——v1.1.1 根治:真相是<strong>堆布局敏感</strong>(旧"非确定性"=未控布局差异),根因 = match 变体臂的载荷 i64.load 与臂测试平铺急切求值,0 参枚举贴线性内存末尾时读越界;顺带抓获 for 体内 return/? 被吞的潜伏 bug(v0.12.0 起)。修复后 8.4 三层自证全绿(第二层全量 147 文件、第三层 stmt_interp golden 39 条、自施加 dump 逐字),wasm 层回流 CI;完整档案 RFC-0003 修订 25-29;</li>
   <li><strong>json 双内建裁决(v0.27.0)</strong>:自举解释器的 json_parse/json_stringify 曾因缺 <code>char_from_code</code> 挂账;裁决只加这一个内建(42→43),自举侧用它把完整 json 在 Lom 里自实现(含 unicode 转义与代理对、Int/Float 二分、11 变体镜像 stringify)——"宿主内建即硬件指令"原则的典型应用。</li>
 </ul>
 
@@ -924,7 +924,7 @@ mathlib = { path = "mathlib" }</code></pre>
 <p><strong>第二轮独立审查与 R1-R8 整改(2026-09-05,已闭环)</strong>:复审总评 A-——36 项硬指标全部实测复现,但按"文档不撒谎"的自设标准抓出 12 条边缘腐坏,最有代表性的一条颇具讽刺意味:<strong>type alias 假特性活在了喂给 LLM 的那份规范里</strong>(SPEC_FOR_AI §5 教 <code>type UserId = Int</code>,实测 PARSE001)——而 LANGUAGE_SPEC 早已标 never implemented、教程还宣讲过"此类谎言已清扫"。清扫清在了人读的 spec,漏了 LLM 读的那份。整改 R1-R6 清掉全部假话与旧计数;R7/R8 则把教训制度化:<strong>对账工具双件进 CI</strong>(gate ⑩)——SPEC_FOR_AI 的每个代码示例从今往后被机器逐个验证,五类易腐数字(eval 总数/自举计数/文件拆分/行数/版本)由 <code>doc_audit.py</code> 自动对账,改错一个数字 CI 就红(负测试实测过)。<strong>文档腐坏的速度远超直觉,而人肉清单天然漏项——最终的解法不是更仔细的人,是机器 gate。</strong>这呼应了 2.13 节的元教训,也把它推向了终点:三轮评审买来的认知,最终变成了两段 Python。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
-<p>2.10 的迷你解释器像"孩子学会了煮泡面",Phase 8 是"孩子开了一家完整餐厅":菜单(全部语法)、质检(静态检查)、后厨(求值器)全用 Lom 自己写。验收方式也很妙——不问"像不像",而是让<strong>它做的菜和老师做的菜逐字一样</strong>(149 文件 dump 逐字比对、39 条 golden 三层自证)。至于 8.4 那个没抓到的越界 bug:如实写进档案挂账,比假装完成更符合这个项目的性格——毕竟它的立身之本就是"文档不撒谎"。</p></div>
+<p>2.10 的迷你解释器像"孩子学会了煮泡面",Phase 8 是"孩子开了一家完整餐厅":菜单(全部语法)、质检(静态检查)、后厨(求值器)全用 Lom 自己写。验收方式也很妙——不问"像不像",而是让<strong>它做的菜和老师做的菜逐字一样</strong>(149 文件 dump 逐字比对、39 条 golden 三层自证)。至于 8.4 那个越界 bug:先如实挂账五日、后用基线重标定+语义图 diff+野值现场探针根治(v1.1.1)——"先诚实记录、再彻底解决"比当场假装完成更符合这个项目的性格,毕竟它的立身之本就是"文档不撒谎"。</p></div>
 
 <hr>
 <!-- ============================================================ -->

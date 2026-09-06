@@ -4,12 +4,15 @@
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：W 工作包——wasm 越界深挖
-> （2026-09-05 开立，见下）。R1-R8 与 T1-T7 均已关闭（档案保留下文）。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——W 工作包已收官
+> （2026-09-07，v1.1.1，见下档案）。R1-R8 与 T1-T7 均已关闭（档案保留下文）。
 > **纪律**：语言面冻结（LANGUAGE_SPEC §14）不破——只允许新增 warning 级诊断码；
 > 其余行为修复均为 bug 修复性质且不动语法/保留字/内建表。
 
-## W 工作包：wasm 越界深挖（2026-09-05 开立，活跃）
+## W 工作包：wasm 越界深挖（2026-09-05 开立 → 2026-09-07 收官，v1.1.1）✅ done
+
+**结局：修复出口**（非降级）——两处 codegen bug 根治，8.4 改判完成，升版 1.1.1，
+wasm 层回流 CI。完整技术档案 RFC-0003 修订 25-29；工具沉淀 tools/wasm_debug/。
 
 **目标**：根治 8.4 挂账的未定位非确定性内存越界（RFC-0003 修订 20/21 完整档案），
 使 wasm 载体的三层自证成为可能；攻不下时允许"如实降级"出口（见下）。
@@ -59,7 +62,7 @@
   postfix→tok_disc；fn 形态为 comparison→or→range→expr→…）；mem pages at trap 3-9
   （非耗尽）——与修订 21 的"Tok 枚举载荷野值"口径一致且更精确。
 
-### W1｜定位
+### W1｜定位 ✅ done 2026-09-07
 
 - 遗产工具直接复用：run_wasm.mjs 的 LOM_HP_TRACE / trap 内存页数 / LOM_PRE_GROW；
   git 历史中的 lom_dbg_alloc 探针与 LOM_WASM_DUMP_FN=1 函数索引表（源码级探针当时
@@ -73,7 +76,31 @@
 - 假设起点（非限制）：hp 增长撞入静态数据段边界；variant_idx/闭包 table 索引在大模块
   下越界；数据段布局与 4 位 tag 的高位交互；Tok 枚举载荷的野值注入路径。
 
-### W2｜修复 + 验收 + 收尾
+**W1 证据区（2026-09-07 实测）**：
+
+- 探针重建：codegen 加 `lom_dbg_alloc` import（rt_alloc 尾部上报 size/new_hp，
+  harness handler 本就在）→ trap/pass 双侧全量分配日志 13,417/25,757 条——
+  **尺寸序列除 argv0 外逐条一致**（排除错误尺寸分配；hp 全程不降）。
+- **同刻快照 + 语义图 diff**（工具沉淀 tools/wasm_debug/heapdiff.py）：harness 第
+  N 次分配时导出内存，N 从 13400 二分到 13416（trap 前最后一次分配）——按分配日志
+  逐对象解码、指针归一化为 owner 序号后，**全堆语义级零差异**：排除存储腐蚀，
+  野值是运行时算出的（wasm 栈/局部变量直接传递）。
+- **野值现场探针** `lom_dbg_wild`（变体臂载荷提取前 tag/边界检查，异常即现场）抓到
+  实值：`value=0x2fff46 tag=6 ptr=196596 mem=196608 hp=196604`——scrutinee 是
+  **合法的 0 参枚举**（8 字节头对象）躺在线性内存末尾；其 +8 载荷读
+  [196604,196612) 越过页界 4 字节 = trap（字节级解码 0x267 处 `29 00 08` =
+  i64.load offset=8，与 W0 的 0x776d 同一指令）。
+- **根因**：match 变体臂降级（wasm_codegen.rs `Pattern::Variant`）把载荷提取与臂
+  测试平铺 AND——WASM 急切求值下 `i64.load(s>>4+8)` 不等 tag==6 且 idx 匹配就执行；
+  `emit_variant_test` 的 idx 读同样 tag 盲（大 Int scrutinee 会 OOB）。六类旧排除
+  全部兼容（无重做）：bug 不在分配/存储侧，在求值侧的读时机。
+- **顺带抓获第二个独立 bug**（W2 扩量验证时暴露）：eval 020（return-in-if）在 wasm
+  自举层输出 -1/-1/-1 → 直编最小复现（`for x in xs if x>1 return x end end` → -1）
+  确认 **for 体内 return/? 被吞**：`Stmt::For` 三个迭代分派 if（Int/Str/List）未压
+  `Label::If` → br $ret 深度少算 2-3 层、br 落到分派 if 出口。v0.12.0（7.6）起潜伏，
+  eval 116 任务与示例无 "?/return 在 for 体内" 形态所以从未被拦。
+
+### W2｜修复 + 验收 + 收尾 ✅ done 2026-09-07（升版 1.1.1）
 
 - 修复在宿主侧（wasm_codegen.rs / run_wasm.mjs），**不动语言面（冻结）**。
 - 验收阶梯：① W0 标定的必崩阈值解除（原必崩程序稳定通过 ≥10 轮）；② verify_selfhost
@@ -85,10 +112,38 @@
   CI 绿后打 tag v1.1.1。
 - **全量回归电池不倒**（HANDOVER §2.2 + doc-gates 双件）。
 
+**W2 证据区（2026-09-07 实测）**：
+
+- **修复三处（仅 wasm_codegen.rs，零语言面）**：① `emit_variant_test` idx 读改
+  tag 守卫条件读（tag≠6 给不可能 idx -1）；② `Pattern::Variant` 载荷提取推迟到
+  变体测试通过后（`if (result i32)` 内，else 0）；③ `Stmt::For` 三个分派 if 补
+  push/pop `Label::If`。+3 e2e 回归测试（459/459）。
+- **阶梯①解除**：fn 形态 2.2KB-211KB 全过（原 4.4-8.8/17.6/35KB 必崩）；string_demo
+  短路径 10/10（原 10/10 必崩）；expr ≥4KB 的 OOB 消失；nest 8.2/12.3KB OOB 消失。
+  残余失败全部为 `Maximum call stack size exceeded`——深链 parse 递归撞 V8 默认栈，
+  `--stack-size` 可调的**已知限制**（RFC-0002 退出标准 4 口径），非本 bug。
+- **阶梯②③达成**：第二层全量 = examples+bootstrap（RUN_EXCLUDE 豁免）+ eval 116
+  参考解 = 147 文件 × 5 轮稳定 PASS（有状态示例按 §11.0 教训两侧前清理）；file_demo
+  曾因陈旧产物假 FAIL，清理后过。**第三层**：wasm 自举跑 stmt_interp，39 条 golden
+  逐字一致（`--stack-size=60000`）。**自施加（重标第三层）**：wasm 自举解释器解析
+  **自身 5703 行源码**，`--dump-ast` 655,890 字节与宿主原生 dump 逐字一致。
+- **阶梯④回流决策：回流 CI**——5 轮稳定 + 给定 (wasm 字节+argv+目标文件) 完全确定
+  （旧"随机红"根源已除）；verify_selfhost `--wasm` 升级三段验收（layer2 全量 / layer3
+  golden / 自施加），WASM_LAYER2_FILES 限内清单废除；ci.yml selfhost job 新 step。
+- 收尾齐：RFC-0003 修订 25-29、HANDOVER（§0 横幅/§1 8.4 行/§2.2/§9/§11.0 重写为
+  已解决档案）、guide 条目 + 8.4 条目改判、教程 5 处、LANGUAGE_SPEC §13 v1.1.1、
+  README 横幅 v1.1.1 行、工具沉淀 tools/wasm_debug/（gen_scale / dbg_run /
+  heapdiff + README 探针补丁说明）。
+- 全量回归电池：cargo test **459/459**、clippy -D warnings 零告警、stmt_interp
+  golden 逐字、fmt 幂等、eval 双后端 **116/116**、selfhost 六模式全 PASS（dump/tokens
+  149、diags 5、static 15/149、run 31、wasm 三段）、`lom --version` → 1.1.1。
+  doc-gates 双件复跑 PASS。tag v1.1.1 在 CI 绿后打（见下方登记）。
+
 ### 出口条件（攻不下不算失败）
 
 多轮仍无法定位时：把新基线数据、新排除假设、新增诊断工具沉淀为 RFC-0003 修订 25 的
 增补档案后关账——诚实档案与修复同权重（项目纪律）。此时只更新文档不升版本。
+**（本次走修复出口，本节未启用）**
 
 ### 纪律
 

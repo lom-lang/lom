@@ -9,7 +9,7 @@
 > - [docs/TODO.md](TODO.md) — **整改待办台账**（跨会话待办唯一事实源；含审查裁决的驳回/挂起登记）
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-09-05（**W 工作包活跃（wasm 越界深挖，docs/TODO.md）**——8.4 挂账根治尝试：W0 复现基线重建（self_interp 已长到 5703 行/wasm 238KB，修订 21 旧阈值须重标定）→ W1 定位（遗产工具 + 内存快照 diff；六类旧排除假设勿重做）→ W2 修复验收（升版 1.1.1；攻不下有如实降级出口）。此前：第二轮审查整改 R1-R8 全部完成（假特性清除 + 对账工具双件 tools/spec_examples_check.py / tools/doc_audit.py + CI doc-gates——"文档不撒谎"升级为机器 gate；报告 docs/reviews/review-2026-09-05.html）。v1.1.0：第一轮整改 T1-T7。v1.0.0：语言面冻结。**语言面变更须新 RFC 解冻**。交接必读 RFC-0003 修订记录 + §1 快照 + §11 + docs/TODO.md）
+> 最后更新：2026-09-07（**v1.1.1：W 工作包收官——8.4 wasm 越界挂账根治 + 顺带抓获第二个潜伏 bug（for 体内 return/? 被吞）**：堆布局敏感性定性（argv[0] 长度一字节翻转触发）→ 语义图 diff 证全堆干净 → 野值现场探针抓到真相（0 参枚举贴内存尾 + 变体臂急切载荷读越界）；修复仅 wasm_codegen.rs 三处（零语言面）；8.4 就此改判**完成**——第三层 golden（39 条逐字）与自施加（wasm 自举解析自身 5703 行 dump 655,890B 逐字）达成、wasm 层回流 CI；工具沉淀 tools/wasm_debug/；完整档案 RFC-0003 修订 25-29。此前：第二轮审查整改 R1-R8 全部完成（docs/reviews/review-2026-09-05.html）。v1.1.0：第一轮整改 T1-T7。v1.0.0：语言面冻结。**语言面变更须新 RFC 解冻**。交接必读 RFC-0003 修订记录 + §1 快照 + §11 + docs/TODO.md）
 
 ---
 
@@ -32,8 +32,8 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.1.0**（Cargo.toml/lock 一致，2026-09-03 整改会话 T7 升版：MUT002 warning + NAM003 假阳性修复 + inf/NaN 显示统一；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
-| Rust 测试 | **456/456 通过**（含 wasm 单测 + 34 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| 版本 | **v1.1.1**（Cargo.toml/lock 一致，2026-09-07 W 工作包升版：wasm 后端两处 codegen bug 修复——变体臂急切载荷读越界（8.4 挂账根治）+ for 体内 return/? 被吞；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
+| Rust 测试 | **459/459 通过**（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **116/116**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code，v0.27.0 加；任务 116 递归闭包 let / 117 浮点 inf/NaN 显示，2026-09-03 整改 T5 加，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三模型复测达成**（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（Coding Plan 端点）；唯一失败 078 与基线同题（prompt 歧义，4 模型中 3 挂 1 过）；基线 99/100（2026-08-03）见 eval/REPORT.md |
@@ -41,11 +41,11 @@
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |
 | **Phase 8.2** | **完成（2026-09-02）**：静态检查自举（RFC 子集方案）——NAM003（变量/调用/赋值）+ TYPE003-arity（管道左值计入）+ EFF001（效应传播，main 豁免，签名定位）+ MAT001（枚举/Result/Option 穷尽性，guard/Binder 语义对齐）；`self_interp.lom -- <file> --check` 模式；42 内建签名表由宿主测试导出对账。验收 --static：坏文件 15/15 + 干净集 146/146 零误报；8.1 三模式回归不倒 |
 | **Phase 8.3** | **完成（2026-09-02）**：求值器自举——Val 11 变体/Env 链（Map 引用=闭包共享语义）/E2 错误通道（ERet 镜像 EarlyReturn）/调用分派/import 别名表/`--run` 模式；42 内建逐案定案（38 透传宿主硬件 + list_map/filter/fold 强制自实现 + json 双缺口挂账）；Float 位级一致（单次 IEEE 除法）。验收：examples 30/30 + stmt_interp 39 条 golden（三层自证）+ eval 113/113 |
-| **Phase 8.4** | **部分完成（2026-09-02，如实记录）**：self_interp 编译 WASM ✓（220KB）+ 小文件语义正确 ✓ + harness `LOM_PRE_GROW` + verify `--wasm` 模式；**三层 golden 的 wasm 载体未达成**——目标程序 >~6.7KB（约 2500 token）触发未定位的非确定性越界（限内文件两轮 19/21 与 15/19 不同；预扩内存只部分缓解；第三层不可行）——完整技术档案见 RFC 修订 21（已排除 rehash/JS 栈/内存耗尽/build_alloc 字节/静态串去重/独立最小复现全组合）。CI 接入 selfhost gate（8.1/8.2 四模式 + 8.3 run 模式，v0.27.0 起；wasm 层不接——不稳定会随机红） |
+| **Phase 8.4** | **完成（2026-09-07 W 工作包改判，RFC-0003 修订 25-29）**：原 2026-09-02 部分完成的阻塞（未定位越界）已根治——真相是**堆布局敏感**（argv[0] 长度一字节即可翻转，旧"非确定性"=未控布局差异）：match 变体臂降级的**载荷 i64.load 与臂测试平铺急切求值**，0 参枚举（8 字节头对象）贴线性内存末尾时读越界；修复 = 载荷提取推迟到变体测试通过后 + idx 读加 tag 守卫。顺带抓获第二个潜伏 bug（7.6 起）：**for 的三个迭代分派 if 未压 Label::If** → for 体内 return/? 的 br $ret 深度少算、提前返回被吞（eval 020 在自举层暴露）。验收：第二层全量 147 文件（examples+bootstrap+eval 参考解）× 5 轮稳定；**第三层 golden 达成**（wasm 自举跑 stmt_interp 39 条逐字，`--stack-size=60000`——V8 栈深可调的已知限制）；**自施加达成**（wasm 自举解析自身 5703 行，dump 655,890B 与宿主原生逐字）；`verify --wasm` 升级三段验收、限内清单废除；**wasm 层回流 CI**。深链形态（长表达式链/深嵌套 parse 递归）仍受 V8 默认栈限制——已知、可调，非 bug |
 | **v0.27.0 json 裁决** | **完成（2026-09-02，RFC-0003 修订 24）**：语言面 42→43（`string.char_from_code`，唯一新增；`type_of` 不加——自实现路线不需要）。宿主+WASM+自举三实现齐；self_interp.lom Part H（~340 行）json_parse/json_stringify 自实现（字符式递归下降 + 11 变体镜像 stringify）；`args` argv 透传；verify `--run` 模式 31/31（json_demo/todo 豁免解除，todo 走 Latin-1 折叠）；eval 任务 115；runner UTF-8 捕获修复。修订 18 的 json 挂账关闭 |
 | **第二轮审查** | **审查完成 + 整改 R1-R8 完成（2026-09-05，A-，无 P0）**：独立审查 agent 报告 docs/reviews/review-2026-09-05.html（基线 470670d）——硬指标全部实测复现（36 项验证矩阵）；发现 1×P1 + 6×P2 + 6×P3 文档腐坏，全部经维护会话亲手复现证实。**R1-R8 已全部执行关闭**（docs/TODO.md 档案）：R1 type alias 假特性→反例；R2 sin/cos+MUT001 措辞+pub 标注；R3/R4 spec §12 与 eval/README 旧计数；R5 README 拆分+v1.1.0 横幅；R6 ci.yml 149；R7/R8 对账工具双件（tools/spec_examples_check.py 34 块三层断言 + tools/doc_audit.py 16 项数字对账）+ CI doc-gates job——**R7 调查中额外抓出第三个假特性：记录字段赋值 `p.x = 5` 从未实现（parser 赋值目标只认普通变量，实测 PARSE000），SPEC_FOR_AI §5 与 LANGUAGE_SPEC §6.2 双修为如实口径**。"喂给 LLM 的文档"与"文档数字"自此从人工清扫升级为机器 gate |
-| 下一步 | **W 工作包（wasm 越界深挖）活跃（2026-09-05 开立，docs/TODO.md）**：唯一已知真 bug 的根治尝试——W0 复现基线重建 / W1 定位（遗产工具 + 内存快照 diff，六类旧排除勿重做）/ W2 修复验收升版 1.1.1；攻不下有如实降级出口（诚实档案与修复同权重）。其余方向级挂账（按需）：L2 自举编译器（char_from_code 已解锁）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型 |
-| 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；自举诊断消息 Latin-1 化的长期方案（验收脚本折叠换算；v1.0.0 lexer 修复后 dump/run 侧折叠计数已归零，仅诊断消息侧仍需） |
+| 下一步 | 方向级挂账（按需）：L2 自举编译器（char_from_code 已解锁；8.4 三层自证 + tools/wasm_debug/ 是其基建）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型。W 工作包（wasm 越界深挖）已收官（2026-09-07，v1.1.1，docs/TODO.md 档案） |
+| 遗留挂账 | Pattern 无 span（match 模式内变体名诊断仍 (0,0)，fix 回退整词扫描）；栈溢出结构化诊断；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；自举诊断消息 Latin-1 化的长期方案（验收脚本折叠换算；v1.0.0 lexer 修复后 dump/run 侧折叠计数已归零，仅诊断消息侧仍需）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵ 层，verify --wasm 第三层/自施加已内置 60000） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -82,10 +82,10 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 456/456（2026-09-03 整改基线；v1.0.0 时为 454，T2 +2）
+cargo test --release                                    # 期望 459/459（2026-09-07 W 工作包基线：456 + 3 e2e 回归）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
-python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run 模式）
+python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
 python tools\spec_examples_check.py                     # R7 对账：SPEC_FOR_AI 示例实测（正例解析/导入/运行三层，反例必产诊断）
 python tools\doc_audit.py                               # R8 对账：文档数字 16 项（eval 总数/dump 计数/.lom 拆分/行数/版本）——两者已在 CI doc-gates job 常驻
 ```
@@ -282,10 +282,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 456/456、零 warning、`./target/release/lom.exe --version` 显示 1.1.0
+2. `cargo build --release && cargo test --release` 确认 459/459、零 warning、`./target/release/lom.exe --version` 显示 1.1.1
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮审查及其整改 R1-R8 均已闭环（2026-09-05）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-24 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py
+5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮审查整改 R1-R8 闭环（2026-09-05）+ v1.1.1 W 工作包收官（2026-09-07：8.4 wasm 越界根治 + for 体内 return/? 修复，8.4 改判完成、wasm 层回流 CI）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -388,12 +388,16 @@ end
 - **验收脚本会跑 146 个文件×2 进程**，dump 模式全量 ~4 分钟（解释器套解释器常态）；CI 若接入（8.4 计划）注意 job 时限。
 - **8.2 会话坑（2026-09-02）**：① `map_get` 返回 `Some(存储值)` 包装——存 Option 值读出双层 `Some(Some(...))`，必须解一层再 match（最小复现测不出，特定上下文才炸——多打 display 形态直接看真相）；② **宿主 --json 在 parse 有错时跳过 typecheck**（`if diags.ok` 门）——自举静态检查同样要跳（带洞 AST 检查会多报 NAM003），坏文件验收才对齐；③ **内建签名表必须实测导出**（typechecker 测试打印），手抄 42 个签名必漂移（string_to_int 的 ret 在文档形态是 Option、实测是 _Any）；④ 诊断消息顺序依赖诊断产生顺序（em 数值序插入），收集遍/检查遍的分派顺序要对齐宿主两遍架构（import 别名在收集遍注册，函数体检查在第二遍）；⑤ 修 MAT001 漏报类 bug 时 DBG 链要按"调用链逐级"插（fn 级→块级→表达式级→取值级），一次只加一针，display 形态打原始值而非二次加工值。
 
-### 11.0 Phase 8.4 会话结论（2026-09-02，交接前最后更新）
+### 11.0 Phase 8.4 越界挂账（2026-09-02 开账 → 2026-09-07 W 工作包根治，档案保留下）
 
-- **8.4 部分完成的定性依据**：RFC 退出标准 3（三层 golden）与 4（CI gate）的 wasm 载体部分被阻塞——不是没做完，是**客观阻塞且已充分定位尝试**（RFC 修订 21 的排除清单跑了六类决定性实验）。解释器载体的等价验证在 8.3 已全量达成（宿主→自举→stmt_interp 39 条逐字），wasm 载体缺同构验证。
-- **wasm 越界的复现口径**（post-Phase-8 深挖起点）：① 目标程序 >~6.7KB/2500 token 必崩（trap 栈顶 tok_disc——Tok 枚举载荷 i64 野值）；② 限内文件**间歇性**（同一命令两轮结果不同——非确定性是关键特征，指向堆布局交互）；③ `LOM_PRE_GROW=<页数>` 部分缓解；④ 深挖已排除：Map rehash（cap/桶一致绕过仍崩）、V8 栈（--stack-size 无效且引另一种崩）、内存耗尽（trap 时 2.3-4.5MB）、build_alloc 字节级（dump 全字节解码正确）、静态串去重（无查重直插）、独立最小复现（map/List/枚举/record 全组合 7000 元素均过——bug 依赖 220KB 大模块自身结构）。
-- **诊断工具遗产**（深挖时可复用）：run_wasm.mjs 的 `LOM_HP_TRACE`（harness 侧 hp/分配观测——源码级探针已从 codegen 回滚，import 形态 `lom_dbg_alloc` 的加法在 git 历史里）、trap 时打印内存页数、`LOM_PRE_GROW`。函数名映射：`LOM_WASM_DUMP_FN=1 lom build ... 2>fnmap.txt` 打印用户函数索引表（此探针也已回滚，历史里取）。
-- **CI selfhost gate**：ubuntu 单平台跑 `python3 tools/verify_selfhost.py [--tokens|--diags|--static]` 四模式；**首跑未验证**（本轮推送后看首跑——如挂按报错修，别直接降 gate）。
+- **8.4 越界已根治（v1.1.1，RFC-0003 修订 25-29）**。最终画像与当时认知的差异：
+  - **"非确定性"真相 = 堆布局敏感性**：编译产物完全确定（5 次 md5 全同）；argv[0]（wasm 路径，经 lom_env_args 物化进堆）长度 ≤22/≥23 字节即可让同一文件必崩/必过——旧两轮 19/21、15/19 的漂移来自未控的调用形式差异。
+  - **">~6.7KB 必崩"是伪阈值**：fn 形态非单调（2.2K 过 / 4.4-8.8K 崩 / 11-13K 过 / 17.6K 崩 / 26K 过 / 35K 崩）——是否踩中取决于分配序列是否把 0 参枚举排到页尾。
+  - **根因**：match 变体臂降级把载荷 `i64.load(ptr+8)` 与臂测试平铺 AND——WASM 急切求值下不等 guard 就执行；0 参枚举只有 8 字节头，贴线性内存末尾时载荷读越界。野值现场（lom_dbg_wild 探针）：tag=6 ptr=196596 mem=196608——**对象完全合法，堆零腐蚀**（语义图 diff 证到 trap 前最后一次分配全堆干净）。
+  - **第二个 bug 顺带抓获**（7.6 起潜伏）：for 的三个迭代分派 if 未压 Label::If → for 体内 return/? 的 br $ret 深度少算、提前返回被吞（`for x in xs if x > 1 return x end end` 输出 -1；eval 020 在 wasm 自举层暴露）。eval/示例无此形态所以 7.6 起从未被拦。
+  - 修复全在 wasm_codegen.rs：① emit_variant_test idx 读加 tag 守卫；② Pattern::Variant 载荷提取推迟到测试通过后；③ For 三个分派 if 补 Label::If 压/弹。+3 e2e 回归（459/459）。
+- **诊断工具（沉淀 tools/wasm_debug/）**：gen_scale.py（规模标定）/ dbg_run.mjs（分配日志 + 同刻快照 + 野值现场探针 harness）/ heapdiff.py（堆语义图 diff——指针归一化到 owner 分配序号，直接字节 diff 在布局平移下全是噪音）。codegen 侧探针补丁的 4 行说明在该目录 README（探针本体随修复回滚，未常驻）。方法论：一次一针 → 分配序列对比 → 同刻快照二分 → 语义图 diff → 野值现场。
+- **8.4 收官验收**：第二层全量（examples+bootstrap+eval 参考解 147 文件）× 5 轮稳定；第三层 golden（wasm 自举跑 stmt_interp 39 条逐字，`--stack-size=60000`）；自施加（wasm 自举解析自身 5703 行，dump 与宿主原生逐字）；`verify --wasm` 三段验收；wasm 层回流 CI（selfhost job）。深链 parse 递归仍受 V8 默认栈限制（已知、可调、非 bug）。
 - eval 116 参考解在 tasks JSON 的 solution 字段（verify 脚本动态提取）；跑 wasm 模式会先编译 self_interp 到系统临时目录。
 
 ### 11.2 Phase 8.2 交付清单（2026-09-02，供 8.3 开工对账）
