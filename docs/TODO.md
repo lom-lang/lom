@@ -138,6 +138,10 @@ wasm 层回流 CI。完整技术档案 RFC-0003 修订 25-29；工具沉淀 tool
   golden 逐字、fmt 幂等、eval 双后端 **116/116**、selfhost 六模式全 PASS（dump/tokens
   149、diags 5、static 15/149、run 31、wasm 三段）、`lom --version` → 1.1.1。
   doc-gates 双件复跑 PASS。tag v1.1.1 在 CI 绿后打（见下方登记）。
+- **CI 首跑 + tag 登记（2026-09-07）**：commit `edd0c5e` run #34058172473 全绿——
+  三平台矩阵 / selfhost 六模式（含新 step "Selfhost wasm (8.4 三段验收)" ubuntu 首跑
+  success）/ clippy / doc-gates 全部 success；**tag `v1.1.1` 已打并推送**（CI 绿后）。
+  提交对：`eb0ce7e`（fix: 修复+验收基建+升版）+ `edd0c5e`（docs: 档案）。
 
 ### 出口条件（攻不下不算失败）
 
