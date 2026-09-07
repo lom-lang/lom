@@ -100,6 +100,13 @@ M3 = fix_corpus 扩充（repair-native 回归网 4 例 → 全诊断码家族覆
   EOF 截断形态才是"期望 'end' 闭合 match"的可靠触发。
 - 文档计数联动：README:130/HANDOVER §11 的"4 例"为 M4 时点历史快照，
   按惯例不回改；无现值计数声称需要更新。
+- **CI #74 事故与修复（2026-09-07）**：windows-latest Unit tests 挂——
+  05/06 是首批**含换行插入**的语料，apply 插入文本是 LF 而 autocrlf 检出的
+  fixed 是 CRLF，逐字比对失败（本地过因本地检出为 LF；01-04 老语料插入
+  均无换行所以从未暴露）。修复 fdfddb9：测试内比对前 CRLF→LF 归一化——
+  对齐 CI golden diff 的 tr -d '\r' 既有防线惯例；**CI #75 全绿复验**。
+  教训：**语料的 fixed 若含"修复动作生成的换行"，autocrlf 平台就会红**
+  ——归一化防线已在测试内常驻，后续加语料无需再虑。
 
 ### 纪律
 
