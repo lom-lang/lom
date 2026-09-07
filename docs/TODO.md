@@ -42,6 +42,11 @@ A 表 1→2→3；5/6 合为后续 P 工作包；10/11/12 维持现状；B 表�
   归零四断言）、闭包递归、上限内正常递归零影响。
 - 全量回归全绿：clippy 零告警、golden 逐字、eval 116/116、selfhost
   dump 149、doc_audit 16/16、spec_examples 三文档 PASS。
+- **性能账（2026-09-08 补测，同机对照 git worktree 681858d vs a6b06a7）**：
+  bench 三负载首测 lookup 1000 显 +16% 迹象，×3 复测推翻——两版分布交叉
+  重叠（前 7881/8441/8445ms vs 后 8479/6725/5810ms），系统噪声带内不可
+  分辨；map_lookup/list_build 亦噪声内。结论：深度计数开销无可测量退化
+  （三次整数操作 vs 每调用的 Rc/RefCell/HashMap 工作，理论 <1%）。
 - 文档同步：SECURITY hardening 条改写（附可执行验证命令）+ accepted
   risk 1 改写（求值守卫已立，剩余 parser 侧深嵌套如实保留）；HANDOVER
   §1（测试数 463 + 挂账行）、§2.2/§9 基线、§4.6（守卫与注入设计）；
