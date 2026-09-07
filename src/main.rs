@@ -1370,7 +1370,15 @@ mod tests {
             let fixed = std::fs::read_to_string(&fixed_path)
                 .unwrap_or_else(|_| panic!("缺少配对 fixed 文件: {:?}", fixed_path));
             let (final_src, _results) = apply_iterative(&bad, &bad_path.to_string_lossy(), 5);
-            assert_eq!(final_src, fixed, "语料 {:?} 修复结果不符", bad_path);
+            // CI 的 Windows runner autocrlf 检出为 CRLF，而修复动作的插入文本是 LF
+            // （M3 的 05/06 是首批含换行插入的语料，CI #74 因此挂过）——行尾是
+            // 环境噪声不是语义差异，比对前归一化（对齐 CI golden diff 的 tr -d '\r' 防线）
+            assert_eq!(
+                final_src.replace("\r\n", "\n"),
+                fixed.replace("\r\n", "\n"),
+                "语料 {:?} 修复结果不符",
+                bad_path
+            );
         }
     }
 
