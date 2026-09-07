@@ -132,11 +132,7 @@ def is_ebnf(content):
         return False
     # Q4 收紧（R14 建议）：排除真 Lom 代码误吞——教学片段不会同时含这些
     # Lom 语句特征；含任一则按正例走实测而非跳过
-    lom_markers = ('println(', '
-fn ', '
-let ', '
-enum ', '
-from ')
+    lom_markers = ('println(', '\nfn ', '\nlet ', '\nenum ', '\nfrom ')
     return not any(m in body for m in lom_markers)
 
 
