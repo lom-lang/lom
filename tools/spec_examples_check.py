@@ -4,9 +4,15 @@
 # 只在评审点名时被扫——第二轮审查的 P1（type alias 假特性）正是漏网结果。本工具把
 # "lexer/parser 实测对账"制度化到 SPEC_FOR_AI 的每个 fenced 代码块。
 #
+# 2026-09-07 M 工作包扩展：覆盖面从 SPEC_FOR_AI 一份扩到三份（+ LANGUAGE_SPEC.md
+# + docs/lom-tutorial.html）——历史上 type alias/字段赋值/pub 都是双文档同病，只修了
+# SPEC_FOR_AI 侧进工具锁定，其余文档侧从未机器对账。HTML 教程的 <pre> 块同样提取
+# （实体反转 + 剥内嵌标签）。新增三条机械 skip 规则（EBNF 产生式 / 关键字表 / CLI
+# 用法列表——它们不是 Lom 代码，skip 仅限此类"非代码块"，不用于吞断言失败）。
+#
 # 用法：
-#   python tools/spec_examples_check.py                     # 默认 SPEC_FOR_AI.md + 本地 lom 二进制
-#   python tools/spec_examples_check.py --spec <file>       # 指定规范文件
+#   python tools/spec_examples_check.py                     # 默认三份文档 + 本地 lom 二进制
+#   python tools/spec_examples_check.py --spec A.md B.html  # 指定文档（可多个）
 #   python tools/spec_examples_check.py --lom <path>        # 指定 lom 二进制
 #
 # 分类与断言（对每个 fenced 块）：
@@ -14,6 +20,9 @@
 #     前缀（人类可读诊断输出示例）——不是 Lom 代码，跳过（计数报告）；
 #   - skip-marker：围栏上方最近的非空行含 `spec-check: skip`（HTML 注释形态，
 #     如概念性内建类型定义——真实代码里重定义是 NAM002）；
+#   - skip-ebnf / skip-keywords / skip-cli：机械识别的非代码块（M1）——
+#     EBNF 产生式（首行 `小写名 = ` 且 RHS 含 "{"/"\""/"|"/";"）、纯保留字罗列
+#     （全部词 ∈ 20 保留字集）、CLI 用法列表（非空行均以 `lom ` 开头）；
 #   - 反例（counterexample）：围栏上方最近的非空行含 ❌ 或 "Do not write"/「不要写」
 #     ——断言其确实产生 ≥1 条 Error 诊断（反知识声明一旦失效即红，倒逼文档更新）；
 #   - 正例（positive）——三层断言：
@@ -31,6 +40,7 @@
 # Git Bash 的 /tmp 对 Windows 进程不可见）。
 
 import argparse
+import html as html_mod
 import json
 import os
 import re
@@ -38,11 +48,19 @@ import shutil
 import subprocess
 import sys
 
-DEFAULT_SPEC = 'SPEC_FOR_AI.md'
+DEFAULT_DOCS = ['SPEC_FOR_AI.md', 'LANGUAGE_SPEC.md', 'docs/lom-tutorial.html']
 TMP_DIR = '.spec_check_tmp'
 TIMEOUT_RUN = 10          # 正例实跑超时（秒）——文档示例不应有长循环
 TOPLEVEL_RE = re.compile(r'^(fn |enum |from )')
 DIAG_PREFIX_RE = re.compile(r'^\[(lex|parse|type|runtime|eff|mat|nam|pkg)\]')
+
+# 20 个保留字（lexer 实际保留字集，与 LANGUAGE_SPEC §2.2 一致）
+KEYWORDS = {'fn', 'let', 'mut', 'if', 'else', 'elif', 'while', 'for', 'in',
+            'return', 'match', 'end', 'and', 'or', 'True', 'False',
+            'from', 'import', 'as', 'enum'}
+
+# EBNF 产生式首行：`小写名 = ` 且 RHS 含结构特征（终结符引号/花括号重复/选择/分号）
+EBNF_FIRST_RE = re.compile(r'^[a-z_][a-z0-9_]*\s*=\s*\S')
 
 
 def default_lom():
@@ -50,7 +68,10 @@ def default_lom():
 
 
 def extract_blocks(text):
-    """返回 [(start_line_1based, [行...])]——start_line 是围栏开行（``` 那行）。"""
+    """返回 [(start_line_1based, [行...])]——markdown fenced 块与 HTML <pre> 块统一形态。
+
+    HTML <pre> 的内容做实体反转并剥内嵌标签（<code> 等）。
+    """
     lines = text.split('\n')
     blocks = []
     i = 0
@@ -64,6 +85,25 @@ def extract_blocks(text):
             if j < len(lines):  # 找到闭合围栏
                 blocks.append((i + 1, content))
             i = j + 1
+        elif '<pre>' in lines[i]:
+            # HTML <pre> 块：收集到含 </pre> 的行为止，截取标签间内容
+            j = i
+            buf = []
+            while j < len(lines) and '</pre>' not in lines[j]:
+                buf.append(lines[j])
+                j += 1
+            if j < len(lines):
+                buf.append(lines[j])
+                raw = '\n'.join(buf)
+                p0, p1 = raw.find('<pre>'), raw.rfind('</pre>')
+                if p0 != -1 and p1 > p0:
+                    raw = raw[p0 + 5:p1]
+                    raw = html_mod.unescape(raw)
+                    raw = re.sub(r'<[^>]+>', '', raw)
+                    blocks.append((i + 1, raw.split('\n')))
+                i = j + 1
+            else:
+                i += 1
         else:
             i += 1
     return blocks
@@ -82,6 +122,27 @@ def nearest_text_above(lines, fence_line, lookback=5):
     return ''
 
 
+def is_ebnf(content):
+    first = next((l for l in content if l.strip()), '')
+    if not EBNF_FIRST_RE.match(first.strip()):
+        return False
+    body = '\n'.join(content)
+    # RHS 结构特征：终结符引号 / 花括号重复 / 选择竖线 / 产生式分号
+    return any(c in body for c in ('{', '"', '|', ';'))
+
+
+def is_keyword_table(content):
+    words = []
+    for l in content:
+        words.extend(l.split())
+    return bool(words) and all(w in KEYWORDS for w in words)
+
+
+def is_cli_usage(content):
+    nonempty = [l.strip() for l in content if l.strip()]
+    return bool(nonempty) and all(l.startswith('lom ') for l in nonempty)
+
+
 def classify(content, above):
     first = next((l for l in content if l.strip()), '')
     if first.lstrip().startswith('{'):
@@ -90,6 +151,12 @@ def classify(content, above):
         return 'skip-diag'
     if 'spec-check: skip' in above:
         return 'skip-marker'
+    if is_ebnf(content):
+        return 'skip-ebnf'
+    if is_keyword_table(content):
+        return 'skip-keywords'
+    if is_cli_usage(content):
+        return 'skip-cli'
     if '❌' in above or 'Do not write' in above or '不要写' in above:
         return 'counterexample'
     return 'positive'
@@ -183,8 +250,9 @@ def check_block(lom, tag, content, kind, tmpdir):
 
 
 def main():
-    ap = argparse.ArgumentParser(description='SPEC_FOR_AI 代码示例实测对账（R7）')
-    ap.add_argument('--spec', default=DEFAULT_SPEC)
+    ap = argparse.ArgumentParser(description='代码示例实测对账（R7 + M1 三文档）')
+    ap.add_argument('--spec', nargs='+', default=DEFAULT_DOCS,
+                    help='要对账的文档（markdown 或 HTML，可多个；默认三份）')
     ap.add_argument('--lom', default=default_lom())
     args = ap.parse_args()
 
@@ -192,42 +260,55 @@ def main():
         print('错误：找不到 lom 二进制 %s（先 cargo build --release）' % args.lom)
         return 2
 
-    with open(args.spec, encoding='utf-8') as f:
-        text = f.read()
-    lines = text.split('\n')
-    blocks = extract_blocks(text)
-    if not blocks:
-        print('错误：%s 中没有 fenced 代码块' % args.spec)
-        return 2
-
     os.makedirs(TMP_DIR, exist_ok=True)
-    stats = {'skip-json': 0, 'skip-diag': 0, 'skip-marker': 0,
+    all_failures = []
+    grand = {'skip-json': 0, 'skip-diag': 0, 'skip-marker': 0,
+             'skip-ebnf': 0, 'skip-keywords': 0, 'skip-cli': 0,
              'counterexample': 0, 'positive': 0}
-    failures = []
-    print('SPEC_FOR_AI 示例对账：%d 个 fenced 块（%s）' % (len(blocks), args.spec))
-    for n, (fence_line, content) in enumerate(blocks):
-        tag = 'L%d' % fence_line
-        kind = classify(content, nearest_text_above(lines, fence_line))
-        if kind.startswith('skip'):
+    file_idx = 0
+    for doc in args.spec:
+        if not os.path.isfile(doc):
+            print('错误：找不到文档 %s' % doc)
+            return 2
+        with open(doc, encoding='utf-8') as f:
+            text = f.read()
+        lines = text.split('\n')
+        blocks = extract_blocks(text)
+        if not blocks:
+            print('错误：%s 中没有代码块' % doc)
+            return 2
+
+        stats = {k: 0 for k in grand}
+        failures = []
+        print('%s 示例对账：%d 个代码块' % (doc, len(blocks)))
+        for n, (fence_line, content) in enumerate(blocks):
+            file_idx += 1
+            tag = '%s:L%d' % (os.path.basename(doc), fence_line)
+            kind = classify(content, nearest_text_above(lines, fence_line))
+            if kind.startswith('skip'):
+                stats[kind] += 1
+                print('  %s: %s（跳过）' % (tag, kind))
+                continue
             stats[kind] += 1
-            print('  %s: %s（跳过）' % (tag, kind))
-            continue
-        stats[kind] += 1
-        try:
-            ok, detail = check_block(args.lom, tag, content, kind, TMP_DIR)
-        except subprocess.TimeoutExpired:
-            ok, detail = False, '  %s: 超时' % tag
-        print(detail)
-        if not ok:
-            failures.append(detail.strip())
+            try:
+                ok, detail = check_block(args.lom, 'f%d' % file_idx, content, kind, TMP_DIR)
+            except subprocess.TimeoutExpired:
+                ok, detail = False, '  %s: 超时' % tag
+            print(detail.replace('f%d' % file_idx, tag, 1))
+            if not ok:
+                failures.append(detail.strip())
+        for k in grand:
+            grand[k] += stats[k]
+        all_failures.extend(failures)
 
     shutil.rmtree(TMP_DIR, ignore_errors=True)
 
-    print('分类：正例 %d / 反例 %d / skip(json %d + diag %d + marker %d)'
-          % (stats['positive'], stats['counterexample'],
-             stats['skip-json'], stats['skip-diag'], stats['skip-marker']))
-    if failures:
-        print('RESULT: FAIL（%d 个块断言失败）' % len(failures))
+    print('分类：正例 %d / 反例 %d / skip(json %d + diag %d + marker %d + ebnf %d + keywords %d + cli %d)'
+          % (grand['positive'], grand['counterexample'],
+             grand['skip-json'], grand['skip-diag'], grand['skip-marker'],
+             grand['skip-ebnf'], grand['skip-keywords'], grand['skip-cli']))
+    if all_failures:
+        print('RESULT: FAIL（%d 个块断言失败）' % len(all_failures))
         return 1
     print('RESULT: PASS')
     return 0

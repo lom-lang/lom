@@ -193,6 +193,7 @@
 
 <h2>1.2 整体架构:一条单向管道 + 一条 AI 工具链</h2>
 
+<!-- spec-check: skip: ASCII architecture diagram, not Lom source -->
 <pre><code>源码 (.lom 字符串)
    │
    ▼ ① Lexer (src/lexer.rs)         —— 切成 token,每个 token 烙上行号/列号
@@ -299,6 +300,7 @@ end</code></pre>
 
 <p>表达式解析不用任何表驱动,就是一串函数互相调用,<strong>每个优先级一个函数</strong>,低优先级的调用高优先级的:</p>
 
+<!-- spec-check: skip: parser chain description, not Lom source -->
 <pre><code>parse_or → parse_and → parse_comparison(== &lt; &gt;) → parse_pipeline(|&gt;)
   → parse_addition(+ -) → parse_multiplication(* / %) → parse_unary(- !)
   → parse_question(后缀 ?) → parse_postfix(调用/索引/字段) → parse_primary(字面量/括号/闭包/if/match)</code></pre>
@@ -364,6 +366,7 @@ end</code></pre>
 
 <p>主调用链四层,背下来:</p>
 
+<!-- spec-check: skip: interpreter flow description, not Lom source -->
 <pre><code>run(program)          注册所有顶层函数/枚举 → 找到 main → 执行(552 行)
  → exec_block         逐条执行语句,最后算尾表达式(685 行)
   → exec_stmt         let/if/while/for/return/match(707 行)
@@ -394,6 +397,7 @@ end</code></pre>
 
 <p>作用域是 <code>Rc&lt;RefCell&lt;Scope&gt;&gt;</code> 组成的<strong>父指针链表</strong>:</p>
 
+<!-- spec-check: skip: Rust implementation excerpt, not Lom source -->
 <pre><code>struct Scope {
     vars: HashMap&lt;String, Value&gt;,
     parent: Option&lt;ScopeRef&gt;,   // 查不到就往父层查
@@ -421,13 +425,13 @@ end</code></pre>
 <p>闭包是怎么回事?一个经典例子:</p>
 <pre><code>fn make_counter() -> Fn
     let mut count = 0
-    fn step() -> Int
+    let step = fn() -> Int
         count = count + 1
         count
     end
-    step        # 把内层函数 step 当返回值交出去
+    step        # 把内层闭包 step 当返回值交出去
 end</code></pre>
-<p><code>make_counter</code> 执行完,按理说它的"房间"该拆了,<code>count</code> 也该消失。但 <code>step</code> 被交出去时,偷偷带走了那把通向自己出生房间的钥匙(房间 Rc 的引用计数 +1)——只要 <code>step</code> 还活着,那间房就拆不掉。之后每次调用 <code>step()</code>,它都能回到出生房间改 <code>count</code>。这就是"闭包捕获环境":函数值带走了它的出生环境,这就是计数器能一直累加的原因。</p></div>
+<p><code>make_counter</code> 执行完,按理说它的"房间"该拆了,<code>count</code> 也该消失。但 <code>step</code> 被交出去时,偷偷带走了那把通向自己出生房间的钥匙(房间 Rc 的引用计数 +1)——只要 <code>step</code> 还活着,那间房就拆不掉。之后每次调用 <code>step()</code>,它都能回到出生房间改 <code>count</code>。这就是"闭包捕获环境":函数值带走了它的出生环境,这就是计数器能一直累加的原因。(写这段代码时 Lom 会给一条 <code>MUT002</code> 警告——闭包捕获 <code>mut</code> 变量在两个后端语义不同:树遍历解释器共享房间、WASM 后端带走房间快照。语言主动告诉你这里有坑,这正是"修复原生"设计的一例。)</p></div>
 
 <aside class="sn"><b>词法作用域 vs 动态作用域</b>:词法作用域看代码写在哪(定义处),动态作用域看函数从哪被调用(调用处)。现代语言几乎全是词法作用域。记住对比,面试官可能追问。</aside>
 
@@ -634,6 +638,7 @@ end</code></pre>
 
 <p>Lom 的清单文件用手写 TOML 解析器读(零依赖,不引入 toml crate),格式极简:</p>
 
+<!-- spec-check: skip: TOML manifest sample, not Lom source -->
 <pre><code># 项目根目录的 lom.toml
 name = "app"
 version = "0.1.0"

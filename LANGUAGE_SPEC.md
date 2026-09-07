@@ -87,6 +87,8 @@ let x = 1 let y = 2    # ERROR: unexpected 'let'
 
 If a statement must span multiple lines, wrap it in parentheses or use a continuation context (e.g. inside `|>` pipeline, which allows each step on its own line):
 ```
+from string import {trim, upper}
+
 # Valid: pipeline steps can each be on their own line
 fn main() -> Unit
     "hello"
@@ -347,6 +349,8 @@ end
 
 ### 6.1 Result and Option (error-as-value)
 
+<!-- spec-check: skip: conceptual definition of builtin types — redefining Result/Option in real code is NAM002 -->
+
 ```
 enum Result<T, E> =
     Ok(T)
@@ -468,6 +472,8 @@ Patterns (Phase 2 subset):
 
 > **Status (v0.6.1)**: `type` is an ordinary identifier; `type UserId = Int` is a parse error (PARSE001, verified). Kept as a design sketch only — no type aliases are planned for v1.0.
 
+❌ Do not write — never implemented (PARSE001, verified):
+
 ```
 type UserId = Int
 type Point = {x: Float, y: Float}
@@ -476,6 +482,8 @@ type Point = {x: Float, y: Float}
 ### 6.6 Traits (structural, Phase 2 draft — **rejected for v1.0**, RFC-0001)
 
 > **Status (v0.6.1)**: `trait` / `impl` / `self` have never been keywords or implemented; there are no methods in the language (structural records carry data only). The v1.0 scoping decision (RFC-0001) is to **not** add traits — shared behavior needs will be re-evaluated by a future RFC if real demand appears. Kept as a rejected design sketch for reference.
+
+❌ Do not write — never implemented (PARSE001, verified):
 
 ```
 trait Show
@@ -495,12 +503,20 @@ Traits are **structural** in Phase 2 (duck-typed): if a type has all methods of 
 
 ### 6.7 Effect system (Phase 2.5 — implemented)
 
-Effects declare side effects in the function signature:
+Effects declare side effects in the signature (bodies shown minimal so the examples are runnable — `print` is renamed `print_msg` because `print` is a builtin name):
 
 ```
 fn read_file(path: String) -> Result<String, IoError> ! [IO]
-fn print(s: String) -> Unit ! [IO]
-fn now() -> Int ! [Clock]
+    Ok("contents")
+end
+
+fn print_msg(s: String) -> Unit ! [IO]
+    println(s)
+end
+
+fn now() ! [Clock]
+    0
+end
 ```
 
 - `! [Effect1, Effect2]` after return type declares effects.
@@ -637,6 +653,8 @@ The `type` strings in `lom-info/v1` are produced by these rules (mirrors the `Ty
 #### 6.8.3 Human-readable format
 
 Without `--json`, `lom info <file>` prints a terminal-friendly summary:
+
+<!-- spec-check: skip: terminal output sample, not Lom source -->
 
 ```
 === examples/effects.lom ===
@@ -969,6 +987,7 @@ from io import { println as log }            # per-item alias
 **Prelude** (auto-imported, no `from` needed): `println`, `print`.
 
 Calling an unimported non-prelude builtin produces a structured error:
+<!-- spec-check: skip: diagnostic message sample, not Lom source -->
 ```
 符号 'len' 未导入。需在文件顶部声明：from string import {len}
 ```
@@ -976,6 +995,8 @@ Calling an unimported non-prelude builtin produces a structured error:
 ### 8.3 Public/private (**rejected for v1.0** — RFC-0001)
 
 > **Status (v0.6.1)**: `pub` is not a keyword and this syntax does not parse. The package manager (Phase 4.4) treats **all top-level `fn`/`enum` as public**; there is no privacy. RFC-0001 closed this question: **no `pub` keyword is planned** — per-item privacy adds a modifier LLMs must track without a demonstrated need at current package scale. The sketch below is kept for reference only.
+
+❌ Do not write — never implemented (PARSE001, verified):
 
 ```
 pub fn greet(name: String) -> String
@@ -1201,6 +1222,8 @@ end
 ### 10.4 Structural record (Phase 2)
 
 ```
+from math import {sqrt}
+
 fn distance(p1: {x: Float, y: Float}, p2: {x: Float, y: Float}) -> Float
     let dx = p1.x - p2.x
     let dy = p1.y - p2.y
@@ -1259,6 +1282,8 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 Lom ships a 116-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
+
+<!-- spec-check: skip: directory tree, not Lom source -->
 
 ```
 eval/
