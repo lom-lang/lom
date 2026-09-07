@@ -14,6 +14,8 @@
 #   C. .lom 文件拆分：glob 实数（总数/顶层/bootstrap/pkg_demo/selfhost）→ README 状态段
 #   D. self_interp 行数：wc 口径（换行符计数）→ HANDOVER §9
 #   E. 版本号：Cargo.toml（+ Cargo.lock 一致性）→ HANDOVER §1/§9
+#   G. 测试数（Q4，2026-09-08）：源码 #[test] 静态计数 → HANDOVER §2.2 期望行 /
+#      §9 检查单 / README 状态段（测试数同步教训三连——R 审查两抓 + N1 三处手改）
 #   F. changelog 对账（N3，2026-09-07）：LANGUAGE_SPEC §13 条目 ↔ 版本/tag 双向——
 #      当前 Cargo 版本必须有 §13 条目（防升版忘写 changelog，历史主腐坏形态）；
 #      v1.0 冻结时代起 tag 与条目双向一致（v1.x 前的 0.x spec/工程两套编号是
@@ -166,6 +168,18 @@ def main():
     fictitious = [e for e in entries if e.startswith('v1.') and e not in tags]
     check('v1.x 条目全有 tag（防虚构）', not fictitious,
           '无 tag 的条目：%s' % (fictitious or '无'))
+
+    # ---- G. 测试数（Q4）----
+    print('G. 测试数（源码 #[test] 静态计数）')
+    test_count = 0
+    for fp in sorted(glob.glob('src/**/*.rs', recursive=True)):
+        test_count += read(fp).count('#[test]')
+    expect_all('HANDOVER §2.2 测试行', 'docs/HANDOVER.md',
+               r'cargo test --release\s+# 期望 (\d+)/(\d+)', [test_count, test_count])
+    expect_all('HANDOVER §9 检查单', 'docs/HANDOVER.md',
+               r'test --release` 确认 (\d+)/(\d+)', [test_count, test_count])
+    expect_all('README 状态段测试数', 'README.md',
+               r'(?m)^(\d+)/(\d+) Rust unit tests', [test_count, test_count])
 
     total, ok = len(RESULTS), sum(RESULTS)
     print('RESULT: %s（%d/%d 项通过）' % ('PASS' if ok == total else 'FAIL', ok, total))

@@ -84,7 +84,7 @@ jobs:
           $bin = if ($IsWindows) { "./target/release/lom.exe" } else { "./target/release/lom" }
           ./eval/runner/run.ps1 -Verify -LomBin $bin
 
-      - name: WASM eval parity (116 tasks via node, Phase 7.9)
+      - name: WASM eval parity (118 tasks via node, Phase 7.9)
         # 双后端对齐 gate：eval 全套在 WASM 后端跑一遍（node 在三平台 runner 均预装）
         shell: pwsh
         run: |
@@ -113,7 +113,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --release
-      - name: Selfhost dump (149 文件逐字, Phase 8.1)
+      - name: Selfhost dump (151 文件逐字, Phase 8.1)
         run: python3 tools/verify_selfhost.py
       - name: Selfhost tokens (Phase 8.1 lexer 对账)
         run: python3 tools/verify_selfhost.py --tokens
@@ -163,3 +163,5 @@ jobs:
         run: python3 tools/spec_examples_check.py
       - name: Doc numbers audit (R8)
         run: python3 tools/doc_audit.py
+      - name: Fuzz smoke (Q4, fixed seeds)
+        run: python3 tools/fuzz_smoke.py

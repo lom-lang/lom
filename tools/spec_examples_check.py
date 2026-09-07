@@ -128,7 +128,16 @@ def is_ebnf(content):
         return False
     body = '\n'.join(content)
     # RHS 结构特征：终结符引号 / 花括号重复 / 选择竖线 / 产生式分号
-    return any(c in body for c in ('{', '"', '|', ';'))
+    if not any(c in body for c in ('{', '"', '|', ';')):
+        return False
+    # Q4 收紧（R14 建议）：排除真 Lom 代码误吞——教学片段不会同时含这些
+    # Lom 语句特征；含任一则按正例走实测而非跳过
+    lom_markers = ('println(', '
+fn ', '
+let ', '
+enum ', '
+from ')
+    return not any(m in body for m in lom_markers)
 
 
 def is_keyword_table(content):

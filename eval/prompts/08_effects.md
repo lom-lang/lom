@@ -257,6 +257,10 @@ from string import { int_to_string }。写函数 format_line(label: String, valu
 
 写函数 double(x: Int) -> Int 返回 x*2（纯函数）。写函数 quadruple(x: Int) -> Int 返回 double(double(x))（纯函数调用纯函数）。写函数 print_result(x: Int) -> Unit ! [IO] 调用 println(quadruple(x))。main 调用 print_result(5)。
 
+### Task 118
+
+写函数 get_timestamp() -> Int ! [Clock] 返回 1700000000（模拟时间戳）。写函数 log_msg(msg: String) -> Unit ! [IO, Clock] 获取时间戳后，用**单独一次** println 输出**一行**，格式为 `时间戳 空格 消息`（例如 `1700000000 boot`）。main 调用 log_msg("boot")。
+
 
 ---
 

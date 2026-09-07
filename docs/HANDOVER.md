@@ -34,7 +34,7 @@
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
 | 版本 | **v1.1.1**（Cargo.toml/lock 一致，2026-09-07 W 工作包升版：wasm 后端两处 codegen bug 修复——变体臂急切载荷读越界（8.4 挂账根治）+ for 体内 return/? 被吞；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
 | Rust 测试 | **473/473 通过**（N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
-| eval 评测集 | **116/116**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code，v0.27.0 加；任务 116 递归闭包 let / 117 浮点 inf/NaN 显示，2026-09-03 整改 T5 加，双后端实跑定稿） |
+| eval 评测集 | **118/118**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；**118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）**，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
@@ -85,8 +85,8 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ```powershell
 cargo test --release                                    # 期望 473/473（2026-09-08 Q3 基线：469 + parser/json 嵌套守卫 ×4）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
-powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
-python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
+powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 118/118（2026-09-08 Q4 起；WASM 侧 -Backend wasm 同）
+python tools\verify_selfhost.py                         # 自举验收：dump 151/151（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
 python tools\spec_examples_check.py                     # R7 对账：SPEC_FOR_AI 示例实测（正例解析/导入/运行三层，反例必产诊断）
 python tools\doc_audit.py                               # 对账：文档数字 19 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3）——两者已在 CI doc-gates job 常驻
 ```

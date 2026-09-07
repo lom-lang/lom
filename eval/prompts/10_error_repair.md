@@ -616,6 +616,23 @@ fn main() -> Unit
 
 请输出修复后的完整代码。
 
+### Task 119
+
+以下 .lom 代码能运行（输出 6）但有一条警告（lom-diag/v1 诊断如下）。请修复代码消除该警告，并保持输出不变。
+
+代码：
+fn main() -> Unit
+    let count = 0
+    for i in 1..4
+        count = count + i
+    end
+    println(count)
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "ok": true, "diagnostics": [{"severity": "warning", "stage": "type", "code": "MUT001", "message": "赋值给不可变变量 'count'（声明时未标 mut）", "file": "bad.lom", "line": 4, "col": 9, "source_line": "        count = count + i", "is_hole": false, "hint": "局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本"}]}
+
+请输出修复后的完整代码。
+
 
 ---
 

@@ -1324,7 +1324,7 @@ Each task is a JSON object:
 
 ### 12.3 Runner
 
-- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **116/116 pass on both backends (interpreter and WASM).**
+- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **118/118 pass on both backends (interpreter and WASM).**
 - `./run.ps1 -CandidatesDir <dir>` — evaluate LLM-generated code. Reads `<id>.lom` from `<dir>`, runs each, compares stdout to `expected`. Reports per-category and overall pass-rate. Exit code 1 on any failure (CI-friendly).
 - The runner only runs `lom` + compares stdout; it does **not** call any LLM API. LLM candidates are produced out-of-band (e.g. DeepSeek API batch) into a `candidates/` directory.
 
@@ -1334,7 +1334,7 @@ Each task is a JSON object:
 
 ### 12.5 Status
 
-- Reference solutions: 116/116 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
+- Reference solutions: 118/118 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
 - LLM pass-rate: **99/100 (99%)** — measured 2026-08-03 with expert model + thinking mode. 9/10 categories at 100%; sole failure (task 078) was output-format misunderstanding, not a language-feature error. See `eval/REPORT.md` for full analysis. **Phase 2 exit criterion met.**
 
 ---
