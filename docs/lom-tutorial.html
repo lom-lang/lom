@@ -183,7 +183,7 @@
   <tr><td><strong>v1.0 语言面冻结</strong></td><td><strong>已生效(2026-09-02,v1.0.0,spec §14)</strong></td></tr>
 </table>
 
-<p>量化指标:Rust 测试 <strong>456/456</strong>;CI 三平台 <strong>10 个回归 gate</strong> 全绿（含 clippy、selfhost 五模式与 doc-gates 对账双件）;eval runner <strong>116/116</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
+<p>量化指标:Rust 测试 <strong>459/459</strong>;CI 三平台 <strong>11 个回归 gate</strong> 全绿（含 clippy、selfhost 六模式与 doc-gates 对账双件;wasm 层自 v1.1.1 越界根治后回流）;eval runner <strong>116/116</strong> 双后端;LLM 实测<strong>四模型复测 99.1%-100%</strong>(2026-08-31,deepseek-v4-pro+thinking/v4-flash/glm-4.7/glm-5.3,全 113 任务——见 eval/REPORT-2026-08-31-multimodel.md;2026-08-03 的 99/100 是单模型基线)。</p>
 
 <div class="easy"><span class="tag-easy">通俗解读</span>
 <p>把整个项目想象成"你发明了一门新的外语,然后雇了一个翻译官"。<code>.lom</code> 文件是用这门外语写的信,那个 Rust 程序(约 23,700 行)就是翻译官——他拿起信,逐句读懂,然后照信里的指示办事(打印东西、算数、读写文件)。</p>
@@ -724,7 +724,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <li><strong>6.6 SECURITY.md</strong>:零依赖供应链承诺(grep 验证零 <code>unsafe</code>)+ 威胁模型。</li>
 </ul>
 
-<p><strong>CI 的 10 个回归 gate</strong>(<code>.github/workflows/ci.yml</code>,三平台各跑一遍;selfhost 与 doc-gates 只跑 ubuntu)——记住这张清单,它是"项目工程成熟度"最直接的面试证据:</p>
+<p><strong>CI 的 11 个回归 gate</strong>(<code>.github/workflows/ci.yml</code>,三平台各跑一遍;selfhost 与 doc-gates 只跑 ubuntu)——记住这张清单,它是"项目工程成熟度"最直接的面试证据:</p>
 
 <table>
   <tr><th>gate</th><th>内容</th><th>防什么</th></tr>
@@ -738,6 +738,7 @@ mathlib = { path = "mathlib" }</code></pre>
   <tr><td>⑧ clippy</td><td><code>cargo clippy --release -- -D warnings</code>(2026-08-31 第四轮评审整改新增,存量 54 条清零后转 gate,只跑 ubuntu)</td><td>风格/惯用法腐坏</td></tr>
   <tr><td>⑨ selfhost 自举验收</td><td>自举解释器六模式对账宿主(dump/tokens 149 文件逐字、diags、static 四类检查、run 31 文件运行验收含三层自证;v1.1.1 起 --wasm 三段验收:第二层全量 147 文件/第三层 stmt_interp golden/自施加 dump 逐字;Phase 8.4 接入,只跑 ubuntu)</td><td>三实现语义漂移</td></tr>
   <tr><td>⑩ doc-gates 文档对账</td><td>对账双件:<code>spec_examples_check.py</code> 把 SPEC_FOR_AI 全部代码示例逐个跑 <code>--check</code>(正例必须零 Error、反例必须产诊断);<code>doc_audit.py</code> 把五类易腐数字(eval 总数/自举计数/文件拆分/行数/版本号)对 16 处文档现值自动比对(第二轮审查后接入,只跑 ubuntu)</td><td>文档腐坏——计数簿记漏项与 LLM 规范假特性</td></tr>
+  <tr><td>⑪ selfhost wasm 三段验收</td><td>verify_selfhost --wasm 三段:layer2 全量 146 文件(examples+bootstrap+eval 参考解,规模限制已废除)/layer3 golden(wasm 自举跑 stmt_interp,39 条逐字,--stack-size=60000)/<strong>自施加</strong>(wasm 自举解析自身 5703 行源码,dump 与宿主逐字)。v1.1.1 越界根治(变体臂急切载荷读)后回流 CI</td><td>wasm 后端回归与三实现语义漂移</td></tr>
 </table>
 
 <div class="warn"><strong>两次真实的版本纪律教训</strong>(能主动讲出来是加分项):① v0.6.0 的 tag 不慎切在两个 CI 修复之前,复审发现后只能补发 v0.6.1——从此铁律"<strong>tag 永远切在 CI 全绿之后</strong>";② 6.4/6.5 加了 lom doc/fmt 两个用户可见功能却没升 minor,被外部评审抓到"语义版本政策发布当周自我违背"——从此铁律"<strong>加了用户可见功能就升 minor,别攒</strong>"。</div>
