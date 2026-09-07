@@ -1,0 +1,4 @@
+fn main() -> Unit
+    let p = {x: 1, y: 2}
+    println(p.xx)
+end

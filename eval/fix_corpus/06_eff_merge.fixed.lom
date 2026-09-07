@@ -1,0 +1,12 @@
+fn clock_tick() -> Int ! [Clock]
+    1
+end
+
+fn greet(s: String) -> Unit ! [IO, Clock]
+    println(clock_tick())
+    println(s)
+end
+
+fn main() -> Unit ! [IO, Clock]
+    greet("hello")
+end

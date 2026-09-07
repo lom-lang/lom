@@ -1,0 +1,16 @@
+fn safe_div(a: Int, b: Int) -> Result<Int, String>
+    if b == 0
+        Err("div by zero")
+    else
+        Ok(a / b)
+    end
+end
+
+fn main() -> Unit
+    let r = safe_div(10, 2)
+    match r
+        Ok(n) =>
+            println(n)
+        end
+    end
+end
