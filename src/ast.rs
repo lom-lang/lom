@@ -311,14 +311,15 @@ pub enum MatchArmBody {
 /// 模式
 #[derive(Debug, Clone)]
 pub enum Pattern {
-    /// 字面量模式：0, "hi", True, 3.14
+    /// 字面量模式：0, "hi", True, 3.14（Lit 内含 Expr 自带 span）
     Lit(Expr),
     /// 变量绑定：name（匹配任意值并绑定）
     Binder(String),
     /// 通配符：_
     Wildcard,
-    /// 枚举变体模式：Name(sub1, sub2) 或 Name（无参数）
-    Variant { name: String, sub: Vec<Pattern> },
+    /// 枚举变体模式：Name(sub1, sub2) 或 Name（无参数）。
+    /// name_span 定位变体名 token（M2：NAM004 变体版诊断与 fix 单点替换用）
+    Variant { name: String, sub: Vec<Pattern>, name_span: Span },
 }
 
 /// 二元运算符

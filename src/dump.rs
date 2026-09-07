@@ -294,7 +294,7 @@ fn dump_pattern(pattern: &Pattern, depth: usize, out: &mut String) {
         }
         Pattern::Binder(name) => line(depth, &format!("Binder {}", name), out),
         Pattern::Wildcard => line(depth, "Wildcard", out),
-        Pattern::Variant { name, sub } => {
+        Pattern::Variant { name, sub, .. } => {
             line(depth, &format!("Variant {}", name), out);
             for p in sub {
                 dump_pattern(p, depth + 1, out);

@@ -1204,7 +1204,7 @@ impl Interpreter {
                 };
                 Ok(self.values_eq(&lit_val, val))
             }
-            Pattern::Variant { name, sub } => {
+            Pattern::Variant { name, sub, .. } => {
                 match val {
                     Value::Enum {
                         variant,

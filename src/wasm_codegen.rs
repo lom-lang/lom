@@ -915,7 +915,7 @@ impl Codegen {
                 a.lget(s).call(RT_EQ).untag().op(op::I32_WRAP_I64);
                 Ok(())
             }
-            Pattern::Variant { name, sub } => {
+            Pattern::Variant { name, sub, .. } => {
                 let &(vidx, arity) = match self.variant_idx.get(name.as_str()) {
                     Some(v) => v,
                     None => return Err(format!("WASM 编译：未知变体 '{}'", name)),

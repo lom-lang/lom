@@ -1354,6 +1354,7 @@ impl Parser {
                     Ok(Pattern::Variant {
                         name: s.clone(),
                         sub: subs,
+                        name_span: tok_span,
                     })
                 } else {
                     // 绑定模式（也可能是无参数变体如 None，由解释器区分）

@@ -1220,7 +1220,7 @@ impl TypeChecker {
                 None
             }
             Pattern::Wildcard => None,
-            Pattern::Variant { name, sub } => {
+            Pattern::Variant { name, sub, name_span } => {
                 // 阶段1：只读借用 self.enums，收集变体信息到局部变量
                 // （随后要可变借用 self 进行 push_diag 和递归 check_pattern，故先 clone 出来）
                 let (variant_exists, expected_arity, field_tys, enum_name): (
@@ -1252,12 +1252,13 @@ impl TypeChecker {
 
                 // 阶段2：可变借用 self，根据收集的信息报错
                 if !variant_exists {
+                    // M2：定位到变体名 token（此前硬编码 (0,0)，fix 只能整词扫描兜底）
                     self.push_diag(
                         Severity::Error,
                         "NAM004".into(),
                         format!("枚举 {} 无变体 '{}'", enum_name, name),
-                        0,
-                        0,
+                        name_span.line,
+                        name_span.col,
                     );
                     // 变体名拼写建议（候选 = 该枚举的变体名），供 fix 产出 Replace
                     if let Some(info) = self.enums.get(&enum_name) {
@@ -1976,6 +1977,20 @@ mod tests {
             "hint 应建议 Circle，实际: {}",
             hint
         );
+    }
+
+    /// M2: NAM004 变体版定位到变体名 token（此前硬编码 (0,0)，fix 只能整词扫描）
+    #[test]
+    fn nam004_variant_diag_locates_name_token() {
+        // 变体名 Circl 在第 8 行、列 9（8 空格缩进后）
+        let src = "enum Shape\n    | Circle(Int)\n    | Square(Int)\nend\nfn main() -> Unit\n    let s = Circle(1)\n    match s\n        Circl(r) => println(r)\n        Square(x) => println(x)\n    end\nend\n";
+        let diags = check_src(src);
+        let nam004 = diags
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "NAM004")
+            .expect("应报 NAM004");
+        assert_eq!((nam004.line, nam004.col), (8, 9), "定位到变体名 token");
     }
 
     #[test]
