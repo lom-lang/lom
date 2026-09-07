@@ -33,7 +33,7 @@
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
 | 版本 | **v1.1.1**（Cargo.toml/lock 一致，2026-09-07 W 工作包升版：wasm 后端两处 codegen bug 修复——变体臂急切载荷读越界（8.4 挂账根治）+ for 体内 return/? 被吞；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
-| Rust 测试 | **463/463 通过**（N1 深度守卫 ×3：函数递归/闭包递归/合法深度不拦）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| Rust 测试 | **469/469 通过**（N1 深度守卫 ×3 + Q1 覆盖率盲区补测 ×6：json 错误路径 ×4 + info --json 导出 ×2；行覆盖率 84.4%——cargo test 口径下界，e2e/CLI 驱动不计入）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **116/116**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code，v0.27.0 加；任务 116 递归闭包 let / 117 浮点 inf/NaN 显示，2026-09-03 整改 T5 加，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
@@ -83,7 +83,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 463/463（2026-09-07 N1 基线：460 + 深度守卫 ×3）
+cargo test --release                                    # 期望 469/469（2026-09-08 Q1 基线：463 + 覆盖率盲区 ×6）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -283,7 +283,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 463/463、零 warning、`./target/release/lom.exe --version` 显示 1.1.1
+2. `cargo build --release && cargo test --release` 确认 469/469、零 warning、`./target/release/lom.exe --version` 显示 1.1.1
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮审查整改 R1-R8 闭环（2026-09-05）+ v1.1.1 W 工作包收官（2026-09-07：8.4 wasm 越界根治 + for 体内 return/? 修复，8.4 改判完成、wasm 层回流 CI）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py

@@ -17,11 +17,24 @@
 **来源**：用户裁决（"还有什么优化空间"第二轮盘点的建议排序整体采纳：
 覆盖率测量 → P 拆分 → parser 守卫 → 小件打包；差分测试压轴另立项待令）。
 
-### Q1｜测试覆盖率测量 ⏳
+### Q1｜测试覆盖率测量 ✅ done 2026-09-08
 
-- 463 测试的覆盖率从未测过——发现未知盲区的测量学前置。工具：rustc 自带
-  instrument-coverage（llvm-tools 组件，零新项目依赖不破铁律）。
-- 产出：src/ 逐文件覆盖率表 + 盲区清单；视面积决定补测试（独立立项或顺手）。
+**Q1 证据区（2026-09-08 实测，rustup llvm-tools-preview + instrument-coverage，
+零新项目依赖）**：
+
+- **全景（cargo test 口径下界——e2e/CLI 驱动不计入）**：行覆盖 **84.4%**、
+  函数执行 90.9%（469 测试）。逐文件：fmt 98.6 / wasm 94.6 / fix 91.3 /
+  lexer 92.6 / parser 92.3 / wasm_codegen 95.5 / typechecker 82.6 /
+  interpreter 80.5 / json 77.9 / info 87.5 / dump 68.7 / **main 13.5**。
+- **盲区分型**（关键产出）：A 类"cargo test 口径外但 e2e 已覆盖"——dump.rs
+  的 stmt 分支（verify 149 文件 CLI 验收全覆盖）、interpreter 的 Display
+  变体/短路求值/内建分支（eval 116 任务 + fix_corpus CLI 驱动）——不补；
+  B 类"真盲区"——json.rs 解析器错误路径（畸形 JSON 零测试）、info.rs 的
+  --json 导出（enums/type_params）与 Generic 类型名分支（`lom info` 子命令
+  近零测试）——已补 ×6 测试（json +3.6pp→77.9%、info +10.9pp→87.5%）。
+- main.rs 13.5% 是最大盲区 = Q2 拆分（CLI 层可测化）的量化证据。
+- 全量回归全绿：469/469、clippy 零告警、golden 逐字、eval 116/116、
+  doc_audit 19/19。HANDOVER/README 测试数同步 463→469。
 
 ### Q2｜双文件拆分（吸收预登记 P 工作包）⏳
 

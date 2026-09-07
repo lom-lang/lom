@@ -414,6 +414,38 @@ pub fn to_human(info: &ProgramInfo) -> String {
 
 #[cfg(test)]
 mod tests {
+    // Q1 覆盖率盲区补测：to_json 的 enums/type_params 导出 + type_to_string 泛型分支
+    #[test]
+    fn info_json_exports_enums_with_type_params() {
+        let src = "enum Shape
+    | Circle(Float)
+    | Point(Int, Int)
+end
+fn main() -> Unit
+    println(1)
+end
+";
+        let info = parse_info(src);
+        assert!(info.ok);
+        assert_eq!(info.enums.len(), 1);
+        let j = to_json(&info);
+        assert!(j.contains("\"name\": \"Shape\""), "导出应含枚举名: {}", j);
+        assert!(j.contains("\"type_params\""), "导出应含 type_params 字段: {}", j);
+    }
+
+    #[test]
+    fn type_to_string_generic_with_args() {
+        use crate::ast::Type;
+        // Pair<Int, String> → "Pair<Int, String>"（Generic 带参分支）
+        let t = Type::Generic(
+            "Pair".to_string(),
+            vec![Type::Int, Type::String],
+        );
+        assert_eq!(type_to_string(&t), "Pair<Int, String>");
+        // 空 args 分支 → 裸名
+        assert_eq!(type_to_string(&Type::Generic("Solo".to_string(), vec![])), "Solo");
+    }
+
     use super::*;
     use crate::parser::Parser;
 

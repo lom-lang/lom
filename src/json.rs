@@ -637,6 +637,34 @@ pub fn escape_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    // Q1 覆盖率盲区补测：json::parse 的错误路径（畸形 JSON 的诊断消息）
+    #[test]
+    fn parse_error_unexpected_char_in_value() {
+        let e = super::parse("{\"a\": @}").unwrap_err();
+        assert!(e.message.contains("意外字符"), "消息: {}", e.message);
+        assert!(e.pos > 0, "错误应带位置，得到 pos={}", e.pos);
+    }
+
+    #[test]
+    fn parse_error_missing_colon() {
+        let e = super::parse("{\"a\" 1}").unwrap_err();
+        assert!(e.message.contains("':'"), "消息: {}", e.message);
+    }
+
+    #[test]
+    fn parse_error_missing_comma_or_brace() {
+        let e = super::parse("{\"a\": 1 \"b\": 2}").unwrap_err();
+        assert!(e.message.contains("','") || e.message.contains("'}'"),
+                "消息: {}", e.message);
+    }
+
+    #[test]
+    fn parse_error_truncated_input() {
+        // 截断的对象（EOF 处应报结构错误而非 panic/死循环）
+        let r = super::parse("{\"a\": [1, 2");
+        assert!(r.is_err(), "截断输入应报错");
+    }
+
     use super::*;
 
     #[test]
