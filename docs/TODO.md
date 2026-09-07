@@ -19,6 +19,17 @@ Read 可整读）；Q3 深嵌套守卫收官（parser 30k + json 100k，SECURITY
 限制 1 关闭）；Q4 小件五件（任务 118/119 + fuzz 常态化进 CI + doc_audit
 22 项 + is_ebnf 收紧）。473/473，零语言面不升版。
 
+**CI 事故记录（2026-09-08，#90/#91/#92 三连红 → #93 恢复，如实档案）**：
+① Q2-b 提交不完整——`git add src/typechecker/` 不 stage 兄弟文件
+`src/typechecker.rs` 的删除，checkout 得到新旧两份并存 → 重复模块编译
+失败（#90/#91，264c833/ba16d35 两个提交红）；Q4 的 `git add -A` 顺带
+删除了旧文件（2cd44ce）但；② 该提交里 is_ebnf 收紧补丁的 heredoc
+转义链丢失一层（`\n` 写入文件成真实换行 → SyntaxError → doc-gates
+R7 step 炸，#92）；③ **三连失察**：Q2-b/Q3/Q4 推送后均未看 CI 首跑
+（纪律明文，三次违反连坐）。教训（并入 HANDOVER §11）：含删除/移动
+的提交必须 `git status` 复核 staged 列表（add 目录不覆盖兄弟删除）；
+heredoc 内嵌含转义的代码改用 Edit 工具落盘；推送后看首跑没有豁免情形。
+
 **来源**：用户裁决（"还有什么优化空间"第二轮盘点的建议排序整体采纳：
 覆盖率测量 → P 拆分 → parser 守卫 → 小件打包；差分测试压轴另立项待令）。
 
