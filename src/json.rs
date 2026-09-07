@@ -36,6 +36,11 @@ impl std::error::Error for JsonError {}
 struct JsonParser<'a> {
     src: &'a [u8],
     pos: usize,
+    /// Q3 深度守卫：JSON 值嵌套递归计数（与 parser/求值守卫同族——
+    /// 深嵌套 JSON 数组/对象在 256MB 栈下约 10⁶ 层才溢出，取 100k 保守上限）
+    depth: usize,
+    /// 嵌套上限（测试注入小阈值用——cargo test 线程 8MB 栈，生产 100k 达不到）
+    max_depth: usize,
 }
 
 impl<'a> JsonParser<'a> {
@@ -43,6 +48,8 @@ impl<'a> JsonParser<'a> {
         JsonParser {
             src: src.as_bytes(),
             pos: 0,
+            depth: 0,
+            max_depth: 100_000,
         }
     }
 
@@ -60,8 +67,27 @@ impl<'a> JsonParser<'a> {
         Ok(v)
     }
 
-    /// 解析一个 JSON 值（不跳过前导空白）
+    /// 解析一个 JSON 值（不跳过前导空白）。
+    /// Q3：入口深度计数——超限返回结构化 JsonError 而非栈溢出（? 传播路径
+    /// 不经守卫后的 Ok 分支，错误直接上抛，无需对称递减补偿）。
     fn parse_value_inner(&mut self) -> Result<Value, JsonError> {
+        self.depth += 1;
+        if self.depth > self.max_depth {
+            self.depth -= 1;
+            return Err(JsonError {
+                message: format!(
+                    "JSON 嵌套超过 {} 层（256MB 栈的安全上限）",
+                    self.max_depth
+                ),
+                pos: self.pos,
+            });
+        }
+        let r = self.parse_value_inner_g();
+        self.depth -= 1;
+        r
+    }
+
+    fn parse_value_inner_g(&mut self) -> Result<Value, JsonError> {
         if self.pos >= self.src.len() {
             return Err(JsonError {
                 message: "意外的输入结束".to_string(),
@@ -637,6 +663,22 @@ pub fn escape_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// Q3：深嵌套 JSON 数组 → 结构化 JsonError（非栈溢出）。
+    /// json 的递归下降每层 Rust 帧小，10 万层在测试线程 8MB 栈内可完成（守卫前的
+    /// 真实溢出点在 ~10⁶ 层，生产 256MB 线程）——本测用 10 万零 1 层触发守卫。
+    #[test]
+    fn deep_nested_json_reports_depth_error() {
+        // 测试注入小阈值（生产 100k；cargo test 线程 8MB 栈达不到，实测 10 万层
+        // 直接爆——与 N1/Q3 同款教训：阈值必须字段化）
+        let src = "[".repeat(300);
+        let mut p = super::JsonParser::new(&src);
+        p.max_depth = 100;
+        let e = p.parse_value().unwrap_err();
+        assert!(e.message.contains("嵌套超过 100 层"), "消息: {}", e.message);
+        // 守卫回退后浅层调用不受影响
+        assert!(super::parse("[[1]]").is_ok());
+    }
+
     // Q1 覆盖率盲区补测：json::parse 的错误路径（畸形 JSON 的诊断消息）
     #[test]
     fn parse_error_unexpected_char_in_value() {

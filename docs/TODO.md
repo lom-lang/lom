@@ -41,10 +41,28 @@
 - main.rs 拆分/CLI 层可测（process::exit 不可测）+ typechecker.rs 103KB
   拆分——纯重构零行为，全量回归电池 + 覆盖率不降验收。
 
-### Q3｜parser 深嵌套守卫（N1 姊妹项）⏳
+### Q3｜深嵌套守卫收官（parser + json，N1 姊妹项）✅ done 2026-09-08
 
-- 求值侧守卫（N1）平移到 parser：深嵌套表达式递归计数，超限结构化
-  PARSE 诊断（带位置）而非崩溃。SECURITY 限制 1 收尾。
+**Q3 证据区（2026-09-08 实测）**：
+
+- **parser 守卫**：parse_expr 入口软件计数（对称 +1/-1 不用 ?），超限返回
+  `表达式嵌套超过 N 层…检查右括号/改用循环构造` 的 PARSE 诊断 + **pos 跳
+  Eof 哨兵**（容错恢复模式下防"同 token 反复递归-超限-恢复"的错误风暴——
+  实测单条诊断终止；len 本身越界 panic 的坑实测抓获修正为 len-1）。
+  DEFAULT=30_000（256MB 栈实测括号嵌套 40k 过/50k 爆，75% 取值；Pratt
+  每层 ~10 Rust 帧 ≈5KB）。CLI 实测 150k 层 → `[PARSE000] 表达式嵌套
+  超过 30000 层`（位置 2:30012）而非崩溃。
+- **json_parse 守卫**（系统盘点补漏——全部递归入口清点后唯一漏项）：
+  parse_value_inner 计数，100k 上限（json 每层帧小，256MB 真实溢出
+  ~10⁶ 层）。盘点结论：lexer 线性 ✓、dump/doc/typechecker 的 AST 递归
+  受 parser 30k 上限保护且每层栈小 ✓。
+- 测试注入教训第三次应验：json 守卫初版硬编码 100k，测试 10 万层在
+  8MB 测试线程**先爆栈**（STATUS_STACK_OVERFLOW）——阈值字段化
+  （max_depth 注入）是必然模式。
+- +4 测试（473/473）：parser 严格模式 Err/合法深度不拦/容错单条诊断、
+  json 深嵌套 Err。SECURITY 限制 1 **关闭**（全部递归入口结构化失败）。
+- 全量回归全绿：clippy 零告警、golden 逐字、eval 双后端 116/116、
+  selfhost dump 149、doc_audit 19/19。
 
 ### Q4｜小件打包 ⏳
 

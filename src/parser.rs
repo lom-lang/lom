@@ -48,6 +48,13 @@ enum BlockEl {
 }
 
 /// 解析器
+/// 默认表达式嵌套上限（Q3：parser 深嵌套守卫，N1 的求值侧姊妹项）。
+/// 校准依据：256MB 栈线程实测括号嵌套 40k 层通过 / 50k 层溢出（Pratt 每层
+/// 递归约 10 个 Rust 帧）；取 30k（通过点的 75%，留余量）。超限返回结构化
+/// PARSE 诊断并终止解析（pos 跳 EOF，防容错恢复循环）而非进程崩溃。
+/// cargo test 线程栈远小于 main——测试经 max_expr_depth 字段注入小阈值。
+const DEFAULT_MAX_EXPR_DEPTH: usize = 30_000;
+
 pub struct Parser {
     tokens: Vec<SpannedToken>,
     pos: usize,
@@ -55,6 +62,10 @@ pub struct Parser {
     errors: Vec<ParseError>,
     /// true = 容错模式（错误不终止，插入 Hole 继续）；false = 严格模式（首个错误即返回）
     recover: bool,
+    /// Q3 深度守卫：表达式嵌套递归的当前深度（parse_expr 计数）
+    expr_depth: usize,
+    /// 表达式嵌套上限（测试注入小阈值用；生产 = DEFAULT_MAX_EXPR_DEPTH）
+    max_expr_depth: usize,
 }
 
 impl Parser {
@@ -64,6 +75,8 @@ impl Parser {
             pos: 0,
             errors: Vec::new(),
             recover: false,
+            expr_depth: 0,
+            max_expr_depth: DEFAULT_MAX_EXPR_DEPTH,
         }
     }
 
@@ -828,7 +841,29 @@ impl Parser {
     // ===== 表达式（Pratt 解析）=====
 
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
-        self.parse_range()
+        // Q3 深度守卫：嵌套表达式递归（括号/运算链嵌套）软件计数。
+        // 不用 `?`（早退跳过递减），显式对称；超限时 pos 直接跳 EOF——
+        // 容错恢复模式下若不终止，同一 '(' 会反复递归-超限-恢复，errors 爆炸。
+        self.expr_depth += 1;
+        if self.expr_depth > self.max_expr_depth {
+            self.expr_depth -= 1;
+            let (line, col) = {
+                let tok = self.current();
+                (tok.line, tok.col)
+            };
+            self.pos = self.tokens.len().saturating_sub(1);  // 跳到 Eof 哨兵位置（len 本身越界）
+            return Err(ParseError {
+                message: format!(
+                    "表达式嵌套超过 {} 层（256MB 栈的安全上限）：检查是否缺少右括号，或深结构改用循环构造",
+                    self.max_expr_depth
+                ),
+                line,
+                col,
+            });
+        }
+        let r = self.parse_range();
+        self.expr_depth -= 1;
+        r
     }
 
     /// v0.4.2 P1-1: range 表达式 a..b —— 最低优先级（低于 or），非结合
@@ -1372,6 +1407,61 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Q3：表达式嵌套超限 → 结构化 ParseError（非栈溢出崩溃），容错模式单条诊断终止。
+    /// 测试注入小阈值（cargo test 线程栈远小于 main 的 256MB）。
+    #[test]
+    fn deep_nesting_reports_parse_error_not_crash() {
+        use crate::lexer::Lexer;
+        let src = format!("fn main() -> Unit
+    println({}1{})
+end
+",
+                          "(".repeat(300), ")".repeat(300));
+        let tokens = Lexer::new(&src).tokenize().unwrap();
+        let mut p = Parser::new(tokens);
+        p.max_expr_depth = 100;
+        let err = p.parse_program().unwrap_err();
+        assert!(err.message.contains("嵌套超过 100 层"), "消息: {}", err.message);
+        assert!(err.message.contains("右括号"), "应含修复建议: {}", err.message);
+    }
+
+    /// Q3：上限内嵌套正常解析（守卫不拦合法深度）
+    #[test]
+    fn moderate_nesting_unaffected_by_guard() {
+        use crate::lexer::Lexer;
+        let src = format!("fn main() -> Unit
+    println({}1{})
+end
+",
+                          "(".repeat(50), ")".repeat(50));
+        let tokens = Lexer::new(&src).tokenize().unwrap();
+        let mut p = Parser::new(tokens);
+        p.max_expr_depth = 100;
+        assert!(p.parse_program().is_ok(), "50 层嵌套在 max=100 内应正常");
+    }
+
+    /// Q3：容错模式下超限 = 单条诊断后终止（pos 跳 Eof，不产生错误风暴）
+    #[test]
+    fn deep_nesting_recover_mode_single_error() {
+        use crate::lexer::Lexer;
+        let src = format!("fn main() -> Unit
+    println({}1{})
+end
+",
+                          "(".repeat(300), ")".repeat(300));
+        let (tokens, lex_errors) = Lexer::new(&src).tokenize_recover();
+        assert!(lex_errors.is_empty());
+        let mut p = Parser::new(tokens);
+        p.recover = true;
+        p.max_expr_depth = 100;
+        let program = p.parse_program().expect("容错模式应返回带洞 AST");
+        let errors = p.errors;
+        assert_eq!(errors.len(), 1, "应恰好 1 条错误（终止防御），得 {}",
+                   errors.len());
+        assert!(errors[0].message.contains("嵌套超过"));
+        assert!(!program.items.is_empty(), "带洞 AST 应保留 fn main 项");
+    }
 
     fn parse_ok(src: &str) -> Program {
         Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e))
