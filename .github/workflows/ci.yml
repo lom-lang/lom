@@ -151,6 +151,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # N3 changelog 对账需要 git tag（默认浅克隆 fetch-depth:1 不带 tag，
+          # CI #82/#83 因此把 v1.x 条目全判"虚构"而红）
+          fetch-depth: 0
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build
