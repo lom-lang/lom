@@ -4,11 +4,74 @@
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——L 工作包已收官
-> （2026-09-07，见下档案）；W 工作包已收官（2026-09-07，v1.1.1，见下档案）。
-> R1-R8 与 T1-T7 均已关闭（档案保留下文）。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：M 工作包（三线
+> 优化：文档对账扩展 / Pattern span / fix_corpus 扩充，2026-09-07 开立，见下）。
+> L 工作包已收官（2026-09-07，见下档案）；W 工作包已收官（2026-09-07，v1.1.1，
+> 见下档案）。R1-R8 与 T1-T7 均已关闭（档案保留下文）。
 > **纪律**：语言面冻结（LANGUAGE_SPEC §14）不破——只允许新增 warning 级诊断码；
 > 其余行为修复均为 bug 修复性质且不动语法/保留字/内建表。
+
+## M 工作包：三线优化（2026-09-07 开立，进行中）
+
+**来源**：用户裁决（2026-09-07"还有什么优化空间"盘点后的 6→1→3 排序）。三项
+互不依赖但顺序执行（协作偏好），全部不动语言面（冻结 §14 安全区：文档/工具/
+诊断定位/测试语料）。
+
+**用户裁决（2026-09-07）**：M1 = spec_examples_check 扩展到 LANGUAGE_SPEC +
+tutorial（"文档不撒谎"从 SPEC_FOR_AI 一份扩到三份，R7 制度红利延伸）；
+M2 = Pattern 无 span 补齐（诊断定位最后一个死角，fix 整词扫描兜底退役）；
+M3 = fix_corpus 扩充（repair-native 回归网 4 例 → 全诊断码家族覆盖）。
+
+### M1｜spec_examples_check 扩展 LANGUAGE_SPEC + tutorial ✅ done 2026-09-07
+
+**M1 证据区（2026-09-07 实测）**：
+
+- 工具升级：`--spec` 多值 + 默认三文档（SPEC_FOR_AI / LANGUAGE_SPEC /
+  tutorial HTML）；HTML `<pre>` 块提取（实体反转 + 剥内嵌标签）；三条机械
+  skip 规则（skip-ebnf 产生式形态强特征 / skip-keywords 全词 ∈ 20 保留字 /
+  skip-cli 行首 `lom `）——skip 仅限"非 Lom 代码块"，不吞断言失败。
+- **存量腐坏 7 处实测修复**（预期成真——双文档同病只修一半的实锤）：
+  ① LANGUAGE_SPEC §2.4.1 管道示例缺 `from string import {trim, upper}`
+  （照抄即 RUNTIME002）；② §10.4 distance 示例缺 `from math import {sqrt}`；
+  ③ §6.7 效应签名块无函数体（补最小体，print→print_msg 避内置 NAM002）；
+  ④⑤⑥ type alias / trait-impl / pub 三个"rejected sketch"块加 ❌ 反例标记
+  （R1/R2 在 SPEC_FOR_AI 侧加过、LANGUAGE_SPEC 侧漏了——正是"同病只修一半"）；
+  ⑦ **tutorial L422 闭包教学示例用嵌套具名 fn——Lom 不支持（PARSE001），
+  教程在教非法语法**；改 `let step = fn() -> Int` 闭包字面量 + 顺带加 MUT002
+  教学旁注（mut 捕获双后端分歧，语言主动警告——repair-native 活示范）。
+- 9 处非 Lom 块 marker（概念性 enum 重定义 / lom info 输出 / 诊断消息 /
+  eval 目录树 + tutorial 架构图/解析链/执行流程/Rust 代码/TOML 清单）。
+- 全绿：81 块（34+40+7）= 正例 51 + 反例 5 + skip 25（json 8/diag 1/
+  marker 10/ebnf 4/keywords 1/cli 1）；ci.yml 无参调用自动继承三文档默认
+  （零 CI 配置变更）；doc_audit 16/16、cargo test 459/459。
+- **锁定测试三组全红**：①type alias 去❌→大写名外来语法检测 FAIL；
+  ②教程闭包改回嵌套 fn→PARSE001 FAIL；③删 import→运行层退出码 1 FAIL；
+  各恢复后复绿。工具统计 bug 一枚（跨文档累计重复累加）已修。
+- 过程坑：Read 工具显示吞 markdown 反引号围栏内闭合花括号的坑（§3.1 变体）
+  再次防御性核对——本轮经 python assert 替换（不落地中间态）绕开。
+
+### M2｜Pattern 无 span 补齐 ⏳
+
+- parser 的 Pattern AST 加 span（对齐 3.2b 惯例：start=首 token、end=末 token
+  起始位）；变体名/字段拼错的诊断（NAM004 族）离开 (0,0)。
+- fix.rs 的 precise_occurrence 对 Pattern 诊断启用（整词扫描兜底保留为
+  内容不符时的回退）。
+- 验收：模式内拼错的诊断带真实位置 + fix 单点替换；全量回归（自举 dump
+  格式不含 span——dump 契约不变，8.1 基线不倒）。
+
+### M3｜fix_corpus 扩充 ⏳
+
+- 4 例 → 覆盖全部可自动修复的诊断码家族（LEX/PARSE/NAM 拼写/复合赋值等），
+  每例 .bad.lom/.fixed.lom 配对，main.rs 测试驱动 apply_iterative 逐字比对。
+- 预期可能暴露真 bug（M4 前科：组合语义误修）——抓到如实记录处置。
+- 验收：新语料全绿；测试数同步 HANDOVER §2.2/§9（老教训）。
+
+### 纪律
+
+顺序执行（M1→M2→M3，每项完成跑全量回归电池 + doc_audit 双件才进入下一项）；
+语言面冻结不破；严禁虚构数据；每项 feat+docs 成对提交推送看 CI 首跑。
+
+---
 
 ## L 工作包：LLM 复测升级 pass@k（2026-09-07 开立 → 2026-09-07 收官）✅ done
 
