@@ -14,6 +14,10 @@
 #   C. .lom 文件拆分：glob 实数（总数/顶层/bootstrap/pkg_demo/selfhost）→ README 状态段
 #   D. self_interp 行数：wc 口径（换行符计数）→ HANDOVER §9
 #   E. 版本号：Cargo.toml（+ Cargo.lock 一致性）→ HANDOVER §1/§9
+#   F. changelog 对账（N3，2026-09-07）：LANGUAGE_SPEC §13 条目 ↔ 版本/tag 双向——
+#      当前 Cargo 版本必须有 §13 条目（防升版忘写 changelog，历史主腐坏形态）；
+#      v1.0 冻结时代起 tag 与条目双向一致（v1.x 前的 0.x spec/工程两套编号是
+#      历史结构，不追改——§13 是 spec 视角记录，纯工程版本明文豁免）
 #
 # 纪律：模式找不到也算 FAIL（文档措辞重构时必须同步更新本清单——对账清单本身也是文档）。
 # 历史时点值（带日期/版本标签的快照，如 changelog 的 "eval 114/114 (v1.0.0)"、
@@ -24,6 +28,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 RESULTS = []
@@ -145,6 +150,22 @@ def main():
                r'\| 版本 \| \*\*v([\d.]+)\*\*', [cargo_ver])
     expect_all('HANDOVER §9 版本显示', 'docs/HANDOVER.md',
                r'--version` 显示 ([\d.]+)', [cargo_ver])
+
+    # ---- F. changelog 对账（N3）----
+    print('F. changelog 对账（LANGUAGE_SPEC §13）')
+    entries = re.findall(r'(?m)^- \*\*(v[\d.]+)', read('LANGUAGE_SPEC.md'))
+    check('当前版本有 changelog 条目', 'v' + cargo_ver in entries,
+          'Cargo %s；§13 现有条目 %s' % (cargo_ver, ' '.join(entries)))
+    tags = subprocess.run(['git', 'tag', '--list'], capture_output=True,
+                          encoding='utf-8').stdout.split()
+    tags_v1 = sorted(t for t in tags if t.startswith('v1.'))
+    missing = [t for t in tags_v1 if t not in entries]
+    check('v1.x tag 全有条目', not missing,
+          '%d 个 v1.x tag（%s）；缺条目：%s' % (len(tags_v1), ' '.join(tags_v1),
+                                               missing or '无'))
+    fictitious = [e for e in entries if e.startswith('v1.') and e not in tags]
+    check('v1.x 条目全有 tag（防虚构）', not fictitious,
+          '无 tag 的条目：%s' % (fictitious or '无'))
 
     total, ok = len(RESULTS), sum(RESULTS)
     print('RESULT: %s（%d/%d 项通过）' % ('PASS' if ok == total else 'FAIL', ok, total))
