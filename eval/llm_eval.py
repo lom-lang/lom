@@ -13,8 +13,15 @@
 用法：
   python eval/llm_eval.py --provider deepseek --model deepseek-v4-pro --thinking
   python eval/llm_eval.py --provider glm --model glm-5.3
+  python eval/llm_eval.py --provider deepseek --model deepseek-v4-pro --thinking \
+      --samples 10 --temperature 1.0        # 多采样（pass@k 采集，L 工作包）
 
-输出：
+多采样布局（samples > 1，与单采样向后兼容）：
+  eval/candidates_rerun/<provider>_<model>/s<k>/<id>.lom  — 第 k 个采样的候选代码
+  eval/candidates_rerun/<provider>_<model>/raw/<cat>_s<k>.md — 第 k 个采样的原始回复
+断点续跑：raw 文件已存在的采样跳过 API 调用（零成本恢复），提取步骤仍执行。
+
+输出（samples = 1 时保持旧布局）：
   eval/candidates_rerun/<provider>_<model>/<id>.lom      — 提取的候选代码
   eval/candidates_rerun/<provider>_<model>/raw/*.md      — 原始回复（审计用）
   eval/candidates_rerun/<provider>_<model>/run_meta.json — 模型/参数/时间戳/提取统计
@@ -82,6 +89,17 @@ def expected_ids() -> dict:
             tasks = json.load(f)
         out[fn[:-5]] = [t["id"] for t in tasks]
     return out
+
+
+def sample_names(cat: str, samples: int) -> list:
+    """某分类的 (raw 文件名, 候选子目录名) 序列。
+
+    samples=1 保持旧布局（raw/<cat>.md、候选直接在 out_dir）——向后兼容上轮
+    四模型存量目录；samples>1 用 raw/<cat>_s<k>.md 与 s<k>/ 子目录。
+    """
+    if samples == 1:
+        return [(f"{cat}.md", ".")]
+    return [(f"{cat}_s{k}.md", f"s{k}") for k in range(1, samples + 1)]
 
 
 def call_api(base_url: str, key: str, model: str, prompt: str,
@@ -158,6 +176,8 @@ def main():
     ap.add_argument("--thinking", action="store_true",
                     help="开启思考模式（DeepSeek/GLM 的 thinking.type=enabled）")
     ap.add_argument("--only", default=None, help="只跑某个分类（如 05_match_enum），调试用")
+    ap.add_argument("--samples", type=int, default=1,
+                    help="每分类采样次数（默认 1；>1 时走 s<k>/ 多采样布局，L 工作包 pass@k）")
     ap.add_argument("--from-raw", action="store_true",
                     help="不调 API，从已有 raw/ 回复重新提取（提取器修复后复用，零成本）")
     ap.add_argument("--out-root", default=os.path.join(os.path.dirname(__file__), "candidates_rerun"))
@@ -172,29 +192,38 @@ def main():
     want = expected_ids()
 
     if args.from_raw:
-        # 离线重提取：raw/*.md → 候选文件
+        # 离线重提取：raw/*.md → 候选文件（兼容单/多采样两种 raw 命名）
         total_e = total_x = 0
         for fn in sorted(os.listdir(raw_dir)):
             if not fn.endswith(".md"):
                 continue
-            cat = fn[:-3]
+            m = re.match(r"^(.*)_s(\d+)$", fn[:-3])
+            cat, sub = (m.group(1), f"s{m.group(2)}") if m else (fn[:-3], ".")
+            cand_dir = out_dir if sub == "." else os.path.join(out_dir, sub)
+            os.makedirs(cand_dir, exist_ok=True)
             with open(os.path.join(raw_dir, fn), encoding="utf-8") as f:
                 reply = f.read()
             blocks = extract_blocks(reply)
             for tid, code in blocks.items():
-                with open(os.path.join(out_dir, f"{tid}.lom"), "w", encoding="utf-8") as f:
+                with open(os.path.join(cand_dir, f"{tid}.lom"), "w", encoding="utf-8") as f:
                     f.write(code)
             missing = [i for i in want.get(cat, []) if i not in blocks]
             total_e += len(want.get(cat, []))
             total_x += len(blocks)
-            print(f"[{cat}] 重提取 {len(blocks)}/{len(want.get(cat, []))}"
-                  + ("" if not missing else f" 缺 {missing}"))
+            msg = f"[{fn[:-3]}] 重提取 {len(blocks)}/{len(want.get(cat, []))}"
+            if missing:
+                msg += f" 缺 {missing}"
+            print(msg)
         print(f"\n重提取完成：{total_x}/{total_e}")
         return
+
+    if args.samples < 1:
+        sys.exit("--samples 必须 >= 1")
 
     key = load_key(args.provider)
 
     stats = {}
+    skipped_calls = 0
     t0 = datetime.datetime.now(datetime.timezone.utc)
 
     for fn in sorted(os.listdir(PROMPTS_DIR)):
@@ -205,21 +234,33 @@ def main():
             continue
         with open(os.path.join(PROMPTS_DIR, fn), encoding="utf-8") as f:
             prompt = f.read()
-        print(f"[{cat}] 调用 {args.model}（{len(prompt)} 字符）...")
-        reply = call_api(PROVIDERS[args.provider], key, args.model, prompt,
-                         args.temperature, args.max_tokens, args.thinking)
-        with open(os.path.join(raw_dir, f"{cat}.md"), "w", encoding="utf-8") as f:
-            f.write(reply)
-        blocks = extract_blocks(reply)
-        for tid, code in blocks.items():
-            with open(os.path.join(out_dir, f"{tid}.lom"), "w", encoding="utf-8") as f:
-                f.write(code)
-        missing = [i for i in want.get(cat, []) if i not in blocks]
-        stats[cat] = {"extracted": len(blocks), "expected": len(want.get(cat, [])),
-                      "missing": missing}
-        flag = "OK" if not missing else f"缺 {missing}"
-        print(f"[{cat}] 提取 {len(blocks)}/{len(want.get(cat, []))} {flag}")
-        time.sleep(2)  # 礼貌限速
+        for raw_name, sub in sample_names(cat, args.samples):
+            raw_path = os.path.join(raw_dir, raw_name)
+            cand_dir = out_dir if sub == "." else os.path.join(out_dir, sub)
+            os.makedirs(cand_dir, exist_ok=True)
+            if os.path.exists(raw_path):
+                # 断点续跑：raw 已留档的采样跳过调用，提取仍执行（提取器可能被修过）
+                with open(raw_path, encoding="utf-8") as f:
+                    reply = f.read()
+                skipped_calls += 1
+                print(f"[{raw_name[:-3]}] raw 已存在，跳过 API 调用（断点续跑）")
+            else:
+                print(f"[{raw_name[:-3]}] 调用 {args.model}（{len(prompt)} 字符）...")
+                reply = call_api(PROVIDERS[args.provider], key, args.model, prompt,
+                                 args.temperature, args.max_tokens, args.thinking)
+                with open(raw_path, "w", encoding="utf-8") as f:
+                    f.write(reply)
+                time.sleep(2)  # 礼貌限速
+            blocks = extract_blocks(reply)
+            for tid, code in blocks.items():
+                with open(os.path.join(cand_dir, f"{tid}.lom"), "w", encoding="utf-8") as f:
+                    f.write(code)
+            missing = [i for i in want.get(cat, []) if i not in blocks]
+            stats[raw_name[:-3]] = {"extracted": len(blocks),
+                                    "expected": len(want.get(cat, [])),
+                                    "missing": missing}
+            flag = "OK" if not missing else f"缺 {missing}"
+            print(f"[{raw_name[:-3]}] 提取 {len(blocks)}/{len(want.get(cat, []))} {flag}")
 
     meta = {
         "provider": args.provider,
@@ -227,6 +268,7 @@ def main():
         "temperature": args.temperature if args.temperature is not None else "provider-default",
         "thinking": args.thinking,
         "max_tokens": args.max_tokens,
+        "samples": args.samples,
         "started_utc": t0.isoformat(),
         "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "prompt_method": "整分类 prompt 文件作为单条 user 消息（对齐 2026-08-03 基线方法论）",
@@ -237,8 +279,9 @@ def main():
 
     total_e = sum(s["expected"] for s in stats.values())
     total_x = sum(s["extracted"] for s in stats.values())
-    print(f"\n完成：提取 {total_x}/{total_e}，候选目录 {out_dir}")
-    print("下一步：用 run.ps1 -CandidatesDir 评分（见文件头注释）")
+    print(f"\n完成：提取 {total_x}/{total_e}，跳过已有调用 {skipped_calls} 次，候选目录 {out_dir}")
+    print("下一步：用 run.ps1 -CandidatesDir 评分（见文件头注释）；"
+          "多采样目录用 eval/passk_summarize.py 汇总 pass@k")
 
 
 if __name__ == "__main__":
