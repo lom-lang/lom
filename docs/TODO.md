@@ -17,15 +17,33 @@
 A 表 1→2→3；5/6 合为后续 P 工作包；10/11/12 维持现状；B 表设计取舍不动；
 发布线同日裁决冻结：优化到完美前不发布）。
 
-### N1｜栈溢出结构化诊断 ⏳
+### N1｜栈溢出结构化诊断 ✅ done 2026-09-07
 
-- 现状：深递归（256MB 栈下 ~10⁵ 层）崩溃无 RUNTIME 码、无位置——
-  repair-native 主张下"LLM 无法修复看不见的错误"的最后缺口。
-- 约束：**零 unsafe 铁律**（SECURITY.md/CI gate）——信号处理器/SEH 路线
-  直接排除；方案 = 解释器侧软件深度计数（call_function 计数，超阈值返回
-  结构化 RUNTIME 诊断带位置）。阈值按实测安全深度的保守比例定并文档化。
-- 验收：深递归程序产出结构化诊断（带码+位置）而非进程崩溃；正常程序
-  零行为变化；全量回归不倒。
+**N1 证据区（2026-09-07 实测）**：
+
+- 方案：**软件深度计数**（零 unsafe 铁律排除信号处理器/SEH 路线）——
+  `Interpreter.call_depth/max_depth` 字段；call_function/call_closure 入口
+  +1、超限返回 `RuntimeError::DepthLimit{msg, line, col}`（新变体自带位置：
+  函数版定位递归函数**签名 span**、闭包版定位调用点）；出口显式 match
+  不用 `?`（早退跳过递减的坑）；`DEFAULT_MAX_CALL_DEPTH = 80_000`
+  （256MB 栈实测 ~100k 帧的 80% 余量，§10 校准）。诊断复用 RUNTIME000
+  兜底码（零冻结争议），消息自含修复建议；diagnostics.rs 的 from_runtime
+  用自带位置覆盖 (0,0)；repl.rs 补 DepthLimit 分支。
+- **测试注入设计**：cargo test 线程栈远小于 main 的 256MB 专用线程——
+  max_depth 字段化，测试注入 100/500 小阈值（生产常量不可用）。
+- 实测：无限递归 `down(n+1)` → `[runtime] error (1:1): [RUNTIME000]
+  递归深度超过 80000 层（256MB 栈的安全上限）：函数 'down' 疑似缺少终止
+  条件——检查递归出口或改写为 while 循环` + 源码指针，exit 1（此前是
+  进程崩溃）；bench recurse 10000 正常（守卫不拦合法深度）。
+- +3 测试（463/463）：函数递归 DepthLimit（消息/函数名/位置 (1,1)/计数
+  归零四断言）、闭包递归、上限内正常递归零影响。
+- 全量回归全绿：clippy 零告警、golden 逐字、eval 116/116、selfhost
+  dump 149、doc_audit 16/16、spec_examples 三文档 PASS。
+- 文档同步：SECURITY hardening 条改写（附可执行验证命令）+ accepted
+  risk 1 改写（求值守卫已立，剩余 parser 侧深嵌套如实保留）；HANDOVER
+  §1（测试数 463 + 挂账行）、§2.2/§9 基线、§4.6（守卫与注入设计）；
+  README 测试数。**已知边界**：parser 侧深嵌套（非调用递归）无守卫、
+  WASM 侧深递归是 V8 宿主栈限制（--stack-size 可调，文档化差异）。
 
 ### N2｜自举诊断消息 Latin-1 化长期方案 ⏳
 

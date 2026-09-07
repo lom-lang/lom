@@ -351,6 +351,9 @@ pub enum RuntimeError {
     Msg(String),
     /// `?` 触发的提前返回：携带应从函数返回的值（Err(e) 或 None）
     EarlyReturn(Value),
+    /// 递归深度超限（N1）：自带触发位置（函数签名/调用点 span）——
+    /// RuntimeError::Msg 没有位置通道，而深度错误的定位价值高（指向递归函数定义）
+    DepthLimit { msg: String, line: usize, col: usize },
 }
 
 impl fmt::Display for RuntimeError {
@@ -358,11 +361,20 @@ impl fmt::Display for RuntimeError {
         match self {
             RuntimeError::Msg(s) => write!(f, "运行时错误: {}", s),
             RuntimeError::EarlyReturn(v) => write!(f, "提前返回: {}", v.to_display()),
+            RuntimeError::DepthLimit { msg, .. } => write!(f, "运行时错误: {}", msg),
         }
     }
 }
 
 impl std::error::Error for RuntimeError {}
+
+/// 默认递归深度上限（N1：栈溢出结构化诊断）。
+/// 校准依据：256MB 栈线程下实测每 Lom 调用帧约 2.6KB Rust 栈（HANDOVER §10），
+/// 理论极限 ~100,000 层（recurse n=100000 实测溢出）；取 80% 留表达式求值
+/// 嵌套的额外栈空间。超限返回 RUNTIME 结构化诊断而非进程崩溃。
+/// 注意：cargo test 的测试线程栈远小于 main 的 256MB 专用线程——测试经
+/// max_depth 字段注入小阈值，不可用生产值。
+const DEFAULT_MAX_CALL_DEPTH: usize = 80_000;
 
 /// 控制流信号（return）
 enum ControlFlow {
@@ -396,6 +408,10 @@ pub struct Interpreter {
     /// Phase 3.5: 程序参数（argv），供 env::args() 读取
     /// argv[0] = .lom 文件路径，argv[1..] = -- 之后的用户参数
     program_args: Vec<String>,
+    /// 当前函数/闭包调用深度（N1：软件栈深度计数，超 max_depth 报结构化诊断）
+    call_depth: usize,
+    /// 递归深度上限（测试注入小阈值用；生产 = DEFAULT_MAX_CALL_DEPTH）
+    max_depth: usize,
 }
 
 /// 内置变体
@@ -502,6 +518,8 @@ impl Interpreter {
             import_aliases: HashMap::new(),
             packages: HashMap::new(),
             program_args: Vec::new(),
+            call_depth: 0,
+            max_depth: DEFAULT_MAX_CALL_DEPTH,
         }
     }
 
@@ -1143,7 +1161,7 @@ impl Interpreter {
                     env: closure_env,
                 }) = env.borrow().get(name)
                 {
-                    return self.call_closure(&params, &body, closure_env.clone(), arg_vals);
+                    return self.call_closure(&params, &body, closure_env.clone(), arg_vals, &callee.span);
                 }
                 Err(RuntimeError::Msg(format!("未定义函数: '{}'", name)))
             }
@@ -1155,7 +1173,7 @@ impl Interpreter {
                         params,
                         body,
                         env: closure_env,
-                    } => self.call_closure(&params, &body, closure_env, arg_vals),
+                    } => self.call_closure(&params, &body, closure_env, arg_vals, &callee.span),
                     _ => Err(RuntimeError::Msg(format!(
                         "不能调用 {} 类型的值",
                         c.type_name()
@@ -1410,9 +1428,27 @@ impl Interpreter {
         for (param, arg) in f.params.iter().zip(args.iter()) {
             env.borrow_mut().define(param.name.clone(), arg.clone());
         }
-        match self.exec_block(&f.body, env)? {
-            ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+        // N1 深度计数：不用 `?`（早退会跳过递减），显式匹配保证对称
+        self.call_depth += 1;
+        if self.call_depth > self.max_depth {
+            self.call_depth -= 1;
+            return Err(RuntimeError::DepthLimit {
+                msg: format!(
+                    "递归深度超过 {} 层（256MB 栈的安全上限）：函数 '{}' 疑似缺少终止条件——检查递归出口或改写为 while 循环",
+                    self.max_depth, f.name
+                ),
+                line: f.span.line,
+                col: f.span.col,
+            });
         }
+        let result = match self.exec_block(&f.body, env) {
+            Ok(cf) => match cf {
+                ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+            },
+            Err(e) => Err(e),
+        };
+        self.call_depth -= 1;
+        result
     }
 
     /// 调用闭包
@@ -1422,6 +1458,7 @@ impl Interpreter {
         body: &Block,
         closure_env: ScopeRef,
         args: &[Value],
+        site: &crate::ast::Span,
     ) -> Result<Value, RuntimeError> {
         if args.len() != params.len() {
             return Err(RuntimeError::Msg(format!(
@@ -1434,9 +1471,27 @@ impl Interpreter {
         for (param, arg) in params.iter().zip(args.iter()) {
             env.borrow_mut().define(param.name.clone(), arg.clone());
         }
-        match self.exec_block(body, env)? {
-            ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+        // N1 深度计数：同 call_function（闭包递归同样受保护）
+        self.call_depth += 1;
+        if self.call_depth > self.max_depth {
+            self.call_depth -= 1;
+            return Err(RuntimeError::DepthLimit {
+                msg: format!(
+                    "递归深度超过 {} 层（256MB 栈的安全上限）：闭包疑似缺少终止条件——检查递归出口或改写为 while 循环",
+                    self.max_depth
+                ),
+                line: site.line,
+                col: site.col,
+            });
         }
+        let result = match self.exec_block(body, env) {
+            Ok(cf) => match cf {
+                ControlFlow::Return(v) | ControlFlow::Normal(v) => Ok(v),
+            },
+            Err(e) => Err(e),
+        };
+        self.call_depth -= 1;
+        result
     }
 
     /// 内置函数调用
@@ -1678,7 +1733,7 @@ impl Interpreter {
                     ) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            out.push(self.call_closure(params, body, env.clone(), std::slice::from_ref(e))?);
+                            out.push(self.call_closure(params, body, env.clone(), std::slice::from_ref(e), &crate::ast::Span::at(0, 0))?);
                         }
                         Ok(Some(Value::List(ListVal::from_vec(out))))
                     }
@@ -1702,7 +1757,7 @@ impl Interpreter {
                     ) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            let keep = self.call_closure(params, body, env.clone(), std::slice::from_ref(e))?;
+                            let keep = self.call_closure(params, body, env.clone(), std::slice::from_ref(e), &crate::ast::Span::at(0, 0))?;
                             if keep.is_truthy()? {
                                 out.push(e.clone());
                             }
@@ -1729,7 +1784,7 @@ impl Interpreter {
                     ) => {
                         let mut acc = args[1].clone();
                         for e in l.iter() {
-                            acc = self.call_closure(params, body, env.clone(), &[acc, e.clone()])?;
+                            acc = self.call_closure(params, body, env.clone(), &[acc, e.clone()], &crate::ast::Span::at(0, 0))?;
                         }
                         Ok(Some(acc))
                     }
@@ -2139,6 +2194,75 @@ mod tests {
         let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
         let mut interp = Interpreter::new();
         interp.run(&program)
+    }
+
+    /// N1：深递归触发深度上限 → 结构化 DepthLimit（带函数名与签名位置），非进程崩溃。
+    /// 测试注入小阈值（cargo test 线程栈远小于 main 的 256MB 专用线程，生产值不可用）。
+    #[test]
+    fn deep_recursion_reports_depth_limit() {
+        let src = "fn down(n: Int) -> Int
+    down(n + 1)
+end
+fn main() -> Unit
+    println(down(0))
+end
+";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.max_depth = 100;
+        let err = interp.run(&program).unwrap_err();
+        match err {
+            RuntimeError::DepthLimit { msg, line, col } => {
+                assert!(msg.contains("递归深度超过 100 层"), "消息: {}", msg);
+                assert!(msg.contains("'down'"), "应指向递归函数: {}", msg);
+                assert!(msg.contains("while"), "应含改写建议: {}", msg);
+                assert_eq!((line, col), (1, 1), "定位到 fn down 签名");
+                assert_eq!(interp.call_depth, 0, "超限后深度计数归零（对称）");
+            }
+            other => panic!("应为 DepthLimit，得到 {:?}", other),
+        }
+    }
+
+    /// N1：闭包递归同样受保护（call_closure 路径）
+    #[test]
+    fn deep_closure_recursion_reports_depth_limit() {
+        let src = "fn main() -> Unit
+    let down = fn(n: Int) -> Int
+        down(n + 1)
+    end
+    println(down(0))
+end
+";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.max_depth = 100;
+        let err = interp.run(&program).unwrap_err();
+        match err {
+            RuntimeError::DepthLimit { msg, .. } => {
+                assert!(msg.contains("闭包"), "闭包版消息应指明闭包: {}", msg);
+            }
+            other => panic!("应为 DepthLimit，得到 {:?}", other),
+        }
+    }
+
+    /// N1：上限内的正常递归零影响（守卫不拦截合法深度）
+    #[test]
+    fn shallow_recursion_unaffected_by_depth_guard() {
+        let src = "fn down(n: Int) -> Int
+    if n <= 0
+        0
+    else
+        down(n - 1)
+    end
+end
+fn main() -> Unit
+    println(down(100))
+end
+";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.max_depth = 500;
+        interp.run(&program).expect("100 层递归在 max_depth=500 内应正常运行");
     }
 
     #[test]

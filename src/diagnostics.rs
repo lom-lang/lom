@@ -172,6 +172,16 @@ impl Diagnostic {
             // EarlyReturn 是内部控制流信号，正常不会到达诊断层；
             // 此处为防御性处理，用 Debug 输出避免暴露内部 Value 类型
             RuntimeError::EarlyReturn(v) => format!("内部控制流泄漏: {:?}", v),
+            // N1：深度超限自带位置（递归函数签名/闭包调用点），覆盖调用方缺省的 (0,0)
+            RuntimeError::DepthLimit { msg, line, col } => {
+                return Self::from_runtime(
+                    &RuntimeError::Msg(msg.clone()),
+                    file,
+                    source_lines,
+                    *line,
+                    *col,
+                )
+            }
         };
         let code = classify_runtime_error(&msg);
         let source_line = if line > 0 {

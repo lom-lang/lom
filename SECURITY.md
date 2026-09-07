@@ -13,13 +13,18 @@ Lom is a **tree-walking interpreter for trusted programs**. Running a `.lom` fil
 
 Every claim in this section ships with an executable verification command (rule 5 of the audit procedure below).
 
-- **Stack exhaustion**: the interpreter runs on a dedicated 256 MB-stack thread (Phase 5.0). Measured safe depth is ~10⁴ Lom frames (Phase 5.18); beyond that, deep recursion aborts the process. This is a documented known limitation, not a memory-safety issue (Rust's stack overflow guard applies; there is no UB). Verify: `./target/release/lom examples/bench.lom -- recurse 10000` completes with exit 0; deeper recursion aborts (limitation 1 below).
+- **Recursion depth guard**: the interpreter runs on a dedicated 256 MB-stack thread (Phase 5.0) **and enforces a software depth limit of 80,000 Lom call frames** (N1, 2026-09-07; measured frame cost ~2.6 KB → theoretical limit ~100k on 256 MB, 80% headroom). Exceeding it produces a structured `[RUNTIME000] 递归深度超过 80000 层` diagnostic (exit 1) with the recursive function's signature location — never a silent process abort. Verify: save `fn down(n: Int) -> Int
+    down(n + 1)
+end
+fn main() -> Unit
+    println(down(0))
+end` as `deep.lom`; `./target/release/lom deep.lom` prints the diagnostic and exits 1; `./target/release/lom examples/bench.lom -- recurse 10000` completes with exit 0. Parser-side deep nesting (non-call recursion) is not guarded — see limitation 1.
 - **Memory safety**: the interpreter is 100% safe Rust — no `unsafe` block anywhere in `src/`. Shared mutability uses `Rc<RefCell<...>>`; a `RefCell` double-borrow panics (safe abort), it cannot corrupt memory. Verify: `grep -rn "unsafe" src/` prints nothing.
 - **Parser robustness**: the parser is total by design (holey AST, Phase 2.2/5.15): malformed, truncated, or adversarial input produces diagnostics, never panics. Unknown characters are reported as explicit lexer diagnostics (LEX005) and skipped, so parsing continues and collects the remaining errors — nothing is silently dropped. Verify: save `fn f( -> Int` as `bad.lom`; `./target/release/lom bad.lom` prints PARSE diagnostics and exits 1 — no panic.
 
 ## Known limitations (accepted risks)
 
-1. **No recursion-depth guard for the evaluator** beyond the 256 MB stack — a hostile Lom program can abort the process (availability impact only).
+1. **Parser-side deep nesting is not depth-guarded** — the evaluator's call recursion is guarded (see above), but a pathologically nested expression (e.g. 10⁵ levels of parentheses) recurses in the parser before any guard applies and aborts the process (availability impact only; no UB).
 2. **`file` module performs no path validation** — it reads/writes whatever the OS user can access (trusted-program threat model).
 3. **`RefCell` reentrancy**: a builtin that borrows a Map while a user closure mutates the same Map would panic. No such reentrancy path is currently reachable (higher-order builtins operate on List, not Map), but it is a documented invariant to preserve when adding builtins.
 4. **Int arithmetic is not checked** (corrected 2026-09-03; an earlier revision of this file wrongly claimed "checked arithmetic"). Lom `Int` is plain `i64`: on overflow, release builds **silently wrap** (two's complement) with no diagnostic. Checked arithmetic (`checked_add`/`checked_sub`/`checked_mul`) has never been implemented — verify the absence: `grep -rn "checked_add\|checked_sub\|checked_mul\|checked_div" src/` returns no matches. Only division/modulo by zero is a runtime diagnostic — verify: `println(9223372036854775807 + 1)` prints `-9223372036854775808` (wrap, no diagnostic); `println(1 / 0)` reports `RUNTIME000` and exits 1. Accepted risk: under the trusted-program threat model wraparound affects program correctness, not memory safety; moving to checked arithmetic is a semantic change that requires an RFC (spec §14 freeze).

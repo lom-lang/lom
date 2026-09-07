@@ -369,6 +369,7 @@ fn repl_error_msg(e: &RuntimeError) -> String {
     match e {
         RuntimeError::Msg(s) => s.clone(),
         RuntimeError::EarlyReturn(_) => "提前返回（? 运算符在 REPL 顶层）".to_string(),
+        RuntimeError::DepthLimit { msg, .. } => msg.clone(),
     }
 }
 

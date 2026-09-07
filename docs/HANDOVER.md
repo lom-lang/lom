@@ -33,7 +33,7 @@
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
 | 版本 | **v1.1.1**（Cargo.toml/lock 一致，2026-09-07 W 工作包升版：wasm 后端两处 codegen bug 修复——变体臂急切载荷读越界（8.4 挂账根治）+ for 体内 return/? 被吞；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
-| Rust 测试 | **460/460 通过**（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| Rust 测试 | **463/463 通过**（N1 深度守卫 ×3：函数递归/闭包递归/合法深度不拦）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **116/116**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code，v0.27.0 加；任务 116 递归闭包 let / 117 浮点 inf/NaN 显示，2026-09-03 整改 T5 加，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
@@ -46,7 +46,7 @@
 | **第二轮审查** | **审查完成 + 整改 R1-R8 完成（2026-09-05，A-，无 P0）**：独立审查 agent 报告 docs/reviews/review-2026-09-05.html（基线 470670d）——硬指标全部实测复现（36 项验证矩阵）；发现 1×P1 + 6×P2 + 6×P3 文档腐坏，全部经维护会话亲手复现证实。**R1-R8 已全部执行关闭**（docs/TODO.md 档案）：R1 type alias 假特性→反例；R2 sin/cos+MUT001 措辞+pub 标注；R3/R4 spec §12 与 eval/README 旧计数；R5 README 拆分+v1.1.0 横幅；R6 ci.yml 149；R7/R8 对账工具双件（tools/spec_examples_check.py 34 块三层断言 + tools/doc_audit.py 16 项数字对账）+ CI doc-gates job——**R7 调查中额外抓出第三个假特性：记录字段赋值 `p.x = 5` 从未实现（parser 赋值目标只认普通变量，实测 PARSE000），SPEC_FOR_AI §5 与 LANGUAGE_SPEC §6.2 双修为如实口径**。"喂给 LLM 的文档"与"文档数字"自此从人工清扫升级为机器 gate |
 | **第三轮审查** | **完成 + 整改 R9-R14 关闭（2026-09-07，总评 A，无 P0/P1）**：独立审查 agent 报告 docs/reviews/review-2026-09-07.html（基线 7281936，覆盖 W/L/M 三工作包变更面）——硬指标 38 项矩阵实测 34 项全符 + 4 项表述精度差；pass@k 无偏公式独立复算逐位一致、fix_corpus 8/8 逐字、25 个 skip 逐块核查无误吞。6 条发现（P2×2：README pass@k 矛盾 + 5-mode 陈旧；P3×4：8.4 后注/147 口径注/舍入注/skip 摘要）全部采纳关闭。**审查轨迹：B+（08-31）→ A-（09-05）→ A（09-07）** |
 | 下一步 | **无活跃工作包——方向菜单（与用户共同裁决后立项，立项登记 docs/TODO.md）**：① 工程线：L2 自举编译器（char_from_code 已解锁；8.4 三层自证 + tools/wasm_debug/ 是其基建；phase 级工作量）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型；② 主张线剩余：**跨语言对照组**（同任务 Python/JS 生成对比——L 工作包时用户已裁决另立项；llm_eval.py/passk_summarize.py 管线现成可复用）；③ 北极星线：发布动作——**用户 2026-09-07 裁决冻结：技术强迫症，优化到完美之前绝对不发布**（GitHub Releases/Pages/对外宣布全部后置到用户主动解冻；"第三方生产使用"是长期北极星，明确不作门禁）。历史工作包档案见 docs/TODO.md（L 工作包 pass@k 复测 2026-09-07 收官） |
-| 遗留挂账 | 栈溢出结构化诊断；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；自举诊断消息 Latin-1 化的长期方案（验收脚本折叠换算；v1.0.0 lexer 修复后 dump/run 侧折叠计数已归零，仅诊断消息侧仍需）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵ 层，verify --wasm 第三层/自施加已内置 60000） |
+| 遗留挂账 | （栈溢出结构化诊断已于 N1 关闭——求值侧函数/闭包递归 80k 软上限；parser 侧深嵌套仍无守卫，SECURITY 限制 1）；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；自举诊断消息 Latin-1 化的长期方案（验收脚本折叠换算；v1.0.0 lexer 修复后 dump/run 侧折叠计数已归零，仅诊断消息侧仍需）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵ 层，verify --wasm 第三层/自施加已内置 60000） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -83,7 +83,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 460/460（2026-09-07 M2 基线：459 + Pattern span 定位测试）
+cargo test --release                                    # 期望 463/463（2026-09-07 N1 基线：460 + 深度守卫 ×3）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -191,7 +191,7 @@ end
 
 ### 4.6 深递归与 256MB 栈
 
-树遍历解释器在 Rust 默认 1MB 栈下，深层递归（长程序/长字符串解析）会栈溢出。main.rs 里已改为在 256MB 栈线程中跑解释器（Phase 5.0 修复）。如果遇到新的栈溢出，先确认这个线程包装没被破坏。
+树遍历解释器在 Rust 默认 1MB 栈下，深层递归（长程序/长字符串解析）会栈溢出。main.rs 里已改为在 256MB 栈线程中跑解释器（Phase 5.0 修复）。**N1（2026-09-07）起求值侧有软件深度守卫**：函数/闭包调用深度超 80,000（256MB 栈实测 ~100k 帧的 80% 余量）返回结构化 `[RUNTIME000] 递归深度超过...` 诊断（带递归函数签名位置，exit 1）而非进程崩溃——测试经 `interp.max_depth` 注入小阈值（cargo test 线程栈小，不可用生产值）。parser 侧深嵌套（非调用递归）仍无守卫（SECURITY 限制 1）；WASM 后端深递归是 V8 宿主栈限制（trap，--stack-size 可调，已知差异）。如果遇到新的栈溢出，先确认线程包装与守卫没被破坏。
 
 ---
 
@@ -283,7 +283,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 460/460、零 warning、`./target/release/lom.exe --version` 显示 1.1.1
+2. `cargo build --release && cargo test --release` 确认 463/463、零 warning、`./target/release/lom.exe --version` 显示 1.1.1
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮审查整改 R1-R8 闭环（2026-09-05）+ v1.1.1 W 工作包收官（2026-09-07：8.4 wasm 越界根治 + for 体内 return/? 修复，8.4 改判完成、wasm 层回流 CI）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py
