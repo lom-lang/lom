@@ -50,14 +50,28 @@ M3 = fix_corpus 扩充（repair-native 回归网 4 例 → 全诊断码家族覆
 - 过程坑：Read 工具显示吞 markdown 反引号围栏内闭合花括号的坑（§3.1 变体）
   再次防御性核对——本轮经 python assert 替换（不落地中间态）绕开。
 
-### M2｜Pattern 无 span 补齐 ⏳
+### M2｜Pattern 无 span 补齐 ✅ done 2026-09-07
 
-- parser 的 Pattern AST 加 span（对齐 3.2b 惯例：start=首 token、end=末 token
-  起始位）；变体名/字段拼错的诊断（NAM004 族）离开 (0,0)。
-- fix.rs 的 precise_occurrence 对 Pattern 诊断启用（整词扫描兜底保留为
-  内容不符时的回退）。
-- 验收：模式内拼错的诊断带真实位置 + fix 单点替换；全量回归（自举 dump
-  格式不含 span——dump 契约不变，8.1 基线不倒）。
+**M2 证据区（2026-09-07 实测）**：
+
+- 方案：`Pattern::Variant` 加 `name_span: Span`（诊断需求仅在变体名——
+  Lit 内含 Expr 自带 span、Binder/Wildcard 无名；未做 Pattern→PatternKind
+  全面外置重构，改动面收敛）。消费点六处：parser 构造 1 + typechecker
+  解构用 name_span + dump/interpreter/wasm 解构加 `..`（wasm_codegen 4493
+  原有 `..` 不动）。
+- 实测：`Circl(r)` 拼错 → `[NAM004] (5:9)` 定位变体名 token（此前硬编码
+  (0,0)）；`fix --plan` 产出 `replace at 5:9..5:14 text="Circle"` 单点精确
+  替换（fix.rs 零改动——precise_occurrence 对非零位置自动生效，扫描兜底
+  保留为内容不符回退）。`--apply` 对 Medium 置信度仍不自动应用（既有裁决）。
+- +1 测试 `nam004_variant_diag_locates_name_token`（460/460）；全量回归
+  电池全绿：clippy -D warnings 零告警、stmt_interp golden 逐字（dump 格式
+  契约不含 span、AST 变更零输出变化——149 文件 dump 验证）、fmt 幂等、
+  eval 双后端 116/116、selfhost dump 149/static 对齐 149、doc_audit 16/16。
+- 文档同步：README 测试数 456→460（**顺手修两代陈旧**——W 工作包升 459
+  时漏改了 README，文档腐坏复发实例）；HANDOVER §1/§2.2/§9 三处 459→460；
+  §1 遗留挂账移除"Pattern 无 span"条目（就此关闭）。
+- 已知边界（如实记录）：无参数变体拼错（`Grean`）在 parser 层就是 Binder
+  模式、不触发 NAM004——M1 时代记录过的既有模式语义，非本项范围。
 
 ### M3｜fix_corpus 扩充 ⏳
 
