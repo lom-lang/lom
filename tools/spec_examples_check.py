@@ -287,7 +287,10 @@ def main():
             kind = classify(content, nearest_text_above(lines, fence_line))
             if kind.startswith('skip'):
                 stats[kind] += 1
-                print('  %s: %s（跳过）' % (tag, kind))
+                # 附块首行摘要——skip 的分类正当性人眼可审（R14：机械规则如
+                # is_ebnf 存在理论误吞通道，摘要让滥用/误判在输出里可见）
+                first = next((l for l in content if l.strip()), '')[:48]
+                print('  %s: %s（跳过）首行: %s' % (tag, kind, first))
                 continue
             stats[kind] += 1
             try:

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-07（基线 v1.1.1 / commit 7281936）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--ok); border:3px solid var(--ok); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-07）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>7281936</code>（"docs(m): M3 补记 CI #74 行尾事故与修复闭环"，2026-09-07；工作树干净，与 origin/main 一致；tag <code>v1.1.1</code> → <code>edd0c5e</code>（远端 <code>git ls-remote</code> 实查存在））</p>
+<p><strong>审查范围</strong>：<code>470670d..HEAD</code>（上轮基线 v1.1.0 之后的 22 个提交）——三个工作包：<strong>W</strong>（v1.1.1 wasm 双 bug 根治 + 8.4 改判）、<strong>L</strong>（pass@k 复测）、<strong>M</strong>（三线优化：示例对账三文档 / Pattern span / fix_corpus 扩充）+ 其间全部文档同步与新增代码质量</p>
+<p><strong>宣称版本</strong>：v1.1.1（Cargo.toml = Cargo.lock = 1.1.1，<code>lom --version</code> 实测输出 <code>lom 1.1.1</code>）</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行构建/测试/全部验收脚本/独立复算。除本报告文件外未修改任何项目文件（fix_corpus 的 <code>--apply</code> 实跑在临时副本上进行，语料原文件未动）；未执行任何 git commit/push/tag。</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 1.97.1 / cargo 1.97.1 / node v24.15.0 / Python 3.13.2</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A</span></p>
+
+<p><strong>结论</strong>：上轮基线（470670d / v1.1.0 / A-）之后的三个工作包<strong>全部落地且宣称逐条属实</strong>。所有可机械验证的硬指标实测全部复现：460/460 测试、clippy <code>-D warnings</code> 零告警、构建零 warning、eval 116/116 双后端、自举验收 dump 149/149 + wasm 三段验收全 PASS、doc_audit 16/16、spec_examples_check 三文档 81 块全绿、<code>lom --version</code> → 1.1.1、tag v1.1.1 远端实查存在。</p>
+
+<p>三个工作包的执行质量分别核验：</p>
+<ul>
+<li><strong>W（v1.1.1）</strong>：eb0ce7e 的三处 wasm_codegen 修复逐一逻辑推演通过（载荷提取推迟进 <code>if (result i32)</code>、idx 读 tag 守卫条件读、for 三分派 if 补 Label::If 压弹对称）；<code>verify_selfhost.py --wasm</code> 三段验收实测全 PASS（layer2 146/0 + layer3 golden + 自施加）；8.4 改判有 RFC-0003 修订 25-29 完整档案支撑，HANDOVER §11.0 已重写为已解决档案形态。</li>
+<li><strong>L（pass@k）</strong>：两模型留档矩阵各 116 任务 × 10 格、通过单元各 1149/1160；本人用无偏公式 <code>1 - C(n-c,k)/C(n,k)</code>（Fraction 整数精确）<strong>独立复算</strong> pass@1 = 0.990517、pass@5 = pass@10 = 0.991379，与 passk_summary.json 逐位一致；矩阵单元实跑抽查 5/5 吻合（含 078 丢时间戳失败形态、051/104 的 9/10 方差单元）；raw 留档每模型恰 100 个；run_meta 参数（temperature=1.0、samples=10、max_tokens=16384）与报告声称一致。</li>
+<li><strong>M（三线优化）</strong>：M1 的 25 个 skip <strong>逐块人工核查全部正当</strong>（全是 JSON schema/诊断输出/EBNF 产生式/保留字表/CLI 用法/架构图/TOML 等真正的非 Lom 代码块，无"为绿而绿"）；7 处存量腐坏修复与 diff 逐条对应，教程闭包修复经新旧形态双向实测（旧嵌套 fn → PARSE001 实锤"教程在教非法语法"；新闭包字面量 → rc=0 + MUT002 警告与教学旁注一致）。M2 的 NAM004 定位 (4:9) 与 fix 单点替换 <code>replace at 4:9..4:14</code> 实测成立，无参变体边界如实记录。M3 的 8 对语料 <code>--plan</code> 输出与档案表格逐条一致、<code>--apply</code> 产物与 fixed 文件 8/8 逐字一致、07/08 fixed==bad 钉 Medium 语义属实。</li>
+</ul>
+
+<p><strong>未给 A+ 的原因</strong>：README 的三处现值段落未随工作包收官同步——最明确的一处是 <strong>README:154 仍写"pass@k … remain open"</strong>，与同文件 L68 的 pass@k retest (2026-09-07) 段直接矛盾（读者读到 L154 会以为 pass@k 还没做）；另两处是 L68 末尾"5-mode self-hosting gate"（CI 实为 6 模式，v1.1.1 起 +wasm step）与 L140 的 ◐ 8.4 旧条目（OOB 已根治、已回流 CI，顶部横幅 L8 已正确而此处未加后注）。这暴露 doc_audit 数字 gate 的盲区：它核数字模式，核不了叙述性旧话。此外有四条 P3 级口径/健壮性备注（147 vs 146 文件数简写、99.1% 舍入掩盖 pass@1 与 pass@5/10 的微小差异、is_ebnf 规则的潜在误吞通道）。无 P0（失实宣称）、无 P1（真 bug）。</p>
+
+<p><strong>与上轮的对比</strong>：上轮（A-）扣分主因是"喂给 LLM 的规范教假特性"（type alias / sin/cos）级别的失实；本轮同类问题为零，发现的都是"同一文档新旧段未同步"型腐坏，且同文件均存在正确信息源。上轮整改建立的机器 gate（R7/R8 doc-gates）本轮在 L 工作包的报告对账密度上可见实效。按本项目自设的"文档不撒谎"标准：硬指标全真、档案级对账全真、README 正文三处旧话——总评 <strong>A</strong>。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>HEAD = 7281936、工作区干净（任务书）</td><td><code>git status</code> → nothing to commit, working tree clean；分支 main 与 origin/main 一致</td><td class="ok">✓ 相符</td></tr>
+<tr><td>2</td><td>构建零 warning（HANDOVER §2.1）</td><td><code>cargo build --release</code> → <code>Finished … in 31.10s</code>，无任何 warning 行</td><td class="ok">✓ 相符</td></tr>
+<tr><td>3</td><td>版本 1.1.1，Cargo.toml/lock 一致（HANDOVER §1）</td><td><code>lom --version</code> → <code>lom 1.1.1</code>；doc_audit E 组双验通过</td><td class="ok">✓ 相符</td></tr>
+<tr><td>4</td><td>测试 460/460（README:68、HANDOVER §1/§2.2、TODO M2/M3）</td><td><code>cargo test --release</code> → <code>test result: ok. 460 passed; 0 failed; 0 ignored</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>5</td><td>clippy <code>-D warnings</code> 零告警（HANDOVER §1、ci.yml:140）</td><td><code>cargo clippy --release -- -D warnings</code> → Finished 无告警</td><td class="ok">✓ 相符</td></tr>
+<tr><td>6</td><td>37 个 Node e2e 测试，v1.1.1 +3（HANDOVER §1）</td><td>源码清点 <code>mod e2e</code> 恰 37 个 <code>#[test]</code>；3 个新测试 <code>e2e_return_inside_for</code>/<code>e2e_try_inside_for</code>/<code>e2e_binder_arm_vs_nullary_scrutinee</code> 在测试输出中全 ok</td><td class="ok">✓ 相符</td></tr>
+<tr><td>7</td><td>eval 116/116 参考解，宿主后端（README:68、HANDOVER §1）</td><td><code>run.ps1 -Verify</code> → <code>Total: 116 / Passed: 116</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>8</td><td>eval 116/116，WASM 后端（同上）</td><td><code>run.ps1 -Verify -Backend wasm</code> → <code>Total: 116 / Passed: 116</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>9</td><td>自举 dump 149/149（HANDOVER §2.2）</td><td><code>verify_selfhost.py</code> → <code>dump: PASS 149 / FAIL 0（Latin-1 折叠等价 0）</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>10</td><td>W：verify --wasm 三段验收（TODO W2、HANDOVER §1 8.4 行）</td><td>实测 <code>wasm-layer2: PASS 146 / FAIL 0</code> + <code>wasm-layer3: PASS</code>（39 条 golden，--stack-size=60000）+ <code>wasm-selfapply: PASS</code> + <code>RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>11</td><td>W：第二层"147 文件 × 5 轮"（TODO W2、HANDOVER §1/§11.0、guide）</td><td>verify 工具实际执行 layer2 为 <strong>146</strong>（stmt_interp 排除、走第三层）；RFC-0003 修订 29 有精确口径"147 文件 × 5 轮稳定 <strong>146/147</strong>（唯一 stmt_interp 走第三层）"，TODO/HANDOVER 为无注简写</td><td class="warn">△ 结果真、简写差 1</td></tr>
+<tr><td>12</td><td>W：三处修复仅 wasm_codegen.rs、零语言面（TODO W2、commit eb0ce7e）</td><td><code>git show eb0ce7e --stat</code>：代码改动仅 wasm_codegen.rs（81 行）+ verify_selfhost.py + 工具/CI/版本簿记；三处修复逐一逻辑推演通过（详见 §3.1）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>13</td><td>W：wasm 层回流 CI（TODO W2、HANDOVER §1）</td><td>ci.yml selfhost job 实有 6 个模式 step，含 <code>Selfhost wasm (8.4 三段验收, v1.1.1 起规模限制解除)</code>（ci.yml:126-127）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>14</td><td>W：WASM_LAYER2_FILES 限内清单废除（TODO W2）</td><td><code>grep WASM_LAYER2 tools/verify_selfhost.py</code> 零命中</td><td class="ok">✓ 相符</td></tr>
+<tr><td>15</td><td>W：RFC-0003 修订 25-29 完整档案（TODO W2）</td><td>docs/rfc/0003 修订 29 存在，含四段验收完整口径；修订 25-28 越界/定位档案在列</td><td class="ok">✓ 相符</td></tr>
+<tr><td>16</td><td>W：tools/wasm_debug/ 工具沉淀（TODO W2）</td><td>目录实有 README.md / dbg_run.mjs / gen_scale.py / heapdiff.py，README 含探针补丁 4 处说明与方法论</td><td class="ok">✓ 相符</td></tr>
+<tr><td>17</td><td>tag v1.1.1 CI 绿后打（TODO W2）</td><td><code>git ls-remote --tags origin</code> → v1.1.1 → edd0c5e（W 收官 docs 提交）；<strong>CI 运行状态本身未验证</strong>（gh CLI 不可用，见 §5）</td><td class="warn">△ tag 属实、CI 状态未验</td></tr>
+<tr><td>18</td><td>L：矩阵 116 任务 × 每任务 10 格（任务书、报告）</td><td>两模型 passk_summary.json 矩阵各恰 116 键（001-117 无 108）、每值长度集合 = {10}</td><td class="ok">✓ 相符</td></tr>
+<tr><td>19</td><td>L：两模型各 1149/1160 通过单元（TODO L2、报告）</td><td>矩阵求和各 = 1149 / 1160</td><td class="ok">✓ 相符</td></tr>
+<tr><td>20</td><td>L：pass@k = 99.1%（无偏估计）（README/HANDOVER/TODO/报告）</td><td><strong>独立复算</strong>（Fraction + 组合数比值展开）：两模型 pass@1 = 0.990517、pass@5 = pass@10 = 0.991379，与 JSON 逐位一致。99.05% 与 99.14% 都舍入为 99.1%（报告正文用 "≈" 且给出 1149/1160 精确值；总览表用 "="，见问题 5）</td><td class="ok">✓ 复算一致</td></tr>
+<tr><td>21</td><td>L：非满分任务 078=0/10、051=9/10（deepseek）/ 104=9/10（glm）（TODO L2）</td><td>矩阵非全真任务：deepseek {051: 1 挂, 078: 10 挂}、glm {078: 10 挂, 104: 1 挂}；s6（deepseek）与 s3（glm）各 114/116 与档案一致</td><td class="ok">✓ 相符</td></tr>
+<tr><td>22</td><td>L：矩阵真实性（评分器 run.ps1 事实源）</td><td>实跑抽查 5 个单元全吻合：deepseek s6/051 rc=1（FAIL）、s1/051 rc=0 输出与 expected 逐字（PASS）、s1/078 rc=0 但 stdout=<code>boot</code> 丢时间戳（FAIL）、glm s3/104 rc=1（FAIL）、s1/104 rc=0 输出 55/5050（PASS）；另 glm s5/078 输出 <code>[1700000000] boot</code> 自创格式（报告失败形态三类的实例）</td><td class="ok">✓ 5/5 吻合</td></tr>
+<tr><td>23</td><td>L：raw 留档每模型 100 个、200 全留档（TODO L1、报告）</td><td><code>ls */raw | wc -l</code>：deepseek = 100、glm = 100</td><td class="ok">✓ 相符</td></tr>
+<tr><td>24</td><td>L：run_meta temperature=1.0、samples=10（任务书、报告）</td><td>两目录 run_meta.json 实测：deepseek {temperature: 1.0, thinking: true, samples: 10, max_tokens: 16384}、glm {temperature: 1.0, thinking: false, samples: 10}；stats 100 键全 extracted=expected、missing=[]</td><td class="ok">✓ 相符</td></tr>
+<tr><td>25</td><td>L：error_repair 200/200（TODO L2、报告）</td><td>矩阵复算：两模型 error_repair 分类 20 任务 × 10 全 true（by_category = 100/100/100）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>26</td><td>L：分类汇总（报告按分类表）</td><td>JSON by_category 与报告表逐格一致（deepseek match_enum 99.4/100/100、effects 80/80/80；glm control_flow 99.23/100/100 报告写 99.2）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>27</td><td>M1：三文档 81 块全绿 = 正例 51 + 反例 5 + skip 25（TODO M1）</td><td><code>spec_examples_check.py</code> → <code>分类：正例 51 / 反例 5 / skip(json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1) / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>28</td><td>M1：skip 仅用于非 Lom 代码块（TODO M1 纪律）</td><td><strong>25 个 skip 块逐块提取核查</strong>：json 8 = lom-diag/lom-info/lom-fix/lom-apply/lom-eval JSON schema 与任务 JSON 示例；diag 1 = 诊断输出示例；marker 10 = 概念性内建枚举重定义 ×2、lom info 终端输出、诊断消息文本、eval 目录树、tutorial 架构图/解析链/执行流程/Rust 代码/TOML；ebnf 4 = 产生式语法；keywords 1 = 20 保留字表；cli 1 = lom 命令列表。<strong>全部正当，无吞真代码块</strong></td><td class="ok">✓ 25/25 正当</td></tr>
+<tr><td>29</td><td>M1：7 处存量腐坏修复（TODO M1）</td><td><code>git show 30059c7</code> 逐条对应：§2.4.1 管道补 <code>from string import {trim, upper}</code>、§10.4 补 <code>from math import {sqrt}</code>、§6.7 效应签名补体（print→print_msg）、type alias/trait/pub 三处补 "❌ Do not write"（各附 PARSE001 verified）、tutorial L425 嵌套 fn → 闭包字面量 + MUT002 旁注</td><td class="ok">✓ 7/7 对账</td></tr>
+<tr><td>30</td><td>M1：教程闭包修复的双向行为（TODO M1："教非法语法"→合法）</td><td>实测旧形态（嵌套具名 fn）→ <code>[PARSE001] 期望 '('，得到 标识符 'step'</code>（实锤修复前教非法语法）；新形态（闭包字面量）→ rc=0 + 2 条 MUT002 警告（与新增教学旁注逐字对应）</td><td class="ok">✓ 双向实测</td></tr>
+<tr><td>31</td><td>M2：NAM004 定位变体名 token 非 (0,0)（TODO M2）</td><td>实测 <code>Circl(r)</code> 对 Circle 枚举 → <code>[NAM004] (4:9)</code> + hint "是否想用 'Circle'？"（4:9 = 变体名 token 起始）；源码级测试 nam004_variant_diag_locates_name_token 断言 (8,9)（其测试文件行号）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>32</td><td>M2：fix --plan 单点替换（TODO M2："replace at 5:9..5:14"）</td><td>实测 <code>replace at 4:9..4:14 text="Circle"</code>（4:9+5 字符 = 4:14，单点精确；TODO 行号差异系其测试文件构造不同）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>33</td><td>M2：无参变体拼错不触发 NAM004（TODO M2 已知边界）</td><td>实测 <code>Grean</code>（无参）→ 无 NAM004，仅 MAT001 穷尽警告——与档案"parser 层就是 Binder 模式"的如实记录一致</td><td class="ok">✓ 如实</td></tr>
+<tr><td>34</td><td>M3：8 对语料 plan 行为与档案表格逐条一致（TODO M3 表）</td><td>8 个 bad 文件实跑 <code>fix --plan</code>：01 insert 6:22 ")" High、02 delete @ High、03 insert 引号 High + low 语法提示（钉已知限制）、04 replace cont→count Medium、05 insert <code>Err(_) =&gt; ()</code> High、06 insert 5:34 ", Clock" High、07 insert 3:28 "\nend\n" Medium、08 replace 3:15..3:17 "x" Medium——8/8 与表格一致</td><td class="ok">✓ 8/8 一致</td></tr>
+<tr><td>35</td><td>M3：fixed 文件由 --apply 实跑产出、05/06 逐字一致（TODO M3）</td><td>对 8 个 bad 的临时副本跑 <code>fix --apply</code>，产物与 fixed 文件 <strong>8/8 diff 逐字一致</strong>（语料原文件未动）；07/08 实测 fixed==bad（钉 Medium 不应用语义，对齐 04 既有设计）</td><td class="ok">✓ 8/8 逐字</td></tr>
+<tr><td>36</td><td>M3：fix_corpus_end_to_end 测试 8/8（TODO M3）</td><td>src/main.rs:1352 测试遍历全部 .bad.lom 经 apply_iterative 后 CRLF→LF 归一化逐字比对（含 fdfddb9 的 CI #74 行尾事故防线）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>37</td><td>doc_audit 16/16（HANDOVER §2.2）</td><td><code>python tools/doc_audit.py</code> → <code>RESULT: PASS（16/16 项通过）</code>（真值行：eval 116 / dump 149 / 拆分 36=29+4+2+1 / self_interp 5703 行 / 版本 1.1.1）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>38</td><td>W/L/M 收官文档同步（TODO 三包"文档同步"条目）</td><td>HANDOVER 顶部横幅（L12 含 W/L/M 三段）/§1 8.4 行/§11.0 重写 ✓；TODO 三包证据区 ✓；guide L1072/1073/1074 三条目 + L1066 后注 ✓；README 横幅 v1.1.1 行（L8）✓、LLM 三层证据行（L68）✓；LANGUAGE_SPEC §13 v1.1.1 条目 ✓；eval/README pass@k 段（L119）✓。<strong>例外三处见问题 1-3</strong></td><td class="warn">△ 大体齐、三处漏</td></tr>
+</table>
+
+<p class="small">矩阵 38 项：34 项完全相符、3 项"结果真但表述/计数有口径差"（#11/#17/#38）、1 项复算完全一致但舍入表述有备注（#20）。无一项硬指标失败。</p>
+
+<h2>3. 专项审查</h2>
+
+<h3>3.1 W 工作包：三处 wasm 修复的逻辑推演（git show eb0ce7e）</h3>
+<p>① <strong>emit_variant_test idx 读 tag 守卫</strong>（src/wasm_codegen.rs:957 起）：旧实现把 <code>tag==6</code> 与 <code>i32.load(s&gt;&gt;4)</code> 两个操作数先后压栈再 AND——WASM 栈机急切求值，load 无条件执行，非枚举 scrutinee（大 Int）的 &gt;&gt;4 是野地址即 OOB。新实现 <code>tag==6 → if (result i32) { load idx } else { -1 }</code> 后与 vidx 比较——tag 不符给 -1（变体索引为小非负整数，-1 不可能命中），语义等价且无盲读。<strong>推演成立</strong>。</p>
+<p>② <strong>Pattern::Variant 载荷提取推迟</strong>（同文件 :931 起）：旧实现把 <code>i64.load(s&gt;&gt;4 + 8+8k)</code> 与臂测试平铺 AND，0 参枚举（仅 8 字节头对象）贴线性内存末尾时 +8 载荷读越界——这正是 8.4 挂账的 tok_disc 野值真相。新实现：emit_variant_test 结果留栈作条件，<code>if (result i32)</code> 内做载荷提取 + 子模式 AND 链（first 标志保证首项不加 AND），else 给 0；<code>sub.is_empty()</code>（无参 Binder 臂）时不生成 if、仅留 variant_test 结果。<strong>推演成立</strong>；配套 e2e 测试 <code>e2e_binder_arm_vs_nullary_scrutinee</code> 锁定 0 参 scrutinee 落臂语义（实测输出 0/7）。</p>
+<p>③ <strong>Stmt::For 三个分派 if 补 Label::If</strong>（同文件 :1110/:1142/:1176）：for 体编译在 Int/Str/List 三个分派 if 之内，br $ret 的深度按 label 栈计算——分派 if 未入栈则 for 体内 return/? 的 br 深度少算 2-3 层、提前返回被静默吞掉（v0.12.0/7.6 起潜伏）。修复为三个分派 if 各 push、end 后各 pop，压弹严格对称（else 分支共享所属 if 的 label，无需额外压）。<strong>推演成立</strong>；配套 <code>e2e_return_inside_for</code>（期望 2/7）与 <code>e2e_try_inside_for</code>（期望 err: boom）实测通过。</p>
+
+<h3>3.2 L 工作包：pass@k 数学的独立复算</h3>
+<p>用 Python <code>fractions.Fraction</code> + <code>math.comb</code> 对两模型矩阵独立重算（不复用 passk_summarize.py 代码路径）：逐任务 <code>1 - C(10-c,k)/C(10,k)</code> 求和取平均，k∈{1,5,10}——两模型均为 pass@1 = 1149/1160 = 0.990517、pass@5 = pass@10 = 115/116 = 0.991379（051/104 的 c=9 在 k=5 时 C(1,5)=0 估 1，仅 pass@1 承受该单元的 9/10），与 JSON 的 overall 逐位一致。分类值（effects 0.8、match_enum 0.99375、control_flow 0.9923 等）亦复算吻合。断点续跑与重试修复（e51ad54：http.client.HTTPException + ConnectionError 进重试分支——RemoteDisconnected/IncompleteRead 确非 URLError 子类）经代码审查正确；<strong>live 断点续跑行为未实测</strong>（需 API key，见 §5）。</p>
+
+<h3>3.3 新代码质量</h3>
+<p><strong>eval/passk_summarize.py</strong>（192 行）：公式实现用乘积展开 <code>prod(n-c-i)/(n-i)</code> 等价于组合数比值，整数精确；n-c&lt;k 早退 1 正确（全失败槽不足 k 个必有通过）；k 越界双拦（函数内 + main）；run.ps1 退出码 0/1 均视为正常终局、其余报错；局部采集（--only）覆盖不齐降级为警告 + 缺失计不通过（矩阵仍保 n 格）；显式 encoding="utf-8"（HANDOVER §3.3 家族坑防御到位）。质量良好。</p>
+<p><strong>eval/llm_eval.py 改动</strong>（6c94d61 + e51ad54）：--samples 布局向后兼容（samples=1 保持旧目录形态）；断点续跑"raw 已存在跳过调用、提取仍执行"的设计正确（提取器修复后可零成本重提）；--from-raw 兼容两种 raw 命名；stats 键用 raw 文件名保持 run_meta 审计粒度。轻微备注：续跑时 run_meta 的参数取当前命令行（而非 raw 留档时点），实践上同参数续跑无影响、且报告已如实披露起止时间的续跑覆盖语义——不构成问题。</p>
+<p><strong>tools/spec_examples_check.py 扩展</strong>（30059c7）：HTML &lt;pre&gt; 提取（实体反转+剥标签）正确；三条机械 skip 规则本轮 25 例无一误触。潜在健壮性缺口见问题 6。</p>
+
+<h2>4. 问题清单（按优先级）</h2>
+
+<h3><span class="tag p0">P0</span> 无</h3>
+
+<h3><span class="tag p1">P1</span> 无</h3>
+
+<h3><span class="tag p2">P2</span> 文档腐坏（2 条）</h3>
+
+<ol>
+<li>
+<p><strong>README.md:154 — "pass@k … remain open" 与同文件 pass@k 完成段直接矛盾（现值失实）</strong></p>
+<p>"What is Lom" 第 1 条末尾写 <em>"still single-run sampling — pass@k and cross-language control groups remain open, stated as such"</em>。但 pass@k 已于 2026-09-07 完成（L 工作包收官），且同一文件 L68 已有完整的 "pass@k retest (2026-09-07): 2 models × 10 samples … pass@1 = pass@5 = pass@10 = 99.1%" 段落。读者读到 L154 会得出"pass@k 还没做"的错误结论——这是项目自我定义的"诚实挂账"话术变成了旧话。跨语言对照组确实仍挂账（另立项），但 pass@k 部分必须改口（如 "pass@k done 2026-09-07; cross-language control group remains open"）。L 工作包的文档同步清单（TODO L2："README 现状段…同步"）漏掉了这一处——同步了 L68 现状段、漏了 L154 叙述段。</p>
+<p class="small">证据：README.md:154 原文 vs README.md:68（同文件）；eval/REPORT-2026-09-07-passk.md 全文；TODO.md L2 证据区。</p>
+</li>
+<li>
+<p><strong>README.md:68 — "5-mode self-hosting gate" 计数陈旧（CI 实为 6 模式）</strong></p>
+<p>README 现值状态段末尾写 <em>"CI is green on 3 platforms with a 5-mode self-hosting gate (dump/tokens/diags/static/run)"</em>。v1.1.1 起 selfhost job 新增 wasm step，ci.yml 实有 6 个模式 step（:116-127：dump/tokens/diags/static/run/wasm）。W 工作包自身的档案（TODO W2"wasm 层回流 CI"、HANDOVER §11.0）与 README 横幅（L8"re-enters CI"）都已正确记录，唯独同一条状态行的 gate 计数没跟上。属"同文件横幅已正确、正文旧值未同步"型腐坏（与 M2 顺手修掉的 README 456→460 同类，但漏网）。</p>
+<p class="small">证据：README.md:68 vs .github/workflows/ci.yml:116-127。</p>
+</li>
+</ol>
+
+<h3><span class="tag p3">P3</span> 建议 / 轻微口径（4 条）</h3>
+
+<ol start="3">
+<li>
+<p><strong>README.md:140 + :135 — 8.4 旧条目（◐ partial / OOB unlocated / "CI covers five stable modes"）未加"已根治"后注</strong></p>
+<p>Phase 8 详情列表的 ◐ 8.4 条目仍描述"unlocated nondeterministic OOB (&gt;~6.7KB) … deep-dive deferred to the post-1.0 ledger. CI selfhost gate covers the five stable modes instead"，且 L135 标题 "Phase 8 — complete 2026-09-02"。8.4 已于 v1.1.1 改判完成（顶部横幅 L8 正确）。项目对此类条目有既定先例——README:127 的 M1 条目带 "**superseded by Phase 3.2b (v0.21.0)**" 后注、guide L1066 的 8.4 条目带"后记：越界挂账于 2026-09-07 W 工作包根治"——README 侧这条恰恰缺同款后注，而它含有对 CI 现状的陈述（"covers five modes"），不纯是历史快照。建议补一句 superseded 后注（否则新读者扫 changelog 会以为 OOB 仍挂账）。</p>
+<p class="small">证据：README.md:135/140 vs README.md:8；先例 README.md:127、docs/lom-project-guide.html:1066。</p>
+</li>
+<li>
+<p><strong>"第二层全量 147 文件"简写与工具实测 146 的口径差（TODO/HANDOVER/guide 三处）</strong></p>
+<p>TODO.md:332、HANDOVER.md:44/400、guide 1072 均写"147 文件 × 5 轮稳定"；verify_selfhost --wasm 的 layer2 实际执行并输出 <code>PASS 146 / FAIL 0</code>（脚本显式排除 stmt_interp——它走第三层，verify_selfhost.py:421）。RFC-0003 修订 29 的原始口径是精确的（"147 文件 × 5 轮稳定 <strong>146/147</strong>（唯一 stmt_interp 走第三层）"），三份下游文档简写时丢了"146/147"注。数字不假（147 = 29 examples + 4 bootstrap − 2 豁免 + 116 参考解，stmt_interp 的验收由第三层承担），但按"逐字对账"标准，简写应保留例外注。</p>
+<p class="small">证据：tools/verify_selfhost.py:415-445（排除逻辑）+ 实测输出 vs docs/rfc/0003:49（修订 29 精确口径）。</p>
+</li>
+<li>
+<p><strong>pass@1 = 99.05% 与 pass@5/10 = 99.14% 在总览表合并为 "= 99.1%"</strong></p>
+<p>README:68、eval/README:119、TODO L2、HANDOVER §1、报告总览表均写"pass@1 = pass@5 = pass@10 = 99.1%"。实测 pass@1 = 0.990517（99.05%）、pass@5 = pass@10 = 0.991379（99.14%）——两者并不相等，"=" 依赖对 99.05% 的一位小数舍入（常规四舍五入成立）。报告正文行 19 用了 "≈"、且全链给出 1149/1160 精确分子分母可复算（本人已复算一致），信息不丢失；但总览表的 "=" 形态在最显眼处抹平了 pass@1 与 pass@5 的差异。建议总览表给两位小数（99.05 / 99.14 / 99.14）或加舍入脚注。</p>
+<p class="small">证据：passk_summary.json overall 值 0.990517/0.991379 vs 各文档 "= 99.1%" 表述；eval/REPORT-2026-09-07-passk.md:14-19。</p>
+</li>
+<li>
+<p><strong>spec_examples_check.py 的 is_ebnf 规则存在未来误吞真代码的通道</strong></p>
+<p>EBNF 判定 = 首行匹配 <code>^[a-z_][a-z0-9_]*\s*=\s*\S</code> 且正文含 <code>{ " | ;</code> 任一字符（spec_examples_check.py:125-131）。一个真实的 Lom 片段若首行恰为小写变量赋值且含字符串/分号（如教学片段 <code>x = "hello"</code> 单行块，或含 <code>|</code> 的表达式），会被静默 skip-ebnf 而非实测——这是"文档不撒谎"gate 的潜在绕过通道。本轮 25 个 skip 已逐一人工核查无误触（当前三文档的代码块均以 fn/enum/from 或语句形态开头，未命中），故仅为风险而非现行失实。建议：skip-ebnf 的输出行附块首行摘要（人工审计成本降为零），或收紧特征（如要求 RHS 以 <code>;</code> 结尾 / 首行含 <code>"</code> 包裹的终结符序列）。</p>
+<p class="small">证据：tools/spec_examples_check.py:125-131 规则定义 + 本人对 25 个 skip 块的逐一提取核查（全部正当）。</p>
+</li>
+</ol>
+
+<h2>5. 方法局限声明</h2>
+<ul>
+<li><strong>CI 运行状态未直接验证</strong>：任务书称 CI #76 全绿，但本环境无 gh CLI、GitHub API 未认证——CI 结论以 ci.yml 配置审查 + tag v1.1.1 远端存在性（git ls-remote 实查 → edd0c5e）替代。"edd0c5e run #34058172473 全绿"（TODO W2 登记）与"CI #75 复绿 / #76"（TODO M3）为<strong>未验证项</strong>。</li>
+<li><strong>llm_eval.py 的 live 采集/断点续跑未实测</strong>：需要有效 API key（采集属消耗性操作）。以 e51ad54/6c94d61 的 diff 审查 + run_meta/stats 留档一致性（100 键全 extracted=expected）+ 报告披露的两次断连事件记录替代。L1 的"1160/1160 提取零缺失"经留档复核为真，但 200 个 raw 的内容真实性（确系模型原始回复）无法从本地复核。</li>
+<li><strong>W0/W1 的过程性数据（探针日志 13,417/25,757 条、野值现场 0x2fff46、argv0 阈值 22/23、指令偏移 0x776d 等）未复现</strong>：这些是一次性调试现场，探针已随修复回滚（tools/wasm_debug/README 有复现补丁说明）。本轮验证的是其结论的可复现面（三段验收 + 147 档解除后的全量绿 + e2e 锁定），根因推演经 diff 逻辑审查采信。</li>
+<li><strong>三处修复的深层等价性</strong>：除实测与 e2e 外，未做修复前后 wasm 字节码的全量 diff 推演（147 文件 × 双载体逐字输出一致已是更强的行为级证据）。</li>
+<li><strong>报告基线</strong>：审查执行于 2026-09-07，HEAD = 7281936。fix_corpus --apply 实跑在 _review_tmp/ 临时副本上进行（评测后删除），eval 语料原文件未动、工作区保持干净（git status 验证）。</li>
+</ul>
+
+<hr>
+<p class="small">审查方法对齐项目纪律：逐条给证据（文件:行号 + 命令输出）；所有实测数字来自真实命令执行；优先级口径 P0 失实宣称 / P1 真 bug / P2 文档腐坏 / P3 建议。上轮报告：<a href="review-2026-09-05.html">review-2026-09-05.html</a>（A-）、<a href="review-2026-09-03.html">review-2026-09-03.html</a>、<a href="review-2026-08-31.html">review-2026-08-31.html</a>（B+）。</p>
+
+</div>
+</body>
+</html>
