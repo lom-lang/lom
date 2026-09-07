@@ -33,6 +33,7 @@
 
 import argparse
 import datetime
+import http.client
 import json
 import os
 import re
@@ -144,9 +145,13 @@ def call_api(base_url: str, key: str, model: str, prompt: str,
                 time.sleep(wait)
             else:
                 sys.exit(f"API 错误 HTTP {e.code}: {detail}")
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError,
+                http.client.HTTPException, ConnectionError) as e:
+            # HTTPException/ConnectionError 覆盖 RemoteDisconnected 等服务端断连
+            # （2026-09-07 L1 实测踩到：RemoteDisconnected 不是 URLError 子类，
+            # 原始 catch 列表漏掉它会导致 75/100 时点整个进程崩溃退出）
             if attempt < retries:
-                print(f"  网络错误 {e}，10s 后重试...", file=sys.stderr)
+                print(f"  网络/连接错误 {type(e).__name__}，10s 后重试...", file=sys.stderr)
                 time.sleep(10)
             else:
                 sys.exit(f"网络错误: {e}")
