@@ -4,10 +4,80 @@
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——W 工作包已收官
-> （2026-09-07，v1.1.1，见下档案）。R1-R8 与 T1-T7 均已关闭（档案保留下文）。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：L 工作包（LLM 复测
+> 升级 pass@k，2026-09-07 开立，见下）。W 工作包已收官（2026-09-07，v1.1.1，见下档案）。
+> R1-R8 与 T1-T7 均已关闭（档案保留下文）。
 > **纪律**：语言面冻结（LANGUAGE_SPEC §14）不破——只允许新增 warning 级诊断码；
 > 其余行为修复均为 bug 修复性质且不动语法/保留字/内建表。
+
+## L 工作包：LLM 复测升级 pass@k（2026-09-07 开立，进行中）
+
+**目标**：把"LLM 写 Lom"证据链从单采样升级为多采样 pass@k，关闭上轮复测
+（REPORT-2026-08-31-multimodel.md）诚实挂账第一条（**单采样**）；评测集从 113
+升到现行 116 任务（115-117 三任务的首次 LLM 实测）。
+
+**用户裁决（2026-09-07）**：2 模型（deepseek-v4-pro+thinking / glm-5.3 Coding Plan
+端点）× **10 采样** × temperature=1.0，报告 pass@1 / pass@5 / pass@10（无偏估计）；
+跨语言对照组（挂账第二条）**另立项，本包不含**。API 走 eval/.api_keys.json 已配置 key。
+
+### L0｜管线升级（纯本地改造，零 API 成本）✅ done 2026-09-07
+
+- `eval/llm_eval.py` 加 `--samples N`：每分类 prompt 调用 N 次，raw 留档
+  `raw/<cat>_s<k>.md`，候选写 `s<k>/<id>.lom` 子目录；不带 `--samples` 时行为
+  与现状完全一致（向后兼容）。
+- **断点续跑**：某采样的 raw 文件已存在即跳过该次调用（10 采样长跑必然中断，零成本恢复）。
+- 新 `eval/passk_summarize.py`：驱动 run.ps1 逐采样评分（评分事实源不二设）→
+  逐任务通过矩阵 → pass@k 无偏估计（HumanEval 式 `1 - C(n-c,k)/C(n,k)`，
+  整数运算）+ 分类汇总。
+- 验收：`--from-raw` 对上轮四模型存量目录复算零行为变化；`--samples 2 --only
+  <单分类>` 端到端实测通过。
+
+**L0 证据区（2026-09-07 实测）**：
+
+- 公式对账：pass_at_k 已知值全对（n=10 c=2 k=5 = 0.7778 = 1−C(8,5)/C(10,5)
+  手算双验证；Fraction 整数精确无浮点漂移）。
+- passk_summarize 端到端（零 API 成本的假双采样目录：s1=上轮 glm-4.7 候选、
+  s2=上轮 v4-pro 候选）：s1=112/116、s2=113/116 与上轮报告一致；078 = 1/2
+  （glm 挂 pro 过，吻合）；115/116/117 = 0/2（上轮候选是 113 任务集时代产物，
+  MISSING 计不通过的正确语义）；总体 pass@1 = 97.0%（112.5/116 手算吻合）、
+  pass@2 = 97.4%（113/116 吻合）。
+- `--from-raw` 兼容：deepseek-v4-pro 存量目录重提取 113/116（缺 115-117 为
+  上述同因），113 个候选文件前后 md5 逐字节一致（幂等）。
+- live 冒烟（glm-5.3 Coding Plan 端点，--samples 2 --only 08_effects）：
+  raw/08_effects_s1.md + _s2.md、s1//s2/ 各 5 候选、run_meta 记录 samples=2；
+  passk_summarize 评分联调通过（局部采集警告路径正确）；同命令重跑断点续跑
+  "跳过已有调用 2 次"零 API 消耗。
+- 过程坑（留档）：① Python subprocess 读 PowerShell 输出须显式
+  `encoding="utf-8"`（默认 GBK 解码直接 UnicodeDecodeError，§3.3 家族坑）；
+  ② **Read 工具显示会吞 f-string 的闭合花括号**（§3.1 坑新变体：git 原版
+  `{len(want.get(cat, []))}"` 显示为 `{len(want.get(cat, []))"`）——转抄长段
+  代码必须 git diff 逐行核对。
+- key 状态：上轮两个 key 均已失效（deepseek `****a34f invalid` / glm 401），
+  用户当日更新后双端点复通（deepseek 标准端点 + glm Coding Plan 端点）。
+
+### L1｜正式采集（2 模型 × 10 采样 × 116 任务）⏳
+
+- deepseek-v4-pro --thinking、glm-5.3（glm-coding 端点）各 10 采样；
+  全部参数（温度/采样数/起止时间/逐分类统计）记录 run_meta.json。
+- 预计每模型 100 次大 prompt 调用，thinking 模式总时长可能数小时——后台跑 +
+  断点续跑，严禁虚构：所有数字来自实测留档。
+
+### L2｜评分汇总 + 报告 + 文档同步 ✅/⏳
+
+- passk_summarize 全量评分 → 新报告 eval/REPORT-<日期>-passk.md（总览/分类/
+  pass@k 表/失败分析/方法论与偏差如实记录）。
+- 文档同步：README 现状段、HANDOVER §1 LLM 实测行、guide 条目、eval/README
+  （如涉及计数）；**改计数必须跑 tools/doc_audit.py**。
+- feat + docs 成对提交，推送后看 CI 首跑；若用户可见行为无变化则无需升版
+  （纯 eval 侧管线与报告，语言面零变化）。
+
+### 纪律
+
+顺序工作；严禁虚构数据（所有通过率/统计来自 run.ps1 实测与 raw 留档）；
+每阶段完成在本文件标进度附证据；完成后自行提交推送（conventional commits）
+并看 CI 首跑——维护会话随后独立复核。
+
+---
 
 ## W 工作包：wasm 越界深挖（2026-09-05 开立 → 2026-09-07 收官，v1.1.1）✅ done
 
