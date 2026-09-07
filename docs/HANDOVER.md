@@ -88,7 +88,7 @@ cargo test --release                                    # 期望 463/463（2026-
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 116/116（2026-09-03 起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 149/149（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
 python tools\spec_examples_check.py                     # R7 对账：SPEC_FOR_AI 示例实测（正例解析/导入/运行三层，反例必产诊断）
-python tools\doc_audit.py                               # R8 对账：文档数字 16 项（eval 总数/dump 计数/.lom 拆分/行数/版本）——两者已在 CI doc-gates job 常驻
+python tools\doc_audit.py                               # 对账：文档数字 19 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3）——两者已在 CI doc-gates job 常驻
 ```
 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
