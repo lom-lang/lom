@@ -9,7 +9,7 @@
 > - [docs/TODO.md](TODO.md) — **整改待办台账**（跨会话待办唯一事实源；含审查裁决的驳回/挂起登记）
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-09-07（**M 工作包收官——三线优化**：①示例对账三文档化（SPEC_FOR_AI + LANGUAGE_SPEC + tutorial，存量腐坏 7 处实测修复——含 tutorial 闭包教学教非法嵌套 fn；"文档不撒谎"机器 gate 覆盖全部三份面向 LLM/用户的文档）；②Pattern span 补齐（NAM004 变体版离开 (0,0)，fix 单点精确替换——3.2b 最后一个定位死角关闭，挂账移除）；③fix_corpus 4→8 对覆盖全部有动作修复规则族。全部零语言面、不升版，460/460。同日早些：**L 工作包收官——LLM 复测升级 pass@k**：管线升级（llm_eval.py --samples 断点续跑 + 新 eval/passk_summarize.py 无偏估计）；deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × 116 任务 × temperature=1.0，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**，唯一系统性失败仍是 078 歧义锚点（0/10）；报告 eval/REPORT-2026-09-07-passk.md，档案 docs/TODO.md。此前同日：**v1.1.1：W 工作包收官——8.4 wasm 越界挂账根治 + 顺带抓获第二个潜伏 bug（for 体内 return/? 被吞）**：堆布局敏感性定性（argv[0] 长度一字节翻转触发）→ 语义图 diff 证全堆干净 → 野值现场探针抓到真相（0 参枚举贴内存尾 + 变体臂急切载荷读越界）；修复仅 wasm_codegen.rs 三处（零语言面）；8.4 就此改判**完成**——第三层 golden（39 条逐字）与自施加（wasm 自举解析自身 5703 行 dump 655,890B 逐字）达成、wasm 层回流 CI；工具沉淀 tools/wasm_debug/；完整档案 RFC-0003 修订 25-29。此前：第二轮审查整改 R1-R8 全部完成（docs/reviews/review-2026-09-05.html）。v1.1.0：第一轮整改 T1-T7。v1.0.0：语言面冻结。**语言面变更须新 RFC 解冻**。交接必读 RFC-0003 修订记录 + §1 快照 + §11 + docs/TODO.md）
+> 最后更新：2026-09-08（**v1.1.2 交接就绪**。本维护周期收官链：**M 工作包**三线优化（示例对账三文档化——存量腐坏 7 处实测修复含 tutorial 教非法嵌套 fn；Pattern::Variant 带 name_span——NAM004 变体版离开 (0,0)；fix_corpus 4→8 对）；**第三轮独立审查 A + 整改 R9-R14**（docs/reviews/review-2026-09-07.html；轨迹 B+→A-→A）；**N 工作包**（N1 递归深度守卫 80k——深递归产结构化诊断非崩溃；N2 Latin-1 挂账调查关闭——过时认知零代码改动；N3 changelog 对账进 doc_audit）；**Q 工作包**（Q1 覆盖率测量 84.4% 下界+盲区分型+补测；Q2 main/typechecker 双拆分全文件可整读；Q3 parser 30k+json 100k 守卫——SECURITY 限制 1 关闭，全部递归入口结构化失败；Q4 任务 118/119+fuzz 常态化进 CI+doc_audit 22 项）；**AB-DE 尾巴**（Q3 性能账噪声带内；深度守卫双后端文档涟漪 §11f 第 6 条；**078/118 歧义对照实测——歧义版 1/10 vs 明确版 10/10，损失 90pp**；覆盖复测 84.44%）。升版 **v1.1.2**（稳健性 patch：崩溃→结构化诊断，零新码零语言面）。**CI #90-92 三连红事故已修复落档**（staged 复核/heredoc 转义/首跑纪律三教训，§11）。**用户裁决在案**：发布线冻结（优化到完美前不发布）、L2 自举与差分测试待令立项、第四轮审查待令。交接必读：§1 快照 + §2.2 + §9 + §11 + docs/TODO.md 全档）
 
 ---
 
@@ -32,7 +32,7 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.1.2**（Cargo.toml/lock 一致，2026-09-07 W 工作包升版：wasm 后端两处 codegen bug 修复——变体臂急切载荷读越界（8.4 挂账根治）+ for 体内 return/? 被吞；tag 在 CI 绿后打；历史 tag：v0.5.1-v0.27.0） |
+| 版本 | **v1.1.2**（Cargo.toml/lock 一致，2026-09-08 升版：稳健性 patch——N1 求值递归守卫 80k + Q3 parser 30k/json 100k 守卫，深递归/深嵌套从崩溃改结构化诊断（复用 RUNTIME000/PARSE000 零新码零语言面）；同期行为中性变更见 spec §13 v1.1.2 条目；tag 在 CI 绿后打；历史 tag：v0.5.1-v1.1.1） |
 | Rust 测试 | **473/473 通过**（N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **118/118**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；**118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）**，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
@@ -45,8 +45,8 @@
 | **v0.27.0 json 裁决** | **完成（2026-09-02，RFC-0003 修订 24）**：语言面 42→43（`string.char_from_code`，唯一新增；`type_of` 不加——自实现路线不需要）。宿主+WASM+自举三实现齐；self_interp.lom Part H（~340 行）json_parse/json_stringify 自实现（字符式递归下降 + 11 变体镜像 stringify）；`args` argv 透传；verify `--run` 模式 31/31（json_demo/todo 豁免解除，todo 走 Latin-1 折叠）；eval 任务 115；runner UTF-8 捕获修复。修订 18 的 json 挂账关闭 |
 | **第二轮审查** | **审查完成 + 整改 R1-R8 完成（2026-09-05，A-，无 P0）**：独立审查 agent 报告 docs/reviews/review-2026-09-05.html（基线 470670d）——硬指标全部实测复现（36 项验证矩阵）；发现 1×P1 + 6×P2 + 6×P3 文档腐坏，全部经维护会话亲手复现证实。**R1-R8 已全部执行关闭**（docs/TODO.md 档案）：R1 type alias 假特性→反例；R2 sin/cos+MUT001 措辞+pub 标注；R3/R4 spec §12 与 eval/README 旧计数；R5 README 拆分+v1.1.0 横幅；R6 ci.yml 149；R7/R8 对账工具双件（tools/spec_examples_check.py 34 块三层断言 + tools/doc_audit.py 16 项数字对账）+ CI doc-gates job——**R7 调查中额外抓出第三个假特性：记录字段赋值 `p.x = 5` 从未实现（parser 赋值目标只认普通变量，实测 PARSE000），SPEC_FOR_AI §5 与 LANGUAGE_SPEC §6.2 双修为如实口径**。"喂给 LLM 的文档"与"文档数字"自此从人工清扫升级为机器 gate |
 | **第三轮审查** | **完成 + 整改 R9-R14 关闭（2026-09-07，总评 A，无 P0/P1）**：独立审查 agent 报告 docs/reviews/review-2026-09-07.html（基线 7281936，覆盖 W/L/M 三工作包变更面）——硬指标 38 项矩阵实测 34 项全符 + 4 项表述精度差；pass@k 无偏公式独立复算逐位一致、fix_corpus 8/8 逐字、25 个 skip 逐块核查无误吞。6 条发现（P2×2：README pass@k 矛盾 + 5-mode 陈旧；P3×4：8.4 后注/147 口径注/舍入注/skip 摘要）全部采纳关闭。**审查轨迹：B+（08-31）→ A-（09-05）→ A（09-07）** |
-| 下一步 | **无活跃工作包——方向菜单（与用户共同裁决后立项，立项登记 docs/TODO.md）**：① 工程线：L2 自举编译器（char_from_code 已解锁；8.4 三层自证 + tools/wasm_debug/ 是其基建；phase 级工作量）、Pattern 无 span、栈溢出结构化诊断、包注册中心/调试器/概率类型；② 主张线剩余：**跨语言对照组**（同任务 Python/JS 生成对比——L 工作包时用户已裁决另立项；llm_eval.py/passk_summarize.py 管线现成可复用）；③ 北极星线：发布动作——**用户 2026-09-07 裁决冻结：技术强迫症，优化到完美之前绝对不发布**（GitHub Releases/Pages/对外宣布全部后置到用户主动解冻；"第三方生产使用"是长期北极星，明确不作门禁）。历史工作包档案见 docs/TODO.md（L 工作包 pass@k 复测 2026-09-07 收官） |
-| 遗留挂账 | （栈溢出结构化诊断已于 N1 关闭——求值侧函数/闭包递归 80k 软上限；parser 侧深嵌套仍无守卫，SECURITY 限制 1）；包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已落地解锁）；（自举诊断消息 Latin-1 化已于 N2 调查关闭——2026-09-07 实测 v1.0.0 lexer 修复的涟漪实际已覆盖诊断侧：9 坏文件 8 条 LEX/PARSE 消息 + 构造含 '汉' 的 LEX005 消息均逐字一致、折叠零命中；折叠逻辑保留为防御网，对齐 dump 模式口径）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵ 层，verify --wasm 第三层/自施加已内置 60000） |
+| 下一步 | **无活跃工作包——方向菜单（与用户共同裁决后立项，立项登记 docs/TODO.md）**：① **双后端差分测试（旗舰待令）**：程序生成器→双后端对拍→白名单外差异即新发现——针对 W 包 for-return 潜伏 7 版本的事故模式，发布解冻前最有分量的语义对齐证据（§11f 已知分歧 6 条作白名单底册）；② 第四轮独立审查（时机成熟：第三轮基线后已积累 N/Q 两包变更，轨迹 B+→A-→A）；③ 工程线：L2 自举编译器（远大志愿）；④ 北极星线：发布动作——**用户 2026-09-07 裁决冻结：技术强迫症，优化到完美前绝对不发布**（全部后置到用户主动解冻）。历史工作包档案见 docs/TODO.md（M/N/Q/L/W 均已收官） |
+| 遗留挂账 | （已关闭：栈溢出诊断 N1+Q3、Pattern span M2、Latin-1 化 N2 调查关闭）剩余：包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已解锁，工作量决策）；cli.rs 25.7%/main.rs 7.5% 的 CLI 粘合层测试（可测性结构已备、测试未写——Q2 拆分收尾可选项）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵，verify --wasm 已内置 60000） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -87,7 +87,10 @@ cargo test --release                                    # 期望 473/473（2026-
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 118/118（2026-09-08 Q4 起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 151/151（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
-python tools\spec_examples_check.py                     # R7 对账：SPEC_FOR_AI 示例实测（正例解析/导入/运行三层，反例必产诊断）
+python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
+python toolsuzz_smoke.py                              # Q4 随机冲击冒烟（固定种子 80 轮正常终态断言；CI doc-gates 常驻）
+# 覆盖率（按需）：rustup component add llvm-tools-preview 后
+#   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
 python tools\doc_audit.py                               # 对账：文档数字 19 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3）——两者已在 CI doc-gates job 常驻
 ```
 
@@ -199,9 +202,12 @@ end
 
 | 文件 | 职责 | 备注 |
 |---|---|---|
-| src/main.rs | CLI 入口 | 256MB 栈线程在这里；子命令分发在这里 |
+| src/main.rs | CLI 入口（1011 行） | 256MB 栈线程在这里；子命令分发/IO/run_* 与 process::exit 层（Q2-a 拆出纯函数层后） |
 | src/lexer.rs / parser.rs / ast.rs | 前端 | parser 有错误恢复模式（`self.recover`），panic! 的那些是测试断言不是运行时路径 |
-| src/typechecker.rs | 类型检查 | **103KB 大文件**，Read 会被 100KB 限制拒，用 offset/limit 分段读或 Grep 定位 |
+| src/cli.rs | CLI 可测纯函数层（Q2-a 拆分） | CliArgs/parse_args/print_help、merge_packages_for_wasm、apply_iterative、LSP JSON 参数提取——测试可直测 |
+| src/typechecker/mod.rs | 类型检查主体（1590 行，Q2-b 拆分） | TypeChecker/检查流程/check_stmt/check_expr 家族 |
+| src/typechecker/builtins.rs | 内建签名表（235 行） | register_builtins 整方法 + 对账哨兵 export_builtin_table_for_selfhost（自举侧同步） |
+| src/typechecker/tests.rs | typechecker 测试（784 行） | 拆分后全部源文件 <100KB 可 Read 整读 |
 | src/interpreter.rs | 树遍历求值器 | 内置函数全在这（42 个，见 `module_of` 的模块分派），`Value::List` 不可变 |
 | src/fix.rs + apply.rs + fix_history.rs | AI 修复闭环 | `lom fix --plan/--apply/--dry-run/--history`；历史写 `.lom/fix-history.jsonl`（NDJSON） |
 | src/dump.rs | AST dump（Phase 8 前置） | `lom <file> --dump-ast`；确定性缩进树、**不含 span**（格式即契约，8.1 验收逐字比对的基准） |
@@ -286,7 +292,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 473/473、零 warning、`./target/release/lom.exe --version` 显示 1.1.2
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
-5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0 整改（2026-09-03）+ 第二轮审查整改 R1-R8 闭环（2026-09-05）+ v1.1.1 W 工作包收官（2026-09-07：8.4 wasm 越界根治 + for 体内 return/? 修复，8.4 改判完成、wasm 层回流 CI）——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py
+5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0/v1.1.1 整改与 W 包（2026-09-03/07）+ M/N/Q 三工作包收官（2026-09-07/08：三文档对账 + Pattern span + fix_corpus 8 对 + 递归/嵌套全入口守卫 + 双拆分 + 覆盖率 84.4% + 任务 118/119）+ 第三轮审查 A + R9-R14（2026-09-07）+ **v1.1.2 稳健性 patch（2026-09-08）**——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -408,5 +414,23 @@ end
 - 宿主侧：typechecker.rs +export_builtin_table_for_selfhost 测试（也是同步哨兵——签名变了重跑更新自举表）。
 - verify_selfhost.py +--static 模式 + tools/selfhost_cases/ 9 个专项坏文件（四类码各至少 1 例）。
 - 已知差异（8.3 前不用管，8.4 前复核）：MAT001 的 scrutinee 类型覆盖 Ident(注解)/Call(ret)/字面量/Group/变体构造，Binary/Range/Tuple/Record 返回 Unknown（宿主全量类型流之外）；嵌套变体模式内层绑定类型 Unknown；NAM004/TYPE001/002/010/020/MUT001 不产出（8.2 范围外）。
+
+### 11.3 2026-09-07/08 维护周期新坑（M/N/Q 工作包踩的）
+
+**CI/提交流程**：
+- **`git add <目录>` 不 stage 兄弟文件的删除**——Q2-b 拆分只 add 了 `src/typechecker/`，旧 `src/typechecker.rs` 的删除漏 stage，checkout 新旧并存编译失败（CI #90/#91 双红，下个提交才顺带恢复）。**含删除/移动的提交必须 `git status` 复核 staged 列表**。
+- **推送后看 CI 首跑没有豁免情形**——同一次事故里连续三个提交没看首跑，三连红。查法：GitHub API `actions/runs?per_page=1` + `/runs/{id}/jobs` 看 failed step。
+- **doc-gates 的 changelog 对账需要 git tag**——`actions/checkout` 默认 `fetch-depth:1` 不带 tag，"防虚构"检查把 v1.x 条目全判虚构（CI #82/#83）；doc-gates job 已加 `fetch-depth: 0`。
+- **CI 的 Windows runner autocrlf**：修复动作生成的换行是 LF、检出文件是 CRLF——fix_corpus 比对已在测试内归一化（CI #74 教训，防线常驻）。
+
+**深度守卫的阈值注入模式（三次应验）**：
+- **cargo test 的测试线程栈远小于 main 的 256MB 专用线程**——深度守卫阈值若硬编码生产值，测试在到达阈值前先真爆栈（json 守卫初版实测 STATUS_STACK_OVERFLOW）。**阈值必须字段化**（`max_depth`/`max_expr_depth`），测试注入小值。校准用实测梯度（求值 ~100k 帧/parser 40k 过 50k 爆/json ~10⁶）。
+
+**工具链**：
+- **heredoc 内嵌含转义的代码会丢一层转义**（`
+` 落盘成真实换行 → SyntaxError，CI #92）——含转义/特殊字符的代码落盘一律用 Edit/Write 工具，不用 bash heredoc。
+- **Read 工具显示会吞字符**（本周期两次实证：f-string 闭合花括号、§2.2 命令行的反斜杠路径）——**基于 Read 显示构造 Edit 锚点前先 `grep -n` 核对实际形态**，python 替换锚点必须 assert count==1。
+- **git worktree 是检验历史提交健康度的利器**——坏提交（#90/#91）无法作 worktree 基线（编译失败即实证），性能对照用它拉旧版最干净（`git worktree add ../x <sha>` 用完 `--force` 删）。
+- Python subprocess 读 PowerShell 输出必须显式 `encoding="utf-8"`（默认 GBK 直接 UnicodeDecodeError）。
 
 ---
