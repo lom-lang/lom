@@ -165,9 +165,12 @@ def main():
     check('v1.x tag 全有条目', not missing,
           '%d 个 v1.x tag（%s）；缺条目：%s' % (len(tags_v1), ' '.join(tags_v1),
                                                missing or '无'))
-    fictitious = [e for e in entries if e.startswith('v1.') and e not in tags]
-    check('v1.x 条目全有 tag（防虚构）', not fictitious,
-          '无 tag 的条目：%s' % (fictitious or '无'))
+    # 当前发布中的版本豁免防虚构（升版流程是"先写条目→CI 绿→后打 tag"——
+    # 与 tag 纪律的时序冲突，v1.1.2 升版时暴露过死锁：CI #96/#97）
+    fictitious = [e for e in entries
+                  if e.startswith('v1.') and e not in tags and e != 'v' + cargo_ver]
+    check('v1.x 条目全有 tag（防虚构；当前发布版本豁免）', not fictitious,
+          '无 tag 的条目：%s（当前版本 v%s 豁免）' % (fictitious or '无', cargo_ver))
 
     # ---- G. 测试数（Q4）----
     print('G. 测试数（源码 #[test] 静态计数）')
