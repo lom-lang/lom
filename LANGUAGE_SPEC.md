@@ -777,6 +777,7 @@ Per-fix fields:
 | `NAM003` | Hint: undefined variable | low | hint |
 | `NAM004` | Hint: no such field/variant | low | hint |
 | `EFF001` | Insert effect annotation: `! [E]` at line end (pure fn) or `, E` before `]` (partial effects) | high | insert |
+| `RUNTIME000` | Hint: generic runtime error (div/mod by zero; recursion depth > 80,000 since 2026-09-08 — structured message with the recursive fn's signature position) | low | hint |
 | `RUNTIME001` | Hint: runtime type mismatch | low | hint |
 | `RUNTIME002` | Hint: undefined at runtime | low | hint |
 | `RUNTIME003` | Hint: hole execution | low | hint |

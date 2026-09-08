@@ -700,7 +700,7 @@ Key points:
   3. **Div/mod by zero** — interpreter reports `RUNTIME000` (整数除以零/取模零); WASM traps with a different message text (`wasm trap: divide by zero`). Exit code 1 on both.
   4. **`trim` whitespace set** — interpreter strips Unicode whitespace (e.g. U+00A0); WASM strips ASCII whitespace only.
   5. **Large-float display** — interpreter prints the full decimal expansion (Rust `Display`), WASM prints JS scientific notation (e.g. 1e30-scale: `1000000000000000200000000000000.0` vs `1.0000000000000002e+30`). Recorded divergence, not unified. (`inf`/`-inf`/`NaN` **are** unified — both backends print them verbatim since v1.1.0.)
-- Recursion depth is bounded by the host stack (~10k–30k frames under Node's default stack; `node --stack-size=60000` reaches 10⁵).
+  6. **Deep recursion / deep nesting** (since 2026-09-08) — the interpreter enforces software depth guards with **structured diagnostics and exit 1**: call recursion > 80,000 frames → `[RUNTIME000] 递归深度超过 80000 层...` (positioned at the recursive `fn` signature); expression nesting > 30,000 levels → `[PARSE000] 表达式嵌套超过 30000 层...`; `json_parse` nesting > 100,000. WASM instead hits the host stack: V8 traps with `Maximum call stack size exceeded` (adjustable via `node --stack-size`; ~10k–30k frames at default, 10⁵ at `--stack-size=60000`). Fix pattern is identical on both: add a termination condition or rewrite as a `while` loop.
 
 ---
 
