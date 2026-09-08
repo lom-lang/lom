@@ -1396,6 +1396,11 @@ Each task is a JSON object:
   - **`return`/`?` inside `for` silently swallowed (latent since v0.12.0)**: the three iteration-dispatch `if`s in `for` lowering did not push `Label::If`, so `br $ret` inside the loop body under-counted depth and branched to the dispatch exit — the early return vanished (e.g. `for x in xs ... return x` kept falling through). Fix: the dispatch ifs push/pop the label; +3 e2e regression tests.
   - With these, the Phase 8.4 wasm-carrier self-proof completes: layer-2 full set (examples + bootstrap + 116 eval reference solutions, 5 stable rounds), layer-3 golden (wasm self-hosted interpreter running `stmt_interp.lom`, 39 lines verbatim, needs `--stack-size`), and self-application (the wasm self-hosted interpreter parsing its own 5703-line source, dump byte-identical to the native host). The wasm acceptance layer re-enters CI. Regression: 459 tests; eval 116/116 dual backend; self-host six-mode acceptance green.
 
+- **v1.1.2 (2026-09-08)**: robustness patch — deep-recursion and deep-nesting failures are now structured diagnostics instead of process aborts (M/N/Q workpackages, docs/TODO.md). Language surface unchanged (no new syntax/keywords/diagnostic codes/builtins — the new messages reuse `RUNTIME000`/`PARSE000`):
+  - **Evaluator depth guard (N1)**: call/closure recursion beyond 80,000 frames (measured ~100k theoretical on the 256 MB stack) reports `[RUNTIME000] 递归深度超过 80000 层...` positioned at the recursive `fn` signature, exit 1.
+  - **Parser depth guard (Q3)**: expression nesting beyond 30,000 levels (40k passes / 50k overflows measured) reports `[PARSE000] 表达式嵌套超过 30000 层...` and terminates parsing; `json_parse` nesting beyond 100,000 reports a structured error. All recursion entry points now fail with diagnostics (SECURITY limitation 1 closed).
+  - Also in this window (behavior-neutral): example-audit gates extended to LANGUAGE_SPEC + tutorial (M1), `Pattern::Variant` carries `name_span` so NAM004 variant diagnostics pinpoint the name token (M2), fix_corpus 4→8 pairs (M3), main.rs/typechecker.rs split into readable modules (Q2), eval tasks 118 (078 unambiguous twin) + 119 (MUT001 warning repair) added — 118/118 both backends, test count 473/473, line coverage 84.4%.
+
 ---
 
 ## 14. v1.0 Freeze Declaration (2026-09-02)
