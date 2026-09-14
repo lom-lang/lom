@@ -6,7 +6,7 @@
 #   python tools/diff_test.py --probe                            # 探针模式：验证 §11f 白名单仍如档案所述
 #   python tools/diff_test.py --rounds 20 --ci                   # CI 冒烟（固定小轮次）
 #
-# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 六条已知分歧形态，
+# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 七条已知分歧形态，
 # 因此**任何 stdout/退出码差异都是新发现**（差异即 FAIL，留档 .diff_failures/
 # 供人工调查——bug 则修复 + 回归测试，未记录分歧则补 §11f 白名单）。
 # 探针模式纪律：显式生成已知分歧形态，验证差异**确实出现且形态符合档案**——
@@ -63,7 +63,9 @@ def one_normal(seed: int) -> tuple[bool, str]:
         f.write(text)
     c = subprocess.run([LOM, path, "--check"], capture_output=True, timeout=25)
     if c.returncode != 0:
-        first = [l for l in c.stderr.decode("utf-8", errors="replace").splitlines() if l.strip()][:1]
+        # --check 诊断走 stdout（run 路径才走 stderr）——两流都看
+        out = c.stdout.decode("utf-8", errors="replace") + c.stderr.decode("utf-8", errors="replace")
+        first = [l for l in out.splitlines() if l.strip()][:1]
         os.makedirs(FAILDIR, exist_ok=True)
         shutil.copyfile(path, os.path.join(FAILDIR, "seed%d.lom" % seed))
         os.remove(path)
@@ -107,7 +109,7 @@ def _pair_for_probe(kind: str, seed: int):
 
 
 def run_probes() -> int:
-    """探针模式：验证 §11f 六条白名单中的四条可执行分歧仍如档案所述。
+    """探针模式：验证 §11f 七条白名单中的五条可执行分歧仍如档案所述。
 
     （分歧 2 JSON 数字与分歧 4 trim Unicode 涉及非 ASCII/JSON 宿主物化，
     由 SPEC_FOR_AI §11f 文档描述 + eval 既有用例覆盖，不在本探针集。）
@@ -163,7 +165,39 @@ def run_probes() -> int:
     else:
         report("large-float", False, "意外形态：interp=%r wasm=%r rc=%d/%d" % (i_out.strip()[:40], w_out.strip()[:40], i_rc, w_rc))
 
-    # 4. deep-recursion：预期双侧失败（rc!=0），stdout 前缀一致
+    # 4. json-number：预期 stdout 不同（Int/Float 切分按 JS 值 vs 源语法，§11f-2）
+    p = _pair_for_probe("json-number", 42)
+    i_out, i_rc = run_interp(p)
+    w_out, w_rc = run_wasm(p)
+    if i_out != w_out and i_rc == 0 and w_rc == 0 and "30.0" in i_out and "30.0" not in w_out:
+        report("json-number", True, "分歧存在（§11f-2）：interp=%r wasm=%r" % (i_out.strip(), w_out.strip()))
+    elif i_out == w_out:
+        report("json-number", False, "分歧消失——白名单可能腐坏（需复核 §11f-2）")
+    else:
+        report("json-number", False, "意外形态：interp=%r wasm=%r rc=%d/%d" % (i_out.strip()[:40], w_out.strip()[:40], i_rc, w_rc))
+
+    # 5. int-range：预期 stdout 不同（WASM ±2^59 外静默截断/翻符号，§11f-7）
+    p = _pair_for_probe("int-range", 42)
+    i_out, i_rc = run_interp(p)
+    w_out, w_rc = run_wasm(p)
+    il = [l for l in i_out.splitlines() if l.strip()]
+    wl = [l for l in w_out.splitlines() if l.strip()]
+    mod_ok = False
+    if len(il) == len(wl) == 3 and i_rc == 0 and w_rc == 0 and i_out != w_out:
+        try:
+            a, b = int(il[1]), int(wl[1])
+            # wasm 值应等于 interp 值对 2^64 的带符号折叠（60 位载荷截断的下游形态）
+            mod_ok = ((a - b) % (1 << 64) == 0) or ((b - a) % (1 << 64) == 0) or (a % (1 << 60) == (b % (1 << 60)))
+        except ValueError:
+            pass
+    if mod_ok:
+        report("int-range", True, "分歧存在且为 2^60 截断形态（§11f-7）：2^60 行 interp=%r wasm=%r" % (il[1], wl[1]))
+    elif i_out == w_out:
+        report("int-range", False, "分歧消失——白名单可能腐坏（需复核 §11f-7）")
+    else:
+        report("int-range", False, "意外形态：interp=%r wasm=%r rc=%d/%d" % (il[:1], wl[:1], i_rc, w_rc))
+
+    # 6. deep-recursion：预期双侧失败（rc!=0），stdout 前缀一致
     p = _pair_for_probe("deep-recursion", 42)
     i_out, i_rc = run_interp(p, timeout=60)
     w_out, w_rc = run_wasm(p, timeout=60)
@@ -176,11 +210,60 @@ def run_probes() -> int:
     return failures
 
 
+def one_pkg(seed: int) -> tuple[bool, str]:
+    """包模式（D5）：生成多文件包项目 + 双后端对拍。返回 (pass?, 摘要)。
+
+    包发现规则修复（v1.1.4）：解释器与 build 均按 main.lom 所在目录发现
+    lom.toml——对拍从任意 cwd 都有效（修复前 build 按 cwd 发现会假失败）。
+    """
+    files = diff_gen.gen_pkg_project(seed)
+    root = os.path.join(TMP, "pkg%d" % seed)
+    for rel, content in files.items():
+        p = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+    main = os.path.join(root, "main.lom")
+    # 注意：--check 的诊断走 stdout（run 路径才走 stderr）——rc 非 0 时两流都看
+    c = subprocess.run([LOM, main, "--check"], capture_output=True, timeout=25)
+    if c.returncode != 0:
+        out = c.stdout.decode("utf-8", errors="replace") + c.stderr.decode("utf-8", errors="replace")
+        first = [l for l in out.splitlines() if l.strip()][:1]
+        return False, "GENERATOR-BUG（--check rc=%d）: %s" % (c.returncode, first)
+    i_out, i_rc = run_interp(main)
+    w_out, w_rc = run_wasm(main)
+    ok = i_out == w_out and i_rc == w_rc
+    if not ok:
+        os.makedirs(FAILDIR, exist_ok=True)
+        base = os.path.join(FAILDIR, "pkgseed%d" % seed)
+        os.makedirs(base, exist_ok=True)
+        for rel, content in files.items():
+            out = os.path.join(base, *rel.split("/"))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with open(out, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+        with open(base + ".interp.out", "w", encoding="utf-8", newline="\n") as f:
+            f.write("rc=%d\n---\n%s" % (i_rc, i_out))
+        with open(base + ".wasm.out", "w", encoding="utf-8", newline="\n") as f:
+            f.write("rc=%d\n---\n%s" % (w_rc, w_out))
+        detail = "rc %d vs %d" % (i_rc, w_rc)
+        il, wl = i_out.splitlines(), w_out.splitlines()
+        for k in range(max(len(il), len(wl))):
+            a = il[k] if k < len(il) else "<missing>"
+            b = wl[k] if k < len(wl) else "<missing>"
+            if a != b:
+                detail += "; line %d: interp=%r wasm=%r" % (k + 1, a[:60], b[:60])
+                break
+        return False, detail
+    return True, ""
+
+
 def main():
     ap = argparse.ArgumentParser(description="双后端差分测试对拍器（D 工作包）")
     ap.add_argument("--rounds", type=int, default=100)
     ap.add_argument("--seed-base", type=int, default=1)
     ap.add_argument("--probe", action="store_true", help="探针模式：验证 §11f 白名单")
+    ap.add_argument("--pkg", action="store_true", help="包模式（D5）：多文件包项目对拍")
     ap.add_argument("--ci", action="store_true", help="CI 冒烟口径（失败时退出码 1 不变，输出精简）")
     args = ap.parse_args()
 
@@ -190,24 +273,26 @@ def main():
     os.makedirs(TMP, exist_ok=True)
     try:
         if args.probe:
-            print("probe 模式：验证 §11f 已知分歧白名单（4 条可执行探针）")
+            print("probe 模式：验证 §11f 已知分歧白名单（6 条可执行探针）")
             fails = run_probes()
-            n = 4
+            n = 6
             print("probe: %d/%d 验证通过" % (n - fails, n))
             print("RESULT: %s" % ("PASS" if fails == 0 else "FAIL"))
             sys.exit(0 if fails == 0 else 1)
 
         fails = 0
+        one = one_pkg if args.pkg else one_normal
+        label = "包项目" if args.pkg else "程序"
         for i in range(args.rounds):
             seed = args.seed_base + i
-            ok, detail = one_normal(seed)
+            ok, detail = one(seed)
             if not ok:
                 fails += 1
                 print("  seed %d: 新发现差异 — %s" % (seed, detail))
             if not args.ci and (i + 1) % 50 == 0:
                 print("  ... %d/%d（fail %d）" % (i + 1, args.rounds, fails))
-        print("diff: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 六条已知分歧）"
-              % (args.rounds - fails, args.rounds))
+        print("diff[%s]: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 七条已知分歧）"
+              % (label, args.rounds - fails, args.rounds))
         if fails:
             print("失败留档：%s/*.lom + .interp.out + .wasm.out" % FAILDIR)
         print("RESULT: %s" % ("PASS" if fails == 0 else "FAIL"))

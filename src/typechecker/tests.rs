@@ -80,6 +80,25 @@ fn logical_operand_undefined_function_reported() {
     assert!(!nam003.is_empty(), "and 右操作数未定义函数应报 NAM003");
 }
 
+/// D 包二期（2026-09-14）：包符号 + as 别名导入曾假报 NAM003——
+/// collect_import 只查 functions 表（stdlib 在），包符号只在 external_symbols。
+#[test]
+fn external_symbol_alias_import_no_false_nam003() {
+    let src = concat!(
+        "from somepkg import { real_fn as aliased_fn }\n\n",
+        "fn main() -> Unit\n    println(aliased_fn(1))\nend\n"
+    );
+    let program = crate::parser::Parser::parse_recover(src).program;
+    let source_lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
+    let mut diags = crate::diagnostics::Diagnostics::new("test.lom");
+    let mut tc = TypeChecker::new("test.lom", source_lines);
+    tc.external_symbols.insert("real_fn".to_string());
+    tc.check(&program, &mut diags);
+    let nam003: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+    assert!(nam003.is_empty(), "包符号别名导入不应报 NAM003，实际: {:?}",
+            nam003.iter().map(|d| &d.message).collect::<Vec<_>>());
+}
+
 /// 同族：or 左操作数位置的未定义变量（曾经同样漏检）
 #[test]
 fn logical_operand_undefined_variable_reported() {

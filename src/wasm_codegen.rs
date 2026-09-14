@@ -1571,7 +1571,9 @@ impl Codegen {
             }
             // 用户函数（具名直调；注意解释器里具名函数优先于同名闭包变量，保持一致）
             if let Some(&idx) = self.fn_idx.get(orig).or_else(|| self.fn_idx.get(real.as_str())) {
-                self.check_arity(orig, args.len())?;
+                // arity 按有签名的名字查（别名导入时签名挂在 real 名下——D 包二期
+                // 2026-09-14 修复：此前 check_arity(orig) 对包符号别名误报"期望 0 个参数"）
+                self.check_arity(real.as_str(), args.len())?;
                 for arg in args {
                     self.compile_expr(ctx, a, arg)?;
                 }

@@ -168,4 +168,5 @@ jobs:
       - name: Diff test (D 包, fixed seeds + §11f probes)
         run: |
           python3 tools/diff_test.py --rounds 20 --seed-base 1 --ci
+          python3 tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci
           python3 tools/diff_test.py --probe

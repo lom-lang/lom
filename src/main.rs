@@ -448,9 +448,13 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         process::exit(1);
     }
     let program = parser::Parser::parse_recover(&src).program;
-    // 7.8 包链接：当前目录有 lom.toml 时，把依赖包源码合并进编译单元
-    // （包内 item 在前，主文件在后；重名函数后主文件覆盖——对齐解释器 load_packages 语义）
-    let (program, pkg_names) = merge_packages_for_wasm(program);
+    // 7.8 包链接：main.lom 所在目录有 lom.toml 时，把依赖包源码合并进编译单元
+    // （包内 item 在前，主文件在后；重名函数后主文件覆盖——对齐解释器 load_packages 语义；
+    // 发现目录 = 文件所在目录而非 cwd——对齐解释器路径，D 包二期修复）
+    let base_dir = std::path::Path::new(file)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
+    let (program, pkg_names) = merge_packages_for_wasm(program, base_dir);
     // 7.9：类型检查可见性对齐——编译前跑检查器，诊断走 stderr，不拦截编译（渐进式承诺与解释器一致）
     {
         let mut tdiags = diagnostics::Diagnostics::new(file);

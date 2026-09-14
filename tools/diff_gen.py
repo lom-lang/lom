@@ -7,7 +7,7 @@
 #   （常量/边界/分支数/变量名）上——不生成"自由拼接"的语法，保证零 parse/ type Error。
 # - 确定性输出：只用纯计算 + println（无 Clock/file/env/随机），同一程序
 #   双后端输出必须逐字一致。
-# - 默认避开 SPEC_FOR_AI §11f 六条已知分歧形态：
+# - 默认避开 SPEC_FOR_AI §11f 七条已知分歧形态：
 #   1. 闭包捕获 mut（模板只捕获不可变绑定）
 #   2. JSON 数字 Int/Float 切分（不生成 json_parse）
 #   3. 除零/模零（除数为非零字面量或加 != 0 守卫）
@@ -860,6 +860,121 @@ end"""
         calls = [f"println({v}({a}))"]
         self.emit(fn, calls)
 
+    # ===== 模板族 L：JSON（D6，2026-09-14）=====
+    # 分歧 2 边界（D6a 实测）：安全区 = 纯整数字面量（无小数点/指数）+ 真小数值；
+    # 分歧区 = "源语法 Float 但 JS 值为整"（30.0 / 1e2 / -0.0 / 0.0）——模板只
+    # 用安全区数字，分歧形态由 --probe json-number 验证白名单。
+
+    def t_json_parse_consume(self):
+        v = self.uniq("jp")
+        n1 = self.rng.randint(-99, 99)
+        i1, i2 = self.rng.randint(0, 50), self.rng.randint(0, 50)
+        f1 = self.rng.choice(["0.5", "1.25", "2.75", "3.5"])
+        s1 = self.rng.choice(STR_ATOMS)
+        doc = '{{"k1": {n1}, "name": "{s1}", "xs": [{i1}, {i2}, {f1}]}}'.format(
+            n1=n1, s1=s1, i1=i1, i2=i2, f1=f1)
+        # Lom 源内字符串转义：JSON 文档的引号写成 \"
+        doc_lit = doc.replace('"', '\\"')
+        fn = f'''fn {v}() -> Int
+    let d = json_parse("{doc_lit}")
+    let a = d.k1
+    let xs = d.xs
+    a + len(d.name) + list_length(xs) + list_get(xs, 0) + list_get(xs, 1)
+end'''
+        calls = [f'println({v}())']
+        self.emit(fn, calls)
+
+    def t_json_roundtrip(self):
+        v = self.uniq("jr")
+        n1 = self.rng.randint(-99, 99)
+        i1, i2 = self.rng.randint(0, 50), self.rng.randint(0, 50)
+        f1 = self.rng.choice(["0.5", "1.25", "2.75"])
+        b1 = self.rng.choice(["True", "False"])  # Lom 布尔字面量大写（JSON 思维小写会 NAM003）
+        s1 = self.rng.choice(STR_ATOMS)
+        # 注意：宿主无 [..] List 字面量（list_demo 头注释），List 用 range 构造
+        fn = f'''fn {v}() -> String
+    let xs = {i1}..({i2} + 1)
+    let d = {{ a: {n1}, tag: "{s1}", flags: {{ on: {b1} }}, tail: {f1}, xs: xs }}
+    json_stringify(d)
+end'''
+        calls = [f'println({v}())']
+        self.emit(fn, calls)
+
+    def t_json_nested(self):
+        v = self.uniq("jn")
+        n1 = self.rng.randint(-50, 50)
+        i1, i2 = self.rng.randint(0, 40), self.rng.randint(0, 40)
+        f1 = self.rng.choice(["0.25", "0.75", "1.5"])
+        doc_lit = '{{"outer": {{"inner": {{"v": {n1}, "xs": [{i1}, {i2}, {f1}]}}}}}}'.format(
+            n1=n1, i1=i1, i2=i2, f1=f1).replace('"', '\\"')
+        fn = f'''fn {v}() -> Int
+    let d = json_parse("{doc_lit}")
+    let inner = d.outer.inner
+    let rt = json_stringify(inner)
+    inner.v + list_get(inner.xs, 1) + len(rt)
+end'''
+        calls = [f'println({v}())']
+        self.emit(fn, calls)
+
+
+    # ===== 模板族 M：递归梯度（D7，2026-09-14）=====
+    # 深度档位 <=8000：解释器 80k 软件守卫与 V8 默认栈（~1-3 万层）的安全带
+    # 之内；更深形态属 §11f-6 已知分歧（int-range 同理不生成），由探针验证。
+
+    def t_mutual_recursion(self):
+        # 相互递归 a <-> b（even/odd 式）
+        v1, v2 = self.uniq("ev"), self.uniq("od")
+        n = self.rng.choice([11, 57, 433, 1001, 2500, 7997])
+        fn = f"""fn {v1}(n: Int) -> Bool
+    if n == 0
+        True
+    else
+        {v2}(n - 1)
+    end
+end
+
+fn {v2}(n: Int) -> Bool
+    if n == 0
+        False
+    else
+        {v1}(n - 1)
+    end
+end"""
+        calls = [f'println({v1}({n}))', f'println({v2}({n}))']
+        self.emit(fn, calls)
+
+    def t_deep_recursion_gradient(self):
+        # 深度梯度档位（百/千/八千级），值域守恒：n(n+1)/2 <= 8000*8001/2 < 2^59
+        v = self.uniq("sd")
+        n = self.rng.choice([100, 500, 1000, 2000, 4000, 8000])
+        fn = f"""fn {v}(n: Int) -> Int
+    if n == 0
+        0
+    else
+        n + {v}(n - 1)
+    end
+end"""
+        calls = [f'println({v}({n}))', f'println({v}({n // 7}))']
+        self.emit(fn, calls)
+
+    def t_recursion_early_return(self):
+        # 递归体内的提前返回（命中即停 vs 沉降到底的对照）
+        v = self.uniq("find")
+        n = self.rng.choice([7, 33, 121, 500, 1500])
+        k = self.rng.choice([3, 5, 7])
+        fn = f"""fn {v}(n: Int) -> Int
+    if n == 0
+        0 - 1
+    else
+        if n % {k} == 0
+            return n
+        end
+        {v}(n - 1)
+    end
+end"""
+        calls = [f'println({v}({n}))', f'println({v}({n * 2 + 1}))']
+        self.emit(fn, calls)
+
 
 # 模板池：提前返回族（B）加权 ×3 —— W 包事故模式的定向覆盖
 POOL_BASE = [
@@ -874,7 +989,8 @@ POOL_BASE = [
     Gen.t_pipeline_int, Gen.t_pipeline_string,
     Gen.t_map_ops, Gen.t_map_keys,
     Gen.t_bool_logic, Gen.t_mixed_io, Gen.t_string_escapes, Gen.t_compare_ops,
-    Gen.t_shadowing,
+    Gen.t_shadowing, Gen.t_json_parse_consume, Gen.t_json_roundtrip, Gen.t_json_nested,
+    Gen.t_mutual_recursion, Gen.t_deep_recursion_gradient, Gen.t_recursion_early_return,
 ]
 POOL_EARLY_RETURN = [
     Gen.t_return_in_for_list, Gen.t_return_in_for_int, Gen.t_return_in_nested_for,
@@ -897,12 +1013,139 @@ def gen_program(seed: int) -> tuple[str, str]:
         "from math import { sqrt, abs, min, max }",
         "from list import { list_map, list_filter, list_fold, list_cons, list_head, list_tail, list_length, list_get }",
         "from map import { map_empty, map_set, map_get, map_has, map_remove, map_keys, map_size }",
+        "from json import { json_parse, json_stringify }",
         "",
     ]
     body = "\n\n".join(g.decls)
     main_text = "fn main() -> Unit\n" + "\n".join("    " + s for s in g.main) + "\n    ()\nend"
     return "\n".join(header) + body + "\n\n" + main_text + "\n", ""
 
+
+# ---------- 包模式（D5）：多文件包项目的随机生成 ----------
+# 覆盖面：lom.toml 依赖图（扁平 + 链式 libB→libA）、跨包导入（含 as 别名）、
+# 包符号在主文件的组合调用、WASM merge（包前主后）与解释器 load_packages 的
+# 行为对齐。包内函数**只保留 Int 单参/双参两种签名**——调用形态二值化消灭
+# 签名分派错误（首版 Float/String/enum 分派出过错；那些类型的覆盖由单文件
+# 模式的 39 模板族承担，包模式的独特价值在依赖图与合并语义）。包内函数保持
+# 自包含（仅 prelude 纯运算——包源码的 import 在 WASM merge 时只收集 items）。
+
+_PKG_BODY_1 = [
+    "fn {name}(x: Int) -> Int\n    x * {k} + {m}\nend",
+    "fn {name}(x: Int) -> Int\n    if x % 2 == 0\n        x / 2 + {m}\n    else\n        x * 3 - {m}\n    end\nend",
+    # 注：不放阶乘/大数增长模板——WASM 后端 Int 安全值域 ±2^59（§11f 第 7 条，
+    # tagged i64 低 4 位 tag 的结构性限制），包模式结果控制在百量级；
+    # 阶乘覆盖由单文件模式承担（n ≤ 12，结果 < 2^59）
+    "fn {name}(n: Int) -> Int\n    let mut total = 0\n    for i in n\n        total += i * {k}\n    end\n    total\nend",
+]
+_PKG_BODY_2 = [
+    "fn {name}(x: Int, y: Int) -> Int\n    x * {k} - y + {m}\nend",
+    "fn {name}(x: Int, y: Int) -> Int\n    if x > y\n        x - y + {k}\n    else\n        y - x + {m}\n    end\nend",
+]
+
+
+def gen_pkg_project(seed: int) -> dict:
+    """生成一个包项目（D5 包模式）。返回 {相对路径: 内容} 的文件树。
+
+    结构：主目录 lom.toml + main.lom；libA 必有；libB 50% 概率，
+    且存在 libb 符号时 60% 概率 libB 链式依赖 libA（bridge 函数调用 liba 符号）。
+    """
+    rng = random.Random(seed)
+    files: dict[str, str] = {}
+    n = 0
+
+    def mkfn() -> tuple[str, str, int]:
+        """产出一个包内函数：返回 (导出名, 函数源码, arity ∈ {1,2})。"""
+        nonlocal n
+        n += 1
+        name = "pf_%d" % n
+        arity = rng.choice([1, 1, 2])
+        tpl = rng.choice(_PKG_BODY_1 if arity == 1 else _PKG_BODY_2)
+        src = tpl.format(name=name, k=rng.randint(2, 9), m=rng.randint(0, 50))
+        return name, src, arity
+
+    def call(name: str, arity: int) -> str:
+        """按签名生成调用表达式（字面量参数，确定性）。"""
+        if arity == 1:
+            return "%s(%d)" % (name, rng.randint(1, 30))
+        return "%s(%d, %d)" % (name, rng.randint(1, 30), rng.randint(1, 30))
+
+    # --- libA（必有，2-3 个函数）---
+    liba_fns = [mkfn() for _ in range(rng.randint(2, 3))]
+    files["liba/lom.toml"] = 'name = "liba"\nversion = "0.1.0"\n'
+    files["liba/a.lom"] = "\n\n".join(src for _, src, _ in liba_fns) + "\n"
+
+    # --- libB（50%；有符号时 60% 概率链式依赖 libA，bridge 调用 liba 单参符号）---
+    libb_fns: list[tuple[str, str, int]] = []
+    has_b = rng.random() < 0.5
+    chain = has_b and rng.random() < 0.6
+    if has_b:
+        libb_fns = [mkfn() for _ in range(rng.randint(2, 3))]
+        if chain:
+            cands = [nm for nm, _, ar in liba_fns if ar == 1]
+            if cands:
+                liba_name = rng.choice(cands)
+                n += 1
+                bridge = "pf_%d" % n
+                bridge_src = (
+                    "from liba import { %s }\n\nfn %s(x: Int) -> Int\n    %s(x) + %d\nend"
+                    % (liba_name, bridge, liba_name, rng.randint(1, 99))
+                )
+                libb_fns.append((bridge, bridge_src, 1))
+        files["libb/lom.toml"] = (
+            'name = "libb"\nversion = "0.1.0"\n\n[dependencies]\nliba = { path = "../liba" }\n'
+            if chain else 'name = "libb"\nversion = "0.1.0"\n'
+        )
+        files["libb/b.lom"] = "\n\n".join(src for _, src, _ in libb_fns) + "\n"
+
+    # --- 主清单 ---
+    deps = ['liba = { path = "liba" }']
+    if has_b:
+        deps.append('libb = { path = "libb" }')
+    files["lom.toml"] = 'name = "app"\nversion = "0.1.0"\n\n[dependencies]\n' + "\n".join(deps) + "\n"
+
+    # --- 主文件：导入（含别名）+ 本地组合 + main ---
+    # liba 选 2 个符号（第二个用别名；别名不改变 arity）
+    picks = rng.sample(range(len(liba_fns)), 2)
+    (nm1, _, ar1) = liba_fns[picks[0]]
+    (nm2, _, ar2) = liba_fns[picks[1]]
+    imports = ["from liba import { %s, %s as aliased_fn }" % (nm1, nm2)]
+    call1 = call(nm1, ar1)
+    call2 = call("aliased_fn", ar2)
+    call_b = None
+    if has_b:
+        b_nm, _, b_ar = rng.choice(libb_fns)
+        imports.append("from libb import { %s }" % b_nm)
+        call_b = call(b_nm, b_ar)
+
+    # 本地组合函数：仅当 liba 有单参符号时做跨符号组合（双参符号在 main 直接调用）
+    n += 1
+    combo = "local_%d" % n
+    single_syms = [s for s in [(nm1, ar1), ("aliased_fn", ar2)] if s[1] == 1]
+    if single_syms:
+        s1 = single_syms[0][0]
+        combo_lines = ["fn %s(x: Int) -> Int" % combo, "    %s(x) + %s(x * 2)" % (s1, s1), "end"]
+    else:
+        combo_lines = ["fn %s(x: Int) -> Int" % combo, "    x * 2 + 1", "end"]
+
+    main_lines = ["fn main() -> Unit"]
+    main_lines.append("    println(%s)" % call1)
+    main_lines.append("    println(%s)" % call2)
+    main_lines.append("    println(%s(%d))" % (combo, rng.randint(1, 30)))
+    if call_b:
+        main_lines.append("    println(%s)" % call_b)
+    main_lines.append("    ()")
+    main_lines.append("end")
+
+    files["main.lom"] = (
+        "# diff_gen 包模式（D5）—— seed=%d\n" % seed
+        + "\n".join(imports)
+        + "\n\n"
+        + "\n".join(combo_lines)
+        + "\n\n"
+        + "\n".join(main_lines)
+        + "\n"
+    )
+    return files
 
 # ---------- 探针模式：显式生成 §11f 已知分歧形态 ----------
 
@@ -935,6 +1178,28 @@ end
         return f"""# probe: large-float（§11f 分歧 5——预期 stdout 数值等价但格式不同）
 fn main() -> Unit
     println({n}.0 * 1000000000000000000000000000000.0)
+end
+"""
+    if kind == "json-number":
+        # 分歧 2：JSON 数字按 JS 宿主值切分 Int/Float 而非源语法——
+        # "30.0"/"1e2"/"-0.0" 源语法是 Float、JS 值为整 → 双后端分叉
+        return """# probe: json-number（§11f 分歧 2——预期 30.0 类形态双后端分叉）
+from json import { json_parse }
+
+fn main() -> Unit
+    let v = json_parse("[30, 30.0, 1e2, -0.0, 0.5]")
+    println(v)
+end
+"""
+    if kind == "int-range":
+        # 分歧 7（D 包二期 2026-09-14 实测发现）：WASM tagged i64 低 4 位 tag
+        # 只能无损承载 60 位载荷——2^59 起撞符号位变负、2^60 起高位静默截断；
+        # 解释器全 i64。预期双侧 stdout 不同且 wasm 值 = interp 值 mod 2^60 的符号解释
+        return """# probe: int-range（§11f 分歧 7——预期 wasm 侧静默截断/翻符号）
+fn main() -> Unit
+    println(576460752303423488)
+    println(1152921504606846976)
+    println(1152921504606846977)
 end
 """
     if kind == "deep-recursion":

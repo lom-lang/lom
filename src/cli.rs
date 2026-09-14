@@ -211,19 +211,28 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
 /// Phase 7.8: 包合并（WASM 编译用）。当前目录有 lom.toml 时解析依赖图，
 /// 把每个依赖包的源码 item 合并到主程序前面（重名后主文件覆盖，对齐解释器语义）。
 /// 无 lom.toml 时原样返回。
-pub(crate) fn merge_packages_for_wasm(mut program: ast::Program) -> (ast::Program, Vec<String>) {
-    let toml_path = std::path::Path::new("lom.toml");
+/// 7.8 包链接：把依赖包源码合并进编译单元（包内 item 在前，主文件在后；
+/// 重名函数后主文件覆盖——对齐解释器 load_packages 语义）。
+///
+/// `base_dir` = 被编译的 main.lom 所在目录（对齐解释器路径的包发现规则：
+/// main.rs 按文件所在目录发现 lom.toml——build 曾按 cwd 发现，同一文件在
+/// 不同 cwd 下编译结果漂移且与解释器路径不对称，D 包二期 2026-09-14 修复）。
+pub(crate) fn merge_packages_for_wasm(
+    mut program: ast::Program,
+    base_dir: &std::path::Path,
+) -> (ast::Program, Vec<String>) {
+    let toml_path = base_dir.join("lom.toml");
     if !toml_path.exists() {
         return (program, Vec::new());
     }
-    let manifest = match package::load_manifest_file(toml_path) {
+    let manifest = match package::load_manifest_file(&toml_path) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("lom.toml 解析失败: {}", e);
             process::exit(1);
         }
     };
-    let graph = match package::resolve_dependencies(&manifest, std::path::Path::new(".")) {
+    let graph = match package::resolve_dependencies(&manifest, base_dir) {
         Ok(g) => g,
         Err(e) => {
             eprintln!("依赖解析失败: {}", e);
@@ -434,6 +443,53 @@ mod tests {
     /// 语料在 eval/fix_corpus/，新增修复规则时应同步加语料对。
     /// 注意 04_spelling_medium：fixed 与 bad 逐字相同是**有意为之**
     /// （Medium 猜测性修复不被自动应用，源码必须保持不变）。
+    /// D 包二期（2026-09-14）：包发现规则 = base_dir（main.lom 所在目录）而非
+    /// cwd——build 曾按 cwd 发现导致同一文件在不同目录下编译结果漂移、且与
+    /// 解释器路径（file_dir 发现）不对称。本测试锁定修复后的发现语义。
+    #[test]
+    fn merge_packages_discovers_manifest_from_base_dir_not_cwd() {
+        let tmp = std::env::temp_dir().join(format!("lom_merge_test_{}", std::process::id()));
+        std::fs::create_dir_all(tmp.join("mylib")).expect("建包目录失败");
+        std::fs::write(
+            tmp.join("lom.toml"),
+            "name = \"app\"
+version = \"0.1.0\"
+
+[dependencies]
+mylib = { path = \"mylib\" }
+",
+        )
+        .expect("写主清单失败");
+        std::fs::write(tmp.join("mylib").join("lom.toml"), "name = \"mylib\"
+version = \"0.1.0\"
+")
+            .expect("写包清单失败");
+        std::fs::write(
+            tmp.join("mylib").join("lib.lom"),
+            "fn pkg_double(x: Int) -> Int
+    x * 2
+end
+",
+        )
+        .expect("写包源码失败");
+
+        // 主程序零 item：合并后应只有包的 1 个 fn，包名表含 mylib
+        let program = ast::Program { items: Vec::new() };
+        let (merged, names) = merge_packages_for_wasm(program, &tmp);
+        assert_eq!(merged.items.len(), 1, "包源码应合并进编译单元");
+        assert_eq!(names, vec!["mylib".to_string()], "包名表应含依赖包");
+
+        // base_dir 无 lom.toml：零合并（不受 cwd 是否有 lom.toml 影响）
+        let empty_dir = tmp.join("no_manifest_here");
+        std::fs::create_dir_all(&empty_dir).expect("建空目录失败");
+        let program2 = ast::Program { items: Vec::new() };
+        let (merged2, names2) = merge_packages_for_wasm(program2, &empty_dir);
+        assert_eq!(merged2.items.len(), 0, "无清单目录不应合并任何包");
+        assert!(names2.is_empty());
+
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
     #[test]
     fn fix_corpus_end_to_end() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("eval/fix_corpus");

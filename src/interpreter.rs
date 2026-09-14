@@ -1150,8 +1150,15 @@ impl Interpreter {
                 if let Some(v) = self.call_builtin(name, arg_vals)? {
                     return Ok(v);
                 }
-                // 用户函数
-                if let Some(f) = self.functions.get(name).cloned() {
+                // 用户函数（含外部包符号）——别名导入时按 alias→本名映射查表
+                // （D 包二期 2026-09-14 修复：此前包符号的 as 别名在运行时
+                // RUNTIME002——别名解析只在 call_builtin 路径，用户函数路径漏了）
+                let real_name: &str = self
+                    .import_aliases
+                    .get(name)
+                    .map(|s| s.as_str())
+                    .unwrap_or(name);
+                if let Some(f) = self.functions.get(real_name).cloned() {
                     return self.call_function(&f, arg_vals);
                 }
                 // 闭包变量

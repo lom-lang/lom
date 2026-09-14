@@ -223,6 +223,11 @@ impl TypeChecker {
             // 仅当真实名已注册（prelude/stdlib）时，才注册别名
             if let Some(sig) = self.functions.get(&item.name).cloned() {
                 self.functions.insert(item.alias.clone(), sig);
+            } else if self.external_symbols.contains(&item.name) {
+                // 包符号别名（D 包二期差分测试 2026-09-14 抓出）：真实名在
+                // externals 而不在 functions 表——此前包符号 + as 别名导入在
+                // --check 假报 NAM003。别名加入 external_symbols 走同款放行。
+                self.external_symbols.insert(item.alias.clone());
             }
         }
     }
