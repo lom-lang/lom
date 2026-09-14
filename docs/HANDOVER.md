@@ -9,7 +9,8 @@
 > - [docs/TODO.md](TODO.md) — **整改待办台账**（跨会话待办唯一事实源；含审查裁决的驳回/挂起登记）
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-09-14（**第四轮独立审查总评 A + 整改 R15-R21 关闭**——报告 docs/reviews/review-2026-09-14.html，基线 c4e960a：硬指标 45 项矩阵 42✓+3△+0✗、无 P0/P1，验证深度超前三轮（三守卫亲手触发/N3 三组锁定测试/Q2 拆分纯搬运独立复算/坏提交 worktree 实证/CI 逐 run 对账）；7 条发现（P2×4+P3×3）全部复核属实采纳——R15 §2.2 fuzz 命令换页符修复（0x0C 咬字，CI #92 教训同型复发，教训入 §11.3）/R16 doc_audit 行 19→22 项/R17 §4.6 parser 守卫改口/R18 TODO Q2 翻牌+证据区/R19 N3 标号修正/R20 cli.rs 注释如实口径/R21 #96/#97 tag 时序死锁入档。同日新任维护者完成交接：基线验证 11 项全符（473/473、118/118 双后端、六模式、对账三件、CI 绿、tag 正确）。审查轨迹 B+→A-→A→A。交接必读不变：§1 快照 + §2.2 + §9 + §11 + docs/TODO.md 全档）
+> 最后更新：2026-09-14 晚（**D 工作包：双后端差分测试收官，升版 v1.1.3**——用户裁决的旗舰项落地：tools/diff_gen.py 类型感知模板化随机程序生成器（39 模板族，提前返回族加权 ×3 定向覆盖 W 包 for-return 事故模式；默认避开 §11f 六条已知分歧——正常模式任何差异都是新发现）+ tools/diff_test.py 对拍器（--check 闸门分离生成器 bug 与后端差异；**1000 程序（seed 1000/5000 两段）双后端 stdout+退出码逐字一致**；--probe 探针 4/4 验证 §11f 可执行分歧仍如档案——守护白名单本身）；**真发现一枚：typechecker `and`/`or` 操作数 NAM003 漏检**（Phase 2.4 起 `ExprKind::Logical` 不递归检查子表达式；生成器 `not` 笔误意外暴露——解释器短路逃过 rc=0 而 wasm build 编译期失败的不对称；自举检查器 8.2 起就递归，宿主修复对齐；+2 测试 475/475）；CI doc-gates 加固定种子差分冒烟 step；顺手修 §11f 三处陈旧（116/118、five/six、大浮点实测形态 2e+30.0 补精度）。生成器自坑三枚如实落档：not 不是运算符（! 才是）、%= 不在复合赋值四件套、Form B 臂 end 又漏（§4.1 第 N 次应验）。详见 docs/TODO.md D 包证据区）
+> 2026-09-14 早（**第四轮独立审查总评 A + 整改 R15-R21 关闭**——报告 docs/reviews/review-2026-09-14.html，基线 c4e960a：硬指标 45 项矩阵 42✓+3△+0✗、无 P0/P1，验证深度超前三轮（三守卫亲手触发/N3 三组锁定测试/Q2 拆分纯搬运独立复算/坏提交 worktree 实证/CI 逐 run 对账）；7 条发现（P2×4+P3×3）全部复核属实采纳——R15 §2.2 fuzz 命令换页符修复（0x0C 咬字，CI #92 教训同型复发，教训入 §11.3）/R16 doc_audit 行 19→22 项/R17 §4.6 parser 守卫改口/R18 TODO Q2 翻牌+证据区/R19 N3 标号修正/R20 cli.rs 注释如实口径/R21 #96/#97 tag 时序死锁入档。同日新任维护者完成交接：基线验证 11 项全符。审查轨迹 B+→A-→A→A）
 > 上一周期 2026-09-08（**v1.1.2 交接就绪**。本维护周期收官链：**M 工作包**三线优化（示例对账三文档化——存量腐坏 7 处实测修复含 tutorial 教非法嵌套 fn；Pattern::Variant 带 name_span——NAM004 变体版离开 (0,0)；fix_corpus 4→8 对）；**第三轮独立审查 A + 整改 R9-R14**（docs/reviews/review-2026-09-07.html；轨迹 B+→A-→A）；**N 工作包**（N1 递归深度守卫 80k——深递归产结构化诊断非崩溃；N2 Latin-1 挂账调查关闭——过时认知零代码改动；N3 changelog 对账进 doc_audit）；**Q 工作包**（Q1 覆盖率测量 84.4% 下界+盲区分型+补测；Q2 main/typechecker 双拆分全文件可整读；Q3 parser 30k+json 100k 守卫——SECURITY 限制 1 关闭，全部递归入口结构化失败；Q4 任务 118/119+fuzz 常态化进 CI+doc_audit 22 项）；**AB-DE 尾巴**（Q3 性能账噪声带内；深度守卫双后端文档涟漪 §11f 第 6 条；**078/118 歧义对照实测——歧义版 1/10 vs 明确版 10/10，损失 90pp**；覆盖复测 84.44%）。升版 **v1.1.2**（稳健性 patch：崩溃→结构化诊断，零新码零语言面）。**CI #90-92 三连红事故已修复落档**（staged 复核/heredoc 转义/首跑纪律三教训，§11）。**用户裁决在案**：发布线冻结（优化到完美前不发布）、L2 自举与差分测试待令立项。）
 
 ---
@@ -33,8 +34,8 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.1.2**（Cargo.toml/lock 一致，2026-09-08 升版：稳健性 patch——N1 求值递归守卫 80k + Q3 parser 30k/json 100k 守卫，深递归/深嵌套从崩溃改结构化诊断（复用 RUNTIME000/PARSE000 零新码零语言面）；同期行为中性变更见 spec §13 v1.1.2 条目；tag 在 CI 绿后打；历史 tag：v0.5.1-v1.1.1） |
-| Rust 测试 | **473/473 通过**（N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| 版本 | **v1.1.3**（Cargo.toml/lock 一致，2026-09-14 升版：checker patch——D 包差分测试抓出 typechecker `and`/`or` 操作数 NAM003 漏检（Phase 2.4 起潜伏，自举检查器本就递归、宿主实现对齐修复）+ 双后端差分测试基建（diff_gen/diff_test，1000 程序双后端逐字一致 + §11f 白名单探针）；详见 spec §13 v1.1.3 条目；tag 在 CI 绿后打；历史 tag：v0.5.1-v1.1.2） |
+| Rust 测试 | **475/475 通过**（v1.1.3 D 包 +2：Logical 操作数 NAM003 ×2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **118/118**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；**118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）**，双后端实跑定稿） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
@@ -47,7 +48,7 @@
 | **第二轮审查** | **审查完成 + 整改 R1-R8 完成（2026-09-05，A-，无 P0）**：独立审查 agent 报告 docs/reviews/review-2026-09-05.html（基线 470670d）——硬指标全部实测复现（36 项验证矩阵）；发现 1×P1 + 6×P2 + 6×P3 文档腐坏，全部经维护会话亲手复现证实。**R1-R8 已全部执行关闭**（docs/TODO.md 档案）：R1 type alias 假特性→反例；R2 sin/cos+MUT001 措辞+pub 标注；R3/R4 spec §12 与 eval/README 旧计数；R5 README 拆分+v1.1.0 横幅；R6 ci.yml 149；R7/R8 对账工具双件（tools/spec_examples_check.py 34 块三层断言 + tools/doc_audit.py 16 项数字对账）+ CI doc-gates job——**R7 调查中额外抓出第三个假特性：记录字段赋值 `p.x = 5` 从未实现（parser 赋值目标只认普通变量，实测 PARSE000），SPEC_FOR_AI §5 与 LANGUAGE_SPEC §6.2 双修为如实口径**。"喂给 LLM 的文档"与"文档数字"自此从人工清扫升级为机器 gate |
 | **第三轮审查** | **完成 + 整改 R9-R14 关闭（2026-09-07，总评 A，无 P0/P1）**：独立审查 agent 报告 docs/reviews/review-2026-09-07.html（基线 7281936，覆盖 W/L/M 三工作包变更面）——硬指标 38 项矩阵实测 34 项全符 + 4 项表述精度差；pass@k 无偏公式独立复算逐位一致、fix_corpus 8/8 逐字、25 个 skip 逐块核查无误吞。6 条发现（P2×2：README pass@k 矛盾 + 5-mode 陈旧；P3×4：8.4 后注/147 口径注/舍入注/skip 摘要）全部采纳关闭。**审查轨迹：B+（08-31）→ A-（09-05）→ A（09-07）** |
 | **第四轮审查** | **完成 + 整改 R15-R21 关闭（2026-09-14，总评 A，无 P0/P1）**：独立审查 agent 报告 docs/reviews/review-2026-09-14.html（基线 c4e960a，覆盖 7281936 后 22 提交——N/Q 两包 + AB-DE + CI #90-92 事故 + v1.1.2）——硬指标 45 项矩阵 42✓ + 3△ + 0✗，验证深度超前三轮：三守卫亲手触发、N3 三组锁定测试、Q2 拆分缩进归一化独立复算证纯搬运、坏提交 worktree 实编译复现 E0761、CI #84-#98 逐 run API 对账。7 条发现（P2×4：§2.2 换页符咬掉 fuzz 命令——CI #92 教训同型复发/doc_audit 行 19→22/§4.6 parser 守卫旧句/Q2 小节 ⏳ 未翻牌；P3×3：N3 标号/cli.rs 注释口径/#96-97 未入档）全部复核属实采纳关闭。**审查轨迹：B+（08-31）→ A-（09-05）→ A（09-07）→ A（09-14）** |
-| 下一步 | **无活跃工作包——方向菜单（与用户共同裁决后立项，立项登记 docs/TODO.md）**：① **双后端差分测试（旗舰待令）**：程序生成器→双后端对拍→白名单外差异即新发现——针对 W 包 for-return 潜伏 7 版本的事故模式，发布解冻前最有分量的语义对齐证据（§11f 已知分歧 6 条作白名单底册）；② ~~第四轮独立审查~~ **已完成（2026-09-14，总评 A + R15-R21 关闭）**；③ 工程线：L2 自举编译器（远大志愿）；④ 北极星线：发布动作——**用户 2026-09-07 裁决冻结：技术强迫症，优化到完美前绝对不发布**（全部后置到用户主动解冻）。历史工作包档案见 docs/TODO.md（M/N/Q/L/W + 四轮审查整改均收官） |
+| 下一步 | **无活跃工作包——方向菜单（与用户共同裁决后立项，立项登记 docs/TODO.md）**：① ~~双后端差分测试~~ **已完成（2026-09-14，D 包收官 v1.1.3：1000 程序双后端全一致 + Logical NAM003 漏检修复）**；可扩方向：生成器模板面继续加深（json/递归深度梯度/包系统）、差分轮次常态扩量；② 第五轮独立审查（时机：D 包基线后已积累 1 个 typechecker 修复 + 差分基建）；③ 工程线：L2 自举编译器（远大志愿）；④ 北极星线：发布动作——**用户 2026-09-07 裁决冻结：技术强迫症，优化到完美前绝对不发布**（全部后置到用户主动解冻）。历史工作包档案见 docs/TODO.md（M/N/Q/L/W/D + 四轮审查整改均收官） |
 | 遗留挂账 | （已关闭：栈溢出诊断 N1+Q3、Pattern span M2、Latin-1 化 N2 调查关闭）剩余：包注册中心/调试器/概率类型（按需）；L2 自举编译器（`char_from_code` 已解锁，工作量决策）；cli.rs 25.7%/main.rs 7.5% 的 CLI 粘合层测试（可测性结构已备、测试未写——Q2 拆分收尾可选项）；V8 默认栈深对自举套自举的限制（`--stack-size` 可调至 10⁵，verify --wasm 已内置 60000） |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
@@ -85,12 +86,14 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 473/473（2026-09-08 Q3 基线：469 + parser/json 嵌套守卫 ×4）
+cargo test --release                                    # 期望 475/475（2026-09-14 v1.1.3 基线：473 + D 包 Logical NAM003 ×2）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 118/118（2026-09-08 Q4 起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 151/151（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
 python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
 python tools/fuzz_smoke.py                             # Q4 随机冲击冒烟（固定种子 80 轮正常终态断言；CI doc-gates 常驻）
+python tools/diff_test.py --probe                      # D 包探针：验证 §11f 四条可执行分歧仍如档案（守护白名单）
+python tools/diff_test.py --rounds 20 --seed-base 1 --ci   # D 包差分冒烟（CI 同款；全量口径 --rounds 500 ×多 seed 段）
 # 覆盖率（按需）：rustup component add llvm-tools-preview 后
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
 python tools\doc_audit.py                               # 对账：文档数字 22 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3 + Q4 测试数 ×3）——已在 CI doc-gates job 常驻
@@ -291,7 +294,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 读本文（§0 协作偏好、§1 快照、§11 最新坑优先）+ lom-project-guide.html 的 Phase 5/6 部分
-2. `cargo build --release && cargo test --release` 确认 473/473、零 warning、`./target/release/lom.exe --version` 显示 1.1.2
+2. `cargo build --release && cargo test --release` 确认 475/475、零 warning、`./target/release/lom.exe --version` 显示 1.1.3
 3. 跑 §2.2 回归三件套确认基线
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿（§11 有 API 查法）
 5. **当前状态：v1.0 冻结（2026-09-02）+ v1.1.0/v1.1.1 整改与 W 包（2026-09-03/07）+ M/N/Q 三工作包收官（2026-09-07/08：三文档对账 + Pattern span + fix_corpus 8 对 + 递归/嵌套全入口守卫 + 双拆分 + 覆盖率 84.4% + 任务 118/119）+ 第三轮审查 A + R9-R14（2026-09-07）+ **v1.1.2 稳健性 patch（2026-09-08）**——语言面变更须新 RFC 解冻，这是铁律**。任何新会话先读 RFC-0003 全文修订记录（1-29 条全读）+ LANGUAGE_SPEC §14 + docs/TODO.md，自举代码 examples/selfhost/self_interp.lom（5703 行：Part A-D 前端+dump / E 检查器 / F-G 求值器 / H json 自实现），验收 tools/verify_selfhost.py 六模式（dump/tokens/diags/static/run/wasm）+ 对账双件 tools/spec_examples_check.py / tools/doc_audit.py

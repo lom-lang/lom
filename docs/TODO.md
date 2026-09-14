@@ -4,12 +4,81 @@
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——
-> 第四轮独立审查 + 整改 R15-R21 已收官（2026-09-14，总评 A）。已收官：
-> Q/N/M/L/W 五工作包；四轮审查整改 R1-R8、R9-R14、R15-R21 与 T1-T7 全部
-> 关闭（档案见下）；差分测试压轴项待用户下令立项。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无——D 工作包
+> （双后端差分测试）已收官（2026-09-14，v1.1.3：1000 程序全一致 + Logical
+> NAM003 修复）。已收官：D/Q/N/M/L/W 六工作包；四轮审查整改 R1-R8、R9-R14、
+> R15-R21 与 T1-T7 全部关闭（档案见下）。
 > **纪律**：语言面冻结（LANGUAGE_SPEC §14）不破——只允许新增 warning 级诊断码；
 > 其余行为修复均为 bug 修复性质且不动语法/保留字/内建表。
+
+## D 工作包：双后端差分测试（2026-09-14 开立 → 同日收官，v1.1.3）✅ done
+
+**来源**：用户裁决（2026-09-14 交接方向菜单 ①旗舰项）。**结局：修复出口 + 基建落地**——
+1000 程序双后端逐字一致的全量证据 + 一枚真 bug 修复（Logical NAM003 漏检）+ 升版 v1.1.3。
+
+**D1｜程序生成器 tools/diff_gen.py** ✅ done
+
+- 类型感知模板化生成：39 个模板族（A 纯 Int ×8 / **B 提前返回 ×8 加权 ×3**（W 包
+  for-return 事故模式定向覆盖：for 内 return、for 内 ?、嵌套 for 内层 return、
+  块内 if+return、match Form B 臂内 return、while 内 return、Result/Option 消费）/
+  C String ×4 / D Float ×4 / E List ×3 / F enum+match ×4 / G Record/Tuple ×3 /
+  H 闭包 ×4 / I 管道 ×2 / J Map ×2 / K 杂项 ×4），随机性在模板选择 + 参数填充
+  （常量池/边界/变量名 uniq），结构手写保证语法/类型/效应正确。
+- 确定性输出（纯计算 + println）；默认避开 §11f 六条分歧形态（构造性规避：无
+  mut 捕获/无 json_parse/除数非零/纯 ASCII/Float |x|<1e12/递归 ≤200 嵌套 ≤8）。
+- **生成器自坑五枚（如实落档）**：① `not` 不是 Lom 运算符（`!` 才是；`not` 是
+  普通标识符→未定义调用）——解释器短路逃过 rc=0 而 wasm build 编译失败，正是
+  这个不对称暴露了 D3 的 typechecker bug；② `%=` 不在复合赋值四件套（+= -=
+  *= /=）；③ Form B 臂独立 end 在 t_nested_match 又漏一次（§4.1 第 N 次应验）；
+  ④ t_map_keys 的 len(List) 类型错（list_length 才收 List）；⑤ "裸语句杀尾
+  if"（map_set 裸调用使尾 if 降级→TYPE010，§11.1 修法 let _ = 包裹）；另
+  t_pipeline_int helper 固定名在模板重复抽中时 NAM002（uniq 化）。
+- 自测：60/60 程序 --check 零 Error 零 warning。
+
+**D2｜对拍器 tools/diff_test.py** ✅ done
+
+- 正常模式：逐程序 `lom <file>` vs `lom build --target wasm` + `node
+  run_wasm.mjs`，比对 stdout 逐字 + 退出码；**--check 前置闸门**分离生成器 bug
+  与后端差异（D3 首轮 43 个 not 误报的教训制度化）；差异/生成器 bug 全量留档
+  .diff_failures/。
+- 探针模式（--probe）：mut-capture / div-zero / large-float / deep-recursion
+  四条可执行分歧——验证**差异确实出现且形态符合 §11f 档案**（探针无差异 =
+  白名单腐坏，同样 FAIL）。分歧 2（JSON 数字）与 4（trim Unicode）涉非 ASCII/
+  JSON 宿主物化，由文档 + eval 既有用例覆盖不在探针集（工具头注释声明）。
+- 首轮探针顺手发现：large-float 的 WASM 侧实际形态是 `2e+30.0`（harness
+  fmtFloat 给科学计数法补 .0 尾）——§11f-5 示例形态已补精度。
+
+**D3｜全量对拍 + 真发现** ✅ done
+
+- **真发现：typechecker `and`/`or` 操作数 NAM003 漏检**（Phase 2.4 起潜伏）。
+  `ExprKind::Logical` 分支（typechecker/mod.rs:548）不递归检查操作数——
+  `a < 0 and undefined_fn(b)` 的未定义调用整体逃过 --check；运行时靠 or/and
+  短路掩盖（求值到才 RUNTIME002），wasm build 则编译期失败（非法程序上的
+  后端不对称，正是差分测试暴露链）。**自举检查器（8.2）本就递归检查
+  ExLogical 左右（self_interp.lom:3072）——宿主修复=与自举对齐**，干净集
+  ALIGNED 151 验证不倒。修复：Logical 分支补 check_expr(left/right)（纯静态
+  检查与求值顺序无关；操作数类型仍从宽不强制 Bool——渐进式历史行为保持）。
+  +2 回归测试（475/475）。
+- 生成器修复后全量：**seed 1000-1499 与 5000-5499 两段各 500 程序，双后端
+  stdout+退出码 1000/1000 逐字一致**（--check 闸门下零生成器 bug）；探针 4/4。
+- 涟漪验证：eval 双后端 118/118 不倒、golden 逐字、selfhost static 对齐
+  （坏 19 + 干净 151）、examples stderr 27/29 干净（apply_test/effects_bad
+  为设计内坏文件）、clippy 零告警。
+
+**D4｜收尾** ✅ done
+
+- CI doc-gates 加 step：`diff_test --rounds 20 --seed-base 1 --ci` + `--probe`
+  （固定种子，ubuntu 已预装 node）。
+- 顺手修 §11f 三处：首段 "116 eval tasks/five divergences" → 118/six（Q4 后
+  未同步）、分歧 5 补实测形态 `2e+30.0`、结尾导航段 116→118（R2 先例）。
+- 升版 **v1.1.3**（checker patch）：Cargo.toml/lock、spec §13 条目、测试数
+  475 三处（README/HANDOVER §2.2/§9）、HANDOVER 横幅/§1/§2.2/下一步、guide
+  条目。tag CI 绿后打。
+
+### 纪律
+
+顺序执行（D0→D4）；每阶段全量回归；语言面冻结不破（typechecker 修复为既有
+NAM003 语义的实现偏差修复，零新码零语法）；严禁虚构（所有对拍数字来自实跑留档）。
 
 ## 第四轮审查 + 整改 R15-R21（2026-09-14 开立 → 同日关闭）✅ done
 
