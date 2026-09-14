@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-14（基线 v1.1.2 / commit c4e960a）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--ok); border:3px solid var(--ok); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-14）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>c4e960a</code>（"fix(tools): changelog 防虚构检查豁免当前发布版本——tag 时序死锁"，2026-09-08；分支 main 与 origin/main 一致；工作区仅一处预期内未提交改动：docs/TODO.md 的第四轮审查工作包登记 + 顺手删除 3562ff9 误写的重复 AB-DE 段——重复段经 <code>git log -S</code> 与 <code>git show 3562ff9:docs/TODO.md | grep -c</code> 双重实证为同一提交写了两遍，登记属实）。tag <code>v1.1.2</code> → <code>c4e960a</code>（远端 <code>git ls-remote</code> 实查存在）</p>
+<p><strong>审查范围</strong>：<code>7281936..c4e960a</code> 共 22 个提交——<strong>N</strong>（毛边清理三件：N1 求值递归守卫 80k / N2 Latin-1 调查关闭 / N3 changelog 对账）+ <strong>Q</strong>（质量四阶段：Q1 覆盖率 / Q2 双拆分 / Q3 深嵌套守卫 / Q4 小件打包）+ <strong>AB-DE 尾巴清理</strong> + <strong>CI #90-92 三连红事故</strong>与修复 + <strong>v1.1.2 升版</strong>，及其间全部文档同步与新增代码质量。上轮报告（review-2026-09-07，总评 A）已覆盖的 W/L/M 三包不重复审，硬指标全量复跑</p>
+<p><strong>宣称版本</strong>：v1.1.2（Cargo.toml = Cargo.lock = 1.1.2，<code>lom --version</code> 实测输出 <code>lom 1.1.2</code>）</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行构建/测试/全部验收脚本/对账三件/自举六模式/锁定测试三组/坏提交 worktree 实证/守卫触发实测/独立复算。除本报告文件外未修改任何项目文件（N3 锁定测试对 LANGUAGE_SPEC.md 的三组临时改写均已还原，<code>git diff --numstat</code> 验证零残留；worktree 两个已删除；全部临时文件已清理）；未执行任何 git commit/push/tag</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 1.97.1 / cargo 1.97.1 / node v24.15.0 / Python 3.13.2</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A</span></p>
+
+<p><strong>结论</strong>：上轮基线（7281936 / v1.1.1 / A）之后的 22 个提交<strong>全部宣称逐条属实、全部硬指标实测复现</strong>：473/473 测试、clippy <code>-D warnings</code> 零告警、构建零 warning、eval 双后端 118/118、golden 逐字、自举六模式全 PASS（dump 151 / tokens 151 / diags 9 / static 坏 19+干净 151 / run 31 / wasm 三段 layer2 148+golden+自施加）、对账三件 PASS（51/5/25、22/22、fuzz 80 轮 ×2 确定性）、<code>lom --version</code> → 1.1.2、tag v1.1.2 远端实查存在且指向 HEAD、CI #98（c4e960a）实查 success。</p>
+
+<p>本轮的验证深度超过前三轮：不止跑通了验收，还对全部关键宣称做了<strong>主动对抗性实测</strong>——N1/Q3 三个守卫全部亲手触发（无限递归 → RUNTIME000 结构化诊断 exit 1；150k 层括号 → 单条 PARSE000 exit 1 无错误风暴；150k 层 JSON → 结构化错误 exit 1）；N3 的 F 类三条规则做了三组锁定测试（删当前版本条目/删历史条目/添伪造条目，分别命中 ①/②/③）；Q2 拆分用缩进归一化行多重集比对证明纯搬运（Q2-a 零旧行缺失、Q2-b 仅 2 行壳 vs 11 行样板）；CI #90/#91 的两个坏提交用 git worktree 拉出实编译，双双复现 E0761（新旧 typechecker 模块并存）；CI #90-93、#96-98 的红绿历史逐 run 与 GitHub API 对账。全部通过。</p>
+
+<p><strong>未给 A+ 的原因</strong>：文档腐坏抓到 4 条 P2，且第一条的成色值得警惕——<strong>HANDOVER §2.2 的全量回归清单里有一行被换页符咬掉的命令 <code>python tools\x0cuzz_smoke.py</code></strong>（"tools\fuzz_smoke.py" 的 <code>\f</code> 被转义吞掉），这是 CI #92 事故教训（"heredoc 内嵌含转义的代码改用 Edit 工具落盘"，HANDOVER §11 原文）的同型复发，而且发生在记录该教训的同一份文档、由收官交接提交 820fa63 引入——教训落档没有防住教训本身。另三条：同清单的 doc_audit 行仍写"19 项"（Q4 已 19→22）、§4.6 仍写"parser 侧深嵌套仍无守卫（SECURITY 限制 1）"（Q3 已关闭该限制、同文档 §1 与 SECURITY.md 均已改口）、TODO 的 Q2 小节状态钉在"⏳"从未翻成 done（无证据区，与同文件 Q 包头部"✅ done"及实际提交矛盾）。四条都是单行级陈旧，无一条是数字造假或行为失实，但按本项目"逐字对账"的自我标准，A+ 需要 P2 清零。另有 3 条 P3（N3 证据行规则标号错标、412589b 提交信息的"无 process::exit 依赖"过强表述、#96/#97 双红仅存于 commit message 与代码注释）。无 P0（失实宣称）、无 P1（真 bug）。</p>
+
+<p><strong>与上轮的对比</strong>：上轮 2×P2 + 4×P3 给 A；本轮 4×P2 + 3×P3，P2 数量略增但单条分量更轻（上轮是"README 正文与同文件现状段直接矛盾"级的叙述性旧话；本轮三条是计数/状态未同步，一条是命令字节腐坏）。同时本轮变更面（22 提交、两个工作包 + 事故 + 升版）远大于上轮，且新增的机器 gate（doc_audit 22 项、fuzz 常态化、F 类 changelog 对账）在审查中全部实测有效。审查轨迹 B+ → A- → A → A：维持 <strong>A</strong>。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>HEAD = c4e960a、工作区仅预期 TODO.md 改动（任务书）</td><td><code>git status</code> → 仅 <code>modified: docs/TODO.md</code>；diff 内容 = 第四轮审查工作包开立 + 删重复 AB-DE 段（重复段在 3562ff9 提交版中 grep 计 2 处，实证为单提交笔误，登记属实）；main 与 origin/main 一致</td><td class="ok">✓ 相符</td></tr>
+<tr><td>2</td><td>构建零 warning（HANDOVER §1/§2.2）</td><td><code>cargo clean --release -p lom</code> 后全量重编 1m32s，输出 0 行 warning</td><td class="ok">✓ 相符</td></tr>
+<tr><td>3</td><td>版本 1.1.2 三处一致（HANDOVER §1）</td><td><code>lom --version</code> → <code>lom 1.1.2</code>；Cargo.toml 与 Cargo.lock 的 <code>name="lom"</code> 块版本均 1.1.2</td><td class="ok">✓ 相符</td></tr>
+<tr><td>4</td><td>测试 473/473（README:68、HANDOVER §1/§2.2/§9）</td><td><code>cargo test --release</code> → <code>test result: ok. 473 passed; 0 failed; 0 ignored</code>；守卫测试按名过滤实跑全 ok（deep_recursion / deep_closure_recursion / shallow_recursion_unaffected ×3 + deep_nesting ×2 + moderate_nesting + deep_nested_json ×4）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>5</td><td>clippy <code>-D warnings</code> 零告警（HANDOVER §1、ci.yml:140）</td><td><code>cargo clippy --release -- -D warnings</code> → Finished 无告警</td><td class="ok">✓ 相符</td></tr>
+<tr><td>6</td><td>eval 118/118 宿主后端（README:68、HANDOVER §2.2）</td><td><code>run.ps1 -Verify</code> → <code>Total: 118 / Passed: 118 / Failed: 0</code>（分类：arithmetic 10 / control_flow 13 / types 13 / closures 13 / match_enum 16 / pipeline 10 / records_tuples 10 / effects 6 / modules 6 / error_repair 21，合计 118）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>7</td><td>eval 118/118 WASM 后端（同上）</td><td><code>run.ps1 -Verify -Backend wasm</code> → exit 0（runner 语义 failed&gt;0 才 exit 1，run.ps1:195；全 118 任务零失败）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>8</td><td>stmt_interp golden 逐字（HANDOVER §2.2）</td><td><code>lom.exe examples/bootstrap/stmt_interp.lom</code> 输出与 stmt_interp.expected.txt 行尾归一化后 <code>diff</code> 零差异（39 行 = 39 行）</td><td class="ok">✓ 逐字一致</td></tr>
+<tr><td>9</td><td>自举 dump 151/151（HANDOVER §2.2）</td><td><code>verify_selfhost.py</code> → <code>dump: PASS 151 / FAIL 0（Latin-1 折叠等价 0）</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>10</td><td>自举 tokens / diags / static / run（任务书期望 151/9/19+151/31）</td><td>tokens <code>PASS 151 / FAIL 0</code>（列坐标系已知差异 1）；diags <code>PASS 9 / FAIL 0</code>；static <code>坏 19 / 干净集 ALIGNED 151 / DIFF 0</code>；run <code>PASS 31 / FAIL 0</code> — 四模式全 PASS</td><td class="ok">✓ 相符</td></tr>
+<tr><td>11</td><td>自举 wasm 三段验收（HANDOVER §1 8.4 行、§2.2）</td><td><code>--wasm</code> → <code>wasm-layer2: PASS 148 / FAIL 0</code> + <code>wasm-layer3: PASS</code>（39 条 golden，--stack-size=60000）+ <code>wasm-selfapply: PASS</code> + RESULT: PASS（layer2=148 = 29 examples + 3 bootstrap（stmt_interp 走第三层）+ 118 参考解 − 2 豁免；较 v1.1.1 时代的 146 随任务 116→118 同步 +2，账目自洽）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>12</td><td>spec_examples_check 三文档 PASS（HANDOVER §2.2）</td><td>→ <code>正例 51 / 反例 5 / skip(json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1) / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>13</td><td>doc_audit 22/22（TODO Q4、HANDOVER §1）</td><td>→ <code>RESULT: PASS（22/22 项通过）</code>；22 = A×9 + B×2 + C×1 + D×1 + E×3 + F×3 + G×3 逐类清点吻合；真值行 eval 118 / dump 151 / 拆分 36=29+4+2+1 / self_interp 5703 行 / 版本 1.1.2</td><td class="ok">✓ 相符</td></tr>
+<tr><td>14</td><td>fuzz_smoke 80 轮零崩溃 + 固定种子可复现（TODO Q4）</td><td>两次实跑均 <code>fuzz: 80 轮冲击零崩溃 / RESULT: PASS</code>，两次日志逐字节 diff 相同（确定性成立）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>15</td><td>tag v1.1.2 存在且在 CI 绿后打（HANDOVER §1）</td><td><code>git ls-remote --tags origin</code> → v1.1.2（annotated 00f8cd3）→ <code>c4e960a</code> = HEAD；GitHub API：c4e960a 的 run <strong>#98 success</strong>（2026-09-08T12:42Z），tag 指向的 commit CI 绿属实</td><td class="ok">✓ 相符</td></tr>
+<tr><td>16</td><td>N1：守卫设计五要素（TODO N1 证据区）</td><td>源码逐条核实：interpreter.rs:377 <code>DEFAULT_MAX_CALL_DEPTH=80_000</code>；:411-414 call_depth/max_depth 字段；:1432-1450 call_function 与 :1475-1493 call_closure 入口 +1、显式 match 出口（注释言明不用 <code>?</code>）、超限先 -1 再返回；:356 DepthLimit 变体（函数版带 f.span 签名位置、闭包版带调用点）；diagnostics.rs:176/:256 from_runtime 覆盖位置 + RUNTIME000 兜底码；repl.rs:372 补分支。main.rs:49-50 的 256MB 栈线程系 Phase 5.0 既有（非 N1 新增）；2.6KB/帧 × 80k ≈ 208MB &lt; 256MB，账目自洽</td><td class="ok">✓ 逐条核实</td></tr>
+<tr><td>17</td><td>N1：无限递归 → 结构化诊断而非崩溃（TODO N1）</td><td>实测 <code>down(n+1)</code> 无限递归 → <code>[runtime] error (1:1): [RUNTIME000] 递归深度超过 80000 层（256MB 栈的安全上限）：函数 'down' 疑似缺少终止条件——检查递归出口或改写为 while 循环</code> + 源码指针行，exit 1（与档案逐字同形）</td><td class="ok">✓ 实测复现</td></tr>
+<tr><td>18</td><td>N1：bench recurse 10000 守卫不拦合法深度（TODO N1、SECURITY.md:16 验证命令）</td><td><code>lom.exe examples/bench.lom -- recurse 10000</code> → 输出 <code>0</code>，exit 0</td><td class="ok">✓ 相符</td></tr>
+<tr><td>19</td><td>N1：测试注入小阈值设计 + 3 测试（TODO N1）</td><td>interpreter.rs:2212/:2238/:2264 三处 <code>interp.max_depth = 100/500</code> 注入；三测试断言消息/函数名/位置 (1,1)/计数归零，实跑 ok</td><td class="ok">✓ 相符</td></tr>
+<tr><td>20</td><td>N2：零代码改动关闭（TODO N2）</td><td><code>git show 681858d --stat</code>：仅 docs/HANDOVER.md + docs/TODO.md + tools/verify_selfhost.py（注释），src/ 零改动</td><td class="ok">✓ 相符</td></tr>
+<tr><td>21</td><td>N3：F 类三条规则机械有效（TODO N3）</td><td><strong>三组锁定测试</strong>（改后即还原，<code>git diff --numstat</code> 零残留，恢复后 22/22 复绿）：删 v1.1.2 当前版本条目 → ①+② 双 FAIL；删 v1.1.1 历史条目 → ② 单 FAIL（缺条目 ['v1.1.1']）；添伪造 v1.2.0 条目 → ③ FAIL（防虚构命中）。三条规则全部真实可触发</td><td class="ok">✓ 三组实测</td></tr>
+<tr><td>22</td><td>N3 证据行"删 v1.1.1 条目 → ①③ 双 FAIL"（TODO.md:221）</td><td>实测为 <strong>② 单红</strong>——删条目逻辑上不可能触发 ①（当前版本仍有条目）与 ③（删除不产生无 tag 条目）；TODO 同段自己的规则编号（①当前版本②tag 全有条目③条目全有 tag）与之矛盾。机制真实、规则标号错标（见问题 5）</td><td class="warn">△ 机制真、标号错</td></tr>
+<tr><td>23</td><td>N3/c4e960a：当前发布版本豁免防虚构（commit message、doc_audit.py:168-171）</td><td>代码注释与 commit message 记录 #96/#97 死锁；实测 v1.1.2 无 tag 场景已由豁免覆盖（当前 22/22 PASS）；豁免范围仅当前 Cargo 版本，伪造其他版本仍拦截（v1.2.0 实测 FAIL）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>24</td><td>Q1：84.4% 行覆盖下界，cargo test 口径（TODO Q1、HANDOVER §1/§2.2）</td><td><strong>未复测</strong>（需 llvm-tools-preview + instrument-coverage 全量跑，本轮做口径审查：TODO/HANDOVER/§2.2 均一致标注"cargo test 口径下界（e2e/CLI 驱动不计入）"且给出复测命令，口径自洽无矛盾；see §5 局限）</td><td class="warn">△ 口径自洽、未复测</td></tr>
+<tr><td>25</td><td>Q1：B 类真盲区补测 ×6（TODO Q1）</td><td><code>git show aa739b9</code> 实有 6 个新测试：json 错误路径 ×4（unexpected_char/missing_colon/missing_comma_or_brace/truncated）+ info ×2（enums_with_type_params/generic_with_args）；测试计数链条 463（N1 后）→469（Q1 +6）→473（Q3 +4）逐环吻合</td><td class="ok">✓ 相符</td></tr>
+<tr><td>26</td><td>Q2：拆分行数 1011+467 / 1590+235+784（TODO Q 结局、guide:1075）</td><td><code>wc -l</code> 实测 src/main.rs=1011、src/cli.rs=467、src/typechecker/mod.rs=1590、builtins.rs=235、tests.rs=784 — <strong>五个数字逐位相符</strong>（412589b 提交信息写 1014 系当时值，后续提交漂 3 行，TODO/guide 为现值）</td><td class="ok">✓ 逐位相符</td></tr>
+<tr><td>27</td><td>Q2：全部文件 &lt;100KB、恢复可整读（TODO Q 结局）</td><td>最大 src/typechecker/mod.rs = 70,196B；全 src 文件 ls 核对均 &lt;100KB</td><td class="ok">✓ 相符</td></tr>
+<tr><td>28</td><td>Q2-a：纯重构零行为（commit 412589b、TODO Q 纪律）</td><td><strong>缩进归一化行多重集独立复算</strong>：412589b^ 的 main.rs 全部非空行 vs 412589b 的 main.rs+cli.rs 并集 → <strong>旧侧缺失 0 行</strong>，新侧多出 29 行全部为样板（mod cli;/use 声明 ×17/文件头注释/#[cfg(test)] 重构）——纯搬运实证</td><td class="ok">✓ 纯搬运实证</td></tr>
+<tr><td>29</td><td>Q2-b：纯重构零行为（commit 264c833、TODO Q 纪律）</td><td>同法复算 412589b 的 typechecker.rs（2597 行）vs 264c833 的三文件并集：缩进归一化后旧侧仅缺 2 行（<code>mod tests {</code> 壳 + 一行 use 迁移改写），新侧多 11 行样板（三文件头注释/mod 声明/use super/impl 壳）；测试剥壳导致的缩进差（-4 空格）与 rustfmt 重排在归一化后消解——纯搬运实证；<code>git log --follow src/typechecker/mod.rs</code> 追溯 26 个提交至 v0.1.3，历史连续</td><td class="ok">✓ 纯搬运实证</td></tr>
+<tr><td>30</td><td>Q2：264c833/ba16d35 两坏提交编译失败 = CI #90/#91（TODO CI 事故记录）</td><td><strong>git worktree 实证</strong>：两提交的树均同时含 src/typechecker.rs 与 src/typechecker/mod.rs（git ls-files 核对），<code>cargo build</code> 双双 <code>error[E0761]: file for module typechecker found at both …</code>——事故根因（add 目录不 stage 兄弟删除）与"#90/#91 双红"记录实证成立（worktree 已删）</td><td class="ok">✓ 实证复现</td></tr>
+<tr><td>31</td><td>Q3：parser 守卫设计（TODO Q3 证据区）</td><td>源码核实 parser.rs:56 <code>DEFAULT_MAX_EXPR_DEPTH=30_000</code>、:843-867 parse_expr 入口对称计数、:854 <code>pos = tokens.len().saturating_sub(1)</code> 跳 Eof 哨兵（防容错恢复错误风暴）、超限 PARSE000 结构化消息；实测 150k 层括号 → <strong>单条</strong> <code>[PARSE000] 表达式嵌套超过 30000 层（256MB 栈的安全上限）…</code>（位置 2:30013；TODO 记 2:30012，差 1 列系测试文件前缀构造不同，非行为差异）+ 共 1 个诊断 + exit 1，无崩溃无错误风暴</td><td class="ok">✓ 实测复现</td></tr>
+<tr><td>32</td><td>Q3：json_parse 守卫 100k（TODO Q3）</td><td>json.rs:52 <code>max_depth=100_000</code> + :73-88 入口计数；实测 150k 层嵌套数组经 json_parse → <code>[RUNTIME000] json_parse 失败: JSON 解析错误 (偏移 100000): JSON 嵌套超过 100000 层…</code> exit 1，无崩溃</td><td class="ok">✓ 实测复现</td></tr>
+<tr><td>33</td><td>Q3：+4 测试与 473 基线（TODO Q3）</td><td>parser ×3（严格 Err/合法深度不拦/容错单条诊断恰好断言 errors.len()==1）+ json ×1，全部实跑 ok；469+4=473 链条吻合</td><td class="ok">✓ 相符</td></tr>
+<tr><td>34</td><td>Q4：任务 118 = 078 明确版对照题（TODO Q4）</td><td>08_effects.json 实有 id=118：prompt 明写"用<strong>单独一次</strong> println 输出<strong>一行</strong>，格式为 时间戳 空格 消息"——与 078 的歧义表述构成同逻辑对照；runner 实跑含 118（effects 6/6）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>35</td><td>Q4：任务 119 = MUT001 warning 修复题，诊断 JSON 来自真实输出（TODO Q4）</td><td>10_error_repair.json 实有 id=119（let count → let mut count，expected "6"）；内嵌诊断 JSON 与本人实跑 <code>--check --json</code> 输出逐字段一致（MUT001/warning/line 4/col 9/message/hint 六项全同）——"严禁虚构"纪律兑现</td><td class="ok">✓ 逐字段一致</td></tr>
+<tr><td>36</td><td>Q4：fuzz_smoke.py 设计（固定种子/五类变异/正常终态断言）（TODO Q4）</td><td>源码审查：seed=range(rounds) 固定可重放；五变异含括号洪水 500（Q3 守卫路径）；断言 returncode∈{0,1}，崩溃（Windows 异常码/panic 101）/超时 20s 记 FAIL 并留档 crash 输入；临时文件项目内 .fuzz_tmp 用完即删；encoding='utf-8' 显式</td><td class="ok">✓ 相符</td></tr>
+<tr><td>37</td><td>Q4：doc_audit 19→22 项 + 上线首日抓 README:33 陈旧计数（TODO Q4）</td><td>22 项结构逐类清点吻合（见 #13）；README:33 现带"Phase 1 时点快照，2026-08 初"注；抓取机制复核：Q4 前该行无时点注（git show 2cd44ce^ 实证），未锚定正则首匹配即命中 20/20 → 修复 = 补时点注 + 正则 <code>(?m)^</code> 行首锚定排除历史 bullet——机制与记录自洽</td><td class="ok">✓ 相符</td></tr>
+<tr><td>38</td><td>Q4：簿记全链 manifest 116→118 / prompts 重跑 / ci.yml ×2（TODO Q4）</td><td>manifest total_tasks=118；prompts/08_effects.md 含 Task 118、10_error_repair.md 含 Task 119；ci.yml:87 "WASM eval parity (118 tasks…)" + :116 "Selfhost dump (151 文件逐字…)" + :166 "Fuzz smoke (Q4, fixed seeds)" 三处核对</td><td class="ok">✓ 相符</td></tr>
+<tr><td>39</td><td>AB-B：SPEC_FOR_AI §11f 第 6 条 + LANGUAGE_SPEC §7.3 RUNTIME000 行（TODO AB-DE）</td><td>SPEC_FOR_AI.md:707-708 实有分歧第 6 条（深递归/深嵌套：解释器 RUNTIME000/PARSE000 结构化 + exit 1 vs WASM V8 trap 可调 --stack-size，含统一修复模式）；LANGUAGE_SPEC.md:780 码表 RUNTIME000 行补"recursion depth &gt; 80,000 since 2026-09-08"形态</td><td class="ok">✓ 相符</td></tr>
+<tr><td>40</td><td>AB-D：078 歧义 1/10 vs 118 明确版 10/10、损失 90pp（TODO AB-DE、HANDOVER 横幅、pass@k 报告）</td><td>eval/candidates_rerun/_ab_test_effects/ 实有（s1-s10 + raw 10 个 + run_meta + passk_summary）；矩阵实测 <strong>078 = 1/10、118 = 10/10</strong>（effects 分类 0.85/1.0 交叉自洽）；报告后补节 REPORT-2026-09-07-passk.md:64-74 实在，含 90 个百分点结论与留档指针</td><td class="ok">✓ 留档吻合</td></tr>
+<tr><td>41</td><td>AB-A：Q3 性能账噪声带内不可分辨（TODO AB-DE）</td><td>历史 A/B（worktree 81ms→79.5ms）未重跑；本人对当前 HEAD 连续 5 次 <code>--dump-ast self_interp</code> 实测 83-88ms——与档案量级一致，无可见退化迹象（推演：仅判定"量级不变"，非严格 A/B）</td><td class="warn">△ 量级吻合、未复测 A/B</td></tr>
+<tr><td>42</td><td>CI #90-92 三连红 → #93 恢复（TODO CI 事故记录、HANDOVER §11）</td><td>GitHub API 逐 run 对账：#90=264c833 failure / #91=ba16d35 failure / #92=2cd44ce failure（失败 step = SPEC_FOR_AI example check R7）/ #93=c19ab13 success / #94/#95 success——与档案记录<strong>逐 run 吻合</strong>；#90/#91 的 Build 全平台失败已 worktree 实证（见 #30）</td><td class="ok">✓ 逐 run 对账</td></tr>
+<tr><td>43</td><td>CI #96/#97 双红（tag 时序死锁）→ #98 绿（c4e960a commit message）</td><td>API 实查：#96=ba8f25c / #97=820fa63 均 failure，失败 step 均 = <strong>Doc numbers audit (R8)</strong>；#98=c4e960a success——与 commit message "CI #96/#97 双红无法进入打 tag 环节"吻合；此事仅在 commit message + doc_audit.py:169 注释留档，TODO/HANDOVER 事故档案未收（见问题 7）</td><td class="ok">✓ 事实吻合、留档面窄</td></tr>
+<tr><td>44</td><td>v1.1.2 §13 changelog 条目内容（LANGUAGE_SPEC:1399-1404）</td><td>条目实在且内容与实测行为一致（80k/30k/100k 三阈值、RUNTIME000/PARSE000 复用、零语言面、118/118、473/473、84.4%）；"Also in this window"清单（M1/M2/M3/Q2/118/119）逐项与本轮核实的事实吻合</td><td class="ok">✓ 相符</td></tr>
+<tr><td>45</td><td>上轮整改 R9-R14 修复保持（review-2026-09-07 问题 1-6）</td><td>README:154 "remain open" 已改写为 "single-run sampling closed by the 2026-09-07 pass@k retest …; the cross-language control group remains open"（上轮 P2-1 关闭且未回潮）；README:68 现值段 473/118/6-mode gate 全新（P2-2 关闭）；is_ebnf 收紧落地（Q4）——上轮 6 条修复全部保持</td><td class="ok">✓ 全部保持</td></tr>
+</table>
+
+<p class="small">矩阵 45 项：41 项完全相符（含 5 项对抗性实测复现与 2 项纯搬运独立复算）、3 项口径差（#22 规则标号错标 / #24 覆盖率未复测但口径自洽 / #41 性能账量级吻合未复测 A/B）、1 项事实吻合但留档面窄（#43）。无一项硬指标失败。</p>
+
+<h2>3. 专项审查</h2>
+
+<h3>3.1 N1/Q3 深度守卫族的对抗性实测与边界推演</h3>
+<p>三侧守卫（求值 80k / parser 表达式 30k / json 100k）全部亲手触发成功（矩阵 #17/#31/#32），诊断文本、位置、退出码与档案逐字同形。设计上有三个值得记录的细节均经源码+行为双确认：① 出口<strong>显式 match 不用 <code>?</code></strong>（interpreter.rs:1431 注释言明早退跳过递减的坑——call_depth 对称性由 :2220 断言"超限后计数归零"锁定）；② parser 超限 <strong>pos 跳 Eof 哨兵（len-1）</strong>——不跳则容错恢复模式会"同 token 反复递归-超限-恢复"产生错误风暴，实测 150k 括号恰好 1 条诊断（测试 deep_nesting_recover_mode_single_error 断言 errors.len()==1 锁定）；③ 测试注入模式（max_depth/max_expr_depth/max_depth 字段化 + 100/500 小阈值）是"cargo test 8MB 线程栈跑不了生产阈值"的必然解，三处守卫全部贯彻。<strong>边界推演</strong>：json 守卫的错误经 RuntimeError::Msg 包装（"json_parse 失败: …"）复用 RUNTIME000 而非独立码——与"零新码"的冻结纪律一致；WASM 侧深递归仍走 V8 trap（§11f 第 6 条如实记录为双后端分歧）。SECURITY.md:16 的验证命令本人逐条实跑通过（无限递归 exit 1 / recurse 10000 exit 0），:27 的限制 1 关闭口径与代码现状一致。</p>
+
+<h3>3.2 Q2 拆分的纯搬运独立复算与 CI 事故实证</h3>
+<p>方法：对拆分前后源码做<strong>缩进归一化 + 空行剔除 + pub(crate) 归一 + 行多重集排序比对</strong>（不复用项目任何脚本）。Q2-a（main.rs→cli.rs）：旧侧缺失 0 行、新侧 29 行全为样板——教科书级纯搬运。Q2-b（typechecker.rs→三文件）：旧侧仅缺 <code>mod tests {</code> 壳与 1 行 use 改写、新侧 11 行样板；测试剥壳的 -4 缩进与 rustfmt 链式调用重排在归一化后完全消解（词数 8996→9034，增量恰为样板）。两坏提交（264c833/ba16d35）经 git worktree 拉出实编译：树中同时存在 src/typechecker.rs 与 src/typechecker/mod.rs，cargo 报 E0761——TODO 记录的根因（<code>git add src/typechecker/</code> 不 stage 兄弟文件删除）与"#90/#91 双红"完全实证，且"Q4 的 git add -A 顺带删除旧文件（2cd44ce）恢复编译"的叙述与 git ls-files 在三个提交中的演变吻合。HANDOVER §11 的教训条（staged 复核/heredoc 落盘/首跑纪律）与 TODO 档案互证成立——但其后 §2.2 自身又栽进同型坑（问题 1）。</p>
+
+<h3>3.3 新代码与工具增量质量</h3>
+<p><strong>src/cli.rs（467 行）</strong>：结构清晰（六函数迁出 + 5 测试），但"纯函数层"成色要打个折——parse_args 的四个错误路径（缺 --target 值/未知选项/多文件）仍是 <code>eprintln! + process::exit(1)</code>（cli.rs:158-186），print_help 是 stderr IO；commit 412589b 的"无 IO/无 process::exit 依赖"表述过强（问题 6）。5 个测试全部针对 apply_iterative（×4）+ fix_corpus e2e（×1，含 CRLF 归一化防线），parse_args/LSP 提取/包合并确无测试——与 AB-DE E 的如实记录（"可测性结构已备、测试未写"）一致，HANDOVER §5 的"测试可直测"（能力表述）成立。<strong>typechecker 三拆</strong>：builtins.rs:4 对账哨兵注释与 tests.rs:9 export_builtin_table_for_selfhost 都在；tests.rs 66 个 #[test] + 3 个辅助函数，784 行确为测试。<strong>fuzz_smoke.py</strong>（106 行）：质量良好（矩阵 #36）；一点观察——SEED_SNIPPETS 六片段与五变异的组合空间对 --check 路径覆盖合理，但不含 --run 深递归形态（run 侧守卫由 N1 测试与 SECURITY 验证命令覆盖，非缺口）。</p>
+<p><strong>doc_audit.py 增量</strong>：F 类三条 + G 类三条的锚定质量高（G 用 <code>(?m)^</code> 行首锚 + 上下文锚，历史 bullet 天然排除；F 用 <code>(?m)^- \*\*(v…)</code> 精确条目锚）；"模式找不到也算 FAIL"的元纪律（:24 注释）防住了清单自身腐坏。盲区如实：它核数字模式核不了叙述性旧话（本轮 P2-3 即为例）、核不了 doc_audit 自身项数（P2-2 即为例）——这是数字 gate 的固有边界，项目已在注释中部分言明。</p>
+
+<h2>4. 问题清单（按优先级）</h2>
+
+<h3><span class="tag p0">P0</span> 无</h3>
+
+<h3><span class="tag p1">P1</span> 无</h3>
+
+<h3><span class="tag p2">P2</span> 文档腐坏（4 条）</h3>
+
+<ol>
+<li>
+<p><strong>docs/HANDOVER.md:91（§2.2）— 全量回归清单中的 fuzz 命令被换页符咬掉：<code>python tools\x0cuzz_smoke.py</code></strong></p>
+<p>该行二进制实为 <code>python tools</code> + <code>0x0C</code>（formfeed）+ <code>uzz_smoke.py</code>——写入时 <code>tools\fuzz_smoke.py</code> 的 <code>\f</code> 被当作转义序列吞掉。全仓 git ls-files 字节扫描确认这是唯一一处 formfeed。直接后果：§2.2 是交接文档钦定的"每次改动后跑"复制粘贴清单，接手者复制此行必然 file not found。引入提交是 820fa63（"交接就绪——HANDOVER 全面刷新"）——即 <strong>CI #92 事故教训（heredoc 转义丢层，HANDOVER §11 原文"含转义/特殊字符的代码落盘一律用 Edit/Write 工具"）的同型复发，发生在记录该教训的同一份文档、且是收官交接提交本身</strong>。教训条写了，防线没挡住自己。</p>
+<p class="small">证据：docs/HANDOVER.md:91 二进制 od/python 字节检查（0x0C ×1 全仓唯一）；git log -S 定位引入提交 820fa63；HANDOVER §431 教训原文。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:94（§2.2）— doc_audit 行仍写"19 项"，实际 22 项</strong></p>
+<p>"python tools\doc_audit.py # 对账：文档数字 <strong>19 项</strong>（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3）"——该行写于 N3 收官（3e505b4，当时 19 项属实），Q4 把 doc_audit 扩到 22 项（+G 类测试数 ×3）时此行未同步；同文档 §1 横幅与 §2.2 其余行都已是 22/473 新值。讽刺的是 doc_audit 监控了 HANDOVER 的测试数（G 类）却监控不了自己的项数——数字 gate 的自指盲区。</p>
+<p class="small">证据：docs/HANDOVER.md:94 vs doc_audit 实测输出"RESULT: PASS（22/22 项通过）"；git log -S 定位 3e505b4。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:201（§4.6）— "parser 侧深嵌套（非调用递归）仍无守卫（SECURITY 限制 1）" 与 Q3 后现状矛盾</strong></p>
+<p>§4.6 写于 N1 时代（2026-09-07，当时属实），Q3（2026-09-08，次日后）落地 parser 30k + json 100k 守卫并关闭 SECURITY 限制 1 后未回头改口。同文档 §1 横幅（"Q3 parser 30k+json 100k 守卫——SECURITY 限制 1 关闭"）、SECURITY.md:27（限制 1 划线关闭）、以及代码与本人实测全部相反。§4.6 是"交接必读"级的操作注意事项（末句"如果遇到新的栈溢出，先确认线程包装与守卫没被破坏"），读者据旧句会误判 parser 侧仍会崩溃。与上轮"同文件横幅已正确、正文旧值未同步"型完全同型。</p>
+<p class="small">证据：docs/HANDOVER.md:195-201 vs :12（横幅）/SECURITY.md:27/实测 150k 括号 → PARSE000。</p>
+</li>
+<li>
+<p><strong>docs/TODO.md:90 — "### Q2｜双文件拆分（吸收预登记 P 工作包）⏳" 状态钉死未翻牌、无证据区</strong></p>
+<p>Q 工作包头部（:49-55）宣告"✅ done"且结局行明列"Q2 双文件拆分（main 1443→1011+467、typechecker 2597→1590+235+784）"，AB-DE E 有"拆分验证兑现"（builtins 100%），提交 412589b/264c833 实在——唯独 Q2 小节自身的状态标记停在立项时的"⏳"，四行立项描述原样留存、无证据区。违反 TODO.md 自己的第 6 行纪律（"完成一项就把状态改为 <code>done</code> 并附一行证据"）。扫小节标题的读者会得出"Q2 未做"的错误结论；且 Q2 是唯一没有证据区的小节，拆分的关键证据（纯搬运验证/行数/覆盖率验证）散落在 Q 结局行与 AB-DE E 里。</p>
+<p class="small">证据：docs/TODO.md:90-93（⏳ + 立项原文）vs :51-52（结局行）/118-119（Q4 有证据区对照）/commit 412589b/264c833。</p>
+</li>
+</ol>
+
+<h3><span class="tag p3">P3</span> 建议 / 轻微口径（3 条）</h3>
+
+<ol start="5">
+<li>
+<p><strong>docs/TODO.md:221 — N3 锁定测试证据行的规则标号错标："删 v1.1.1 条目 → ①③ 双 FAIL"</strong></p>
+<p>按 TODO 自己三行前的编号（①当前版本有条目 / ②v1.x tag 全有条目 / ③条目全有 tag），删 v1.1.1 条目机械上只能触发 ②（v1.1.1 tag 无条目）——本人实测正是 ② 单红（21/22）；① 只在删<strong>当前版本</strong>条目时触发（N3 时点当前版本恰是 1.1.1，若当时删除会 ①+② 双红），③ 只在<strong>添加</strong>无 tag 条目时触发（本人添 v1.2.0 实证）。"两红"的结论可能来自当时删当前版本条目的一次实验，但括注把它归给"删 v1.1.1"且标号写成 ①③——证据行与机制不符。gate 本身三轮实测全部真实有效，故仅记档案精度。</p>
+<p class="small">证据：docs/TODO.md:218-221 vs 本人三组锁定测试实测（删当前 → ①②、删历史 → ②、添伪造 → ③）。</p>
+</li>
+<li>
+<p><strong>commit 412589b 信息 — "约 460 行无 IO/无 process::exit 依赖的可测逻辑"表述过强</strong></p>
+<p>迁出的 parse_args 在四个错误路径上保留 eprintln + process::exit(1)（src/cli.rs:163/:172/:180/:185），print_help 是 stderr 输出——"无 IO/无 process::exit"对这两函数不成立（对 merge_packages_for_wasm/apply_iterative/LSP 提取成立）。行为无恙（纯搬运已证）、错误路径 exit 语义与拆分前一致，且 AB-DE E 对"哪些没测试"的记录是诚实的；但按"逐字对账"标准，提交信息的能力表述应收敛为"迁出可直测逻辑（错误路径仍直接终态退出）"。commit 信息不可追改，建议在下次触碰 cli.rs 时于代码头注释补正口径。</p>
+<p class="small">证据：src/cli.rs:8（use std::process）+:163-186（4 处 exit）vs commit 412589b message。</p>
+</li>
+<li>
+<p><strong>CI #96/#97 双红事故未入 TODO/HANDOVER 事故档案——事故叙事止于"#90-92 三连红"</strong></p>
+<p>v1.1.2 升版窗口的两次 doc-gates R8 红（#96 ba8f25c / #97 820fa63，API 实查失败 step 均为 Doc numbers audit）只在 c4e960a 的 commit message 与 doc_audit.py:169 代码注释里留档；TODO 的"CI 事故记录"段与 HANDOVER §11 教训清单都只覆盖 #90-92。这不是失实（两处留档真实且自洽，tag 时序死锁的机制记录完整），但按项目"事故落档"惯例，只读 TODO/HANDOVER 的接手者会漏掉最近一次双红的完整故事（包括"防虚构检查与 tag 纪律的时序冲突"这一制度层教训——它比 #90-92 的三个操作教训更有设计含金量）。建议并入 §11 作第四条教训。</p>
+<p class="small">证据：GitHub API run #96/#97（failure，Doc numbers audit R8）vs docs/TODO.md:57 / docs/HANDOVER.md:421-433（均止于 #90-92）；c4e960a message + doc_audit.py:168-169。</p>
+</li>
+</ol>
+
+<h2>5. 方法局限声明</h2>
+<ul>
+<li><strong>Q1/AB-E 覆盖率未复测</strong>：84.4%/84.44% 与 builtins 100%/tests 96.6%/cli 25.7%/main 7.5% 的分文件数字未重新测量（需 rustup component add llvm-tools-preview + instrument-coverage 全量跑，本轮时间预算内让位于对抗性实测）。已做口径审查：TODO/HANDOVER/§2.2 对"cargo test 口径下界、e2e/CLI 不计入"的标注三处一致且附复测命令，口径无矛盾；84.4%→84.44% 的 +0.08pp 差值无法独立复核。<strong>未验证项</strong>。</li>
+<li><strong>AB-A 性能账未做严格 A/B</strong>：worktree 旧版（412589b）vs 当年的对照未重跑；以当前 HEAD 连续 5 次 --dump-ast self_interp 实测 83-88ms 做量级 sanity（与档案 79.5-81ms 同量级），"噪声带内不可分辨"结论<strong>未复核</strong>。</li>
+<li><strong>AB-D 的 LLM raw 真实性无法本地复核</strong>：_ab_test_effects 的 10 个 raw 回复确系模型原始输出这一点不可验证（与上轮同类局限）；验证的是矩阵与留档/报告三者的自洽性（078=1/10、118=10/10、effects 0.85/1.0 交叉一致）。078 在 L 包正式 pass@k 中 0/10 与 AB 复测 1/10 的差异属采样方差，档案未宣称矛盾。</li>
+<li><strong>CI 内部状态以 API 侧面还原</strong>：run 结论、失败 step 名、head_sha 逐一实查（#84-#98 全表）；但 job 日志正文未拉取（失败根因的最终行文本以 failed step 名 + 本地 worktree 复现佐证）。#98 之后无新 run（2026-09-08 至今 main 无新提交，与本地一致）。</li>
+<li><strong>N2 的"三层实测"过程性证据未复现</strong>（探针统计/含 CJK 错误实测）——以零代码改动的 diff 事实 + verify 工具注释更新采信其调查结论；diags 模式 9/9 本轮复跑 PASS。</li>
+<li><strong>报告基线</strong>：审查执行于 2026-09-14，HEAD = c4e960a。N3 锁定测试的三组 LANGUAGE_SPEC.md 临时改写均在测试后立即还原（<code>git diff --numstat</code> 零输出验证）；两个审计 worktree 已 <code>git worktree remove --force</code>；全部 _review_* 临时文件已删除；工作区仅余任务书预期的 docs/TODO.md 未提交改动（<code>git status</code> 终态验证）。</li>
+</ul>
+
+<hr>
+<p class="small">审查方法对齐项目纪律：逐条给证据（文件:行号 + 命令输出）；所有实测数字来自真实命令执行；对抗性实测优先于采信档案；优先级口径 P0 失实宣称 / P1 真 bug / P2 文档腐坏 / P3 建议。上轮报告：<a href="review-2026-09-07.html">review-2026-09-07.html</a>（A）、<a href="review-2026-09-05.html">review-2026-09-05.html</a>（A-）、<a href="review-2026-09-03.html">review-2026-09-03.html</a>、<a href="review-2026-08-31.html">review-2026-08-31.html</a>（B+）。</p>
+
+</div>
+</body>
+</html>

@@ -1,8 +1,11 @@
 // src/cli.rs — CLI 可测纯函数层（Q2 拆分自 main.rs，2026-09-08）
 //
-// 从 main.rs 迁出的无 IO / 无 process::exit 逻辑：参数解析、帮助文本、
-// LSP JSON 参数提取、WASM 包合并、fix 迭代闭环——可被单元测试直测。
-// main.rs 保留入口（256MB 栈线程）、子命令分发与终态退出码。
+// 从 main.rs 迁出的可直测逻辑：参数解析、帮助文本、LSP JSON 参数提取、
+// WASM 包合并、fix 迭代闭环。注（2026-09-14 R20 如实口径）：parse_args
+// 的参数错误路径与 print_help 仍含 stderr 输出/直接退出（与拆分前
+// main.rs 行为一致，非纯函数）；merge_packages_for_wasm/apply_iterative/
+// LSP 提取为无 IO 纯逻辑。main.rs 保留入口（256MB 栈线程）、子命令分发
+// 与其余终态退出码。
 
 use std::fs;
 use std::process;
