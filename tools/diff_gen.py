@@ -23,8 +23,8 @@
 #   本身不腐坏）。deep-recursion 探针见 --probe deep-recursion（深递归双后端
 #   结构化诊断 vs V8 trap——退出码都非 0，stdout 应一致为空/前缀）。
 # - 固定种子可复现（random.Random(seed)）；零第三方依赖（Python 标准库）。
-# - 数值安全：Int 结果 |x| < 2^62（乘法操作数 ≤10^4、链深 ≤3、阶乘 n ≤15、
-#   累乘值 ≤8 次）；Int 溢出虽双后端一致回绕（i64 语义），仍保守控制可读性。
+# - 数值安全：Int 结果 |x| < 2^59（对齐 §11f-7 的 WASM 安全值域；乘法操作数 ≤10^4、
+#   链深 ≤3、阶乘 n ≤15）；解释器全 i64 无此限，保守口径取双后端交集。
 import argparse
 import os
 import random

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-14 第二轮（基线 v1.1.4 / commit 828560c）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--warn); border:3px solid var(--warn); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-14 第二轮，第五轮总序）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>828560c</code>（"feat(pkg): D 包二期——包发现/别名三处修复 + §11f-7 Int 值域档案 + 差分三扩展（v1.1.4）"，2026-09-14；工作区仅一处预期内未提交改动：docs/TODO.md 的第五轮审查工作包登记——diff 内容经逐行核对确为立项登记，无其他夹带）。tag <code>v1.1.4</code>（annotated b1e71257）→ <code>828560c</code> = HEAD（远端 <code>git ls-remote</code> 实查存在）；tag <code>v1.1.3</code> → d9cdcd9</p>
+<p><strong>审查范围</strong>：<code>18edf7f..828560c</code> 共 3 个提交——<strong>D 一期</strong>（85df18c + d9cdcd9，v1.1.3：typechecker Logical NAM003 漏检修复 + diff_gen.py/diff_test.py 差分基建 + CI 差分冒烟 + §11f 三处陈旧修正）+ <strong>D 二期</strong>（828560c，v1.1.4：build 包发现修复 + 包符号 as 别名三处修复 + §11f-7 Int 值域档案 + gen_pkg_project/json/递归梯度三扩展），及 R15-R21 修复保持验证与全量文档现值抽查。上轮报告（review-2026-09-14，总评 A，基线 c4e960a）已覆盖内容不重复</p>
+<p><strong>宣称版本</strong>：v1.1.4（Cargo.toml = Cargo.lock = 1.1.4，<code>lom --version</code> 实测输出 <code>lom 1.1.4</code>）</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行构建/测试/clippy/eval 双后端/golden/自举两模式/对账三件/探针/差分冒烟两模式/210 程序独立 seed 段与宣称 seed 段抽样对拍/种子确定性字节级复算/最小案例实测（Logical NAM003、别名三处、Int 值域三值、包发现）/git 历史考古（tag 编年、潜伏起点、formfeed 引入提交）/模板池机械清点。除本报告文件外未修改任何项目文件；全部 _review_* 临时文件与临时包项目已删除（<code>git status</code> 终态仅余任务书预期的 docs/TODO.md）；未执行任何 git commit/push/tag</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 1.97.1 / cargo 1.97.1 / node v24.15.0 / Python 3.13.2</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A-</span></p>
+
+<p><strong>结论</strong>：增量（18edf7f..828560c，D 两期）的<strong>工程实质全部属实</strong>：全部 14 类硬指标实测复现（477/477、clippy <code>-D warnings</code> 零告警、clean 重建 0 warning、eval 双后端 118/118、golden 逐字、自举 dump 151 + static 坏 19/干净 151、对账三件 PASS、探针 6/6、差分冒烟两模式 PASS、tag v1.1.4 远端指向 HEAD、CI #101 success）；四枚潜伏 bug 修复<strong>全部亲手实测复现</strong>——Logical NAM003（最小案例 --check 报 NAM003 (4:24) rc=1、运行时短路照跑 rc=0，与档案叙事逐字吻合）、build 包发现（从项目根 <code>lom build examples/pkg_demo/main.lom</code> 成功且双后端输出一致）、别名三处（手工构造 <code>from liba import {real_fn as alias_fn}</code> 项目：--check 零诊断、解释器 44/65、WASM 编译成功输出一致）、§11f-7（2^59-1 双侧一致 / 2^59 wasm 打 -576460752303423488 / 2^60 wasm 打 0，与 SPEC 数值逐位一致）；2600 宣称以独立 seed 段 150 程序 + 宣称 seed 段 30 程序 + CI 冒烟 30 程序共 210 次对拍抽样全一致；生成器种子确定性字节级复算成立（同 seed 两次生成 sha256 相同，单文件与包模式皆验）。</p>
+
+<p><strong>未维持 A 的原因</strong>：文档纪律出现五轮以来最重的滑坡——<strong>6 条 P2（其中 4 条由被审增量自身引入）</strong>，且第一条直击项目立身之本：① <strong>"合计 D 两期 2600 程序/项目"的算术不闭合</strong>——四段验收的文档数字之和为 1000+400+1000+1000 = 3400，任何自然读法（全量 3400 / 去重 seed 2900 / 宽松去重 2700）都得不出 2600，头条数字无法从自己的证据推出；② <strong>HANDOVER §1 版本行的 v1.1.4 内容整体错位</strong>——只把 v1.1.3 行的版本号改成 1.1.4，正文仍是 v1.1.3 的故事（NAM003 修复 + 1000 程序 + "详见 spec §13 v1.1.3 条目" + "历史 tag v0.5.1-v1.1.2"），v1.1.4 实际交付（包发现/别名/§11f-7）在该行完全缺席——而 §1 是 §9 钦定的接手者第一阅读位；③ <strong>"latent since v0.7.2" 版本归属错误</strong>（五处文档同错）——4 位 tag/60 位载荷/±2^59 边界实为 Phase 7.6a（05b8a9c，v0.11.0）引入，v0.7.0–v0.10.0 是 3 位 tag（61 位载荷，边界在 ±2^60），且仓库根本不存在 v0.7.2 这个版本 tag（v0.7.0→v0.8.0），代码自身头注释写的正是"7.6 起"；④ guide 的 R15 教训描述句里又被 heredoc 写入 2 个真实换页符（0x0C）——<strong>引入提交是 18edf7f，即 R15 整改提交本身</strong>，换页符教训第四次咬人、这次咬在记录教训的句子里；⑤ LANGUAGE_SPEC §12 开头仍写"116-task evaluation suite"（同节 :1328/:1338 已是 118，节内自相矛盾；D 一期把 SPEC_FOR_AI 的同型 116 修了、漏了这份）；⑥ 探针口径三处三个数——工具 docstring 写"五条/分歧 2 不在探针集"（实际 6 条且 json-number 即分歧 2 在集内）、HANDOVER §2.2 注释写"四条"、main() 打印"6 条"。另有 3 条 P3（diff_gen 头注释数值安全界仍写 2^62 与自家发现的 ±2^59 矛盾、TODO 模板族分解"K×4"实为 5、HANDOVER 下一步行括注停留在一期时点）。无 P0（失实宣称——2600 属账目不闭合且方向为少报，非虚报成功）、无 P1（真 bug）。</p>
+
+<p><strong>与上轮的对比</strong>：上轮 4×P2 + 3×P3 给 A（22 提交的大变更面，P2 全为单行陈旧）；本轮 3 提交的变更面引入 4 条 P2，且含头条数字对不上账——按"文档不撒谎、所有宣称必须可机械复现"的自我标准，2600 恰恰是宣称清单的第一行。工程侧（四修复全实测、工具设计良好、自坑如实落档、全部自坑档案与工具现状一致）是 A 级成色；按短板计，<strong>A-</strong>。审查轨迹 B+ → A- → A → A → <strong>A-</strong>。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>HEAD = 828560c、工作区仅预期 TODO.md 改动（任务书）</td><td><code>git status</code> → 仅 <code>modified: docs/TODO.md</code>；diff 逐行核对 = 第五轮审查工作包立项登记（含范围/流程纪律/报告命名），无夹带</td><td class="ok">✓ 相符</td></tr>
+<tr><td>2</td><td>构建零 warning（HANDOVER §1/§2.2）</td><td><code>cargo clean --release -p lom</code> 后全量重编 1m34s，输出 0 行 warning（日志 grep -ci warning = 0）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>3</td><td>版本 1.1.4 三处一致（HANDOVER §1/§9.2）</td><td><code>lom --version</code> → <code>lom 1.1.4</code>；Cargo.toml 与 Cargo.lock 的 <code>name="lom"</code> 块版本均 1.1.4</td><td class="ok">✓ 相符</td></tr>
+<tr><td>4</td><td>测试 477/477（README:68、HANDOVER §1/§2.2/§9.2）</td><td><code>cargo test --release</code> → <code>test result: ok. 477 passed; 0 failed; 0 ignored</code>；计数链 473（v1.1.2）→475（D 一期 Logical +2）→477（D 二期 +2）逐环吻合</td><td class="ok">✓ 相符</td></tr>
+<tr><td>5</td><td>clippy <code>-D warnings</code> 零告警（HANDOVER §1、ci.yml）</td><td><code>cargo clippy --release -- -D warnings</code> → Finished 无告警；touch src/main.rs 强制重新 Checking 再跑一次仍零告警</td><td class="ok">✓ 相符</td></tr>
+<tr><td>6</td><td>eval 118/118 宿主后端（README:68、HANDOVER §2.2）</td><td><code>run.ps1 -Verify</code> → <code>Total: 118 / Passed: 118 / Failed: 0</code>，exit 0</td><td class="ok">✓ 相符</td></tr>
+<tr><td>7</td><td>eval 118/118 WASM 后端（同上）</td><td><code>run.ps1 -Verify -Backend wasm</code> → <code>Total: 118 / Passed: 118 / Failed: 0</code>，exit 0（error_repair 21/21、pipeline 10/10 等分类行可见）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>8</td><td>stmt_interp golden 逐字（HANDOVER §2.2）</td><td><code>lom.exe examples/bootstrap/stmt_interp.lom</code> 输出与 stmt_interp.expected.txt 行尾归一化后 <code>diff</code> 零差异（39 行 = 39 行）</td><td class="ok">✓ 逐字一致</td></tr>
+<tr><td>9</td><td>自举 dump 151/151（HANDOVER §2.2、D 收官清单）</td><td><code>verify_selfhost.py</code> → <code>dump: PASS 151 / FAIL 0（Latin-1 折叠等价 0）</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>10</td><td>自举 static 对齐 151（TODO D 收官"selfhost static 对齐 151"）</td><td><code>verify_selfhost.py --static</code> → <code>坏文件 PASS 19 / FAIL 0；干净集 ALIGNED 151 / DIFF 0</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>11</td><td>spec_examples_check 三文档 PASS（HANDOVER §2.2）</td><td>→ <code>正例 51 / 反例 5 / skip(json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1) / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>12</td><td>doc_audit 22/22（HANDOVER §1/§2.2）</td><td>→ <code>RESULT: PASS（22/22 项通过）</code>；G 类 HANDOVER §9/README 测试数现值 ['477','477'] 均命中</td><td class="ok">✓ 相符</td></tr>
+<tr><td>13</td><td>fuzz_smoke 80 轮零崩溃（HANDOVER §2.2）</td><td>→ <code>fuzz: 80 轮冲击零崩溃（固定种子 range(80)，--check 全部正常终态）/ RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>14</td><td>探针 6/6——七条 §11f 分歧中六条可执行验证（TODO D 收官、HANDOVER:12、SPEC_FOR_AI §11f-7）</td><td><code>diff_test.py --probe</code> → 6/6 全 OK：mut-capture（interp 12 vs wasm 2）/ div-zero（双侧 rc=1 stdout 一致）/ large-float（<code>2000000000000000000000000000000.0</code> vs <code>2e+30.0</code>——与 §11f-5 新示例逐字一致）/ json-number（<code>[30, 30.0, 100.0, -0.0, 0.5]</code> vs <code>[30, 30, 100, 0, 0.5]</code>——与 D6 边界矩阵逐字一致）/ int-range（2^60 行 interp 1152921504606846976 vs wasm 0）/ deep-recursion（双侧 rc≠0 stdout 一致）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>15</td><td>CI 冒烟口径全绿：单文件 20 + 包 10 + 探针（TODO D 收官、ci.yml:168-172）</td><td><code>--rounds 20 --seed-base 1 --ci</code> → 20/20 PASS；<code>--pkg --rounds 10 --seed-base 1 --ci</code> → 10/10 PASS；ci.yml step "Diff test (D 包, fixed seeds + §11f probes)" 实含三条命令（probe/单文件/包）核对无误</td><td class="ok">✓ 相符</td></tr>
+<tr><td>16</td><td>2600 程序全一致——抽样复跑（任务书：单文件 100 + 包 50 独立 seed 段）</td><td>独立 seed 段 4242-4341：单文件 100/100 双后端 stdout+退出码逐字一致（fail 0）；包模式 4242-4291：50/50 全一致（fail 0）；另在宣称原文 seed 段各抽 10：8000-8009 / 9000-9009（单文件）/ 7000-7009（包）全 PASS；<code>.diff_failures/</code> 无残留</td><td class="ok">✓ 抽样全一致</td></tr>
+<tr><td>17</td><td>合计 D 两期 2600 程序/项目双后端逐字一致（TODO:33、HANDOVER:12/:52、guide:1078）</td><td><strong>算术不闭合</strong>：文档自列四段验收 = D3 1000（seed 1000-1499 + 5000-5499）+ D5 400（1-200 + 7000-7199）+ D6 1000（1-500 + 8000-8499）+ D7 1000（1-500 + 9000-9499），和 = <strong>3400</strong>；去重 seed 值读法 = 2900（1-500 两段共享）；均 ≠ 2600。头条数字无法从自身证据推出（方向为少报非虚报，抽样实测零差异，见问题 1）</td><td class="warn">△ 账目不闭合</td></tr>
+<tr><td>18</td><td>种子确定性（diff_gen 头注释"固定种子可复现"）</td><td>同 seed（777）两次生成 sha256 比对：单文件模式与包模式均逐字节相同（04c9a41d… / 42533906…）；random.Random(seed) 纯计算，无全局状态</td><td class="ok">✓ 字节级成立</td></tr>
+<tr><td>19</td><td>tag v1.1.4 存在且指向 HEAD（HANDOVER §1"tag 在 CI 绿后打"）</td><td><code>git ls-remote --tags origin</code> → v1.1.4（annotated b1e71257）→ <code>828560c</code> = HEAD；GitHub API：828560c 的 run <strong>#101 success</strong>，#100（d9cdcd9）/#99（18edf7f）亦 success——tag 时序纪律兑现</td><td class="ok">✓ 相符</td></tr>
+<tr><td>20</td><td>D 一期：Logical NAM003 修复（TODO D3、spec §13 v1.1.3、+2 测试）</td><td>源码 diff：Logical 分支由"不递归（渐进式）"改为 <code>let _ = self.check_expr(left/right)</code>（诊断经 self.errors 副作用记录，丢弃返回类型不丢诊断；操作数类型仍从宽）。实测最小案例 <code>(a &lt; 0 and undefined_fn(b)) or a &gt; 0</code> → --check 报 <code>[NAM003] 调用未定义函数 'undefined_fn' (4:24)</code> rc=1；运行时诊断照出（stderr）但短路求值继续打 <code>true</code> rc=0——与档案"运行时靠短路掩盖、wasm build 编译期失败"叙事吻合。修复前行为按 diff 推演（旧分支无任何递归调用）</td><td class="ok">✓ 实测复现</td></tr>
+<tr><td>21</td><td>"Phase 2.4 起潜伏"（TODO D3、HANDOVER:13、spec §13）</td><td><code>git show e672cc5:src/typechecker.rs</code>（v0.1.3，Phase 1-2 一次性交付含 2.4 检查器）:532-535 即为无递归的 Logical 分支（逐字同旧形态）——潜伏起点口径成立</td><td class="ok">✓ 考古证实</td></tr>
+<tr><td>22</td><td>"自举检查器 8.2 本就递归——宿主修复=与自举对齐"（TODO D3）</td><td>self_interp.lom:3072-3076 <code>ExLogical(_, l, r) =&gt; chk_expr(l…) chk_expr(r…)</code> 实在；static 模式坏 19/干净 151 不倒（#10）——定性成立</td><td class="ok">✓ 相符</td></tr>
+<tr><td>23</td><td>D 二期：build 包发现修复（TODO D5、spec §13 v1.1.4、+1 单测）</td><td>实测从项目根：<code>lom build examples/pkg_demo/main.lom --target wasm</code> → 编译成功 9811 字节，node 运行输出 <code>25/27/120/24</code> 与 <code>lom examples/pkg_demo/main.lom</code> 完全一致。源码链：main.rs run_build_wasm 以 <code>Path::new(file).parent()</code> 为 base_dir → cli.rs merge_packages_for_wasm(program, base_dir) 以 <code>base_dir.join("lom.toml")</code> 发现 + resolve_dependencies(manifest, base_dir)——与解释器按 main.lom 所在目录发现对齐；+1 单测（merge_packages_discovers_manifest_from_base_dir_not_cwd：base_dir 发现 + 无清单零合并两断言）实跑通过（477 内）</td><td class="ok">✓ 实测复现</td></tr>
+<tr><td>24</td><td>D 二期：包符号 as 别名三处修复（TODO D5、spec §13 v1.1.4、+1 单测）</td><td>手工构造临时包项目（liba 导出 real_fn，主文件 <code>from liba import { real_fn as alias_fn }</code> 后 alias_fn(2) 与 real_fn(3) 调用）：--check <code>诊断通过，无错误</code> rc=0（修复① 假 NAM003 消失：collect_import 对 external_symbols 内真名补插别名）；解释器输出 44/65 rc=0（修复② RUNTIME002 消失：eval_call 按 import_aliases alias→本名查 functions 表）；wasm build 成功且 node 输出 44/65 与解释器一致（修复③ arity 误报消失：check_arity 按有签名的 real 名查）。三处 diff 逻辑逐一推演成立（typechecker/mod.rs:223-231、interpreter.rs:1153-1160、wasm_codegen.rs:1571-1576 + import_aliases 表 :497/:512/:1541）；+1 单测 external_symbol_alias_import_no_false_nam003 实跑通过</td><td class="ok">✓ 三口径实测</td></tr>
+<tr><td>25</td><td>§11f-7 数值：2^59=576460752303423488 翻符号、2^60 截断为 0、±2^59 内安全（TODO D5、SPEC_FOR_AI §11f-7、spec §13 v1.1.4）</td><td>实测三值双后端：576460752303423487（2^59-1）双侧一致；576460752303423488 interp 原值 / wasm <strong>-576460752303423488</strong>；1152921504606846976（2^60）interp 原值 / wasm <strong>0</strong>——与 SPEC_FOR_AI §11f-7 的数值与形态逐位一致；int-range 探针 PASS（判据 a≡b mod 2^64 或 mod 2^60 相等，覆盖翻符号与截断两形态，推演成立）</td><td class="ok">✓ 逐位一致</td></tr>
+<tr><td>26</td><td>"v0.7.2 tagged i64 低 4 位 tag 起，60 位载荷"（TODO:52、HANDOVER:12、guide:1078、SPEC_FOR_AI:704、LANGUAGE_SPEC:1411）</td><td><strong>版本归属错误</strong>：git 考古——首个 WASM 提交 b2fe7ee（Phase 7.2，v0.7.0）至 3a5bc32（Phase 7.5，v0.10.0）均为<strong>低 3 位 tag</strong>（V_TRUE = (1&lt;&lt;3)|1 = 9，61 位载荷，边界在 ±2^60）；<strong>4 位 tag（V_TRUE = 17）自 05b8a9c（Phase 7.6a，v0.11.0）起</strong>；仓库 tag 序列 v0.7.0→v0.8.0，<strong>不存在 v0.7.2</strong>；wasm_codegen.rs:5 自身注释写"低 4 位 tag（<strong>7.6 起</strong>；3 位曾导致 tag 8+ 被掩码截断）"——五处文档与代码注释及 git 历史矛盾（见问题 3）</td><td class="bad">✗ 归属错误</td></tr>
+<tr><td>27</td><td>D 一期 §11f 三处修正：首段 116/five → 118/six（后二期再 → seven）、分歧 5 补实测形态 2e+30.0、结尾导航 116→118（TODO D4）</td><td>SPEC_FOR_AI:693 现值"118 eval tasks (the seven known divergences…)"；§11f-5 现值示例 <code>2000000000000000000000000000000.0</code> vs <code>2e+30.0</code>——与本人探针实测输出逐字相同；结尾段"118-task eval suite"——三处全部落地</td><td class="ok">✓ 相符</td></tr>
+<tr><td>28</td><td>diff_gen：39 模板族（D1 时点）+ 提前返回族加权 ×3（TODO D1、HANDOVER:13）</td><td>机械清点（Python 解析池定义）：85df18c 时点 POOL_BASE = 39（A8/C4/D4/E3/F4/G3/H4/I2/J2/<strong>K5</strong>）+ POOL_EARLY_RETURN = 8；POOL = base + er×3 加权成立；当前 828560c = 45+8 = 53（+D6 json ×3 + D7 递归 ×3），与"D6 3 模板/D7 3 模板"相符。TODO 分解写"K 杂项 ×4"实为 5（见问题 8）</td><td class="ok">✓ 池清点相符</td></tr>
+<tr><td>29</td><td>diff_gen 自测 60/60 --check 零 Error 零 warning（TODO D1）+ 生成器自坑档案与工具现状一致（TODO D1/D6/D5 纪律）</td><td>本轮 210 次对拍的 --check 前置闸门零 GENERATOR-BUG（覆盖更强）；自坑逐条核对工具现状：t_bool_logic 用 <code>!</code>（not 教训）、t_compound_assign 用 <code>a = a % 97</code>（%= 教训）、t_json_roundtrip 用 range 构造 List + True/False 大写（D6 两坑注释在代码内）、t_map_ops 用 <code>let _ = map_set</code>（裸语句杀尾 if 教训）、t_map_keys 用 list_length、t_pipeline_int helper uniq 化——全部一致</td><td class="ok">✓ 一致</td></tr>
+<tr><td>30</td><td>diff_test --check 闸门两流读取 + 差异/生成器 bug 全量留档 .diff_failures/（TODO D2/D5）</td><td>源码核实：one_normal/one_pkg 的 --check 失败路径拼接 stdout+stderr 双流（diff_test.py:67/:230）；正常差异留 .lom + .interp.out + .wasm.out（含 rc 头），包差异整项目留档（:81-91/:236-248）；唯一观察：one_pkg 的生成器 bug 路径不留档（one_normal 留）——轻微不对称，非正确性问题</td><td class="ok">✓ 源码核实</td></tr>
+<tr><td>31</td><td>探针判定逻辑正确性（json-number "30.0 in i_out" 判据、int-range mod 判据、large-float 数值等价）（任务书 B 项）</td><td>推演+实测：json-number 判据——interp 输出含 "30.0"（[30, 30.0, 100.0, -0.0, 0.5]）、wasm 输出（[30, 30, 100, 0, 0.5]）不含该子串，判据对当前形态成立且 i_out≠w_out 兜底；int-range——(a-b)≡0 mod 2^64 或 a≡b mod 2^60，Python 模语义下对翻符号（2^59: a-b=2^60→第三条命中）与截断（2^60: 双侧 mod 2^60 = 0）均覆盖，且行数=3/双 rc=0/i≠w 三重前置；large-float——剥科学计数法 ".0" 尾后 float() 相对误差 1e-12 判等，对 2e+30.0 形态成立（本人实测通过）</td><td class="ok">✓ 推演+实测</td></tr>
+<tr><td>32</td><td>R15-R21 修复保持（任务书 ⑭）</td><td>R15：HANDOVER 全文 0 字节 0x0C、:95 fuzz 命令完整可复制、§11.3 教训在——<strong>但 guide:1076 被同一教训第四次咬（18edf7f 自身引入 2 个 0x0C，见问题 4）</strong>；R16：§2.2 doc_audit 行 22 项 ✓；R17：§4.6 已改口"Q3 起同样有软件守卫…SECURITY 限制 1 已关闭" ✓；R18：TODO:290 Q2 小节 ✅ done 2026-09-08 + 证据区 ✓；R19：①② 标号已修（TODO:202/:443）✓；R20：cli.rs 头注释如实口径在（且 D 二期改动未破坏）✓；R21：TODO:260-266 补档 + HANDOVER:430 §11.3 教训条 ✓</td><td class="warn">△ 六条保持、R15 同型复发</td></tr>
+<tr><td>33</td><td>文档现值：477/118/151/1.1.4（README、HANDOVER §1/§2.2/§9、doc_audit 真值行）</td><td>README:68 = 477/477 + 118/118 + 36 .lom；HANDOVER §2.2 = 477/477 + golden + 118/118 + dump 151/151；§9.2 = 477/1.1.4；doc_audit 真值行 477/151/1.1.4 全对——<strong>唯 §1 版本行 v1.1.4 内容错位为 v1.1.3 故事（见问题 2）</strong>；LANGUAGE_SPEC §12 intro 残留 116（见问题 5）</td><td class="warn">△ 两处腐坏</td></tr>
+<tr><td>34</td><td>spec §13 v1.1.3/v1.1.4 条目内容（LANGUAGE_SPEC:1401-1413）</td><td>两条目实在；v1.1.3（Logical 修复叙事 + 工具 + 475/475）与 v1.1.4（包发现 7.8 起/别名 4.4 起/§11f-7/三扩展 400+1000+1000/探针 6/7）逐项与本人实测/代码/考古一致——唯条目内 "latent since v0.7.2" 同问题 3；v1.1.4 的 "D5 …400 projects over two seed ranges" 等分段数字与 TODO 相同（同样参与 3400≠2600 的账目）</td><td class="ok">✓ 实质相符</td></tr>
+</table>
+
+<p class="small">矩阵 34 项：30 项 ✓（含 9 项亲手实测复现、1 项字节级确定性复算、3 项 git 考古证实）、3 项 △（账目/版本行/R15 复发）、1 项 ✗（v0.7.2 归属）。无一项硬指标（构建/测试/评测/自举/对账/探针/冒烟）失败。</p>
+
+<h2>3. 专项审查</h2>
+
+<h3>3.1 D 一期：Logical 修复与差分基建的对抗性实测</h3>
+<p><strong>Logical NAM003</strong>的修复经三层验证：源码（旧分支零递归 → 新分支两侧 check_expr，诊断走 self.errors 副作用故 <code>let _ =</code> 不丢错误；操作数类型从宽保持——渐进式历史行为未收紧，与"零语言面"纪律一致）；行为（--check 报 NAM003 定位 (4:24) 精确指向 undefined_fn 的 u 字符；运行时 stderr 出诊断但短路求值继续打印 true——"非法程序上的后端不对称"叙事完整复现）；历史（e672cc5 v0.1.3 的 typechecker.rs:532 即旧形态，"Phase 2.4 起潜伏"有据）。<strong>自举对齐</strong>定性属实（self_interp.lom:3072 递归在先，static 坏 19/干净 151 不倒）。</p>
+<p><strong>diff_gen/diff_test 工具质量</strong>：整体设计良好——模板全部类型/效应标注齐全（人工逐读 53 个模板方法，未发现语法/类型错误形态；数值上最大结果 t_deep_recursion_gradient 的 8000×8001/2 ≈ 3.2×10⁷，距 2^59 有十个数量级裕度）；--check 闸门的双流读取、.diff_failures 留档、.diff_tmp 项目内自清理、encoding 显式 utf-8、种子确定性（字节级复算成立）全部落实。两点工具内文档失真：run_probes docstring"七条中的五条…分歧 2 不在本探针集"（实际 6 条且分歧 2 在集内——85df18c 时点写"六条/四条"正确，828560c 把计数改成"七条/五条"却漏改括注，而正确值应为"七条/六条"）；diff_gen 头注释"数值安全：Int 结果 |x| &lt; 2^62"在自家发现 §11f-7（±2^59）后未收敛——同文件 _PKG_BODY 注释已写对 ±2^59，头注释与正文互相矛盾，未来照头注释扩展模板的维护者会踩进分歧区。探针三判据（json-number/int-range/large-float）经推演与实测双重确认逻辑成立（矩阵 #31）。</p>
+
+<h3>3.2 D 二期：三处引擎修复的实测与 §11f-7 边界</h3>
+<p><strong>build 包发现</strong>：从项目根构建 pkg_demo 双后端输出一致（矩阵 #23）；修复方式（base_dir 自 main.lom 所在目录派生，父目录缺省 "."）与解释器路径对称；单测锁定两断言（发现/零合并）。<strong>别名三处</strong>：手工构造最小包项目三口径全绿（矩阵 #24）；三处修复的共同模式（alias→real 先解析再查表/查签名）在三个引擎中一致贯彻，wasm 侧 fn_idx 以 orig 或 real 双查而 arity 只按 real——推演无死角（同名闭包变量优先级注释保留，行为对齐说明在）。<strong>§11f-7</strong>：三值双后端实测与档案逐位一致（矩阵 #25）；"发现链"（包模式阶乘模板 20! 双后端分叉 → 20! mod 2^60 吻合）与数值自洽（20! = 2.43×10^18 &gt; 2^60 = 1.15×10^18，mod 折叠 plausible）；处理决策（文档化 + 探针 + 生成器值域规避，tag 重构出冻结范围）与 T4/P1-1 先例一致——唯潜伏起点版本归属错误（矩阵 #26/问题 3）。<strong>生成器扩展</strong>：包模式二值化签名（Int 单/双参）是诚实的取舍且注释言明单文件模式承担类型覆盖；json 模板只用安全区数字、递归模板档位 ≤8000 且值域注释（n(n+1)/2 &lt; 2^59）数学正确。</p>
+
+<h3>3.3 数字账本审查（本轮新抓的重点）</h3>
+<p><strong>2600 不闭合</strong>：四段验收之和 3400、去重读法 2900，均非 2600。由于方向是少报（若各段属实，"2600 全一致"作为子集命题甚至为真），不构成 P0 虚报；但"所有宣称必须可机械复现"的标准下，头条数字必须能从证据段推出——现在不能。最可能的成因是把 400+1000+1000 = 2400（二期）与一期 1000 相加时的算术滑笔。建议整改：全文统一为一个可复算口径（推荐 3400 = 各段之和，或注明去重口径）。<strong>v0.7.2 考古</strong>：4 位 tag 的引入有明确提交（05b8a9c，v0.11.0）；v0.7.2 不存在。宽容读法"分歧自首个 WASM 后端即潜伏"在精神上成立（3 位 tag 时代 2^60 翻符号/2^61 截断，同为静默值域分歧），但文档写死了"4 位 tag/60 位载荷/v0.7.2"三者绑定，其中版本号与位宽史实均错。建议改为"latent since the first wasm backend (v0.7.0, 3-bit tag era); the documented ±2⁵⁹/60-bit form since v0.11.0 (Phase 7.6a)"。</p>
+
+<h2>4. 问题清单（按优先级）</h2>
+
+<h3><span class="tag p0">P0</span> 无</h3>
+
+<h3><span class="tag p1">P1</span> 无</h3>
+
+<h3><span class="tag p2">P2</span> 文档腐坏（6 条）</h3>
+
+<ol>
+<li>
+<p><strong>docs/TODO.md:33 / docs/HANDOVER.md:12、:52 / docs/lom-project-guide.html:1078 — "合计 D 两期 2600 程序/项目双后端逐字一致"算术不闭合</strong></p>
+<p>文档自列四段验收：D3 = seed 1000-1499 + 5000-5499 两段各 500（1000/1000）、D5 = seed 1-200 + 7000-7199（400/400，包）、D6 = seed 1-500 + 8000-8499（1000/1000）、D7 = seed 1-500 + 9000-9499（1000/1000），合计 <strong>3400</strong>；即便按"去重 seed 值"读（D6/D7 共享 seed 1-500）也是 2900（宽松并入包模式 seed 也只得 2700）。2600 无法从任何一段组合推出——头条数字与自身证据矛盾。方向为少报而非虚报（本人独立 seed 段 150 + 宣称段 30 + 冒烟 30 共 210 次对拍零差异，"全一致"的实质可信），但这是"文档不撒谎"纪律的第一行字，必须对账修正（顺带注明：LANGUAGE_SPEC §13 v1.1.4 条目的分段数字同样参与该账）。</p>
+<p class="small">证据：TODO.md:33/:63/:76/:88/:155-156 各段数字机械相加；HANDOVER:12/:52、guide:1078 的"2600"；本轮矩阵 #16/#17 抽样实测。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:38（§1 版本行）— v1.1.4 行内容整体是 v1.1.3 的故事</strong></p>
+<p>该行标签写"package/alias patch"（v1.1.4 正确的补丁名），破折号后却是 v1.1.3 的内容："D 包差分测试抓出 typechecker and/or 操作数 NAM003 漏检…+ 双后端差分测试基建（…1000 程序…）；详见 spec §13 <strong>v1.1.3</strong> 条目…历史 tag：v0.5.1-<strong>v1.1.2</strong>"。考古：d9cdcd9 的该行是正确的 v1.1.3 行，828560c 只把版本号与补丁名改掉、正文未重写——v1.1.4 的真实交付（build 包发现、别名三处、§11f-7、477）在 §1 快照中完全缺席，历史 tag 区间也漏了 v1.1.3。§1 是 §9"快速上手检查单"第 1 步钦定的接手者第一阅读位；同表 Rust 测试行（:39）的"v1.1.4 D5 +2"倒是新的——同一张表两种时态。</p>
+<p class="small">证据：HANDOVER.md:38 vs d9cdcd9 同行（git show）；对比 :39（测试行已正确描述 v1.1.4）。</p>
+</li>
+<li>
+<p><strong>SPEC_FOR_AI.md:704 / LANGUAGE_SPEC.md:1411 / TODO.md:52 / HANDOVER.md:12 / guide:1078 — §11f-7 "latent since v0.7.2" 版本归属错误（五处同错）</strong></p>
+<p>git 考古：4 位 tag（60 位载荷、±2^59 边界——§11f-7 档案的形态）自 <strong>05b8a9c（Phase 7.6a，v0.11.0）</strong>引入（diff 实证 V_TRUE: 9→17、注释"低 4 位 tag（7.6 起）"）；此前 b2fe7ee（Phase 7.2，v0.7.0）至 3a5bc32（Phase 7.5，v0.10.0）均为低 3 位 tag（61 位载荷，边界 ±2^60，同为静默值域分歧但形态不同）；仓库 tag 序列 v0.7.0→v0.8.0，<strong>不存在 v0.7.2 版本</strong>。wasm_codegen.rs:5 代码自身注释写的正是"7.6 起"——文档与被文档的代码互相矛盾。分歧本身真实（本人三值实测），错的是潜伏起点的版本史。</p>
+<p class="small">证据：git show b2fe7ee/fdbd89f/0a986c5/3a5bc32/05b8a9c 的 wasm_codegen.rs tag 段；git tag 全表；src/wasm_codegen.rs:5。</p>
+</li>
+<li>
+<p><strong>docs/lom-project-guide.html:1076 — R15 教训描述句被换页符咬（2 个真实 0x0C），引入提交 = R15 整改提交 18edf7f 本身</strong></p>
+<p>第四轮 R15 修复清掉了 HANDOVER 的换页符，但 18edf7f 在 guide 里新写的 R15 条目描述句"（<code>tools\fuzz_smoke.py</code> 的 \f 成真实 0x0C 字节…"中，两处本应显示为两个字面字符 <code>\f</code> 的位置经 heredoc 又落成真实换页符（字节扫描全仓唯一命中文件，共 2 处；"的 ␌ 成真实 0x0C 字节"一句的主语被吞成不可见控制符）。这是该教训链上的<strong>第四次咬人</strong>（#92 → HANDOVER:91(R15 所修) → gen_pkg_project 首版(TODO"第三次") → 本次），且发生在记录教训的句子里——与第四轮 P2-1"教训落档没有防住教训本身"完全同型。实害低于 R15（叙事 HTML 非复制粘贴命令清单），但同型复发本身即构成纪律信号。</p>
+<p class="small">证据：guide:1076 二进制扫描（offset 164218 等 2 处）；git log -S 0x0c 定位引入提交 18edf7f；TODO D 二期纪律段"heredoc 转义第三次咬人"。</p>
+</li>
+<li>
+<p><strong>LANGUAGE_SPEC.md:1283（§12 开头）— "116-task evaluation suite"陈旧（118 since Q4，2026-09-08）</strong></p>
+<p>§12 intro 仍写 116，而同节 :1328（"118/118 pass on both backends"）与 :1338（"118/118"）已是 118——同节自相矛盾；§12.1 目录树的分类计数（10+13+13+13+16+10+10+6+6+21 = 118）也是新值。D 一期的"116→118"清扫修了 SPEC_FOR_AI §11f 首段与结尾段，漏了 LANGUAGE_SPEC §12 intro 这一处（18edf7f 时点已陈旧，非本增量引入，但属本轮现值抽查范围）。doc_audit 的数字锚不含此行，机器 gate 覆盖不到。</p>
+<p class="small">证据：LANGUAGE_SPEC.md:1283 vs :1328/:1338；git show 18edf7f 同行已为 116（Q4 后未同步）。</p>
+</li>
+<li>
+<p><strong>tools/diff_test.py:112-116 + docs/HANDOVER.md:96 — 探针口径三处三个数：docstring"五条"（且括注称分歧 2 不在探针集）、§2.2 注释"四条"、实际 6 条</strong></p>
+<p>run_probes 的 docstring 写"验证 §11f 七条白名单中的<strong>五条</strong>可执行分歧…（分歧 2 JSON 数字与分歧 4 trim Unicode…不在本探针集）"——实际探针集 6 条且 json-number 正是分歧 2（探针 #4）；85df18c 时点原文"六条/四条 + 分歧 2/4 不在"是正确的时点值，828560c 把计数升为"七条/五条"却没改括注，正确组合应为"七条/六条 + 仅分歧 4 不在"。HANDOVER §2.2:96 的命令注释"D 包探针：验证 §11f <strong>四条</strong>可执行分歧"则停在 D1 时点从未更新（§2.2 也缺 CI 已有的 --pkg 冒烟行）。main() 打印与 CI 步骤名是正确的"6"——同一事实在工具头、命令清单、运行输出三处三个数，读者会误判探针覆盖面（漏以为 JSON 分歧无探针守护）。</p>
+<p class="small">证据：diff_test.py:112-116 vs :279（打印 6）；HANDOVER.md:96；git show 85df18c:tools/diff_test.py:110-113；ci.yml:168-172（三命令实跑）。</p>
+</li>
+</ol>
+
+<h3><span class="tag p3">P3</span> 建议 / 轻微口径（3 条）</h3>
+
+<ol start="7">
+<li>
+<p><strong>tools/diff_gen.py:26-27 — 文件头"数值安全：Int 结果 |x| &lt; 2^62"与自家 §11f-7（±2^59）矛盾</strong></p>
+<p>D5 发现 WASM 值域 ±2^59 后，同文件 _PKG_BODY 注释（:1035-1036）已正确写"包模式结果控制在百量级（±2^59）"，但文件头的生成器总纲仍宣称 2^62 安全界（"Int 溢出虽双后端一致回绕（i64 语义）"在 2^59-2^62 区间恰恰不成立——wasm 侧不回绕而翻符号/截断）。现有 53 模板实际最大结果 ~3.2×10⁷，无现实分歧；但照头注释扩模板会直接踩进 §11f-7。建议头注释收敛为 ±2^59（顺带"阶乘 n ≤15"实为 randint(2,12)）。</p>
+<p class="small">证据：diff_gen.py:26-27 vs :1035-1036 与 SPEC_FOR_AI §11f-7。</p>
+</li>
+<li>
+<p><strong>docs/TODO.md:114-119 — 模板族分解"K 杂项 ×4"实为 5；D5"3 枚潜伏 bug"的枚数分解含糊</strong></p>
+<p>机械清点：POOL_BASE 39 = A8+C4+D4+E3+F4+G3+H4+I2+J2+<strong>K5</strong>（bool_logic/mixed_io/string_escapes/compare_ops/shadowing）——写 K×4 则分解求和为 38，括注含 B8 则 46，两种读法都对不上标题 39（唯一自洽读法：39 = 不含 B 的基池且 K=5，B8 为独立加权池）。同类：D5 开头"抓出 3 枚潜伏 bug"但其小节列了 4 处代码修复（包发现 + 别名①②③）；"D 两期 4 枚"（1+3）在总量上自洽，但 D5 内部 3 枚对应 4 处修复的映射没有说清（别名三处算一枚还是两枚）。均为计数精度问题，不涉行为。</p>
+<p class="small">证据：本轮 Python 池解析（85df18c/828560c）；TODO.md:44-49（三处①②③）vs :32-34（3 枚）。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:52（下一步行）— "第五轮独立审查（时机：D 包基线后已积累 1 个 typechecker 修复 + 差分基建）"停留在一期时点</strong></p>
+<p>该括注描述的是 v1.1.3 时点的积累；828560c 更新了同一行的①（两期收官 2600/4 枚/探针 6/6）却留下②的旧口径——按现状应述为 4 枚修复 + 两期基建。单行级陈旧，无行为影响（未提交的 TODO 第五轮工作包登记里已是正确的"5 提交"表述）。</p>
+<p class="small">证据：HANDOVER.md:52 括注 vs 同行①的新值。</p>
+</li>
+</ol>
+
+<h2>5. 方法局限声明</h2>
+<ul>
+<li><strong>2600/3400 全量未逐轮复跑</strong>：以独立 seed 段 150（单文件 100 + 包 50，seed 4242 起）+ 宣称原文 seed 段抽 30（8000/9000/7000 各 10）+ CI 冒烟口径 30 共 210 程序/项目对拍全一致作抽样证据；且 D3/D6/D7 各段宣称是对<strong>当时的生成器版本</strong>（39/42/45 模板池）跑的——池扩后同 seed 生成不同程序，历史时点结果已不可逐字节复现，只能以现生成器 + 档案双重采样佐证。若真执行了 3400 轮（约 55 分钟），本人未重放。</li>
+<li><strong>CI 以 API 侧面还原</strong>：#99-#101 的结论/head_sha 实查（全 success）；job 日志正文未拉取（差分 step 的运行细节以本地复跑同款命令替代）。</li>
+<li><strong>Logical 修复前行为按源码 diff 推演</strong>（未对 18edf7f 前的旧二进制实测）：旧分支无递归调用是确定性静态事实；本轮无需 worktree 坏提交复现（增量无 CI 事故）。</li>
+<li><strong>覆盖率和 LLM 历史数据未复核</strong>：84.4% 行覆盖、pass@k 99.1% 等沿袭上轮口径未重测（不在本轮范围）。</li>
+<li><strong>过程性叙述按一致性采信</strong>：TODO 中"手工实证再纳入""首版 heredoc 出错""D5 手工冒烟即抓 bug"等过程细节无法重放，以 diff、工具现状注释与行为考古三方一致采信（如 §11f-7 发现链的 20! mod 2^60 数值自洽性做了 plausibility 复核）。</li>
+<li><strong>探针/模板的语义正确性人工审查</strong>：53 个模板逐读未见语法/类型错误形态、210 次对拍零生成器 bug 为强佐证，但形式化穷举（所有 seed 段 × 所有模板组合）未做。</li>
+<li><strong>报告基线</strong>：审查执行于 2026-09-14，HEAD = 828560c。全部 _review_* 临时文件/临时 wasm/手工包项目已删除，<code>.diff_tmp</code>/<code>.diff_failures</code> 无残留，<code>git status</code> 终态仅余任务书预期的 docs/TODO.md 未提交改动。</li>
+</ul>
+
+<hr>
+<p class="small">审查方法对齐项目纪律：逐条给证据（文件:行号 + 命令输出）；所有实测数字来自真实命令执行；对抗性实测优先于采信档案；优先级口径 P0 失实宣称 / P1 真 bug / P2 文档腐坏 / P3 建议。前序报告：<a href="review-2026-09-14.html">review-2026-09-14.html</a>（A，第四轮）、<a href="review-2026-09-07.html">review-2026-09-07.html</a>（A）、<a href="review-2026-09-05.html">review-2026-09-05.html</a>（A-）、<a href="review-2026-09-03.html">review-2026-09-03.html</a>、<a href="review-2026-08-31.html">review-2026-08-31.html</a>（B+）。</p>
+
+</div>
+</body>
+</html>
