@@ -66,6 +66,31 @@ fn undefined_variable_reported() {
     assert!(type_diags.iter().any(|d| d.code == "NAM003"));
 }
 
+/// D 包差分测试 2026-09-14 抓出：and/or 操作数内的未定义函数曾逃过 NAM003
+/// （宿主 Logical 分支不递归检查——自举检查器 8.2 起就检查，两侧本应对齐）
+#[test]
+fn logical_operand_undefined_function_reported() {
+    let src = "fn main() -> Unit\n    let a = 5\n    let b = -3\n    println((a < 0 and not_defined_fn(b)) or a > 0)\nend\n";
+    let diags = check_src(src);
+    let nam003: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
+    assert!(!nam003.is_empty(), "and 右操作数未定义函数应报 NAM003");
+}
+
+/// 同族：or 左操作数位置的未定义变量（曾经同样漏检）
+#[test]
+fn logical_operand_undefined_variable_reported() {
+    let src = "fn main() -> Unit\n    let a = 5\n    if (undefined_var > 0 or a > 0)\n        println(1)\n    else\n        println(2)\n    end\nend\n";
+    let diags = check_src(src);
+    assert!(
+        diags.diagnostics.iter().any(|d| d.code == "NAM003"),
+        "or 左操作数未定义变量应报 NAM003"
+    );
+}
+
 /// Phase 4.1.1: NAM003 拼写建议 — 函数名拼错时应建议正确名
 #[test]
 fn nam003_suggests_similar_function_name() {

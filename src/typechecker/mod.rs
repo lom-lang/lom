@@ -545,8 +545,13 @@ impl TypeChecker {
                     },
                 }
             }
-            ExprKind::Logical { .. } => {
-                // and/or 短路求值，结果为 Bool；不强制检查操作数（渐进式）
+            ExprKind::Logical { left, right, .. } => {
+                // and/or 短路求值只豁免求值、不豁免检查：子表达式的 NAM003 等
+                // 纯静态问题与求值顺序无关，仍需递归检查（自举检查器 8.2 起即
+                // 如此，宿主漏检是实现缺陷——D 包差分测试 2026-09-14 抓出）。
+                // 操作数类型不强制 Bool（渐进式从宽，保持历史行为）。
+                let _ = self.check_expr(left, env);
+                let _ = self.check_expr(right, env);
                 TypeOrUnknown::known(Type::Bool)
             }
             ExprKind::Call { callee, args } => {
