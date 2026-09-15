@@ -1127,6 +1127,8 @@ Command-line argument access. Pure function (reads interpreter-internal state, n
 **CLI usage**: `lom <file.lom> -- <arg1> <arg2> ...` — everything after `--` is passed to the Lom program via `env::args()`.
 
 > **Convention**: like C/Rust/Python, `argv[0]` is the program path. User arguments start at index 1. See [examples/todo.lom](examples/todo.lom) for a complete CLI tool that dispatches on `args()`.
+>
+> **Backend note (known divergence #8, since 2026-09-15)**: on the WASM backend `argv[0]` is the compiled `.wasm` binary path rather than the `.lom` source path (structural, not a bug); user arguments after `--` are byte-identical on both backends. Consume `args()[1..]` only — never print, hash, or branch on `args[0]` (see SPEC_FOR_AI §11f item 8).
 
 Examples: [examples/todo.lom](examples/todo.lom) — a complete todo list CLI (add/list/done/remove/help) with JSON persistence.
 
