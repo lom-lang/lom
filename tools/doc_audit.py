@@ -160,6 +160,10 @@ def main():
                r'\| 版本 \| \*\*v([\d.]+)\*\*', [cargo_ver])
     expect_all('HANDOVER §9 版本显示', 'docs/HANDOVER.md',
                r'--version` 显示 ([\d.]+)', [cargo_ver])
+    # R42（七审整改）：README 门面 Current release 行——B 包升版漏改四个版本的
+    # 存量腐坏位，E 类此前只盯 HANDOVER 不覆盖此处
+    expect_all('README Current release', 'README.md',
+               r'Current release: v([\d.]+)', [cargo_ver])
 
     # ---- F. changelog 对账（N3）----
     print('F. changelog 对账（LANGUAGE_SPEC §13）')
