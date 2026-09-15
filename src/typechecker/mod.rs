@@ -36,6 +36,12 @@ pub struct TypeChecker {
     /// 枚举定义：enum name -> variants
     /// 内置 Result/Option 也注册在此
     pub(crate) enums: HashMap<String, EnumInfo>,
+    /// B 包（2026-09-15）：内建函数名 -> 所属 stdlib 模块名（NAM005 反查用；
+    /// 用户 fn 与内建同名声明时从此表移除——该名字从此按用户函数处理）
+    pub(crate) builtin_module: HashMap<String, String>,
+    /// B 包：本文件已导入的符号名（collect_import 填充；prelude 恒可用）。
+    /// `from m import {f as g}` 只加 g 不加 f——用真实名 f 仍属未导入（运行时同款）
+    pub(crate) available_imports: std::collections::HashSet<String>,
     /// 当前所在函数的返回类型（用于 return 语句和 `?` 检查）
     pub(crate) current_ret: Option<Type>,
     /// Phase 2.5: 当前所在函数声明的效应集合
@@ -119,6 +125,8 @@ impl TypeChecker {
         let mut tc = TypeChecker {
             functions: HashMap::new(),
             enums: HashMap::new(),
+            builtin_module: HashMap::new(),
+            available_imports: std::collections::HashSet::new(),
             current_ret: None,
             current_effects: Vec::new(),
             current_fn_is_main: false,
@@ -170,6 +178,9 @@ impl TypeChecker {
                 f.span.line,
                 f.span.col,
             );
+            // B 包：与内建同名的冲突已按 NAM002 报 Error——该名字移出内建
+            // 模块映射，后续调用不再追加 NAM005 warning（病态程序单报不堆噪）
+            self.builtin_module.remove(&f.name);
             return;
         }
         let params: Vec<(String, Type)> = f
@@ -220,6 +231,9 @@ impl TypeChecker {
     /// （别名继承真实函数的签名；符号是否在模块导出由解释器运行时检查，typechecker 不重复报错）
     fn collect_import(&mut self, imp: &ImportDecl) {
         for item in &imp.items {
+            // B 包：导入的符号名进入可用集（NAM005 判定）。`f as g` 只加 g——
+            // 真实名 f 未导入，用 f 仍属未导入（与运行时 available_builtins 同款）
+            self.available_imports.insert(item.alias.clone());
             // 仅当真实名已注册（prelude/stdlib）时，才注册别名
             if let Some(sig) = self.functions.get(&item.name).cloned() {
                 self.functions.insert(item.alias.clone(), sig);
@@ -784,7 +798,23 @@ impl TypeChecker {
             ExprKind::Ident(name) => {
                 // 顶层函数？
                 if let Some(sig) = self.functions.get(name).cloned() {
-                    // Phase 2.5: 效应检查
+                    // B 包（2026-09-15）：NAM005——真实内建但未导入（warning，
+                    // 渐进式不拦截）。此前该形态静态全过、运行时才 RUNTIME002
+                    // （typechecker 全量灌内建签名、导入可用性归运行时的旧分工
+                    // 漏掉了"忘写 import"这个 LLM 高频错误形态）。prelude 恒可用。
+                    if let Some(module) = self.builtin_module.get(name)
+                        && !self.available_imports.contains(name) {
+                            self.push_diag(
+                                Severity::Warning,
+                                "NAM005".into(),
+                                format!(
+                                    "内建 '{}' 未导入——需在文件顶部声明：from {} import {{{}}}",
+                                    name, module, name
+                                ),
+                                cspan.line,
+                                cspan.col,
+                            );
+                        }                    // Phase 2.5: 效应检查
                     // 当前函数未声明的效应，不能调用带该效应的函数（EFF001，Warning，渐进式）
                     self.check_call_effects(name, &sig.effects);
                     // 参数数量检查

@@ -2156,8 +2156,9 @@ fn is_known_builtin(name: &str) -> bool {
     )
 }
 
-/// 返回内置函数所属的标准库模块名（用于错误提示）
-fn module_of(name: &str) -> Option<&'static str> {
+/// 返回内置函数所属的标准库模块名（用于错误提示）。
+/// pub(crate)：typechecker 的 NAM005（B 包）复用同一映射——单一事实源。
+pub(crate) fn module_of(name: &str) -> Option<&'static str> {
     match name {
         "println" | "print" => Some("io"),
         "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" | "split"

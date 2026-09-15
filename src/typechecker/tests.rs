@@ -826,3 +826,62 @@ fn let_non_closure_self_reference_still_nam003() {
     let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
     assert_eq!(d.len(), 1, "非闭包自引用仍应报 NAM003");
 }
+
+#[test]
+fn nam005_unimported_builtin_warns_with_hint() {
+    // B 包（2026-09-15）：真实内建未导入——此前静态全过、运行时才 RUNTIME002
+    // （typechecker 全量灌内建签名的旧分工漏掉"忘写 import"的 LLM 高频形态）。
+    // NAM005 warning（渐进式不拦截）+ hint 含模块名
+    let src = "fn main() -> Unit\n    println(starts_with(\"a\", \"a\"))\nend\n";
+    let diags = check_src(src);
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM005")
+        .collect();
+    assert_eq!(d.len(), 1, "未导入内建恰 1 条 NAM005");
+    assert!(d[0].message.contains("from string import {starts_with}"), "hint 含模块名与导入写法: {}", d[0].message);
+    assert_eq!(d[0].severity, crate::diagnostics::Severity::Warning);
+    assert!(diags.ok, "warning 不置 ok=false（渐进式承诺，与 MUT001/MUT002 同款）");
+}
+
+#[test]
+fn nam005_imported_builtin_clean() {
+    // 对照：导入后零诊断
+    let src = "from string import { starts_with }\nfn main() -> Unit\n    println(starts_with(\"a\", \"a\"))\nend\n";
+    let diags = check_src(src);
+    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    assert_eq!(d.len(), 0, "导入后不应报 NAM005");
+}
+
+#[test]
+fn nam005_alias_import_real_name_still_warns() {
+    // `f as g` 只解锁别名 g——真实名 f 仍属未导入（与运行时 available_builtins 同款）
+    let src = "from string import { starts_with as sw }\nfn main() -> Unit\n    println(sw(\"a\", \"a\"))\n    println(starts_with(\"a\", \"a\"))\nend\n";
+    let diags = check_src(src);
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM005" && d.message.contains("'starts_with'"))
+        .collect();
+    assert_eq!(d.len(), 1, "别名调用零诊断、真实名恰 1 条");
+}
+
+#[test]
+fn nam005_prelude_exempt() {
+    // prelude（println/print）恒可用，无需导入
+    let src = "fn main() -> Unit\n    print(\"x\")\n    println(\"y\")\nend\n";
+    let diags = check_src(src);
+    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    assert_eq!(d.len(), 0, "prelude 不应报 NAM005");
+}
+
+#[test]
+fn nam005_shadow_by_user_fn_blocked_by_nam002() {
+    // 用户 fn 与内建同名：语言层已由 NAM002 拦截（重复定义）——不存在
+    // "用户遮蔽内建后误报 NAM005"的路径（collect_fn_sig 先报错早退）
+    let src = "fn len(s: String) -> Int\n    42\nend\nfn main() -> Unit\n    println(len(\"a\"))\nend\n";
+    let diags = check_src(src);
+    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    assert_eq!(d.len(), 0, "同名声明走 NAM002 路径，不产生 NAM005");
+}

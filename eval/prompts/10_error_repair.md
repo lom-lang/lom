@@ -633,6 +633,23 @@ end
 
 请输出修复后的完整代码。
 
+### Task 120
+
+以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME002] 符号 'upper' 未导入——警告正是对运行时失败的预警）。请修复代码消除该警告并使程序正常运行。
+
+代码：
+fn shout(s: String) -> String
+    upper(s) + "!"
+end
+
+fn main() -> Unit
+    println(shout("lom"))
+end
+诊断 JSON：
+{"severity": "warning", "stage": "type", "code": "NAM005", "message": "内建 'upper' 未导入——需在文件顶部声明：from string import {upper}", "file": "bad.lom", "line": 2, "col": 5, "source_line": "    upper(s) + \"!\"", "is_hole": false, "hint": null}
+
+请输出修复后的完整代码。
+
 
 ---
 

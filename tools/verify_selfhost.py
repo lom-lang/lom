@@ -248,6 +248,8 @@ def mode_diags():
     return fail == 0
 
 
+# 注：NAM005（v1.2.0 未导入内建 warning，宿主产/自举不产）与 MUT 家族同款
+# 排除在四码对比外（T3 决策先例）——两侧过滤语义天然一致。
 FOUR_CODES = ('NAM003', 'TYPE003', 'EFF001', 'MAT001')
 
 

@@ -230,6 +230,17 @@ impl TypeChecker {
             "args".to_string(),
             FnSig { params: vec![], ret: Some(list_string()), effects: vec![], span: Span::default() },
         );
+
+        // B 包（2026-09-15）：内建 → 模块映射（NAM005"未导入内建"warning 的
+        // hint 反查）。模块归属复用 interpreter::module_of——单一事实源；
+        // prelude（println/print）恒可用，不入映射（无需导入判定）。
+        for name in self.functions.keys() {
+            if let Some(module) = crate::interpreter::module_of(name)
+                && module != "io" {
+                    self.builtin_module
+                        .insert(name.clone(), module.to_string());
+                }
+        }
     }
 
 }
