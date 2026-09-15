@@ -113,9 +113,6 @@ def run_probes() -> int:
 
     （分歧 4 trim Unicode 需非 ASCII 输入，由文档 + eval 既有用例覆盖，不在探针集；
     分歧 2 json-number 在集内。）
-
-    （分歧 2 JSON 数字与分歧 4 trim Unicode 涉及非 ASCII/JSON 宿主物化，
-    由 SPEC_FOR_AI §11f 文档描述 + eval 既有用例覆盖，不在本探针集。）
     """
     failures = 0
 

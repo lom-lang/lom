@@ -1,0 +1,70 @@
+{
+  "_comment": "宣称-证据对账登记（V 工作包 V1，2026-09-15）。每条 claim 由 tools/doc_audit.py H 类机器核验两件事：①算术闭合——sum(parts[].value) == claim；②出现点同步——occurrences 各文档现值的所有捕获组 == claim。parts[].evidence 是人审指针（指向 TODO 证据区原文，机器不核其真实性）。纪律来源：第五轮审查 R22——'合计 D 两期 2600'为算术笔误（四段验收之和 3400），四份文档五处同错；本登记把'宣称清单第一行的数字必须能从自己的证据推出'收敛为 CI gate。新增合计宣称时在此登记：先填分项（附证据指针），合计由回加得出，不手写。",
+  "claims": [
+    {
+      "id": "diff-total-d12",
+      "desc": "D 包两期合计：双后端 stdout+退出码逐字一致的程序/项目实例总数",
+      "claim": 3400,
+      "parts": [
+        {"value": 1000, "evidence": "D3 全量对拍（v1.1.3 一期）：docs/TODO.md 'D 工作包' D3 节——seed 1000-1499 与 5000-5499 两段各 500"},
+        {"value": 400, "evidence": "D5 包模式：docs/TODO.md 'D 包二期' D5 节——seed 1-200 与 7000-7199 两段"},
+        {"value": 1000, "evidence": "D6 JSON：docs/TODO.md 'D 包二期' D6 节——seed 1-500 与 8000-8499 两段"},
+        {"value": 1000, "evidence": "D7 递归梯度：docs/TODO.md 'D 包二期' D7 节——seed 1-500 与 9000-9499 两段"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "D 两期合计\\s+(\\d+) 程序/项目实例双后端逐字一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "两期合计 (\\d+) 程序/项目实例双后端逐字一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "2026-09-14：(\\d+) 程序/项目实例双后端全一致"},
+        {"path": "docs/lom-project-guide.html", "pattern": "D 包两期合计 (\\d+) 程序/项目实例双后端逐字一致"}
+      ]
+    },
+    {
+      "id": "diff-part-d3",
+      "desc": "D3 全量对拍（v1.1.3 一期）：1000 程序双后端一致",
+      "claim": 1000,
+      "parts": [
+        {"value": 500, "evidence": "seed 1000-1499 段 500 程序"},
+        {"value": 500, "evidence": "seed 5000-5499 段 500 程序"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "stdout\\+退出码 (\\d+)/(\\d+) 逐字一致\\*\\*（--check 闸门下零生成器 bug）"}
+      ]
+    },
+    {
+      "id": "diff-part-d5",
+      "desc": "D5 包模式：400 包项目双后端一致",
+      "claim": 400,
+      "parts": [
+        {"value": 200, "evidence": "seed 1-200 段 200 项目"},
+        {"value": 200, "evidence": "seed 7000-7199 段 200 项目"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "seed 1-200 与 7000-7199 两段 (\\d+)/(\\d+) 全一致"}
+      ]
+    },
+    {
+      "id": "diff-part-d6",
+      "desc": "D6 JSON：1000 程序双后端一致",
+      "claim": 1000,
+      "parts": [
+        {"value": 500, "evidence": "seed 1-500 段 500 程序"},
+        {"value": 500, "evidence": "seed 8000-8499 段 500 程序"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "seed 1-500 与 8000-8499 两段 (\\d+)/(\\d+) 全一致"}
+      ]
+    },
+    {
+      "id": "diff-part-d7",
+      "desc": "D7 递归梯度：1000 程序双后端一致",
+      "claim": 1000,
+      "parts": [
+        {"value": 500, "evidence": "seed 1-500 段 500 程序"},
+        {"value": 500, "evidence": "seed 9000-9499 段 500 程序"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "seed 1-500 与 9000-9499 两段 (\\d+)/(\\d+) 全一致"}
+      ]
+    }
+  ]
+}

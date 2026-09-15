@@ -20,6 +20,14 @@
 #      当前 Cargo 版本必须有 §13 条目（防升版忘写 changelog，历史主腐坏形态）；
 #      v1.0 冻结时代起 tag 与条目双向一致（v1.x 前的 0.x spec/工程两套编号是
 #      历史结构，不追改——§13 是 spec 视角记录，纯工程版本明文豁免）
+#   H. 宣称-证据对账（V1，2026-09-15）：tools/claims.json 每条 claim 核验
+#      ①算术闭合 sum(parts)==claim（根治第五轮 R22 的 2600 型算术笔误）；
+#      ②出现点同步——各文档现值捕获组 == claim（根治多文档"五处同错"漏改）
+#   I. 源码计数（V2，2026-09-15）：diff_gen POOL_BASE 模板族数 / diff_test 探针
+#      数 / SPEC_FOR_AI §11f 分歧条数 → 文档现值宣称（含中文数字形态）——
+#      R27/R28 型口径漂移的钉子
+#   Z. 自指项数（V2）：本工具总项数与 HANDOVER §2.2 宣称互锁——R16"监控不了
+#      自身项数"盲区关闭
 #
 # 纪律：模式找不到也算 FAIL（文档措辞重构时必须同步更新本清单——对账清单本身也是文档）。
 # 历史时点值（带日期/版本标签的快照，如 changelog 的 "eval 114/114 (v1.0.0)"、
@@ -183,6 +191,73 @@ def main():
                r'test --release` 确认 (\d+)/(\d+)', [test_count, test_count])
     expect_all('README 状态段测试数', 'README.md',
                r'(?m)^(\d+)/(\d+) Rust unit tests', [test_count, test_count])
+
+    # ---- H. 宣称-证据对账（V1，2026-09-15：第五轮 R22 教训工程化）----
+    # 每条 claim 核验两件事：①算术闭合 sum(parts)==claim（根治 2600 型算术笔误）；
+    # ②出现点同步——各文档现值的所有捕获组 == claim（根治"五处同错"漏改）。
+    # parts 的 evidence 指针供人审（指向 TODO 证据区原文），机器不核其真实性。
+    print('H. 宣称-证据对账（tools/claims.json：分项回加 + 出现点同步）')
+    claims = json.loads(read('tools/claims.json')).get('claims', [])
+    check('claims.json 登记数 >= 1', len(claims) >= 1, '%d 条' % len(claims))
+    for c in claims:
+        s = sum(p['value'] for p in c['parts'])
+        check('H %s 算术闭合' % c['id'], s == c['claim'],
+              'sum(parts)=%d vs claim=%d（%s）'
+              % (s, c['claim'], ' + '.join(str(p['value']) for p in c['parts'])))
+        for occ in c['occurrences']:
+            got = doc_number(occ['path'], occ['pattern'])
+            if got is None:
+                check('H %s @ %s' % (c['id'], occ['path']), False,
+                      '模式未找到（措辞重构时同步 claims.json）: %r' % occ['pattern'])
+            else:
+                check('H %s @ %s' % (c['id'], occ['path']),
+                      all(g == str(c['claim']) for g in got),
+                      '现值 %s（期望每组 == %d）' % (list(got), c['claim']))
+
+    # ---- I. 源码计数（V2：模板池/探针/分歧清单 → 文档现值）----
+    # R27/R28 型口径漂移（探针条数/安全界多处三个数）的钉子：真值从源码/规范
+    # 机械清点，文档宣称位（含中文数字形态）逐处比对。中文数字仅支持一至十
+    # （§11f 分歧清单与探针集在冻结期不会超十，超出时本项 FAIL 提示人工扩表）。
+    print('I. 源码计数（diff_gen 模板池 / diff_test 探针 / SPEC §11f 分歧条数）')
+    CN = '一二三四五六七八九十'
+
+    def cn(n):
+        return CN[n - 1] if 1 <= n <= 10 else None
+
+    m_pool = re.search(r'POOL_BASE = \[(.*?)\n\]', read('tools/diff_gen.py'), re.S)
+    pool_base = len(re.findall(r'Gen\.t_\w+', m_pool.group(1))) if m_pool else -1
+    check('模板池可清点', pool_base > 0, 'POOL_BASE = %d 族' % pool_base)
+    probe_n = len(set(re.findall(r'_pair_for_probe\("([\w-]+)"',
+                                 read('tools/diff_test.py'))))
+    m_11f = re.search(r'## 11f\..*?(?=\n## |\Z)', read('SPEC_FOR_AI.md'), re.S)
+    div_n = len(re.findall(r'(?m)^  \d+\. \*\*', m_11f.group(0))) if m_11f else -1
+    check('§11f 分歧清单可清点', div_n > 0, '§11f = %d 条' % div_n)
+    expect_all('I 模板族数 @ HANDOVER §1 下一步', 'docs/HANDOVER.md',
+               r'模板族 (\d+)）', [pool_base])
+    expect_all('I §11f 条数 @ diff_gen 头注释', 'tools/diff_gen.py',
+               r'§11f (一|二|三|四|五|六|七|八|九|十)条已知分歧', [cn(div_n)])
+    expect_all('I §11f 条数 @ diff_test 头注释', 'tools/diff_test.py',
+               r'§11f (一|二|三|四|五|六|七|八|九|十)条已知分歧', [cn(div_n)])
+    expect_all('I §11f/探针 @ diff_test run_probes docstring', 'tools/diff_test.py',
+               r'(一|二|三|四|五|六|七|八|九|十)条白名单中的'
+               r'(一|二|三|四|五|六|七|八|九|十)条可执行分歧', [cn(div_n), cn(probe_n)])
+    expect_all('I §11f 条数 @ diff_test main 打印', 'tools/diff_test.py',
+               r'§11f (一|二|三|四|五|六|七|八|九|十)条已知分歧', [cn(div_n)])
+    expect_all('I §11f/探针 @ HANDOVER §2.2 --probe 行', 'docs/HANDOVER.md',
+               r'§11f (一|二|三|四|五|六|七|八|九|十)条中'
+               r'(一|二|三|四|五|六|七|八|九|十)条可执行分歧', [cn(div_n), cn(probe_n)])
+    expect_all('I §11f/探针 @ HANDOVER §9-5', 'docs/HANDOVER.md',
+               r'§11f (一|二|三|四|五|六|七|八|九|十)条分歧全档案，探针 (\d+)/(\d+)',
+               [cn(div_n), probe_n, probe_n])
+
+    # ---- Z. 自指项数（R16 盲区关闭：本工具总项数与 HANDOVER 宣称一致）----
+    # R16 教训："doc_audit 监控不了自身项数的自指盲区"。本项把 §2.2 的
+    # "文档数字 N 项"宣称与脚本实际产出项数互锁（len+1 计入本项自身）。
+    m_z = doc_number('docs/HANDOVER.md', r'doc_audit\.py\s+# 对账：文档数字 (\d+) 项')
+    total_all = len(RESULTS) + 1
+    check('Z doc_audit 项数自指', m_z is not None and int(m_z[0]) == total_all,
+          'HANDOVER 宣称 %s vs 本脚本总项数 %d（含本项）'
+          % (m_z[0] if m_z else None, total_all))
 
     total, ok = len(RESULTS), sum(RESULTS)
     print('RESULT: %s（%d/%d 项通过）' % ('PASS' if ok == total else 'FAIL', ok, total))
