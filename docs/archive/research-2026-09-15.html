@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 生态位调研（第一轮继任）— 2026-09-15</title>
+<style>
+  :root { --fg:#1a1a2e; --muted:#5a5a72; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --bg-soft:#f4f5fa; --border:#d9dbe7; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--fg); max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; line-height:1.75; }
+  h1 { font-size:1.6rem; border-bottom:3px solid var(--accent); padding-bottom:.5rem; }
+  h2 { font-size:1.25rem; margin-top:2.2rem; border-left:4px solid var(--accent); padding-left:.6rem; }
+  h3 { font-size:1.05rem; margin-top:1.6rem; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.92rem; }
+  th,td { border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top; }
+  th { background:var(--bg-soft); }
+  .meta { background:var(--bg-soft); border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; font-size:.9rem; margin:1rem 0; }
+  .tag { display:inline-block; padding:.1rem .5rem; border-radius:4px; font-size:.8rem; font-weight:600; }
+  .tag-hot { background:var(--bad); color:#fff; }
+  .tag-warm { background:var(--warn); color:#fff; }
+  .tag-cool { background:var(--accent); color:#fff; }
+  blockquote { border-left:4px solid var(--border); margin:1rem 0; padding:.4rem 1rem; color:var(--muted); }
+  code { background:var(--bg-soft); padding:.1rem .3rem; border-radius:3px; font-size:.9em; }
+  a { color:var(--accent); }
+  .verdict { background:#fffbeb; border:1px solid #f59e0b; border-radius:8px; padding:.8rem 1rem; }
+  ul { padding-left:1.3rem; }
+  li { margin:.3rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Lom 生态位调研（第一轮继任轮）</h1>
+
+<div class="meta">
+<strong>调研轮次</strong>：启动期四份调研（2026-07/29–08/02）后的第一轮继任调研<br>
+<strong>调研日期</strong>：2026-09-15（Lom v1.2.0，语言面冻结 + 双后端 + 三层自举 + 差分 10000 收官后）<br>
+<strong>调研方式</strong>：公开网络检索（MoonBit 官网/博客、The Register/InfoQ/Phoronix 等媒体报道、GitHub 项目、SWE-bench 榜单）；所有数字与事实来自文内来源链接，检索时点 2026-09-15<br>
+<strong>与上轮的关键差异</strong>：上轮调研时（立项前）"LLM-repair-native 语言"赛道接近无人区；本轮发现该赛道在 2026 春夏已成热点——出现定位高度重合的大厂背书竞品（Vercel Labs Zero）
+</div>
+
+<h2>0. 结论摘要（先读）</h2>
+
+<div class="verdict">
+<ol>
+<li><strong>赛道变热，直接竞品出现</strong>：Vercel Labs 于 2026-05 发布、2026-08 正式 ship 的 <strong>Zero</strong> 语言，其定位——"AI agent 可读、可诊断、可修复"——与 Lom 的核心卖点（<code>lom-diag/v1</code> 稳定诊断码 + <code>lom-fix/v1</code> 修复动作 + 显式效应系统）高度重合，且有 Vercel 的渠道与曝光优势。</li>
+<li><strong>两个历史判断需要修订</strong>（HANDOVER §7 / DESIGN_RATIONALE 引用的立项期认知）：<strong>Mojo 已于 2026-08-12 发布 1.0 并开源</strong>（Qualcomm 收购后），不再"绑定硬件不进编码赛道"；<strong>MoonBit 1.0 从 2026 上半年推迟至 Q3</strong>（当前 v0.9，2026-04-07），且其 AI-native 叙事持续强化。</li>
+<li><strong>生态趋势与 Lom 同向</strong>：spec-driven development 成为主流范式（30+ agentic 框架）；SWE-bench Verified 破 80% 但 <strong>SWE-bench Pro（ICML 2026）/SWE-EVO 显示长程修复仍是缺口</strong>——"把 agent 的猜测变成协议驱动的修复"恰是 Lom 的赛道论据。</li>
+<li><strong>Lom 的差异化资产（当前仍独有）</strong>：修复闭环的工程深度（迭代 <code>--apply</code> + fix-history + fix_corpus 回归网）、三层自举自证、双后端 10000 程序差分证据、119 任务评测集与 pass@k 实测、六轮独立审查与冻结治理。Zero/Vera 均处于生态早期，无同等公开证据链。</li>
+<li><strong>风险（如实呈现，非建议）</strong>：在"优化到完美前不发布"的冻结裁决下，赛道声量被先发竞品占据的窗口成本在上升；本调研仅记录事实，发布时机决策权在用户。</li>
+</ol>
+</div>
+
+<h2>1. 竞品逐项</h2>
+
+<h3>1.1 Vercel Labs Zero <span class="tag tag-hot">最高威胁 · 定位重合</span></h3>
+<ul>
+<li>实验性系统编程语言，<strong>明确以"AI agent 能读、诊断、修复、交付原生程序"为设计目标</strong>：编译 sub-10KiB 原生二进制；<code>zero check --json</code> 返回结构化诊断（稳定错误码 + 精确行列 + <strong>类型化修复元数据</strong>）；显式效应；媒体描述为"graph-first language"（[MarkTechPost 2026-05](https://www.marktechpost.com/2026/05/17/vercel-labs-introduces-zero-a-systems-programming-language-designed-so-ai-agents-can-read-repair-and-ship-native-programs/)、[InfoQ 2026-08](https://www.infoq.com/news/2026/08/vercel-ships-zero-ai/)、[Techstrong.ai](https://techstrong.ai/features/vercel-labs-builds-a-programming-language-designed-for-ai-agents/)、[HackerNoon](https://hackernoon.com/vercels-zero-wants-compilers-to-talk-to-ai-agents)、[zerolang.ai](https://zerolang.ai/)）。</li>
+<li><strong>与 Lom 的重合面</strong>：机器可读诊断协议 + 稳定错误码 + 修复元数据 + 显式效应——四项皆中。</li>
+<li><strong>Lom 仍独有/领先的点</strong>：修复动作的<strong>迭代执行闭环</strong>（多轮收敛 + 历史留档 + 8 对 fix_corpus 回归网，Zero 公开材料只见到诊断输出未见等价物）；<strong>渐进式类型</strong>（warning 不拦截的哲学）；<strong>自举三层自证</strong>与双后端差分（10000 程序）的语义对齐证据；LLM 实测数据（119 任务集 pass@k 99.1%）。Zero 是 Vercel Labs 实验项目，语言成熟度与证据深度待观察。</li>
+</ul>
+
+<h3>1.2 MoonBit <span class="tag tag-warm">最直接对标 · 叙事逼近</span></h3>
+<ul>
+<li><strong>1.0 时间线变化</strong>：原计划 2026 上半年（[1.0 Roadmap](https://www.moonbitlang.com/blog/roadmap)）→ 官方 updates（2026-08-19）改口 <strong>Q3 2026</strong>；当前版本 v0.9（2026-04-07），pre-1.0 版本间视为兼容（[官方 updates](https://www.moonbitlang.com/updates/)）。</li>
+<li><strong>AI-native 叙事强化</strong>：2026-09 黑客松与"Software Synthesis Challenge"（以 AI-native 方式构建生产级系统）；路线图明言"AI-native toolchain improvements"。</li>
+<li><strong>设计哲学对照</strong>（其 2024-04 博客 [AI-native applications](https://www.moonbitlang.com/blog/ai-coding)，本轮重读）：AI 友好三特征 = 易测试 / 快速静态分析 / 安全性；纠错机制 = <strong>编辑器内实时重采样 + 静态分析过滤</strong>（token 级实时语义分析，实验称编译率显著提升、性能损耗 ~3%、建议增强延迟 ~0.86s）。</li>
+<li><strong>与 Lom 的分界线</strong>：MoonBit 的 AI 纠错发生在<strong>生成时</strong>（采样侧过滤），Lom 发生在<strong>生成后</strong>（诊断→修复动作→迭代 apply 的闭环）——两者互补而非同构；但对外叙事上"AI-native 语言"这个词的独占性在消失。</li>
+</ul>
+
+<h3>1.3 Mojo <span class="tag tag-cool">判断修订 · 不再排除</span></h3>
+<ul>
+<li><strong>1.0 已发</strong>：2026-08-12 达成 1.0 里程碑，定位"稳定、生产就绪的通用语言"（[The Register](https://www.theregister.com/ai-and-ml/2026/08/12/modulars-mojo-programming-language-hits-10-milestone/5286545/)）。</li>
+<li><strong>已开源</strong>：Qualcomm 收购 Modular 后按承诺开源了 Mojo 编译器（[Phoronix 讨论](https://www.phoronix.com/forums/forum/phoronix/latest-phoronix-articles/1652721-modulars-mojo-language-now-open-source-following-qualcomm-acquisition)、[HN](https://news.ycombinator.com/item?id=49358327)）。</li>
+<li><strong>生态动向</strong>：社区视角——用 Mojo 给 Qualcomm 芯片编 NPU 程序可能让 PC AI 编程"爱好化"；Wikipedia 口径：部分早期目标（完整 Python 兼容等）截至 2026-03 被放弃或推迟。</li>
+<li><strong>对立项期判断的修订</strong>：HANDOVER §7"Mojo 已被高通收购绑定硬件，不会来 LLM 编码赛道"——开源 + 通用语言定位使其间接进入更大竞场，但其重心（AI 工作负载性能）仍与 Lom（修复闭环）不同轴。</li>
+</ul>
+
+<h3>1.4 其他同赛道新面孔</h3>
+<ul>
+<li><strong>Vera</strong>（2026-04 前后 HN 热度）："为机器写、不为人写"的静态类型纯函数语言，无歧义语法、确定性解析，编译到 WASM（[veralang.dev](https://veralang.dev/)、[GitHub](https://github.com/aallan/vera)）。比 Lom 更极端（放弃人类可读优先），人群不同。</li>
+<li><strong>BirdDisk</strong>：独立小项目，自称"LLM-first 语言 + 编译器栈：人类可读 + 确定性解析 + 机器可行动诊断"（[GitHub](https://github.com/Jawbreaker1/bird_disk_code)）——表述与 Lom 设计支柱几乎逐字重合，但工程规模小。</li>
+<li><strong>Plang/PromptLanguage</strong>（[ESWA 2025 论文](https://www.sciencedirect.com/science/article/pii/S0957417425037339)）：string-first、面向 LLM 提示工程的语言——不同赛道（提示编排 vs 程序修复）。</li>
+</ul>
+
+<h2>2. 生态与能力趋势</h2>
+<ul>
+<li><strong>Spec-driven development 主流化</strong>：六大 SDD 工具同台（Augment Cosmos / Kiro / GitHub Spec Kit / OpenSpec / BMAD-METHOD / Cursor，[Augment 盘点](https://www.augmentcode.com/tools/best-spec-driven-development-tools)）；30+ agentic 编码框架图谱（[Medium 深度图](https://medium.com/@visrow/spec-driven-development-is-eating-software-engineering-a-map-of-30-agentic-coding-frameworks-6ac0b5e2b484)）；IBM 提"spec-as-source"终局（[IBM](https://www.ibm.com/think/topics/spec-driven-development)）。→ <strong>与 Lom 同向</strong>：Lom 的 <code>SPEC_FOR_AI.md</code>（喂 LLM 的精简规范）+ 诊断协议本质上是"语言级 spec 协议化"。</li>
+<li><strong>Agent 修复能力：单点强、长程弱</strong>：SWE-bench Verified 2026 年破 80%（[Multiware](https://multiwaresolutions.com/blog/ai-coding-agents-swe-bench-2026)、[官方榜](https://www.swebench.com/)）；但 <strong>SWE-bench Pro（ICML 2026）</strong>揭示长程多议题真实场景仍有大缺口，新基准 SWE-EVO 专测代码库持续演化（[ICML 页面](https://icml.cc/virtual/2026/poster/61047)）。→ 修复<strong>可靠性</strong>（而非单次成功率）是下一战场——协议驱动的修复闭环（Lom 路线）正是针对该缺口的方案论据。</li>
+<li><strong>2026 语言共识图景</strong>：两条流派——(a) 性能型 AI 语言（Mojo/MoonBit/Bend）；(b) LLM-first 设计原则（无歧义语法、强工具、可验证语义、机器可读错误）（[Syracuse 榜单](https://ischool.syracuse.edu/top-ai-programming-languages/)、[Artezio 2026 playbook](https://www.artezio.com/pressroom/blog/playbook-development-languages/) 等）。Lom 属 (b) 中"修复优先"细分。</li>
+</ul>
+
+<h2>3. 竞争格局对照表（检索时点 2026-09-15）</h2>
+
+<table>
+<tr><th></th><th>Lom（本项目）</th><th>Vercel Zero</th><th>MoonBit</th><th>Mojo</th><th>Vera</th></tr>
+<tr><th>核心定位</th><td>LLM-repair-native：写错后高效修复</td><td>Agent 可读/诊断/修复的系统语言</td><td>AI 友好 + WASM-first 工具链</td><td>AI 负载性能（Python 超集）</td><td>为机器写（非人读优先）</td></tr>
+<tr><th>机器可读诊断</th><td>✅ lom-diag/v1（稳定码+span+hint+JSON）</td><td>✅ 结构化 JSON+修复元数据</td><td>部分（静态分析工具链）</td><td>—（传统报错）</td><td>宣称确定性解析</td></tr>
+<tr><th>修复动作协议</th><td>✅ lom-fix/v1 + 迭代 --apply + history + corpus 回归网</td><td>诊断含修复元数据（公开材料未见等价闭环）</td><td>编辑器内重采样（生成时）</td><td>—</td><td>—</td></tr>
+<tr><th>显式效应</th><td>✅ EFF001（冻结期既有）</td><td>✅（媒体确认）</td><td>—</td><td>—</td><td>纯函数（隐式）</td></tr>
+<tr><th>双后端</th><td>✅ 树遍历 + WASM（10000 差分逐字一致）</td><td>原生二进制（sub-10KiB）</td><td>✅ WASM/JS/Native</td><td>原生</td><td>✅ WASM</td></tr>
+<tr><th>自举</th><td>✅ 三层自证（5703 行自举解释器）</td><td>未知</td><td>部分</td><td>未知</td><td>未知</td></tr>
+<tr><th>LLM 实测</th><td>✅ 119 任务 + 4 模型 + pass@k 99.1%</td><td>未见公开</td><td>未见系统公开</td><td>—</td><td>未见</td></tr>
+<tr><th>治理/成熟度</th><td>v1.2.0 冻结、六轮独立审查、零依赖</td><td>2026-08 ship，早期</td><td>v0.9（1.0 目标 Q3）</td><td>1.0（2026-08-12）</td><td>早期</td></tr>
+<tr><th>背书/渠道</th><td>独立项目</th><td>Vercel Labs</td><td>IDEA（HK）</td><td>Qualcomm/Modular</td><td>个人（aallan）</td></tr>
+</table>
+
+<h2>4. 对 Lom 的行动启示（记录，非裁决）</h2>
+<ul>
+<li><strong>差异化叙事需要更新措辞</strong>：从"AI-native 语言（稀缺定位）"收敛为"修复闭环 + 证据链最深的 agent-native 语言"——竞品已有诊断 JSON，但公开材料中尚无与 fix 引擎（计划→置信度分级→迭代应用→历史留档→语料回归）等深的闭环。</li>
+<li><strong>历史判断修订两处</strong>（HANDOVER §7 / DESIGN_RATIONALE 若引用需注新）：Mojo 开源 1.0；MoonBit 1.0 推迟 Q3 且 AI 叙事强化。</li>
+<li><strong>零依赖供应链 + 冻结治理</strong>在 agent 生成代码安全语境下（MoonBit 博客亦把"AI 生成代码安全"列为核心挑战）是可对外强调的资产。</li>
+<li><strong>发布窗口</strong>：Zero 的渠道优势意味着时间成本真实存在；发布时机仍是用户冻结裁决，本调研不改变它，仅提供事实输入。</li>
+<li><strong>可考虑的低成本跟进</strong>（均不破冻结）：README 差异化段落与 Zero/Vera 对照的公开对照表；把 pass@k/差分证据链整理为一页对外材料。</li>
+</ul>
+
+<h2>5. 方法与局限</h2>
+<ul>
+<li>检索式调研：公开网页 + 媒体报道 + GitHub；未做竞品工具的本地实测（Zero/Vera 未安装试用——后续轮次可补）。</li>
+<li>检索时点 2026-09-15；MoonBit 1.0"Q3 目标"在检索时点尚未确认是否已正式发布（9 月黑客松进行中）——下轮调研复核。</li>
+<li>启动期四份调研（2026-07/08）的原始决策证据地位不变（DESIGN_RATIONALE 引用照旧）；本报告是继任轮，认知以本报告为最新。</li>
+<li>来源均内联于正文； headline 数字（1.0 日期/推迟/开源/80%/sub-10KiB）均可在来源链接复核。</li>
+</ul>
+
+<h2>6. 来源总目</h2>
+<ul>
+<li>MoonBit：[1.0 Roadmap](https://www.moonbitlang.com/blog/roadmap) · [官方 updates（2026-08-19，Q3 目标）](https://www.moonbitlang.com/updates/) · [AI-native 博客（2024-04，重读）](https://www.moonbitlang.com/blog/ai-coding)</li>
+<li>Mojo：[The Register：1.0 里程碑（2026-08-12）](https://www.theregister.com/ai-and-ml/2026/08/12/modulars-mojo-programming-language-hits-10-milestone/5286545/) · [Phoronix：收购后开源](https://www.phoronix.com/forums/forum/phoronix/latest-phoronix-articles/1652721-modulars-mojo-language-now-open-source-following-qualcomm-acquisition) · [Modular：path to 1.0](https://www.modular.com/blog/the-path-to-mojo-1-0) · [HN 讨论](https://news.ycombinator.com/item?id=49358327)</li>
+<li>Zero：[MarkTechPost（2026-05-17）](https://www.marktechpost.com/2026/05/17/vercel-labs-introduces-zero-a-systems-programming-language-designed-so-ai-agents-can-read-repair-and-ship-native-programs/) · [InfoQ（2026-08）](https://www.infoq.com/news/2026/08/vercel-ships-zero-ai/) · [Techstrong.ai](https://techstrong.ai/features/vercel-labs-builds-a-programming-language-designed-for-ai-agents/) · [HackerNoon](https://hackernoon.com/vercels-zero-wants-compilers-to-talk-to-ai-agents) · [zerolang.ai](https://zerolang.ai/)</li>
+<li>Vera / BirdDisk：[veralang.dev](https://veralang.dev/) · [GitHub aallan/vera](https://github.com/aallan/vera) · [GitHub Jawbreaker1/bird_disk_code](https://github.com/Jawbreaker1/bird_disk_code)</li>
+<li>生态趋势：[SWE-bench 官方榜](https://www.swebench.com/) · [ICML 2026：SWE-Bench Pro](https://icml.cc/virtual/2026/poster/61047) · [IBM：SDD](https://www.ibm.com/think/topics/spec-driven-development) · [Augment：SDD 工具盘点](https://www.augmentcode.com/tools/best-spec-driven-development-tools) · [30+ agentic 框架图谱](https://medium.com/@visrow/spec-driven-development-is-eating-software-engineering-a-map-of-30-agentic-coding-frameworks-6ac0b5e2b484) · [Multiware：SWE-bench 2026](https://multiwaresolutions.com/blog/ai-coding-agents-swe-bench-2026) · [MorphLLM 榜单](https://www.morphllm.com/best-ai-coding-agents-2026)</li>
+</ul>
+
+</body>
+</html>

@@ -302,7 +302,7 @@ end
 ## 8. 杂项备忘
 
 - `.lom/` 目录（fix-history.jsonl）是运行时产物，已 gitignore。
-- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=启动期四份调研（不再更新，DESIGN_RATIONALE 有 3 处引用作决策证据，别删）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**）。
+- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=调研档案（启动期四份 2026-07/08 不再更新——DESIGN_RATIONALE 有 3 处引用作决策证据，别删；**继任调研轮 2026-09-15 起持续更新**：research-YYYY-MM-DD[-topic].html 命名规范见该目录 README——第 1 轮 research-2026-09-15.html 抓到竞品重大变化：Vercel Zero 定位重合/Mojo 1.0 开源/MoonBit 推迟 Q3，认知以最新轮为准）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**）。
 - eval/candidates/ 里的 001-100.lom 是 LLM 实测的原始产物（99/100 那批），**保留作证据**，别清理。
 - eval/prompts/_generate.ps1 从 tasks JSON 生成 prompts，改任务后记得重跑。
 - examples/todo.lom 是 Phase 3 退出标准的标志 demo（185 行 CLI），回归时可顺带跑。
