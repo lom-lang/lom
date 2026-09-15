@@ -7,7 +7,7 @@
 #   （常量/边界/分支数/变量名）上——不生成"自由拼接"的语法，保证零 parse/ type Error。
 # - 确定性输出：只用纯计算 + println（无 Clock/file/env/随机），同一程序
 #   双后端输出必须逐字一致。
-# - 默认避开 SPEC_FOR_AI §11f 七条已知分歧形态：
+# - 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态：
 #   1. 闭包捕获 mut（模板只捕获不可变绑定）
 #   2. JSON 数字 Int/Float 切分（不生成 json_parse）
 #   3. 除零/模零（除数为非零字面量或加 != 0 守卫）
@@ -514,51 +514,59 @@ end"""
     def t_enum_dispatch(self):
         en = self.uniq("Shape")
         v = self.uniq("area")
+        # 变体名带 uniq 编号：同模板重复抽中时，同名变体跨 enum 会共享全局
+        # 变体 idx（构造点按名解析到最后定义的那个），产生 TYPE003 warning 与
+        # 类型歧义形态（D 三期顺手消除——变体名全局唯一是零歧义写法；
+        # 实测双后端行为一致，非 bug，纯生成质量收敛）
+        p = self.n
+        cir, sq, rect, dot = "Cir%d" % p, "Sq%d" % p, "Rect%d" % p, "Dot%d" % p
         r = self.rng.choice([1.5, 2.0, 2.5, 3.0, 4.0])
         enum = f"""enum {en}
-    | Cir(Float)
-    | Sq(Float)
-    | Rect(Float, Float)
-    | Dot
+    | {cir}(Float)
+    | {sq}(Float)
+    | {rect}(Float, Float)
+    | {dot}
 end"""
         fn = f"""fn {v}(s: {en}) -> Float
     match s
-        Cir(r) => 3.0 * r * r
-        Sq(side) => side * side
-        Rect(w, h) => w * h
-        Dot => 0.0
+        {cir}(r) => 3.0 * r * r
+        {sq}(side) => side * side
+        {rect}(w, h) => w * h
+        {dot} => 0.0
     end
 end"""
         calls = [
-            f"println({v}(Cir({r})))",
-            f"println({v}(Sq({r + 1.0})))",
-            f"println({v}(Rect({r}, {r + 2.0})))",
-            f"println({v}(Dot))",
+            f"println({v}({cir}({r})))",
+            f"println({v}({sq}({r + 1.0})))",
+            f"println({v}({rect}({r}, {r + 2.0})))",
+            f"println({v}({dot}))",
         ]
         self.emit(enum + "\n\n" + fn, calls)
 
     def t_enum_guard_match(self):
         en = self.uniq("Level")
         v = self.uniq("lv")
+        p = self.n
+        low, mid, high, top = "Low%d" % p, "Mid%d" % p, "High%d" % p, "Top%d" % p
         k = self.rng.randint(0, 99)
-        enum = f"enum {en} = Low | Mid | High | Top"
+        enum = f"enum {en} = {low} | {mid} | {high} | {top}"
         fn = f"""fn {v}(l: {en}, x: Int) -> String
     match l
-        Low if x < {max(k, 1)} => "low-small"
-        Low => "low-big"
-        Mid if x % 2 == 0 => "mid-even"
-        Mid => "mid-odd"
-        High => "high"
+        {low} if x < {max(k, 1)} => "low-small"
+        {low} => "low-big"
+        {mid} if x % 2 == 0 => "mid-even"
+        {mid} => "mid-odd"
+        {high} => "high"
         _ => "top-or-other"
     end
 end"""
         calls = [
-            f'println({v}(Low, {k}))',
-            f'println({v}(Low, {k + 50}))',
-            f'println({v}(Mid, {k}))',
-            f'println({v}(Mid, {k + 1}))',
-            f'println({v}(High, {k}))',
-            f'println({v}(Top, {k}))',
+            f'println({v}({low}, {k}))',
+            f'println({v}({low}, {k + 50}))',
+            f'println({v}({mid}, {k}))',
+            f'println({v}({mid}, {k + 1}))',
+            f'println({v}({high}, {k}))',
+            f'println({v}({top}, {k}))',
         ]
         self.emit(enum + "\n\n" + fn, calls)
 
@@ -972,7 +980,242 @@ end"""
         {v}(n - 1)
     end
 end"""
-        calls = [f'println({v}({n}))', f'println({v}({n * 2 + 1}))']
+        calls = [f"println({v}({n}))", f"println({v}({n * 2 + 1}))"]
+        self.emit(fn, calls)
+
+
+    # ===== 模板族 N：file/env/深控制流/import 深形态（D8，D 包三期 2026-09-15）=====
+    # file 三件套的确定性纪律：只生成"覆盖写先行重置基线"的幂等闭环——
+    # 对拍顺序 interp 先跑、wasm 后跑，任何"裸 append/裸 exists"形态都会因
+    # interp 侧留下的文件状态使两侧起点不同（§11.0 两侧同起点教训）。
+
+    def t_file_roundtrip(self):
+        # 覆盖写 → 读回 → 长度消费（file 四件套的核心路径；文件名 uniq，
+        # write 先行保证同 seed 复跑与双后端顺序无关）
+        v = self.uniq("frt")
+        k = self.uniq("fk")
+        fn = f"""fn {v}() -> Int ! [IO]
+    let _ = file_write(".diff_tmp/{k}.txt", "base-{k}-content")
+    let c = file_read(".diff_tmp/{k}.txt")
+    len(c)
+end"""
+        calls = [f"println({v}())"]
+        self.emit(fn, calls)
+
+    def t_file_exists_gated(self):
+        # 写后 exists=True 与"永不写入的唯一名"exists=False 的对照分支
+        v = self.uniq("fex")
+        k = self.uniq("fk")
+        a = self.uniq("absent")
+        fn = f"""fn {v}() -> Int ! [IO]
+    let _ = file_write(".diff_tmp/{k}.txt", "x")
+    let hit = file_exists(".diff_tmp/{k}.txt")
+    let miss = file_exists(".diff_tmp/{a}.txt")
+    if hit and !miss
+        1
+    else
+        0
+    end
+end"""
+        calls = [f"println({v}())"]
+        self.emit(fn, calls)
+
+    def t_file_append_accum(self):
+        # 覆盖基线 → append 两次 → 读长（append 只在 write 重置后发生）
+        v = self.uniq("fap")
+        k = self.uniq("fk")
+        fn = f"""fn {v}() -> Int ! [IO]
+    let _ = file_write(".diff_tmp/{k}.txt", "head")
+    let _ = file_append(".diff_tmp/{k}.txt", "-mid")
+    let _ = file_append(".diff_tmp/{k}.txt", "-tail")
+    let c = file_read(".diff_tmp/{k}.txt")
+    len(c)
+end"""
+        calls = [f"println({v}())"]
+        self.emit(fn, calls)
+
+    def t_env_args_consume(self):
+        # args() 尾部用户参数消费——diff_test 以 `-- d1 d2` 固定调用，两侧
+        # 尾部逐字一致；argv[0] 双后端是不同路径（.lom vs .wasm，§11f-8
+        # 结构性差异），模板永不消费 args[0]
+        v = self.uniq("ea")
+        fn = f"""fn {v}() -> Int ! [IO]
+    let a = args()
+    let n = list_length(a)
+    let last = list_get(a, n - 1)
+    let second = list_get(a, 1)
+    n * 100 + len(last) * 10 + len(second)
+end"""
+        calls = [f"println({v}())"]
+        self.emit(fn, calls)
+
+    def t_while_match_return(self):
+        # while × match 表达式值绑定 × Form B 臂内 if+return（三层控制流嵌套，
+        # W 包 label 栈纪律的深覆盖）；Form B 臂独立 end（§4.1）
+        v = self.uniq("wm")
+        n = self.rng.randint(3, 12)
+        stop = self.rng.randint(1, 4)
+        fn = f"""fn {v}(n: Int, stop: Int) -> Int
+    let mut total = 0
+    let mut i = 0
+    while i < n
+        let d = match i % 3
+            0 => 10
+            1 => 20
+            _ => 30
+        end
+        total += d
+        match i % 4
+            2 =>
+                if i >= {stop}
+                    return i * 1000 + {stop}
+                end
+            end
+            _ => ()
+        end
+        i += 1
+    end
+    total
+end"""
+        calls = [f"println({v}({n}, {stop}))", f"println({v}({n}, 99))"]
+        self.emit(fn, calls)
+
+    def t_nested_for_closure(self):
+        # 外层循环变量的不可变别名被内层闭包捕获（避开分歧 1 的 mut 捕获；
+        # 闭包在循环内多次创建，每次捕获当轮值）
+        v = self.uniq("nfc")
+        a = self.rng.randint(2, 5)
+        b = self.rng.randint(2, 5)
+        fn = f"""fn {v}(a: Int, b: Int) -> Int
+    let mut total = 0
+    for i in a
+        let base = i * 10
+        let add_base = fn(x: Int) -> Int
+            x + base
+        end
+        for j in b
+            total += add_base(j)
+        end
+    end
+    total
+end"""
+        calls = [f"println({v}({a}, {b}))"]
+        self.emit(fn, calls)
+
+    def t_enum_cross_match(self):
+        # 两个 enum 的交叉嵌套 match（Form B 臂内 match 另一 enum——
+        # §4.1 多 end 计数的高危形态定向覆盖）；变体名 uniq（D 三期纪律）
+        e1 = self.uniq("Cx1")
+        e2 = self.uniq("Cx2")
+        v = self.uniq("xm")
+        p = self.n
+        enum1 = f"enum {e1} = A{p} | B{p} | C{p}"
+        enum2 = f"""enum {e2}
+    | P{p}(Int)
+    | Q{p}(Int, Int)
+    | R{p}
+end"""
+        x, y = self.rng.randint(0, 9), self.rng.randint(0, 9)
+        fn = f"""fn {v}(a: {e1}, b: {e2}) -> Int
+    match a
+        A{p} =>
+            match b
+                P{p}(x) => x + 1
+                Q{p}(x, y) => x + y
+                R{p} => 0
+            end
+        end
+        B{p} => 100
+        _ => 200
+    end
+end"""
+        calls = [
+            f"println({v}(A{p}, P{p}({x})))",
+            f"println({v}(A{p}, Q{p}({x}, {y})))",
+            f"println({v}(A{p}, R{p}))",
+            f"println({v}(B{p}, R{p}))",
+            f"println({v}(C{p}, P{p}({x})))",
+        ]
+        self.emit(enum1 + "\n\n" + enum2 + "\n\n" + fn, calls)
+
+    def t_try_in_while(self):
+        # while 体内 `?` 提前返回（t_try_in_for 的 while 版——label 栈的
+        # 另一条降级路径）
+        v = self.uniq("tw")
+        w = self.uniq("whalf")
+        n = self.rng.randint(2, 9)
+        bad = self.rng.choice(["-3", "-7", "0"])
+        fn_helper = f"""fn {w}(n: Int) -> Result<Int, String>
+    if n % 2 == 0
+        Ok(n / 2)
+    else
+        Err("odd: " + n)
+    end
+end"""
+        fn = f"""fn {v}(n: Int) -> Result<Int, String>
+    let mut i = 0
+    while i < n
+        let h = {w}(i)?
+        if h > 1
+            return Ok(h * 50)
+        end
+        i += 1
+    end
+    Ok(0)
+end"""
+        calls = [f'println({v}({n}))', f'println({v}({bad}))']
+        self.emit(fn_helper + "\n\n" + fn, calls)
+
+    def t_mixed_iteration(self):
+        # for-over-String 外层 × for-over-List 内层（两种迭代协议的混合嵌套）
+        v = self.uniq("mi")
+        s = self.rng.choice(["alpha", "banana", "foobar", "lomlang"])
+        n = self.rng.randint(2, 5)
+        fn = f"""fn {v}(s: String, n: Int) -> Int
+    let mut total = 0
+    for c in s
+        if c == "a" or c == "o"
+            for j in 1..{n}
+                total += j
+            end
+        else
+            total += 1
+        end
+    end
+    total
+end"""
+        calls = [f'println({v}("{s}", {n}))']
+        self.emit(fn, calls)
+
+    def t_import_alias_stdlib(self):
+        # stdlib 符号别名导入（v1.1.4 修的是包符号别名路径；stdlib 别名在
+        # 单文件内的独立覆盖）——别名 import 行随模板 decls 走（非文件头）
+        v = self.uniq("ia")
+        s = self.rng.choice(STR_ATOMS)
+        decl = f"""from string import {{ len as length_of, upper as up_case }}
+
+fn {v}(s: String) -> Int
+    length_of(up_case(s)) * 10 + length_of(s)
+end"""
+        calls = [f'println({v}("{s}"))']
+        self.emit(decl, calls)
+
+    def t_recursion_accumulator(self):
+        # 递归带累积参数（acc 模式）+ 命中阈值提前返回（与沉降到底对照）
+        v = self.uniq("racc")
+        n = self.rng.randint(5, 40)
+        stop = self.rng.randint(20, 200)
+        fn = f"""fn {v}(n: Int, acc: Int, stop: Int) -> Int
+    if n == 0
+        acc
+    else
+        if acc > stop
+            return acc * 100
+        end
+        {v}(n - 1, acc + n, stop)
+    end
+end"""
+        calls = [f"println({v}({n}, 0, {stop}))", f"println({v}({n}, 0, 99999))"]
         self.emit(fn, calls)
 
 
@@ -991,6 +1234,10 @@ POOL_BASE = [
     Gen.t_bool_logic, Gen.t_mixed_io, Gen.t_string_escapes, Gen.t_compare_ops,
     Gen.t_shadowing, Gen.t_json_parse_consume, Gen.t_json_roundtrip, Gen.t_json_nested,
     Gen.t_mutual_recursion, Gen.t_deep_recursion_gradient, Gen.t_recursion_early_return,
+    Gen.t_file_roundtrip, Gen.t_file_exists_gated, Gen.t_file_append_accum,
+    Gen.t_env_args_consume, Gen.t_while_match_return, Gen.t_nested_for_closure,
+    Gen.t_enum_cross_match, Gen.t_try_in_while, Gen.t_mixed_iteration,
+    Gen.t_import_alias_stdlib, Gen.t_recursion_accumulator,
 ]
 POOL_EARLY_RETURN = [
     Gen.t_return_in_for_list, Gen.t_return_in_for_int, Gen.t_return_in_nested_for,
@@ -1014,6 +1261,8 @@ def gen_program(seed: int) -> tuple[str, str]:
         "from list import { list_map, list_filter, list_fold, list_cons, list_head, list_tail, list_length, list_get }",
         "from map import { map_empty, map_set, map_get, map_has, map_remove, map_keys, map_size }",
         "from json import { json_parse, json_stringify }",
+        "from file import { file_read, file_write, file_append, file_exists }",
+        "from env import { args }",
         "",
     ]
     body = "\n\n".join(g.decls)

@@ -65,6 +65,32 @@
       "occurrences": [
         {"path": "docs/TODO.md", "pattern": "seed 1-500 与 9000-9499 两段 (\\d+)/(\\d+) 全一致"}
       ]
+    },
+    {
+      "id": "diff-part-d8",
+      "desc": "D8 三期（file/env/深控制流/import 深形态，模板族 45→56）：1000 程序双后端一致",
+      "claim": 1000,
+      "parts": [
+        {"value": 500, "evidence": "seed 10000-10499 段 500 程序：docs/TODO.md 'D 包三期' D8 证据区"},
+        {"value": 500, "evidence": "seed 15000-15499 段 500 程序：docs/TODO.md 'D 包三期' D8 证据区"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "seed 10000-10499 与 15000-15499 两段 (\\d+)/(\\d+) 全一致"}
+      ]
+    },
+    {
+      "id": "diff-total-d123",
+      "desc": "D 包三期累计：双后端 stdout+退出码逐字一致的程序/项目实例总数",
+      "claim": 4400,
+      "parts": [
+        {"value": 3400, "evidence": "D 一期+二期合计（diff-total-d12）"},
+        {"value": 1000, "evidence": "D 三期（diff-part-d8）"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "D 包三期累计 (\\d+) 程序/项目实例双后端逐字一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "2026-09-15：(\\d+) 程序/项目实例双后端全一致"},
+        {"path": "docs/lom-project-guide.html", "pattern": "D 包三期累计 (\\d+) 程序/项目实例双后端逐字一致"}
+      ]
     }
   ]
 }

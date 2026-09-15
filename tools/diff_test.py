@@ -6,7 +6,7 @@
 #   python tools/diff_test.py --probe                            # 探针模式：验证 §11f 白名单仍如档案所述
 #   python tools/diff_test.py --rounds 20 --ci                   # CI 冒烟（固定小轮次）
 #
-# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 七条已知分歧形态，
+# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态，
 # 因此**任何 stdout/退出码差异都是新发现**（差异即 FAIL，留档 .diff_failures/
 # 供人工调查——bug 则修复 + 回归测试，未记录分歧则补 §11f 白名单）。
 # 探针模式纪律：显式生成已知分歧形态，验证差异**确实出现且形态符合档案**——
@@ -37,7 +37,9 @@ import diff_gen  # noqa: E402
 
 
 def run_interp(path: str, timeout=25):
-    p = subprocess.run([LOM, path], capture_output=True, timeout=timeout)
+    # 固定用户参数 `-- d1 d2`：args() 尾部在两后端逐字一致（argv[0] 是 .lom
+    # vs .wasm 路径的结构性差异，§11f-8——不消费 args[0] 的程序不受影响）
+    p = subprocess.run([LOM, path, "--", "d1", "d2"], capture_output=True, timeout=timeout)
     return p.stdout.decode("utf-8", errors="replace"), p.returncode
 
 
@@ -47,7 +49,8 @@ def run_wasm(path: str, timeout=25):
                        capture_output=True, timeout=timeout)
     if b.returncode != 0:
         return ("<wasm build 失败>\n" + b.stderr.decode("utf-8", errors="replace")), b.returncode
-    p = subprocess.run(["node", HARNESS, wasm_path], capture_output=True, timeout=timeout)
+    p = subprocess.run(["node", HARNESS, wasm_path, "--", "d1", "d2"],
+                       capture_output=True, timeout=timeout)
     return p.stdout.decode("utf-8", errors="replace"), p.returncode
 
 
@@ -109,10 +112,11 @@ def _pair_for_probe(kind: str, seed: int):
 
 
 def run_probes() -> int:
-    """探针模式：验证 §11f 七条白名单中的六条可执行分歧仍如档案所述。
+    """探针模式：验证 §11f 八条白名单中的六条可执行分歧仍如档案所述。
 
     （分歧 4 trim Unicode 需非 ASCII 输入，由文档 + eval 既有用例覆盖，不在探针集；
-    分歧 2 json-number 在集内。）
+    分歧 2 json-number 在集内；分歧 8 argv[0] 为结构性路径差异，由生成器构造性
+    规避（t_env_args_consume 永不消费 args[0]），不需要探针。）
     """
     failures = 0
 
@@ -291,7 +295,7 @@ def main():
                 print("  seed %d: 新发现差异 — %s" % (seed, detail))
             if not args.ci and (i + 1) % 50 == 0:
                 print("  ... %d/%d（fail %d）" % (i + 1, args.rounds, fails))
-        print("diff[%s]: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 七条已知分歧）"
+        print("diff[%s]: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 八条已知分歧）"
               % (label, args.rounds - fails, args.rounds))
         if fails:
             print("失败留档：%s/*.lom + .interp.out + .wasm.out" % FAILDIR)
