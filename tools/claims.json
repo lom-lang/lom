@@ -89,8 +89,37 @@
       ],
       "occurrences": [
         {"path": "docs/TODO.md", "pattern": "D 包三期累计 (\\d+) 程序/项目实例双后端逐字一致"},
-        {"path": "docs/HANDOVER.md", "pattern": "2026-09-15：(\\d+) 程序/项目实例双后端全一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "三期 2026-09-15：(\\d+) 程序/项目实例双后端全一致"},
         {"path": "docs/lom-project-guide.html", "pattern": "D 包三期累计 (\\d+) 程序/项目实例双后端逐字一致"}
+      ]
+    },
+    {
+      "id": "diff-part-d9",
+      "desc": "D9 四期五批（模板族 56→101、包模式深化、密度 4-10）：5600 程序/项目实例双后端一致",
+      "claim": 5600,
+      "parts": [
+        {"value": 1000, "evidence": "D9-a+b 批（字符串/数值深水 + 容器深组合，变体名下划线修复后重跑）：seed 20000-20499 与 25000-25499 两段——docs/TODO.md 'D 包四期' 证据区"},
+        {"value": 1000, "evidence": "D9-c+d 批（enum 深水含递归 enum + 闭包/HOF/管道）：seed 30000-30499 与 35000-35499 两段"},
+        {"value": 1000, "evidence": "D9-e 批（Result/Option/效应深组合）：seed 50000-50499 与 55000-55499 两段（50000 段首次运行被并行 probe 的 rmtree 干扰中断，单独重跑通过）"},
+        {"value": 600, "evidence": "包模式深化批（签名多样化+三包链+包内 enum）：--pkg seed 20000-20599"},
+        {"value": 2000, "evidence": "全池混合回归（101 族 + 密度 4-10）：seed 60000-60999 与 65000-65999 两段各 1000"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "D9 四期五批：(\\d+) 程序/项目实例双后端一致"}
+      ]
+    },
+    {
+      "id": "diff-total-d1234",
+      "desc": "D 包四期累计：双后端 stdout+退出码逐字一致的程序/项目实例总数",
+      "claim": 10000,
+      "parts": [
+        {"value": 4400, "evidence": "D 一期+二期+三期合计（diff-total-d123）"},
+        {"value": 5600, "evidence": "D 四期（diff-part-d9）"}
+      ],
+      "occurrences": [
+        {"path": "docs/TODO.md", "pattern": "D 包四期累计 (\\d+) 程序/项目实例双后端逐字一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "四期 2026-09-15：(\\d+) 程序/项目实例双后端全一致"},
+        {"path": "docs/lom-project-guide.html", "pattern": "D 包四期累计 (\\d+) 程序/项目实例双后端逐字一致"}
       ]
     }
   ]
