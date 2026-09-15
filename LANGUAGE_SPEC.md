@@ -271,6 +271,7 @@ Phase 2.4 adds a **gradual** type checker (`src/typechecker.rs`). "Gradual" mean
 | `NAM002` | Error | Duplicate function/enum definition |
 | `NAM003` | Error | Undefined variable / undefined function call |
 | `NAM004` | Error | Record has no such field / enum has no such variant |
+| `NAM005` | Warning | Known builtin used without import (since v1.2.0 — static early warning for the runtime `RUNTIME002` failure; fix: add `from <module> import {name}` at the top; prelude `println`/`print` exempt) |
 | `TYPE001` | Warning | Type mismatch (binary op, let annotation, assignment) |
 | `TYPE002` | Warning | `if`/`while` condition is not `Bool` |
 | `TYPE003` | Warning | Function/variant argument count or type mismatch |
@@ -1282,7 +1283,7 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 
 ## 12. Evaluation Suite (Phase 2.8 — implemented)
 
-Lom ships a 118-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+Lom ships a 119-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
 
@@ -1302,7 +1303,7 @@ eval/
     07_records_tuples.json    # 10 — §6.7 structural records/tuples
     08_effects.json           #  5 — §6.8 explicit effects `! [IO, Clock]`
     09_modules.json           #  6 — §8 module system, §9 stdlib
-    10_error_repair.json      # 20 — §7 diagnostics + §6.9 fix plan (AI-native core)
+    10_error_repair.json      # 22 — §7 diagnostics + §6.9 fix plan (AI-native core)
   runner/
     run.ps1                   # PowerShell (Windows, zero-dep)
     run.sh                    # Bash (Unix, needs jq)
@@ -1327,17 +1328,17 @@ Each task is a JSON object:
 
 ### 12.3 Runner
 
-- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **118/118 pass on both backends (interpreter and WASM).**
+- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **119/119 pass on both backends (interpreter and WASM).**
 - `./run.ps1 -CandidatesDir <dir>` — evaluate LLM-generated code. Reads `<id>.lom` from `<dir>`, runs each, compares stdout to `expected`. Reports per-category and overall pass-rate. Exit code 1 on any failure (CI-friendly).
 - The runner only runs `lom` + compares stdout; it does **not** call any LLM API. LLM candidates are produced out-of-band (e.g. DeepSeek API batch) into a `candidates/` directory.
 
 ### 12.4 AI-native focus
 
-`10_error_repair.json` (20 tasks, ~17% of the suite) is Lom's differentiator: instead of "can the LLM write code", it tests "can the LLM repair code given `lom-diag/v1` + `lom-fix/v1`" — directly validating the §7 / §6.9 toolchain that Phases 2.2–2.7 built.
+`10_error_repair.json` (22 tasks, ~18% of the suite) is Lom's differentiator: instead of "can the LLM write code", it tests "can the LLM repair code given `lom-diag/v1` + `lom-fix/v1`" — directly validating the §7 / §6.9 toolchain that Phases 2.2–2.7 built.
 
 ### 12.5 Status
 
-- Reference solutions: 118/118 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
+- Reference solutions: 119/119 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
 - LLM pass-rate: **99/100 (99%)** — measured 2026-08-03 with expert model + thinking mode. 9/10 categories at 100%; sole failure (task 078) was output-format misunderstanding, not a language-feature error. See `eval/REPORT.md` for full analysis. **Phase 2 exit criterion met.**
 
 ---
@@ -1412,6 +1413,8 @@ Each task is a JSON object:
   - **Package symbols imported with an `as` alias were broken in three places** (latent since 4.4): the type checker's `collect_import` only resolved aliases against the builtin table (false `NAM003` on `--check`); the interpreter's `eval_call` only resolved aliases on the builtin path (runtime `RUNTIME002`); the wasm backend's arity check looked up signatures under the alias name (compile-time "expects 0 arguments"). All three fixed to resolve alias→original before consulting the user-function tables. +1 unit test.
   - **Int value range divergence documented as §11f-7** (found by package-mode differential testing; latent since Phase 7.6a / v0.11.0 — the 4-bit tag era; R24 correction: first recorded as the non-existent "v0.7.2"): the wasm backend's tagged-i64 (4-bit tag) only carries 60 payload bits — at ≥2⁵⁹ values wrap into the sign bit, at ≥2⁶⁰ they silently truncate, while the interpreter is full i64. Structural fix would require re-boxing the value representation (out of freeze scope); documented with an `int-range` probe, generator avoids the range.
   - **Differential-coverage expansion** (all byte-identical on both backends): D5 package mode — multi-file projects with flat and chained (`libb`→`liba`) dependency graphs, cross-package imports with aliases, 400 projects over two seed ranges; D6 JSON — divergence-2 boundary measured (safe: integer literals and true decimals; divergent: `30.0`/`1e2`/`-0.0`), 3 JSON templates (parse-consume / construct-stringify / nested round-trip), 1000 programs; D7 recursion gradient — depth tiers up to 8000 (within the interpreter's 80k guard and V8's default stack), mutual recursion, early-return-inside-recursion, 1000 programs. Probes now cover 6 of the 7 §11f divergences (`json-number` and `int-range` added).
+- **v1.2.0 (2026-09-15)**: checker capability release (B workpackage, docs/TODO.md — the unimported-builtin blind spot found by D-phase-4 differential testing, user-approved). Language surface unchanged except one new **warning**-severity diagnostic code (permitted by freeze §14-③, MUT001/MUT002 precedent):
+  - **`NAM005` (warning): known builtin used without import.** Previously a call to a real builtin that was never imported passed `--check` silently (the typechecker registers all 43 builtin signatures up front and the old division of labor left import-availability to the runtime) and only failed at run time with `RUNTIME002`. Since "forgot the import line" is a top LLM mistake, the checker now flags it statically: `[NAM005] 内建 '<name>' 未导入——需在文件顶部声明：from <module> import {<name>}` (module name from the same `module_of` table the runtime uses — single source of truth). Non-blocking (warning, `ok:true`), same gradual-typing promise as MUT001/MUT002. Prelude (`println`/`print`) is exempt; `f as g` imports unlock only the alias `g` (using the original name `f` still warns — matching the runtime's `available_builtins`); a user `fn` colliding with a builtin name stays a single `NAM002` error (no warning stacking). The self-hosted checker (§8.2 subset) does not produce NAM-family warnings — `verify_selfhost --static` compares the four-code subset only (T3/MUT002 precedent). +5 unit tests (482 total); eval task 120 (warning-repair form: static warning previews the runtime failure).
 
 ---
 

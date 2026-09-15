@@ -183,7 +183,7 @@ Type annotations are **optional**. Type errors are **non-fatal warnings** — th
 - `lom <file> --json` — emits `lom-diag/v1` JSON including `stage: "type"` diagnostics.
 - `lom <file> --dump-ast` — prints the AST as a deterministic indentation tree (no execution, no type check; spans excluded). Debug/verification tool — Phase 8.1's verbatim-diff baseline.
 
-Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars), `MUT002` (a closure body references a captured outer `mut` binding — interpreter and WASM disagree on capture semantics; fix: avoid relying on captured `mut` state). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant).
+Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars), `MUT002` (a closure body references a captured outer `mut` binding — interpreter and WASM disagree on capture semantics; fix: avoid relying on captured `mut` state). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant), `NAM005` (Warning, since v1.2.0 — a real builtin used without import; fix: add `from <module> import {name}` at the top; prelude `println`/`print` exempt).
 
 When you write Lom: annotate function params and return types — the checker will flag mismatches in `--check`/`--json`, helping you fix errors before running. Missing annotations are fine (inferred as `Unknown`, no error).
 
@@ -543,7 +543,7 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 - `RUNTIME001`-`RUNTIME099`: runtime (`RUNTIME001` type mismatch, `RUNTIME002` undefined, `RUNTIME003` hole execution)
 - `TYPE001`-`TYPE099`: type errors (Phase 2.4 — `TYPE001` mismatch, `TYPE002` cond not Bool, `TYPE003` arg count/type, `TYPE010` return mismatch, `TYPE020` `?` misuse)
 - `MAT001`-`MAT099`: match exhaustiveness (Phase 2.4 — `MAT001` non-exhaustive)
-- `NAM001`-`NAM099`: name resolution (Phase 2.4 — `NAM002` duplicate, `NAM003` undefined, `NAM004` no such field/variant)
+- `NAM001`-`NAM099`: name resolution (Phase 2.4 — `NAM002` duplicate, `NAM003` undefined, `NAM004` no such field/variant, `NAM005` unimported builtin [v1.2.0, warning])
 - `EFF001`-`EFF099`: effect errors (Phase 2.5 — `EFF001` pure function calls effectful)
 - `MUT001`-`MUT099`: mutability (v0.20.0 — `MUT001` reassigning an immutable binding: `let` without `mut`, function parameter, `for` loop variable, or `match` binding; v1.1.0 — `MUT002` closure references a captured `mut` binding, warning-only, both-backend divergence flag)
 

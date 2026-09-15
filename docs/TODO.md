@@ -5,10 +5,57 @@
 > **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
 > 的逐条裁决，见文末"驳回/挂起登记"。
 > **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**：无（2026-09-15
-> D 包四期大扩展收官——模板族 56→101、累计对拍 4400→**10000** 全一致、
-> 真发现一枚待裁决（--check 未导入内建盲区）。同日此前：✅ V 工作包 →
-> ✅ D 包三期 → ✅ 第六轮审查 A-+R31-R38）。
-> 已收官：D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 六轮审查整改 R1-R38 与 T1-T7（档案见下）。
+> B 包收官——✅ V → ✅ D 三期 → ✅ 六审 A- → ✅ D 四期（累计 10000）→ ✅ B 包
+> v1.2.0 全链）。
+> 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 六轮审查整改 R1-R38 与 T1-T7（档案见下）。
+
+## B 工作包：未导入内建 --check 盲区修复（2026-09-15 开立 → 同日收官，v1.2.0）✅ done
+
+**B 证据区（2026-09-15 实测）**：
+
+- **实现**：TypeChecker 加 `builtin_module`（内建→模块映射，数据源
+  interpreter::module_of 改 pub(crate) 复用——单一事实源；prelude io 模块
+  不入映射=恒豁免）+ `available_imports`（collect_import 填充；`f as g` 只加
+  g）；check_call 的 functions 命中分支加 NAM005 warning（消息含完整导入
+  写法）；collect_fn_sig 的 NAM002 分支移出 builtin_module（同名冲突单报不堆噪）。
+- **实测形态**：不导入 starts_with → 恰 1 条 `[NAM005] 内建 'starts_with'
+  未导入——需在文件顶部声明：from string import {starts_with}`（2:13 定位调用
+  点，warning、ok:true、rc=0 不拦截）；导入后零诊断；别名导入后真实名仍报/
+  别名调用零诊断；prelude（print/println）零诊断；用户 fn len 同名 → 仅
+  NAM002（不追 NAM005）。
+- **测试 +5（482/482）**：基本形态+hint 断言/导入后干净/别名真实名/prelude
+  豁免/同名遮蔽走 NAM002。
+- **干净性验证**：examples+selfhost 34 文件 --check --json 扫描零 NAM005；
+  verify --static 坏 19 + 干净集 ALIGNED 151 保持（自举不产 NAM warning，
+  四码过滤天然排除——T3/MUT002 先例，verify 头注释补说明）；eval 双后端
+  **119/119**（任务 120 参考解双后端实跑定稿：坏形态静态预警+运行时失败、
+  解补 import 后 "LOM!"）。
+- **簿记链**：manifest 118→119 + error_repair 21→22、prompts 重跑、
+  eval/README ×6、spec §12 ×4 + §7.3 码表 NAM005 行 + §13 v1.2.0 条目、
+  SPEC_FOR_AI ×2、README ×2、HANDOVER（§1 版本行/评测集行/§2.2 三行/§9-5/
+  §4.5b 改口/横幅）、ci.yml ×2（119 tasks/152 文件）、doc_audit 60/60。
+- **升版 v1.2.0**（checker capability：新 warning 诊断能力，v1.1.0 MUT002
+  先例升 minor）；tag CI 绿后打。
+
+**来源**：用户裁决执行（D 包四期真发现：真实内建不导入直接用——--check 静态
+过、运行时 RUNTIME002；typechecker register_builtins 全量灌 43 签名，
+collect_import 注释明示"导入可用性归运行时"；自举侧同款放行——两侧一致的
+设计取舍。LLM 高频错误形态"忘写 import"静态不抓，削弱 repair-native 定位）。
+
+**方案**（候选方案经用户裁决）：**新 warning 级诊断 NAM005**——调用点是已知
+内建但未导入 → warning + hint `from {module} import {{{name}}}`（模块名由
+interpreter::module_of 反查）。冻结安全区（TODO 纪律明文"只允许新增 warning
+级诊断码"，T3/MUT002 先例）；自举侧不动（8.2 子集不产 NAM 家族 warning，
+verify static 过滤清单加 NAM005——T3 同款决策）；fix 动作不做（位置推断/
+多行合并是独立工程，hint 级与 RUNTIME002 同款）。升版 **v1.2.0**（新 warning
+诊断能力，v1.1.0 MUT002 先例升 minor）。
+
+**验收**：复现程序恰 1 条 NAM005（含模块名 hint）+ ok:true；导入后零诊断；
+别名导入后用真实名仍报；prelude（println/print）豁免；用户 fn 与内建同名
+遮蔽不误报（FnSig.is_builtin 单一事实源）；全仓示例/eval/bootstrap/selfhost
+static 干净集零新增；477+N 测试；eval 任务 120（warning 修复题）。
+
+
 
 ## D 包四期：差分覆盖大扩展（2026-09-15 开立 → 同日收官）✅ done
 
