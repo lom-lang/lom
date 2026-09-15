@@ -43,7 +43,7 @@
 <div class="verdict">
 <ol>
 <li><strong>赛道变热，直接竞品出现</strong>：Vercel Labs 于 2026-05 发布、2026-08 正式 ship 的 <strong>Zero</strong> 语言，其定位——"AI agent 可读、可诊断、可修复"——与 Lom 的核心卖点（<code>lom-diag/v1</code> 稳定诊断码 + <code>lom-fix/v1</code> 修复动作 + 显式效应系统）高度重合，且有 Vercel 的渠道与曝光优势。</li>
-<li><strong>两个历史判断需要修订</strong>（HANDOVER §7 / DESIGN_RATIONALE 引用的立项期认知）：<strong>Mojo 已于 2026-08-12 发布 1.0 并开源</strong>（Qualcomm 收购后），不再"绑定硬件不进编码赛道"；<strong>MoonBit 1.0 从 2026 上半年推迟至 Q3</strong>（当前 v0.9，2026-04-07），且其 AI-native 叙事持续强化。</li>
+<li><strong>两个历史判断需要修订</strong>（HANDOVER §7 / DESIGN_RATIONALE 引用的立项期认知）：<strong>Mojo 已于 2026-08-12 发布 1.0 并开源</strong>（Qualcomm 收购后），不再"绑定硬件不进编码赛道"；<strong>MoonBit 1.0 从 2026 上半年推迟至 Q3</strong>（06-08 v0.10.0 注记；最新 v0.10.9，2026-08-19——R43 修正），且其 AI-native 叙事持续强化。</li>
 <li><strong>生态趋势与 Lom 同向</strong>：spec-driven development 成为主流范式（30+ agentic 框架）；SWE-bench Verified 破 80% 但 <strong>SWE-bench Pro（ICML 2026）/SWE-EVO 显示长程修复仍是缺口</strong>——"把 agent 的猜测变成协议驱动的修复"恰是 Lom 的赛道论据。</li>
 <li><strong>Lom 的差异化资产（当前仍独有）</strong>：修复闭环的工程深度（迭代 <code>--apply</code> + fix-history + fix_corpus 回归网）、三层自举自证、双后端 10000 程序差分证据、119 任务评测集与 pass@k 实测、六轮独立审查与冻结治理。Zero/Vera 均处于生态早期，无同等公开证据链。</li>
 <li><strong>风险（如实呈现，非建议）</strong>：在"优化到完美前不发布"的冻结裁决下，赛道声量被先发竞品占据的窗口成本在上升；本调研仅记录事实，发布时机决策权在用户。</li>
@@ -61,7 +61,7 @@
 
 <h3>1.2 MoonBit <span class="tag tag-warm">最直接对标 · 叙事逼近</span></h3>
 <ul>
-<li><strong>1.0 时间线变化</strong>：原计划 2026 上半年（[1.0 Roadmap](https://www.moonbitlang.com/blog/roadmap)）→ 官方 updates（2026-08-19）改口 <strong>Q3 2026</strong>；当前版本 v0.9（2026-04-07），pre-1.0 版本间视为兼容（[官方 updates](https://www.moonbitlang.com/updates/)）。</li>
+<li><strong>1.0 时间线变化</strong>：原计划 2026 上半年（[1.0 Roadmap](https://www.moonbitlang.com/blog/roadmap)）→ v0.10.0 发布注记（2026-06-08）改口 <strong>Q3 2026</strong>（注明视测试与社区反馈可调）；当前最新 v0.10.9（2026-08-19，R43 修正：初记"v0.9/改口出自 08-19"系转述搜索摘要未核原文——v0.10 系列已迭代至 .9 且 Q3 说法出自 06-08 注记，[官方 updates](https://www.moonbitlang.com/updates/) 原文核对）。</li>
 <li><strong>AI-native 叙事强化</strong>：2026-09 黑客松与"Software Synthesis Challenge"（以 AI-native 方式构建生产级系统）；路线图明言"AI-native toolchain improvements"。</li>
 <li><strong>设计哲学对照</strong>（其 2024-04 博客 [AI-native applications](https://www.moonbitlang.com/blog/ai-coding)，本轮重读）：AI 友好三特征 = 易测试 / 快速静态分析 / 安全性；纠错机制 = <strong>编辑器内实时重采样 + 静态分析过滤</strong>（token 级实时语义分析，实验称编译率显著提升、性能损耗 ~3%、建议增强延迟 ~0.86s）。</li>
 <li><strong>与 Lom 的分界线</strong>：MoonBit 的 AI 纠错发生在<strong>生成时</strong>（采样侧过滤），Lom 发生在<strong>生成后</strong>（诊断→修复动作→迭代 apply 的闭环）——两者互补而非同构；但对外叙事上"AI-native 语言"这个词的独占性在消失。</li>

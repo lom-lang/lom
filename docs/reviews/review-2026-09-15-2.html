@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-15（第七轮，基线 847ba17 / v1.2.0）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--warn); border:3px solid var(--warn); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-15，第七轮总序）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>847ba17</code>（"docs: 第七轮审查开立 + 调研后计划表登记"，2026-09-15；开审时 <code>git status</code> 干净）。版本 <code>v1.2.0</code>（Cargo.toml = Cargo.lock = 1.2.0，<code>lom --version</code> 实测 <code>lom 1.2.0</code>；tag v1.2.0 实查存在，指向 4e20e8b）</p>
+<p><strong>审查范围</strong>：<code>5156ab2..847ba17</code> 共 6 个提交——<strong>D 包四期</strong>（70af901 + cca8791：diff_gen 模板族 56→101 五批 45 新族 + 包模式深化三包链/五类签名 + 密度 3-7→4-10 + 变体名下划线式碰撞修复 + 五段对拍 5600/累计 10000 + §4.5b 两条速查 + §11f-8）、<strong>B 工作包</strong>（695b509 + 4e20e8b：新 warning 级诊断 NAM005 未导入内建盲区修复 + 升版 v1.2.0 + 任务 120 + 全链簿记）、<strong>第 1 轮继任调研</strong>（7172764：docs/archive/research-2026-09-15.html + archive README 命名规范）、847ba17（七审开立登记，纯 TODO）。上轮报告（review-2026-09-15，总评 A-，基线 5156ab2）已覆盖内容不重复，但 R31-R38 修复保持纳入核对</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行 clean 重编/482 测试/eval 双后端/golden/自举六模式/对账三件/探针/差分 CI 两模式 + 独立 seed 段 30 程序与宣称全池段 10 程序对拍 + 强制三模板生成人工检查/双后端实跑 + claims 九条算术独立复算（不复用 doc_audit 代码）与 17 出现点正则全量枚举 + NAM005 五形态/运行模式渐进式/边界（错误模块导入）亲手实测 + 任务 120 内嵌 JSON 逐字段核对与参考解双后端实跑 + 包模式 10 项目形态清点 + 调研报告三处关键事实来源链接抽查（MoonBit 官网两次抓取/The Register 经搜索交叉/Microsoft MarkTechPost 直接抓取）+ GitHub API 逐 run 逐 job 对账 + git 跟踪文件 0x0C 字节扫描。除本报告文件外未修改任何项目文件；全部 _review_* 临时脚本/程序/wasm/包项目已删除（<code>git status</code> 终态仅余本报告）；未执行任何 git commit/push/tag</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 与 cargo（clean 重编 1m31s 零告警）/ node v24 / Python 3.13</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A-</span></p>
+
+<p><strong>结论</strong>：增量（5156ab2..847ba17，D 四期 + B 包 + 第 1 轮调研）的<strong>工程实质全部属实</strong>：全部硬指标实测复现（clean 重编 0 warning、482/482、eval 双后端 119/119、golden 逐字、自举六模式 dump 152/tokens 152/diags 9/static 坏 19+干净 ALIGNED 152/run 31/wasm 三段、spec_examples/fuzz PASS、doc_audit 60/60、探针 6/6、CI 冒烟 20+10）；<strong>NAM005 五形态全部亲手实测成立</strong>（未导入恰 1 条含完整 hint 且 ok:true rc=0 / 导入后零诊断 / 别名只解锁别名 / prelude 豁免 / 同名走 NAM002 单报；运行模式 warning 走 stderr 且纯 warning 程序照常执行 rc=0——渐进式承诺实证；错误模块导入归 RUNTIME005 属另一错误面，无越权误报）；<strong>任务 120 完全真实</strong>（坏形态实跑诊断 JSON 与任务内嵌 JSON 除 file 字段规范化外逐字段全同，参考解双后端实跑 <code>LOM!</code>）；<strong>claims 九条算术独立复算全部闭合</strong>（10000=4400+5600、5600=1000+1000+1000+600+2000 原始分链逐环核对 + 4 条跨链引用对账），17 个出现点正则逐个 finditer 全量验证且捕获组==claim（含 d12 深横幅变体位与 d1234 三处）；<strong>D 四期抽样全一致</strong>（独立段 seed 7777×30 + 宣称全池段 60123×10 + 包模式 31000×10，双后端 stdout+退出码逐字一致零差异）；强制生成 t_enum_recursive_tree/t_map_remove_rehash/t_compose_higher_order 人工逐行检查——递归 enum AST 形态（Lit/Neg/Add 自引用 + 递归求值）/墓碑 rehash 路径（9 插入 5 删除 2 再插入触发墓碑探测，输出 366 两后端一致）/compose 链（4849 手算吻合）全部真实；<strong>模板池 101 = 56+45 机械清点成立</strong>（五批 10+12+8+8+7=45 与宣称逐批对上；变体名 12 处生成点全部下划线式 <code>X_%d</code>——"B1_5 vs B_15"型字符串碰撞在分隔符下结构性不可能）；包模式 10 项目三包链 5/包内 enum 7/Float-String-Bool-Int 单双五类签名全命中且 --check 零诊断；§11f-8 argv[0] 最小实测逐点吻合（.lom vs .wasm 路径、尾参逐字一致、len=3）；<strong>升版与 tag 纪律无瑕</strong>（Cargo/lock/二进制三处 1.2.0；spec §13 v1.2.0 条目九个要点与实现逐点核对吻合；tag v1.2.0 → 4e20e8b → run 34965031500 六 job 全 success——与簿记宣称的 run id 完全一致；5156ab2 后 6 个 push 头 run 全绿，feat+docs 成对推送由头部 run 树覆盖）；R31-R38 修复全部保持（seven 仅存更正语境、深横幅 3400 在 d12 登记位、52→54→60 演进链时点记录清晰、"抓齐"仅存引语）；0x0C 全仓扫描清零。<strong>调研报告三处头条事实两实一偏</strong>：Zero（MarkTechPost 2026-05-17 原文逐点相符——sub-10KiB/诊断 JSON+NAM003 码/修复元数据/显式效应全在文中）与 Mojo（1.0 2026-08-12 The Register、Qualcomm 3.9B 收购后开源——多源交叉证实）核实通过；MoonBit 的"Q3 推迟"实质属实但两处细节与来源不符（见问题 5）。</p>
+
+<p><strong>未上 A 的原因</strong>：5 条 P2 全部是文档腐坏，且其中两条恰好落在 B 包自己的招牌交付物——<strong>"NAM005 全链簿记"链内有错数</strong>：① HANDOVER 横幅与 TODO B 证据区宣称 "verify --static … 干净集 ALIGNED <strong>151</strong> 保持"，实际是 <strong>152</strong>——B 包自己加的任务 120 参考解入了干净集（同包 ci.yml 已把 dump 步骤名 151→152，static 数字漏改，"保持"宣称与同提交的另一处改动自相矛盾）；② HANDOVER §2.2 gate 描述行写 "claims.json <strong>十条</strong> claim"，claims.json 实为 <strong>9 条</strong>（doc_audit 自己打印 "9 条"；×27 的分项数倒是算对的）——数字词陈旧，R26/R31 同型；③ HANDOVER §9-5"当前状态"行第三次腐坏（R33 同型）："v1.1.0-v1.1.4 五个 patch" 缺 v1.2.0、枚举里没有 B 包、"doc_audit 54 项" 自 D 四期起就该是 60；④ <strong>README.md:8 门面横幅 "Current release: v1.1.1 (2026-09-07)" 四个版本陈旧</strong>（v1.1.2/1.1.3/1.1.4/v1.2.0 全缺）——存量问题（v1.1.2 起未动，两轮审查亦漏网），但 B 包在 README 做了 ×2 簿记并升版 v1.2.0，最显眼的版本宣称位仍漏；⑤ 新调研报告 MoonBit 节两处数字与自引来源不符（"当前 v0.9（2026-04-07）"——检索时点官网 updates 已是 v0.10.9/2026-08-19；"updates（2026-08-19）改口 Q3"——Q3 表述出自 2026-06-08 v0.10.0 注记），违反其自身"所有数字/日期/事实必须来自来源链接"的规范。另有 2 条 P3（D4 包模式自测 "三包链 4/包内 enum 26" 在所有自然 seed 段下不可复现且未注明 seed 段；HANDOVER §5 代码导航表 interpreter.rs "42 个"内建自 v0.27.0 起应为 43——基线前存量）。无 P0（claims 链九条全闭合、无算术虚报、无"抓齐"式虚假叙事）、无 P1（对抗性检查未发现任何行为缺陷——NAM005 边界行为全部符合设计宣称）。</p>
+
+<p><strong>与上轮的对比</strong>：第六轮 5 提交 4×P2+4×P3 给 A-（头条是"抓齐"宣称失准）；本轮 6 提交 5×P2+2×P3——腐坏<strong>绝对量相当、性质更轻</strong>（全部是陈旧数字/漏改位，无一涉及合计算术或叙事真实性；claims 机器链九条全闭合是六轮以来首次零瑕疵），新调研工作三处头条两处核实通过；但"簿记包自己的簿记错两个数 + 现状行第三次腐坏 + 门面版本行四版陈旧"说明<strong>收尾对账的覆盖面仍停在登记位而非全部出现面</strong>（六审 R32 教训的再回声——本轮的 151/十条/54 都在 claims.json 与 doc_audit 登记面之外）。按短板计，<strong>A-</strong>。审查轨迹 B+ → A- → A → A → A- → A- → <strong>A-</strong>（三连 A-：工程稳定在 A 档，文档纪律持续差一口气）。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>HEAD = 847ba17、工作区干净（任务书）</td><td><code>git status</code> 开审 clean；终态仅余本报告新增文件</td><td class="ok">✓ 相符</td></tr>
+<tr><td>2</td><td>构建零 warning（HANDOVER §1/§2.2）</td><td><code>cargo clean --release -p lom</code> 后全量重编 1m31s，完整输出仅 Compiling+Finished 两行（grep -ci warning = 0）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>3</td><td>版本 1.2.0 三处一致 + 二进制（HANDOVER §1/§9）</td><td><code>lom --version</code> → <code>lom 1.2.0</code>；Cargo.toml:3 与 Cargo.lock:7 均为 "1.2.0"</td><td class="ok">✓ 相符</td></tr>
+<tr><td>4</td><td>测试 482/482（HANDOVER §1/§2.2、README:68、spec §13）</td><td><code>cargo test --release</code> → <code>482 passed; 0 failed; 0 ignored</code>（477+NAM005×5 分解吻合）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>5</td><td>eval 119/119 宿主后端（HANDOVER §2.2、eval/README）</td><td><code>run.ps1 -Verify</code> → <code>Total: 119 / Passed: 119 / Failed: 0</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>6</td><td>eval 119/119 WASM 后端（同上、ci.yml:87）</td><td><code>run.ps1 -Verify -Backend wasm</code> → <code>119/119</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>7</td><td>stmt_interp golden 逐字（HANDOVER §2.2）</td><td>lom.exe 运行 39 行输出与 expected.txt 行尾归一化后 diff 零差异</td><td class="ok">✓ 逐字一致</td></tr>
+<tr><td>8</td><td>自举六模式全 PASS：dump 152 / tokens 152 / diags 9 / static 坏 19+干净 152 / run 31 / wasm 三段（HANDOVER §2.2:101、ci.yml:116）</td><td>逐模式实跑：dump <code>PASS 152 / FAIL 0</code>、tokens <code>PASS 152</code>、diags <code>PASS 9</code>、static <code>坏 19 / 干净集 ALIGNED 152 / DIFF 0</code>、run <code>PASS 31</code>、wasm <code>layer2 PASS 149 / layer3 PASS（39 条 golden）/ selfapply PASS</code>——六段 RESULT 全 PASS（layer2 随任务 120 参考 148→149）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>9</td><td>spec_examples 三文档 PASS（HANDOVER §2.2）</td><td>→ <code>正例 51 / 反例 5 / skip(json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1) / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>10</td><td>fuzz_smoke 80 轮零崩溃（HANDOVER §2.2）</td><td>→ <code>fuzz: 80 轮冲击零崩溃 / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>11</td><td>doc_audit <strong>60/60</strong>（HANDOVER §2.2:109、TODO 头部、4e20e8b 提交信息）</td><td>→ <code>RESULT: PASS（60/60 项通过）</code>；H 类 27（登记数 1 + 算术 9 + 出现点 17）、I 类 10（含 R31 英文位 'eight'）、Z 类 1——与 §2.2 括注 ×27/×10/×1 逐项对上；Z 类打印 "HANDOVER 宣称 60 vs 本脚本总项数 60"；<strong>唯括注内 "十条 claim" 实为 9 条（见问题 2）</strong></td><td class="warn">△ 60/60 属实、数字词一处错</td></tr>
+<tr><td>12</td><td>探针 6/6——§11f 八条中六条可执行（HANDOVER §2.2:104、TODO D4）</td><td><code>diff_test.py --probe</code> → 6/6 OK：mut-capture（'12' vs '2'）/div-zero/large-float（'2e+30.0'）/json-number/int-range（2^60→0）/deep-recursion 全如档案形态</td><td class="ok">✓ 相符</td></tr>
+<tr><td>13</td><td>CI 冒烟口径：单文件 20 + 包 10（HANDOVER §2.2、ci.yml）</td><td><code>--rounds 20 --seed-base 1 --ci</code> → 20/20；<code>--pkg --rounds 10 --seed-base 1 --ci</code> → 10/10，均 PASS</td><td class="ok">✓ 相符</td></tr>
+<tr><td>14</td><td><strong>B2-①</strong> claims.json 九条 claim 算术闭合（TODO D4/B 纪律、claims.json）</td><td>独立复算（不复用 doc_audit 代码，逐项累加）：d12 3400=1000+400+1000+1000、d3 1000=500+500、d5 400=200+200、d6 1000、d7 1000、d8 1000、d123 4400=3400+1000、d9 <strong>5600=1000+1000+1000+600+2000</strong>、d1234 <strong>10000=4400+5600</strong>——九条全闭合</td><td class="ok">✓ 独立复算成立</td></tr>
+<tr><td>15</td><td><strong>B2-②</strong> occurrences 出现点同步（17 个正则）</td><td>独立脚本 finditer 全量枚举：17 个出现点（TODO:295/418/325/338/350/275/278/75×2、HANDOVER:17/19/323×3、guide:1078/1081/1083）全部匹配且捕获组==claim，每模式恰 1 处匹配；<strong>跨链 4 条</strong>（d123←d12/d8、d1234←d123/d9）引用值与独立 claim 逐一对账一致——含 d12 深横幅变体位（HANDOVER:19 "D 包两期：**3400"）与 d1234 三处</td><td class="ok">✓ 逐点验证</td></tr>
+<tr><td>16</td><td><strong>B3-①</strong> D 四期对拍独立段（任务书）</td><td><code>--rounds 30 --seed-base 7777</code> → 30/30 双后端一致，<code>.diff_failures/</code> 无残留</td><td class="ok">✓ 全一致</td></tr>
+<tr><td>17</td><td><strong>B3-②</strong> 宣称全池段抽样（seed 60000-60999 段内）</td><td><code>--rounds 10 --seed-base 60123</code> → 10/10 全一致（101 族全池 + 密度 4-10 混合形态段）</td><td class="ok">✓ 全一致</td></tr>
+<tr><td>18</td><td><strong>B3-③</strong> 三深水模板形态真实（递归 enum 树/墓碑 rehash/compose 链）</td><td>强制生成各 1 例人工逐行检查：t_enum_recursive_tree 产 <code>enum Expr_1 = Lit_2(Int)/Neg_2(Expr_1)/Add_2(Expr_1, Expr_1)</code> 递归 AST + 三层嵌套构造求值（5/-3/124 手算吻合）；t_map_remove_rehash 9 次 set→5 次 remove（墓碑）→2 次再 set→probe 探测（366=36×10+map_size 6）；t_compose_higher_order 产 compose 闭包组合子链（4849=sqm(inc(19))×10+sqm(inc(0))）——三例 --check 零诊断、双后端 stdout+rc 逐字一致</td><td class="ok">✓ 形态+双后端实测</td></tr>
+<tr><td>19</td><td><strong>B4</strong> 模板族 POOL_BASE = 101 = 56+45，五批 10/12/8/8/7（HANDOVER:13、TODO:73、guide:1083）</td><td>Python import 机械清点：POOL_BASE=101、POOL_EARLY_RETURN=8（另计加权×3）；前 56 项=D 三期终点、新 45 项分批清点：字符串/数值 10（string 6+int 4）/容器 12（list 5+map 4+record/tuple 3）/enum 8/闭包管道 8/Result-Option-效应 7——与宣称逐批吻合</td><td class="ok">✓ 机械清点成立</td></tr>
+<tr><td>20</td><td><strong>B4</strong> 变体名下划线式（"字符串唯一分解不撞"——B1%d%5 与 B%d%15 同产 B15 的修复）</td><td>12 处变体名生成点 grep 全覆盖：<code>Cir_%d/Sq_%d/…/B1_%d/B2_%d/Z_%d</code> 全下划线式；无裸 <code>X%d</code> 变体名残留（仅存的 %d 拼接经 uniq 包裹或为字符串实参非变体名）；"A_m == B_n 当且仅当 A==B 且 m==n"——跨前缀/跨计数器字符串碰撞结构性不可能</td><td class="ok">✓ 抽查成立</td></tr>
+<tr><td>21</td><td><strong>B5</strong> 包模式深化形态（三包链/包内 enum/五类签名/密度）</td><td>seed 31000-31009 十项目生成+形态清点：三包链（liba+libb+libc）5/10、包内 enum 7/10、Float 单参 5/10、String 单参 2/10、Bool 单参（(b: Bool) -&gt; Int）2/10、Int 单参 10/10、Int 双参 6/10——五类签名全命中；--check --json 十项目零诊断；对拍 10/10 双后端一致（矩阵 #13 之外独立段）；密度 4-10 源码核对（randint(4,10)，旧版 5156ab2 时点 randint(3,7)）</td><td class="ok">✓ 形态全命中</td></tr>
+<tr><td>22</td><td><strong>B6</strong> §11f-8：argv[0] 双后端路径差异、尾参逐字一致（SPEC_FOR_AI §11f-8、TODO D8）</td><td>最小程序打印 args 四值 <code>-- x y</code> 实跑：interp → <code>_review_tmp/argsprobe.lom</code> / wasm → <code>_review_tmp/argsprobe.wasm</code>（确为 .lom vs .wasm 路径），两侧 x/y/3 逐字一致；diff_test 固定 <code>-- d1 d2</code> 实现（run_interp/run_wasm）核对</td><td class="ok">✓ 逐点吻合</td></tr>
+<tr><td>23</td><td><strong>B1-①</strong> 未导入 starts_with → 恰 1 条 NAM005 warning 含 "from string import {starts_with}"、ok:true、rc=0（TODO B 证据区）</td><td>实测：恰 1 条 warning（2:13 定位调用点）、消息含完整导入写法、summary 1 warning/0 error、ok:true、rc=0</td><td class="ok">✓ 相符</td></tr>
+<tr><td>24</td><td><strong>B1-②③④⑤</strong> 导入后干净/别名真实名仍报·别名零诊断/prelude 豁免/同名走 NAM002</td><td>四形态实测：导入后 0 诊断；<code>starts_with as sw</code> 后 sw 调用 0 条、真实名恰 1 条 NAM005（4:13）；print/println 0 条；用户 <code>fn len</code> 同名 → 恰 1 条 NAM002 error、零 NAM005</td><td class="ok">✓ 四形态全符</td></tr>
+<tr><td>25</td><td><strong>B1 补</strong> 运行模式 NAM005 走 stderr、程序照常执行（渐进式）</td><td>实测两形态：真缺 import → warning 走 stderr + 运行时 RUNTIME002（rc=1，warning 恰为其预警——语义自洽）；纯 warning 形态（未调用路径上的未导入内建）→ stdout 正常输出 "hello"、rc=0、仅 stderr 1 条 warning——<strong>warning 不拦截实证</strong>。边界：错误模块导入（from math import starts_with）不触发 NAM005、运行时 RUNTIME005——属另一错误面，与 B 包宣称范围一致无越权</td><td class="ok">✓ 渐进式实证</td></tr>
+<tr><td>26</td><td><strong>B8-①</strong> 任务 120 内嵌诊断 JSON = 真实 --check --json 输出（TODO B/任务 notes）</td><td>坏形态实跑：恰 1 条诊断，severity/stage/code/message/line(2)/col(5)/source_line/is_hole/hint 九字段与内嵌 JSON 逐字段全同（file 字段为声明的规范化例外）</td><td class="ok">✓ 逐字段全同</td></tr>
+<tr><td>27</td><td><strong>B8-②</strong> 任务 120 参考解双后端 "LOM!"（TODO B 证据区）</td><td>解实跑：interp → <code>LOM!</code> + --check 0 诊断；wasm build rc=0 + node 运行 → <code>LOM!</code>——与 expected 一致</td><td class="ok">✓ 双后端实跑</td></tr>
+<tr><td>28</td><td><strong>B7-①</strong> tag v1.2.0 存在且指向 CI 绿 commit（任务书：run 34965031500 六 job）</td><td><code>git tag</code> v1.2.0 → 4e20e8b；GitHub API 实查 run 34965031500（head 4e20e8b，push CI）conclusion=success，六 job（三平台矩阵/selfhost/clippy/doc-gates）逐个 success——与簿记宣称的 run id 完全一致</td><td class="ok">✓ 逐 job 核对</td></tr>
+<tr><td>29</td><td><strong>B7-②</strong> 5156ab2 后全部 push 头 run success（任务书 B10）</td><td>API 实查：34978954126（847ba17）/34973146456（7172764）/34965031500（4e20e8b）/34948311714（cca8791）/34941372606（9c41596）/34939217955（5156ab2）全部 success；70af901/695b509 随 feat+docs 成对推送非 push 头，由 cca8791/4e20e8b 的 run 树超集覆盖（API run 序列无中间 run，证成对推送）</td><td class="ok">✓ 全绿</td></tr>
+<tr><td>30</td><td><strong>B7-③</strong> spec §13 v1.2.0 条目与实现逐点（任务书：NAM005 语义/豁免/自举/482/任务 120）+ §7.3 码表行</td><td>LANGUAGE_SPEC:1416-1417 九要点逐条核对：warning/ok:true、module_of 单一事实源、prelude 豁免、别名只解锁别名、NAM002 单报、自举不产+四码过滤、+5 测试 482、任务 120 warning 修复题、冻结 §14-③/MUT 先例——全部与实测（#23-25）和源码一致；§7.3:274 NAM005 行同款吻合；SPEC_FOR_AI:186/546 两处登记齐</td><td class="ok">✓ 逐点吻合</td></tr>
+<tr><td>31</td><td><strong>B7-④</strong> R31-R38 修复保持（任务书）</td><td>R31："seven known" 仅存 TODO 更正语境，SPEC_FOR_AI 导语 = eight（doc_audit I 类锁定）✓；R32："抓齐" 仅存引语 ✓；R33：§1 下一步行已翻牌 B 包终态 ✓（但 §9-5 新陈旧，见问题 3）；R34：diff_gen 头注释 file/env 纪律口径 ✓；R35："深控制流六件" 三处统一 ✓；R36："39 模板族" 仅存 D1 时点档案 ✓；R37：探针六类清单补全 ✓；R38：d12 深横幅变体位在登记内且现值 3400 ✓</td><td class="ok">✓ 八条保持</td></tr>
+<tr><td>32</td><td>0x0C 全仓扫描清零（纪律宣称）</td><td>git 跟踪文件逐字节扫描：0 处</td><td class="ok">✓ 清零</td></tr>
+<tr><td>33</td><td><strong>B9-①</strong> 调研：Zero 定位重合（2026-05 发布/08 ship、agent 可读+诊断+修复元数据+效应）</td><td>MarkTechPost 原文（2026-05-17）直接抓取逐点相符：Vercel Labs 实验性系统语言、"AI Agents Can Read, Repair, and Ship Native Programs"、sub-10KiB 原生二进制、<code>zero check --json</code> 稳定码（示例恰为 NAM003）+ 类型化修复 ID（declare-missing-symbol）、<code>world: World</code> 能力式显式效应——报告的五维对照依据全部真实</td><td class="ok">✓ 来源逐点相符</td></tr>
+<tr><td>34</td><td><strong>B9-②</strong> 调研：Mojo 1.0 2026-08-12 + 收购后开源</td><td>The Register 直连被反爬拦截（"Are we human?"——访问限制非证伪）；多源交叉：1.0 于 2026-08-11/12 发布（Register 报道日 08-12 与报告引文一致）、Qualcomm 6-24 宣布 3.9B 全股票收购、7-29 完成、8-18 宣布开源（Apache 2.0）——报告三要点（1.0 日期/开源/收购修订）全部证实，HANDOVER §7 的"39 亿美元"亦获印证</td><td class="ok">✓ 多源交叉证实</td></tr>
+<tr><td>35</td><td><strong>B9-③</strong> 调研：MoonBit 1.0 推迟 Q3（官方 updates 2026-08-19 改口；当前 v0.9 2026-04-07）</td><td>moonbitlang.com/updates 两次抓取：实质成立——roadmap 仍写 "first half of 2026"，官方 v0.10.0 注记（<strong>2026-06-08</strong>）明言 "currently targeting MoonBit 1.0 for Q3"；<strong>但两处细节不符</strong>：① "当前版本 v0.9（2026-04-07）"——检索时点（2026-09-15）页面最新已是 v0.10.9（2026-08-19），v0.9 是 5 个月前 5 个版本前的值；② "updates（2026-08-19）改口 Q3"——08-19 条目（v0.10.9）未提 1.0，Q3 表述出自 06-08 条目（见问题 5）</td><td class="bad">✗ 实质属实、两细节与来源不符</td></tr>
+<tr><td>36</td><td><strong>B9-④</strong> archive README 命名规范与新文件一致（7172764）</td><td>规范 research-YYYY-MM-DD[-topic].html ↔ 实际 research-2026-09-15.html ✓；"自包含零外链"语义核对：README 规范原文是"零外部资源（无外链字体/脚本/图片）"，报告内联 CSS 无外部资源 ✓（正文来源超链接是规范要求的"来源总目"，非渲染依赖）；文件 17,305B ≈ "17KB" ✓；轮次索引表/两代结构/未确认标注（"下轮复核"）齐备</td><td class="ok">✓ 规范一致</td></tr>
+<tr><td>37</td><td>D4 包模式自测宣称："自测 40 项目 --check 零异常，三包链 4/包内 enum 26"（TODO:85）</td><td>seed 段未注明，多段复算无一命中 (4, 26)：批段头 20000-20039 → 三包链 6/enum 19；D3 段 12000-12039 → 8/26（enum 命中、链不符）；1-40 → 5/17；21000/31000/1000 段均不符——数字对不上任何自然口径（见问题 6）</td><td class="bad">✗ 不可复现</td></tr>
+<tr><td>38</td><td>B 包簿记链计数：manifest 119/error_repair 22/prompts/ci.yml ×2（TODO:46-49）</td><td>manifest total_tasks=119 + 10_error_repair 22 ✓；ci.yml:87 "119 tasks" + :116 "152 文件" ✓；prompts/10_error_repair.md 含任务 120 内嵌 NAM005 JSON ✓；spec §12 四处 119/22 ✓；README:68 482+119 ✓；eval/README 119/22/001-120（119 unique）✓</td><td class="ok">✓ 簿记链对上</td></tr>
+<tr><td>39</td><td>B 包干净性：examples+selfhost 34 文件零 NAM005（TODO:41）</td><td>examples 29 + bootstrap 4 + selfhost 1 逐个 --check --json 扫描：零 NAM005；self_interp.lom 在 695b509 零改动（自举侧不动）✓；verify_selfhost.py 头注释四码过滤说明已补（695b509 diff 核对）</td><td class="ok">✓ 零误报</td></tr>
+<tr><td>40</td><td>"static 对齐 151 保持"（HANDOVER:12 横幅、TODO:42 B 证据区）</td><td><strong>实为 152</strong>——任务 120 参考解入干净集（#8 实测 ALIGNED 152）；同包 ci.yml 已把 dump 步骤名 151→152，static 数字漏改（见问题 1）</td><td class="bad">✗ 151 应为 152</td></tr>
+<tr><td>41</td><td>"claims.json 十条 claim"（HANDOVER:109 §2.2）</td><td><strong>实为 9 条</strong>（d12/d3/d5/d6/d7/d8/d123/d9/d1234；doc_audit 打印 "9 条"；分项 ×27 = 1+9+17 正确）（见问题 2）</td><td class="bad">✗ 十条应为九条</td></tr>
+<tr><td>42</td><td>§9-5 现状行（HANDOVER:323）</td><td>三处陈旧：缺 v1.2.0/无 B 包枚举、"doc_audit 54 项"（D 四期起即 60）（见问题 3）</td><td class="bad">✗ 现状行腐坏</td></tr>
+<tr><td>43</td><td>README 门面 "Current release"（README:8）</td><td><strong>v1.1.1（2026-09-07）</strong>——v1.1.2/1.1.3/1.1.4/v1.2.0 四个版本全缺（见问题 4）</td><td class="bad">✗ 四版本陈旧</td></tr>
+</table>
+
+<p class="small">矩阵 43 项：36 项 ✓（含 9 项亲手触发的行为实测、2 项独立复算、3 项强制生成/最小程序实测、2 项 API 逐 job 对账、2 项调研来源核查）、1 项 △（doc_audit 60/60 属实但括注数字词错）、6 项 ✗（问题 1-6——全部为文档/档案数字类，无一条工程行为失实）。硬指标（构建/测试/评测/自举/对账/探针/冒烟/CI/tag）零失败。</p>
+
+<h2>3. 专项审查</h2>
+
+<h3>3.1 B 包 NAM005：设计宣称的全面对抗性复核</h3>
+<p><strong>五形态 + 渐进式 + 两条边界全部亲手实测成立</strong>（矩阵 #23-25）。实现侧逐行核对：builtin_module 映射复用 <code>interpreter::module_of</code>（695b509 改 pub(crate)——单一事实源宣称属实，43 内建注册表与映射的 io 排除逻辑核对无误）；available_imports 在 collect_import 填充且 <code>f as g</code> 只加 alias（与运行时 available_builtins 同款语义）；NAM002 分支的 <code>builtin_module.remove(&f.name)</code> 确保病态程序单报不堆噪。诊断定位在调用点（2:13）而非声明处——与 NAM003 家族一致。<strong>两条设计边界实测确认不越权</strong>：错误模块导入归 RUNTIME005（不触发 NAM005）；纯 warning 程序照常执行（rc=0）。+5 测试逐一核读：断言含 hint 内容、ok:true、别名恰 1 条、prelude 零、NAM002 单报——与实测形态一致。<strong>唯一瑕疵在簿记</strong>：B 包自己的证据区与横幅写 "static 对齐/ALIGNED 151 保持"，而本包加入的任务 120 恰好把干净集推到 152（同包 ci.yml dump 步骤名 151→152 已改——同一份提交里两个口径）。</p>
+
+<h3>3.2 D 四期：模板池、碰撞修复与 claims 链</h3>
+<p><strong>101 族机械清点成立且五批分解精确</strong>（10+12+8+8+7=45，56+45=101）；三深水模板强制生成证实非纸面宣称（递归 enum 树的构造/求值、墓碑 rehash 的 9-5-2 分配序列、compose 组合子链均有实际语义，输出手算吻合）。<strong>变体名碰撞修复的数学性质成立</strong>：12 处生成点全部下划线式，前缀互异 + 计数器单调使 "X_m == Y_n ⟺ X==Y ∧ m==n"——B15 型碰撞结构性不可能。<strong>claims 九条链六轮以来首次零瑕疵通过独立复算</strong>（算术 9 + 出现点 17 + 跨链 4 全闭合，含 D 四期新登记的 d9 五分项与 d1234 三处出现位）。抽样对拍 50 次（7777×30 + 60123×10）+ 包模式 10 项目全一致。<strong>唯一瑕疵</strong>：包模式自测的 "三包链 4/包内 enum 26" 未注明 seed 段且在所有自然段下不可复现——600/600 主宣称本身有 CI 与本轮 10 项目抽样佐证，但这对小数字违背了证据区"数字可从证据推出"的纪律（最接近的 26 恰好命中 D3 时代的 12000-12039 段，疑为跨段 tally）。</p>
+
+<h3>3.3 第 1 轮继任调研：新审查面的首次事实核查</h3>
+<p>调研报告的三处头条：<strong>Zero 全部证实</strong>（MarkTechPost 原文逐点相符，连"诊断示例码恰为 NAM003"这种细节都与 Lom 的码段巧合一致——报告的重合面判断有据）；<strong>Mojo 证实</strong>（Register 直连被反爬挡住，但 1.0 时间/开源/Qualcomm 3.9B 收购经多源交叉成立，报告忠实反映其引文源）；<strong>MoonBit 实质成立但两处细节失真</strong>——"当前 v0.9" 是检索时点前 5 个月的值（官网 updates 明列 v0.10.9/2026-08-19），"2026-08-19 改口 Q3" 把 06-08 v0.10.0 注记的表述记到了 08-19 条目头上。按报告自身"严禁虚构：所有数字/日期/事实必须来自来源链接"的规范，这是新档案的第一处污点——结论级判断（推迟 Q3、AI 叙事强化）不受影响，但引用纪律在细节层失守。</p>
+
+<h3>3.4 升版/tag/CI 纪律</h3>
+<p><strong>无瑕</strong>：三处 1.2.0 一致；tag v1.2.0 切在 4e20e8b（B 包 docs 提交、CI 六 job success 的 run 34965031500——与 TODO 簿记宣称的 run id 逐字一致，tag 后置纪律遵守）；六个 push 头 run 全绿，feat+docs 成对推送的覆盖逻辑经 API run 序列证实（70af901/695b509 无独立 run = 与 docs 同时推送）。spec §13 v1.2.0 条目九要点、§7.3 码表行、SPEC_FOR_AI 两处、README/eval-README/spec §12 计数全部与实测对上。doc_audit 60/60 + Z 类自指互锁。R31-R38 八条整改全部保持。</p>
+
+<h2>4. 问题清单（按优先级）</h2>
+
+<h3><span class="tag p0">P0</span> 无</h3>
+
+<h3><span class="tag p1">P1</span> 无</h3>
+
+<h3><span class="tag p2">P2</span> 文档腐坏 / 档案数字失真（5 条）</h3>
+
+<ol>
+<li>
+<p><strong>docs/HANDOVER.md:12（B 包横幅）+ docs/TODO.md:42（B 证据区）— "verify --static 坏 19 + 干净集 ALIGNED 151 保持"：实为 152</strong></p>
+<p>B 包加入 eval 任务 120，其参考解进入 verify --static 的干净集（examples 29 + bootstrap 4 + 参考解 119 = 152），实测 <code>干净集 ALIGNED 152 / DIFF 0</code>。同一提交 695b509 已把 ci.yml 的 dump 步骤名 151→152（同一文件集的姊妹口径），4e20e8b 写档案时 static 数字漏改——"151 保持"与同包另一处改动自相矛盾，且引入时点（4e20e8b，任务 120 已入库）即为错值。修法：两处 151→152；根治法见问题 7（把 static/dump 干净集计数纳入 doc_audit 真值监控——目前 dump 计数有监控、static 没有）。</p>
+<p class="small">证据：实测 <code>verify_selfhost.py --static</code> → "干净集 ALIGNED 152"；TODO:42 与 HANDOVER:12 均写 151；695b509 的 ci.yml diff（151→152）；verify_selfhost.py:104-105 load_refset 含任务 120 参考解。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:109（§2.2 doc_audit 行）— "claims.json 十条 claim"：实为九条</strong></p>
+<p>claims.json 现有 9 条 claim（d12/d3/d5/d6/d7/d8/d123/d9/d1234），doc_audit 自己打印 "claims.json 登记数 &gt;= 1 | 9 条"；同句的分项数 ×27（= 1 登记数 + 9 算术 + 17 出现点）反而是对的——数字词"十"是 D 四期登记 d9/d1234 前的残留（七条时代后的第二次漏改），R26/R31 同型（同文档同句内的计数词与机器可验数脱钩）。该行是 §2.2 钦定的第一对账命令的自描述——恰是 claims 类机制该拦的表述。修法：十→九；根治法：I 类加一条"N 条 claim"计数词监控（en()/中文数字映射已有先例）。</p>
+<p class="small">证据：python -c 清点 claims.json claims 数组 = 9；doc_audit 输出首行 H 类 "9 条"；git log -S "十条 claim" → cca8791 引入。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:323（§9-5 现状行）— 第三次腐坏（R33 同型）：缺 v1.2.0/B 包、"doc_audit 54 项" 陈旧</strong></p>
+<p>"当前状态：v1.0 冻结 + <strong>v1.1.0-v1.1.4 五个 patch</strong> + 六轮审查…+ D 包四期收官（…10000…）+ V 包文档自账制度化（<strong>doc_audit 54 项</strong>）"——① 版本枚举停在 v1.1.4，本轮升版的 v1.2.0（B 包）缺席；② 收官包枚举有 D 四期/V 包而无 B 包；③ "54 项" 是六审终点值，D 四期（d9/d1234 +6 项）起即为 60（现值 60，doc_audit Z 类互锁的正是 §2.2 的 60）。该行整段由 9c41596 引入（时点正确），cca8791 改了中段（四期）却漏了 54，4e20e8b（B 包收官、自称更新 §9）只改了 §9-2 的版本显示行、未动 §9-5。§9 是新接手 AI 的第一检查单。修法：版本枚举补 v1.2.0、包枚举补 B 包与第 1 轮调研、54→60（或改"54→60 项"区间式）。</p>
+<p class="small">证据：HANDOVER:323 原文 vs §1:45（v1.2.0）/:109（60 项）；git log -S "doc_audit 54 项" → 9c41596；4e20e8b 对 HANDOVER 的 diff（§9 只动 :320）。</p>
+</li>
+<li>
+<p><strong>README.md:8 — 门面横幅 "Current release: v1.1.1 (2026-09-07)" 四个版本陈旧</strong></p>
+<p>现行 v1.2.0；v1.1.2（2026-09-08）、v1.1.3（2026-09-14）、v1.1.4（2026-09-14）、v1.2.0（2026-09-15）四个版本的发布都未回改此行（最后触碰 = edd0c5e/v1.1.1）。存量问题（第五/六轮审查亦漏网），但本轮 B 包在 README 做了 ×2 簿记（482/119 两处数字都对）并完成升版——门面上最显眼的版本宣称仍漏；doc_audit 的版本监控只锚 HANDOVER §1/§9，README 横幅不在登记面（gate 覆盖面缺口的又一实例）。README 是"项目门面"（HANDOVER 头部钦定），外部读者看到的"当前版本"差 4 个 release。修法：改写为 v1.2.0 条目（或"Current release: v1.2.0 (2026-09-15) — NAM005 checker capability"+ 历史行压缩）；根治法：doc_audit 版本类加 README 横幅位。</p>
+<p class="small">证据：README:8 vs Cargo.toml:3；git log -S "Current release: v1.1.1" → edd0c5e 后零触碰；doc_audit 版本监控清单（HANDOVER §1/§9 两处）。</p>
+</li>
+<li>
+<p><strong>docs/archive/research-2026-09-15.html（§1.2 MoonBit 节）— 两处数字与自引来源不符，违反其自身"严禁虚构"规范</strong></p>
+<p>① "当前版本 v0.9（2026-04-07）"——报告自注检索时点 2026-09-15，而 moonbitlang.com/updates 当时最新条目已是 <strong>v0.10.9（2026-08-19）</strong>（其下还有 v0.10.4/2026-07-13、v0.10.0/2026-06-08 等 5 个更新）——"当前 v0.9"是 5 个月前的值；② "官方 updates（2026-08-19）改口 Q3 2026"——"currently targeting MoonBit 1.0 for Q3" 出自 <strong>2026-06-08 的 v0.10.0 注记</strong>，08-19 条目（v0.10.9）未提 1.0，日期归属错。archive README 为该目录立的规范明言"所有数字/日期/事实必须来自来源链接"——两处均与被引来源矛盾。结论级判断（1.0 推迟 Q3、AI-native 叙事强化）不受影响（roadmap 仍写 H1、Q3 表述官方真实存在）。修法：v0.9→v0.10.9、（2026-08-19）→（2026-06-08 v0.10.0 注记）；下轮调研按其自身"未确认标下轮复核"纪律先核官网现值。</p>
+<p class="small">证据：moonbitlang.com/updates 两次抓取（条目表：08-19 v0.10.9 / 07-13 v0.10.4 / 06-08 v0.10.0（Q3 表述在此）/ 05-13 v0.9.2 / 04-07 v0.9）；报告 :64 原文；README.md:41 规范原文。</p>
+</li>
+</ol>
+
+<h3><span class="tag p3">P3</span> 计数精度 / 复现性（2 条）</h3>
+
+<ol start="6">
+<li>
+<p><strong>docs/TODO.md:85（D4 包模式证据区）— "自测 40 项目 --check 零异常，三包链 4/包内 enum 26" 不可复现且未注明 seed 段</strong></p>
+<p>证据区未写自测 seed 段，本轮多段复算无一同时命中 (4, 26)：批段头 20000-20039 → 三包链（libc 存在）6 / enum 项目 19；D3 时代段 12000-12039 → 8/<strong>26</strong>（enum 命中、链不符——26 恰为 D3 段的值，疑 tally 跨段或生成器中间态）；1-40 → 5/17；21000/31000/1000 段均不符。600/600 主宣称有 CI 冒烟与本轮 10 项目全一致佐证，不受影响；但这对小数字违背"宣称可从证据推出"的纪律（无法定位其证据）。修法：补注 seed 段并复算（或按现生成器重跑更正数字）。</p>
+<p class="small">证据：本轮 gen_pkg_project(seed) 多段清点输出（12000-12039: libc=8, enum=26；20000-20039: 6/19）。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:239（§5 代码导航表）— interpreter.rs 行 "内置函数全在这（42 个）"：实为 43</strong></p>
+<p>v0.27.0（2026-09-02）加 char_from_code 后内建为 43（typechecker register_builtins 机械清点 = 43，与冻结 §14 "43 builtins"、D4 横幅 "43 内建签名"、spec §13 一致）；该行自 v0.27.0 起陈旧，历轮审查漏网（§5 导航表不在 doc_audit 监控面）。基线前存量、非本增量引入。修法：42→43。</p>
+<p class="small">证据：builtins.rs insert 模式清点 43；HANDOVER:239 原文；v0.27.0 档案（HANDOVER §1 "语言面 42→43"）。</p>
+</li>
+</ol>
+
+<h2>5. 方法与局限声明</h2>
+<ul>
+<li><strong>D 四期五段 5600 未全量重放</strong>：以独立段 7777×30 + 宣称全池段 60123×10 + 包模式 31000×10 + CI 冒烟 30 + 强制三模板共 80+ 次对拍全一致作抽样证据；生成器 seed 确定性已由 7777 段与 CI 段（seed-base 1）双路径验证。B 包 eval/测试为全量复现（119×2 + 482）。</li>
+<li><strong>调研核查以来源相符性为限</strong>：The Register 直连被反爬拦截，Mojo 事实以多源交叉（开源媒体/搜索摘要/官网）替代单源直读；MoonBit/MarkTechPost 为官网与原文直接抓取（两次独立抓取互证）。未对 Zero/Vera 做本地实测（报告自身已声明此局限并留待第 2 轮）。</li>
+<li><strong>CI 以 API 侧面还原</strong>：六个 run 的 conclusion/job 列表实查全 success；job 日志正文未拉取（doc-gates 的 doc_audit step 以本地复跑 60/60 替代）。</li>
+<li><strong>claims 复算为机制级</strong>：parts[].evidence 的人审指针（指向 TODO 证据区原文）按项目纪律不由机器核验，本轮抽核了 d9 五分项的 seed 段描述与 TODO 原文一致性；"三包链 4/enum 26"因 seed 段缺失无法定位（问题 6）。</li>
+<li><strong>覆盖率和 LLM 历史数据未复核</strong>（84.4%、pass@k 99.1% 沿袭上轮口径）；clippy 以 CI job 绿为准，未本地重跑。</li>
+<li><strong>报告基线</strong>：审查执行于 2026-09-15，HEAD = 847ba17。全部 _review_* 临时脚本/程序/wasm/包项目/args 探针已删除，<code>.diff_tmp</code>/<code>.diff_failures</code> 无残留，<code>git status</code> 终态仅余本报告文件（新增）。</li>
+</ul>
+
+<hr>
+<p class="small">审查方法对齐项目纪律：逐条给证据（文件:行号 + 命令输出）；所有实测数字来自真实命令执行；对抗性实测优先于采信档案；优先级口径 P0 失实宣称 / P1 真 bug / P2 文档腐坏 / P3 建议。前序报告：<a href="review-2026-09-15.html">review-2026-09-15.html</a>（A-，第六轮）、<a href="review-2026-09-14-2.html">review-2026-09-14-2.html</a>（A-，第五轮）、<a href="review-2026-09-14.html">review-2026-09-14.html</a>（A，第四轮）、<a href="review-2026-09-07.html">review-2026-09-07.html</a>（A）、<a href="review-2026-09-05.html">review-2026-09-05.html</a>（A-）、review-2026-09-03.html、review-2026-08-31.html（B+）。审查轨迹：B+ → A- → A → A → A- → A- → <strong>A-（本轮）</strong>。</p>
+
+</div>
+</body>
+</html>
