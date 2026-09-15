@@ -220,9 +220,13 @@ def main():
     # （§11f 分歧清单与探针集在冻结期不会超十，超出时本项 FAIL 提示人工扩表）。
     print('I. 源码计数（diff_gen 模板池 / diff_test 探针 / SPEC §11f 分歧条数）')
     CN = '一二三四五六七八九十'
+    EN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 
     def cn(n):
         return CN[n - 1] if 1 <= n <= 10 else None
+
+    def en(n):
+        return EN[n - 1] if 1 <= n <= 10 else None
 
     m_pool = re.search(r'POOL_BASE = \[(.*?)\n\]', read('tools/diff_gen.py'), re.S)
     pool_base = len(re.findall(r'Gen\.t_\w+', m_pool.group(1))) if m_pool else -1
@@ -232,6 +236,9 @@ def main():
     m_11f = re.search(r'## 11f\..*?(?=\n## |\Z)', read('SPEC_FOR_AI.md'), re.S)
     div_n = len(re.findall(r'(?m)^  \d+\. \*\*', m_11f.group(0))) if m_11f else -1
     check('§11f 分歧清单可清点', div_n > 0, '§11f = %d 条' % div_n)
+    expect_all('I §11f 条数 @ SPEC_FOR_AI §11f 导语（英文位）', 'SPEC_FOR_AI.md',
+               r'the (one|two|three|four|five|six|seven|eight|nine|ten) known divergences',
+               [en(div_n)])
     expect_all('I 模板族数 @ HANDOVER §1 下一步', 'docs/HANDOVER.md',
                r'模板族 (\d+)）', [pool_base])
     expect_all('I §11f 条数 @ diff_gen 头注释', 'tools/diff_gen.py',

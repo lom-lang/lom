@@ -14,6 +14,7 @@
       "occurrences": [
         {"path": "docs/TODO.md", "pattern": "D 两期合计\\s+(\\d+) 程序/项目实例双后端逐字一致"},
         {"path": "docs/HANDOVER.md", "pattern": "两期合计 (\\d+) 程序/项目实例双后端逐字一致"},
+        {"path": "docs/HANDOVER.md", "pattern": "D 包两期：\\*\\*(\\d+) 程序/项目实例双后端逐字一致"},
         {"path": "docs/HANDOVER.md", "pattern": "2026-09-14：(\\d+) 程序/项目实例双后端全一致"},
         {"path": "docs/lom-project-guide.html", "pattern": "D 包两期合计 (\\d+) 程序/项目实例双后端逐字一致"}
       ]

@@ -5,8 +5,10 @@
 # - 类型感知的模板化生成：每个模板是一个手写正确的函数骨架（返回类型固定、
 #   语法/类型/效应标注全部对齐 SPEC_FOR_AI），随机性在模板选择 + 参数填充
 #   （常量/边界/分支数/变量名）上——不生成"自由拼接"的语法，保证零 parse/ type Error。
-# - 确定性输出：只用纯计算 + println（无 Clock/file/env/随机），同一程序
-#   双后端输出必须逐字一致。
+# - 确定性输出：纯计算 + println 为主；file/env 形态按纪律生成（file 三件套
+#   "覆盖写先行"幂等闭环——append/exists 只在 write 重置基线后发生；env 只消费
+#   args[1..] 永不触 argv[0]，见 docs/TODO.md D 包三期 D8），同一程序双后端
+#   输出必须逐字一致。
 # - 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态：
 #   1. 闭包捕获 mut（模板只捕获不可变绑定）
 #   2. JSON 数字 Int/Float 切分（不生成 json_parse）
@@ -18,10 +20,11 @@
 # - 定向覆盖 W 包事故模式（for-return 潜伏 7 版本）：提前返回族模板
 #   （for 体内 return / for 体内 ? / while 内 return / 块尾 if 内 return /
 #   match Form B 臂内 return / 嵌套循环内层 return）在模板池中加权。
-# - --probe <kind> 探针模式：显式生成已知分歧形态（mut-capture / div-zero /
-#   large-float），供 diff_test 验证 §11f 白名单仍然如档案所述（守护白名单
-#   本身不腐坏）。deep-recursion 探针见 --probe deep-recursion（深递归双后端
-#   结构化诊断 vs V8 trap——退出码都非 0，stdout 应一致为空/前缀）。
+# - --probe <kind> 探针模式：显式生成已知分歧形态（六类：mut-capture /
+#   div-zero / large-float / json-number / int-range / deep-recursion，
+#   全集见 tools/diff_test.py run_probes），供 diff_test 验证 §11f 白名单
+#   仍然如档案所述（守护白名单本身不腐坏）。deep-recursion 探针验证双后端
+#   结构化诊断 vs V8 trap——退出码都非 0，stdout 应一致为空/前缀。
 # - 固定种子可复现（random.Random(seed)）；零第三方依赖（Python 标准库）。
 # - 数值安全：Int 结果 |x| < 2^59（对齐 §11f-7 的 WASM 安全值域；乘法操作数 ≤10^4、
 #   链深 ≤3、阶乘 n ≤15）；解释器全 i64 无此限，保守口径取双后端交集。
@@ -1275,7 +1278,7 @@ def gen_program(seed: int) -> tuple[str, str]:
 # 包符号在主文件的组合调用、WASM merge（包前主后）与解释器 load_packages 的
 # 行为对齐。包内函数**只保留 Int 单参/双参两种签名**——调用形态二值化消灭
 # 签名分派错误（首版 Float/String/enum 分派出过错；那些类型的覆盖由单文件
-# 模式的 39 模板族承担，包模式的独特价值在依赖图与合并语义）。包内函数保持
+# 模式的模板池承担，池大小见 doc_audit I 类监控），包模式的独特价值在依赖图与合并语义）。包内函数保持
 # 自包含（仅 prelude 纯运算——包源码的 import 在 WASM merge 时只收集 items）。
 
 _PKG_BODY_1 = [
