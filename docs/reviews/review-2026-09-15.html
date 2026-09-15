@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-15（第六轮，基线 5156ab2 / v1.1.4）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--warn); border:3px solid var(--warn); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Lom 独立审查报告（2026-09-15，第六轮总序）</h1>
+
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（AI 原生编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器</p>
+<p><strong>审查基线 commit</strong>：<code>5156ab2</code>（"docs: 第六轮独立审查开立登记（TODO）"，2026-09-15；开审时 <code>git status</code> 干净——与第五轮开审时存在未提交 TODO 改动的情形不同，本轮任务书预期的登记提交 5156ab2 已入库）。版本 <code>v1.1.4</code>（Cargo.toml = Cargo.lock = 1.1.4，<code>lom --version</code> 实测 <code>lom 1.1.4</code>；本轮增量纯工具+文档不升版，tag 仍 v1.1.4）</p>
+<p><strong>审查范围</strong>：<code>8351e98..5156ab2</code> 共 5 个提交——<strong>V 工作包</strong>（23e9a28 + 1b91f9c：doc_audit 22→46 项——新 H 类 claims.json 宣称-证据对账 / I 类源码计数 / Z 类项数自指，R22/R27/R16 三型教训 gate 化）+ <strong>D 包三期</strong>（4b1fc9e + 860e83c：diff_gen 模板族 45→56（file 三件/env args/深控制流/import 别名 +11）+ diff_test 固定 <code>-- d1 d2</code> + enum 变体名 uniq + §11f-8 argv[0] 分歧档案化 + 七条→八条口径联动）+ 5156ab2（审查开立登记，纯 TODO）。上轮报告（review-2026-09-14-2，总评 A-，基线 828560c）已覆盖内容不重复，但 R22-R30 修复保持纳入核对</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行构建/测试/eval 双后端/golden/自举六模式/对账三件/探针/差分 CI 两模式 + 独立 seed 段 30 程序与宣称段 20 程序对拍 + 强制模板生成人工检查/双后端实跑 + claims 七条算术独立复算与 12 个出现点正则逐个验证 + 六组锁定测试亲手触发（四组任务书 + R27 场景 + 分项位复现，全部红后恢复绿）+ §11f-8 argv[0] 双后端最小实测 + enum uniq/旧 TYPE003 形态正反两向复现 + GitHub API 逐 run 对账 + git 跟踪文件 0x0C 字节扫描。除本报告文件外未修改任何项目文件；全部 _review_* 临时脚本/产物已删除（<code>git status</code> 终态仅余本报告）；未执行任何 git commit/push/tag</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / rustc 与 cargo（clean 重编 20.18s 零告警）/ node v24 / Python 3.13</p>
+</div>
+
+<h2>1. 总评</h2>
+
+<p><span class="grade">A-</span></p>
+
+<p><strong>结论</strong>：增量（8351e98..5156ab2，V 包 + D 三期）的<strong>工程实质全部属实且质量扎实</strong>：全部硬指标实测复现（clean 重编 0 warning、477/477、eval 双后端 118/118、golden 逐字、自举六模式 dump 151/tokens 151/diags 9/static 坏 19+干净 151/run 31/wasm 三段、spec_examples/fuzz PASS、<strong>doc_audit 52/52</strong>（H/I/Z 三类新项输出形态如宣称）、探针 6/6、CI 冒烟 20+10）；<strong>claims.json 七条 claim 算术闭合独立复算全部成立</strong>（4400 = 3400+1000，3400 = 1000+400+1000+1000 原始分链逐环核对），12 个出现点正则逐个验证匹配且现值==claim（匹配行号逐一核对均为现值宣称位、无误锚历史行）；<strong>六组锁定测试亲手触发全部红后恢复绿</strong>（R22 算术场景一次触发 5 项 FAIL、R27 场景、R16 自指场景、分项位——机制真实有效，非摆设）；D 三期 5 个新模板强制生成人工检查确认命中宣称形态（file 覆盖写先行幂等闭环/env args 永不消费 args[0]/while×match×Form B 三层嵌套/两 enum 交叉/stdlib 别名非文件头）且双后端逐字一致，独立 seed 段 4242 起 30 程序 + 宣称段 10000/15000 各 10 + 包模式 12000 段 10 共 60 次对拍零差异；<strong>§11f-8 argv[0] 逐点实测符合</strong>（interp 传 .lom 路径、wasm 传 .wasm 路径、尾部用户参数逐字一致）；enum uniq 修复正向验证（双模板重复抽中→变体名带 2/4/6/8 后缀、--check --json 零诊断）与旧形态反向复现（同名变体跨 enum→TYPE003 warning 恰如档案）双成立；CI 三个 run（1b91f9c/860e83c/5156ab2）六 job 全绿（23e9a28/4b1fc9e 随 feat+docs 成对推送，由各自 push 头部 run 的树覆盖）；R22-R30 修复全部保持。</p>
+
+<p><strong>未上 A 的原因</strong>：本轮增量的主题恰是"文档自账制度化"，而增量自身引入的文档腐坏恰又集中在它立志根治的口径域——<strong>4 条 P2 全部由被审增量引入或钝化</strong>，其中头条直击新机制的首战叙事：① <strong>SPEC_FOR_AI.md:693 导语仍写 "the seven known divergences"，而同节 §11f 列表现在是 8 条</strong>——同文件自相矛盾（与第五轮 R26 的 spec §12 intro 116 完全同型）；② 由此，HANDOVER 横幅/TODO D8/guide 三处宣称的"七条→八条口径联动<strong>七处</strong>由 V 包 I 类机制<strong>全数抓出</strong>（机制首次实战即<strong>抓齐</strong>）"<strong>不成立</strong>——实际同步位 6 处（grep 可数），I 类登记的 §11f 位置也是 6 处，而真正的第 7 处（SPEC_FOR_AI 导语）既未登记也未同步、至今残留"seven"；③ HANDOVER §1 下一步行"**进行中：D 包三期**"陈旧（同提交 860e83c 的横幅与 TODO 均已收官，且该提交信息自称更新了"§1 下一步（六审队列头）"，实际只改了行内"模板族 45→56"），同行"doc_audit 46 项"与现值 52 混排；④ diff_gen.py 头注释"确定性输出：只用纯计算 + println（<strong>无 Clock/file/env/随机</strong>）"自本轮起为假——增量给每个生成程序加了 file/env import 并新增 file 三件/env args 模板（同块相邻行的"七条→八条"改了、这两行漏改）。另有 4 条 P3（"深控制流五件"括号列 6 项且 banner 重复计"递归 acc"、TODO "+11"分解实际列 10 个模板、diff_gen 内两处基线期陈旧注释"I 类只钉一处"的覆盖面残留）。无 P0（无算术不闭合、无版本史错误——4400/3400 两级合计均闭合；"抓齐"属过程性夸大而非数字虚报，且机器产物 52/52 与六处同步本身真实）、无 P1（真 bug 零——对抗性检查未发现任何行为缺陷）。</p>
+
+<p><strong>与上轮的对比</strong>：第五轮 3 提交 6×P2 给 A-（头条算术不闭合）；本轮 5 提交 4×P2+4×P3——腐坏的<strong>绝对量下降且全部是口径/状态级</strong>（无算术、无版本归属、无控制字符咬字，R22-R30 教训全部吸收），新机制本身经对抗验证真实有效；但"防漂移包自己的同步宣称失准 + 漏掉最核心文档（喂 LLM 的 SPEC_FOR_AI）的一处"这一反讽结构，说明机器 gate 的覆盖面与"全数抓出"型表述都还差一口气。按短板计，<strong>A-</strong>。审查轨迹 B+ → A- → A → A → A- → <strong>A-</strong>（持平：上轮回落的文档纪律在本轮止跌，但未回升到 A）。</p>
+
+<h2>2. 验证矩阵（可机械验证的量化宣称 vs 实测）</h2>
+
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+
+<tr><td>1</td><td>HEAD = 5156ab2、工作区干净（任务书）</td><td><code>git status</code> 开审与终态均 clean（终态仅余本报告新增文件）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>2</td><td>构建零 warning（HANDOVER §1/§2.2）</td><td><code>cargo clean --release -p lom</code> 后全量重编 20.18s，输出 0 行 warning（日志 grep -ci warning = 0）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>3</td><td>版本 1.1.4 三处一致（HANDOVER §1/§9.2；本轮不升版）</td><td><code>lom --version</code> → <code>lom 1.1.4</code>；Cargo.toml 与 Cargo.lock 均为 1.1.4</td><td class="ok">✓ 相符</td></tr>
+<tr><td>4</td><td>测试 477/477（HANDOVER §1/§2.2/§9.2、README）</td><td><code>cargo test --release</code> → <code>477 passed; 0 failed; 0 ignored</code>（零 Rust 改动的增量，测试数不变正确）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>5</td><td>eval 118/118 宿主后端（HANDOVER §2.2）</td><td><code>run.ps1 -Verify</code> → <code>Total: 118 / Passed: 118 / Failed: 0</code>，exit 0</td><td class="ok">✓ 相符</td></tr>
+<tr><td>6</td><td>eval 118/118 WASM 后端（同上）</td><td><code>run.ps1 -Verify -Backend wasm</code> → <code>118/118</code>，exit 0</td><td class="ok">✓ 相符</td></tr>
+<tr><td>7</td><td>stmt_interp golden 逐字（HANDOVER §2.2）</td><td>lom.exe 运行 39 行输出与 expected.txt 行尾归一化后 diff 零差异，rc=0</td><td class="ok">✓ 逐字一致</td></tr>
+<tr><td>8</td><td>自举六模式全 PASS（HANDOVER §2.2：dump 151 / --tokens 151 / --diags 9 / --static 坏 19+干净 151 / --run 31 / --wasm 三段）</td><td>逐模式实跑：dump <code>PASS 151 / FAIL 0</code>、tokens <code>PASS 151</code>、diags <code>PASS 9</code>、static <code>坏 19 / 干净集 ALIGNED 151</code>、run <code>PASS 31</code>、wasm <code>layer2 PASS 148 / layer3 PASS（39 条 golden）/ selfapply PASS</code>——六段 RESULT 全 PASS</td><td class="ok">✓ 相符</td></tr>
+<tr><td>9</td><td>spec_examples_check 三文档 PASS（HANDOVER §2.2）</td><td>→ <code>正例 51 / 反例 5 / skip(json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1) / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>10</td><td>fuzz_smoke 80 轮零崩溃（HANDOVER §2.2）</td><td>→ <code>fuzz: 80 轮冲击零崩溃 / RESULT: PASS</code></td><td class="ok">✓ 相符</td></tr>
+<tr><td>11</td><td>doc_audit <strong>52/52</strong>（HANDOVER §2.2:106、§9-5:318、TODO D8/860e83c 提交信息）</td><td>→ <code>RESULT: PASS（52/52 项通过）</code>；H 类 20 项（1 登记数 + 7 算术 + 12 出现点）、I 类 9 项、Z 类 1 项输出形态与 §2.2 括注的 <code>×20/×9/×1</code> 逐一对上；Z 类打印"HANDOVER 宣称 52 vs 本脚本总项数 52"</td><td class="ok">✓ 相符</td></tr>
+<tr><td>12</td><td>探针 6/6——§11f 八条中六条可执行（HANDOVER §2.2:101、§9-5:318、TODO D8、diff_test docstring）</td><td><code>diff_test.py --probe</code> → 6/6 OK：mut-capture/div-zero/large-float/json-number/int-range/deep-recursion 全如档案形态（large-float 与 json-number 输出与第五轮矩阵逐字相同）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>13</td><td>CI 冒烟口径：单文件 20 + 包 10（HANDOVER §2.2、ci.yml）</td><td><code>--rounds 20 --seed-base 1 --ci</code> → 20/20；<code>--pkg --rounds 10 --seed-base 1 --ci</code> → 10/10，均 PASS</td><td class="ok">✓ 相符</td></tr>
+<tr><td>14</td><td><strong>B1</strong> claims.json 七条 claim 算术闭合（V1/D8 证据区）</td><td>独立复算（不复用 doc_audit 代码，逐项累加）：d12 3400=1000+400+1000+1000、d3 1000=500+500、d5 400=200+200、d6 1000、d7 1000、d8 1000、d123 <strong>4400=3400+1000</strong>——七条全闭合；3400 的原始分链（D3 seed 1000-1499+5000-5499 / D5 1-200+7000-7199 / D6 1-500+8000-8499 / D7 1-500+9000-9499）与 TODO 证据区原文逐段核对一致</td><td class="ok">✓ 独立复算成立</td></tr>
+<tr><td>15</td><td><strong>B1</strong> occurrences 出现点同步（同上）</td><td>12 个正则逐个 finditer 全量验证：全部匹配且捕获组==claim；匹配行号逐一核对（TODO:153/276/183/196/208/135/138、HANDOVER:14/318、guide:1078/1081）——全部是现值宣称位，无误锚历史行；无同形多位置漏检（每模式仅 1 处匹配）</td><td class="ok">✓ 逐点验证</td></tr>
+<tr><td>16</td><td><strong>B2-①</strong> R22 场景：claims.json 3400→2600 应 FAIL（V 证据区锁定测试①）</td><td>亲手触发：<code>H diff-total-d12 算术闭合 FAIL（sum=3400 vs claim=2600）</code> + 4 个出现点同步 FAIL，<code>RESULT: FAIL（47/52）</code>；git checkout 恢复后 52/52 PASS</td><td class="ok">✓ 红后复绿</td></tr>
+<tr><td>17</td><td><strong>B2-②</strong> HANDOVER §9-5 3400→2600 应 FAIL（锁定测试②）</td><td>亲手触发：<code>H diff-total-d12 @ docs/HANDOVER.md 现值 ['2600']（期望 3400）</code> 单项 FAIL（51/52）；恢复复绿</td><td class="ok">✓ 红后复绿</td></tr>
+<tr><td>18</td><td><strong>B2-③</strong> 模板族 56→57 应 FAIL（I 类；V 时点为 45→46）</td><td>亲手触发 §1 下一步"模板族 56"→57：<code>I 模板族数 FAIL（现值 57 期望 56）</code>；恢复复绿</td><td class="ok">✓ 红后复绿</td></tr>
+<tr><td>19</td><td><strong>B2-④</strong> §2.2 "52 项"→51 应 FAIL（Z 类；V 时点为 46→45）</td><td>亲手触发：<code>Z doc_audit 项数自指 FAIL（宣称 51 vs 实产 52）</code>；恢复复绿</td><td class="ok">✓ 红后复绿</td></tr>
+<tr><td>20</td><td><strong>B2 补</strong> R27 场景（"八条中六条"→"八条中五条"）与分项位（TODO D5 400/400→400/399）应 FAIL（V 证据区④⑥）</td><td>两组均亲手触发：I 类 <code>现值 ['八','五']（期望 ['八','六']）</code> FAIL、H 类 <code>现值 ['400','399']</code> FAIL；各恢复复绿——V 证据区"锁定测试六组"全数机制复核</td><td class="ok">✓ 红后复绿</td></tr>
+<tr><td>21</td><td><strong>B3</strong> D 三期 1000 程序全一致（seed 10000-10499 + 15000-15499；TODO D8/HANDOVER:12）</td><td>抽样复跑：宣称段各抽 10（10000-10009、15000-15009）全一致 + 独立 seed 段 4242-4271 共 30 全一致——50/50 双后端 stdout+退出码逐字一致，<code>.diff_failures/</code> 无残留</td><td class="ok">✓ 抽样全一致</td></tr>
+<tr><td>22</td><td><strong>B3</strong> 包模式 40/40（seed 12000-12039；TODO D8）</td><td>抽 12000-12009：10/10 全一致</td><td class="ok">✓ 抽样一致</td></tr>
+<tr><td>23</td><td><strong>B3</strong> 新模板命中宣称形态（file 三件/env args/while-match/enum-cross/import-alias）</td><td>强制生成（每模板×2 seed）人工逐行检查：t_file_roundtrip 覆盖写→读回→len、t_file_exists_gated 写后 True+唯一名 False 对照、t_file_append_accum write 重置→append×2、t_env_args_consume 只消费 args[1]/args[n-1] 永不 args[0]、t_while_match_return 三层嵌套+Form B 臂独立 end、t_enum_cross_match 两 enum 交叉+变体名带 uniq 后缀、t_import_alias_stdlib <code>len as length_of</code> 别名且 import 行随 decls 非文件头——全部命中；--check rc=0；双后端输出逐字一致（ea_3()=322 = 3×100+2×10+2，验证 args 消费语义）</td><td class="ok">✓ 形态+双后端实测</td></tr>
+<tr><td>24</td><td><strong>B4</strong> §11f-8：argv[0] 双后端路径差异、尾部参数逐字一致（SPEC_FOR_AI §11f-8、LANGUAGE_SPEC env 注、TODO D8）</td><td>最小程序打印 args()[0]/[1]/[2]/len，<code>-- x y</code> 实跑：interp → <code>_review_tmp/argsprobe.lom</code> / wasm → <code>_review_tmp/argsprobe.wasm</code>（确为 .lom vs .wasm 路径、长度内容均异），两侧 x/y/3 逐字一致——与 SPEC_FOR_AI §11f-8（"interpreter passes the .lom source path, the WASM harness passes the .wasm binary path (different lengths and contents). User arguments … byte-identical"）与 LANGUAGE_SPEC 注逐点吻合；diff_test 固定 <code>-- d1 d2</code> 两侧实现核对（run_interp:42/run_wasm:52）</td><td class="ok">✓ 逐点吻合</td></tr>
+<tr><td>25</td><td><strong>B8</strong> enum 变体名 uniq：重复抽中零歧义；"旧形态伴随 TYPE003 warning 非 Error"（TODO D8 顺手修）</td><td>正向：强制 t_enum_dispatch×2 + t_enum_guard_match×2 → 变体名 Cir2/Sq2…Low4…Cir6…Low8…（后缀 2/4/6/8），<code>--check --json</code> 零诊断（rc=0）；反向：手写两 enum 同名变体 Cir（异 arity）→ 恰好 2 条 <code>TYPE003 warning</code>（"期望 2 个参数，得到 1 个"+"参数 0: 期望 ShapeA 得到 ShapeB"）而程序照常运行 rc=0——档案"warning 与类型歧义形态、双后端一致非 bug"如实</td><td class="ok">✓ 正反双向复现</td></tr>
+<tr><td>26</td><td>D8 自测：60 程序（seed 2000-2059）--check --json 零诊断（TODO D8）</td><td>抽 seed 2000-2009 复现：10/10 零 Error 零 warning（JSON 口径逐条数 severity）</td><td class="ok">✓ 抽样相符</td></tr>
+<tr><td>27</td><td><strong>B5</strong> "七条"现值残留清零（口径八条联动；TODO D8 口径涟漪）</td><td>全仓 grep 七条已知分歧/七条分歧/七条白名单/七条中：工具+文档现值位零残留（仅 TODO V/R27 时点记录与第五轮报告）——<strong>但 SPEC_FOR_AI:693 英文导语 "the <strong>seven</strong> known divergences" 残留（见问题 1），该位不在七条中文形态 grep 与 I 类登记的捕获范围内</strong></td><td class="bad">✗ 一处英文位残留</td></tr>
+<tr><td>28</td><td>"联动七处由 I 类机制全数抓出（抓齐）"（HANDOVER:12、TODO:140-142、guide:1081、860e83c 提交信息）</td><td><strong>宣称失准</strong>：grep 可数的七→八同步位为 <strong>6 处</strong>（diff_gen:10 / diff_test:9/:115/:298 / HANDOVER:101/:318），I 类登记的 §11f 位置亦为 6 处（I 类 9 项中 §11f 相关 6 + 模板族 1 + 可清点 2）；"第 7 处"若指 SPEC_FOR_AI 导语则恰是漏网位（问题 1）——"全数抓出/抓齐"与现存残留矛盾（见问题 2）</td><td class="bad">✗ 宣称失准</td></tr>
+<tr><td>29</td><td><strong>B6</strong> 数字对账：56 族 / 52 项 / 八条 / 6-6 / 1000 / 40-40 / 4400</td><td>POOL_BASE 机械清点=56（POOL_EARLY_RETURN=8 另计）✓；52=22+20+9+1 且 Z 类互锁 ✓；§11f 编号列表=8 条 ✓（唯导语 seven，问题 1）；探针 6/6 ✓；两段各 500 抽样 ✓；4400 两级分链闭合 ✓——除问题清单所列，全部对上</td><td class="ok">✓ 相符</td></tr>
+<tr><td>30</td><td><strong>B7</strong> CI 逐 run 全绿（任务书五提交）</td><td>GitHub API 实查：run 34939217955（5156ab2）/ 34938919426（860e83c）/ 34937812733（1b91f9c）各六 job（三平台矩阵/selfhost/clippy/doc-gates）全部 success；23e9a28/4b1fc9e 与 docs 成对推送非 push 头，由上述 run 的树覆盖（8351e98 与 7c33787 的 run 亦 success）</td><td class="ok">✓ 全绿</td></tr>
+<tr><td>31</td><td>0x0C 全仓扫描清零（V 证据区、R25 保持）</td><td>git 跟踪文件逐字节扫描：0 处（二进制产物 .pyc/.exe/.wasm 中的 0x0C 字节不计——非文本）</td><td class="ok">✓ 清零</td></tr>
+<tr><td>32</td><td>R22-R30 修复保持（第五轮整改，任务书 C 项）</td><td>R22：2600 仅存于"初记 2600"更正语境 ✓；R23：§1 版本行 v1.1.4 内容完整 ✓；R24：v0.7.2 仅存更正语境（SPEC_FOR_AI:704 等）✓；R25：0x0C=0 ✓；R26：spec §12 intro=118 ✓；R27：探针口径统一"八条中六条"（新值联动后保持统一）✓；R28：diff_gen 头注释 |x|&lt;2^59 ✓；R29：K 杂项 ×5 ✓；R30：下一步行旧括注已不存在（但该行有新陈旧项，见问题 3）</td><td class="warn">△ 九条保持、下一步行新陈旧</td></tr>
+<tr><td>33</td><td>V 包宣称"occurrences 覆盖 TODO ×5、HANDOVER ×2、guide ×1"（V1 证据区）</td><td>d12+d3/d5/d6/d7 五条 claim 的出现点清点：TODO 5 处（:153/:276/:183/:196/:208）、HANDOVER 2 处（:14/:318）、guide 1 处（:1078）——与证据区文字一致；D 三期新增 d8/d123 各自登记（TODO:135/:138、HANDOVER:318、guide:1081）</td><td class="ok">✓ 相符</td></tr>
+<tr><td>34</td><td>doc_audit H/I/Z 输出形态与 §2.2 括注 ×20/×9/×1（HANDOVER:106）</td><td>实跑输出分类清点：H=20（登记数 1 + 算术 7 + 出现点 12）、I=9、Z=1——算术 20+9+1+22=52 闭合，与括注逐项一致</td><td class="ok">✓ 相符</td></tr>
+</table>
+
+<p class="small">矩阵 34 项：29 项 ✓（含 8 项亲手触发锁定测试、2 项独立复算、2 项强制模板/最小程序实测、1 项 API 对账）、1 项 △（R22-R30 保持但下一步行新陈旧）、2 项 ✗（SPEC_FOR_AI 导语 seven 残留 / "七处抓齐"宣称失准——同一问题簇）。硬指标（构建/测试/评测/自举/对账/探针/冒烟/CI）零失败。</p>
+
+<h2>3. 专项审查</h2>
+
+<h3>3.1 V 包：claims 机制与锁定测试的对抗性复核</h3>
+<p><strong>claims.json 机制本身经三层独立验证全部成立</strong>：算术层——七条 claim 用独立脚本（不复用 doc_audit 代码）逐项累加复核，包括 4400=3400+1000 与 3400 的原始四段分链（分段的 seed 区间与 TODO 证据区原文逐段比对）；出现点层——12 个正则以 finditer 全量枚举匹配位置与捕获组（doc_audit 的 doc_number 只取首匹配，本轮逐一确认每个模式在目标文件中恰有 1 处匹配，首匹配语义下无漏检盲区——同形多位置的风险目前为零，但属机制边界，见问题 8）；行为层——六组锁定测试全部亲手触发红、恢复绿（R22 场景一次五 FAIL 的联动反应与 V 证据区描述一致）。<strong>机制的薄弱处不在核验逻辑而在登记覆盖面</strong>：I 类把 §11f 条数钉在 6 个中文形态位置、把模板族数钉在 HANDOVER §1 一处，而英文形态位（SPEC_FOR_AI:693 导语）、"45→56"型区间表述位（banner/TODO/guide 三处）、HANDOVER 深夜横幅的"合计 D 包两期：3400"（措辞变体未被 d12 的正则捕获，幸现值正确）均在登记之外——本轮 SPEC_FOR_AI 导语的漏网正是这一覆盖面缺口的直接后果，而"全数抓出（抓齐）"的表述把登记面等同于了全部出现面。</p>
+
+<h3>3.2 D 三期：新模板面与 §11f-8 的实证</h3>
+<p><strong>新模板设计纪律与实现一致</strong>：file 三件套"覆盖写先行"经源码逐行核对（write 永远先于 append/read/exists 的 False 对照；absent 名用 uniq("absent") 前缀而写入只用 uniq("fk") 前缀——跨程序同名碰撞下 exists False 仍稳健）；env args 模板只索引 args[1] 与 args[n-1]，在 diff_test 固定 <code>-- d1 d2</code> 下 n=3 恒定，实测 322 双后端一致；强制生成的人工检查确认五种深形态无一是纸面宣称（三层嵌套的 end 配对、Form B 臂独立 end、别名 import 随 decls 等均实际生成）。<strong>§11f-8 的档案与实测逐点吻合</strong>（矩阵 #24），且"Not a bug — the program path is inherently a different artifact per backend"的定性、以 t_env_args_consume 构造性覆盖（而非探针）的处理决策自洽——结构性差异无法用"分歧确实出现"的探针判据守护（两侧输出本就应不同且路径随环境变），构造性规避是正确设计。<strong>enum uniq 修复</strong>正反双向复现（矩阵 #25）：新形态零诊断、旧形态恰产出档案所述 TYPE003 warning 而行为一致——"实测非 bug，纯生成质量收敛"的定性如实。</p>
+
+<h3>3.3 头条问题簇：防漂移机制首战叙事的裂缝</h3>
+<p>本轮增量的核心叙事是"V 包 I 类机制在 D 三期口径联动中首次实战即全数抓出（抓齐）"。实测：七→八的同步位共 6 处且全部同步正确；但 <strong>SPEC_FOR_AI §11f 自己的导语（:693，"the seven known divergences are listed below"）未同步</strong>——这是喂给 LLM 的主文档、§11f 列表的正门，其陈旧比工具注释的陈旧影响更大（LLM 按"七条"理解分歧面）。三个文档 + 提交信息把"6 处"写成"七处"并宣称"全数抓出/抓齐"，最可能的成因是把 V 包证据区"七处文档现值宣称"（= 模板族 1 + §11f 6，含与七→八无关的模板族位）的"七处"误代入了 D 三期的联动口径。按本项目"宣称清单第一行必须能从证据推出"的标准，这一句恰恰是本轮最该被 claims 类机制拦下的表述——而它描述的正是该机制自身。</p>
+
+<h2>4. 问题清单（按优先级）</h2>
+
+<h3><span class="tag p0">P0</span> 无</h3>
+
+<h3><span class="tag p1">P1</span> 无</h3>
+
+<h3><span class="tag p2">P2</span> 文档腐坏 / 宣称失准（4 条）</h3>
+
+<ol>
+<li>
+<p><strong>SPEC_FOR_AI.md:693 — §11f 导语仍写 "the seven known divergences"，同节列表已是 8 条</strong></p>
+<p>8351e98 时点该句正确（当时 §11f 为 7 条）；4b1fc9e/860e83c 给 §11f 增补第 8 条（argv[0]）并同步了 6 处中文口径位，漏掉了本节自己的英文导语——<strong>同一节内导语与列表自相矛盾</strong>，与第五轮 R26（LANGUAGE_SPEC §12 intro 116 vs 同节 118）完全同型。SPEC_FOR_AI 是喂给 LLM 的精简规范，"seven"直接误导对分歧面的理解。修法：seven→eight；根治法见问题 8（把该位纳入 I 类登记——I 类的 §11f 清点真值已算出 div_n=8，只差这一条 expect_all）。</p>
+<p class="small">证据：grep -n "known divergences" SPEC_FOR_AI.md → :693 唯一命中 "seven"；§11f 编号列表机械清点=8；git diff 8351e98..5156ab2 -- SPEC_FOR_AI.md 仅 +1 行（第 8 条），:693 未动。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:12 / docs/TODO.md:140-142 / docs/lom-project-guide.html:1081（+860e83c 提交信息）— "七条→八条口径联动七处由 V 包 I 类机制全数抓出（机制首次实战即抓齐）"宣称失准</strong></p>
+<p>实测同步位 6 处（diff_gen.py:10、diff_test.py:9/:115/:298、HANDOVER:101/:318），I 类登记的 §11f 位置亦 6 处；"七处"对不上任何可数集合（若并入模板族位则该位与七→八联动无关；若指 SPEC_FOR_AI 导语则恰是漏网位）。"全数抓出/抓齐"与问题 1 的现存残留直接矛盾——新机制首战实际是"登记面内 6/6 抓出、登记面外 1 处漏网"，宣称写成了完全成功。修法：三处文档改为"联动六处（登记位）全数同步"+ 删除"抓齐"或如实注明覆盖面边界；这正是 V 包自己立下的"宣称必须能从证据推出"纪律的适用对象。</p>
+<p class="small">证据：grep -rn 八条已知分歧/八条白名单（现值位恰 6 处）；doc_audit.py:237-251 I 类 expect_all 共 6 个 §11f 位置；SPEC_FOR_AI:693 残留（问题 1）。</p>
+</li>
+<li>
+<p><strong>docs/HANDOVER.md:57（§1 下一步行）— "进行中：D 包三期 差分覆盖扩展"陈旧；同行 "doc_audit 46 项" 与现值 52 混排</strong></p>
+<p>860e83c 同提交内：横幅（:12）与 TODO 头部均记 D 三期收官，§1 下一步行却仍写"进行中"——该提交信息自称更新了"§1 下一步（六审队列头）"，实际只把行内"模板族 45"改成"56"，状态与"doc_audit 46 项"（V 包终点值，现值 52——作为 V 里程碑终点描述勉强可读，但与同行"模板族 56"的现值混排，同一行两种时态）未动。§1 是 §9 检查单钦定的接手者第一阅读位。修法："进行中"→"✅ 已收官"或直接改写为"第六轮独立审查（队列头）"序列；"46 项"建议改"22→46 项"或"46→52 项"显式区间以消歧。</p>
+<p class="small">证据：HANDOVER:57 vs :12（横幅"收官"）；860e83c 对该行的实际 diff 仅"模板族 45→56"一处；TODO 头部"D 包三期已收官"。</p>
+</li>
+<li>
+<p><strong>tools/diff_gen.py:8-9 — 头注释"确定性输出：只用纯计算 + println（无 Clock/file/env/随机）"自本轮起为假</strong></p>
+<p>4b1fc9e 新增 t_file_roundtrip/t_file_exists_gated/t_file_append_accum/t_env_args_consume 四个模板，并给<strong>每个</strong>生成程序的头部加了 <code>from file import …</code> 与 <code>from env import { args }</code>——生成器现在系统性地产出含文件读写与 args 消费的程序，头注释宣称的不变量（无 file/env）不再成立。确定性本身仍由"覆盖写先行幂等闭环"纪律保障（TODO D8 有专段），但头注释作为维护者扩展模板时的第一参考，会让人误以为无需顾及文件状态纪律（恰恰是 D8 花最多笔墨设计的那条纪律）。同块相邻第 10 行"七条→八条"在同一提交改了、这两行漏改。修法：改为"确定性输出：纯计算 + println 为主；file/env 形态按'覆盖写先行幂等闭环/只消费 args[1..]'纪律生成（见 D8），双后端输出必须逐字一致"。</p>
+<p class="small">证据：diff_gen.py:8-9 vs :992-1055（file/env 模板）与 :1264-1265（全程序 import 头）；TODO D8"file 三件套（确定性纪律…）"专段。</p>
+</li>
+</ol>
+
+<h3><span class="tag p3">P3</span> 计数精度 / 覆盖面残留（4 条）</h3>
+
+<ol start="5">
+<li>
+<p><strong>"深控制流五件"枚举 6 项 + "+11"分解列 10 个模板（docs/HANDOVER.md:12、docs/lom-project-guide.html:1081、docs/TODO.md:103-104）</strong></p>
+<p>banner 与 guide 的"深控制流五件（while×match/循环内闭包捕获/两 enum 交叉/?-in-while/String×List 混合迭代/<strong>递归 acc+提前返回</strong>）"括号内是 6 项；banner 在"import 深形态"之后又写"+ 递归 acc"（同一模板重复出现两次）。TODO:103"模板族 45→56（+11：file 三件/env args/深控制流五/import 深形态一 + enum 变体名 uniq 顺手修）"的模板分解 = 3+1+5+1 = <strong>10</strong>，"+11"差一——缺的正是 t_recursion_accumulator（D8 正文以"深控制流五件：…五项 + t_recursion_accumulator"的加接式写法自洽，但结局行的分解没有）。R29（K 杂项 ×4→×5）同型。修法：三处统一为"深控制流五件（不含递归 acc）+ 递归 acc 一件"或把"五件"改"六件"并在分解补齐。</p>
+<p class="small">证据：POOL_BASE 机械清点 56 = 45+11，新模板逐个命名清点 = file 3 + env 1 + 深控制流 5 + 递归 acc 1 + import 1 = 11。</p>
+</li>
+<li>
+<p><strong>tools/diff_gen.py:1278 — "那些类型的覆盖由单文件模式的 39 模板族承担"陈旧（基线期遗留）</strong></p>
+<p>该注释由 828560c（D 二期）引入，时点池已 45（D1 39 + D6 3 + D7 3），现值 56——引入时即陈旧（或指 D1 时点但未标注）。非本增量引入，但 V 包"源码计数口径钉死"的目标下同文件同类数字未被 I 类覆盖（I 类只钉 HANDOVER §1 一处"56"）。修法：改"由单文件模式模板池承担"（去数字）或改现值并考虑纳入 I 类。</p>
+<p class="small">证据：git log -S "39 模板族" → 828560c；POOL_BASE 现值 56。</p>
+</li>
+<li>
+<p><strong>tools/diff_gen.py:21-24 — 探针清单"(mut-capture / div-zero / large-float)"只列 3 类（+ 单独提到的 deep-recursion），缺 json-number/int-range（基线期遗留）</strong></p>
+<p>探针实际 6 类；json-number（D6）、int-range（D5）加入后头注释清单未扩。I 类已在 diff_test 三处钉住"八条/六条"，但 diff_gen 头注释的这个枚举不在登记内。修法：清单补全或删去枚举改指 diff_test。</p>
+<p class="small">证据：diff_gen.py:21-24 vs diff_test.py:130-212（6 个 _pair_for_probe 调用）。</p>
+</li>
+<li>
+<p><strong>gate 覆盖面残留（机制建议，随问题 1/2 一并收口）</strong></p>
+<p>三个可登记而未登记的位：① SPEC_FOR_AI §11f 导语的英文计数（问题 1 的根治位——I 类已有 div_n 真值，加一条 expect_all 即可）；② "45→56"型区间表述（HANDOVER:12/:57、TODO:103/:142、guide:1081 五处——I 类现只钉 §1 的"模板族 56）"单靶位，区间形态漂移不报警）；③ HANDOVER 深夜横幅"合计 D 包两期：**3400 …"是 d12 正则（"两期合计 (\d+) …"）捕不到的措辞变体（现值正确，幸存）。另 doc_number 首匹配语义在"同形多位置"场景只检首处（当前各模式恰 1 处匹配，暂无实害）。修法：扩 claims.json occurrences / I 类登记位，或按 V 包纪律在新合计/新口径宣称时同步登记"全部出现位"。</p>
+<p class="small">证据：本轮 finditer 全量枚举（矩阵 #15）；claims.json 各 pattern 的匹配计数均为 1。</p>
+</li>
+</ol>
+
+<h2>5. 方法局限声明</h2>
+<ul>
+<li><strong>D 三期 1000 程序未全量重放</strong>：以独立 seed 段 30（4242-4271）+ 宣称段各 10（10000-10009 / 15000-15009）+ 包模式 10（12000-12009）+ CI 冒烟 30 共 80 次对拍全一致作抽样证据；D8 两段宣称是对 4b1fc9e 时点生成器跑的（现 HEAD 同版本生成器，seed 确定性下可逐字节复现，本轮未重放全量 1000）。</li>
+<li><strong>D8"自测 60 程序零诊断"抽查 10</strong>（2000-2009）：全部零诊断，与宣称一致；其余 50 个未逐个复跑（有全量 1000 对拍与 CI 20 轮的 --check 闸门作更强覆盖佐证——任一 --check 失败都会以 GENERATOR-BUG 形式 FAIL，本轮全部 PASS）。</li>
+<li><strong>CI 以 API 侧面还原</strong>：三个 run 的 conclusion/job 列表实查全 success；job 日志正文未拉取（doc-gates 的 doc_audit step 以本地复跑 52/52 替代）。</li>
+<li><strong>V 包"锁定测试六组"按机制复现而非字节级回放</strong>：六组全部以等价改错亲手触发（R22 场景用 4400 链上的 d12 3400→2600，与 V 时点记录同靶位）；V 证据区的"字节级还原断言"过程本身无法重放，以恢复后 52/52 + git status 干净等效验证。</li>
+<li><strong>覆盖率和 LLM 历史数据未复核</strong>（84.4%、pass@k 99.1% 等沿袭上轮口径，不在本轮范围）；clippy 以 CI job 绿为准，未本地重跑。</li>
+<li><strong>报告基线</strong>：审查执行于 2026-09-15，HEAD = 5156ab2。全部 _review_* 临时脚本/程序/wasm/日志已删除，<code>.diff_tmp</code>/<code>.diff_failures</code> 无残留，<code>git status</code> 终态仅余本报告文件（新增）。</li>
+</ul>
+
+<hr>
+<p class="small">审查方法对齐项目纪律：逐条给证据（文件:行号 + 命令输出）；所有实测数字来自真实命令执行；对抗性实测优先于采信档案；优先级口径 P0 失实宣称 / P1 真 bug / P2 文档腐坏 / P3 建议。前序报告：<a href="review-2026-09-14-2.html">review-2026-09-14-2.html</a>（A-，第五轮）、<a href="review-2026-09-14.html">review-2026-09-14.html</a>（A，第四轮）、<a href="review-2026-09-07.html">review-2026-09-07.html</a>（A）、<a href="review-2026-09-05.html">review-2026-09-05.html</a>（A-）、review-2026-09-03.html、review-2026-08-31.html（B+）。审查轨迹：B+ → A- → A → A → A- → <strong>A-（本轮）</strong>。</p>
+
+</div>
+</body>
+</html>

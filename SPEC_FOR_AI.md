@@ -690,7 +690,7 @@ Key points:
 
 ## 11f. Compiling to WebAssembly (Phase 7, v0.15.0)
 
-`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 118 eval tasks (the seven known divergences are listed below).
+`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 118 eval tasks (the eight known divergences are listed below).
 
 - Type checking runs before compilation (diagnostics on stderr, never blocking — the same gradual-typing promise as the interpreter).
 - Running the `.wasm` requires a host providing the `env.lom_*` imports (print / file / env / json); the repo ships a Node.js harness at `eval/runner/run_wasm.mjs`.
