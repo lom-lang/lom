@@ -62,14 +62,21 @@
 <li><strong>供应链</strong>：Rust 实现<strong>零第三方依赖、零 unsafe</strong>——JSON/JSON-RPC/时间戳全部手写，工具链本身 LLM 可读可修。</li>
 </ul>
 
-<h2>4. 如实标注：对方领先项</h2>
+<h2>4. 判定边界（本页宣称的适用范围——必读）</h2>
+<ul>
+<li><strong>"只此一家"= 在已调研样本中</strong>：截至本页时点，深读竞品仅 Zero 与 Vera 两家（docs/archive/ 第 2 轮，一手原文）+ 第 1 轮的浅读扫描——赛道实际有 30+ agentic 框架与工具，未逐一排查。宣称的准确含义是"**在新兴 agent-native 语言的头部两家里，修复执行闭环完成度领先**"，非世界范围的概念独占。</li>
+<li><strong>传统工具链早有自动修复基建</strong>：Rust 的 <code>cargo fix</code>（error 元数据携带 machine-applicable replacement，自动应用）、ESLint <code>--fix</code>、TypeScript code fixes、C# Roslyn analyzers——"修复执行自动化"作为<strong>概念</strong>并非 Lom 首发。Lom 的差异在于：把修复闭环放在<strong>语言定位的中心</strong>而非工具链附属、置信度分级的自动应用策略、fix_corpus 修复语料回归网、以及高温 LLM 实测（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录）。</li>
+<li><strong>"独有"的最终检验在发布后的外部反应</strong>：Lom 当前未发布，七轮独立审查均为内部委托（对抗深度真实、外部独立性相对）。</li>
+</ul>
+
+<h2>5. 如实标注：对方领先项</h2>
 <ul>
 <li><strong>Vera</strong>：Z3 形式化契约验证（Lom 的验证形态是 golden/差分/自举/审查的工程证据链，非形式化证明）。</li>
 <li><strong>Zero</strong>：expected/actual 结构化诊断字段（Lom 目前揉在 message 文本；列为冻结期外的候选演进）；sub-10KiB 原生二进制（Lom 是 WASM 目标）。</li>
 <li><strong>MoonBit</strong>：生态与工具链规模（IDE/包管理/多目标成熟度，1.0 在途）；编辑器内生成时纠错路线。</li>
 </ul>
 
-<h2>5. 当前状态（如实）</h2>
+<h2>6. 当前状态（如实）</h2>
 <ul>
 <li>v1.2.0（checker capability：NAM005 未导入内建静态预警）；<strong>未发布</strong>——按用户裁决"优化到完美前不发布"，语言面冻结、发布线冻结。</li>
 <li>本页不是营销材料：所有竞品描述来自其官方一手文档（见 docs/archive/ 第 2 轮调研的逐字引文），所有自家数字可由本仓库 CI 复验。</li>
