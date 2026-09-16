@@ -58,7 +58,7 @@
 <li><strong>双后端语义对齐</strong>：树遍历解释器 + 手写零依赖 WASM 后端，<span class="num">10000</span> 个随机生成程序/项目实例 stdout+退出码<strong>逐字一致</strong>（差分测试四期，含递归 enum、三包依赖链、file/env 深形态）；已知分歧全部文档化（§11f 八条）并有探针守护白名单不腐坏。</li>
 <li><strong>自举自证</strong>：用 Lom 写的 <span class="num">5703</span> 行解释器（lexer/parser/checker/evaluator/json）三层自证——WASM 载体上的自举解释器解析自身源码，dump 与宿主原生<strong>逐字一致</strong>。</li>
 <li><strong>LLM 实测</strong>：评测集现值 <span class="num">121</span> 任务，实测分层带时点——113 任务集四模型单采样（2026-08-31）、116 任务集双模型 × 10 采样（2026-09-07）<strong>pass@1 = pass@5 = pass@10 = 99.1%</strong>（无偏估计）、error_repair 24 题双模型 × 10 补测全过（2026-09-16，含全部后补修复题）；唯一系统性失败是刻意的 prompt 歧义锚点题 078；唯一无采样记录的是其明确版对照题 118（Q4 单采样对照 10/10）。</li>
-<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；<strong>八轮独立对抗性审查</strong>（R1-R54 整改全关闭）；宣称数字由 CI 机器对账（doc_audit <span class="num">62</span> 项 + claims.json 分项回加）。</li>
+<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；<strong>八轮独立对抗性审查</strong>（R1-R54 整改全关闭）；宣称数字由 CI 机器对账（doc_audit <span class="num">63</span> 项 + claims.json 分项回加）。</li>
 <li><strong>供应链</strong>：Rust 实现<strong>零第三方依赖、零 unsafe</strong>——JSON/JSON-RPC/时间戳全部手写，工具链本身 LLM 可读可修。</li>
 </ul>
 

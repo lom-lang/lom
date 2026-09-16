@@ -2,6 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
+> **Context budget**: 37,851 characters ≈ 9.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md (88,578 characters). Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 

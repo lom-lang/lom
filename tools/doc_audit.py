@@ -248,6 +248,11 @@ def main():
                [en(div_n)])
     expect_all('I 模板族数 @ HANDOVER §1 下一步', 'docs/HANDOVER.md',
                r'模板族 (\d+)）', [pool_base])
+    # ④ 包（2026-09-16）：SPEC_FOR_AI 尺寸口径行——宣称字符数与实际文件长度一致（防漂移）
+    spec_ai_len = len(read('SPEC_FOR_AI.md'))
+    expect_all('I SPEC_FOR_AI 尺寸行', 'SPEC_FOR_AI.md',
+               r'Context budget\*\*: ([\d,]+) characters',
+               [f'{spec_ai_len:,}'])
     expect_all('I §11f 条数 @ diff_gen 头注释', 'tools/diff_gen.py',
                r'§11f (一|二|三|四|五|六|七|八|九|十)条已知分歧', [cn(div_n)])
     expect_all('I §11f 条数 @ diff_test 头注释', 'tools/diff_test.py',

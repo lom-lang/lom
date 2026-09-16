@@ -8,14 +8,49 @@
 > 用户裁决四连包，按序执行）：**① 第八轮审查 A-（四连）+ 整改 R46-R54 关闭 ✓ →
 > ② L2 预研 ✓（RFC-0004 draft，动工待用户裁决）→ ③ 修复闭环资产深化 ✓
 > （v1.2.1：fix 动作面 NAM005/MUT001 双 High 模板 + fix_corpus 11 对 +
-> eval 121/error_repair 24 题 + 高温补测 480/480）→ ④ 文档工程小包
-> （SPEC_FOR_AI token 尺寸口径 + 第 4 轮复核项）——进行中**。
+> eval 121/error_repair 24 题 + 高温补测 480/480）→ ④ 文档工程小包 ✓
+> （SPEC_FOR_AI 尺寸口径 37,851 字符 + doc_audit 63 项 + Ronacher 博文深读
+> 归档）——**四连包全部收官（2026-09-16）**。
 > 调整：差分扩展维持降级按需、发布线维持冻结（用户 2026-09-07 裁决）。
 > 此前（2026-09-15/16）：ⒶⒷⒸ 三项收官（七审 A-+R39-R45 / 第 2 轮调研 /
 > positioning 一页纸）+ 第 3/4 轮调研 + B 包 v1.2.0 + D 四期（累计 10000）。
 > 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 八轮审查整改 R1-R54 与 T1-T7（档案见下）。
 
-## ③ 修复闭环资产深化（2026-09-16，四连包第三项，v1.2.1）✅ done
+## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
+
+**来源**：用户裁决（2026-09-16 四连包 ④）。两条线：
+
+- **SPEC_FOR_AI 尺寸口径**：头部新增 Context budget 行——**37,851 字符 ≈ 9.5k
+  tokens**（≈4 chars/token 英文主导 BPE 近似；字符口径非字节——UTF-8 中文节
+  两口径差 259）；对照 Mog 自述 "spec fits in 3,200 tokens"（第 4 轮目录原文）
+  与 LANGUAGE_SPEC 全量 88,578 字符。**doc_audit 新增 I 类监控位**（宣称字符
+  数 == 实际 len()，62→63 项；自引用悖论经同宽替换两次迭代收敛）——尺寸
+  数字从此不腐。
+- **Ronacher "A Language For Agents" 深读**（第 4 轮"下轮复核"最后一项关闭；
+  原文一手 2026-02-09，lucumr.pocoo.org/2026/2/9/a-language-for-agents/）：
+  - **独立收敛证据（Lom 已实现的八项中六项同构）**：effect markers（他的例子
+    `needs { time, rng }` + "auto-formatting fixes propagates the annotation"
+    ——与 Lom `! [IO, Clock]` + fix_eff_undeclared 签名行自动插入**同构**）；
+    Results over exceptions（"agents are afraid of exceptions"）；无宏；无
+    barrel/re-export；确定性测试；本地可推理。
+  - **repair-native 的观点领袖预言**：What Agents Hate 末段——agents 最恨
+    "build、lint、test 各自一套命令"的三分裂，想要 **"one command that lints
+    and compiles"、"mechanical fixing for as many linting failures as
+    possible"**——2026-02 独立提出方向，Lom 已实现为语言存在理由
+    （lom fix --apply 迭代闭环）。
+  - **两个未对齐点（如实记录，语言面冻结不动）**：① 他主张 Go 式强制包前缀
+    （math.sqrt）保 greppability——Lom 选择显式 import 清单 + 裸名（中位
+    设计）；② "agents often hate aliasing"——Lom 支持 `as` 别名（NAM005 语义
+    一致性对齐运行时），观点分歧挂账无动作。
+  - 结论：赛道合法性的最强观点领袖背书（Flask 作者、"boring languages with
+    LLMs" 讨论的另一极），其对 effect marker 修法的论述与 Lom 的实现细节
+    （含自动传播注解）精确同构——positioning 的"显式效应"与"修复闭环"两卖点
+    获独立佐证；证据属外部观点，不进 positioning 证据链（保持自家可复验口径）。
+
+**验收**：doc_audit **63/63**（新尺寸位 OK）；纯文档 + 监控扩展，无 CLI/语言面
+变化，不升版。
+
+
 
 **来源**：用户裁决（2026-09-16 四连包 ③；R46 留口的采样补测为其首项目的）。
 四条线全部收官：
