@@ -17,6 +17,7 @@
 | 第 0 轮（启动期） | 下表四份 | 2026-07/29–08/02 | 立项前全景调研 | 确立 LLM-repair-native 定位 |
 | 第 1 轮 | [research-2026-09-15.html](research-2026-09-15.html) | 2026-09-15 | 完成态生态位复查（v1.2.0 / 冻结 / 差分 10000 后） | 赛道变热：Vercel Zero 定位重合、Mojo 1.0 开源、MoonBit 1.0 推迟 Q3 且 AI 叙事强化；Lom 差异化资产 = 修复闭环深度 + 证据链（R43 修正：MoonBit 两处数字以原文为准） |
 | 第 2 轮（单主题） | [research-2026-09-15-zero-vera-doc-deepdive.html](research-2026-09-15-zero-vera-doc-deepdive.html) | 2026-09-15 | Zero/Vera 文档级深读对标（用户裁决不安装；全一手原文，R43 纪律） | 修正第 1 轮：Zero 有 fix --plan（计划层同构），Lom 独有修复**执行层**（apply/置信度/历史/语料）；三范式定位确立（图优先/模型专属/人机共读）；Vera 也有 LLM 实测（6/9 模型） |
+| 第 3 轮（单主题） | [research-2026-09-15-repair-landscape.html](research-2026-09-15-repair-landscape.html) | 2026-09-15 | 修复基建全景：传统工具链（rustc/cargo fix/TS）+ APR 学术线（用户质疑"只此一家"触发） | 机制三件套（结构化建议/置信度分级/迭代应用到不动点）Rust 生态已存在多年——Lom 机制层无原创；真实差异=中心定位+schema 契约+修复语料回归+高温实测的四维组合；APR 分型（生成型 vs 建议型）确立，Lom 与 LLM-APR 互补 |
 
 ## 继任调研文档的命名与格式规范
 

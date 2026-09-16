@@ -65,7 +65,7 @@
 <h2>4. 判定边界（本页宣称的适用范围——必读）</h2>
 <ul>
 <li><strong>"只此一家"= 在已调研样本中</strong>：截至本页时点，深读竞品仅 Zero 与 Vera 两家（docs/archive/ 第 2 轮，一手原文）+ 第 1 轮的浅读扫描——赛道实际有 30+ agentic 框架与工具，未逐一排查。宣称的准确含义是"**在新兴 agent-native 语言的头部两家里，修复执行闭环完成度领先**"，非世界范围的概念独占。</li>
-<li><strong>传统工具链早有自动修复基建</strong>：Rust 的 <code>cargo fix</code>（error 元数据携带 machine-applicable replacement，自动应用）、ESLint <code>--fix</code>、TypeScript code fixes、C# Roslyn analyzers——"修复执行自动化"作为<strong>概念</strong>并非 Lom 首发。Lom 的差异在于：把修复闭环放在<strong>语言定位的中心</strong>而非工具链附属、置信度分级的自动应用策略、fix_corpus 修复语料回归网、以及高温 LLM 实测（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录）。</li>
+<li><strong>机制层无原创</strong>（第 3 轮调研结论）：结构化建议（span+替换文本）、置信度分级（rustc 的 applicability <strong>四级</strong> vs Lom 三级）、迭代自动应用到不动点（cargo fix 的 fixpoint 循环）——<strong>机制三件套在 Rust 生态已完整存在多年</strong>；ESLint <code>--fix</code>/TS code fixes/Roslyn 为同类。Lom 的真实差异是<strong>四维组合</strong>：把修复闭环作为语言的存在理由（repair-native，非工具链附属）+ lom-diag/lom-fix schema 作为语言契约 + fix_corpus 修复语料回归网 + 高温 LLM 实测口径——该组合截至第 3 轮检索未见先例（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录；详见 docs/archive/ 第 3 轮调研）。</li>
 <li><strong>"独有"的最终检验在发布后的外部反应</strong>：Lom 当前未发布，七轮独立审查均为内部委托（对抗深度真实、外部独立性相对）。</li>
 </ul>
 

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修复基建全景：传统工具链与 APR 学术线（第 3 轮调研·单主题）— 2026-09-15</title>
+<style>
+  :root { --fg:#1a1a2e; --muted:#5a5a72; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --bg-soft:#f4f5fa; --border:#d9dbe7; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--fg); max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; line-height:1.75; }
+  h1 { font-size:1.6rem; border-bottom:3px solid var(--accent); padding-bottom:.5rem; }
+  h2 { font-size:1.25rem; margin-top:2.2rem; border-left:4px solid var(--accent); padding-left:.6rem; }
+  h3 { font-size:1.05rem; margin-top:1.6rem; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.9rem; }
+  th,td { border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top; }
+  th { background:var(--bg-soft); }
+  .meta { background:var(--bg-soft); border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; font-size:.9rem; margin:1rem 0; }
+  blockquote { border-left:4px solid var(--border); margin:1rem 0; padding:.4rem 1rem; color:var(--muted); }
+  code { background:var(--bg-soft); padding:.1rem .3rem; border-radius:3px; font-size:.9em; }
+  a { color:var(--accent); }
+  .verdict { background:#fffbeb; border:1px solid #f59e0b; border-radius:8px; padding:.8rem 1rem; }
+  ul { padding-left:1.3rem; } li { margin:.3rem 0; }
+</style>
+</head>
+<body>
+
+<h1>修复基建全景：传统工具链与 APR 学术线（第 3 轮调研·单主题轮）</h1>
+
+<div class="meta">
+<strong>轮次</strong>：第 3 轮（单主题）——源于用户对 positioning.html"只此一家"宣称的质疑（第 2 轮暴露判定边界问题，本轮补齐坐标系）<br>
+<strong>日期</strong>：2026-09-15<br>
+<strong>方式</strong>：文档级调研（不安装）——rustc/rustfix/cargo fix 官方文档、TypeScript code fixes 机制文档、APR 学术 survey 一手核对；R43 纪律执行<br>
+<strong>产出用途</strong>：为 positioning.html 的差异化宣称提供"整个修复生态坐标系"内的事实地基（当前仅在新兴 agent-native 语言两家中对比）
+</div>
+
+<h2>0. 结论摘要</h2>
+
+<div class="verdict">
+<ol>
+<li><strong>用户质疑被证实，且比边界声明承认的更重</strong>：Rust 生态早在 cargo fix 时代（2018 前后）就具备<strong>结构化建议（span + suggested_replacement）+ 置信度分级（applicability 四级）+ 迭代自动应用到不动点（compile→fix→recompile 循环）</strong>——与 Lom 的 lom-fix/v1 + 置信度三级 + --apply 迭代收敛<strong>机制同构</strong>。Lom 在"机制层"没有原创性。</li>
+<li><strong>Lom 真正的差异收窄为四点</strong>（相对传统基建）：①<strong>定位中心性</strong>——修复闭环是 Lom 的语言存在理由（repair-native）而非工具链附属；②<strong>修复语料回归网</strong>（fix_corpus 8 对作为 CI 常驻资产）；③<strong>高温 LLM 实测口径</strong>（修复类任务在 temperature=1.0 下 20/20）；④<strong>公开 schema 契约</strong>（lom-diag/v1 + lom-fix/v1 是语言规格的一部分，为 agent 消费而设计）。机制相同，产品形态与证据纪律不同。</li>
+<li><strong>学术谱系的关键分型（本报告的分析框架）</strong>：修复分两支——<strong>生成型修复</strong>（APR 学术线：从失败测试反推补丁，GenProg→学习型 AlphaRepair/CURE→LLM 型"ChatGPT 修 162/337 bugs 每 bug $0.42"，Defects4J 基准）与<strong>建议型修复</strong>（编译器诊断前向给出修复动作：rustfix/Lom/TS code fixes）。Lom 属后者，但 LLM-based APR 的兴起是 repair-native 定位的<strong>学术平行证据</strong>：世界在向"修复效率"投入，主流走"更强的补丁生成器"路线，Lom 走"为修复设计的语言与协议"路线——两条线互补且未被 APR survey 收录任何"语言级"工作（survey 分类的输入端只有代码/测试/缺陷报告）。</li>
+<li><strong>positioning 的最终口径建议</strong>：从"修复执行自动化只此一家（新兴赛道内）"再收窄为——<strong>"把 rustfix 级别的修复基建做成语言的中心定位与公开契约，并配上修复语料回归网与高温 LLM 实测——这个组合在工程与学术两个谱系中均未见先例（截至本报告检索）"</strong>。</li>
+</ol>
+</div>
+
+<h2>1. 工程谱系：传统自动修复基建</h2>
+
+<h3>1.1 Rust：rustc → rustfix → cargo fix（机制最完整的前辈）</h3>
+<ul>
+<li><strong>结构化建议</strong>：rustc 诊断的 JSON 输出携带 suggestion 子诊断——<code>span</code>（文件/行列）+ <code>suggested_replacement</code>（替换文本）+ <code>suggestion_applicability</code> 四级：<code>MachineApplicable</code>（"definitely what the user intended... should be automatically applied"）/ <code>MaybeIncorrect</code> / <code>HasPlaceholders</code> / <code>Unspecified</code>（[rustc book · JSON 输出](https://doc.rust-lang.org/rustc/json.html)、[rustc-dev-guide](https://rustc-dev-guide.rust-lang.org/diagnostics.html)）。</li>
+<li><strong>应用层</strong>：rustfix 是低层库——"you pass it the JSON output from rustc, and you can then use it to apply suggestions to in-memory strings"（[rustfix 文档](https://doc.rust-lang.org/beta/nightly-rustc/rustfix/index.html)）。</li>
+<li><strong>编排层与迭代</strong>：cargo fix 以 <code>--error-format=json</code> 跑 rustc → rustfix 应用 MachineApplicable 建议 → 重编译 → <strong>循环到不动点</strong>；<code>cargo fix --clippy</code> 应用 Clippy 机器建议、<code>--edition</code> 做 edition 迁移（[Cargo book](https://rustwiki.org/en/cargo/commands/cargo-fix.html)、[RFC 3085](https://rust-lang.github.io/rfcs/3085-edition-2021.html)）。</li>
+<li><strong>生态消费</strong>：rust-analyzer / bacon / Emacs 插件直接消费 <code>suggested_replacement</code>+span 构造 quick-fix。</li>
+</ul>
+
+<h3>1.2 TypeScript：code fixes + fix-all + ts-fix</h3>
+<ul>
+<li>语言服务在 <code>src/services/codefixes/</code> 注册 provider（<code>provideCodeFixes</code> 返回带 <code>fixName</code> 的 <code>CodeFixAction</code>）；fix-all 机制：code fix 携带 <code>fixId</code>，编辑器调 <code>getCombinedCodeFix</code> 一次算出全文件同款问题（设计提案 [#14549](https://github.com/Microsoft/TypeScript/issues/14549)）；微软官方另有 <code>ts-fix</code> CLI 批量应用（[microsoft/ts-fix](https://github.com/microsoft/ts-fix)）。</li>
+<li>ESLint <code>--fix</code>（fixer 返回文本替换）与 C# Roslyn analyzers + IDE code fixes 为同类机制，不赘。</li>
+</ul>
+
+<h2>2. 学术谱系：APR（自动程序修复）</h2>
+<ul>
+<li><strong>领域形态</strong>：APR 从失败测试/缺陷报告出发自动生成修复补丁，评测依赖缺陷基准（Defects4J 等）。三代演进：搜索/约束型（GenProg 传统）→ 学习型（AlphaRepair：cloze 式 token 级修复，[ICSE 2023](https://abhikrc.com/pdf/ICSE23.pdf)；CURE：预训练模型）→ LLM 型（"Fixing 162 out of 337 Bugs for $0.42 Each using ChatGPT"，[ISSTA 2024](https://lingming.cs.illinois.edu/publications/issta2024.pdf)；LLM-based APR 已在基准上超越传统方法——[arXiv survey 2025](https://arxiv.org/html/2506.23749v1)、[ACM CSUR 2024 learning-based survey](https://dl.acm.org/doi/10.1145/3631974)）。</li>
+<li><strong>与本报告主题的分型</strong>（本报告提出，供讨论）：生成型（APR：测试失败 → 反推候选补丁 → 测试验证，产物是"猜测的修复"）vs 建议型（rustfix/Lom/TS：编译器诊断 → 前向的结构化修复动作，产物是"编译器已知答案的建议"，如拼写/未导入/迁移）。前者解决"没人知道怎么修"，后者解决"知道怎么修但每次手写"。</li>
+<li><strong>关键观察</strong>：LLM-based APR survey 的分类学（输入=代码/测试/缺陷报告）中<strong>没有"语言级/工具契约级"工作</strong>——即"为修复而设计的语言"在学术谱系中同样缺位（截至本报告检索的 survey 覆盖面）。</li>
+</ul>
+
+<h2>3. Lom 在谱系中的坐标（诚实校准）</h2>
+
+<table>
+<tr><th>能力</th><th>rustc/cargo fix（~2018 起）</th><th>TS code fixes</th><th>Lom（v1.2.0）</th></tr>
+<tr><th>结构化建议（span+文本）</th><td>✅ JSON suggestion 子诊断</td><td>✅ CodeFixAction</td><td>✅ lom-fix/v1 动作</td></tr>
+<tr><th>置信度分级</th><td>✅ applicability <strong>四级</strong></td><td>部分（fixName 无显式分级）</td><td>✅ High/Medium/Low <strong>三级</strong>（更细粒度的四级 Rust 在先）</td></tr>
+<tr><th>迭代自动应用</th><td>✅ cargo fix <strong>fixpoint 循环</strong></td><td>✅ fix-all / ts-fix</td><td>✅ --apply 迭代（三刹车）</td></tr>
+<tr><th>修复历史留档</th><td>—（未见）</td><td>—</td><td>✅ fix-history（NDJSON）</td></tr>
+<tr><th>修复语料回归网</th><td>—（crater 是编译回归非修复语料）</td><td>—</td><td><strong>✅ fix_corpus 8 对 CI 常驻</strong></td></tr>
+<tr><th>高温 LLM 实测</th><td>—</td><td>—</td><td><strong>✅ 修复类 22 任务 ×2 模型 ×10 采样 t=1.0 全过</strong></td></tr>
+<tr><th>schema 作为语言契约</th><td>JSON 格式是工具接口（非语言规范部分）</td><td>同左</td><td><strong>✅ lom-diag/v1 + lom-fix/v1 进语言文档/评测协议</strong></td></tr>
+<tr><th>定位</th><td>工具链附属能力</td><td>工具链附属</td><td><strong>语言的存在理由（repair-native）</strong></td></tr>
+</table>
+
+<h2>4. 对 positioning 的影响（供下次更新）</h2>
+<ul>
+<li>现有 §4 判定边界声明方向正确但需再进一步：不只是"概念非首发"，而是<strong>机制三件套（建议结构/置信度/迭代应用）在 Rust 生态已完整存在多年</strong>——Lom 的宣称应落在"组合的产物形态"上：中心定位 + schema 契约 + 修复语料回归 + 高温实测，四个维度同时成立的组合未见先例（截至检索）。</li>
+<li>APR 学术线为 repair-native 提供<strong>平行论据</strong>（修复是真实且被大量投入的问题域）而非竞品（不同修复类型）；对外叙事可引"生成型 vs 建议型"分型说明 Lom 与 LLM-APR 的互补关系（Lom 的诊断码把"建议型修复"的确定性发挥到极致，为"生成型"兜住高频低难错误）。</li>
+</ul>
+
+<h2>5. 方法与局限</h2>
+<ul>
+<li>文档级调研；rustc/TS 机制来自官方文档与设计提案（一手），APR 来自 survey 与代表论文（一手）；未实测 cargo fix/ts-fix 的当前行为（机制文档足够本报告目的）。</li>
+<li>"未见先例（组合四维度）"仍是<strong>检索范围内的判定</strong>：未穷尽 scalafix/SonarLint/IntelliJ 意图动作等长尾（机制同类，按 §1.2 同类推断）；APR survey 覆盖面以两份 survey 的分类学为据。</li>
+<li>MoonBit 1.0 Q3 复核与广域样本扫描仍留全景轮。</li>
+</ul>
+
+<h2>6. 来源总目</h2>
+<ul>
+<li>Rust：[rustc book · JSON 输出](https://doc.rust-lang.org/rustc/json.html) · [rustc-dev-guide · diagnostics](https://rustc-dev-guide.rust-lang.org/diagnostics.html) · [rustfix 文档](https://doc.rust-lang.org/beta/nightly-rustc/rustfix/index.html) · [Cargo book · cargo fix](https://rustwiki.org/en/cargo/commands/cargo-fix.html) · [RFC 3085](https://rust-lang.github.io/rfcs/3085-edition-2021.html)</li>
+<li>TypeScript：[fix-all 提案 #14549](https://github.com/Microsoft/TypeScript/issues/14549) · [microsoft/ts-fix](https://github.com/microsoft/ts-fix) · [code fixes 机制（DeepWiki 索引）](https://deepwiki.com/microsoft/TypeScript/4.2-code-fixes-and-quick-fixes)</li>
+<li>APR：[LLM-based APR survey（arXiv 2025）](https://arxiv.org/html/2506.23749v1) · [Learning-based APR survey（ACM CSUR 2024）](https://dl.acm.org/doi/10.1145/3631974) · [AlphaRepair（ICSE 2023）](https://abhikrc.com/pdf/ICSE23.pdf) · [ChatGPT APR（ISSTA 2024）](https://lingming.cs.illinois.edu/publications/isesta2024.pdf)（注：原文链接为 ISSTA 2024 论文 PDF，题名 "Fixing 162 out of 337 Bugs for $0.42 Each using ChatGPT"）· [AwesomeLLM4APR](https://github.com/iSEngLab/AwesomeLLM4APR)</li>
+</ul>
+
+</body>
+</html>
