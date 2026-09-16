@@ -164,6 +164,9 @@ def main():
     # 存量腐坏位，E 类此前只盯 HANDOVER 不覆盖此处
     expect_all('README Current release', 'README.md',
                r'Current release: v([\d.]+)', [cargo_ver])
+    # Ⓒ 一页纸（2026-09-15）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
+    expect_all('positioning 版本位', 'docs/positioning.html',
+               r'截至 <strong>2026-09-15（v([\d.]+)）</strong>', [cargo_ver])
 
     # ---- F. changelog 对账（N3）----
     print('F. changelog 对账（LANGUAGE_SPEC §13）')
