@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 4 轮调研（单主题）：广域样本扫描 — agentlanguages.dev 目录 + Zero CLI 补深（2026-09-16）</title>
+<style>
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; max-width: 980px;
+         margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #1f2328;
+         background: #fff; }
+  h1 { font-size: 1.5rem; border-bottom: 3px solid #1f6feb; padding-bottom: .4rem; }
+  h2 { font-size: 1.2rem; border-bottom: 1px solid #d0d7de; padding-bottom: .25rem;
+       margin-top: 2.2rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.6rem; }
+  .meta { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 8px;
+          padding: .8rem 1.2rem; font-size: .92rem; margin: 1rem 0 1.6rem; }
+  .meta b { color: #1f6feb; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; margin: 1rem 0; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .6rem; text-align: left;
+           vertical-align: top; }
+  th { background: #f6f8fa; }
+  code { background: #f6f8fa; border-radius: 4px; padding: .1rem .35rem;
+         font-size: .88em; }
+  .tl { color: #57606a; font-size: .85rem; }
+  .flag { color: #9a6700; background: #fff8c5; border-radius: 4px;
+          padding: .05rem .4rem; font-size: .85em; }
+  .key { background: #dafbe1; border-left: 4px solid #1a7f37; padding: .6rem 1rem;
+         border-radius: 0 6px 6px 0; margin: 1rem 0; }
+  blockquote { border-left: 4px solid #d0d7de; margin: 1rem 0; padding: .2rem 1rem;
+               color: #57606a; }
+  li { margin: .3rem 0; }
+</style>
+</head>
+<body>
+
+<h1>第 4 轮调研（单主题）：广域样本扫描 — agentlanguages.dev 目录 + Zero CLI 补深</h1>
+
+<div class="meta">
+  <b>轮次</b>：第 4 轮（单主题）　<b>完成日期</b>：2026-09-16　<b>执行</b>：维护者（调研授权轮）<br>
+  <b>方式</b>：全部一手原文 fetch（目录站全文 / Zero CLI Reference 页 / BirdDisk 仓库 README /
+  AINL whitepaper）+ WebSearch 定位线索。<b>未安装任何竞品</b>（用户裁决：文档级深读）。<br>
+  <b>与上轮差异</b>：第 2/3 轮是"选定对象深读"（Zero/Vera、rustc/TS/APR）；本轮是
+  <b>广域扫描</b>——目标把"已调研样本"的边界从 2 家深读扩到目录级，并补第 2 轮未尽的
+  Zero CLI 细节。<br>
+  <b>R43 纪律</b>：所有星数/日期/引文均来自本轮打开的原文页面；目录为 2026-06-14 时点快照，
+  星数亦为该刷新日时点值。个别未能核验的归属信息在正文标注 <span class="flag">下轮复核</span>。
+</div>
+
+<h2>§0 结论摘要（先读）</h2>
+
+<div class="key">
+<ol>
+  <li><b>发现社区目录站 agentlanguages.dev：35 家"为 AI agent 写代码而设计"的语言，
+      分三营（Syntactic 表征派 / Verification 验证派 / Orchestration 编排派），目录最后更新
+      2026-06-14。</b>赛道规模远超第 1 轮估计（当时深读 2 家、广搜零散）。
+      目录提供 llms.txt / llms-full.txt 机器可读版，本身就是"为 agent 设计"的。<b>Lom 不在
+      目录中。</b></li>
+  <li><b>三营分类学对 Lom 定位是净增益</b>：三营的共同底色是"防错"（token 层防歧义 /
+      编译期防语义错 / 流程层防 agent 失控）；Lom 的 repair-native 是<b>"治错"——接受错误
+      必然发生，让修复循环（诊断→建议→应用→回归）成为语言的存在理由</b>。在 35 家的
+      <b>描述层面</b>，没有一家以修复闭环为核心卖点，但存在<b>部分元素</b>：Codong
+      （"structured JSON errors with fix/retry fields"，69★）与 X07（"quickfixes the
+      toolchain applies deterministically"，8★）。机制层无原创的结论（第 3 轮）再次被
+      强化；"四维组合未见先例"在目录描述层面仍然成立，但样本基数应如实写为
+      "35 家目录 + 2 家深读"。</li>
+  <li><b>Zero CLI 补深（第 2 轮未尽项）</b>：修复是 CLI 一级命令（<code>zero fix --plan
+      --json</code> = typed repair plan）；<code>check --json</code> 诊断含
+      <b>repair metadata</b> 字段；LSP quick-fix 已落到五个具体诊断码（TAR002/TYP009/
+      ERR002/ERR003/PUB001）；另有 <code>zero skills</code>（skill 文档与编译器版本捆绑，
+      agent 可加载）与 <code>zero tokens</code>（token 计数意识）。Zero 在"计划层"的完整度
+      比第 2 轮认知更进一步，但仍未见修复语料回归网与置信度分级（文档层面）。</li>
+  <li><b>行动启示（记录，非裁决）</b>：① Lom 符合目录收录标准（"bar is intent"），
+      提交收录属于对外发布动作——<b>冻结裁决下不做，挂账解冻后</b>；② positioning 一页纸的
+      判定边界节已按本轮样本面同步（35 家目录 + Codong/X07 部分元素如实列出）；
+      ③ Mog 的"spec 3200 tokens"口径与 Zero 的 skills 捆绑，对 Lom 的
+      SPEC_FOR_AI 尺寸意识是同源参照（记录，不动语言面）。</li>
+</ol>
+</div>
+
+<h2>§1 agentlanguages.dev：赛道目录站（本轮最大发现）</h2>
+
+<p>来源：<code>https://agentlanguages.dev/</code>（本轮 fetch 全文）。定位原文：社区维护的
+"programming languages designed for AI agents to write"目录。关键事实：</p>
+
+<ul>
+  <li><b>规模与时点</b>：35 家语言，目录页标注 <b>last updated 2026-06-14</b>（星数同为该日
+      刷新时点）——即本轮拿到的是约三个月前的快照，检索时点 2026-09-16。</li>
+  <li><b>三营分类</b>（目录自己的分类学，比我们的"三范式"更成体系）：
+      <ul>
+        <li><b>Syntactic（表征派）</b>：问题出在 token 层歧义——X07（JSON AST 替代文本）、
+            NERD（英文关键词替代运算符）、Magpie（SSA 表面语法）、Mog（spec 3200 tokens）、
+            Codong、Tacit 等；</li>
+        <li><b>Verification（验证派）</b>：目录导语原文 <i>"The model doesn't need to be
+            right. It needs to be checkable."</i>——Vera、MoonBit、NanoLang（193 条 Coq
+            定理、零公理）、Aver（Lean4/Dafny 风格）、Vow（ESBMC 模型检查）、Intent、
+            Prove（反向：明确禁 AI 训练）；</li>
+        <li><b>Orchestration（编排派）</b>：导语原文 <i>"It isn't a language problem. It's
+            an agent-coordination problem."</i>——Boruna、Fabro（1.2k+★，工作流
+            harness）、Pel（CMU）、Quasar（Penn）、Marsha（2023-07，最早的"LLM 即编译器"
+            实验之一，466★）。</li>
+      </ul></li>
+  <li><b>收录标准</b>（原文大意）："The bar is <b>intent</b>"——收录显式为 AI/agent 写作而
+      设计的语言；不收"运行时调用 LLM"的语言；"唯一创新是'works with Copilot'的不算"。
+      <b>Lom 完全符合收录标准</b>（repair-native 是显式设计意图）。</li>
+  <li><b>机器可读</b>：提供 <code>/llms.txt</code> 与 <code>/llms-full.txt</code>，另有
+      markdown 伴随版——目录本身也在为 agent 消费而设计。</li>
+  <li><b>编辑方式</b>：社区编辑、GitHub 仓库公开接受提交。<span class="flag">下轮复核</span>：
+      目录维护者与 Vera 作者的关系（本轮上下文压缩后未能从原文直接再核验，不作为事实引用）。</li>
+</ul>
+
+<h3>§1.1 头部样本速览（星数为目录页 2026-06-14 时点值）</h3>
+
+<table>
+  <tr><th>语言</th><th>星数</th><th>营</th><th>一句话（目录条目口径）</th></tr>
+  <tr><td>Zero</td><td>5k+</td><td>Syntactic</td><td>结构化 JSON 诊断 + 稳定错误码 + <b>typed repair plans</b>（本轮目录条目措辞，比第 2 轮的 "repair plan" 更精确）</td></tr>
+  <tr><td>Fabro</td><td>1.2k+</td><td>Orchestration</td><td>工作流 harness，编排营头部</td></tr>
+  <tr><td>NanoLang</td><td>602</td><td>Verification</td><td>作者 Jordan Hubbard（FreeBSD 联合创始人）；193 条 Coq 定理、零公理</td></tr>
+  <tr><td>Marsha</td><td>466</td><td>Orchestration</td><td>2023-07，"LLM 即编译器"最早实验之一</td></tr>
+  <tr><td>Vera</td><td>382</td><td>Verification</td><td>De Bruijn 槽位 + 强制契约 + Z3（第 2 轮已深读）</td></tr>
+  <tr><td>Mog</td><td>138</td><td>Syntactic</td><td>静态类型；spec 自述 <b>3200 tokens</b>——"为 LLM 写的小语言"最直白的尺寸口径</td></tr>
+  <tr><td>NERD</td><td>135</td><td>Syntactic</td><td>英文关键词替代运算符</td></tr>
+  <tr><td>Codong</td><td>69</td><td>Syntactic</td><td><b>"structured JSON errors with fix/retry fields"</b>——目录中修复元素最显式的非 Zero 语言</td></tr>
+  <tr><td>Sever</td><td>68</td><td>Verification</td><td>思想实验（目录标注）</td></tr>
+  <tr><td>Magpie</td><td>52</td><td>Syntactic</td><td>SSA 表面语法</td></tr>
+  <tr><td>Aver</td><td>49</td><td>Verification</td><td>Lean4/Dafny 风格验证</td></tr>
+  <tr><td>X07</td><td>8</td><td>Syntactic</td><td><b>"diagnostics ship as stable JSON with quickfixes the toolchain applies deterministically"</b>（Jason Hall 实验）</td></tr>
+  <tr><td>B-IR / Loom</td><td>0 / 0</td><td>—</td><td>Jason Hall（Go 团队）的思想实验三连，B-IR 条目提到 pre/postconditions 与 <b>stable error codes</b>——"Loom"与本项目仅同名，无关联</td></tr>
+</table>
+
+<p class="tl">其余条目（AILANG 32★、Tacit、Prove、Intent、Vow、Boruna、Pel、Quasar 等）已入档
+本轮 fetch 原文；深读优先级低（星数小或营别与 Lom 远）。Valea（2026-03、Rust MVP、JSON 诊断）
+经 WebSearch 定位但<b>未在本轮目录原文中逐条核对</b><span class="flag">下轮复核</span>。</p>
+
+<h2>§2 三营分类学与 Lom 的位置：防错三营，治错第四维</h2>
+
+<p>目录三营的共同底色是<b>防错</b>：表征派防 token 歧义、验证派防语义错误、编排派防 agent
+流程失控——全部押注"让错误不发生"。Lom 押的是另一面：<b>错误必然发生，让修复便宜</b>
+（诊断→结构化建议→迭代应用→修复语料回归）。这个"治错"维度在 35 家的描述层面没有
+对应条目。</p>
+
+<p>但必须如实记录<b>部分元素</b>（描述层面，未读源码）：</p>
+
+<ul>
+  <li><b>Codong</b>：错误 JSON 带 <code>fix/retry</code> 字段——"建议型修复"的字段级实现；</li>
+  <li><b>X07</b>：quickfix 由工具链<b>确定性应用</b>——Lom "迭代应用到不动点"的最小形态；</li>
+  <li><b>Zero</b>：typed repair plans + repair metadata + LSP quick-fix 五码（§4）——计划层
+      完整度最高的同行。</li>
+</ul>
+
+<p>结论（承接第 3 轮口径并扩样本）：Lom 的<b>机制层无原创</b>（rustc/cargo fix 早已有之，
+目录里 Codong/X07 又添两个小型例证）；<b>差异化仍在四维组合</b>——修复闭环作为语言存在
+理由 + schema 作为语言契约 + fix_corpus 修复语料回归网 + 高温 LLM 实测口径——该组合在
+35 家目录描述层面仍未见完整对应。样本边界从"2 家深读"扩到"35 家目录 + 2 家深读 +
+Zero CLI 一手补深"。</p>
+
+<h2>§3 广域样本归位：BirdDisk 与 AINL（本轮早期一手 fetch）</h2>
+
+<ul>
+  <li><b>BirdDisk</b>（<code>github.com/Jawbreaker1/bird_disk_code</code>，3★/78 commits，
+      个人 POC）：<b>不在目录中</b>，但其设计支柱与 Lom 高度重合——结构化 JSON 诊断 +
+      fix-its、三后端（VM/WASM/native）差分测试作<b>默认</b>测试、require-tests 门禁、
+      确定性输出格式化，并有"LLM 全程生成 Yahtzee"自证实验。定性：独立收敛到同款支柱的
+      小样本，反证该设计方向的自然性；工程量与证据链与 Lom 不可比。</li>
+  <li><b>AINL</b>（whitepaper 一手）：graph-first 工作流编排编译系统（"Canonical IR =
+      nodes/edges; everything else is serialization"）。相邻赛道（编排营外围），非直接
+      竞品；但其 bounded repair loops + 结构化诊断（lineno/span/kind/suggested fixes）与
+      Lom 修复理念同款，属编排营向修复理念的渗透信号。</li>
+  <li><b>观点领袖信号</b>（WebSearch 线索，未深读<span class="flag">下轮可选</span>）：
+      Armin Ronacher "A Language For Agents"博文（2026-02）；"use boring languages with
+      LLMs"反方讨论并存——赛道热度的两面。</li>
+</ul>
+
+<h2>§4 Zero CLI 补深（第 2 轮未尽项，本轮一手原文）</h2>
+
+<p>来源：<code>https://zerolang.ai/cli</code>（本轮 fetch）。第 2 轮已确认
+<code>fix --plan</code> 计划层同构；本轮增量细节：</p>
+
+<ul>
+  <li><b>修复是一级命令</b>：<code>zero fix --plan --json &lt;input&gt;</code>——"Ask for a
+      typed repair plan"。修复与 check/fmt/test 平级，不是附属模式。</li>
+  <li><b>诊断 JSON 含修复元数据</b>：<code>zero check --json</code> 的诊断字段包括 code、
+      span、expected/actual 细节、help、<b>repair metadata</b>、targetReadiness。</li>
+  <li><b>LSP quick-fix 已落到具体诊断码</b>：文档 LSP smoke 节展示 quick-fix code actions
+      surfaced from <code>zero fix</code>，覆盖 <code>TAR002 / TYP009 / ERR002 / ERR003 /
+      PUB001</code> 五码——即"编辑器内一键应用修复"在 Zero 已是文档化承诺。</li>
+  <li><b><code>zero skills</code></b>：与编译器版本捆绑的 skill 文档，agent 按工作流加载
+      ——与 Lom 的 SPEC_FOR_AI 思路同源，但 Zero 做到"版本化捆绑 + CLI 分发"。</li>
+  <li><b><code>zero tokens</code></b>：token 计数意识进入 CLI（与 Mog 的 3200-token spec
+      口径同源）。</li>
+  <li><b>xfail 机制</b>：测试框架支持 expected failures 标注——工程口径与 Lom 差分纪律
+      相邻（Lom 用 §11f 已知分歧白名单 + 探针守护，方向不同）。</li>
+</ul>
+
+<p><b>对比结论</b>：Zero 在计划层（typed repair plan、repair metadata、LSP quick-fix）完整度
+高于此前认知；文档层面仍未见 Lom 的三件东西——修复<b>执行</b>闭环（迭代应用到不动点的
+默认工作流）、<b>fix_corpus 修复语料回归网</b>（历史修复案例作为回归资产）、<b>置信度
+分级</b>。第 2 轮"Zero 计划层同构、Lom 独有执行层与语料层"的结论维持，且论据更实。</p>
+
+<h2>§5 对 Lom 的行动启示（记录，非裁决）</h2>
+
+<ol>
+  <li><b>提交收录 agentlanguages.dev</b>：Lom 符合收录标准（intent 显式）。提交目录 PR =
+      对外发布性质动作，<b>发布线冻结裁决下不做</b>；已记入 HANDOVER §1 ⑤ 北极星线
+      （解冻后动作）。</li>
+  <li><b>positioning 一页纸同步</b>：判定边界节的样本面与部分元素例证已按本轮更新
+      （见 docs/positioning.html §4）。</li>
+  <li><b>SPEC_FOR_AI 尺寸意识</b>（记录，不动语言面）：Mog spec 3200 tokens、Zero
+      skills 版本化捆绑——Lom 的 SPEC_FOR_AI 可在未来考虑标注 token 尺寸口径与版本化
+      分发方式。属文档工程，非语言面变更。</li>
+  <li><b>样本维护策略</b>：目录是 2026-06-14 快照——全景轮复查时应连同目录一起刷新
+      （llms-full.txt 一次拉全量），比逐家搜索便宜。</li>
+</ol>
+
+<h2>§6 方法与局限</h2>
+
+<ul>
+  <li>目录为 2026-06-14 时点快照（检索时点 2026-09-16）：35 家为该日数，星数同；三个月内
+      的新语言（如有）不在其中。</li>
+  <li>Codong / X07 / B-IR 的描述来自目录条目原文，<b>未读其源码与文档</b>——"部分元素"
+      的判断停在描述层。若未来 positioning 需要更强论断，需单开一轮深读。</li>
+  <li>目录维护者归属、Valea 是否在目录、Ronacher 博文内容——三处标注<span class="flag">下轮
+      复核</span>，本轮不作为事实引用。</li>
+  <li>Zero CLI 页为文档口径（无实机验证，用户裁决不安装）；"未见修复语料回归网/置信度
+      分级"限于已读文档页面，非对其全部生态的断言。</li>
+</ul>
+
+<h2>§7 来源总目（本轮全部一手）</h2>
+
+<ol class="tl">
+  <li>agentlanguages.dev 目录全文（fetch，2026-09-16；目录自标 last updated 2026-06-14）</li>
+  <li>zerolang.ai/cli — Zero CLI Reference（fetch，2026-09-16）</li>
+  <li>github.com/Jawbreaker1/bird_disk_code — BirdDisk README（fetch，2026-09-15/16）</li>
+  <li>AINL whitepaper（fetch，2026-09-15/16）</li>
+  <li>WebSearch：Mog / Valea / agentlanguages / Ronacher 博文定位线索（仅定位，未深读）</li>
+</ol>
+
+<p class="tl">归档：docs/archive/research-2026-09-16-broad-scan.html · 第 4 轮 · 认知以本目录
+最新一轮为准。</p>
+
+</body>
+</html>

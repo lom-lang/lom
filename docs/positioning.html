@@ -28,7 +28,7 @@
 <div class="meta">
 <strong>性质</strong>：对外定位材料（发布解冻时的弹药库——当前 Lom <strong>未发布</strong>，语言面 v1.0 冻结中）。
 <strong>数字口径</strong>：截至 <strong>2026-09-15（v1.2.0）</strong> 的时点快照，全部可溯源到本仓库（README / LANGUAGE_SPEC §12-13 / docs/TODO.md / docs/archive/ 调研档）；现值数字以仓库为准。
-<strong>竞品事实来源</strong>：docs/archive/ 第 1-2 轮调研（research-2026-09-15*.html，全一手原文核对）。
+<strong>竞品事实来源</strong>：docs/archive/ 第 1-4 轮调研（research-2026-09-1*.html，全一手原文核对；第 4 轮含 agentlanguages.dev 目录 35 家广域扫描，2026-09-16）。
 </div>
 
 <p class="lede">一句话：在"为 AI agent 造编程语言"的赛道上，诊断计划层正在成为行业标配——<strong>修复的执行自动化与文本源码主权，是 Lom 独有且未被占据的定位</strong>。</p>
@@ -58,14 +58,14 @@
 <li><strong>双后端语义对齐</strong>：树遍历解释器 + 手写零依赖 WASM 后端，<span class="num">10000</span> 个随机生成程序/项目实例 stdout+退出码<strong>逐字一致</strong>（差分测试四期，含递归 enum、三包依赖链、file/env 深形态）；已知分歧全部文档化（§11f 八条）并有探针守护白名单不腐坏。</li>
 <li><strong>自举自证</strong>：用 Lom 写的 <span class="num">5703</span> 行解释器（lexer/parser/checker/evaluator/json）三层自证——WASM 载体上的自举解释器解析自身源码，dump 与宿主原生<strong>逐字一致</strong>。</li>
 <li><strong>LLM 实测</strong>：<span class="num">119</span> 任务评测集，4 模型单采样 + 2 模型 × 10 采样 pass@k：<strong>pass@1 = pass@5 = pass@10 = 99.1%</strong>（无偏估计）；唯一系统性失败是刻意的 prompt 歧义锚点题。</li>
-<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；<strong>七轮独立对抗性审查</strong>（R1-R45 整改全关闭）；宣称数字由 CI 机器对账（doc_audit <span class="num">61</span> 项 + claims.json 分项回加）。</li>
+<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；<strong>七轮独立对抗性审查</strong>（R1-R45 整改全关闭）；宣称数字由 CI 机器对账（doc_audit <span class="num">62</span> 项 + claims.json 分项回加）。</li>
 <li><strong>供应链</strong>：Rust 实现<strong>零第三方依赖、零 unsafe</strong>——JSON/JSON-RPC/时间戳全部手写，工具链本身 LLM 可读可修。</li>
 </ul>
 
 <h2>4. 判定边界（本页宣称的适用范围——必读）</h2>
 <ul>
-<li><strong>"只此一家"= 在已调研样本中</strong>：截至本页时点，深读竞品仅 Zero 与 Vera 两家（docs/archive/ 第 2 轮，一手原文）+ 第 1 轮的浅读扫描——赛道实际有 30+ agentic 框架与工具，未逐一排查。宣称的准确含义是"**在新兴 agent-native 语言的头部两家里，修复执行闭环完成度领先**"，非世界范围的概念独占。</li>
-<li><strong>机制层无原创</strong>（第 3 轮调研结论）：结构化建议（span+替换文本）、置信度分级（rustc 的 applicability <strong>四级</strong> vs Lom 三级）、迭代自动应用到不动点（cargo fix 的 fixpoint 循环）——<strong>机制三件套在 Rust 生态已完整存在多年</strong>；ESLint <code>--fix</code>/TS code fixes/Roslyn 为同类。Lom 的真实差异是<strong>四维组合</strong>：把修复闭环作为语言的存在理由（repair-native，非工具链附属）+ lom-diag/lom-fix schema 作为语言契约 + fix_corpus 修复语料回归网 + 高温 LLM 实测口径——该组合截至第 3 轮检索未见先例（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录；详见 docs/archive/ 第 3 轮调研）。</li>
+<li><strong>"只此一家"= 在已调研样本中</strong>：深读竞品 Zero 与 Vera 两家（docs/archive/ 第 2 轮，一手原文）+ 第 4 轮发现的社区目录 agentlanguages.dev（35 家"为 AI agent 写"的语言，2026-06-14 时点快照，描述层面全量扫描）——目录三营（表征/验证/编排）的共同底色是"防错"，以修复闭环为核心卖点的条目为零；Codong（"fix/retry fields"）与 X07（"quickfixes … deterministically"）有修复部分元素（描述层）。宣称的准确含义是"**在已扫描的新兴 agent-native 语言样本（2 家深读 + 35 家目录）里，修复执行闭环完成度领先**"，非世界范围的概念独占。</li>
+<li><strong>机制层无原创</strong>（第 3 轮调研结论）：结构化建议（span+替换文本）、置信度分级（rustc 的 applicability <strong>四级</strong> vs Lom 三级）、迭代自动应用到不动点（cargo fix 的 fixpoint 循环）——<strong>机制三件套在 Rust 生态已完整存在多年</strong>；ESLint <code>--fix</code>/TS code fixes/Roslyn 为同类。Lom 的真实差异是<strong>四维组合</strong>：把修复闭环作为语言的存在理由（repair-native，非工具链附属）+ lom-diag/lom-fix schema 作为语言契约 + fix_corpus 修复语料回归网 + 高温 LLM 实测口径——该组合截至第 4 轮检索（rustc/TS 生态 + 35 家 agent 语言目录描述层面）未见先例；目录内 Codong/X07 具备修复机制的部分元素，为该判断再添两个机制层例证（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录；详见 docs/archive/ 第 3/4 轮调研）。</li>
 <li><strong>"独有"的最终检验在发布后的外部反应</strong>：Lom 当前未发布，七轮独立审查均为内部委托（对抗深度真实、外部独立性相对）。</li>
 </ul>
 
@@ -79,7 +79,7 @@
 <h2>6. 当前状态（如实）</h2>
 <ul>
 <li>v1.2.0（checker capability：NAM005 未导入内建静态预警）；<strong>未发布</strong>——按用户裁决"优化到完美前不发布"，语言面冻结、发布线冻结。</li>
-<li>本页不是营销材料：所有竞品描述来自其官方一手文档（见 docs/archive/ 第 2 轮调研的逐字引文），所有自家数字可由本仓库 CI 复验。</li>
+<li>本页不是营销材料：所有竞品描述来自其官方一手文档（见 docs/archive/ 第 2 轮逐字引文与第 4 轮目录条目），所有自家数字可由本仓库 CI 复验。</li>
 </ul>
 
 </body>
