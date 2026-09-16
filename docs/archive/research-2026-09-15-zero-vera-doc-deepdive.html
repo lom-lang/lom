@@ -52,7 +52,7 @@
 <ul>
 <li>官方定位："an experimental <strong>graph-native</strong> programming language where the semantic graph is the program database"（[GitHub](https://github.com/vercel-labs/zerolang)）——<strong>程序本体是语义图数据库，文本（<code>.0</code> 投影文件）只是 source map 式的可读投影</strong>："That does not mean the agent should edit that file."，人工编辑被限定为 "rare manual edits"。</li>
 <li>编辑单位是图补丁：<code>zero patch --expect-graph-hash graph:... --op 'set node="#expr_..." field="value" expect="..." value="..."'</code>——由 graph hash 与期望值双重守卫，"Stale or invalid edits fail before they touch the store"。</li>
-<li>工具链：init/patch/run/query/status/explain，双轨（图数据库 + 投影），编译产物 sub-10KiB 原生二进制；主页标注 <strong>Experimental、5.4k stars、"Expect breaking changes... not against production systems"</strong>。</li>
+<li>工具链：init/patch/run/query/status/explain，双轨（图数据库 + 投影），编译产物 sub-10KiB 原生二进制（注：该数字出自媒体与目录侧——MarkTechPost 2026-05 报道、agentlanguages.dev 目录条目 "sub-10 KiB native binaries"；官方文档仅写 "Small, dependency-free artifacts"——八审 P3-4 出处校准）；主页标注 <strong>Experimental、5.4k stars、"Expect breaking changes... not against production systems"</strong>。</li>
 </ul>
 
 <h3>1.2 诊断与修复（对标核心）</h3>

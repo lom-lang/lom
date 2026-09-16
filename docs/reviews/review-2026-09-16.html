@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 独立审查报告 — 2026-09-16（第八轮，基线 554a3b1 / v1.2.0）</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --bg:#fafafa; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --code:#f4f4f4; }
+  * { box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; line-height:1.75; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 28px 80px; }
+  h1 { font-size:1.7em; border-bottom:3px solid var(--ink); padding-bottom:12px; }
+  h2 { font-size:1.3em; margin-top:2.2em; border-left:5px solid var(--ink); padding-left:10px; }
+  h3 { font-size:1.08em; margin-top:1.6em; }
+  code, pre { font-family:Consolas,"Cascadia Mono",monospace; }
+  code { background:var(--code); padding:1px 5px; border-radius:3px; font-size:.92em; }
+  pre { background:#11151a; color:#d7dde4; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.86em; line-height:1.55; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; font-size:.92em; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .bad { color:var(--bad); font-weight:bold; }
+  .warn { color:var(--warn); font-weight:bold; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.82em; font-weight:bold; color:#fff; }
+  .p0 { background:#dc2626; } .p1 { background:#ea580c; } .p2 { background:#d97706; } .p3 { background:#6b7280; }
+  .grade { font-size:3em; font-weight:bold; color:var(--warn); border:3px solid var(--warn); border-radius:12px; padding:6px 26px; display:inline-block; margin:8px 0; background:#fff; }
+  .meta { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 20px; margin:18px 0; }
+  .note { background:#fffbe6; border:1px solid #f0d896; border-radius:8px; padding:10px 16px; margin:12px 0; }
+  .small { color:var(--muted); font-size:.88em; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Lom 独立审查报告（2026-09-16，第八轮总序）</h1>
+<div class="meta">
+<p><strong>审查对象</strong>：<code>D:\project\PROJECTS\ai-native-language</code> — Lom（LLM-repair-native 编程语言）：Rust 树遍历解释器 + 手写零依赖 WASM 后端 + 自举解释器，v1.2.0 未发布、语言面 v1.0 冻结中</p>
+<p><strong>审查基线 commit</strong>：<code>554a3b1</code>（"docs(research): 第 4 轮调研——广域样本扫描"，2026-09-16；开审时 <code>git status</code> 干净）。版本 <code>v1.2.0</code>（Cargo.toml = 1.2.0，README Current release = v1.2.0，positioning 版本位 = v1.2.0 三处一致）</p>
+<p><strong>审查范围</strong>：八审增量 <code>e003bab..554a3b1</code>（即 42c9160 七审收官之后）共 7 个提交、8 个文件、+566/-9 行——<strong>全部为 docs + 工具增量，无任何 Rust 源码改动</strong>：① e003bab 第 2 轮调研（Zero/Vera 文档级深读）；② 844fc8c doc_audit E 类新增 positioning 版本位（61→62 项）；③ 3df5d09 Ⓒ 差异化一页纸 positioning.html；④ 13fc896 判定边界声明补丁；⑤ aa03aae 第 3 轮调研（修复基建全景）；⑥ 554a3b1 第 4 轮调研（agentlanguages.dev 广域扫描 + Zero CLI 补深）+ HANDOVER ⑤ 挂账 + positioning 同步。上轮报告（review-2026-09-15-2.html，总评 A-，基线 847ba17）已覆盖内容不重复，R39-R45 整改保持纳入核对</p>
+<p><strong>审查方式</strong>：只读审查 + 实际执行 cargo test（release，CI 同口径）/ python tools/doc_audit.py / python tools/diff_test.py --probe（独占运行，未与任何其他 diff_test 并行）/ eval manifest 与 fix_corpus 机械清点 / self_interp 行数清点 / 7 提交逐个 git show 改动面对账 / positioning.html 全部数字与论断逐条对照仓库实测与调研报告原文 / <strong>三轮调研报告关键事实联网打开来源原文逐字复核（约 45 个外部事实点：agentlanguages.dev 全文、zerolang.ai 四页、GitHub 三个仓库 README、rustc/rustfix/cargo 官方文档、TypeScript 提案与 API、ISSTA 2024 论文）</strong>，双抓取工具交叉、以原文全文为准。除本报告文件外未修改任何项目文件；未执行任何 git commit/push/tag</p>
+<p><strong>环境</strong>：Windows 10（win32 10.0.26200 x64）/ Git Bash / cargo（release 测试 1.72s）/ Python 3.13</p>
+</div>
+
+<h2>1. 总评</h2>
+<p><span class="grade">A-</span></p>
+<p><strong>结论</strong>：八审增量的<strong>主体质量高且方向正确</strong>。三轮调研报告（第 2/3/4 轮）经对抗性原文复核，<strong>约 45 个外部事实点中 41 个逐字精确、无一数字编造</strong>——包括极易出错的小数字（Codong 69★、Sever 68★、Aver 49★、NanoLang 602★、Mog "Full spec fits in 3,200 tokens"）与长引文（agentlanguages.dev 两营导语、Zero CLI "Ask for a typed repair plan"、五码 TAR002/TYP009/ERR002/ERR003/PUB001、Vera "six of the nine write 100% correct Vera"、rustc applicability 四级描述）全部与当前原文一致——R43 调研纪律整改（七审开立）<strong>真实落地且执行质量显著</strong>，这是七轮以来调研工作首次经独立原文复核近乎全绿。第 4 轮报告的"下轮复核"三个未确认项（目录维护者归属/Valea/Ronacher 博文）确实未被当作事实引用，报告内部自洽。工具侧：doc_audit E 类新增 positioning 版本位（正则失配即 FAIL 的强互锁，实测 62/62）、TODO Ⓒ 翻牌、HANDOVER ⑤ 挂账、archive README 四轮索引——簿记链除一处（见 P3-1 的 36 分钟自愈史）全部到位。硬指标全绿：cargo test --release 482/482（CI 同口径）、doc_audit 62/62、探针 6/6、fix_corpus 8 对、eval 119 任务/error_repair 22、POOL_BASE 101、§11f 8 条、self_interp 5703 行。</p>
+<p><strong>未上 A 的原因</strong>：三连 A- 的病灶"收官簿记（宣称数字与实测/文档不同步）"<strong>第四次复发，且首次进入对外材料的核心证据链、首次达到 P1 级</strong>——positioning.html §3 证据链第一条："22 个 error_repair 评测任务（含 warning 级修复题），双模型 × 10 采样 temperature=1.0 下 20/20 全过"。实测：pass@k 复测（2026-09-07）覆盖的 error_repair 分类是<strong>20 任务</strong>（原报告原文："error_repair 分类 20 任务双模型 20 采样全过（200/200）"）；任务 119（Q4 加入）与 120（B 包加入）——恰恰是"warning 级修复题"——<strong>从未参与任何 LLM 采样实测</strong>（两者验收均为"参考解双后端实跑定稿"）。"22 任务实测全过"的宣称含义超出证据覆盖面，且该页自定位为"发布解冻时的对外弹药库"，外部读者可证伪。§3 第四条（"119 任务评测集……99.1%"）为同族 P2：单采样是 113 集、pass@k 是 116 集、评测集现值 119——三个时点拧成一句，README.md:68 原本的分写时点口径（"as it stood then"/"116-task set"）在压缩成一页纸时丢失。E 类新监控位盯住了版本号，却盯不住"实测覆盖面"类宣称——收官簿记的盲区从"数字陈旧"演变为"覆盖面拼接"。</p>
+<p><strong>与上轮的对比</strong>：第七轮 5×P2（全部陈旧数字/漏改位）给 A-；本轮 1×P1 + 1×P2 + 7×P3。P1 的出现按判例（第二轮 1×P1+6×P2+6×P3 给 A-）仍在 A- 档内，且本轮 P1 是文档宣称拼接而非工程行为缺陷、调研实质经复核几乎全绿——不足以降到 B+；但相比七审，<strong>病灶复发位置从内部台账升级到对外一页纸的招牌证据链</strong>，"文档纪律差一口气"的账单在变贵。按短板计，<strong>A-</strong>（四连）。审查轨迹 B+ → A- → A → A → A- → A- → A- → <strong>A-</strong>。</p>
+
+<h2>2. 硬指标矩阵（可机械验证的量化宣称 vs 实测）</h2>
+<table>
+<tr><th>#</th><th>宣称（出处）</th><th>实测结果</th><th>判定</th></tr>
+<tr><td>1</td><td>cargo test 全量通过（HANDOVER §2.2：期望 482/482）</td><td><code>cargo test --release</code>（CI 同口径）：482 passed / 0 failed（增量无 Rust 源码改动，477+NAM005×5=482 链自洽；debug 模式首跑因本机沙箱线程限制异常，见 §6）</td><td class="ok">✓</td></tr>
+<tr><td>2</td><td>doc_audit 62 项全绿（HANDOVER §2.2 / positioning §3）</td><td><code>python tools/doc_audit.py</code>：RESULT: PASS（62/62 项通过），含 Z 自指项"HANDOVER 宣称 62 vs 本脚本总项数 62"</td><td class="ok">✓</td></tr>
+<tr><td>3</td><td>positioning 版本位 = v1.2.0（E 类新位，844fc8c）</td><td>positioning.html L30 "截至 2026-09-15（v1.2.0）" = Cargo.toml 1.2.0；正则 <code>r'截至 &lt;strong&gt;2026-09-15（v([\d.]+)）&lt;/strong&gt;'</code> 命中 1 处且 == cargo_ver；expect_all 失配即 FAIL（doc_audit.py L66-69），升版/改措辞/滞留任一情形都会红——互锁强</td><td class="ok">✓</td></tr>
+<tr><td>4</td><td>README Current release = v1.2.0（R42 整改位）</td><td>README.md:8 "Current release: v1.2.0 (2026-09-15)"，E 类监控在位</td><td class="ok">✓</td></tr>
+<tr><td>5</td><td>fix_corpus 8 对 / 16 文件（positioning §3 / claims）</td><td><code>ls eval/fix_corpus/</code>：16 文件（01-08 各 .bad+.fixed）</td><td class="ok">✓</td></tr>
+<tr><td>6</td><td>eval 评测集 119 任务、error_repair 22（manifest / positioning）</td><td>manifest.json total_tasks=119；10_error_repair.json 逐条清点 22 条（086-100、109-113、119、120）</td><td class="ok">✓</td></tr>
+<tr><td>7</td><td>模板池 POOL_BASE = 101 族</td><td>doc_audit I 类输出：POOL_BASE = 101 族</td><td class="ok">✓</td></tr>
+<tr><td>8</td><td>§11f 已知分歧 8 条 + 探针 6</td><td>doc_audit I 类：§11f = 8 条；<code>python tools/diff_test.py --probe</code> 独占运行：probe 6/6 验证通过 RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>9</td><td>self_interp.lom 5703 行</td><td><code>wc -l examples/selfhost/self_interp.lom</code> = 5703</td><td class="ok">✓</td></tr>
+<tr><td>10</td><td>差分四期累计 10000（claims 链）</td><td>doc_audit H 类：diff-total-d1234 sum(parts)=10000（4400+5600）闭合，TODO/HANDOVER/guide 三出现点同步</td><td class="ok">✓</td></tr>
+<tr><td>11</td><td>零第三方依赖、零 unsafe（positioning §3）</td><td>Cargo.toml [dependencies] 节空（仅注释）；<code>grep -rn "unsafe" src/*.rs</code> 零命中</td><td class="ok">✓</td></tr>
+<tr><td>12</td><td>七轮审查 R1-R45 全关闭（positioning §3）</td><td>docs/reviews/ 八份报告在位；42c9160 七审收官档案在 HEAD~7；TODO R39-R45 区全翻牌</td><td class="ok">✓</td></tr>
+<tr><td>13</td><td>0x0C 清零（aa03aae 提交宣称）</td><td>七个新增/改动文档（positioning/三份调研/archive README/HANDOVER/TODO）逐个 <code>grep -c $'\x0c'</code> 全为 0</td><td class="ok">✓</td></tr>
+<tr><td>14</td><td>7 提交改动面与提交信息宣称一致</td><td>逐个 <code>git show --stat</code>：e003bab（2 文件）/844fc8c（doc_audit.py +3）/3df5d09（3 文件）/13fc896（positioning +9-2）/aa03aae（3 文件）/554a3b1（4 文件）——与各自提交信息列举的改动面全部对上；全增量无 src/ 改动与"docs+工具增量"宣称一致</td><td class="ok">✓</td></tr>
+<tr><td>15</td><td>TODO Ⓒ 翻牌（3df5d09 宣称）</td><td>TODO.md 头部"三项全部收官（2026-09-15）——Ⓐ…→Ⓑ…→Ⓒ 差异化一页纸"在位</td><td class="ok">✓</td></tr>
+<tr><td>16</td><td>HANDOVER §1 ⑤ 挂账（554a3b1 宣称）</td><td>HANDOVER.md L61"下一步"行内新增"第 4 轮调研新增解冻后动作：提交 Lom 收录 agentlanguages.dev 社区目录"；与 L62 遗留挂账行无冲突、无重复</td><td class="ok">✓</td></tr>
+<tr><td>17</td><td>archive README 第 1-4 轮索引</td><td>四行齐备；逐行对照各报告内容：一句话结论均如实概括（第 2 轮"修正第 1 轮/执行层独有/三范式/6 of 9"、第 3 轮"机制三件套已在/四维组合/APR 分型"、第 4 轮"35 家三营/Codong-X07/Zero 计划层再进/Lom 不在目录"）</td><td class="ok">✓</td></tr>
+<tr><td>18</td><td>HANDOVER §8 文档导航含 positioning（3df5d09 宣称）</td><td>HANDOVER.md L306：docs/positioning.html 条目（时点快照口径+E 类钉住说明）在位</td><td class="ok">✓</td></tr>
+<tr><td>19</td><td>"22 个 error_repair 任务双模型×10 采样 20/20 全过"（positioning §3 第一条）</td><td><strong>不成立</strong>：pass@k 报告原文 = "error_repair 分类 <strong>20</strong> 任务双模型 20 采样全过（200/200）"（116 任务集，2026-09-07）；任务 119/120（含全部 warning 级修复题）加入于实测之后，无任何 LLM 采样记录</td><td class="bad">✗ P1</td></tr>
+<tr><td>20</td><td>"119 任务评测集……pass@1 = pass@5 = pass@10 = 99.1%"（positioning §3 第四条）</td><td><strong>拼接失真</strong>：99.1% 是 116 任务集（09-07）双模型数字；单采样四模型是 113 集（08-31）；119 集从未整体 LLM 实测。README.md:68 原口径分写带时点，positioning 丢失限定</td><td class="warn">△ P2</td></tr>
+<tr><td>21</td><td>"doc_audit 62 项"（positioning §3 第五条，554a3b1 修正后）</td><td>现值正确（62）；但 3df5d09 初版写 61（当时已 62），554a3b1 在 36 分钟后自愈——HEAD 一致，按修正后口径通过</td><td class="ok">✓（附注）</td></tr>
+</table>
+<p class="small">矩阵 21 项：19 ✓ / 1 △ / 1 ✗。第 21 项按 HEAD 现值通过但保留附注（引入时点曾错，见 §3 P3-1）。</p>
+
+<h2>3. 发现清单</h2>
+
+<h3>P1-1 positioning.html §3 证据链第一条："22 个任务（含 warning 级修复题）双模型×10 采样 20/20 全过"——实测覆盖面只有 20 任务，warning 级修复题从未被采样实测</h3>
+<p><strong>证据链</strong>：</p>
+<ul>
+<li>positioning.html L57（3df5d09 引入，13fc896/aa03aae/554a3b1 三次修补均未触及）："修复闭环实测：<strong>22 个 error_repair 评测任务（含 warning 级修复题）</strong>，双模型 × 10 采样 temperature=1.0 下 <strong>20/20 全过</strong>——repair-native 闭环在高温下依然有效。"</li>
+<li>实测记录原文（eval/REPORT-2026-09-07-passk.md L36 与 L84）："error_repair (20) | 100 / 100 / 100"、"error_repair 分类 <strong>20 任务</strong>双模型 20 采样全过（<strong>200/200</strong>）"——pass@k 复测基于 116 任务集（2026-09-07）。</li>
+<li>当前 error_repair 22 任务 = 086-100（15）+ 109-113（5）+ <strong>119</strong>（git 2cd44ce，Q4，2026-09-08 加入——pass@k 之后一天）+ <strong>120</strong>（git 695b509，B 包，2026-09-15 加入）。</li>
+<li>任务 119 验收（TODO.md Q4 证据区）："内嵌诊断 JSON 来自真实 --check --json 输出"、"run.ps1 双后端 118/118（新任务<strong>参考解实跑</strong>定稿）"——无 LLM 采样。任务 120 验收（TODO.md B 包证据区）："任务 120 <strong>参考解双后端实跑</strong>定稿"——无 LLM 采样。</li>
+<li>两个任务恰是 error_repair 类目仅有的 warning 级修复题（119=MUT001 不可变重赋值、120=NAM005 未导入内建）——括号"（含 warning 级修复题）"把它们明确挂进了"双模型 × 10 采样……全过"的宣称范围。</li>
+</ul>
+<p><strong>定性</strong>："22"（现值任务数）与"20/20"（09-07 时点 20 任务实测缩写）各自有出处，拼接后宣称含义（22 任务全部经双模型×10 采样实测全过）<strong>超出证据覆盖面</strong>——R39"时点值当现值写"同族第四次复发（R22 2600 算术 → R39 151 保持 → 61→62 三十六分钟自愈 → 本条），且首次出现在对外定位材料的核心证据链第一条。原报告语境的"20/20"本就歧义（"20 任务全过"与"20 采样全过"双关——Q4 证据区自己记录过 README:33 的 Phase 1 时代 "20/20" 陈旧计数前科），转写进一页纸后失真放大。<strong>修复建议</strong>（供裁决，非本审查执行）：改写为"20 个 error_repair 任务（2026-09-07 pass@k 时点集）双模型×10 采样全过（200/200）；后续新增的 2 个 warning 级修复题（119/120）经参考解双后端实跑定稿、LLM 采样实测待补"，或对 119/120 补跑一次双模型×10 采样让宣称成立。</p>
+
+<h3>P2-1 positioning.html §3 第四条："119 任务评测集，4 模型单采样 + 2 模型 × 10 采样 pass@k：99.1%"——三个时点的数字拧成一句</h3>
+<p>单采样四模型 = 113 任务集（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）；pass@k = 116 任务集（2026-09-07）；"119 任务评测集" = 现值。99.1%（=115/116 无偏）不是 119 任务集的实测值——119 集从未整体跑过 LLM 实测。meta 块的"截至 2026-09-15 时点快照"豁免不适用：即便在 09-15 时点该句也不成立。对照：README.md:68 的口径是分写且各带时点（"full 113-task set <em>as it stood then</em>"、"on the 116-task set"），HANDOVER L50 亦然——一页纸压缩时丢失限定。证据定位：positioning.html L60 vs README.md:68 vs eval/REPORT-2026-09-07-passk.md。</p>
+
+<h3>P3 清单（7 条）</h3>
+<ul>
+<li><strong>P3-1</strong> <strong>doc_audit 61→62 的 36 分钟窗口</strong>：3df5d09（14:36）positioning 初版写 "doc_audit <strong>61</strong> 项"，而 844fc8c（同分钟、DAG 父级）已把 doc_audit 升到 62——提交序内即已过时，554a3b1（15:12）自愈并在提交信息自认"R39 同族时点值"。HEAD 正确故不列为活体发现，但这是收官簿记病灶在本增量的第四次触发（连同 P1-1），E 类监控位对"刚写下的总结句"依然无防护——七审"总结句先跑 doc_audit 再落盘"的处方未覆盖 positioning 这类<strong>非登记位新文档</strong>。</li>
+<li><strong>P3-2</strong> positioning.html L67 markdown 语法泄漏进 HTML：宣称句内 <code>"**在已扫描的…完成度领先**"</code> 的 <code>**</code> 在浏览器按字面星号渲染（13fc896 引入、554a3b1 改写保留）。对外材料格式瑕疵。</li>
+<li><strong>P3-3</strong> 第 3 轮报告来源 URL 拼写错误致死链：research-2026-09-15-repair-landscape.html L101 链接 <code>lingming.cs.illinois.edu/publications/<strong>isesta</strong>2024.pdf</code> 实测 HTTP 404（正确为 issta2024.pdf，WebSearch 证实该 URL 为论文作者副本）。论文标题本身核实为真（"Automated Program Repair via Conversation: Fixing 162 out of 337 Bugs for $0.42 Each using ChatGPT"，Xia &amp; Zhang，ISSTA 2024，ACM DL 10.1145/3650212.3680323）。</li>
+<li><strong>P3-4</strong> 第 2 轮报告 §1.1 "编译产物 sub-10KiB 原生二进制"不在其宣称的一手核对范围内：zerolang.ai 主页/learn/diagnostics 三页与 GitHub README（四处均本轮实开）<strong>均无</strong> sub-10KiB 表述（GitHub 只写 "Small, dependency-free artifacts"）。该数字实际源自第 1 轮引用的媒体报道（MarkTechPost 2026-05）与第 4 轮的 agentlanguages.dev 目录条目（目录原文确有 "sub-10 KiB native binaries"，一手成立）——数字非失实，但第 2 轮 meta"全部关键事实逐字核对一手原文（zerolang.ai 三页 + Vera README）"的宣称与该数字的实际出处不符，R43 纪律的边缘违规。positioning.html L75 引用该数字时可溯源到目录原文，不构成失实。</li>
+<li><strong>P3-5</strong> 第 3 轮报告两处引文支撑强度不足（机制属实、出处错位）：① "cargo fix……循环到不动点"——Cargo book 官方页与报告引用的 rustwiki 镜像现文均无 fixpoint/不动点表述（仅"remaining warnings will be displayed"+"可再跑一次"），迭代行为是 cargo::ops::fix 实现事实（rustfix 文档确认"the core of it is located in cargo::ops::fix"），宜补实现侧一手出处；② "cargo fix --clippy 应用 Clippy 机器建议"——该标志是 nightly <code>-Z unstable-options --clippy</code> 历史路径，Rust 1.54（2021-08）起已被 <code>cargo clippy --fix</code> 取代，报告未注明时效。</li>
+<li><strong>P3-6</strong> 第 3 轮 TS 引用错位：设计提案 #14549 页面本身不含 "fixId"/"getCombinedCodeFix" 字样（提案时代叫 "kind identifier"，2017-03 由 Matt Bierner 提出，落地 TS 2.7.1）；fixId/getCombinedCodeFix 是真实 LanguageService API（本轮经 TS 5.9 官方 API 文档与 Angular 语言服务源码双重证实）——报告将 API 词汇的出处挂到提案页，宜补 API 文档链接。</li>
+<li><strong>P3-7</strong> positioning 口径日期轻微倒挂：L30 "截至 <strong>2026-09-15</strong>（v1.2.0）"（E 类正则钉死该日期字面）与 L31 竞品事实来源含 "第 4 轮……2026-09-16"——后入的第 4 轮事实比页面口径日期新一天。另第 4 轮报告"35 家分三营"为口径粗化：目录实为三营 31 家 + adjacent/unclassified 4 家（Plumbing/Koru/Spec/Valea），结论（以修复闭环为核心卖点的条目为零）经全条目复核不受影响。</li>
+</ul>
+
+<h2>4. 调研报告 R43 纪律联网复核（八审重点，全部打开原文、零转述）</h2>
+<h3>4.1 第 4 轮报告（research-2026-09-16-broad-scan.html）——23/23 事实点通过</h3>
+<p>agentlanguages.dev 全文（本轮实开，站头自标 <code>as of 14 jun 2026 · 35 languages tracked</code>，尾注 stars refreshed 2026-06-14，站内明细 31+4=35 内部自洽）：</p>
+<table>
+<tr><th>报告宣称</th><th>原文实测</th><th>判定</th></tr>
+<tr><td>35 家 / last updated 2026-06-14 / 星数同日刷新</td><td>"as of 14 jun 2026 · 35 languages tracked" / "stars refreshed 2026-06-14"</td><td class="ok">✓</td></tr>
+<tr><td>三营分类（Syntactic/Verification/Orchestration）</td><td>目录三营结构与营内条目归属逐一对上（X07/Mog/Codong/Tacit 在 Syntactic；Vera/MoonBit/NanoLang/Aver/Vow/Intent/Prove 在 Verification；Boruna/Fabro/Pel/Quasar/Marsha 在 Orchestration）</td><td class="ok">✓</td></tr>
+<tr><td>验证营导语 "The model doesn't need to be right. It needs to be checkable."</td><td>原文一字不差</td><td class="ok">✓</td></tr>
+<tr><td>编排营导语 "It isn't a language problem. It's an agent-coordination problem."</td><td>原文一字不差</td><td class="ok">✓</td></tr>
+<tr><td>Codong 69★ + "structured JSON errors with fix/retry fields"</td><td>"★ 69 MIT mar 2026 working compiler" + "structured JSON errors with fix/retry fields"（逐字）</td><td class="ok">✓</td></tr>
+<tr><td>X07 8★ + "diagnostics ship as stable JSON with quickfixes the toolchain applies deterministically"</td><td>"★ 8 MIT apr 2026" + 引文逐字</td><td class="ok">✓</td></tr>
+<tr><td>Zero 5k+★ + 目录条目 "typed repair plans" 措辞</td><td>"★ 5k+ Apache-2.0 may 2026 early" + "stable codes and typed repair plans. One obvious path."</td><td class="ok">✓</td></tr>
+<tr><td>Fabro 1.2k+★ / NanoLang 602★ / Marsha 466★（jul 2023）/ Vera 382★ / Mog 138★ / NERD 135★ / Sever 68★（思想实验标注）/ Magpie 52★ / Aver 49★ / AILANG 32★ / B-IR 与 Loom 各 0★</td><td>目录逐条星数与状态标签全部一致（"★ 1.2k+"/"★ 602"/"★ 466 MIT jul 2023"/"★ 382"/"★ 138"/"★ 135"/"★ 68 … thought experiment"/"★ 52"/"★ 49"/"★ 32"/"★ 0"×2）</td><td class="ok">✓</td></tr>
+<tr><td>Mog spec 3200 tokens</td><td>"Full spec fits in 3,200 tokens."</td><td class="ok">✓</td></tr>
+<tr><td>NanoLang 193 条 Coq 定理零公理 + Jordan Hubbard</td><td>"193 Coq theorems with zero axioms" + "by Jordan Hubbard"</td><td class="ok">✓</td></tr>
+<tr><td>收录标准 "The bar is intent" + 不收运行时 LLM 工具</td><td>"The bar is intent." + "Runtime LLM tools … are explicitly out of scope"</td><td class="ok">✓</td></tr>
+<tr><td>llms.txt / llms-full.txt 机器可读版</td><td>两文件均存在且欢迎 agent 抓取</td><td class="ok">✓</td></tr>
+<tr><td>Lom 不在目录中（B-IR 条目提 pre/postconditions 与 stable error codes，"Loom"与本项目同名无关联）</td><td>目录全文无 Lom 项目；Jason Hall 思想实验三连含 "Loom with pre/postconditions and stable error codes"（注：目录原文标注 Jason Hall 为 "Chainguard"，报告写"Go 团队"系常识归属而非目录原文——并入 P3-7 口径备注）</td><td class="ok">✓</td></tr>
+</table>
+<p>zerolang.ai/cli（本轮实开）——报告 §4 七项全部逐字证实：</p>
+<table>
+<tr><th>报告宣称</th><th>原文实测</th><th>判定</th></tr>
+<tr><td><code>zero fix --plan --json</code> = "Ask for a typed repair plan"</td><td>Daily Commands 表："<code>zero fix --plan --json &lt;input&gt;</code> — Ask for a typed repair plan."</td><td class="ok">✓</td></tr>
+<tr><td>check --json 诊断含 code、span、expected/actual、help、<strong>repair metadata</strong>、targetReadiness</td><td>"Diagnostics with code, span, expected/actual details, help, repair metadata, and <code>targetReadiness</code> for the selected target/emit kind."</td><td class="ok">✓</td></tr>
+<tr><td>LSP quick-fix 五码 TAR002/TYP009/ERR002/ERR003/PUB001（surfaced from zero fix）</td><td>"quick-fix code actions surfaced from <code>zero fix</code> for <code>TAR002</code>, <code>TYP009</code>, <code>ERR002</code>, <code>ERR003</code>, and <code>PUB001</code>."</td><td class="ok">✓</td></tr>
+<tr><td>zero skills：与编译器版本捆绑、agent 按工作流加载</td><td>"serves bundled skill content for agents" + "bundled with the compiler so agents can load the workflow that matches the Zero binary"</td><td class="ok">✓</td></tr>
+<tr><td>zero tokens / xfail 机制</td><td><code>zero tokens --json &lt;input&gt;</code> 在列；"Expected-fail tests use <code>xfail:</code> … A test marked this way must fail; an unexpected pass fails the command."</td><td class="ok">✓</td></tr>
+<tr><td>"仍未见修复语料回归网与置信度分级（文档层面）"</td><td>该页全文复核：确无此二者（负面宣称与原文一致）</td><td class="ok">✓</td></tr>
+</table>
+<p>BirdDisk（github.com/Jawbreaker1/bird_disk_code，本轮实开）：3★ / 78 commits、"Structured JSON diagnostics + fix-its (machine actionable)"、"Differential testing: VM/WASM/native parity (default birddiskc test)"、require-tests 门禁、"Deterministic formatter (one canonical style)"、LLM 生成 Yahtzee 多文件实验——报告 §3 六要素全部属实。<strong>"下轮复核"三项纪律核验</strong>：目录维护者归属、Valea 是否在目录、Ronacher 博文内容——报告正文均未将其当事实引用（自洽 ✓）。本轮复核顺带获得两项事实供下轮登记：<strong>① 目录维护者为 Alasdair Allan（站尾 "Maintained by Alasdair Allan"）——与深读竞品 Vera 的作者同名同人，对"目录中立性"有潜在叙事影响（不改变本轮任何宣称）；② Valea 现已在目录（Unclassified 营，4★）</strong>——即第 4 轮标注的待核项现在有了答案。</p>
+
+<h3>4.2 第 2 轮报告（zero-vera-doc-deepdive）——抽查 11/11 通过（另 1 条 P3-4 出处瑕疵）</h3>
+<ul>
+<li>Vera GitHub README（本轮实开）："six of the nine write 100% correct Vera, a language none of them was trained on"（逐字）/ "active development at v0.1.13" / "2,000+ commits" / "12,290 tests" / "95% Python code coverage" / "244 conformance programs" / "stable error code (E001–E702)" + W001/W002 / "The model doesn't need to be right, it needs to be checkable." / "Names are replaced by structural references. Contracts are mandatory. Effects are typed." / Z3 契约验证 + SQL 注入类型层禁止 + Lark LALR(1) + typed-hole 补全 + WASI p2——全部逐字或等义证实。备注：Vera 的评测口径是单采样 "% solved (pass@1)"，第 2 轮报告"无 pass@k 无偏估计"的表述按"无 k&gt;1 多采样无偏估计"理解成立，未失实。</li>
+<li>Zero：GitHub README "Zerolang is an experimental <strong>graph-native</strong> programming language where the semantic graph is the program database"（逐字）+ 5.4k stars + "Expect breaking changes, rough edges, and security issues" + "not against production systems or sensitive data"；zerolang.ai 主页 "Experimental" 徽章 + 5.4k + ".0 projections stay available for review and <strong>rare manual edits</strong>"；diagnostics 页 "<code>zero fix --plan --json</code> returns <strong>a repair plan, not an automatic edit</strong>"（逐字）+ NAM003 示例字段 rule/expected/actual/fix (local-edit)/explain 五件套 + 五个错误码 NAM003/BLD002/RGP003/GRF013/CIMP003——全部逐字证实。唯 sub-10KiB 见 P3-4。</li>
+</ul>
+
+<h3>4.3 第 3 轮报告（repair-landscape）——抽查 5/5 关键论断属实（另 2 条 P3-5/P3-6 出处瑕疵 + 1 条 P3-3 死链）</h3>
+<ul>
+<li>rustc applicability 四级（doc.rust-lang.org/rustc/json.html，本轮实开）："MachineApplicable"（"definitely what the user intended … should be automatically applied"）/ "MaybeIncorrect" / "HasPlaceholders" / "Unspecified"——四级名称与描述逐字吻合；suggested_replacement 字段文档吻合。</li>
+<li>rustfix（doc.rust-lang.org/beta/nightly-rustc/rustfix/index.html，本轮实开）："You pass it the JSON output from rustc, and you can then use it to apply suggestions to in-memory strings"（逐字）+ cargo fix 实现位置指向（cargo::ops::fix）吻合。</li>
+<li>cargo fix --edition 迁移流程（官方 man 页实开）吻合；"fixpoint 循环"与 --clippy 的出处问题见 P3-5。</li>
+<li>TS：fixId/getCombinedCodeFix 为真实 LanguageService API（TS 5.9 官方 API 文档签名 <code>getCombinedCodeFix(scope, fixId, formatOptions, preferences): CombinedCodeActions</code> + Angular 语言服务实际调用双证）；提案 #14549 实开确认为 fix-all 设计起点（2017-03 Matt Bierner，closed via PR #20338/#21247，2.7.1 milestone）——见 P3-6。</li>
+<li>ISSTA 2024 论文：标题/作者/数字（162/337/$0.42）核实为真（ACM DL 10.1145/3650212.3680323，Xia &amp; Zhang）——链接拼写死链见 P3-3。</li>
+</ul>
+
+<h2>5. 七审整改 R39-R45 抽验（两条）</h2>
+<ul>
+<li><strong>R42（E 类 README Current release 位）</strong>：整改真实落地且未复发——doc_audit.py L164-165 位在位，README.md:8 现值 v1.2.0（含 NAM005 完整描述），本轮 62/62 输出中该项 OK。844fc8c 在同一机制上扩展 positioning 版本位（正则+字面日期+expect_all 失配即 FAIL 三重钉），设计有效。<strong>但</strong>：E 类盯的是"版本号"，P1-1 的"实测覆盖面"宣称不在任何监控面内——收官簿记的下一块盲区已被本轮证实（见 P3-1 与 §7 建议）。</li>
+<li><strong>R43（调研纪律：关键数字必须打开来源原文）</strong>：archive/README.md L44-47 规范条文在位且带第 1 轮教训引证；第 2/3/4 轮报告 meta 均声明执行 R43。本轮对三轮报告约 45 个外部事实点的独立原文复核结果：41 个逐字精确、1 个出处错位（sub-10KiB，P3-4）、2 个引文支撑强度不足（P3-5/P3-6）、1 个死链（P3-3）——<strong>无一数字失实</strong>。对比第 1 轮被 R43 抓出的两处转述失实，整改成效显著。报告自标的"下轮复核"项均未被当事实引用（纪律自洽）。</li>
+</ul>
+
+<h2>6. 方法与局限</h2>
+<ul>
+<li><strong>测试口径</strong>：cargo test 采用 <code>--release</code>（与 .github/workflows/ci.yml "Unit tests: cargo test --release" 同口径），482/482 通过。debug 模式首跑因本机沙箱线程资源限制异常退出（"failed to spawn thread to run test: os error 5" + 深递归守护测试栈溢出）——CI 三平台 release 口径不受影响，判定为环境噪声而非代码回归（增量无 Rust 源码改动）。</li>
+<li><strong>diff_test --probe 独占运行</strong>（未与任何其他 diff_test 并行，TMP 共享风险规避）：6/6 PASS。eval 双后端 119/119、golden、自举六模式、verify --static 152 未重跑——增量零源码改动，七审已实测且本轮无触发面（报告口径注明）。</li>
+<li><strong>联网复核的双工具分歧与裁定</strong>：对 agentlanguages.dev，通用抓取工具（摘要模型）曾返回"42 家/last updated 2026-09-14"及一组更高星数；改用全文抓取工具取到站点原文为"35 家/14 jun 2026/星数 2026-06-14 刷新"，且原文内部三处自洽（站头 35 + 明细 31+4=35 + 尾注刷新日）。<strong>裁定以原文全文为准</strong>：第 4 轮报告的 35 家/2026-06-14 与原文一致，摘要工具数据判为幻觉噪声。此节如实记录，提醒后续轮次：对该类站点复核必须拿全文而非摘要。</li>
+<li><strong>未复核项</strong>：第 1 轮报告的媒体类来源（MarkTechPost/InfoQ 等）未逐一重开（七审已抽三处、本轮增量不涉）；第 4 轮 AINL whitepaper 未重开（§3 定性为相邻赛道，低风险）；Marsha "最早实验之一"、Pel/Quasar 论文细节未深核（不影响任何 positioning 论断）。</li>
+<li><strong>简报勘误</strong>：任务简报称 844fc8c "改动 tools/doc_audit.py + claims 类文件"——实测仅 doc_audit.py 3 行，无 claims 类文件改动；简报基线"cargo test 477 通过"为 v1.1.4 时点旧值，仓库内部口径（HANDOVER L99：482 = 477+NAM005×5）自洽。</li>
+<li>只读纪律：除本报告文件外未修改任何项目文件；git status 终态仅余本报告。</li>
+</ul>
+
+<h2>7. 结论与建议（供裁决，非审查执行）</h2>
+<ul>
+<li>八审增量把"调研→定位材料"的链条立起来了，外部事实纪律经对抗复核近乎全绿——这是七轮以来首次。<strong>短板仍在收官簿记</strong>：病灶第四次触发且首次进入对外材料证据链（P1-1）+ 同族拼接（P2-1）。建议：① 修 P1-1/P2-1（改写口径或补 119/120 的采样实测）；② 把"实测覆盖面"类宣称（X 任务全过/某集 pass@k）纳入下一轮 doc_audit/claims 登记面——E 类证明"钉一个正则"成本低、收益高；③ 第 4 轮两个"下轮复核"项已有答案（目录维护者=Vera 作者 Alasdair Allan；Valea 已在目录 Unclassified 营），建议登记；④ P3-2/P3-3 顺手修（markdown 泄漏、死链拼写）。</li>
+<li>轨迹：B+（08-31）→ A-（09-05）→ A（09-07）→ A（09-14）→ A-（09-14-2）→ A-（09-15）→ A-（09-15-2）→ <strong>A-（09-16，四连）</strong>。工程与调研实质稳定在 A 档；文档纪律连续四轮差同一口气，且账单位置在升级（内部台账 → 对外证据链）。</li>
+</ul>
+
+<p class="small">报告：docs/reviews/review-2026-09-16.html · 第八轮独立对抗性审查 · 2026-09-16 · 自包含 HTML（内嵌 CSS、零外部资源、UTF-8）</p>
+</div>
+</body>
+</html>

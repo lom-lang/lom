@@ -50,13 +50,13 @@
 <ul>
 <li><strong>结构化建议</strong>：rustc 诊断的 JSON 输出携带 suggestion 子诊断——<code>span</code>（文件/行列）+ <code>suggested_replacement</code>（替换文本）+ <code>suggestion_applicability</code> 四级：<code>MachineApplicable</code>（"definitely what the user intended... should be automatically applied"）/ <code>MaybeIncorrect</code> / <code>HasPlaceholders</code> / <code>Unspecified</code>（[rustc book · JSON 输出](https://doc.rust-lang.org/rustc/json.html)、[rustc-dev-guide](https://rustc-dev-guide.rust-lang.org/diagnostics.html)）。</li>
 <li><strong>应用层</strong>：rustfix 是低层库——"you pass it the JSON output from rustc, and you can then use it to apply suggestions to in-memory strings"（[rustfix 文档](https://doc.rust-lang.org/beta/nightly-rustc/rustfix/index.html)）。</li>
-<li><strong>编排层与迭代</strong>：cargo fix 以 <code>--error-format=json</code> 跑 rustc → rustfix 应用 MachineApplicable 建议 → 重编译 → <strong>循环到不动点</strong>；<code>cargo fix --clippy</code> 应用 Clippy 机器建议、<code>--edition</code> 做 edition 迁移（[Cargo book](https://rustwiki.org/en/cargo/commands/cargo-fix.html)、[RFC 3085](https://rust-lang.github.io/rfcs/3085-edition-2021.html)）。</li>
+<li><strong>编排层与迭代</strong>：cargo fix 以 <code>--error-format=json</code> 跑 rustc → rustfix 应用 MachineApplicable 建议 → 重编译 → <strong>迭代重跑至不再产生新建议</strong>（官方文档表述为剩余 warning 将显示、可再跑一次收敛；循环的实现位于 <code>cargo::ops::fix</code>——rustfix 文档确认 "the core of it is located in cargo::ops::fix"，八审 P3-5 出处校准）；<code>cargo clippy --fix</code> 应用 Clippy 机器建议（旧 <code>cargo fix --clippy</code> 为 nightly 历史路径，Rust 1.54 起由前者取代）、<code>--edition</code> 做 edition 迁移（[Cargo book](https://rustwiki.org/en/cargo/commands/cargo-fix.html)、[RFC 3085](https://rust-lang.github.io/rfcs/3085-edition-2021.html)、[rustfix](https://rust-lang.github.io/rustfix/)）。</li>
 <li><strong>生态消费</strong>：rust-analyzer / bacon / Emacs 插件直接消费 <code>suggested_replacement</code>+span 构造 quick-fix。</li>
 </ul>
 
 <h3>1.2 TypeScript：code fixes + fix-all + ts-fix</h3>
 <ul>
-<li>语言服务在 <code>src/services/codefixes/</code> 注册 provider（<code>provideCodeFixes</code> 返回带 <code>fixName</code> 的 <code>CodeFixAction</code>）；fix-all 机制：code fix 携带 <code>fixId</code>，编辑器调 <code>getCombinedCodeFix</code> 一次算出全文件同款问题（设计提案 [#14549](https://github.com/Microsoft/TypeScript/issues/14549)）；微软官方另有 <code>ts-fix</code> CLI 批量应用（[microsoft/ts-fix](https://github.com/microsoft/ts-fix)）。</li>
+<li>语言服务在 <code>src/services/codefixes/</code> 注册 provider（<code>provideCodeFixes</code> 返回带 <code>fixName</code> 的 <code>CodeFixAction</code>）；fix-all 机制：code fix 携带 <code>fixId</code>，编辑器调 <code>getCombinedCodeFix</code> 一次算出全文件同款问题（提案 [#14549](https://github.com/Microsoft/TypeScript/issues/14549)（2017-03）提出前身 "kind identifier"，落地为 TS 2.7 起的 fixId/getCombinedCodeFix LanguageService API——八审 P3-6 出处校准）；微软官方另有 <code>ts-fix</code> CLI 批量应用（[microsoft/ts-fix](https://github.com/microsoft/ts-fix)）。</li>
 <li>ESLint <code>--fix</code>（fixer 返回文本替换）与 C# Roslyn analyzers + IDE code fixes 为同类机制，不赘。</li>
 </ul>
 
@@ -98,7 +98,7 @@
 <ul>
 <li>Rust：[rustc book · JSON 输出](https://doc.rust-lang.org/rustc/json.html) · [rustc-dev-guide · diagnostics](https://rustc-dev-guide.rust-lang.org/diagnostics.html) · [rustfix 文档](https://doc.rust-lang.org/beta/nightly-rustc/rustfix/index.html) · [Cargo book · cargo fix](https://rustwiki.org/en/cargo/commands/cargo-fix.html) · [RFC 3085](https://rust-lang.github.io/rfcs/3085-edition-2021.html)</li>
 <li>TypeScript：[fix-all 提案 #14549](https://github.com/Microsoft/TypeScript/issues/14549) · [microsoft/ts-fix](https://github.com/microsoft/ts-fix) · [code fixes 机制（DeepWiki 索引）](https://deepwiki.com/microsoft/TypeScript/4.2-code-fixes-and-quick-fixes)</li>
-<li>APR：[LLM-based APR survey（arXiv 2025）](https://arxiv.org/html/2506.23749v1) · [Learning-based APR survey（ACM CSUR 2024）](https://dl.acm.org/doi/10.1145/3631974) · [AlphaRepair（ICSE 2023）](https://abhikrc.com/pdf/ICSE23.pdf) · [ChatGPT APR（ISSTA 2024）](https://lingming.cs.illinois.edu/publications/isesta2024.pdf)（注：原文链接为 ISSTA 2024 论文 PDF，题名 "Fixing 162 out of 337 Bugs for $0.42 Each using ChatGPT"）· [AwesomeLLM4APR](https://github.com/iSEngLab/AwesomeLLM4APR)</li>
+<li>APR：[LLM-based APR survey（arXiv 2025）](https://arxiv.org/html/2506.23749v1) · [Learning-based APR survey（ACM CSUR 2024）](https://dl.acm.org/doi/10.1145/3631974) · [AlphaRepair（ICSE 2023）](https://abhikrc.com/pdf/ICSE23.pdf) · [ChatGPT APR（ISSTA 2024）](https://lingming.cs.illinois.edu/publications/issta2024.pdf)（注：原文链接为 ISSTA 2024 论文 PDF，题名 "Fixing 162 out of 337 Bugs for $0.42 Each using ChatGPT"）· [AwesomeLLM4APR](https://github.com/iSEngLab/AwesomeLLM4APR)</li>
 </ul>
 
 </body>
