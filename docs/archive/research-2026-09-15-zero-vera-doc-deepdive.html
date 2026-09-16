@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zero / Vera 文档级深读对标（第 2 轮调研·单主题）— 2026-09-15</title>
+<style>
+  :root { --fg:#1a1a2e; --muted:#5a5a72; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --bg-soft:#f4f5fa; --border:#d9dbe7; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--fg); max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; line-height:1.75; }
+  h1 { font-size:1.6rem; border-bottom:3px solid var(--accent); padding-bottom:.5rem; }
+  h2 { font-size:1.25rem; margin-top:2.2rem; border-left:4px solid var(--accent); padding-left:.6rem; }
+  h3 { font-size:1.05rem; margin-top:1.6rem; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.9rem; }
+  th,td { border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top; }
+  th { background:var(--bg-soft); }
+  .meta { background:var(--bg-soft); border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; font-size:.9rem; margin:1rem 0; }
+  blockquote { border-left:4px solid var(--border); margin:1rem 0; padding:.4rem 1rem; color:var(--muted); }
+  code { background:var(--bg-soft); padding:.1rem .3rem; border-radius:3px; font-size:.9em; }
+  a { color:var(--accent); }
+  .verdict { background:#fffbeb; border:1px solid #f59e0b; border-radius:8px; padding:.8rem 1rem; }
+  .fix { background:#f0fdf4; border:1px solid #16a34a; border-radius:8px; padding:.8rem 1rem; margin:1rem 0; }
+  ul { padding-left:1.3rem; } li { margin:.3rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Zero / Vera 文档级深读对标（第 2 轮调研·单主题轮）</h1>
+
+<div class="meta">
+<strong>轮次</strong>：第 2 轮（单主题）——"审查→实测→包装"计划表 Ⓑ 项<br>
+<strong>日期</strong>：2026-09-15<br>
+<strong>方式</strong>：文档级深读（用户裁决：不在本机安装）——Zero 官网/官方 learn 与 diagnostics 页原文、Vera GitHub README 原文逐字核对；R43 纪律执行：<strong>全部关键数字与字段名来自一手原文，零转述搜索摘要</strong><br>
+<strong>与第 1 轮的关系</strong>：修正第 1 轮两处判断（见 §0），补齐差异化叙事的事实地基——为 Ⓒ（差异化一页纸）供料
+</div>
+
+<h2>0. 结论摘要</h2>
+
+<div class="verdict">
+<ol>
+<li><strong>第 1 轮判断修正一</strong>："Zero 公开材料未见修复闭环等价物"——<strong>不准确</strong>。Zero 官方 diagnostics 页明确有 <code>zero fix --plan --json</code>（"returns a repair plan, not an automatic edit"）+ <code>zero patch</code> 补丁循环，<strong>计划层与 Lom 的 <code>lom fix --plan</code> 同名同语义</strong>。Lom 仍独有的是<strong>执行层</strong>：<code>--apply</code> 迭代自动应用（多轮收敛三刹车）+ 置信度分级（High 才自动改）+ fix-history 留档 + 8 对 fix_corpus 回归网——Zero 明确把应用交给 agent，且要求"先解释补丁、后验证用户可见行为"。</li>
+<li><strong>第 1 轮判断修正二</strong>：证据链竞争者 +1——<strong>Vera 也做了 LLM 实测</strong>（"six of the nine write 100% correct Vera, a language none of them was trained on"）。但形态弱于 Lom（无 pass@k 无偏估计、无修复类任务集、无独立审查），且成熟度 v0.1.13。</li>
+<li><strong>三范式定位清晰化</strong>（本轮最大产出）：Zero=<strong>图优先</strong>（语义图是程序数据库，文本只是投影，agent 不应直接编辑投影——最激进 agent-first）；Vera=<strong>模型专属</strong>（De Bruijn 槽位代替变量名、强制契约 + Z3 验证，"The model doesn't need to be right, it needs to be checkable"——牺牲人类可读性换可验证性）；Lom=<strong>文本优先人机共读 + 修复执行闭环</strong>（源码是单一事实源，人保留直接编辑主权）。三者同题不同解，Lom 的中间道路定位成立且未被占。</li>
+<li><strong>惊人的一致性</strong>：Zero 的错误码体系（三字母前缀+三位数字：NAM003/BLD002/RGP003/GRF013/CIMP003）与 Lom（LEX/PARSE/TYPE/NAM/EFF/MAT/RUNTIME + 三位数）<strong>同款命名法</strong>，且 Zero 的 NAM003 同为"未知标识符"——收敛进化到同一形态是赛道方向正确的旁证。Vera 用 E001-E702+W001/W002 连续编号（无类别前缀）。</li>
+<li><strong>Ⓒ 一页纸的核心论点更新</strong>：从"修复闭环最深"细化为——<strong>"诊断计划层三家都有；修复执行自动化（apply/置信度/历史/语料回归）仍只此一家；且只有 Lom 保有文本源码主权与全套证据链（自举/差分 10000/pass@k/七轮审查）"</strong>。</li>
+</ol>
+</div>
+
+<h2>1. Zero 深读（一手：zerolang.ai 主页 / learn / diagnostics 页）</h2>
+
+<h3>1.1 范式：图优先（与 Lom 的根本差异）</h3>
+<ul>
+<li>官方定位："an experimental <strong>graph-native</strong> programming language where the semantic graph is the program database"（[GitHub](https://github.com/vercel-labs/zerolang)）——<strong>程序本体是语义图数据库，文本（<code>.0</code> 投影文件）只是 source map 式的可读投影</strong>："That does not mean the agent should edit that file."，人工编辑被限定为 "rare manual edits"。</li>
+<li>编辑单位是图补丁：<code>zero patch --expect-graph-hash graph:... --op 'set node="#expr_..." field="value" expect="..." value="..."'</code>——由 graph hash 与期望值双重守卫，"Stale or invalid edits fail before they touch the store"。</li>
+<li>工具链：init/patch/run/query/status/explain，双轨（图数据库 + 投影），编译产物 sub-10KiB 原生二进制；主页标注 <strong>Experimental、5.4k stars、"Expect breaking changes... not against production systems"</strong>。</li>
+</ul>
+
+<h3>1.2 诊断与修复（对标核心）</h3>
+<ul>
+<li>错误码：三字母前缀+三位数——NAM003（未知标识符）/BLD002/RGP003/GRF013/CIMP003/005；任意码可 <code>zero explain CODE</code> 查询。</li>
+<li>文本诊断字段（NAM003 示例原文逐行）：<code>位置 file:line:col</code>、上下文行+<code>^^^</code> span、<code>rule:</code>（违反的规则）、<code>expected:</code> / <code>actual:</code>（结构化分离于消息文本——<strong>Lom 把这两者揉在 message 里，可吸收的设计点</strong>）、<code>fix:</code>（建议 + <strong>edit shape 标签</strong>如 <code>(local-edit)</code>）、<code>explain:</code>（深挖入口）。</li>
+<li>JSON 模式："JSON is for automation, edit planning, CI, editors, and exact diagnostic fields"——官方页<strong>未公布逐字段 schema 与完整示例</strong>（字段类别：spans/codes/fix ids/readiness facts）。</li>
+<li><strong>修复闭环形态</strong>：<code>zero fix --plan --json</code> 返回修复计划（非自动编辑）→ agent 生成补丁文件 → <code>zero patch</code> 应用 → 重跑聚焦检查。官方要求 agent "explain the patch it will apply and validate the user-visible behavior afterward"；图优先包的修复"should normally be a graph patch"。</li>
+<li><strong>与 Lom 逐项对照</strong>：诊断计划层（fix --plan）同构同义；<strong>执行层缺席</strong>——无 --apply 等价物、无置信度分级自动应用策略、无修复历史留档、无修复语料回归网（这些是 Lom M1-M4 + fix_corpus 的独有资产）。edit shape 标签 ≈ lom-fix/v1 的 action 类型（replace/insert），粒度更粗。</li>
+</ul>
+
+<h2>2. Vera 深读（一手：GitHub README）</h2>
+<ul>
+<li><strong>定位</strong>："designed for large language models to write"——核心哲学 "The model doesn't need to be right, it needs to be checkable"；三大手段 "Names are replaced by structural references. Contracts are mandatory. Effects are typed."。</li>
+<li><strong>诊断</strong>："Vera produces instructions for the model that wrote the code"——每条错误含 what/why/<strong>how to fix with a concrete code example</strong>/spec reference 四要素；稳定码 E001-E702 + W001/W002，<code>--json</code> 结构化输出，<code>vera errors --json</code> 列全部注册项。</li>
+<li><strong>激进设计</strong>：无变量名（类型化 De Bruijn 槽位 <code>@Int.0</code>/<code>@Int.1</code>）；强制契约（requires/ensures/effects 三段 + 递归 decreases）；<strong>SQL 注入在类型检查层被禁止</strong>（查询文本必须字面写在源码）；LALR(1) 确定性语法 + <code>vera fmt</code> 规范化为唯一形式。</li>
+<li><strong>验证栈</strong>：check（解析+类型）/ verify（<strong>Z3 契约验证</strong>）/ run（WASM）；浏览器与 WASI p2 目标；LSP 带 typed-hole 补全。</li>
+<li><strong>成熟度与证据</strong>："active development at v0.1.13"，2000+ commits、12290 测试、95% 覆盖、244 一致性程序；<strong>LLM 实测："six of the nine write 100% correct Vera"</strong>（9 模型、零训练语言——形态类似 Lom 的多模型实测，但无 pass@k、无修复任务类目、无独立审查）。</li>
+<li><strong>修复</strong>：错误内嵌 "Fix:" 段落（含代码示例），<strong>无 plan/apply 引擎</strong>——修复建议是文档性的，不产出结构化修复动作。</li>
+</ul>
+
+<h2>3. 三家对照表（诊断/修复维度，全部一手材料）</h2>
+
+<table>
+<tr><th></th><th>Lom</th><th>Zero（Vercel Labs）</th><th>Vera</th></tr>
+<tr><th>程序本体</th><td>文本源码（人机共读单一事实源）</td><td>语义图数据库（文本是投影，agent 不编辑投影）</td><td>文本源码（但无变量名，人读门槛高）</td></tr>
+<tr><th>诊断 JSON</th><td>lom-diag/v1（severity/stage/code/line/col/source_line/is_hole/hint）</td><td>spans/codes/fix ids/readiness facts（官方未公布完整 schema）</td><td>--json + E001-E702 稳定码</td></tr>
+<tr><th>expected/actual 结构化</th><td>❌（揉在 message 文本）</td><td>✅（独立字段）</td><td>部分（what/why/fix/spec 四要素）</td></tr>
+<tr><th>修复计划</th><td>✅ lom fix --plan（JSON 动作：replace/insert + span + text）</td><td>✅ zero fix --plan --json（repair plan）</td><td>❌（Fix: 文档性建议段落）</td></tr>
+<tr><th><strong>修复执行自动化</strong></th><td><strong>✅ --apply 迭代（三刹车收敛）+ 置信度分级（High 才自动）+ fix-history + fix_corpus 回归网</strong></td><td>❌（计划非编辑；应用交给 agent patch + 人工审查要求）</td><td>❌</td></tr>
+<tr><th>效应系统</th><td>✅ ! [IO] 标注 + EFF001</td><td>✅（媒体确认；stdlib 声明副作用）</td><td>✅（effects() 强制契约 + Z3）</td></tr>
+<tr><th>渐进式（warning 不拦截）</th><td>✅（核心哲学）</td><td>未见承诺</td><td>❌（契约强制，编译期硬约束）</td></tr>
+<tr><th>LLM 实测</th><td>119 任务/4 模型/pass@k 99.1%/修复类 22 任务</td><td>未见</td><td>9 模型（6 个 100%）</td></tr>
+<tr><th>自证/差分</th><td>三层自举 + 双后端 10000 差分逐字</td><td>未见</td><td>244 一致性程序（无后端差分口径）</td></tr>
+<tr><th>独立审查</th><td>七轮（R1-R45）</td><td>❌</td><td>❌</td></tr>
+<tr><th>成熟度</th><td>v1.2.0 冻结</td><td>pre-1 Experimental（"expect breaking changes"）</td><td>v0.1.13</td></tr>
+</table>
+
+<h2>4. 对 Lom 的行动启示（记录，非裁决）</h2>
+<ul>
+<li><strong>Ⓒ 一页纸论点定稿依据</strong>（本节即供料）："诊断计划层已是行业标配（Zero/Lom 同构、Vera 文档化）；<strong>修复执行自动化</strong>（迭代 apply + 置信度 + 历史 + 语料回归）仍是 Lom 独有；<strong>文本源码主权</strong>是 Lom 与图优先/模型专属两范式的分界——人永远可以直接改源码，修复闭环围绕源码而非图投影构建。"</li>
+<li><strong>可吸收的设计点</strong>（冻结期外记录，均不动语言面）：①诊断的 expected/actual 独立字段（lom-diag/v2 的 additive 演进方向——冻结 §14 允许 schema additive？需核实"零新诊断码"边界，列为待裁决项而非建议）；②"explain 错误码"的等价物（Lom 的诊断文档化已由 SPEC_FOR_AI 码表承担，命令化收益存疑）；③Vera 的 spec reference 字段（诊断指向规范章节——Lom hint 已含等价信息文本）。</li>
+<li><strong>错误码命名收敛</strong>（Zero 与 Lom 同款三字母+三位）可作为"设计收敛"的对外叙事素材。</li>
+<li><strong>Vera 的 Z3 契约验证</strong>是 Lom 没有的维度（形式化验证）——一页纸如实标注为 Vera 领先项，避免失实宣称（Lom 的验证形态是 golden/差分/自举/审查的工程证据链）。</li>
+</ul>
+
+<h2>5. 方法与局限</h2>
+<ul>
+<li><strong>文档级深读，未安装实测</strong>（用户裁决）：Zero 的 JSON 逐字段 schema 官方未公布（CLI Reference 页本轮未抓取），<code>fix --plan</code> 的 plan JSON 内部结构、补丁文件格式均为文档外推——下轮若用户授权受控安装可补实测。</li>
+<li>全部关键事实逐字来自一手原文（zerolang.ai 三页 + Vera GitHub README），执行 R43 纪律（零搜索摘要转述）；引号内文字为原文。</li>
+<li>第 1 轮 MoonBit "Q3 落定"复核项：本轮未查（单主题轮不越界）——留全景轮。</li>
+</ul>
+
+<h2>6. 来源总目</h2>
+<ul>
+<li>Zero：[zerolang.ai 主页](https://zerolang.ai/) · [learn 页](https://zerolang.ai/learn) · [diagnostics 页](https://zerolang.ai/diagnostics) · [GitHub vercel-labs/zerolang](https://github.com/vercel-labs/zerolang)</li>
+<li>Vera：[GitHub aallan/vera README](https://github.com/aallan/vera) · [veralang.dev](https://veralang.dev/)</li>
+<li>背景（第 1 轮，经 R43 修正）：[research-2026-09-15.html](research-2026-09-15.html)</li>
+</ul>
+
+</body>
+</html>
