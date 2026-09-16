@@ -1,0 +1,9 @@
+from io import {println}
+fn main()
+    let s = "lom-lang"
+    if starts_with(s, "lom")
+        println("yes")
+    else
+        println("no")
+    end
+end

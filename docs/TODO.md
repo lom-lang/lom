@@ -6,13 +6,44 @@
 > 的逐条裁决，见文末"驳回/挂起登记"。
 > **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**（2026-09-16
 > 用户裁决四连包，按序执行）：**① 第八轮审查 A-（四连）+ 整改 R46-R54 关闭 ✓ →
-> ② L2 自举编译器预研（可行性/RFC 骨架，动工另裁决）→ ③ 修复闭环资产深化
-> （fix_corpus/error_repair 扩充；119/120 warning 题双模型×10 采样补测候选——
-> R46 留口）→ ④ 文档工程小包（SPEC_FOR_AI token 尺寸口径 + 第 4 轮复核项）**。
+> ② L2 预研 ✓（RFC-0004 draft，动工待用户裁决）→ ③ 修复闭环资产深化 ✓
+> （v1.2.1：fix 动作面 NAM005/MUT001 双 High 模板 + fix_corpus 11 对 +
+> eval 121/error_repair 24 题 + 高温补测 480/480）→ ④ 文档工程小包
+> （SPEC_FOR_AI token 尺寸口径 + 第 4 轮复核项）——进行中**。
 > 调整：差分扩展维持降级按需、发布线维持冻结（用户 2026-09-07 裁决）。
 > 此前（2026-09-15/16）：ⒶⒷⒸ 三项收官（七审 A-+R39-R45 / 第 2 轮调研 /
 > positioning 一页纸）+ 第 3/4 轮调研 + B 包 v1.2.0 + D 四期（累计 10000）。
 > 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 八轮审查整改 R1-R54 与 T1-T7（档案见下）。
+
+## ③ 修复闭环资产深化（2026-09-16，四连包第三项，v1.2.1）✅ done
+
+**来源**：用户裁决（2026-09-16 四连包 ③；R46 留口的采样补测为其首项目的）。
+四条线全部收官：
+
+- **fix 动作面扩充（src/fix.rs）**：NAM005 修复动作化——B 包诊断消息自带完整
+  import 语句，`fix_nam005_import` 从消息切出语句在文件顶部插入（High，
+  插入即修）；MUT001 从 hint 升级——`fix_mut001_add_mut` 声明按名回扫
+  （词边界防 `let x` 误配 `let xy`、注释行跳过），全文唯一命中 Replace
+  let→let mut（High），多处（shadowing/字面量干扰）或零命中（参数/for 变量）
+  降 Medium hint。+5 单元测试。
+- **fix_corpus 8→11 对**：09_mut001 / 10_nam005 / 11_lex005（ASCII 意外字符
+  `$` 删除——全角形态因宿主字节列 vs Delete 偏移语义风险留给 error_repair
+  LLM 题），全部经 `fix_corpus_end_to_end` 迭代 --apply golden 逐字验收。
+- **error_repair 22→24 题**：121（LEX005 全角标点——CJK 输入法混入形态，
+  真实 --check JSON）+ 122（TYPE002 真值 warning 预告 RUNTIME001——120 同款
+  warning-as-prophecy 双诊断叙事，Python 习惯迁移形态）；prompt/manifest 同步
+  （121 任务），run.ps1 -Verify 121/121。
+- **高温补测（R46 留口闭环）**：err22 轮（119/120）+ err24 轮（全 24 题）×
+  deepseek-v4-pro(thinking) / glm-5.3，temperature=1.0 ×10 采样——
+  **error_repair 24 题双模型 480/480 全过**（报告
+  [REPORT-2026-09-16-err-repair-patch.md](../eval/REPORT-2026-09-16-err-repair-patch.md)）；
+  positioning §3 两条实测句升回全量口径（118 为唯一无采样任务，Q4 单采样对照
+  10/10 在档）。
+
+**验收（2026-09-16 实测）**：cargo test --release **487/487**；doc_audit
+**62/62**；verify_selfhost dump **154/154**、--static 坏文件 **22** /干净集
+**154**（三新对+两新任务参考解入集）；eval -Verify **121/121**；clippy 零
+warning；升版 **v1.2.1**（纯 fix 行为，冻结面零变更）。
 
 ## ② L2 自举编译器预研（2026-09-16，四连包第二项）✅ done——产出 RFC-0004 draft，动工待用户裁决
 

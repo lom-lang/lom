@@ -651,6 +651,40 @@ end
 请输出修复后的完整代码。
 
 
+
+### Task 121
+
+以下 .lom 代码有词法错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行。
+
+错误代码：
+fn main() -> Unit
+    let s = "lom"；
+    println(s + "!")
+end
+诊断 JSON：
+{"severity": "error", "stage": "lex", "code": "LEX005", "message": "意外字符 '；'", "file": "bad.lom", "line": 2, "col": 18, "source_line": "    let s = \"lom\"；", "is_hole": false, "hint": "移除或替换非法字符"}
+
+请输出修复后的完整代码。
+
+### Task 122
+
+以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME001] 期望 Bool，得到 String——警告正是对运行时失败的预警）。请修复代码消除该警告并使程序正常运行。
+
+代码：
+from io import {println}
+fn main() -> Unit
+    let name = "lom"
+    if name
+        println("yes")
+    else
+        println("no")
+    end
+end
+诊断 JSON：
+{"severity": "warning", "stage": "type", "code": "TYPE002", "message": "if 条件应为 Bool，得到 String", "file": "bad.lom", "line": 4, "col": 8, "source_line": "    if name", "is_hole": false, "hint": "条件表达式应为 Bool"}
+
+请输出修复后的完整代码。
+
 ---
 
 ## 输出格式

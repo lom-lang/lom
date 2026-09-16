@@ -113,7 +113,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --release
-      - name: Selfhost dump (152 文件逐字, Phase 8.1)
+      - name: Selfhost dump (154 文件逐字, Phase 8.1)
         run: python3 tools/verify_selfhost.py
       - name: Selfhost tokens (Phase 8.1 lexer 对账)
         run: python3 tools/verify_selfhost.py --tokens

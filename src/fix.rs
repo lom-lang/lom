@@ -256,17 +256,17 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
         )],
         "NAM003" => fix_nam_undefined(d, source_lines),
         "NAM004" => fix_nam_unknown_member(d, source_lines),
+        // B 包诊断的修复动作化（③ 包）：消息自带完整 import 语句，插入即修
+        "NAM005" => fix_nam005_import(d),
 
         // ===== 效应系统（Phase 2.5）=====
         "EFF001" => fix_eff_undeclared(d, source_lines),
 
-        // ===== 可变性（v0.20.0）=====
-        // 修复点是不可变变量的"声明处"，但诊断定位在赋值处；声明点定位需要
-        // 反向索引（诊断 → 声明），暂无机制——保持 hint 级，不猜。
-        "MUT001" => vec![hint_only(
-            "不可变重赋值：局部变量把声明改为 let mut；函数参数/for 循环变量请引入局部 let mut 副本",
-            Confidence::Medium,
-        )],
+        // ===== 可变性（v0.20.0；③ 包升级为可应用动作）=====
+        // 声明点按变量名回扫（诊断在赋值处、声明在别处）：全文唯一 `let {name}`
+        // 命中 → Replace let → let mut（High，重赋值已发生，语义忠实）；
+        // 多处声明（shadowing 定位近似）或无 let 命中（参数/for 变量）→ hint。
+        "MUT001" => fix_mut001_add_mut(d, source_lines),
 
         // ===== 运行时错误 =====
         "RUNTIME001" => vec![hint_only(
@@ -632,6 +632,80 @@ fn fix_nam_unknown_member(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixActio
         _ => vec![hint_only(
             "无此字段/变体：检查拼写或查阅类型定义",
             Confidence::Low,
+        )],
+    }
+}
+
+/// NAM005 未导入内建（B 包诊断的修复动作化，③ 包）：在文件顶部插入完整 import 语句
+///
+/// B 包诊断消息自带完整修复语句（"…需在文件顶部声明：from {m} import {{{f}}}"），
+/// 从消息切出该语句在文件最前插入——import 顺序无关，恒合法；插入即修，High。
+fn fix_nam005_import(d: &Diagnostic) -> Vec<FixAction> {
+    match d.message.split("声明：").nth(1) {
+        Some(stmt) if !stmt.is_empty() => vec![FixAction {
+            description: format!("在文件顶部插入 '{}'", stmt),
+            action: ActionKind::Insert,
+            line: 1,
+            col: 1,
+            end_line: None,
+            end_col: None,
+            text: Some(format!("{}\n", stmt)),
+            confidence: Confidence::High,
+        }],
+        _ => vec![hint_only(
+            "未导入内建：按诊断消息在文件顶部补 from … import {…}",
+            Confidence::Medium,
+        )],
+    }
+}
+
+/// MUT001 不可变重赋值（③ 包升级）：声明处 `let` → `let mut`
+///
+/// 诊断定位在赋值行，声明点按名回扫：`let {name}` 后跟 :/=/空格（词边界防
+/// `let x` 误配 `let xy`），注释行跳过。全文唯一命中 → Replace（High，可
+/// --apply）；多处命中（shadowing 近似，或字符串字面量干扰）或零命中（参数/
+/// for 变量重赋值）→ hint（Medium）。字面量含 "let x" 的误命中由唯一性判据
+/// 自然降级，不单做字符串状态机。
+fn fix_mut001_add_mut(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    let Some(name) = extract_last_quoted(&d.message) else {
+        return vec![hint_only(
+            "不可变重赋值：删除该赋值或改用新变量",
+            Confidence::Low,
+        )];
+    };
+    let pat = format!("let {}", name);
+    let mut hits: Vec<(usize, usize)> = vec![]; // (0-based 行, 0-based "let" 列)
+    for (idx, line) in source_lines.iter().enumerate() {
+        if line.trim_start().starts_with('#') {
+            continue;
+        }
+        let mut from = 0;
+        while let Some(rel) = line[from..].find(&pat) {
+            let abs = from + rel;
+            let after = &line[abs + pat.len()..];
+            if after.starts_with(':') || after.starts_with('=') || after.starts_with(' ') {
+                hits.push((idx, abs));
+            }
+            from = abs + 1;
+        }
+    }
+    match hits.as_slice() {
+        [(li, c)] => vec![FixAction {
+            description: format!("声明改为可变：let mut {}", name),
+            action: ActionKind::Replace,
+            line: li + 1,
+            col: c + 1,
+            end_line: Some(li + 1),
+            end_col: Some(c + 1 + 3), // "let" 3 字符
+            text: Some("let mut".to_string()),
+            confidence: Confidence::High,
+        }],
+        _ => vec![hint_only(
+            &format!(
+                "不可变变量 '{}' 被重赋值：未唯一定位到 let 声明——人工确认声明处加 mut，或改用新变量",
+                name
+            ),
+            Confidence::Medium,
         )],
     }
 }
@@ -1745,5 +1819,79 @@ mod tests {
         let occ = find_token_occurrences(&lines, "lenght", false);
         assert_eq!(occ.len(), 1);
         assert_eq!(occ[0].0, 2);
+    }
+
+    // ===== ③ 包：NAM005 / MUT001 修复动作化 =====
+
+    #[test]
+    fn nam005_inserts_import_stmt_from_message() {
+        // B 包消息格式：内建 'f' 未导入——需在文件顶部声明：from m import {f}
+        let lines: Vec<&str> = vec!["from io import {println}", "fn main()", "end"];
+        let d = make_nam_diag(
+            "NAM005",
+            "内建 'starts_with' 未导入——需在文件顶部声明：from string import {starts_with}",
+            None,
+        );
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].line, 1);
+        assert_eq!(fixes[0].col, 1);
+        assert_eq!(
+            fixes[0].text.as_deref(),
+            Some("from string import {starts_with}\n")
+        );
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    #[test]
+    fn nam005_message_without_stmt_falls_back_to_hint() {
+        let d = make_nam_diag("NAM005", "内建 'foo' 未导入", None);
+        let fixes = fix_for_diagnostic(&d, &[]);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+    }
+
+    #[test]
+    fn mut001_unique_let_decl_replaces_with_let_mut() {
+        let src = "fn main()\n    let x = 1\n    x = x + 1\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].col, 5); // "    let x"：let 前有 4 空格
+        assert_eq!(fixes[0].end_col, Some(8)); // "let" 3 字符
+        assert_eq!(fixes[0].text.as_deref(), Some("let mut"));
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    #[test]
+    fn mut001_word_boundary_rejects_longer_name() {
+        // 声明是 let xy：'x' 的回扫不得命中（词边界）
+        let src = "fn main()\n    let xy = 1\n    x = 2\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+    }
+
+    #[test]
+    fn mut001_multiple_or_zero_hits_fall_back_to_hint() {
+        // 多处 let x 命中（shadowing）→ hint；注释行不算命中
+        let src = "fn main()\n    let x = 1\n    let x = 2\n    x = 3\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
+        let fixes = fix_for_diagnostic(&d, &lines);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+
+        // 零命中（参数重赋值形态）→ hint
+        let src2 = "fn f(n: Int) -> Int\n    n = n + 1\n    n\nend\n";
+        let lines2: Vec<&str> = src2.lines().collect();
+        let fixes2 = fix_for_diagnostic(&d, &lines2);
+        assert_eq!(fixes2[0].action, ActionKind::Hint);
     }
 }

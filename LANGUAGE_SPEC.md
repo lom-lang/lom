@@ -1283,7 +1283,7 @@ All eight questions are now resolved (1-4 inline above; 5-8 by RFC-0001, 2026-08
 
 ## 12. Evaluation Suite (Phase 2.8 — implemented)
 
-Lom ships a 119-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
+Lom ships a 121-task evaluation suite at `eval/` to measure LLM generation pass-rate — the hard metric for Lom's "AI-native" claim. It is not part of the language proper, but tests conformance to this spec.
 
 ### 12.1 Layout
 
@@ -1328,7 +1328,7 @@ Each task is a JSON object:
 
 ### 12.3 Runner
 
-- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **119/119 pass on both backends (interpreter and WASM).**
+- `./run.ps1 -Verify` (Windows) / `./run.sh --verify` (Unix) — smoke-test reference solutions against `expected`. **121/121 pass on both backends (interpreter and WASM).**
 - `./run.ps1 -CandidatesDir <dir>` — evaluate LLM-generated code. Reads `<id>.lom` from `<dir>`, runs each, compares stdout to `expected`. Reports per-category and overall pass-rate. Exit code 1 on any failure (CI-friendly).
 - The runner only runs `lom` + compares stdout; it does **not** call any LLM API. LLM candidates are produced out-of-band (e.g. DeepSeek API batch) into a `candidates/` directory.
 
@@ -1338,7 +1338,7 @@ Each task is a JSON object:
 
 ### 12.5 Status
 
-- Reference solutions: 119/119 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
+- Reference solutions: 121/121 pass on both backends (`./eval/runner/run.ps1 -Verify`, `-Backend wasm`).
 - LLM pass-rate: **99/100 (99%)** — measured 2026-08-03 with expert model + thinking mode. 9/10 categories at 100%; sole failure (task 078) was output-format misunderstanding, not a language-feature error. See `eval/REPORT.md` for full analysis. **Phase 2 exit criterion met.**
 
 ---
@@ -1413,6 +1413,7 @@ Each task is a JSON object:
   - **Package symbols imported with an `as` alias were broken in three places** (latent since 4.4): the type checker's `collect_import` only resolved aliases against the builtin table (false `NAM003` on `--check`); the interpreter's `eval_call` only resolved aliases on the builtin path (runtime `RUNTIME002`); the wasm backend's arity check looked up signatures under the alias name (compile-time "expects 0 arguments"). All three fixed to resolve alias→original before consulting the user-function tables. +1 unit test.
   - **Int value range divergence documented as §11f-7** (found by package-mode differential testing; latent since Phase 7.6a / v0.11.0 — the 4-bit tag era; R24 correction: first recorded as the non-existent "v0.7.2"): the wasm backend's tagged-i64 (4-bit tag) only carries 60 payload bits — at ≥2⁵⁹ values wrap into the sign bit, at ≥2⁶⁰ they silently truncate, while the interpreter is full i64. Structural fix would require re-boxing the value representation (out of freeze scope); documented with an `int-range` probe, generator avoids the range.
   - **Differential-coverage expansion** (all byte-identical on both backends): D5 package mode — multi-file projects with flat and chained (`libb`→`liba`) dependency graphs, cross-package imports with aliases, 400 projects over two seed ranges; D6 JSON — divergence-2 boundary measured (safe: integer literals and true decimals; divergent: `30.0`/`1e2`/`-0.0`), 3 JSON templates (parse-consume / construct-stringify / nested round-trip), 1000 programs; D7 recursion gradient — depth tiers up to 8000 (within the interpreter's 80k guard and V8's default stack), mutual recursion, early-return-inside-recursion, 1000 programs. Probes now cover 6 of the 7 §11f divergences (`json-number` and `int-range` added).
+- **v1.2.1 (2026-09-16)**: repair-loop asset release (③ workpackage of the user-approved 2026-09-16 four-pack; frozen language surface unchanged — `lom fix` behavior only). Two more diagnostics get machine-applicable fix actions: **NAM005** now inserts the exact `from <module> import {<name>}` line carried by its own diagnostic message at the top of the file (High — insert-and-done); **MUT001** rescans the declaration by variable name and rewrites the unique `let x` declaration to `let mut x` (High when exactly one hit; multi-hit shadowing or non-`let` targets fall back to a Medium hint — comment lines and word boundaries respected). fix_corpus grows **8 → 11 pairs** (09 MUT001 / 10 NAM005 / 11 LEX005 unexpected ASCII char), all driven end-to-end through the iterative `--apply` loop. eval grows **119 → 121 tasks**, error_repair **22 → 24**: task 121 (LEX005 fullwidth punctuation — CJK input-method contamination, real `--check` JSON) and task 122 (TYPE002 truthiness warning forecasting a RUNTIME001 failure — the 120-style "warning as prophecy" shape). 121/121 reference solutions pass; +5 fix tests.
 - **v1.2.0 (2026-09-15)**: checker capability release (B workpackage, docs/TODO.md — the unimported-builtin blind spot found by D-phase-4 differential testing, user-approved). Language surface unchanged except one new **warning**-severity diagnostic code (permitted by freeze §14-③, MUT001/MUT002 precedent):
   - **`NAM005` (warning): known builtin used without import.** Previously a call to a real builtin that was never imported passed `--check` silently (the typechecker registers all 43 builtin signatures up front and the old division of labor left import-availability to the runtime) and only failed at run time with `RUNTIME002`. Since "forgot the import line" is a top LLM mistake, the checker now flags it statically: `[NAM005] 内建 '<name>' 未导入——需在文件顶部声明：from <module> import {<name>}` (module name from the same `module_of` table the runtime uses — single source of truth). Non-blocking (warning, `ok:true`), same gradual-typing promise as MUT001/MUT002. Prelude (`println`/`print`) is exempt; `f as g` imports unlock only the alias `g` (using the original name `f` still warns — matching the runtime's `available_builtins`); a user `fn` colliding with a builtin name stays a single `NAM002` error (no warning stacking). The self-hosted checker (§8.2 subset) does not produce NAM-family warnings — `verify_selfhost --static` compares the four-code subset only (T3/MUT002 precedent). +5 unit tests (482 total); eval task 120 (warning-repair form: static warning previews the runtime failure).
 
