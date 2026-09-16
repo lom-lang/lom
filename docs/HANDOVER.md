@@ -107,7 +107,7 @@ python tools/diff_test.py --rounds 20 --seed-base 1 --ci   # D 包差分冒烟�
 python tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci   # D5 包模式冒烟（CI 同款；全量口径 --rounds 200 ×多 seed 段）
 # 覆盖率（按需）：rustup component add llvm-tools-preview 后
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
-python tools\doc_audit.py                               # 对账：文档数字 61 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3 + Q4 测试数 ×3 + V1 宣称-证据对账 ×27（claims.json 九条 claim 分项回加+出现点同步，含 R38 深横幅变体位与 D 四期 d9/d1234） + V2 源码计数 ×10（模板池/探针/§11f 条数含 R31 英文位） + V2 项数自指 ×1 + E 类 README Current release 位 ×1（R42））——已在 CI doc-gates job 常驻
+python tools\doc_audit.py                               # 对账：文档数字 62 项（eval 总数/dump 计数/.lom 拆分/行数/版本 + N3 changelog ×3 + Q4 测试数 ×3 + V1 宣称-证据对账 ×27（claims.json 九条 claim 分项回加+出现点同步，含 R38 深横幅变体位与 D 四期 d9/d1234） + V2 源码计数 ×10（模板池/探针/§11f 条数含 R31 英文位） + V2 项数自指 ×1 + E 类 README Current release 位 ×1（R42）+ positioning 版本位 ×1（Ⓒ））——已在 CI doc-gates job 常驻
 ```
 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
@@ -303,7 +303,7 @@ end
 ## 8. 杂项备忘
 
 - `.lom/` 目录（fix-history.jsonl）是运行时产物，已 gitignore。
-- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/archive/`=调研档案（启动期四份 2026-07/08 不再更新——DESIGN_RATIONALE 有 3 处引用作决策证据，别删；**继任调研轮 2026-09-15 起持续更新**：research-YYYY-MM-DD[-topic].html 命名规范见该目录 README——第 1 轮 research-2026-09-15.html 抓到竞品重大变化：Vercel Zero 定位重合/Mojo 1.0 开源/MoonBit 推迟 Q3，认知以最新轮为准）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**）。
+- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/positioning.html`=差异化定位一页纸（2026-09-15 Ⓒ 产出：三范式对照/修复执行层独有性/证据链——发布解冻的对外弹药，数字为时点快照口径、版本位由 doc_audit E 类钉住）；`docs/archive/`=调研档案（启动期四份 2026-07/08 不再更新——DESIGN_RATIONALE 有 3 处引用作决策证据，别删；**继任调研轮 2026-09-15 起持续更新**：research-YYYY-MM-DD[-topic].html 命名规范见该目录 README——第 1 轮 research-2026-09-15.html 抓到竞品重大变化：Vercel Zero 定位重合/Mojo 1.0 开源/MoonBit 推迟 Q3，认知以最新轮为准）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**）。
 - eval/candidates/ 里的 001-100.lom 是 LLM 实测的原始产物（99/100 那批），**保留作证据**，别清理。
 - eval/prompts/_generate.ps1 从 tasks JSON 生成 prompts，改任务后记得重跑。
 - examples/todo.lom 是 Phase 3 退出标准的标志 demo（185 行 CLI），回归时可顺带跑。
