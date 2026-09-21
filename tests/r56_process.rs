@@ -37,23 +37,27 @@ fn r56_arith_overflow_process_level_exit_code() {
         assert!(
             stderr.contains("RUNTIME000"),
             "{}：stderr 应含 RUNTIME000，实际: {}",
-            name, stderr
+            name,
+            stderr
         );
         assert!(
             stderr.contains("溢出"),
             "{}：消息应含溢出说明，实际: {}",
-            name, stderr
+            name,
+            stderr
         );
         assert!(
             !stderr.contains("panicked"),
             "{}：不得以线程 panic 收场，实际: {}",
-            name, stderr
+            name,
+            stderr
         );
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(
             stdout.trim().is_empty(),
             "{}：错误前不应有输出，实际: {:?}",
-            name, stdout
+            name,
+            stdout
         );
     }
     std::fs::remove_dir_all(&dir).ok();

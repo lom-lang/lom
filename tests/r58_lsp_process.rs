@@ -99,7 +99,9 @@ impl LspProc {
 
 impl Drop for LspProc {
     fn drop(&mut self) {
-        let _ = self.stdin.write_all(b"Content-Length: 47\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}");
+        let _ = self
+            .stdin
+            .write_all(b"Content-Length: 47\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}");
         let _ = self.stdin.flush();
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -113,15 +115,26 @@ fn r58_lsp_stdio_e2e_full_session() {
     // 1. initialize：合法带空格 JSON（v1.2.1 精确扫描完全忽略 → 0 字节响应）
     lsp.send("{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"initialize\", \"params\": { \"capabilities\": {}, \"processId\": null }}");
     let init_resp = lsp.recv();
-    assert!(init_resp.contains("\"id\":1"), "initialize 应有响应: {}", init_resp);
-    assert!(init_resp.contains("capabilities"), "应声明能力: {}", init_resp);
+    assert!(
+        init_resp.contains("\"id\":1"),
+        "initialize 应有响应: {}",
+        init_resp
+    );
+    assert!(
+        init_resp.contains("capabilities"),
+        "应声明能力: {}",
+        init_resp
+    );
 
     // 2. initialized 通知（无响应）
     lsp.send("{\"jsonrpc\": \"2.0\", \"method\": \"initialized\", \"params\": {}}");
 
     // 3. didOpen：text 是 JSON 转义的三行源码（\n 转义 + 字符串内花括号不在源码里）
     let src = "fn add(x: Int, y: Int) -> Int\n    x + y\nend\nfn main() -> Unit\n    println(add(1, 2))\nend\n";
-    let text_json = src.replace('\\', "\\\\").replace('\n', "\\n").replace('"', "\\\"");
+    let text_json = src
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('"', "\\\"");
     let did_open = format!(
         "{{\"jsonrpc\": \"2.0\", \"method\": \"textDocument/didOpen\", \"params\": {{ \"textDocument\": {{ \"uri\": \"file:///e2e.lom\", \"languageId\": \"lom\", \"version\": 1, \"text\": \"{}\" }} }}}}",
         text_json
@@ -129,24 +142,39 @@ fn r58_lsp_stdio_e2e_full_session() {
     lsp.send(&did_open);
     // 干净源码：publishDiagnostics 应为空数组（v1.2.1 报 3 条 LEX005——\n 未反转义）
     let diag = lsp.recv_method("publishDiagnostics");
-    assert!(diag.contains("\"diagnostics\":[]"), "干净三行源码零诊断: {}", diag);
+    assert!(
+        diag.contains("\"diagnostics\":[]"),
+        "干净三行源码零诊断: {}",
+        diag
+    );
 
     // 4. hover：position 嵌套对象 + 空格
     lsp.send("{\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"textDocument/hover\", \"params\": { \"textDocument\": { \"uri\": \"file:///e2e.lom\" }, \"position\": { \"line\": 0, \"character\": 4 } }}");
     let hover = lsp.recv();
     assert!(hover.contains("\"id\":2"), "hover 应有响应: {}", hover);
-    assert!(hover.contains("fn add(x: Int, y: Int) -> Int"), "hover 应含签名: {}", hover);
+    assert!(
+        hover.contains("fn add(x: Int, y: Int) -> Int"),
+        "hover 应含签名: {}",
+        hover
+    );
 
     // 5. didChange：全量替换为含语法错误的文本（缺 end → R57 的 PARSE001）
     let bad_src = "fn main() -> Unit\n    let x = 5\n    println(x)\n";
-    let bad_json = bad_src.replace('\\', "\\\\").replace('\n', "\\n").replace('"', "\\\"");
+    let bad_json = bad_src
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('"', "\\\"");
     let did_change = format!(
         "{{\"jsonrpc\": \"2.0\", \"method\": \"textDocument/didChange\", \"params\": {{ \"textDocument\": {{ \"uri\": \"file:///e2e.lom\", \"version\": 2 }}, \"contentChanges\": [ {{ \"text\": \"{}\" }} ] }}}}",
         bad_json
     );
     lsp.send(&did_change);
     let diag2 = lsp.recv_method("publishDiagnostics");
-    assert!(diag2.contains("PARSE001"), "缺 end 应报 PARSE001: {}", diag2);
+    assert!(
+        diag2.contains("PARSE001"),
+        "缺 end 应报 PARSE001: {}",
+        diag2
+    );
 
     // 6. shutdown
     lsp.send("{\"jsonrpc\": \"2.0\", \"id\": 3, \"method\": \"shutdown\"}");
@@ -163,7 +191,10 @@ fn r58_lsp_output_json_is_valid_and_escaped() {
 
     // didOpen 一个会产生含中文+引号诊断的源码（输出转义必须完整）
     let bad = "fn main() -> Unit\n    println@(\"你好\")\n";
-    let bad_json = bad.replace('\\', "\\\\").replace('\n', "\\n").replace('"', "\\\"");
+    let bad_json = bad
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('"', "\\\"");
     let did_open = format!(
         "{{\"jsonrpc\": \"2.0\", \"method\": \"textDocument/didOpen\", \"params\": {{ \"textDocument\": {{ \"uri\": \"file:///esc.lom\", \"languageId\": \"lom\", \"version\": 1, \"text\": \"{}\" }} }}}}",
         bad_json

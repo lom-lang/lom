@@ -407,10 +407,11 @@ impl Module {
                 let mut groups: Vec<(u32, ValType)> = Vec::new();
                 for &l in &f.locals {
                     if let Some(last) = groups.last_mut()
-                        && last.1 == l {
-                            last.0 += 1;
-                            continue;
-                        }
+                        && last.1 == l
+                    {
+                        last.0 += 1;
+                        continue;
+                    }
                     groups.push((1, l));
                 }
                 let mut body = leb_u(groups.len() as u64);
@@ -475,9 +476,11 @@ pub fn hello_module(text: &str) -> Vec<u8> {
         },
     });
     m.memory_min_pages = Some(1);
-    m.exports.push(("memory".to_string(), ExportKind::Memory, 0));
+    m.exports
+        .push(("memory".to_string(), ExportKind::Memory, 0));
     let main_idx = m.func_index_of_local(0);
-    m.exports.push(("main".to_string(), ExportKind::Func, main_idx));
+    m.exports
+        .push(("main".to_string(), ExportKind::Func, main_idx));
     m.data.push(DataSegment {
         offset: 0,
         bytes: text.as_bytes().to_vec(),
@@ -497,7 +500,10 @@ mod tests {
         assert_eq!(leb_u(127), [0x7F]);
         assert_eq!(leb_u(128), [0x80, 0x01]);
         assert_eq!(leb_u(624485), [0xE5, 0x8E, 0x26]);
-        assert_eq!(leb_u(u64::MAX), [0xFF; 9].into_iter().chain([0x01]).collect::<Vec<u8>>());
+        assert_eq!(
+            leb_u(u64::MAX),
+            [0xFF; 9].into_iter().chain([0x01]).collect::<Vec<u8>>()
+        );
     }
 
     #[test]
@@ -526,12 +532,11 @@ mod tests {
             0x09, 0x6C, 0x6F, 0x6D, 0x5F, 0x70, 0x72, 0x69, 0x6E, 0x74, // "lom_print"
             0x00, 0x00, //   kind=func, typeidx=0
             // function section (id=3, len=2)：1 个本地函数用 type1
-            0x03, 0x02, 0x01, 0x01,
-            // memory section (id=5, len=3)：min=1 页
+            0x03, 0x02, 0x01, 0x01, // memory section (id=5, len=3)：min=1 页
             0x05, 0x03, 0x01, 0x00, 0x01,
             // export section (id=7, len=17)："memory"→mem0，"main"→func1（导入占 func0）
-            0x07, 0x11, 0x02, 0x06, 0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, 0x00,
-            0x04, 0x6D, 0x61, 0x69, 0x6E, 0x00, 0x01,
+            0x07, 0x11, 0x02, 0x06, 0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, 0x00, 0x04, 0x6D,
+            0x61, 0x69, 0x6E, 0x00, 0x01,
             // code section (id=10, len=10)：locals=0; i32.const 0; i32.const 2; call 0; end
             0x0A, 0x0A, 0x01, 0x08, 0x00, 0x41, 0x00, 0x41, 0x02, 0x10, 0x00, 0x0B,
             // data section (id=11, len=8)：offset 0, "hi"
@@ -543,19 +548,43 @@ mod tests {
     #[test]
     fn add_type_dedup() {
         let mut m = Module::new();
-        let a = m.add_type(FuncType { params: vec![], results: vec![] });
-        let b = m.add_type(FuncType { params: vec![ValType::I32], results: vec![] });
-        let c = m.add_type(FuncType { params: vec![], results: vec![] });
+        let a = m.add_type(FuncType {
+            params: vec![],
+            results: vec![],
+        });
+        let b = m.add_type(FuncType {
+            params: vec![ValType::I32],
+            results: vec![],
+        });
+        let c = m.add_type(FuncType {
+            params: vec![],
+            results: vec![],
+        });
         assert_eq!((a, b, c), (0, 1, 0));
     }
 
     #[test]
     fn func_index_space_imports_first() {
         let mut m = Module::new();
-        let ty = m.add_type(FuncType { params: vec![], results: vec![] });
-        m.imports.push(Import { module: "env".into(), name: "a".into(), type_idx: ty });
-        m.imports.push(Import { module: "env".into(), name: "b".into(), type_idx: ty });
-        m.funcs.push(Function { type_idx: ty, locals: vec![], body: vec![] });
+        let ty = m.add_type(FuncType {
+            params: vec![],
+            results: vec![],
+        });
+        m.imports.push(Import {
+            module: "env".into(),
+            name: "a".into(),
+            type_idx: ty,
+        });
+        m.imports.push(Import {
+            module: "env".into(),
+            name: "b".into(),
+            type_idx: ty,
+        });
+        m.funcs.push(Function {
+            type_idx: ty,
+            locals: vec![],
+            body: vec![],
+        });
         assert_eq!(m.func_index_of_local(0), 2); // 两个导入占 0/1
     }
 
@@ -563,11 +592,21 @@ mod tests {
     fn empty_body_still_ends() {
         // 空函数体也必须以 0x0B 结尾（code entry = locals_vec + body + END）
         let mut m = Module::new();
-        let ty = m.add_type(FuncType { params: vec![], results: vec![] });
-        m.funcs.push(Function { type_idx: ty, locals: vec![], body: vec![] });
+        let ty = m.add_type(FuncType {
+            params: vec![],
+            results: vec![],
+        });
+        m.funcs.push(Function {
+            type_idx: ty,
+            locals: vec![],
+            body: vec![],
+        });
         let bytes = m.encode();
         // code section 内容：count=1, body_len=2, locals=0, END
-        let pos = bytes.windows(2).position(|w| w == [0x0A, 0x04]).expect("code section");
+        let pos = bytes
+            .windows(2)
+            .position(|w| w == [0x0A, 0x04])
+            .expect("code section");
         assert_eq!(&bytes[pos..], &[0x0A, 0x04, 0x01, 0x02, 0x00, 0x0B]);
     }
 }

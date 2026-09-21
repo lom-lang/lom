@@ -24,11 +24,11 @@ pub enum Token {
     False,
     And,
     Or,
-    From, // Phase 2.1.5 显式导入
+    From,   // Phase 2.1.5 显式导入
     Import, // Phase 2.1.5 显式导入
-    As,    // Phase 2.1.5 导入别名
-    Match, // Phase 2
-    Enum,  // Phase 2
+    As,     // Phase 2.1.5 导入别名
+    Match,  // Phase 2
+    Enum,   // Phase 2
 
     // 字面量
     Int(i64),
@@ -39,41 +39,41 @@ pub enum Token {
     Ident(String),
 
     // 运算符
-    Plus,      // +
-    Minus,     // -
-    Star,      // *
-    Slash,     // /
-    Percent,   // %
-    PlusEq,    // += (v0.4.1 P0-3 复合赋值)
-    MinusEq,   // -=
-    StarEq,    // *=
-    SlashEq,   // /=
-    Eq,        // ==
-    NotEq,     // !=
-    Lt,        // <
-    Gt,        // >
-    LtEq,      // <=
-    GtEq,      // >=
-    Assign,    // =
-    Bang,      // !
-    Question,  // ? (Phase 2)
-    Pipe,      // |> (Phase 2)
-    Bar,       // | (Phase 2, enum 变体分隔)
-    Arrow,     // -> (闭包返回类型)
-    FatArrow,  // => (Phase 2 match)
+    Plus,     // +
+    Minus,    // -
+    Star,     // *
+    Slash,    // /
+    Percent,  // %
+    PlusEq,   // += (v0.4.1 P0-3 复合赋值)
+    MinusEq,  // -=
+    StarEq,   // *=
+    SlashEq,  // /=
+    Eq,       // ==
+    NotEq,    // !=
+    Lt,       // <
+    Gt,       // >
+    LtEq,     // <=
+    GtEq,     // >=
+    Assign,   // =
+    Bang,     // !
+    Question, // ? (Phase 2)
+    Pipe,     // |> (Phase 2)
+    Bar,      // | (Phase 2, enum 变体分隔)
+    Arrow,    // -> (闭包返回类型)
+    FatArrow, // => (Phase 2 match)
 
     // 标点
-    LParen,    // (
-    RParen,    // )
-    LBrace,    // { (Phase 2 记录)
-    RBrace,    // }
-    LBracket,  // [
-    RBracket,  // ]
-    Comma,     // ,
-    Colon,     // :
-    Dot,       // .
-    DotDot,    // .. (v0.4.2 P1-1 range 表达式)
-    Semi,      // ; (保留，Phase 1 不使用但 lexer 识别)
+    LParen,   // (
+    RParen,   // )
+    LBrace,   // { (Phase 2 记录)
+    RBrace,   // }
+    LBracket, // [
+    RBracket, // ]
+    Comma,    // ,
+    Colon,    // :
+    Dot,      // .
+    DotDot,   // .. (v0.4.2 P1-1 range 表达式)
+    Semi,     // ; (保留，Phase 1 不使用但 lexer 识别)
 
     // 结束
     Eof,
@@ -667,11 +667,7 @@ impl<'a> Lexer<'a> {
             "enum" => Token::Enum,
             _ => Token::Ident(s.to_string()),
         };
-        Ok(SpannedToken {
-            token,
-            line,
-            col,
-        })
+        Ok(SpannedToken { token, line, col })
     }
 }
 
@@ -774,8 +770,16 @@ mod tests {
         let src = "let 中文 = 1";
         let (_, errors) = Lexer::new(src).tokenize_recover();
         assert_eq!(errors.len(), 2, "两个汉字应各报一次错，得到: {:?}", errors);
-        assert!(errors[0].message.contains("中"), "消息应含完整字符: {}", errors[0].message);
-        assert!(errors[1].message.contains("文"), "消息应含完整字符: {}", errors[1].message);
+        assert!(
+            errors[0].message.contains("中"),
+            "消息应含完整字符: {}",
+            errors[0].message
+        );
+        assert!(
+            errors[1].message.contains("文"),
+            "消息应含完整字符: {}",
+            errors[1].message
+        );
         assert_eq!(errors[0].col, 5);
         assert_eq!(errors[1].col, 8, "列坐标按字节（中占 3 字节：5,6,7）");
     }

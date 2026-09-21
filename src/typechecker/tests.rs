@@ -36,8 +36,11 @@ fn check_src(src: &str) -> Diagnostics {
     // 合并解析错误
     let source_lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
     for e in &result.errors {
-        diags.diagnostics
-            .push(Diagnostic::from_parse(e, "test.lom", &source_lines.iter().map(|s| s.as_str()).collect::<Vec<_>>()));
+        diags.diagnostics.push(Diagnostic::from_parse(
+            e,
+            "test.lom",
+            &source_lines.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+        ));
         diags.ok = false;
     }
     if result.is_ok() {
@@ -47,7 +50,11 @@ fn check_src(src: &str) -> Diagnostics {
 }
 
 fn count_type_diags(diags: &Diagnostics) -> usize {
-    diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).count()
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .count()
 }
 
 #[test]
@@ -61,7 +68,11 @@ fn clean_program_has_no_type_errors() {
 fn undefined_variable_reported() {
     let src = "fn main() -> Unit\n    println(undefined_var)\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
     assert!(!type_diags.is_empty());
     assert!(type_diags.iter().any(|d| d.code == "NAM003"));
 }
@@ -94,9 +105,16 @@ fn external_symbol_alias_import_no_false_nam003() {
     let mut tc = TypeChecker::new("test.lom", source_lines);
     tc.external_symbols.insert("real_fn".to_string());
     tc.check(&program, &mut diags);
-    let nam003: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
-    assert!(nam003.is_empty(), "包符号别名导入不应报 NAM003，实际: {:?}",
-            nam003.iter().map(|d| &d.message).collect::<Vec<_>>());
+    let nam003: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
+    assert!(
+        nam003.is_empty(),
+        "包符号别名导入不应报 NAM003，实际: {:?}",
+        nam003.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
 }
 
 /// 同族：or 左操作数位置的未定义变量（曾经同样漏检）
@@ -143,11 +161,7 @@ fn nam003_suggests_similar_variable_name() {
         .collect();
     assert!(!nam003.is_empty(), "应报 NAM003");
     let hint = nam003[0].hint.as_ref().expect("应有 hint");
-    assert!(
-        hint.contains("count"),
-        "hint 应建议 count，实际: {}",
-        hint
-    );
+    assert!(hint.contains("count"), "hint 应建议 count，实际: {}", hint);
 }
 
 /// Phase 4.1.1: NAM003 拼写建议 — 无相似名时保持通用 hint（不误报）
@@ -229,7 +243,11 @@ fn nam004_variant_diag_locates_name_token() {
 fn type_mismatch_in_let_annotation() {
     let src = "fn main() -> Unit\n    let x: Int = \"hello\"\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
     assert!(type_diags.iter().any(|d| d.code == "TYPE001"));
 }
 
@@ -237,15 +255,27 @@ fn type_mismatch_in_let_annotation() {
 fn function_param_count_mismatch() {
     let src = "fn add(a: Int, b: Int) -> Int\n    a + b\nend\nfn main() -> Unit\n    add(1)\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
-    assert!(type_diags.iter().any(|d| d.code == "TYPE003" && d.message.contains("参数")));
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
+    assert!(
+        type_diags
+            .iter()
+            .any(|d| d.code == "TYPE003" && d.message.contains("参数"))
+    );
 }
 
 #[test]
 fn return_type_mismatch() {
     let src = "fn f() -> Int\n    \"hello\"\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
     // Phase 3.2: TYPE010 诊断应定位到函数签名行（fn 关键字位置 1:1），而非 (0:0)
     let type010 = type_diags.iter().find(|d| d.code == "TYPE010");
     assert!(type010.is_some(), "应报告 TYPE010");
@@ -258,7 +288,11 @@ fn return_type_mismatch() {
 fn if_condition_must_be_bool() {
     let src = "fn main() -> Unit\n    if 5\n        println(\"hi\")\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
     assert!(type_diags.iter().any(|d| d.code == "TYPE002"));
 }
 
@@ -266,23 +300,42 @@ fn if_condition_must_be_bool() {
 fn result_exhaustive_match_ok() {
     let src = "fn f() -> Unit\n    let x = Ok(5)\n    match x\n        Ok(n) => println(n)\n        Err(e) => println(e)\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
-    assert_eq!(mat_diags.len(), 0, "exhaustive Result match should not warn");
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
+    assert_eq!(
+        mat_diags.len(),
+        0,
+        "exhaustive Result match should not warn"
+    );
 }
 
 #[test]
 fn result_non_exhaustive_match_warns() {
     let src = "fn f() -> Unit\n    let x = Ok(5)\n    match x\n        Ok(n) => println(n)\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
-    assert!(mat_diags.iter().any(|d| d.message.contains("Err")), "should warn about missing Err");
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
+    assert!(
+        mat_diags.iter().any(|d| d.message.contains("Err")),
+        "should warn about missing Err"
+    );
 }
 
 #[test]
 fn option_exhaustive_with_none_and_some() {
     let src = "fn f() -> Unit\n    let x = Some(5)\n    match x\n        Some(n) => println(n)\n        None => println(\"none\")\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
     assert_eq!(mat_diags.len(), 0);
 }
 
@@ -290,7 +343,11 @@ fn option_exhaustive_with_none_and_some() {
 fn user_enum_non_exhaustive_warns() {
     let src = "enum Color = Red | Green | Blue\nfn f() -> Unit\n    let c = Red\n    match c\n        Red => println(\"r\")\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
     assert!(mat_diags.iter().any(|d| d.message.contains("Green")));
     assert!(mat_diags.iter().any(|d| d.message.contains("Blue")));
 }
@@ -299,7 +356,11 @@ fn user_enum_non_exhaustive_warns() {
 fn user_enum_exhaustive_no_warn() {
     let src = "enum Color = Red | Green | Blue\nfn f() -> Unit\n    let c = Red\n    match c\n        Red => println(\"r\")\n        Green => println(\"g\")\n        Blue => println(\"b\")\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
     assert_eq!(mat_diags.len(), 0);
 }
 
@@ -307,7 +368,11 @@ fn user_enum_exhaustive_no_warn() {
 fn wildcard_makes_match_exhaustive() {
     let src = "enum Color = Red | Green | Blue\nfn f() -> Unit\n    let c = Red\n    match c\n        Red => println(\"r\")\n        _ => println(\"other\")\n    end\nend\n";
     let diags = check_src(src);
-    let mat_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+    let mat_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
     assert_eq!(mat_diags.len(), 0);
 }
 
@@ -399,7 +464,11 @@ fn mat001_user_enum_not_auto_applied() {
 fn try_on_non_result_warns() {
     let src = "fn f() -> Int\n    let x = 5\n    x?\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type).collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .collect();
     assert!(type_diags.iter().any(|d| d.code == "TYPE020"));
 }
 
@@ -407,7 +476,11 @@ fn try_on_non_result_warns() {
 fn try_on_result_in_result_function_ok() {
     let src = "fn f() -> Result<Int, String>\n    let x = Ok(5)\n    Ok(x?)\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE020").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE020")
+        .collect();
     // ? on Result<Int, String> in fn returning Result<Int, String> — should not warn
     assert_eq!(type_diags.len(), 0);
 }
@@ -416,7 +489,11 @@ fn try_on_result_in_result_function_ok() {
 fn string_concat_ok() {
     let src = "fn f() -> String\n    \"hello\" + \" world\"\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type && d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type && d.code == "TYPE001")
+        .collect();
     assert_eq!(type_diags.len(), 0);
 }
 
@@ -425,7 +502,11 @@ fn int_plus_string_concat_no_warn() {
     // v0.4.1 P0-2: 字符串拼接提升 —— 1 + "hello" 合法,结果为 String,不报 TYPE001
     let src = "fn f() -> Unit\n    let x = 1 + \"hello\"\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert_eq!(type_diags.len(), 0);
 }
 
@@ -434,8 +515,17 @@ fn int_plus_float_promotion_no_warn() {
     // 2026-08-22 评审整改：Int/Float 混合运算与解释器提升语义一致（→ Float），不报 TYPE001
     let src = "fn f() -> Unit\n    let x = 1 + 0.5\n    let y = 2.0 * 3\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
-    assert_eq!(type_diags.len(), 0, "Int/Float 混合不应报 TYPE001: {:?}", type_diags.iter().map(|d| &d.message).collect::<Vec<_>>());
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
+    assert_eq!(
+        type_diags.len(),
+        0,
+        "Int/Float 混合不应报 TYPE001: {:?}",
+        type_diags.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -443,8 +533,17 @@ fn pipe_arity_no_false_positive() {
     // 2026-08-22 评审整改：管道左值计入 arity——`5 |> add(1)` 对 add(a,b) 不应报 TYPE003
     let src = "fn add(a: Int, b: Int) -> Int\n    a + b\nend\nfn main() -> Unit\n    println(5 |> add(1))\nend\n";
     let diags = check_src(src);
-    let arity_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE003").collect();
-    assert_eq!(arity_diags.len(), 0, "管道场景不应报 TYPE003: {:?}", arity_diags.iter().map(|d| &d.message).collect::<Vec<_>>());
+    let arity_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE003")
+        .collect();
+    assert_eq!(
+        arity_diags.len(),
+        0,
+        "管道场景不应报 TYPE003: {:?}",
+        arity_diags.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -461,11 +560,21 @@ fn external_symbols_skip_nam003() {
         &mut diags,
         &["square".to_string()],
     );
-    let nam003: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+    let nam003: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
     assert_eq!(nam003.len(), 0, "外部包符号不应报 NAM003");
     // 对照组：不在外部名单里的符号仍报 NAM003
     let mut diags2 = Diagnostics::new("test.lom");
-    crate::typechecker::check_program_with_externals(&result.program, src, "test.lom", &mut diags2, &[]);
+    crate::typechecker::check_program_with_externals(
+        &result.program,
+        src,
+        "test.lom",
+        &mut diags2,
+        &[],
+    );
     assert!(diags2.diagnostics.iter().any(|d| d.code == "NAM003"));
 }
 
@@ -474,7 +583,11 @@ fn int_plus_bool_still_warns() {
     // 非 String 的不兼容组合仍然报警(1 + True 没有提升规则)
     let src = "fn f() -> Unit\n    let x = 1 + True\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -483,7 +596,11 @@ fn range_result_is_int_list() {
     // v0.4.2 P1-1: 1..5 → List<Int>,for i in 1..5 的 i 按 Int 检查(i - "s" 报 TYPE001)
     let src = "fn f() -> Unit\n    for i in 1..5\n        let y = i - \"s\"\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -492,7 +609,11 @@ fn range_float_end_warns() {
     // range 两端应为 Int:1.5..3 报 TYPE001
     let src = "fn f() -> Unit\n    let xs = 1.5..3\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -501,16 +622,25 @@ fn range_int_ok_no_warn() {
     // 正常 range 不应有 TYPE001
     let src = "fn f() -> Unit\n    let mut total = 0\n    for i in 1..10\n        total += i\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert_eq!(type_diags.len(), 0);
 }
 
 #[test]
 fn match_guard_non_bool_warns() {
     // v0.4.2 P1-2: guard 应为 Bool,得到 Int 报 TYPE002
-    let src = "fn f(n: Int) -> Int\n    match n\n        m if m + 1 => 1\n        _ => 0\n    end\nend\n";
+    let src =
+        "fn f(n: Int) -> Int\n    match n\n        m if m + 1 => 1\n        _ => 0\n    end\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE002").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE002")
+        .collect();
     assert!(!d.is_empty());
 }
 
@@ -519,7 +649,11 @@ fn match_guarded_arm_not_exhaustive() {
     // 带 guard 的臂不计入穷尽性:用户枚举全部臂带 guard 且无通配 → MAT001
     let src = "enum Color = Red | Green\nfn f(c: Color) -> Int\n    match c\n        Red if True => 1\n        Green if True => 2\n    end\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001")
+        .collect();
     assert!(!d.is_empty());
 }
 
@@ -528,7 +662,11 @@ fn match_guard_with_wildcard_ok() {
     // guard 臂 + 无 guard 通配兜底 → 无 MAT001;guard 用绑定变量合法
     let src = "fn f(n: Int) -> String\n    match n\n        m if m > 10 => \"big\"\n        _ => \"small\"\n    end\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "MAT001" || d.code == "TYPE002" || d.code == "NAM003").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MAT001" || d.code == "TYPE002" || d.code == "NAM003")
+        .collect();
     assert_eq!(d.len(), 0);
 }
 
@@ -538,7 +676,11 @@ fn for_list_element_type_checked() {
     // (注:不能用 x + "s" 当反面案例 —— v0.4.1 P0-2 字符串拼接提升使其合法)
     let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    for x in xs\n        let y = x - \"s\"\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -547,7 +689,11 @@ fn for_list_element_type_ok() {
     // for x in List<Int> → x + 1 合法,不应报 TYPE001
     let src = "from list import {list_cons, list_empty}\nfn f() -> Unit\n    let xs: List<Int> = list_cons(1, list_empty())\n    let mut sum = 0\n    for x in xs\n        sum = sum + x\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE001").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .collect();
     assert_eq!(type_diags.len(), 0);
 }
 
@@ -555,7 +701,11 @@ fn for_list_element_type_ok() {
 fn record_field_access_ok() {
     let src = "fn f() -> Int\n    let p = {x: 3, y: 4}\n    p.x\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == Stage::Type && d.code == "NAM004").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type && d.code == "NAM004")
+        .collect();
     assert_eq!(type_diags.len(), 0);
 }
 
@@ -563,7 +713,11 @@ fn record_field_access_ok() {
 fn record_missing_field_warns() {
     let src = "fn f() -> Int\n    let p = {x: 3, y: 4}\n    p.z\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM004").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM004")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -571,7 +725,11 @@ fn record_missing_field_warns() {
 fn duplicate_function_definition() {
     let src = "fn f() -> Unit\n    println(1)\nend\nfn f() -> Unit\n    println(2)\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM002").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM002")
+        .collect();
     assert!(!type_diags.is_empty());
     // Phase 3.2: NAM002 应定位到第二次重复定义的 fn 关键字 (line 4, col 1)，而非 (0:0)
     let d = &type_diags[0];
@@ -583,7 +741,11 @@ fn duplicate_function_definition() {
 fn closure_return_type_checked() {
     let src = "fn main() -> Unit\n    let f = fn(x: Int) -> String\n        x\n    end\nend\n";
     let diags = check_src(src);
-    let type_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE010").collect();
+    let type_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE010")
+        .collect();
     assert!(!type_diags.is_empty());
 }
 
@@ -594,7 +756,11 @@ fn pure_function_calling_io_function_reports_eff001() {
     // 纯函数 helper 调用 println（带 IO 效应）→ 应报 EFF001
     let src = "fn helper(x: Int) -> Int\n    println(x)\n    x\nend\nfn main() -> Unit\n    helper(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert_eq!(eff_diags.len(), 1, "纯函数调用 IO 函数应报 EFF001");
     // Phase 3.2: EFF001 应定位到 helper 的函数签名行 (line 1, col 1)，而非 (0:0)
     let d = &eff_diags[0];
@@ -607,8 +773,15 @@ fn io_function_calling_io_function_no_error() {
     // helper 声明 ! [IO]，调用 println 不报 EFF001
     let src = "fn helper(x: Int) -> Int ! [IO]\n    println(x)\n    x\nend\nfn main() -> Unit\n    helper(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
-    assert!(eff_diags.is_empty(), "声明了 IO 效应的函数调用 println 不应报 EFF001");
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
+    assert!(
+        eff_diags.is_empty(),
+        "声明了 IO 效应的函数调用 println 不应报 EFF001"
+    );
 }
 
 #[test]
@@ -616,7 +789,11 @@ fn main_function_calling_io_no_error() {
     // main 函数隐式拥有所有效应，调用 println 不报 EFF001
     let src = "fn main() -> Unit\n    println(\"hello\")\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert!(eff_diags.is_empty(), "main 函数调用 println 不应报 EFF001");
 }
 
@@ -625,7 +802,11 @@ fn main_calling_pure_then_io_no_error() {
     // main 调用纯函数 double，再调用 println — 都不报 EFF001
     let src = "fn double(x: Int) -> Int\n    x * 2\nend\nfn main() -> Unit\n    println(double(5))\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert!(eff_diags.is_empty(), "main 中调用 println 不应报 EFF001");
 }
 
@@ -634,8 +815,16 @@ fn partial_effect_coverage_reports_eff001() {
     // helper 声明 ! [IO]，调用 declare_clock（带 Clock 效应）→ 应报 EFF001（Clock 未声明）
     let src = "fn declare_clock() -> Int ! [Clock]\n    0\nend\nfn helper(x: Int) -> Int ! [IO]\n    declare_clock()\n    x\nend\nfn main() -> Unit\n    helper(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
-    assert_eq!(eff_diags.len(), 1, "声明 [IO] 但调用带 [Clock] 的函数应报 EFF001");
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
+    assert_eq!(
+        eff_diags.len(),
+        1,
+        "声明 [IO] 但调用带 [Clock] 的函数应报 EFF001"
+    );
 }
 
 #[test]
@@ -643,8 +832,15 @@ fn multi_effect_function_no_error() {
     // helper 声明 ! [IO, Clock]，调用 println 和 declare_clock 都不报
     let src = "fn declare_clock() -> Int ! [Clock]\n    0\nend\nfn helper(x: Int) -> Int ! [IO, Clock]\n    println(x)\n    declare_clock()\n    x\nend\nfn main() -> Unit\n    helper(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
-    assert!(eff_diags.is_empty(), "声明 [IO, Clock] 后调用对应效应函数不应报 EFF001");
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
+    assert!(
+        eff_diags.is_empty(),
+        "声明 [IO, Clock] 后调用对应效应函数不应报 EFF001"
+    );
 }
 
 #[test]
@@ -652,7 +848,11 @@ fn empty_effect_list_treated_as_pure() {
     // ! [] 等价于纯函数，调用 println 仍报 EFF001
     let src = "fn helper(x: Int) -> Int ! []\n    println(x)\n    x\nend\nfn main() -> Unit\n    helper(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert_eq!(eff_diags.len(), 1, "! [] 等价于纯函数，应报 EFF001");
 }
 
@@ -661,7 +861,11 @@ fn pure_function_calling_pure_no_error() {
     // 纯函数调用纯函数（如 math 模块的 len/upper 等）不报 EFF001
     let src = "from string import { len }\nfn helper(s: String) -> Int\n    len(s)\nend\nfn main() -> Unit\n    println(helper(\"hi\"))\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert!(eff_diags.is_empty(), "纯函数调用纯函数不应报 EFF001");
 }
 
@@ -671,10 +875,18 @@ fn effect_annotation_parsed_correctly() {
     let src = "fn fetch(url: String) -> String ! [IO, Network]\n    \"data\"\nend\nfn main() -> Unit\n    fetch(\"x\")\nend\n";
     let diags = check_src(src);
     // main 调用 fetch（带 IO/Network 效应）— main 隐式所有效应，不报
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     assert!(eff_diags.is_empty(), "main 调用带效应函数不应报 EFF001");
     // 也不应有语法错误
-    let parse_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.stage == crate::diagnostics::Stage::Parse).collect();
+    let parse_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == crate::diagnostics::Stage::Parse)
+        .collect();
     assert!(parse_diags.is_empty(), "不应有语法错误");
 }
 
@@ -686,7 +898,11 @@ fn nested_pure_function_calling_io_through_chain() {
     // 这个测试验证：效应检查只看声明的效应，不传递
     let src = "fn c(x: Int) -> Int\n    println(x)\n    x\nend\nfn b(x: Int) -> Int\n    c(x)\nend\nfn main() -> Unit\n    b(5)\nend\n";
     let diags = check_src(src);
-    let eff_diags: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "EFF001").collect();
+    let eff_diags: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "EFF001")
+        .collect();
     // c 内调用 println 报 1 次 EFF001；b 调用 c 不报（c 未声明效应）
     assert_eq!(eff_diags.len(), 1, "只有 c 内调用 println 报 EFF001");
 }
@@ -694,7 +910,11 @@ fn nested_pure_function_calling_io_through_chain() {
 // ===== MUT001 不可变重赋值校验（2026-08-31，用户裁决实现 warning 级）=====
 
 fn mut001_diags(diags: &Diagnostics) -> Vec<&Diagnostic> {
-    diags.diagnostics.iter().filter(|d| d.code == "MUT001").collect()
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "MUT001")
+        .collect()
 }
 
 #[test]
@@ -739,7 +959,11 @@ fn mut001_compound_assign_warns() {
     // x += 1 在 parser 去糖为 x = x + 1，同样命中 MUT001
     let src = "fn main() -> Unit\n    let x = 3\n    x += 1\nend\n";
     let diags = check_src(src);
-    assert_eq!(mut001_diags(&diags).len(), 1, "不可变变量复合赋值应报 MUT001");
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "不可变变量复合赋值应报 MUT001"
+    );
 }
 
 #[test]
@@ -747,7 +971,11 @@ fn mut001_for_var_reassign_warns() {
     // for 循环变量是每轮迭代的新鲜绑定，不可变
     let src = "fn main() -> Unit\n    for i in 1..3\n        i = 5\n    end\nend\n";
     let diags = check_src(src);
-    assert_eq!(mut001_diags(&diags).len(), 1, "for 循环变量重赋值应报 MUT001");
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "for 循环变量重赋值应报 MUT001"
+    );
 }
 
 #[test]
@@ -755,7 +983,11 @@ fn mut001_match_binder_reassign_warns() {
     // match 臂绑定变量不可变
     let src = "fn f(n: Int) -> Unit\n    match n\n        m =>\n            m = 5\n        end\n    end\nend\n";
     let diags = check_src(src);
-    assert_eq!(mut001_diags(&diags).len(), 1, "match 绑定变量重赋值应报 MUT001");
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "match 绑定变量重赋值应报 MUT001"
+    );
 }
 
 #[test]
@@ -763,7 +995,11 @@ fn mut001_mut_compound_assign_no_warn() {
     // 对照组：let mut + += 合法（既有 for_list_element_type_ok 类场景不能回归）
     let src = "fn main() -> Unit\n    let mut total = 0\n    for i in 1..10\n        total += i\n    end\nend\n";
     let diags = check_src(src);
-    assert_eq!(mut001_diags(&diags).len(), 0, "let mut 复合赋值不应报 MUT001");
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        0,
+        "let mut 复合赋值不应报 MUT001"
+    );
 }
 
 // ===== Phase 3.2b：表达式级 span —— 诊断精确位置 =====
@@ -773,9 +1009,17 @@ fn span_nam003_points_at_ident_use() {
     // 行 3: `    let x = toatl + 1`——toatl 在 col 13（此前 NAM003 钉在 (0,0)）
     let src = "fn main() -> Unit\n    let total = 1\n    let x = toatl + 1\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
     assert_eq!(d.len(), 1);
-    assert_eq!((d[0].line, d[0].col), (3, 13), "NAM003 应定位到标识符使用处");
+    assert_eq!(
+        (d[0].line, d[0].col),
+        (3, 13),
+        "NAM003 应定位到标识符使用处"
+    );
 }
 
 #[test]
@@ -793,9 +1037,17 @@ fn span_nam004_points_at_field_name() {
     // 行 3: `    println(p.z)`——z 在 col 15（Field span 的 end），不是对象 p 的 col 13
     let src = "fn main() -> Unit\n    let p = {x: 3, y: 4}\n    println(p.z)\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM004").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM004")
+        .collect();
     assert_eq!(d.len(), 1);
-    assert_eq!((d[0].line, d[0].col), (3, 15), "NAM004 应定位到字段名 token");
+    assert_eq!(
+        (d[0].line, d[0].col),
+        (3, 15),
+        "NAM004 应定位到字段名 token"
+    );
 }
 
 #[test]
@@ -803,7 +1055,11 @@ fn span_type002_points_at_condition() {
     // 行 2: `    if 1 + 1`——条件表达式起点在 col 8
     let src = "fn main() -> Unit\n    if 1 + 1\n        println(1)\n    end\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "TYPE002").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE002")
+        .collect();
     assert_eq!(d.len(), 1);
     assert_eq!((d[0].line, d[0].col), (2, 8), "TYPE002 应定位到条件表达式");
 }
@@ -814,7 +1070,11 @@ fn let_closure_self_reference_no_nam003() {
     // WASM pre-bind + 槽位补丁），静态检查不应报 NAM003（此前先查后绑导致假阳性）
     let src = "fn main() -> Unit\n    let f = fn(n: Int) -> Int\n        if n <= 1\n            1\n        else\n            n * f(n - 1)\n        end\n    end\n    println(f(5))\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
     assert_eq!(d.len(), 0, "递归闭包 let 自引用不应报 NAM003");
 }
 
@@ -823,7 +1083,11 @@ fn let_non_closure_self_reference_still_nam003() {
     // T2 对照组：非闭包初始化器（let x = x + 1）不预绑，NAM003 照报
     let src = "fn main() -> Unit\n    let x = x + 1\n    println(x)\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM003").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM003")
+        .collect();
     assert_eq!(d.len(), 1, "非闭包自引用仍应报 NAM003");
 }
 
@@ -840,9 +1104,16 @@ fn nam005_unimported_builtin_warns_with_hint() {
         .filter(|d| d.code == "NAM005")
         .collect();
     assert_eq!(d.len(), 1, "未导入内建恰 1 条 NAM005");
-    assert!(d[0].message.contains("from string import {starts_with}"), "hint 含模块名与导入写法: {}", d[0].message);
+    assert!(
+        d[0].message.contains("from string import {starts_with}"),
+        "hint 含模块名与导入写法: {}",
+        d[0].message
+    );
     assert_eq!(d[0].severity, crate::diagnostics::Severity::Warning);
-    assert!(diags.ok, "warning 不置 ok=false（渐进式承诺，与 MUT001/MUT002 同款）");
+    assert!(
+        diags.ok,
+        "warning 不置 ok=false（渐进式承诺，与 MUT001/MUT002 同款）"
+    );
 }
 
 #[test]
@@ -850,7 +1121,11 @@ fn nam005_imported_builtin_clean() {
     // 对照：导入后零诊断
     let src = "from string import { starts_with }\nfn main() -> Unit\n    println(starts_with(\"a\", \"a\"))\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM005")
+        .collect();
     assert_eq!(d.len(), 0, "导入后不应报 NAM005");
 }
 
@@ -872,7 +1147,11 @@ fn nam005_prelude_exempt() {
     // prelude（println/print）恒可用，无需导入
     let src = "fn main() -> Unit\n    print(\"x\")\n    println(\"y\")\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM005")
+        .collect();
     assert_eq!(d.len(), 0, "prelude 不应报 NAM005");
 }
 
@@ -880,8 +1159,13 @@ fn nam005_prelude_exempt() {
 fn nam005_shadow_by_user_fn_blocked_by_nam002() {
     // 用户 fn 与内建同名：语言层已由 NAM002 拦截（重复定义）——不存在
     // "用户遮蔽内建后误报 NAM005"的路径（collect_fn_sig 先报错早退）
-    let src = "fn len(s: String) -> Int\n    42\nend\nfn main() -> Unit\n    println(len(\"a\"))\nend\n";
+    let src =
+        "fn len(s: String) -> Int\n    42\nend\nfn main() -> Unit\n    println(len(\"a\"))\nend\n";
     let diags = check_src(src);
-    let d: Vec<_> = diags.diagnostics.iter().filter(|d| d.code == "NAM005").collect();
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "NAM005")
+        .collect();
     assert_eq!(d.len(), 0, "同名声明走 NAM002 路径，不产生 NAM005");
 }

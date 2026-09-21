@@ -135,11 +135,7 @@ pub fn is_input_complete(input: &str) -> bool {
         i += 1;
     }
 
-    paren_depth == 0
-        && brace_depth == 0
-        && bracket_depth == 0
-        && !in_string
-        && block_depth <= 0
+    paren_depth == 0 && brace_depth == 0 && bracket_depth == 0 && !in_string && block_depth <= 0
 }
 
 /// 从 chars 的 pos 处读取一个单词（字母/数字/下划线）
@@ -259,10 +255,11 @@ impl ReplSession {
         // 但 program 可能只含 main，我们需要把 main 加入 interpreter.functions
         for item in &program.items {
             if let Item::Fn(f) = item
-                && f.name == "main" {
-                    // 检查 main body：如果是单条 let 或表达式，需要在全局环境执行并保留绑定
-                    return self.exec_repl_stmt(&f.body, original_input);
-                }
+                && f.name == "main"
+            {
+                // 检查 main body：如果是单条 let 或表达式，需要在全局环境执行并保留绑定
+                return self.exec_repl_stmt(&f.body, original_input);
+            }
         }
         Ok(ReplResult {
             should_continue: true,
@@ -401,8 +398,12 @@ mod tests {
 
     #[test]
     fn test_is_complete_block_needs_end() {
-        assert!(!is_input_complete("fn add(a: Int, b: Int) -> Int\n    a + b"));
-        assert!(is_input_complete("fn add(a: Int, b: Int) -> Int\n    a + b\nend"));
+        assert!(!is_input_complete(
+            "fn add(a: Int, b: Int) -> Int\n    a + b"
+        ));
+        assert!(is_input_complete(
+            "fn add(a: Int, b: Int) -> Int\n    a + b\nend"
+        ));
         assert!(!is_input_complete("if true\n    println(1)"));
         assert!(is_input_complete("if true\n    println(1)\nend"));
     }
@@ -431,19 +432,17 @@ mod tests {
 
     #[test]
     fn test_is_complete_match_block() {
-        assert!(!is_input_complete(
-            "match x\n    Ok(n) => n"
-        ));
-        assert!(is_input_complete(
-            "match x\n    Ok(n) => n\nend"
-        ));
+        assert!(!is_input_complete("match x\n    Ok(n) => n"));
+        assert!(is_input_complete("match x\n    Ok(n) => n\nend"));
     }
 
     #[test]
     fn test_is_complete_enum_decl() {
         // enum 是单行声明，不需要 end，应判为完整
         assert!(is_input_complete("enum Color = Red | Green"));
-        assert!(is_input_complete("enum Shape = Circle(Float) | Square(Float)"));
+        assert!(is_input_complete(
+            "enum Shape = Circle(Float) | Square(Float)"
+        ));
     }
 
     #[test]
@@ -467,7 +466,9 @@ mod tests {
     #[test]
     fn test_repl_fn_definition_persists() {
         let mut session = ReplSession::new();
-        session.exec_line("fn add(a: Int, b: Int) -> Int\n    a + b\nend").unwrap();
+        session
+            .exec_line("fn add(a: Int, b: Int) -> Int\n    a + b\nend")
+            .unwrap();
         let result = session.exec_line("add(2, 3)").unwrap();
         assert_eq!(result.output, "5");
     }
@@ -524,10 +525,14 @@ mod tests {
         let mut session = ReplSession::new();
         // 多行 fn 定义：第一行不完整，第二行 end 闭合
         assert!(!is_input_complete("fn double(n: Int) -> Int\n    n * 2"));
-        assert!(is_input_complete("fn double(n: Int) -> Int\n    n * 2\nend"));
+        assert!(is_input_complete(
+            "fn double(n: Int) -> Int\n    n * 2\nend"
+        ));
 
         // 执行完整的 fn 定义
-        let result = session.exec_line("fn double(n: Int) -> Int\n    n * 2\nend").unwrap();
+        let result = session
+            .exec_line("fn double(n: Int) -> Int\n    n * 2\nend")
+            .unwrap();
         assert!(result.output.contains("fn double 已定义"));
 
         // 调用
@@ -554,7 +559,9 @@ mod tests {
     fn test_repl_enum_definition_persists() {
         let mut session = ReplSession::new();
         // enum 单行声明
-        let result = session.exec_line("enum Color = Red | Green | Blue").unwrap();
+        let result = session
+            .exec_line("enum Color = Red | Green | Blue")
+            .unwrap();
         assert!(result.output.contains("enum Color 已定义"));
     }
 

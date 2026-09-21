@@ -37,10 +37,10 @@
 //   TYPE001-099  类型错误（Phase 2.4 预留）
 //   RUNTIME001-099 运行时错误
 
+use crate::interpreter::RuntimeError;
 use crate::json::escape_str;
 use crate::lexer::LexError;
 use crate::parser::ParseError;
-use crate::interpreter::RuntimeError;
 
 /// 错误阶段
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,12 +180,14 @@ impl Diagnostic {
                     source_lines,
                     *line,
                     *col,
-                )
+                );
             }
         };
         let code = classify_runtime_error(&msg);
         let source_line = if line > 0 {
-            source_lines.get(line.saturating_sub(1)).map(|s| s.to_string())
+            source_lines
+                .get(line.saturating_sub(1))
+                .map(|s| s.to_string())
         } else {
             None
         };
@@ -291,7 +293,6 @@ fn runtime_hint(code: &str) -> Option<String> {
 
 // ===== JSON 序列化（手写，零依赖）=====
 
-
 // ===== 诊断集合 =====
 
 /// 诊断集合：聚合一轮编译/运行的全部诊断
@@ -333,8 +334,13 @@ impl Diagnostics {
     /// 添加一条运行时错误诊断
     pub fn add_runtime(&mut self, err: &RuntimeError, src: &str, line: usize, col: usize) {
         let source_lines: Vec<&str> = src.lines().collect();
-        self.diagnostics
-            .push(Diagnostic::from_runtime(err, &self.file, &source_lines, line, col));
+        self.diagnostics.push(Diagnostic::from_runtime(
+            err,
+            &self.file,
+            &source_lines,
+            line,
+            col,
+        ));
         self.ok = false;
     }
 
@@ -376,7 +382,10 @@ impl Diagnostics {
             out.push('\n');
             for (i, d) in self.diagnostics.iter().enumerate() {
                 out.push_str("    {\n");
-                out.push_str(&format!("      \"severity\": \"{}\",\n", d.severity.as_str()));
+                out.push_str(&format!(
+                    "      \"severity\": \"{}\",\n",
+                    d.severity.as_str()
+                ));
                 out.push_str(&format!("      \"stage\": \"{}\",\n", d.stage.as_str()));
                 out.push_str(&format!("      \"code\": \"{}\",\n", d.code));
                 out.push_str(&format!(
@@ -387,17 +396,14 @@ impl Diagnostics {
                 out.push_str(&format!("      \"line\": {},\n", d.line));
                 out.push_str(&format!("      \"col\": {},\n", d.col));
                 match &d.source_line {
-                    Some(s) => out.push_str(&format!(
-                        "      \"source_line\": \"{}\",\n",
-                        escape_str(s)
-                    )),
+                    Some(s) => {
+                        out.push_str(&format!("      \"source_line\": \"{}\",\n", escape_str(s)))
+                    }
                     None => out.push_str("      \"source_line\": null,\n"),
                 }
                 out.push_str(&format!("      \"is_hole\": {},\n", d.is_hole));
                 match &d.hint {
-                    Some(h) => {
-                        out.push_str(&format!("      \"hint\": \"{}\"\n", escape_str(h)))
-                    }
+                    Some(h) => out.push_str(&format!("      \"hint\": \"{}\"\n", escape_str(h))),
                     None => out.push_str("      \"hint\": null\n"),
                 }
                 out.push_str("    }");
@@ -557,9 +563,7 @@ mod tests {
 
     #[test]
     fn runtime_hole_classifies_correctly() {
-        let err = RuntimeError::Msg(
-            "代码洞（hole）@ 3:5 — 该处解析失败，无法执行".to_string(),
-        );
+        let err = RuntimeError::Msg("代码洞（hole）@ 3:5 — 该处解析失败，无法执行".to_string());
         let lines = src_lines("fn f()\n  let x =\n  1\nend");
         let d = Diagnostic::from_runtime(&err, "test.lom", &lines, 3, 5);
         assert_eq!(d.code, "RUNTIME003");
@@ -584,7 +588,9 @@ mod tests {
             col: 9,
         };
         let lines = src_lines("let s = \"hello");
-        diags.diagnostics.push(Diagnostic::from_lex(&err, "test.lom", &lines));
+        diags
+            .diagnostics
+            .push(Diagnostic::from_lex(&err, "test.lom", &lines));
         diags.ok = false;
 
         let json = diags.to_json();
@@ -639,7 +645,9 @@ mod tests {
             col: 1,
         };
         let lines = src_lines("# bad");
-        diags.diagnostics.push(Diagnostic::from_lex(&err, "test.lom", &lines));
+        diags
+            .diagnostics
+            .push(Diagnostic::from_lex(&err, "test.lom", &lines));
         diags.ok = false;
 
         let human = diags.to_human();

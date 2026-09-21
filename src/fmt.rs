@@ -31,9 +31,9 @@ pub fn format_source(src: &str) -> Result<String, String> {
     // 按行聚合 token 统计：首 token 类型、末 token 类型、块开计数、End 计数、括号净增量
     struct LineStat {
         first: Option<Token>,
-        openers: usize,   // fn/if/while/for/match（enum 单独计数）
-        enums: usize,     // enum 关键字数
-        ends: usize,      // end
+        openers: usize, // fn/if/while/for/match（enum 单独计数）
+        enums: usize,   // enum 关键字数
+        ends: usize,    // end
         fat_arrow_last: bool,
         has_assign: bool, // 单行枚举 `enum X = A | B` 无 end，靠此排除块开
         bracket_delta: i32,
@@ -106,7 +106,8 @@ pub fn format_source(src: &str) -> Result<String, String> {
                 let continuation = bracket_depth > 0;
 
                 // 发射深度：End/Else/Elif 开头的行先降一层
-                let dedent = matches!(first, Token::End | Token::Else | Token::Elif) && !continuation;
+                let dedent =
+                    matches!(first, Token::End | Token::Else | Token::Elif) && !continuation;
                 let emit_depth = if dedent { depth - 1 } else { depth }.max(0);
 
                 if continuation {
@@ -233,7 +234,8 @@ mod tests {
     #[test]
     fn fmt_single_line_enum_no_leak() {
         // 单行枚举 enum X = A | B 无 end，不能开块（否则后续所有行深度泄漏）
-        let src = "enum Color = Red | Green | Blue\n\nfn f(c: Int) -> Int\nmatch c\n_ => 0\nend\nend\n";
+        let src =
+            "enum Color = Red | Green | Blue\n\nfn f(c: Int) -> Int\nmatch c\n_ => 0\nend\nend\n";
         let expected = "enum Color = Red | Green | Blue\n\nfn f(c: Int) -> Int\n    match c\n        _ => 0\n    end\nend\n";
         assert_eq!(format_source(src).unwrap(), expected);
     }

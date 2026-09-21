@@ -268,18 +268,19 @@ impl TypeChecker {
         // 检查返回类型匹配
         if let Some(ret_ty) = &f.ret_type
             && let TypeOrUnknown::Known(bt) = &body_ty
-                && !self.types_compatible(bt, ret_ty) {
-                    self.push_diag(
-                        Severity::Warning,
-                        "TYPE010".into(),
-                        format!(
-                            "函数 '{}' 声明返回 {:?}，但实际返回 {:?}",
-                            f.name, ret_ty, bt
-                        ),
-                        self.current_fn_span.line,
-                        self.current_fn_span.col,
-                    );
-                }
+            && !self.types_compatible(bt, ret_ty)
+        {
+            self.push_diag(
+                Severity::Warning,
+                "TYPE010".into(),
+                format!(
+                    "函数 '{}' 声明返回 {:?}，但实际返回 {:?}",
+                    f.name, ret_ty, bt
+                ),
+                self.current_fn_span.line,
+                self.current_fn_span.col,
+            );
+        }
         self.current_ret = None;
         self.current_effects.clear();
         self.current_fn_is_main = false;
@@ -299,7 +300,13 @@ impl TypeChecker {
 
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
         match stmt {
-            Stmt::Let { name, ty, value, mutable, span } => {
+            Stmt::Let {
+                name,
+                ty,
+                value,
+                mutable,
+                span,
+            } => {
                 // T2：闭包字面量初始化器的自引用（递归闭包）是设计支持的功能——
                 // 运行时解释器按引用捕获作用域（调用时查找，名字已绑定），
                 // WASM 侧为 pre-bind + env 槽位补丁。静态检查镜像该语义：
@@ -310,18 +317,16 @@ impl TypeChecker {
                 }
                 let val_ty = self.check_expr(value, env);
                 if let (Some(annot), TypeOrUnknown::Known(vt)) = (ty, &val_ty)
-                    && !self.types_compatible(vt, annot) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE001".into(),
-                            format!(
-                                "let {} 声明类型 {:?}，但值类型 {:?}",
-                                name, annot, vt
-                            ),
-                            span.line,
-                            span.col,
-                        );
-                    }
+                    && !self.types_compatible(vt, annot)
+                {
+                    self.push_diag(
+                        Severity::Warning,
+                        "TYPE001".into(),
+                        format!("let {} 声明类型 {:?}，但值类型 {:?}", name, annot, vt),
+                        span.line,
+                        span.col,
+                    );
+                }
                 let final_ty = if let Some(annot) = ty {
                     TypeOrUnknown::Known(annot.clone())
                 } else {
@@ -359,7 +364,11 @@ impl TypeChecker {
                     }
                 }
             }
-            Stmt::Assign { target, value, span } => {
+            Stmt::Assign {
+                target,
+                value,
+                span,
+            } => {
                 let val_ty = self.check_expr(value, env);
                 if let Some(expected) = env.get(target) {
                     // 不可变重赋值校验（MUT001）：let 默认不可变，重赋值报 warning。
@@ -376,18 +385,16 @@ impl TypeChecker {
                         );
                     }
                     if let (TypeOrUnknown::Known(e), TypeOrUnknown::Known(v)) = (&expected, &val_ty)
-                        && !self.types_compatible(v, e) {
-                            self.push_diag(
-                                Severity::Warning,
-                                "TYPE001".into(),
-                                format!(
-                                    "赋值给 '{}': 期望 {:?}，得到 {:?}",
-                                    target, e, v
-                                ),
-                                span.line,
-                                span.col,
-                            );
-                        }
+                        && !self.types_compatible(v, e)
+                    {
+                        self.push_diag(
+                            Severity::Warning,
+                            "TYPE001".into(),
+                            format!("赋值给 '{}': 期望 {:?}，得到 {:?}", target, e, v),
+                            span.line,
+                            span.col,
+                        );
+                    }
                 } else {
                     self.push_diag(
                         Severity::Error,
@@ -402,15 +409,16 @@ impl TypeChecker {
                 for (cond, body) in &if_stmt.branches {
                     let cond_ty = self.check_expr(cond, env);
                     if let TypeOrUnknown::Known(t) = &cond_ty
-                        && !matches!(t, Type::Bool) {
-                            self.push_diag(
-                                Severity::Warning,
-                                "TYPE002".into(),
-                                format!("if 条件应为 Bool，得到 {:?}", t),
-                                cond.span.line,
-                                cond.span.col,
-                            );
-                        }
+                        && !matches!(t, Type::Bool)
+                    {
+                        self.push_diag(
+                            Severity::Warning,
+                            "TYPE002".into(),
+                            format!("if 条件应为 Bool，得到 {:?}", t),
+                            cond.span.line,
+                            cond.span.col,
+                        );
+                    }
                     self.check_block(body, env);
                 }
                 if let Some(else_b) = &if_stmt.else_branch {
@@ -420,15 +428,16 @@ impl TypeChecker {
             Stmt::While { cond, body } => {
                 let cond_ty = self.check_expr(cond, env);
                 if let TypeOrUnknown::Known(t) = &cond_ty
-                    && !matches!(t, Type::Bool) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE002".into(),
-                            format!("while 条件应为 Bool，得到 {:?}", t),
-                            cond.span.line,
-                            cond.span.col,
-                        );
-                    }
+                    && !matches!(t, Type::Bool)
+                {
+                    self.push_diag(
+                        Severity::Warning,
+                        "TYPE002".into(),
+                        format!("while 条件应为 Bool，得到 {:?}", t),
+                        cond.span.line,
+                        cond.span.col,
+                    );
+                }
                 self.check_block(body, env);
             }
             Stmt::For { var, iter, body } => {
@@ -455,18 +464,16 @@ impl TypeChecker {
                     None => (TypeOrUnknown::known(Type::Unit), Span::default()),
                 };
                 if let (Some(expected), TypeOrUnknown::Known(actual)) = (&self.current_ret, &ret_ty)
-                    && !self.types_compatible(actual, expected) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE010".into(),
-                            format!(
-                                "return 返回 {:?}，但函数声明返回 {:?}",
-                                actual, expected
-                            ),
-                            rspan.line,
-                            rspan.col,
-                        );
-                    }
+                    && !self.types_compatible(actual, expected)
+                {
+                    self.push_diag(
+                        Severity::Warning,
+                        "TYPE010".into(),
+                        format!("return 返回 {:?}，但函数声明返回 {:?}", actual, expected),
+                        rspan.line,
+                        rspan.col,
+                    );
+                }
             }
             Stmt::Expr(e) => {
                 self.check_expr(e, env);
@@ -573,9 +580,7 @@ impl TypeChecker {
                 let _ = self.check_expr(right, env);
                 TypeOrUnknown::known(Type::Bool)
             }
-            ExprKind::Call { callee, args } => {
-                self.check_call(callee, args, env)
-            }
+            ExprKind::Call { callee, args } => self.check_call(callee, args, env),
             ExprKind::Index { expr, index } => {
                 let _ = self.check_expr(expr, env);
                 let _ = self.check_expr(index, env);
@@ -623,15 +628,16 @@ impl TypeChecker {
                 for (cond, body) in &if_stmt.branches {
                     let cond_ty = self.check_expr(cond, env);
                     if let TypeOrUnknown::Known(t) = &cond_ty
-                        && !matches!(t, Type::Bool) {
-                            self.push_diag(
-                                Severity::Warning,
-                                "TYPE002".into(),
-                                format!("if 条件应为 Bool，得到 {:?}", t),
-                                cond.span.line,
-                                cond.span.col,
-                            );
-                        }
+                        && !matches!(t, Type::Bool)
+                    {
+                        self.push_diag(
+                            Severity::Warning,
+                            "TYPE002".into(),
+                            format!("if 条件应为 Bool，得到 {:?}", t),
+                            cond.span.line,
+                            cond.span.col,
+                        );
+                    }
                     branch_tys.push(self.check_block(body, env));
                 }
                 if let Some(else_b) = &if_stmt.else_branch {
@@ -640,7 +646,11 @@ impl TypeChecker {
                 // 取所有分支的公共类型（若一致）
                 self.unify_types(&branch_tys)
             }
-            ExprKind::Closure { params, ret_type, body } => {
+            ExprKind::Closure {
+                params,
+                ret_type,
+                body,
+            } => {
                 // 闭包捕获外部环境：closure_env 继承当前 env，使闭包内可引用外部变量
                 // T3/MUT002：closure_child 标记闭包边界（Ident 解析据此判捕获）
                 let mut closure_env = env.closure_child();
@@ -653,15 +663,16 @@ impl TypeChecker {
                 self.current_ret = saved_ret;
                 // 检查返回类型匹配
                 if let (Some(ret), TypeOrUnknown::Known(bt)) = (ret_type, &body_ty)
-                    && !self.types_compatible(bt, ret) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE010".into(),
-                            format!("闭包返回 {:?}，但声明返回 {:?}", bt, ret),
-                            espan.line,
-                            espan.col,
-                        );
-                    }
+                    && !self.types_compatible(bt, ret)
+                {
+                    self.push_diag(
+                        Severity::Warning,
+                        "TYPE010".into(),
+                        format!("闭包返回 {:?}，但声明返回 {:?}", bt, ret),
+                        espan.line,
+                        espan.col,
+                    );
+                }
                 TypeOrUnknown::unknown()
             }
             ExprKind::Match(m) => self.check_match(m, env),
@@ -671,34 +682,33 @@ impl TypeChecker {
                     TypeOrUnknown::Known(Type::Result(ok_t, err_t)) => {
                         // ? on Result<T, E> yields T; requires enclosing fn to return Result<_, E>
                         if let Some(ret) = &self.current_ret
-                            && !self.result_compatible(ret, ok_t, err_t) {
-                                self.push_diag(
-                                    Severity::Warning,
-                                    "TYPE020".into(),
-                                    format!(
-                                        "`?` 用于 Result<{:?}, {:?}>，但所在函数返回 {:?}",
-                                        ok_t, err_t, ret
-                                    ),
-                                    espan.line,
-                                    espan.col,
-                                );
-                            }
+                            && !self.result_compatible(ret, ok_t, err_t)
+                        {
+                            self.push_diag(
+                                Severity::Warning,
+                                "TYPE020".into(),
+                                format!(
+                                    "`?` 用于 Result<{:?}, {:?}>，但所在函数返回 {:?}",
+                                    ok_t, err_t, ret
+                                ),
+                                espan.line,
+                                espan.col,
+                            );
+                        }
                         TypeOrUnknown::Known((**ok_t).clone())
                     }
                     TypeOrUnknown::Known(Type::Option(t)) => {
                         if let Some(ret) = &self.current_ret
-                            && !self.option_compatible(ret, t) {
-                                self.push_diag(
-                                    Severity::Warning,
-                                    "TYPE020".into(),
-                                    format!(
-                                        "`?` 用于 Option<{:?}>，但所在函数返回 {:?}",
-                                        t, ret
-                                    ),
-                                    espan.line,
-                                    espan.col,
-                                );
-                            }
+                            && !self.option_compatible(ret, t)
+                        {
+                            self.push_diag(
+                                Severity::Warning,
+                                "TYPE020".into(),
+                                format!("`?` 用于 Option<{:?}>，但所在函数返回 {:?}", t, ret),
+                                espan.line,
+                                espan.col,
+                            );
+                        }
                         TypeOrUnknown::Known((**t).clone())
                     }
                     TypeOrUnknown::Known(other) => {
@@ -752,7 +762,10 @@ impl TypeChecker {
                 for e in elems {
                     elem_tys.push(self.check_expr(e, env));
                 }
-                if elem_tys.iter().all(|t| matches!(t, TypeOrUnknown::Known(_))) {
+                if elem_tys
+                    .iter()
+                    .all(|t| matches!(t, TypeOrUnknown::Known(_)))
+                {
                     let tys: Vec<Type> = elem_tys
                         .into_iter()
                         .map(|t| match t {
@@ -769,15 +782,17 @@ impl TypeChecker {
                 // v0.4.2 P1-1: a..b → List<Int>;两端已知且非 Int 报 TYPE001
                 for e in [start, end] {
                     if let TypeOrUnknown::Known(t) = self.check_expr(e, env)
-                        && !matches!(t, Type::Int) && !self.is_any_type(&t) {
-                            self.push_diag(
-                                Severity::Warning,
-                                "TYPE001".into(),
-                                format!("range 两端应为 Int，得到 {:?}", t),
-                                e.span.line,
-                                e.span.col,
-                            );
-                        }
+                        && !matches!(t, Type::Int)
+                        && !self.is_any_type(&t)
+                    {
+                        self.push_diag(
+                            Severity::Warning,
+                            "TYPE001".into(),
+                            format!("range 两端应为 Int，得到 {:?}", t),
+                            e.span.line,
+                            e.span.col,
+                        );
+                    }
                 }
                 TypeOrUnknown::known(Type::Generic("List".to_string(), vec![Type::Int]))
             }
@@ -803,18 +818,19 @@ impl TypeChecker {
                     // （typechecker 全量灌内建签名、导入可用性归运行时的旧分工
                     // 漏掉了"忘写 import"这个 LLM 高频错误形态）。prelude 恒可用。
                     if let Some(module) = self.builtin_module.get(name)
-                        && !self.available_imports.contains(name) {
-                            self.push_diag(
-                                Severity::Warning,
-                                "NAM005".into(),
-                                format!(
-                                    "内建 '{}' 未导入——需在文件顶部声明：from {} import {{{}}}",
-                                    name, module, name
-                                ),
-                                cspan.line,
-                                cspan.col,
-                            );
-                        }                    // Phase 2.5: 效应检查
+                        && !self.available_imports.contains(name)
+                    {
+                        self.push_diag(
+                            Severity::Warning,
+                            "NAM005".into(),
+                            format!(
+                                "内建 '{}' 未导入——需在文件顶部声明：from {} import {{{}}}",
+                                name, module, name
+                            ),
+                            cspan.line,
+                            cspan.col,
+                        );
+                    } // Phase 2.5: 效应检查
                     // 当前函数未声明的效应，不能调用带该效应的函数（EFF001，Warning，渐进式）
                     self.check_call_effects(name, &sig.effects);
                     // 参数数量检查
@@ -837,22 +853,25 @@ impl TypeChecker {
                             sig.params.iter().zip(arg_tys.iter()).enumerate()
                         {
                             if let TypeOrUnknown::Known(at) = arg_ty
-                                && !self.types_compatible(at, pty) {
-                                    self.push_diag(
-                                        Severity::Warning,
-                                        "TYPE003".into(),
-                                        format!(
-                                            "函数 '{}' 参数 {}: 期望 {:?}，得到 {:?}",
-                                            name, i, pty, at
-                                        ),
-                                        cspan.line,
-                                        cspan.col,
-                                    );
-                                }
+                                && !self.types_compatible(at, pty)
+                            {
+                                self.push_diag(
+                                    Severity::Warning,
+                                    "TYPE003".into(),
+                                    format!(
+                                        "函数 '{}' 参数 {}: 期望 {:?}，得到 {:?}",
+                                        name, i, pty, at
+                                    ),
+                                    cspan.line,
+                                    cspan.col,
+                                );
+                            }
                             let _ = pname;
                         }
                     }
-                    sig.ret.map(TypeOrUnknown::Known).unwrap_or(TypeOrUnknown::unknown())
+                    sig.ret
+                        .map(TypeOrUnknown::Known)
+                        .unwrap_or(TypeOrUnknown::unknown())
                 } else if self.is_variant_constructor(name) {
                     // 枚举变体构造器
                     let (expected_arity, ret_ty) = self.variant_info(name);
@@ -862,7 +881,9 @@ impl TypeChecker {
                             "TYPE003".into(),
                             format!(
                                 "变体 '{}' 期望 {} 个参数，得到 {} 个",
-                                name, expected_arity, args.len()
+                                name,
+                                expected_arity,
+                                args.len()
                             ),
                             cspan.line,
                             cspan.col,
@@ -938,15 +959,17 @@ impl TypeChecker {
             // guard 运行时才知真假,不能证明覆盖)
             if let Some(g) = &arm.guard
                 && let TypeOrUnknown::Known(gt) = self.check_expr(g, &mut arm_env)
-                    && !matches!(gt, Type::Bool) && !self.is_any_type(&gt) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE002".into(),
-                            format!("match guard 应为 Bool，得到 {:?}", gt),
-                            0,
-                            0,
-                        );
-                    }
+                && !matches!(gt, Type::Bool)
+                && !self.is_any_type(&gt)
+            {
+                self.push_diag(
+                    Severity::Warning,
+                    "TYPE002".into(),
+                    format!("match guard 应为 Bool，得到 {:?}", gt),
+                    0,
+                    0,
+                );
+            }
             if arm.guard.is_none() {
                 if let Some(vn) = variant_name {
                     matched_variants.insert(vn);
@@ -965,42 +988,60 @@ impl TypeChecker {
         if !has_wildcard {
             if let TypeOrUnknown::Known(Type::Named(name)) = &scrut_ty {
                 if let Some(info) = self.enums.get(name).cloned()
-                    && !info.is_builtin {
-                        // 用户枚举：必须覆盖所有变体
-                        // Phase 4.1.2: line 填 match 的 end 行，供 fix 精确定位插入点
-                        for (vn, _) in &info.variants {
-                            if !matched_variants.contains(vn) {
-                                self.push_diag(
-                                    Severity::Warning,
-                                    "MAT001".into(),
-                                    format!(
-                                        "match 非穷尽：未覆盖变体 '{}'（枚举 {}）",
-                                        vn, name
-                                    ),
-                                    m.end_line,
-                                    1,
-                                );
-                            }
+                    && !info.is_builtin
+                {
+                    // 用户枚举：必须覆盖所有变体
+                    // Phase 4.1.2: line 填 match 的 end 行，供 fix 精确定位插入点
+                    for (vn, _) in &info.variants {
+                        if !matched_variants.contains(vn) {
+                            self.push_diag(
+                                Severity::Warning,
+                                "MAT001".into(),
+                                format!("match 非穷尽：未覆盖变体 '{}'（枚举 {}）", vn, name),
+                                m.end_line,
+                                1,
+                            );
                         }
                     }
+                }
             } else if let TypeOrUnknown::Known(Type::Result(_, _)) = &scrut_ty {
                 // Result 必须覆盖 Ok 和 Err
                 if !matched_variants.contains("Ok") {
-                    self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Ok".into(), m.end_line, 1);
+                    self.push_diag(
+                        Severity::Warning,
+                        "MAT001".into(),
+                        "match 非穷尽：未覆盖 Ok".into(),
+                        m.end_line,
+                        1,
+                    );
                 }
                 if !matched_variants.contains("Err") {
-                    self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Err".into(), m.end_line, 1);
+                    self.push_diag(
+                        Severity::Warning,
+                        "MAT001".into(),
+                        "match 非穷尽：未覆盖 Err".into(),
+                        m.end_line,
+                        1,
+                    );
                 }
             } else if let TypeOrUnknown::Known(Type::Option(_)) = &scrut_ty {
                 if !matched_variants.contains("Some") {
-                    self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 Some".into(), m.end_line, 1);
+                    self.push_diag(
+                        Severity::Warning,
+                        "MAT001".into(),
+                        "match 非穷尽：未覆盖 Some".into(),
+                        m.end_line,
+                        1,
+                    );
                 }
                 if !matched_variants.contains("None") {
-                    self.push_diag(Severity::Warning, "MAT001".into(),
-                        "match 非穷尽：未覆盖 None".into(), m.end_line, 1);
+                    self.push_diag(
+                        Severity::Warning,
+                        "MAT001".into(),
+                        "match 非穷尽：未覆盖 None".into(),
+                        m.end_line,
+                        1,
+                    );
                 }
             }
         }
@@ -1038,7 +1079,11 @@ impl TypeChecker {
                 None
             }
             Pattern::Wildcard => None,
-            Pattern::Variant { name, sub, name_span } => {
+            Pattern::Variant {
+                name,
+                sub,
+                name_span,
+            } => {
                 // 阶段1：只读借用 self.enums，收集变体信息到局部变量
                 // （随后要可变借用 self 进行 push_diag 和递归 check_pattern，故先 clone 出来）
                 let (variant_exists, expected_arity, field_tys, enum_name): (
@@ -1131,7 +1176,8 @@ impl TypeChecker {
     ///   - `Named("T")` / `Named("E")` 是内置变体的泛型占位符，兼容任何类型（简化泛型推断）
     fn types_compatible(&self, a: &Type, b: &Type) -> bool {
         // 通配符类型（prelude/stdlib 签名用）
-        if matches!(a, Type::Named(n) if n == "_Any") || matches!(b, Type::Named(n) if n == "_Any") {
+        if matches!(a, Type::Named(n) if n == "_Any") || matches!(b, Type::Named(n) if n == "_Any")
+        {
             return true;
         }
         // 内置变体泛型占位符（Ok/Err/Some 返回 Result<T,E>/Option<T>，T/E 是占位符）
@@ -1153,7 +1199,9 @@ impl TypeChecker {
             }
             (Type::Tuple(a), Type::Tuple(b)) => {
                 a.len() == b.len()
-                    && a.iter().zip(b.iter()).all(|(x, y)| self.types_compatible(x, y))
+                    && a.iter()
+                        .zip(b.iter())
+                        .all(|(x, y)| self.types_compatible(x, y))
             }
             (Type::Record(a), Type::Record(b)) => {
                 if a.len() != b.len() {
@@ -1271,15 +1319,16 @@ impl TypeChecker {
             BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
                 // 比较运算返回 Bool；检查操作数类型一致（渐进式：不强制）
                 if let (TypeOrUnknown::Known(a), TypeOrUnknown::Known(b)) = (lt, rt)
-                    && !self.types_compatible(a, b) {
-                        self.push_diag(
-                            Severity::Warning,
-                            "TYPE001".into(),
-                            format!("比较运算两边类型不一致: {:?} vs {:?}", a, b),
-                            0,
-                            0,
-                        );
-                    }
+                    && !self.types_compatible(a, b)
+                {
+                    self.push_diag(
+                        Severity::Warning,
+                        "TYPE001".into(),
+                        format!("比较运算两边类型不一致: {:?} vs {:?}", a, b),
+                        0,
+                        0,
+                    );
+                }
                 TypeOrUnknown::known(Type::Bool)
             }
         }
@@ -1331,7 +1380,7 @@ impl TypeChecker {
                             "Option" => {
                                 return TypeOrUnknown::known(Type::Option(Box::new(Type::Named(
                                     "T".to_string(),
-                                ))))
+                                ))));
                             }
                             _ => {}
                         }
@@ -1408,7 +1457,14 @@ impl TypeChecker {
         }
     }
 
-    fn push_diag(&mut self, severity: Severity, code: String, message: String, line: usize, col: usize) {
+    fn push_diag(
+        &mut self,
+        severity: Severity,
+        code: String,
+        message: String,
+        line: usize,
+        col: usize,
+    ) {
         let hint = type_hint(&code);
         let source_line = if line > 0 {
             self.source_lines.get(line.saturating_sub(1)).cloned()
@@ -1530,7 +1586,10 @@ impl TypeEnv {
 fn type_hint(code: &str) -> Option<String> {
     match code {
         "NAM002" => Some("重命名重复的函数/枚举".into()),
-        "MUT001" => Some("局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本".into()),
+        "MUT001" => Some(
+            "局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本"
+                .into(),
+        ),
         "NAM003" => Some("确认变量/函数已声明，拼写无误".into()),
         "NAM004" => Some("检查字段/变体名是否存在".into()),
         "TYPE001" => Some("检查运算符两侧类型是否一致".into()),

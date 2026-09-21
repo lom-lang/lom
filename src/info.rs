@@ -30,8 +30,8 @@
 //     ]
 //   }
 
-use crate::json::escape_str;
 use crate::ast::*;
+use crate::json::escape_str;
 
 /// 类型信息（lom-info/v1 schema 的 Rust 表示）
 pub struct ProgramInfo {
@@ -185,7 +185,6 @@ pub fn type_to_string(t: &Type) -> String {
     }
 }
 
-
 /// 将 ProgramInfo 序列化为 lom-info/v1 JSON
 pub fn to_json(info: &ProgramInfo) -> String {
     let mut out = String::new();
@@ -211,7 +210,10 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, p) in f.params.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&p.name)));
+                    out.push_str(&format!(
+                        "          \"name\": \"{}\",\n",
+                        escape_str(&p.name)
+                    ));
                     out.push_str(&format!("          \"type\": \"{}\"\n", escape_str(&p.ty)));
                     out.push_str("        }");
                     if j + 1 < f.params.len() {
@@ -276,7 +278,10 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, v) in e.variants.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&v.name)));
+                    out.push_str(&format!(
+                        "          \"name\": \"{}\",\n",
+                        escape_str(&v.name)
+                    ));
                     out.push_str("          \"fields\": [");
                     for (k, fld) in v.fields.iter().enumerate() {
                         if k > 0 {
@@ -312,7 +317,10 @@ pub fn to_json(info: &ProgramInfo) -> String {
         out.push('\n');
         for (i, imp) in info.imports.iter().enumerate() {
             out.push_str("    {\n");
-            out.push_str(&format!("      \"module\": \"{}\",\n", escape_str(&imp.module)));
+            out.push_str(&format!(
+                "      \"module\": \"{}\",\n",
+                escape_str(&imp.module)
+            ));
             out.push_str("      \"items\": [");
             if imp.items.is_empty() {
                 out.push_str("]\n");
@@ -320,8 +328,14 @@ pub fn to_json(info: &ProgramInfo) -> String {
                 out.push('\n');
                 for (j, it) in imp.items.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"name\": \"{}\",\n", escape_str(&it.name)));
-                    out.push_str(&format!("          \"alias\": \"{}\"\n", escape_str(&it.alias)));
+                    out.push_str(&format!(
+                        "          \"name\": \"{}\",\n",
+                        escape_str(&it.name)
+                    ));
+                    out.push_str(&format!(
+                        "          \"alias\": \"{}\"\n",
+                        escape_str(&it.alias)
+                    ));
                     out.push_str("        }");
                     if j + 1 < imp.items.len() {
                         out.push(',');
@@ -352,7 +366,11 @@ pub fn to_human(info: &ProgramInfo) -> String {
 
     out.push_str(&format!("\n[functions] ({}):\n", info.functions.len()));
     for f in &info.functions {
-        let params: Vec<String> = f.params.iter().map(|p| format!("{}: {}", p.name, p.ty)).collect();
+        let params: Vec<String> = f
+            .params
+            .iter()
+            .map(|p| format!("{}: {}", p.name, p.ty))
+            .collect();
         let ret = f.ret_type.clone().unwrap_or_else(|| "?".to_string());
         let effects = if f.effects.is_empty() {
             String::new()
@@ -403,7 +421,11 @@ pub fn to_human(info: &ProgramInfo) -> String {
                     }
                 })
                 .collect();
-            out.push_str(&format!("  from {} import {{{}}}\n", imp.module, items.join(", ")));
+            out.push_str(&format!(
+                "  from {} import {{{}}}\n",
+                imp.module,
+                items.join(", ")
+            ));
         }
     }
 
@@ -430,20 +452,24 @@ end
         assert_eq!(info.enums.len(), 1);
         let j = to_json(&info);
         assert!(j.contains("\"name\": \"Shape\""), "导出应含枚举名: {}", j);
-        assert!(j.contains("\"type_params\""), "导出应含 type_params 字段: {}", j);
+        assert!(
+            j.contains("\"type_params\""),
+            "导出应含 type_params 字段: {}",
+            j
+        );
     }
 
     #[test]
     fn type_to_string_generic_with_args() {
         use crate::ast::Type;
         // Pair<Int, String> → "Pair<Int, String>"（Generic 带参分支）
-        let t = Type::Generic(
-            "Pair".to_string(),
-            vec![Type::Int, Type::String],
-        );
+        let t = Type::Generic("Pair".to_string(), vec![Type::Int, Type::String]);
         assert_eq!(type_to_string(&t), "Pair<Int, String>");
         // 空 args 分支 → 裸名
-        assert_eq!(type_to_string(&Type::Generic("Solo".to_string(), vec![])), "Solo");
+        assert_eq!(
+            type_to_string(&Type::Generic("Solo".to_string(), vec![])),
+            "Solo"
+        );
     }
 
     use super::*;
@@ -507,7 +533,10 @@ end
         let src = "enum Result<T, E> = Ok(T) | Err(E)\nfn main() -> Unit\n    Ok(1)\nend\n";
         let info = parse_info(src);
         assert_eq!(info.enums[0].name, "Result");
-        assert_eq!(info.enums[0].type_params, vec!["T".to_string(), "E".to_string()]);
+        assert_eq!(
+            info.enums[0].type_params,
+            vec!["T".to_string(), "E".to_string()]
+        );
         assert_eq!(info.enums[0].variants[0].name, "Ok");
         assert_eq!(info.enums[0].variants[0].fields, vec!["T".to_string()]);
     }

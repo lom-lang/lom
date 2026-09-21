@@ -9,9 +9,7 @@
 //   lom --json <file.lom>         等价（选项可前可后）
 //   lom --help | -h               帮助
 
-use std::env;
-use std::fs;
-use std::process;
+use cli::CliArgs;
 use cli::apply_iterative;
 use cli::extract_completion_uri;
 use cli::extract_did_change_params;
@@ -20,17 +18,19 @@ use cli::extract_hover_params;
 use cli::merge_packages_for_wasm;
 use cli::parse_args;
 use cli::print_help;
-use cli::CliArgs;
+use std::env;
+use std::fs;
+use std::process;
 
 mod apply;
-mod cli;
 mod ast;
+mod cli;
 mod diagnostics;
 mod doc;
 mod dump;
 mod fix;
-mod fmt;
 mod fix_history;
+mod fmt;
 mod info;
 mod interpreter;
 mod json;
@@ -196,7 +196,10 @@ fn main_inner() {
         let result = parser::Parser::parse_recover(&src);
         print!("{}", dump::dump_program(&result.program));
         if !result.errors.is_empty() {
-            eprintln!("（解析含 {} 个错误，AST 中带 Hole 节点）", result.errors.len());
+            eprintln!(
+                "（解析含 {} 个错误，AST 中带 Hole 节点）",
+                result.errors.len()
+            );
         }
         return;
     }
@@ -269,15 +272,13 @@ fn main_inner() {
     let toml_path = file_dir.join("lom.toml");
     if toml_path.exists() {
         match package::load_manifest_file(&toml_path) {
-            Ok(manifest) => {
-                match package::resolve_dependencies(&manifest, file_dir) {
-                    Ok(graph) => interp.load_packages(&graph),
-                    Err(e) => {
-                        eprintln!("依赖解析失败: {}", e);
-                        process::exit(1);
-                    }
+            Ok(manifest) => match package::resolve_dependencies(&manifest, file_dir) {
+                Ok(graph) => interp.load_packages(&graph),
+                Err(e) => {
+                    eprintln!("依赖解析失败: {}", e);
+                    process::exit(1);
                 }
-            }
+            },
             Err(e) => {
                 eprintln!("清单解析失败: {}", e);
                 process::exit(1);
@@ -545,15 +546,26 @@ fn run_build(json: bool) {
 
     if json {
         // JSON 输出：汇总每个包的源码检查结果
-        print!("{{\"schema\":\"lom-build/v1\",\"ok\":true,\"package\":\"{}\",\"version\":\"{}\",\"dependencies\":[", manifest.name, manifest.version);
+        print!(
+            "{{\"schema\":\"lom-build/v1\",\"ok\":true,\"package\":\"{}\",\"version\":\"{}\",\"dependencies\":[",
+            manifest.name, manifest.version
+        );
         let mut first = true;
         for (name, pkg) in &graph.packages {
-            if !first { print!(","); }
+            if !first {
+                print!(",");
+            }
             first = false;
-            print!("{{\"name\":\"{}\",\"path\":\"{}\",\"symbols\":[", name, pkg.root.display());
+            print!(
+                "{{\"name\":\"{}\",\"path\":\"{}\",\"symbols\":[",
+                name,
+                pkg.root.display()
+            );
             let mut sym_first = true;
             for sym in &pkg.public_symbols {
-                if !sym_first { print!(","); }
+                if !sym_first {
+                    print!(",");
+                }
                 sym_first = false;
                 print!("\"{}\"", sym);
             }
@@ -590,9 +602,16 @@ fn run_build(json: bool) {
                     typechecker::check_program(&program, &src, &path_str, &mut diags);
                 }
                 if diags.diagnostics.is_empty() {
-                    println!("      ✓ {} — 通过", file.file_name().unwrap().to_string_lossy());
+                    println!(
+                        "      ✓ {} — 通过",
+                        file.file_name().unwrap().to_string_lossy()
+                    );
                 } else {
-                    println!("      ✗ {} — {} 个诊断", file.file_name().unwrap().to_string_lossy(), diags.diagnostics.len());
+                    println!(
+                        "      ✗ {} — {} 个诊断",
+                        file.file_name().unwrap().to_string_lossy(),
+                        diags.diagnostics.len()
+                    );
                     print!("{}", diags.to_human());
                 }
             }
@@ -915,14 +934,15 @@ fn handle_lsp_method(
             let id = id?;
             if let Some((uri, line, col)) = extract_hover_params(params)
                 && let Some(src) = docs.get(&uri)
-                    && let Some(hover) = lsp::handle_hover(src, line, col) {
-                        // R58：转义统一走 escape_str（含反斜杠/控制字符）
-                        let result = format!(
-                            "{{\"contents\":{{\"kind\":\"markdown\",\"value\":\"{}\"}}}}",
-                            crate::json::escape_str(&hover.content)
-                        );
-                        return Some(lsp::make_response(id, &result));
-                    }
+                && let Some(hover) = lsp::handle_hover(src, line, col)
+            {
+                // R58：转义统一走 escape_str（含反斜杠/控制字符）
+                let result = format!(
+                    "{{\"contents\":{{\"kind\":\"markdown\",\"value\":\"{}\"}}}}",
+                    crate::json::escape_str(&hover.content)
+                );
+                return Some(lsp::make_response(id, &result));
+            }
             // 无 hover 结果
             Some(lsp::make_response(id, "null"))
         }
@@ -954,7 +974,11 @@ fn handle_lsp_method(
         _ => {
             // 未知方法：返回 method not found 错误
             let id = id?;
-            Some(lsp::make_error_response(id, -32601, &format!("方法未实现: {}", method)))
+            Some(lsp::make_error_response(
+                id,
+                -32601,
+                &format!("方法未实现: {}", method),
+            ))
         }
     }
 }
@@ -1026,4 +1050,3 @@ mod tests {
         assert_eq!(total, declared, "任务总数与 manifest.total_tasks 不一致");
     }
 }
-

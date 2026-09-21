@@ -210,7 +210,12 @@ impl Parser {
     /// （end 是末 token 的"起始"而非"之后"——lexer 只记 token 起点，与签名 span 惯例一致）
     fn span_since(&self, line: usize, col: usize) -> Span {
         let (el, ec) = self.prev_token_pos();
-        Span { line, col, end_line: el, end_col: ec }
+        Span {
+            line,
+            col,
+            end_line: el,
+            end_col: ec,
+        }
     }
 
     /// Phase 3.2b: 以已有节点的 span 起点为起点（左结合链组合节点：a + b 的起点是 a 的起点）
@@ -554,7 +559,10 @@ impl Parser {
                                     args.len()
                                 )));
                             }
-                            Ok(Type::Result(Box::new(args[0].clone()), Box::new(args[1].clone())))
+                            Ok(Type::Result(
+                                Box::new(args[0].clone()),
+                                Box::new(args[1].clone()),
+                            ))
                         }
                         Type::Named(n) if n == "Option" => {
                             if args.len() != 1 {
@@ -670,7 +678,8 @@ impl Parser {
                 && matches!(
                     self.peek(),
                     Token::End | Token::Elif | Token::Else | Token::Eof
-                ) {
+                )
+            {
                 // if 是块最后一个元素，作为 tail
                 return Ok(BlockEl::Tail(Expr::new(
                     ExprKind::If(Box::new(if_stmt)),
@@ -711,7 +720,11 @@ impl Parser {
                         },
                         self.span_from(espan),
                     );
-                    Ok(BlockEl::Stmt(Stmt::Assign { value, target: name, span: espan }))
+                    Ok(BlockEl::Stmt(Stmt::Assign {
+                        value,
+                        target: name,
+                        span: espan,
+                    }))
                 }
                 _ => Err(self.err("复合赋值目标必须是变量".to_string())),
             }
@@ -734,8 +747,8 @@ impl Parser {
             Token::End | Token::Elif | Token::Else | Token::Eof
         ) {
             // if 作为 tail 的条件：此前无 tail 且无裸表达式语句
-            let if_can_be_tail = tail.is_none()
-                && stmts.iter().all(|s| !matches!(s, Stmt::Expr(_)));
+            let if_can_be_tail =
+                tail.is_none() && stmts.iter().all(|s| !matches!(s, Stmt::Expr(_)));
             let saved_pos = self.pos;
             match self.parse_block_el(if_can_be_tail) {
                 Ok(BlockEl::Stmt(s)) => stmts.push(s),
@@ -911,7 +924,7 @@ impl Parser {
                 let tok = self.current();
                 (tok.line, tok.col)
             };
-            self.pos = self.tokens.len().saturating_sub(1);  // 跳到 Eof 哨兵位置（len 本身越界）
+            self.pos = self.tokens.len().saturating_sub(1); // 跳到 Eof 哨兵位置（len 本身越界）
             return Err(ParseError {
                 message: format!(
                     "表达式嵌套超过 {} 层（256MB 栈的安全上限）：检查是否缺少右括号，或深结构改用循环构造",
@@ -1233,7 +1246,10 @@ impl Parser {
                 self.advance();
                 if self.matches(&Token::RParen) {
                     // () = Unit
-                    Ok(Expr::new(ExprKind::Unit, self.span_since(tok.line, tok.col)))
+                    Ok(Expr::new(
+                        ExprKind::Unit,
+                        self.span_since(tok.line, tok.col),
+                    ))
                 } else {
                     let first = self.parse_expr()?;
                     if self.matches(&Token::Comma) {
@@ -1273,10 +1289,7 @@ impl Parser {
                 ))
             }
             Token::Match => self.parse_match(),
-            _ => Err(self.err(format!(
-                "期望表达式，得到 {}",
-                self.token_name(self.peek())
-            ))),
+            _ => Err(self.err(format!("期望表达式，得到 {}", self.token_name(self.peek())))),
         }
     }
 
@@ -1480,10 +1493,7 @@ impl Parser {
                     Ok(Pattern::Binder(s.clone()))
                 }
             }
-            _ => Err(self.err(format!(
-                "期望模式，得到 {}",
-                self.token_name(self.peek())
-            ))),
+            _ => Err(self.err(format!("期望模式，得到 {}", self.token_name(self.peek())))),
         }
     }
 }
@@ -1497,28 +1507,42 @@ mod tests {
     #[test]
     fn deep_nesting_reports_parse_error_not_crash() {
         use crate::lexer::Lexer;
-        let src = format!("fn main() -> Unit
+        let src = format!(
+            "fn main() -> Unit
     println({}1{})
 end
 ",
-                          "(".repeat(300), ")".repeat(300));
+            "(".repeat(300),
+            ")".repeat(300)
+        );
         let tokens = Lexer::new(&src).tokenize().unwrap();
         let mut p = Parser::new(tokens);
         p.max_expr_depth = 100;
         let err = p.parse_program().unwrap_err();
-        assert!(err.message.contains("嵌套超过 100 层"), "消息: {}", err.message);
-        assert!(err.message.contains("右括号"), "应含修复建议: {}", err.message);
+        assert!(
+            err.message.contains("嵌套超过 100 层"),
+            "消息: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("右括号"),
+            "应含修复建议: {}",
+            err.message
+        );
     }
 
     /// Q3：上限内嵌套正常解析（守卫不拦合法深度）
     #[test]
     fn moderate_nesting_unaffected_by_guard() {
         use crate::lexer::Lexer;
-        let src = format!("fn main() -> Unit
+        let src = format!(
+            "fn main() -> Unit
     println({}1{})
 end
 ",
-                          "(".repeat(50), ")".repeat(50));
+            "(".repeat(50),
+            ")".repeat(50)
+        );
         let tokens = Lexer::new(&src).tokenize().unwrap();
         let mut p = Parser::new(tokens);
         p.max_expr_depth = 100;
@@ -1543,15 +1567,13 @@ end
         let _program = p.parse_program().expect("容错模式应返回");
         let errors = p.errors;
         assert!(
-            errors.iter().any(|e| e.message.contains("类型嵌套超过 100 层")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("类型嵌套超过 100 层")),
             "应报类型嵌套超限: {:?}",
             errors
         );
-        assert!(
-            errors.len() <= 3,
-            "不得有错误风暴: {}",
-            errors.len()
-        );
+        assert!(errors.len() <= 3, "不得有错误风暴: {}", errors.len());
     }
 
     /// 深嵌套变体模式（A(A(...(x)))，v1.2.1 无守卫直接栈溢出）
@@ -1571,7 +1593,9 @@ end
         let _program = p.parse_program().expect("容错模式应返回");
         let errors = p.errors;
         assert!(
-            errors.iter().any(|e| e.message.contains("模式嵌套超过 100 层")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("模式嵌套超过 100 层")),
             "应报模式嵌套超限: {:?}",
             errors
         );
@@ -1592,7 +1616,10 @@ end
         assert!(lex_errors.is_empty(), "词法应干净");
         let mut p = Parser::new(tokens);
         p.max_expr_depth = 100;
-        assert!(p.parse_program().is_ok(), "50 层类型/模式在 max=100 内应正常");
+        assert!(
+            p.parse_program().is_ok(),
+            "50 层类型/模式在 max=100 内应正常"
+        );
     }
 
     /// Q3：容错模式下超限 = 深度错误后终止（pos 跳 Eof，不产生错误风暴）。
@@ -1601,11 +1628,14 @@ end
     #[test]
     fn deep_nesting_recover_mode_single_error() {
         use crate::lexer::Lexer;
-        let src = format!("fn main() -> Unit
+        let src = format!(
+            "fn main() -> Unit
     println({}1{})
 end
 ",
-                          "(".repeat(300), ")".repeat(300));
+            "(".repeat(300),
+            ")".repeat(300)
+        );
         let (tokens, lex_errors) = Lexer::new(&src).tokenize_recover();
         assert!(lex_errors.is_empty());
         let mut p = Parser::new(tokens);
@@ -1681,7 +1711,8 @@ end
     fn test_newline_not_call() {
         // 跨行的 ( 不应视为函数调用
         // 回归测试：确保 "0\n(-1)" 不被解析为 "0(-1)"
-        let src = "fn f(n: Int) -> Int\n    if n > 0\n        (-1)\n    else\n        0\n    end\nend";
+        let src =
+            "fn f(n: Int) -> Int\n    if n > 0\n        (-1)\n    else\n        0\n    end\nend";
         parse_ok(src);
     }
 
@@ -1746,7 +1777,10 @@ end
             if let Some(tail) = &main.body.tail {
                 match &tail.kind {
                     ExprKind::Pipe { left, right } => {
-                        assert!(matches!(&left.kind, ExprKind::Binary { op: BinOp::Add, .. }));
+                        assert!(matches!(
+                            &left.kind,
+                            ExprKind::Binary { op: BinOp::Add, .. }
+                        ));
                         assert!(matches!(&right.kind, ExprKind::Ident(_)));
                     }
                     other => panic!("期望 Pipe，得到 {:?}", other),
@@ -1767,7 +1801,11 @@ end
         if let Item::Fn(main) = &p.items[1] {
             if let Some(tail) = &main.body.tail {
                 match &tail.kind {
-                    ExprKind::Binary { op: BinOp::Eq, left, .. } => {
+                    ExprKind::Binary {
+                        op: BinOp::Eq,
+                        left,
+                        ..
+                    } => {
                         assert!(matches!(&left.kind, ExprKind::Pipe { .. }));
                     }
                     other => panic!("期望 Binary(Eq, Pipe, ...)，得到 {:?}", other),
@@ -1857,7 +1895,8 @@ end
     fn test_import_dotted_module() {
         // 点分模块路径：from utils.helpers import { format_date }
         // Phase 2.1.5 parser 接受任意点分路径；语义检查（模块是否存在）由 interpreter 负责
-        let src = "from utils.helpers import { format_date }\nfn main() -> Unit\n    println(1)\nend";
+        let src =
+            "from utils.helpers import { format_date }\nfn main() -> Unit\n    println(1)\nend";
         let p = parse_ok(src);
         match &p.items[0] {
             Item::Import(imp) => {
@@ -1916,10 +1955,7 @@ end
             // fn 体
             ("fn", "fn main() -> Unit\n    let x = 5\n    println(x)\n"),
             // if 体
-            (
-                "if",
-                "fn main() -> Unit\n    if True\n        println(1)\n",
-            ),
+            ("if", "fn main() -> Unit\n    if True\n        println(1)\n"),
             // while 体
             (
                 "while",
@@ -1941,19 +1977,17 @@ end
             assert!(
                 !r.is_ok(),
                 "{}：EOF 缺 end 不得静默通过，errors: {:?}",
-                name, r.errors
+                name,
+                r.errors
             );
             assert!(
                 r.errors.iter().any(|e| e.message.contains("期望 'end'")),
                 "{}：应报缺 end 诊断，errors: {:?}",
-                name, r.errors
+                name,
+                r.errors
             );
             // 严格模式同样拒绝
-            assert!(
-                Parser::parse(src).is_err(),
-                "{}：严格模式应返回 Err",
-                name
-            );
+            assert!(Parser::parse(src).is_err(), "{}：严格模式应返回 Err", name);
         }
     }
 
@@ -1974,7 +2008,11 @@ end
     fn r57_missing_end_mid_file_reports_error() {
         let src = "fn a() -> Unit\n    println(1)\nfn b() -> Unit\n    println(2)\nend\n";
         let r = recover(src);
-        assert!(!r.is_ok(), "fn a 缺 end（被 fn b 顶替）应报错: {:?}", r.errors);
+        assert!(
+            !r.is_ok(),
+            "fn a 缺 end（被 fn b 顶替）应报错: {:?}",
+            r.errors
+        );
     }
 
     #[test]
@@ -1996,11 +2034,15 @@ end
             Item::Fn(f) => {
                 // 应在错误处插入 Hole
                 let has_hole = f.body.stmts.iter().any(|s| matches!(s, Stmt::Hole { .. }));
-                assert!(has_hole, "应在错误处插入 Stmt::Hole，stmts={:?}", f.body.stmts);
+                assert!(
+                    has_hole,
+                    "应在错误处插入 Stmt::Hole，stmts={:?}",
+                    f.body.stmts
+                );
                 // println(1) 应被恢复（作为语句或 tail）
-                let has_println_stmt = f.body.stmts.iter().any(|s| {
-                    matches!(s, Stmt::Expr(e) if matches!(&e.kind, ExprKind::Call { .. }))
-                });
+                let has_println_stmt = f.body.stmts.iter().any(
+                    |s| matches!(s, Stmt::Expr(e) if matches!(&e.kind, ExprKind::Call { .. })),
+                );
                 let tail_is_call = matches!(
                     f.body.tail.as_ref().map(|t| &t.kind),
                     Some(ExprKind::Call { .. })
@@ -2022,11 +2064,7 @@ end
         // 第一行 `fn 123` 非法（函数名不是标识符），第二行 `enum` 无名
         let src = "fn 123 () -> Unit\n    1\nend\nenum\nend";
         let r = recover(src);
-        assert!(
-            !r.is_ok(),
-            "应收集到至少一个错误，errors={:?}",
-            r.errors
-        );
+        assert!(!r.is_ok(), "应收集到至少一个错误，errors={:?}", r.errors);
         // 程序结构仍存在（可能 items 为空或部分）
         let _ = &r.program.items;
     }
@@ -2098,8 +2136,15 @@ end
         // 行 2: `    let x = abc + 24`——let 在 col 5，abc 在 col 13，24 在 col 19
         let src = "fn main() -> Unit\n    let x = abc + 24\nend";
         let p = parse_ok(src);
-        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
-        let Stmt::Let { value, span: let_span, .. } = &f.body.stmts[0] else {
+        let Item::Fn(f) = &p.items[0] else {
+            panic!("期望 fn")
+        };
+        let Stmt::Let {
+            value,
+            span: let_span,
+            ..
+        } = &f.body.stmts[0]
+        else {
             panic!("期望 let 语句")
         };
         // let 语句的 span = let 关键字位置
@@ -2120,11 +2165,17 @@ end
         // 行 3: `    p.z`——p 在 col 5，z 在 col 7（Field span 的 end = 字段名 token）
         let src = "fn main() -> Unit\n    println(x)\n    p.z\nend";
         let p = parse_ok(src);
-        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
-        let Stmt::Expr(call) = &f.body.stmts[0] else { panic!("期望表达式语句") };
+        let Item::Fn(f) = &p.items[0] else {
+            panic!("期望 fn")
+        };
+        let Stmt::Expr(call) = &f.body.stmts[0] else {
+            panic!("期望表达式语句")
+        };
         assert_eq!((call.span.line, call.span.col), (2, 5));
         assert_eq!((call.span.end_line, call.span.end_col), (2, 14));
-        let ExprKind::Call { callee, .. } = &call.kind else { panic!("期望 Call") };
+        let ExprKind::Call { callee, .. } = &call.kind else {
+            panic!("期望 Call")
+        };
         assert_eq!((callee.span.line, callee.span.col), (2, 5));
         // Field：start = 对象起点，end = 字段名 token 起点
         // （p.z 是块内最后一条表达式，归 Block.tail 而非 stmts）
@@ -2139,7 +2190,9 @@ end
         // 行 3: `    x = 4`——赋值目标 x 在 col 5
         let src = "fn main() -> Unit\n    let mut x = 1\n    x = 4\nend";
         let p = parse_ok(src);
-        let Item::Fn(f) = &p.items[0] else { panic!("期望 fn") };
+        let Item::Fn(f) = &p.items[0] else {
+            panic!("期望 fn")
+        };
         let Stmt::Assign { span, .. } = &f.body.stmts[1] else {
             panic!("期望 Assign 语句")
         };

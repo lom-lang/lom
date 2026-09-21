@@ -21,7 +21,7 @@
 
 use crate::ast::*;
 use crate::wasm::{
-    leb_s, leb_u, op, DataSegment, ExportKind, FuncType, Function, Global, Import, Module, ValType,
+    DataSegment, ExportKind, FuncType, Function, Global, Import, Module, ValType, leb_s, leb_u, op,
 };
 
 // ===== tag 与值常量 =====
@@ -359,7 +359,10 @@ impl FnCtx {
     }
     fn bind(&mut self, name: &str) -> u32 {
         let idx = self.alloc();
-        self.scopes.last_mut().unwrap().push((name.to_string(), idx));
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .push((name.to_string(), idx));
         idx
     }
     fn lookup(&self, name: &str) -> Option<u32> {
@@ -374,7 +377,10 @@ impl FnCtx {
     }
     /// 捕获槽位查找（闭包函数内）
     fn capture_slot(&self, name: &str) -> Option<u32> {
-        self.captures.iter().find(|(n, _)| n == name).map(|(_, i)| *i)
+        self.captures
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, i)| *i)
     }
     /// labels 中第 pos 个（0=最外层 $ret）相对当前的 br 深度
     fn depth(&self, pos: usize) -> u32 {
@@ -394,15 +400,15 @@ impl FnCtx {
 /// display/打印用的符号静态串偏移（全在数据段静态区）
 #[derive(Clone, Copy)]
 struct Statics {
-    open_paren: u32,   // (
-    close_paren: u32,  // )
-    comma_sp: u32,     // ", "
-    open_bracket: u32, // [
-    close_bracket: u32,// ]
-    open_brace: u32,   // {
-    close_brace: u32,  // }
-    colon_sp: u32,     // ": "
-    comma: u32,        // ,
+    open_paren: u32,    // (
+    close_paren: u32,   // )
+    comma_sp: u32,      // ", "
+    open_bracket: u32,  // [
+    close_bracket: u32, // ]
+    open_brace: u32,    // {
+    close_brace: u32,   // }
+    colon_sp: u32,      // ": "
+    comma: u32,         // ,
 }
 
 /// 编译器主结构
@@ -438,7 +444,10 @@ pub fn compile_program(prog: &Program) -> Result<Vec<u8>, String> {
 }
 
 /// 带包名集合的编译入口（7.8 包链接）：from <pkg> import {...} 的模块名按包名校验
-pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Result<Vec<u8>, String> {
+pub fn compile_program_with_packages(
+    prog: &Program,
+    pkg_names: &[String],
+) -> Result<Vec<u8>, String> {
     let mut cg = Codegen::new();
     for p in pkg_names {
         cg.known_packages.insert(p.clone());
@@ -462,28 +471,56 @@ pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Re
             Item::Enum(e) => {
                 for v in &e.variants {
                     let idx = cg.variant_idx.len() as u32;
-                    cg.variant_idx.entry(v.name.clone()).or_insert((idx, v.fields.len()));
+                    cg.variant_idx
+                        .entry(v.name.clone())
+                        .or_insert((idx, v.fields.len()));
                 }
             }
             Item::Import(imp) => {
                 // io：println/print 在 prelude 已可用，显式导入等价 no-op
                 // 7.4 起 string / math；7.6a 起 list；json 待 7.7，map 待 7.6b，file/env 待 7.8
                 const STRING_BUILTINS: &[&str] = &[
-                    "len", "int_to_string", "string_to_int", "trim", "upper", "lower",
-                    "contains", "replace", "starts_with", "ends_with", "split",
+                    "len",
+                    "int_to_string",
+                    "string_to_int",
+                    "trim",
+                    "upper",
+                    "lower",
+                    "contains",
+                    "replace",
+                    "starts_with",
+                    "ends_with",
+                    "split",
                     "char_from_code",
                 ];
                 const MATH_BUILTINS: &[&str] = &["sqrt", "abs", "min", "max"];
                 const LIST_BUILTINS: &[&str] = &[
-                    "list_empty", "list_length", "list_get", "list_is_empty", "list_head",
-                    "list_tail", "list_cons", "list_map", "list_filter", "list_fold",
+                    "list_empty",
+                    "list_length",
+                    "list_get",
+                    "list_is_empty",
+                    "list_head",
+                    "list_tail",
+                    "list_cons",
+                    "list_map",
+                    "list_filter",
+                    "list_fold",
                 ];
                 let exports: Option<&[&str]> = match imp.module.as_str() {
                     "io" => Some(&["println", "print"]),
                     "string" => Some(STRING_BUILTINS),
                     "math" => Some(MATH_BUILTINS),
                     "list" => Some(LIST_BUILTINS),
-                    "map" => Some(&["map_empty", "map_set", "map_get", "map_has", "map_remove", "map_keys", "map_values", "map_size"]),
+                    "map" => Some(&[
+                        "map_empty",
+                        "map_set",
+                        "map_get",
+                        "map_has",
+                        "map_remove",
+                        "map_keys",
+                        "map_values",
+                        "map_size",
+                    ]),
                     "json" => Some(&["json_parse", "json_stringify"]),
                     "file" => Some(&["file_read", "file_write", "file_append", "file_exists"]),
                     "env" => Some(&["args"]),
@@ -538,7 +575,11 @@ pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Re
                 params: vec![ValType::I64; f.params.len()],
                 results: vec![ValType::I64],
             });
-            cg.m.funcs.push(Function { type_idx: ty, locals: vec![], body: vec![] });
+            cg.m.funcs.push(Function {
+                type_idx: ty,
+                locals: vec![],
+                body: vec![],
+            });
         }
     }
 
@@ -571,16 +612,34 @@ pub fn compile_program_with_packages(prog: &Program, pkg_names: &[String]) -> Re
     let heap_base = data_end + 64; // 64 字节 ftoa scratch（global 1）
     let pages = (heap_base / 65536) + 1;
     cg.m.memory_min_pages = Some(pages.max(1));
-    cg.m.globals.push(Global { ty: ValType::I32, mutable: true, init: heap_base as i64 }); // global 0 = hp
-    cg.m.globals.push(Global { ty: ValType::I32, mutable: false, init: data_end as i64 }); // global 1 = ftoa buf
+    cg.m.globals.push(Global {
+        ty: ValType::I32,
+        mutable: true,
+        init: heap_base as i64,
+    }); // global 0 = hp
+    cg.m.globals.push(Global {
+        ty: ValType::I32,
+        mutable: false,
+        init: data_end as i64,
+    }); // global 1 = ftoa buf
     // 7.7：宿主 JSON 契约 —— 导出 lom_alloc（宿主物化值时分配）+ lom_variant_table（枚举串化查名）
-    cg.m.globals.push(Global { ty: ValType::I32, mutable: false, init: variant_table_off as i64 }); // global 2
-    cg.m.exports.push(("lom_alloc".into(), ExportKind::Func, RT_ALLOC));
-    cg.m.exports.push(("lom_variant_table".into(), ExportKind::Global, 2));
+    cg.m.globals.push(Global {
+        ty: ValType::I32,
+        mutable: false,
+        init: variant_table_off as i64,
+    }); // global 2
+    cg.m.exports
+        .push(("lom_alloc".into(), ExportKind::Func, RT_ALLOC));
+    cg.m.exports
+        .push(("lom_variant_table".into(), ExportKind::Global, 2));
     cg.m.exports.push(("memory".into(), ExportKind::Memory, 0));
     let main_idx = cg.fn_idx["main"];
-    cg.m.exports.push(("main".into(), ExportKind::Func, main_idx));
-    cg.m.data.push(DataSegment { offset: 0, bytes: std::mem::take(&mut cg.data) });
+    cg.m.exports
+        .push(("main".into(), ExportKind::Func, main_idx));
+    cg.m.data.push(DataSegment {
+        offset: 0,
+        bytes: std::mem::take(&mut cg.data),
+    });
 
     Ok(cg.m.encode())
 }
@@ -592,7 +651,11 @@ impl Codegen {
         // 与 rt_display 用的 "true"/"false"/"()" 字面量
         let mut data: Vec<u8> = vec![b'\n'];
         let mut str_off: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-        fn intern_static(data: &mut Vec<u8>, str_off: &mut std::collections::HashMap<String, u32>, s: &str) -> u32 {
+        fn intern_static(
+            data: &mut Vec<u8>,
+            str_off: &mut std::collections::HashMap<String, u32>,
+            s: &str,
+        ) -> u32 {
             let off = data.len() as u32;
             data.extend((s.len() as u32).to_le_bytes());
             data.extend(s.as_bytes());
@@ -619,22 +682,70 @@ impl Codegen {
             comma: intern_static(&mut data, &mut str_off, ","),
         };
         // 类型注册（add_type 自动去重）
-        let ty_ii_unit = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![] });
-        let ty_fi_unit = m.add_type(FuncType { params: vec![ValType::F64, ValType::I64], results: vec![] });
-        let ty_i_unit = m.add_type(FuncType { params: vec![ValType::I64], results: vec![] });
-        let ty_pp_unit = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32], results: vec![] });
-        let ty_f_i64 = m.add_type(FuncType { params: vec![ValType::F64], results: vec![ValType::I64] });
-        let ty_i64_f = m.add_type(FuncType { params: vec![ValType::I64], results: vec![ValType::F64] });
-        let ty_ii_i32 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![ValType::I32] });
-        let ty_ii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64], results: vec![ValType::I64] });
-        let ty_i64_i64 = m.add_type(FuncType { params: vec![ValType::I64], results: vec![ValType::I64] });
-        let ty_i64_i32 = m.add_type(FuncType { params: vec![ValType::I64], results: vec![ValType::I32] });
-        let ty_i32_i32 = m.add_type(FuncType { params: vec![ValType::I32], results: vec![ValType::I32] });
-        let ty_ftoa = m.add_type(FuncType { params: vec![ValType::F64, ValType::I32], results: vec![ValType::I32] });
-        let ty_iii_i64 = m.add_type(FuncType { params: vec![ValType::I64, ValType::I64, ValType::I64], results: vec![ValType::I64] });
-        let ty_unit_i64 = m.add_type(FuncType { params: vec![], results: vec![ValType::I64] });
-        let ty_json_parse = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I64] });
-        let ty_file_rw = m.add_type(FuncType { params: vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], results: vec![ValType::I64] });
+        let ty_ii_unit = m.add_type(FuncType {
+            params: vec![ValType::I64, ValType::I64],
+            results: vec![],
+        });
+        let ty_fi_unit = m.add_type(FuncType {
+            params: vec![ValType::F64, ValType::I64],
+            results: vec![],
+        });
+        let ty_i_unit = m.add_type(FuncType {
+            params: vec![ValType::I64],
+            results: vec![],
+        });
+        let ty_pp_unit = m.add_type(FuncType {
+            params: vec![ValType::I32, ValType::I32],
+            results: vec![],
+        });
+        let ty_f_i64 = m.add_type(FuncType {
+            params: vec![ValType::F64],
+            results: vec![ValType::I64],
+        });
+        let ty_i64_f = m.add_type(FuncType {
+            params: vec![ValType::I64],
+            results: vec![ValType::F64],
+        });
+        let ty_ii_i32 = m.add_type(FuncType {
+            params: vec![ValType::I64, ValType::I64],
+            results: vec![ValType::I32],
+        });
+        let ty_ii_i64 = m.add_type(FuncType {
+            params: vec![ValType::I64, ValType::I64],
+            results: vec![ValType::I64],
+        });
+        let ty_i64_i64 = m.add_type(FuncType {
+            params: vec![ValType::I64],
+            results: vec![ValType::I64],
+        });
+        let ty_i64_i32 = m.add_type(FuncType {
+            params: vec![ValType::I64],
+            results: vec![ValType::I32],
+        });
+        let ty_i32_i32 = m.add_type(FuncType {
+            params: vec![ValType::I32],
+            results: vec![ValType::I32],
+        });
+        let ty_ftoa = m.add_type(FuncType {
+            params: vec![ValType::F64, ValType::I32],
+            results: vec![ValType::I32],
+        });
+        let ty_iii_i64 = m.add_type(FuncType {
+            params: vec![ValType::I64, ValType::I64, ValType::I64],
+            results: vec![ValType::I64],
+        });
+        let ty_unit_i64 = m.add_type(FuncType {
+            params: vec![],
+            results: vec![ValType::I64],
+        });
+        let ty_json_parse = m.add_type(FuncType {
+            params: vec![ValType::I32, ValType::I32],
+            results: vec![ValType::I64],
+        });
+        let ty_file_rw = m.add_type(FuncType {
+            params: vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+            results: vec![ValType::I64],
+        });
 
         // 导入（funcidx 0-5）
         for (name, ty) in [
@@ -652,7 +763,11 @@ impl Codegen {
             ("lom_file_exists", ty_json_parse),
             ("lom_env_args", ty_unit_i64),
         ] {
-            m.imports.push(Import { module: "env".into(), name: name.into(), type_idx: ty });
+            m.imports.push(Import {
+                module: "env".into(),
+                name: name.into(),
+                type_idx: ty,
+            });
         }
 
         // 运行时 helper（funcidx 6-40；新增 helper 必须同步 FIRST_USER_FN 与上面的 RT_* 常量）
@@ -660,7 +775,11 @@ impl Codegen {
             (ty_f_i64, vec![ValType::I64], build_box_f64()),
             (ty_i64_f, vec![], build_unbox_f64()),
             (ty_i64_f, vec![], build_promote_f64()),
-            (ty_ii_i32, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], build_str_eq()),
+            (
+                ty_ii_i32,
+                vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+                build_str_eq(),
+            ),
             (ty_ii_i64, vec![], build_arith(ArithKind::Add)),
             (ty_ii_i64, vec![], build_arith(ArithKind::Sub)),
             (ty_ii_i64, vec![], build_arith(ArithKind::Mul)),
@@ -679,12 +798,38 @@ impl Codegen {
             (ty_i32_i32, vec![ValType::I32; 3], build_alloc()),
             // ===== 7.4：字符串 / stdlib =====
             (ty_ii_i64, vec![ValType::I32; 6], build_str_concat()),
-            (ty_i64_i64, vec![], build_display(true_off, false_off, unit_off, closure_off)),
-            (ty_i64_i64, vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], build_itoa()),
+            (
+                ty_i64_i64,
+                vec![],
+                build_display(true_off, false_off, unit_off, closure_off),
+            ),
+            (
+                ty_i64_i64,
+                vec![
+                    ValType::I64,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                ],
+                build_itoa(),
+            ),
             (ty_i64_i64, vec![ValType::I32; 4], build_str_len()),
-            (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], build_stoi()),
+            (
+                ty_i64_i64,
+                vec![
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I64,
+                ],
+                build_stoi(),
+            ),
             (ty_i64_i64, vec![ValType::I32; 7], build_trim()),
-            (ty_i64_i64, vec![ValType::I32; 5], build_case(true)),  // upper
+            (ty_i64_i64, vec![ValType::I32; 5], build_case(true)), // upper
             (ty_i64_i64, vec![ValType::I32; 5], build_case(false)), // lower
             (ty_ii_i64, vec![ValType::I32; 6], build_contains()),
             (ty_ii_i64, vec![ValType::I32; 5], build_starts_ends(true)),
@@ -696,33 +841,65 @@ impl Codegen {
             // ===== 7.5：枚举 / match / ? =====
             // RT_ENUM_PRINT / RT_ENUM_STR 的体在 finalize 填（需要变体名表偏移）
             (ty_ii_unit, vec![ValType::I32; 5], vec![]),
-            (ty_i64_i64, vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I64], vec![]),
+            (
+                ty_i64_i64,
+                vec![
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I64,
+                ],
+                vec![],
+            ),
             (ty_ii_i32, vec![ValType::I32; 4], build_enum_eq()),
             // ===== 7.6a：Record/Tuple/List =====
             (ty_ii_i64, vec![ValType::I64; 1], build_cons()),
             (ty_ii_i64, vec![ValType::I64; 2], build_range()),
             (ty_i64_i64, vec![ValType::I64; 2], build_list_len()),
             (ty_ii_i64, vec![ValType::I64; 2], build_list_get()),
-            (ty_ii_i64, {
-                let mut v = vec![ValType::I32; 8];
-                v.extend([ValType::I64; 2]);
-                v
-            }, build_split()),
+            (
+                ty_ii_i64,
+                {
+                    let mut v = vec![ValType::I32; 8];
+                    v.extend([ValType::I64; 2]);
+                    v
+                },
+                build_split(),
+            ),
             (ty_ii_i64, vec![ValType::I64; 3], build_list_map(ty_ii_i64)),
-            (ty_ii_i64, vec![ValType::I64; 3], build_list_filter(ty_ii_i64)),
-            (ty_iii_i64, vec![ValType::I64; 3], build_list_fold(ty_iii_i64)),
+            (
+                ty_ii_i64,
+                vec![ValType::I64; 3],
+                build_list_filter(ty_ii_i64),
+            ),
+            (
+                ty_iii_i64,
+                vec![ValType::I64; 3],
+                build_list_fold(ty_iii_i64),
+            ),
             (ty_iii_i64, vec![ValType::I32; 5], build_substr()),
             (ty_i64_i64, vec![ValType::I64; 3], build_list_str(&statics)),
-            (ty_i64_i64, {
-                let mut v = vec![ValType::I64; 1];
-                v.extend([ValType::I32; 3]);
-                v
-            }, build_tuple_str(&statics)),
-            (ty_i64_i64, {
-                let mut v = vec![ValType::I64; 1];
-                v.extend([ValType::I32; 3]);
-                v
-            }, build_record_str(&statics)),
+            (
+                ty_i64_i64,
+                {
+                    let mut v = vec![ValType::I64; 1];
+                    v.extend([ValType::I32; 3]);
+                    v
+                },
+                build_tuple_str(&statics),
+            ),
+            (
+                ty_i64_i64,
+                {
+                    let mut v = vec![ValType::I64; 1];
+                    v.extend([ValType::I32; 3]);
+                    v
+                },
+                build_record_str(&statics),
+            ),
             (ty_ii_i32, vec![ValType::I32; 4], build_tuple_eq()),
             (ty_ii_i32, vec![ValType::I32; 7], build_record_eq()),
             (ty_ii_i32, vec![ValType::I64; 2], build_list_eq()),
@@ -730,36 +907,64 @@ impl Codegen {
             (ty_unit_i64, vec![ValType::I32; 1], build_map_new()),
             (ty_ii_i32, vec![ValType::I32; 9], build_map_probe()),
             (ty_iii_i64, vec![ValType::I32; 11], build_map_set()),
-            (ty_ii_i64, vec![ValType::I32, ValType::I64, ValType::I64], build_map_get()),
+            (
+                ty_ii_i64,
+                vec![ValType::I32, ValType::I64, ValType::I64],
+                build_map_get(),
+            ),
             (ty_ii_i64, vec![], build_map_has()),
             (ty_ii_i64, vec![ValType::I32; 1], build_map_remove()),
-            (ty_i64_i64, {
-                let mut v = vec![ValType::I32; 8];
-                v.push(ValType::I64);
-                v
-            }, build_map_keys()),
-            (ty_i64_i64, {
-                let mut v = vec![ValType::I64; 3];
-                v.push(ValType::I32);
-                v
-            }, build_map_values()),
-            (ty_i64_i64, {
-                let mut v = vec![ValType::I64; 3];
-                v.push(ValType::I32);
-                v.push(ValType::I64);
-                v
-            }, build_map_str(&statics)),
+            (
+                ty_i64_i64,
+                {
+                    let mut v = vec![ValType::I32; 8];
+                    v.push(ValType::I64);
+                    v
+                },
+                build_map_keys(),
+            ),
+            (
+                ty_i64_i64,
+                {
+                    let mut v = vec![ValType::I64; 3];
+                    v.push(ValType::I32);
+                    v
+                },
+                build_map_values(),
+            ),
+            (
+                ty_i64_i64,
+                {
+                    let mut v = vec![ValType::I64; 3];
+                    v.push(ValType::I32);
+                    v.push(ValType::I64);
+                    v
+                },
+                build_map_str(&statics),
+            ),
             (ty_ii_i32, vec![ValType::I32; 6], build_map_eq()),
             // ===== v0.27.0：char_from_code（码点→UTF-8 单字符 Str）=====
-            (ty_i64_i64, vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32], build_char_from_code()),
+            (
+                ty_i64_i64,
+                vec![ValType::I64, ValType::I32, ValType::I32, ValType::I32],
+                build_char_from_code(),
+            ),
         ];
         for (ty, locals, body) in helpers {
-            m.funcs.push(Function { type_idx: ty, locals, body });
+            m.funcs.push(Function {
+                type_idx: ty,
+                locals,
+                body,
+            });
         }
 
         // 内建变体：Ok=0 Err=1 Some=2 None=3（None 零参）
-        let mut variant_idx: std::collections::HashMap<String, (u32, usize)> = std::collections::HashMap::new();
-        for (i, (v, arity)) in [("Ok", 1), ("Err", 1), ("Some", 1), ("None", 0)].iter().enumerate() {
+        let mut variant_idx: std::collections::HashMap<String, (u32, usize)> =
+            std::collections::HashMap::new();
+        for (i, (v, arity)) in [("Ok", 1), ("Err", 1), ("Some", 1), ("None", 0)]
+            .iter()
+            .enumerate()
+        {
             variant_idx.insert(v.to_string(), (i as u32, *arity));
         }
         let mut available_builtins = std::collections::HashSet::new();
@@ -812,7 +1017,13 @@ impl Codegen {
     }
 
     /// 枚举构造：参数求值 → [variant_idx: i32][n: i32][args: i64×n] 堆对象（tag 6）
-    fn emit_enum_construct(&mut self, ctx: &mut FnCtx, a: &mut Asm, vidx: u32, args: &[Expr]) -> Result<(), String> {
+    fn emit_enum_construct(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        vidx: u32,
+        args: &[Expr],
+    ) -> Result<(), String> {
         let mut scratches = Vec::new();
         for arg in args {
             self.compile_expr(ctx, a, arg)?;
@@ -821,11 +1032,23 @@ impl Codegen {
             scratches.push(s);
         }
         let p = ctx.alloc();
-        a.i32c(8 + 8 * args.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
-        a.lget(p).op(op::I32_WRAP_I64).i32c(vidx as i32).i32_store(0);
-        a.lget(p).op(op::I32_WRAP_I64).i32c(args.len() as i32).i32_store(4);
+        a.i32c(8 + 8 * args.len() as i32)
+            .call(RT_ALLOC)
+            .op(op::I64_EXTEND_I32_S)
+            .lset(p);
+        a.lget(p)
+            .op(op::I32_WRAP_I64)
+            .i32c(vidx as i32)
+            .i32_store(0);
+        a.lget(p)
+            .op(op::I32_WRAP_I64)
+            .i32c(args.len() as i32)
+            .i32_store(4);
         for (k, s) in scratches.iter().enumerate() {
-            a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(8 + 8 * k as u32);
+            a.lget(p)
+                .op(op::I32_WRAP_I64)
+                .lget(*s)
+                .i64_store(8 + 8 * k as u32);
         }
         a.lget(p).tag_int().i64c(TAG_ENUM).op(op::I64_OR);
         Ok(())
@@ -867,7 +1090,12 @@ impl Codegen {
         Ok(())
     }
 
-    fn compile_arm_body(&mut self, ctx: &mut FnCtx, a: &mut Asm, body: &MatchArmBody) -> Result<(), String> {
+    fn compile_arm_body(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        body: &MatchArmBody,
+    ) -> Result<(), String> {
         match body {
             MatchArmBody::Expr(e) => self.compile_expr(ctx, a, e),
             MatchArmBody::Block(b) => self.compile_block_value(ctx, a, b),
@@ -875,7 +1103,13 @@ impl Codegen {
     }
 
     /// 模式测试：栈上留 i32 条件；绑定变量写入当前臂作用域
-    fn compile_pattern_test(&mut self, ctx: &mut FnCtx, a: &mut Asm, pat: &Pattern, s: u32) -> Result<(), String> {
+    fn compile_pattern_test(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        pat: &Pattern,
+        s: u32,
+    ) -> Result<(), String> {
         match pat {
             Pattern::Wildcard => {
                 a.i32c(1);
@@ -923,7 +1157,9 @@ impl Codegen {
                 if sub.len() != arity {
                     return Err(format!(
                         "WASM 编译：变体 '{}' 期望 {} 个子模式，得到 {} 个",
-                        name, arity, sub.len()
+                        name,
+                        arity,
+                        sub.len()
                     ));
                 }
                 self.emit_variant_test(a, s, vidx);
@@ -937,7 +1173,12 @@ impl Codegen {
                     for (k, sp) in sub.iter().enumerate() {
                         // arg_k 装入新 local 再递归测试（此时 tag/idx 已确认，读载荷安全）
                         let arg_l = ctx.alloc();
-                        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8 + 8 * k as u32).lset(arg_l);
+                        a.lget(s)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .i64_load(8 + 8 * k as u32)
+                            .lset(arg_l);
                         self.compile_pattern_test(ctx, a, sp, arg_l)?;
                         if !first {
                             a.op(op::I32_AND);
@@ -959,7 +1200,11 @@ impl Codegen {
     /// 的 >>4 是野地址 → OOB。tag 不符时给不可能的 idx（-1），语义等价且无盲读。
     fn emit_variant_test(&mut self, a: &mut Asm, s: u32, vidx: u32) {
         a.lget(s).tag().i64c(TAG_ENUM).op(op::I64_EQ).if_i32();
-        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+        a.lget(s)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0);
         a.else_();
         a.i32c(-1);
         a.end();
@@ -969,7 +1214,11 @@ impl Codegen {
     /// 变体名表：按 idx 顺序把变体名 intern 进数据段，再写 [name_off: i32] 数组；返回表偏移
     fn build_variant_table(&mut self) -> u32 {
         // 按 idx 排序（内建 0-3 在前，用户变体按声明序）
-        let mut by_idx: Vec<(u32, String)> = self.variant_idx.iter().map(|(n, &(i, _))| (i, n.clone())).collect();
+        let mut by_idx: Vec<(u32, String)> = self
+            .variant_idx
+            .iter()
+            .map(|(n, &(i, _))| (i, n.clone()))
+            .collect();
         by_idx.sort_by_key(|(i, _)| *i);
         // 先 intern 所有名字（复用 str_off 去重），记录偏移
         let mut name_offs = Vec::with_capacity(by_idx.len());
@@ -1000,11 +1249,20 @@ impl Codegen {
         a.block_i64();
         self.compile_block_value(&mut ctx, &mut a, &f.body)?;
         a.end();
-        Ok(Function { type_idx: ty, locals: ctx.locals, body: a.b })
+        Ok(Function {
+            type_idx: ty,
+            locals: ctx.locals,
+            body: a.b,
+        })
     }
 
     /// 编译块（值语境）：语句 + 尾表达式（无尾表达式则补 Unit）
-    fn compile_block_value(&mut self, ctx: &mut FnCtx, a: &mut Asm, block: &Block) -> Result<(), String> {
+    fn compile_block_value(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        block: &Block,
+    ) -> Result<(), String> {
         ctx.scopes.push(Vec::new());
         for s in &block.stmts {
             self.compile_stmt(ctx, a, s)?;
@@ -1020,7 +1278,12 @@ impl Codegen {
     }
 
     /// 编译块（语句语境）：尾表达式的值丢弃
-    fn compile_block_stmt(&mut self, ctx: &mut FnCtx, a: &mut Asm, block: &Block) -> Result<(), String> {
+    fn compile_block_stmt(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        block: &Block,
+    ) -> Result<(), String> {
         ctx.scopes.push(Vec::new());
         for s in &block.stmts {
             self.compile_stmt(ctx, a, s)?;
@@ -1047,7 +1310,10 @@ impl Codegen {
                         a.lset(idx); // 闭包值入 local
                         if let Some(pos) = caps.iter().position(|n| n == name) {
                             // 补丁：env 里自身槽位写入真值
-                            a.lget(env_l).op(op::I32_WRAP_I64).lget(idx).i64_store(4 + 8 * pos as u32);
+                            a.lget(env_l)
+                                .op(op::I32_WRAP_I64)
+                                .lget(idx)
+                                .i64_store(4 + 8 * pos as u32);
                         }
                         return Ok(());
                     }
@@ -1062,11 +1328,29 @@ impl Codegen {
                 self.compile_expr(ctx, a, value)?;
                 let t = ctx.alloc();
                 a.lset(t);
-                a.tag_is(t, TAG_TUPLE).if_().else_().op(op::UNREACHABLE).end();
-                a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).i32c(names.len() as i32).op(op::I32_NE).if_().op(op::UNREACHABLE).end();
+                a.tag_is(t, TAG_TUPLE)
+                    .if_()
+                    .else_()
+                    .op(op::UNREACHABLE)
+                    .end();
+                a.lget(t)
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32_load(0)
+                    .i32c(names.len() as i32)
+                    .op(op::I32_NE)
+                    .if_()
+                    .op(op::UNREACHABLE)
+                    .end();
                 for (i, name) in names.iter().enumerate() {
                     let idx = ctx.bind(name);
-                    a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(4 + 8 * i as u32).lset(idx);
+                    a.lget(t)
+                        .i64c(4)
+                        .op(op::I64_SHR_U)
+                        .op(op::I32_WRAP_I64)
+                        .i64_load(4 + 8 * i as u32)
+                        .lset(idx);
                 }
                 Ok(())
             }
@@ -1142,7 +1426,13 @@ impl Codegen {
                     ctx.labels.push(Label::If);
                     {
                         // String 迭代：按 UTF-8 字符（cnt = 字节偏移；步进 = 当前字符字节数）
-                        a.lget(it).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(limit);
+                        a.lget(it)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .i32_load(0)
+                            .op(op::I64_EXTEND_I32_S)
+                            .lset(limit);
                         a.i64c(0).lset(cnt);
                         a.block();
                         ctx.labels.push(Label::Block);
@@ -1162,8 +1452,15 @@ impl Codegen {
                         }
                         ctx.scopes.pop();
                         // cnt += 当前字符字节数（从 var 的字符串头读）
-                        a.lget(var_idx).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0)
-                            .op(op::I64_EXTEND_I32_S).lget(cnt).op(op::I64_ADD).lset(cnt);
+                        a.lget(var_idx)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .i32_load(0)
+                            .op(op::I64_EXTEND_I32_S)
+                            .lget(cnt)
+                            .op(op::I64_ADD)
+                            .lset(cnt);
                         a.br(ctx.depth(ctx.labels.len() - 1));
                         ctx.labels.pop();
                         a.end();
@@ -1184,7 +1481,12 @@ impl Codegen {
                             a.lget(cnt).i64c(9).op(op::I64_EQ); // Nil 哨兵 = (0<<3)|9
                             let bd = ctx.break_depth();
                             a.br_if(bd);
-                            a.lget(cnt).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(var_idx);
+                            a.lget(cnt)
+                                .i64c(4)
+                                .op(op::I64_SHR_U)
+                                .op(op::I32_WRAP_I64)
+                                .i64_load(0)
+                                .lset(var_idx);
                             ctx.scopes.push(vec![(var.clone(), var_idx)]);
                             for s in &body.stmts {
                                 self.compile_stmt(ctx, a, s)?;
@@ -1194,7 +1496,12 @@ impl Codegen {
                                 a.op(op::DROP);
                             }
                             ctx.scopes.pop();
-                            a.lget(cnt).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(cnt);
+                            a.lget(cnt)
+                                .i64c(4)
+                                .op(op::I64_SHR_U)
+                                .op(op::I32_WRAP_I64)
+                                .i64_load(8)
+                                .lset(cnt);
                             a.br(ctx.depth(ctx.labels.len() - 1));
                             ctx.labels.pop();
                             a.end();
@@ -1238,11 +1545,24 @@ impl Codegen {
     }
 
     /// if/elif/else（want_value=true 时值语境，块类型 i64）
-    fn compile_if(&mut self, ctx: &mut FnCtx, a: &mut Asm, if_stmt: &IfStmt, want_value: bool) -> Result<(), String> {
+    fn compile_if(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        if_stmt: &IfStmt,
+        want_value: bool,
+    ) -> Result<(), String> {
         self.compile_if_from(ctx, a, if_stmt, 0, want_value)
     }
 
-    fn compile_if_from(&mut self, ctx: &mut FnCtx, a: &mut Asm, if_stmt: &IfStmt, branch_idx: usize, want_value: bool) -> Result<(), String> {
+    fn compile_if_from(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        if_stmt: &IfStmt,
+        branch_idx: usize,
+        want_value: bool,
+    ) -> Result<(), String> {
         let (cond, body) = &if_stmt.branches[branch_idx];
         self.compile_expr(ctx, a, cond)?;
         a.call(RT_TRUTHY);
@@ -1317,7 +1637,10 @@ impl Codegen {
                     if arity == 0 {
                         return self.emit_enum_construct(ctx, a, vidx, &[]);
                     }
-                    return Err(format!("WASM 编译：变体 '{}' 需要 {} 个参数（构造写 {}(...)）", name, arity, name));
+                    return Err(format!(
+                        "WASM 编译：变体 '{}' 需要 {} 个参数（构造写 {}(...)）",
+                        name, arity, name
+                    ));
                 }
                 if self.fn_idx.contains_key(name) {
                     // 具名函数当值（v0.4.2 语义）：包装为零捕获闭包（shim 忽略 env 直调原函数）
@@ -1325,7 +1648,11 @@ impl Codegen {
                 }
                 Err(format!("WASM 编译：未定义变量 '{}'", name))
             }
-            ExprKind::Binary { op: bop, left, right } => {
+            ExprKind::Binary {
+                op: bop,
+                left,
+                right,
+            } => {
                 let helper = match bop {
                     BinOp::Add => RT_ADD,
                     BinOp::Sub => RT_SUB,
@@ -1344,7 +1671,10 @@ impl Codegen {
                 a.call(helper);
                 Ok(())
             }
-            ExprKind::Unary { op: uop, expr: inner } => {
+            ExprKind::Unary {
+                op: uop,
+                expr: inner,
+            } => {
                 self.compile_expr(ctx, a, inner)?;
                 a.call(match uop {
                     UnaryOp::Neg => RT_NEG,
@@ -1352,7 +1682,11 @@ impl Codegen {
                 });
                 Ok(())
             }
-            ExprKind::Logical { op: lop, left, right } => {
+            ExprKind::Logical {
+                op: lop,
+                left,
+                right,
+            } => {
                 // 解释器语义：and/or 的结果是 Bool（对右侧取真值），不是右侧原值
                 let sc = ctx.alloc();
                 self.compile_expr(ctx, a, left)?;
@@ -1402,16 +1736,30 @@ impl Codegen {
                 self.compile_expr(ctx, a, inner)?;
                 let t = ctx.alloc();
                 a.lset(t);
-                a.tag_is(t, TAG_ENUM).if_().else_().op(op::UNREACHABLE).end();
+                a.tag_is(t, TAG_ENUM)
+                    .if_()
+                    .else_()
+                    .op(op::UNREACHABLE)
+                    .end();
                 // idx = load32(ptr)；Ok=0/Some=2 解包，Err=1/None=3 早退
                 let vi = ctx.alloc();
-                a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).lset(vi);
+                a.lget(t)
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32_load(0)
+                    .op(op::I64_EXTEND_I32_S)
+                    .lset(vi);
                 a.lget(vi).i64c(0).op(op::I64_EQ);
                 a.lget(vi).i64c(2).op(op::I64_EQ);
                 a.op(op::I32_OR).if_i64();
                 ctx.labels.push(Label::If); // if 也是 label，br 深度要计入（7.2 的坑）
                 {
-                    a.lget(t).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
+                    a.lget(t)
+                        .i64c(4)
+                        .op(op::I64_SHR_U)
+                        .op(op::I32_WRAP_I64)
+                        .i64_load(8);
                 }
                 a.else_();
                 {
@@ -1432,10 +1780,19 @@ impl Codegen {
                     scratches.push(s);
                 }
                 let p = ctx.alloc();
-                a.i32c(4 + 8 * elems.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
-                a.lget(p).op(op::I32_WRAP_I64).i32c(elems.len() as i32).i32_store(0);
+                a.i32c(4 + 8 * elems.len() as i32)
+                    .call(RT_ALLOC)
+                    .op(op::I64_EXTEND_I32_S)
+                    .lset(p);
+                a.lget(p)
+                    .op(op::I32_WRAP_I64)
+                    .i32c(elems.len() as i32)
+                    .i32_store(0);
                 for (k, s) in scratches.iter().enumerate() {
-                    a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(4 + 8 * k as u32);
+                    a.lget(p)
+                        .op(op::I32_WRAP_I64)
+                        .lget(*s)
+                        .i64_store(4 + 8 * k as u32);
                 }
                 a.lget(p).tag_int().i64c(TAG_TUPLE).op(op::I64_OR);
                 Ok(())
@@ -1450,12 +1807,24 @@ impl Codegen {
                     scratches.push(s);
                 }
                 let p = ctx.alloc();
-                a.i32c(4 + 12 * fields.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
-                a.lget(p).op(op::I32_WRAP_I64).i32c(fields.len() as i32).i32_store(0);
+                a.i32c(4 + 12 * fields.len() as i32)
+                    .call(RT_ALLOC)
+                    .op(op::I64_EXTEND_I32_S)
+                    .lset(p);
+                a.lget(p)
+                    .op(op::I32_WRAP_I64)
+                    .i32c(fields.len() as i32)
+                    .i32_store(0);
                 for (k, ((fname, _), s)) in fields.iter().zip(scratches.iter()).enumerate() {
                     let noff = (self.intern_str(fname) - TAG_STR) >> 4; // 裸偏移
-                    a.lget(p).op(op::I32_WRAP_I64).i32c(noff as i32).i32_store(4 + 12 * k as u32);
-                    a.lget(p).op(op::I32_WRAP_I64).lget(*s).i64_store(8 + 12 * k as u32);
+                    a.lget(p)
+                        .op(op::I32_WRAP_I64)
+                        .i32c(noff as i32)
+                        .i32_store(4 + 12 * k as u32);
+                    a.lget(p)
+                        .op(op::I32_WRAP_I64)
+                        .lget(*s)
+                        .i64_store(8 + 12 * k as u32);
                 }
                 a.lget(p).tag_int().i64c(TAG_RECORD).op(op::I64_OR);
                 Ok(())
@@ -1468,10 +1837,19 @@ impl Codegen {
                 a.tag_is(s, TAG_TUPLE).if_i64();
                 match name.parse::<u32>() {
                     Ok(idx) => {
-                    // 越界检查：idx < n（否则 trap）
-                    a.i32c(idx as i32).lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
-                    a.op(op::I32_GE_U).if_().op(op::UNREACHABLE).end();
-                    a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(4 + 8 * idx);
+                        // 越界检查：idx < n（否则 trap）
+                        a.i32c(idx as i32)
+                            .lget(s)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .i32_load(0);
+                        a.op(op::I32_GE_U).if_().op(op::UNREACHABLE).end();
+                        a.lget(s)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .i64_load(4 + 8 * idx);
                     }
                     Err(_) => {
                         // 非数字字段名不可能是元组访问——运行到这里即 trap（记录字段走下面的 RECORD 分支）
@@ -1485,7 +1863,12 @@ impl Codegen {
                         // 记录字段：按字段名内容比较（7.7 起：宿主物化记录与编译期 intern 不同源）
                         let target = self.intern_str(name); // tagged Str
                         let rp = ctx.alloc(); // 记录指针（i64 槽装 i32 扩展）
-                        a.lget(s).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).op(op::I64_EXTEND_I32_S).lset(rp);
+                        a.lget(s)
+                            .i64c(4)
+                            .op(op::I64_SHR_U)
+                            .op(op::I32_WRAP_I64)
+                            .op(op::I64_EXTEND_I32_S)
+                            .lset(rp);
                         let i = ctx.alloc();
                         a.i64c(0).lset(i);
                         // $found 块带值：找到即 br
@@ -1496,14 +1879,40 @@ impl Codegen {
                         ctx.labels.push(Label::Loop);
                         {
                             // i >= n → 字段不存在 → trap
-                            a.lget(i).lget(rp).op(op::I32_WRAP_I64).i32_load(0).op(op::I64_EXTEND_I32_S).op(op::I64_GE_S).if_().op(op::UNREACHABLE).end();
+                            a.lget(i)
+                                .lget(rp)
+                                .op(op::I32_WRAP_I64)
+                                .i32_load(0)
+                                .op(op::I64_EXTEND_I32_S)
+                                .op(op::I64_GE_S)
+                                .if_()
+                                .op(op::UNREACHABLE)
+                                .end();
                             // 字段名内容比较（7.7 修正：宿主物化的记录与编译期 intern 偏移不同源，必须比内容）
-                            a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
-                            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+                            a.lget(rp)
+                                .op(op::I32_WRAP_I64)
+                                .lget(i)
+                                .op(op::I32_WRAP_I64)
+                                .i32c(12)
+                                .op(op::I32_MUL)
+                                .op(op::I32_ADD)
+                                .i32_load(4);
+                            a.op(op::I64_EXTEND_I32_S)
+                                .i64c(4)
+                                .op(op::I64_SHL)
+                                .i64c(TAG_STR)
+                                .op(op::I64_OR);
                             a.i64c(target).call(RT_STR_EQ).if_();
                             ctx.labels.push(Label::If);
                             {
-                                a.lget(rp).op(op::I32_WRAP_I64).lget(i).op(op::I32_WRAP_I64).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+                                a.lget(rp)
+                                    .op(op::I32_WRAP_I64)
+                                    .lget(i)
+                                    .op(op::I32_WRAP_I64)
+                                    .i32c(12)
+                                    .op(op::I32_MUL)
+                                    .op(op::I32_ADD)
+                                    .i64_load(8);
                                 a.br(ctx.depth(found_pos));
                             }
                             a.end();
@@ -1529,29 +1938,52 @@ impl Codegen {
                 a.call(RT_RANGE);
                 Ok(())
             }
-            ExprKind::Index { .. } => Err("WASM 编译：索引操作 xs[i] 在解释器侧也未实现（用 list_get）".to_string()),
+            ExprKind::Index { .. } => {
+                Err("WASM 编译：索引操作 xs[i] 在解释器侧也未实现（用 list_get）".to_string())
+            }
         }
     }
 
-    fn compile_call(&mut self, ctx: &mut FnCtx, a: &mut Asm, callee: &Expr, args: &[Expr]) -> Result<(), String> {
+    fn compile_call(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        callee: &Expr,
+        args: &[Expr],
+    ) -> Result<(), String> {
         if let ExprKind::Ident(name) = &callee.kind {
             let orig: &str = name;
             // 导入别名解析（log → println 等）；变体/用户函数/闭包判断用 orig，内建分派用真名 real
             // real 用 owned String 避免借用 self 卡住后续可变调用
-            let real: String = self.import_aliases.get(orig).cloned().unwrap_or_else(|| orig.to_string());
+            let real: String = self
+                .import_aliases
+                .get(orig)
+                .cloned()
+                .unwrap_or_else(|| orig.to_string());
             // 顺序对齐解释器 eval_call：变体（未被遮蔽）→ 内建 → 用户函数 → 闭包变量
             // 枚举变体构造（未被局部变量遮蔽时）
             if let Some(&(vidx, arity)) = self.variant_idx.get(orig)
-                && ctx.lookup(orig).is_none() && ctx.capture_slot(orig).is_none() {
-                    if arity != args.len() {
-                        return Err(format!("WASM 编译：变体 '{}' 期望 {} 个参数，得到 {} 个", orig, arity, args.len()));
-                    }
-                    return self.emit_enum_construct(ctx, a, vidx, args);
+                && ctx.lookup(orig).is_none()
+                && ctx.capture_slot(orig).is_none()
+            {
+                if arity != args.len() {
+                    return Err(format!(
+                        "WASM 编译：变体 '{}' 期望 {} 个参数，得到 {} 个",
+                        orig,
+                        arity,
+                        args.len()
+                    ));
                 }
+                return self.emit_enum_construct(ctx, a, vidx, args);
+            }
             // println / print（prelude）
             if real == "println" || real == "print" {
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：{} 期望 1 个参数，得到 {} 个", orig, args.len()));
+                    return Err(format!(
+                        "WASM 编译：{} 期望 1 个参数，得到 {} 个",
+                        orig,
+                        args.len()
+                    ));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
                 a.i64c(if real == "println" { 1 } else { 0 });
@@ -1570,7 +2002,11 @@ impl Codegen {
                 ));
             }
             // 用户函数（具名直调；注意解释器里具名函数优先于同名闭包变量，保持一致）
-            if let Some(&idx) = self.fn_idx.get(orig).or_else(|| self.fn_idx.get(real.as_str())) {
+            if let Some(&idx) = self
+                .fn_idx
+                .get(orig)
+                .or_else(|| self.fn_idx.get(real.as_str()))
+            {
                 // arity 按有签名的名字查（别名导入时签名挂在 real 名下——D 包二期
                 // 2026-09-14 修复：此前 check_arity(orig) 对包符号别名误报"期望 0 个参数"）
                 self.check_arity(real.as_str(), args.len())?;
@@ -1594,7 +2030,13 @@ impl Codegen {
     }
 
     /// 求值参数到 scratch local，带可选 tag 检查；返回 scratch 列表
-    fn eval_args_tagged(&mut self, ctx: &mut FnCtx, a: &mut Asm, args: &[Expr], tags: &[Option<i64>]) -> Result<Vec<u32>, String> {
+    fn eval_args_tagged(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        args: &[Expr],
+        tags: &[Option<i64>],
+    ) -> Result<Vec<u32>, String> {
         let mut out = Vec::new();
         for (i, arg) in args.iter().enumerate() {
             self.compile_expr(ctx, a, arg)?;
@@ -1610,11 +2052,27 @@ impl Codegen {
 
     /// 7.4 内建函数编译（调用点已确认名字已导入可用）。返回 Ok(true)=已处理。
     /// 类型检查策略：tag 不符即 trap（对齐解释器运行时错误；结构化错误消息在 7.9 对齐）。
-    fn compile_builtin(&mut self, ctx: &mut FnCtx, a: &mut Asm, name: &str, args: &[Expr]) -> Result<bool, String> {
+    fn compile_builtin(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        name: &str,
+        args: &[Expr],
+    ) -> Result<bool, String> {
         // 单字符串参数辅助：编译 + tag 检查 + call helper
-        let str_unary = |cg: &mut Self, ctx: &mut FnCtx, a: &mut Asm, args: &[Expr], helper: u32, what: &str| -> Result<(), String> {
+        let str_unary = |cg: &mut Self,
+                         ctx: &mut FnCtx,
+                         a: &mut Asm,
+                         args: &[Expr],
+                         helper: u32,
+                         what: &str|
+         -> Result<(), String> {
             if args.len() != 1 {
-                return Err(format!("WASM 编译：{} 期望 1 个参数，得到 {} 个", what, args.len()));
+                return Err(format!(
+                    "WASM 编译：{} 期望 1 个参数，得到 {} 个",
+                    what,
+                    args.len()
+                ));
             }
             cg.compile_expr(ctx, a, &args[0])?;
             let s = ctx.alloc();
@@ -1627,7 +2085,10 @@ impl Codegen {
             "len" => str_unary(self, ctx, a, args, RT_STR_LEN, "len")?,
             "int_to_string" => {
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：int_to_string 期望 1 个参数，得到 {} 个", args.len()));
+                    return Err(format!(
+                        "WASM 编译：int_to_string 期望 1 个参数，得到 {} 个",
+                        args.len()
+                    ));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
                 let s = ctx.alloc();
@@ -1641,7 +2102,10 @@ impl Codegen {
             "lower" => str_unary(self, ctx, a, args, RT_LOWER, "lower")?,
             "char_from_code" => {
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：char_from_code 期望 1 个参数，得到 {} 个", args.len()));
+                    return Err(format!(
+                        "WASM 编译：char_from_code 期望 1 个参数，得到 {} 个",
+                        args.len()
+                    ));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
                 a.call(RT_CHAR_FROM_CODE);
@@ -1654,7 +2118,12 @@ impl Codegen {
                     _ => (3, RT_REPLACE),
                 };
                 if args.len() != want {
-                    return Err(format!("WASM 编译：{} 期望 {} 个参数，得到 {} 个", name, want, args.len()));
+                    return Err(format!(
+                        "WASM 编译：{} 期望 {} 个参数，得到 {} 个",
+                        name,
+                        want,
+                        args.len()
+                    ));
                 }
                 // 每个参数只求值一次：先进 scratch（带 tag 检查），再按序压栈
                 let mut scratches = Vec::new();
@@ -1673,7 +2142,10 @@ impl Codegen {
             "sqrt" => {
                 // Int/Float → Float（promote 内部对非数值 trap）
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：sqrt 期望 1 个参数，得到 {} 个", args.len()));
+                    return Err(format!(
+                        "WASM 编译：sqrt 期望 1 个参数，得到 {} 个",
+                        args.len()
+                    ));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
                 a.call(RT_PROMOTE_F64).op(op::F64_SQRT).call(RT_BOX_F64);
@@ -1681,7 +2153,10 @@ impl Codegen {
             "abs" => {
                 // Int→Int（无分支绝对值：(v^(v>>63))-(v>>63)）；Float→Float
                 if args.len() != 1 {
-                    return Err(format!("WASM 编译：abs 期望 1 个参数，得到 {} 个", args.len()));
+                    return Err(format!(
+                        "WASM 编译：abs 期望 1 个参数，得到 {} 个",
+                        args.len()
+                    ));
                 }
                 self.compile_expr(ctx, a, &args[0])?;
                 let s = ctx.alloc();
@@ -1698,7 +2173,10 @@ impl Codegen {
                 {
                     a.tag_is(s, TAG_F64).if_i64();
                     {
-                        a.lget(s).call(RT_UNBOX_F64).op(op::F64_ABS).call(RT_BOX_F64);
+                        a.lget(s)
+                            .call(RT_UNBOX_F64)
+                            .op(op::F64_ABS)
+                            .call(RT_BOX_F64);
                     }
                     a.else_().op(op::UNREACHABLE).end();
                 }
@@ -1707,7 +2185,11 @@ impl Codegen {
             "min" | "max" => {
                 // 同类型对（Int,Int）/（Float,Float)；混合 trap（对齐解释器）
                 if args.len() != 2 {
-                    return Err(format!("WASM 编译：{} 期望 2 个参数，得到 {} 个", name, args.len()));
+                    return Err(format!(
+                        "WASM 编译：{} 期望 2 个参数，得到 {} 个",
+                        name,
+                        args.len()
+                    ));
                 }
                 let (i64cmp, f64op) = if name == "min" {
                     (op::I64_LT_S, op::F64_MIN)
@@ -1737,7 +2219,12 @@ impl Codegen {
                     {
                         a.tag_is(sb, TAG_F64).if_i64();
                         {
-                            a.lget(sa).call(RT_UNBOX_F64).lget(sb).call(RT_UNBOX_F64).op(f64op).call(RT_BOX_F64);
+                            a.lget(sa)
+                                .call(RT_UNBOX_F64)
+                                .lget(sb)
+                                .call(RT_UNBOX_F64)
+                                .op(f64op)
+                                .call(RT_BOX_F64);
                         }
                         a.else_().op(op::UNREACHABLE).end();
                     }
@@ -1755,13 +2242,31 @@ impl Codegen {
             }
             "list_head" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
-                a.lget(s[0]).i64c(9).op(op::I64_EQ).if_().op(op::UNREACHABLE).end(); // 空表 trap
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+                a.lget(s[0])
+                    .i64c(9)
+                    .op(op::I64_EQ)
+                    .if_()
+                    .op(op::UNREACHABLE)
+                    .end(); // 空表 trap
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i64_load(0);
             }
             "list_tail" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
-                a.lget(s[0]).i64c(9).op(op::I64_EQ).if_().op(op::UNREACHABLE).end();
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8);
+                a.lget(s[0])
+                    .i64c(9)
+                    .op(op::I64_EQ)
+                    .if_()
+                    .op(op::UNREACHABLE)
+                    .end();
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i64_load(8);
             }
             "list_length" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_LIST)])?;
@@ -1777,16 +2282,23 @@ impl Codegen {
                 a.lget(s[0]).lget(s[1]).call(RT_CONS);
             }
             "list_map" => {
-                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
+                let s =
+                    self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
                 a.lget(s[0]).lget(s[1]).call(RT_LIST_MAP);
             }
             "list_filter" => {
-                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
+                let s =
+                    self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), Some(TAG_LIST)])?;
                 a.lget(s[0]).lget(s[1]).call(RT_LIST_FILTER);
             }
             "list_fold" => {
                 // list_fold(f, init, xs)
-                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_CLOSURE), None, Some(TAG_LIST)])?;
+                let s = self.eval_args_tagged(
+                    ctx,
+                    a,
+                    args,
+                    &[Some(TAG_CLOSURE), None, Some(TAG_LIST)],
+                )?;
                 a.lget(s[0]).lget(s[1]).lget(s[2]).call(RT_LIST_FOLD);
             }
             "split" => {
@@ -1797,17 +2309,43 @@ impl Codegen {
             "file_read" | "file_exists" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR)])?;
                 // (ptr+4, len)
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
-                a.call(if name == "file_read" { IMP_FILE_READ } else { IMP_FILE_EXISTS });
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32c(4)
+                    .op(op::I32_ADD);
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32_load(0);
+                a.call(if name == "file_read" {
+                    IMP_FILE_READ
+                } else {
+                    IMP_FILE_EXISTS
+                });
             }
             "file_write" | "file_append" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR), Some(TAG_STR)])?;
                 for &si in s.iter().take(2) {
-                    a.lget(si).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD);
-                    a.lget(si).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+                    a.lget(si)
+                        .i64c(4)
+                        .op(op::I64_SHR_U)
+                        .op(op::I32_WRAP_I64)
+                        .i32c(4)
+                        .op(op::I32_ADD);
+                    a.lget(si)
+                        .i64c(4)
+                        .op(op::I64_SHR_U)
+                        .op(op::I32_WRAP_I64)
+                        .i32_load(0);
                 }
-                a.call(if name == "file_write" { IMP_FILE_WRITE } else { IMP_FILE_APPEND });
+                a.call(if name == "file_write" {
+                    IMP_FILE_WRITE
+                } else {
+                    IMP_FILE_APPEND
+                });
             }
             "args" => {
                 a.call(IMP_ENV_ARGS);
@@ -1815,8 +2353,17 @@ impl Codegen {
             // ===== 7.7：json 模块（宿主中介：harness 用 JS JSON.parse/stringify 实现）=====
             "json_parse" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_STR)])?;
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32c(4).op(op::I32_ADD); // ptr+4（跳过 len 头）
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0); // len
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32c(4)
+                    .op(op::I32_ADD); // ptr+4（跳过 len 头）
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32_load(0); // len
                 a.call(IMP_JSON_PARSE);
             }
             "json_stringify" => {
@@ -1829,7 +2376,8 @@ impl Codegen {
             }
             "map_set" => {
                 // map_set(m, k, v)；引用语义就地改（对齐解释器）——返回 Unit
-                let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR), None])?;
+                let s =
+                    self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP), Some(TAG_STR), None])?;
                 a.lget(s[0]).lget(s[1]).lget(s[2]).call(RT_MAP_SET);
             }
             "map_get" => {
@@ -1855,7 +2403,13 @@ impl Codegen {
             "map_size" => {
                 let s = self.eval_args_tagged(ctx, a, args, &[Some(TAG_MAP)])?;
                 // 内联：load size 字段 → tagged Int
-                a.lget(s[0]).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(8).op(op::I64_EXTEND_I32_S).tag_int();
+                a.lget(s[0])
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .i32_load(8)
+                    .op(op::I64_EXTEND_I32_S)
+                    .tag_int();
             }
             _ => return Ok(false),
         }
@@ -1937,7 +2491,11 @@ fn build_arith(kind: ArithKind) -> Vec<u8> {
         a.lget(1).tag().i64c(TAG_STR).op(op::I64_EQ);
         a.op(op::I32_OR).if_i64();
         {
-            a.lget(0).call(RT_DISPLAY).lget(1).call(RT_DISPLAY).call(RT_STR_CONCAT);
+            a.lget(0)
+                .call(RT_DISPLAY)
+                .lget(1)
+                .call(RT_DISPLAY)
+                .call(RT_STR_CONCAT);
         }
         a.else_();
         build_arith_numeric(&mut a, kind);
@@ -1954,7 +2512,12 @@ fn build_arith_numeric(a: &mut Asm, kind: ArithKind) {
     {
         a.tag_is(1, TAG_INT).if_i64();
         {
-            a.lget(0).untag().lget(1).untag().op(kind.int_op()).tag_int();
+            a.lget(0)
+                .untag()
+                .lget(1)
+                .untag()
+                .op(kind.int_op())
+                .tag_int();
         }
         a.else_();
         {
@@ -2029,7 +2592,12 @@ fn build_cmp(kind: CmpKind) -> Vec<u8> {
     {
         a.tag_is(1, TAG_INT).if_i64();
         {
-            a.lget(0).untag().lget(1).untag().op(kind.i64_op()).bool_tag();
+            a.lget(0)
+                .untag()
+                .lget(1)
+                .untag()
+                .op(kind.i64_op())
+                .bool_tag();
         }
         a.else_().op(op::UNREACHABLE).end();
     }
@@ -2039,7 +2607,12 @@ fn build_cmp(kind: CmpKind) -> Vec<u8> {
         {
             a.tag_is(1, TAG_F64).if_i64();
             {
-                a.lget(0).call(RT_UNBOX_F64).lget(1).call(RT_UNBOX_F64).op(kind.f64_op()).bool_tag();
+                a.lget(0)
+                    .call(RT_UNBOX_F64)
+                    .lget(1)
+                    .call(RT_UNBOX_F64)
+                    .op(kind.f64_op())
+                    .bool_tag();
             }
             a.else_().op(op::UNREACHABLE).end();
         }
@@ -2061,7 +2634,12 @@ fn build_cmp(kind: CmpKind) -> Vec<u8> {
                 {
                     a.tag_is(1, TAG_STR).if_i64();
                     {
-                        a.lget(0).lget(1).call(RT_STR_CMP).i32c(0).op(kind.i32_op()).bool_tag();
+                        a.lget(0)
+                            .lget(1)
+                            .call(RT_STR_CMP)
+                            .i32c(0)
+                            .op(kind.i32_op())
+                            .bool_tag();
                     }
                     a.else_().op(op::UNREACHABLE).end();
                 }
@@ -2087,7 +2665,12 @@ fn build_eq() -> Vec<u8> {
     {
         a.tag_is(0, TAG_F64).if_i64();
         {
-            a.lget(0).call(RT_UNBOX_F64).lget(1).call(RT_UNBOX_F64).op(op::F64_EQ).bool_tag();
+            a.lget(0)
+                .call(RT_UNBOX_F64)
+                .lget(1)
+                .call(RT_UNBOX_F64)
+                .op(op::F64_EQ)
+                .bool_tag();
         }
         a.else_();
         {
@@ -2167,7 +2750,10 @@ fn build_neg() -> Vec<u8> {
     {
         a.tag_is(0, TAG_F64).if_i64();
         {
-            a.lget(0).call(RT_UNBOX_F64).op(op::F64_NEG).call(RT_BOX_F64);
+            a.lget(0)
+                .call(RT_UNBOX_F64)
+                .op(op::F64_NEG)
+                .call(RT_BOX_F64);
         }
         a.else_().op(op::UNREACHABLE).end();
     }
@@ -2211,7 +2797,12 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.end();
         a.tag_is(0, TAG_BOOL).if_();
         {
-            a.lget(0).i64c(4).op(op::I64_SHR_U).lget(1).call(IMP_PRINT_BOOL).br(1);
+            a.lget(0)
+                .i64c(4)
+                .op(op::I64_SHR_U)
+                .lget(1)
+                .call(IMP_PRINT_BOOL)
+                .br(1);
         }
         a.end();
         a.tag_is(0, TAG_UNIT).if_();
@@ -2221,15 +2812,28 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.end();
         a.tag_is(0, TAG_F64).if_();
         {
-            a.lget(0).call(RT_UNBOX_F64).lget(1).call(IMP_PRINT_FLOAT).br(1);
+            a.lget(0)
+                .call(RT_UNBOX_F64)
+                .lget(1)
+                .call(IMP_PRINT_FLOAT)
+                .br(1);
         }
         a.end();
         a.tag_is(0, TAG_STR).if_();
         {
             // ptr = wrap(v >> 3)
-            a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+            a.lget(0)
+                .i64c(4)
+                .op(op::I64_SHR_U)
+                .op(op::I32_WRAP_I64)
+                .lset(2);
             // lom_print(ptr + 4, len)
-            a.lget(2).i32c(4).op(op::I32_ADD).lget(2).i32_load(0).call(IMP_PRINT_STR);
+            a.lget(2)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(2)
+                .i32_load(0)
+                .call(IMP_PRINT_STR);
             // newline：打数据段 offset 0 处的 '\n'
             a.lget(1).i64c(0).op(op::I64_NE).if_();
             {
@@ -2258,18 +2862,28 @@ fn build_print(closure_off: u32) -> Vec<u8> {
         a.end();
         // 兜底：其余 tag（Tuple/Record/List 等）→ display 转字符串打印（对齐解释器 println 走 to_display）
         {
-            a.lget(0).call(RT_DISPLAY).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
-            a.lget(2).i32c(4).op(op::I32_ADD).lget(2).i32_load(0).call(IMP_PRINT_STR);
+            a.lget(0)
+                .call(RT_DISPLAY)
+                .i64c(4)
+                .op(op::I64_SHR_U)
+                .op(op::I32_WRAP_I64)
+                .lset(2);
+            a.lget(2)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(2)
+                .i32_load(0)
+                .call(IMP_PRINT_STR);
             a.lget(1).i64c(0).op(op::I64_NE).if_();
             {
                 a.i32c(0).i32c(1).call(IMP_PRINT_STR);
             }
             a.end();
         }
-        }
-        a.end();
-        a.b
     }
+    a.end();
+    a.b
+}
 
 /// rt_alloc: (i32 size) -> i32；bump allocator（arena，不释放）；不足自动 memory.grow
 /// locals: 1=result(旧 hp), 2=new_hp, 3=mem_bytes（全 i32）
@@ -2278,10 +2892,25 @@ fn build_alloc() -> Vec<u8> {
     a.gget(0).lset(1); // result = hp
     a.gget(0).lget(0).op(op::I32_ADD).lset(2); // new_hp
     // new_hp > memory.size<<16 → memory.grow（失败返回 -1 → trap）
-    a.lget(2).op(op::MEMORY_SIZE).op(0x00).i32c(16).op(op::I32_SHL).op(op::I32_GT_S).if_();
+    a.lget(2)
+        .op(op::MEMORY_SIZE)
+        .op(0x00)
+        .i32c(16)
+        .op(op::I32_SHL)
+        .op(op::I32_GT_S)
+        .if_();
     {
         // grow((new_hp - membytes + 65535) >> 16) 页
-        a.lget(2).op(op::MEMORY_SIZE).op(0x00).i32c(16).op(op::I32_SHL).op(op::I32_SUB).i32c(65535).op(op::I32_ADD).i32c(16).op(op::I32_SHR_U);
+        a.lget(2)
+            .op(op::MEMORY_SIZE)
+            .op(0x00)
+            .i32c(16)
+            .op(op::I32_SHL)
+            .op(op::I32_SUB)
+            .i32c(65535)
+            .op(op::I32_ADD)
+            .i32c(16)
+            .op(op::I32_SHR_U);
         a.op(op::MEMORY_GROW).op(0x00);
         a.i32c(0).op(op::I32_LT_S).if_().op(op::UNREACHABLE).end();
     }
@@ -2296,7 +2925,12 @@ fn build_alloc() -> Vec<u8> {
 fn build_box_f64() -> Vec<u8> {
     let mut a = Asm::new();
     a.gget(0).lget(0).f64_store(0);
-    a.gget(0).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_F64).op(op::I64_OR).lset(1);
+    a.gget(0)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_F64)
+        .op(op::I64_OR)
+        .lset(1);
     a.gget(0).i32c(8).op(op::I32_ADD).gset(0);
     a.lget(1);
     a.b
@@ -2305,7 +2939,11 @@ fn build_box_f64() -> Vec<u8> {
 /// rt_unbox_f64: (i64 tagged) -> f64
 fn build_unbox_f64() -> Vec<u8> {
     let mut a = Asm::new();
-    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).f64_load(0);
+    a.lget(0)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .f64_load(0);
     a.b
 }
 
@@ -2332,8 +2970,16 @@ fn build_promote_f64() -> Vec<u8> {
 /// locals: 2=pl, 3=pr, 4=len, 5=i（全 i32）
 fn build_str_eq() -> Vec<u8> {
     let mut a = Asm::new();
-    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
-    a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(3);
+    a.lget(0)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .lset(2);
+    a.lget(1)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .lset(3);
     a.lget(2).i32_load(0).lset(4);
     // 长度不等 → return 0
     a.lget(4).lget(3).i32_load(0).op(op::I32_NE).if_();
@@ -2366,7 +3012,11 @@ fn build_str_eq() -> Vec<u8> {
 
 /// 发射：tagged Str 参数 → 堆指针（i32）存入 local
 fn emit_str_ptr(a: &mut Asm, param: u32, local: u32) {
-    a.lget(param).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(local);
+    a.lget(param)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .lset(local);
 }
 
 /// rt_str_concat: (i64 a, i64 b) -> i64
@@ -2378,7 +3028,13 @@ fn build_str_concat() -> Vec<u8> {
     a.lget(2).i32_load(0).lset(4); // la
     a.lget(3).i32_load(0).lset(5); // lb
     // pout = alloc(4 + la + lb)
-    a.lget(4).lget(5).op(op::I32_ADD).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(6);
+    a.lget(4)
+        .lget(5)
+        .op(op::I32_ADD)
+        .i32c(4)
+        .op(op::I32_ADD)
+        .call(RT_ALLOC)
+        .lset(6);
     a.lget(6).lget(4).lget(5).op(op::I32_ADD).i32_store(0);
     // copy a
     a.i32c(0).lset(7);
@@ -2387,7 +3043,12 @@ fn build_str_concat() -> Vec<u8> {
     {
         a.lget(7).lget(4).op(op::I32_GE_U).br_if(1);
         a.lget(6).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD); // dest = pout+4+i
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0); // byte
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(7)
+            .op(op::I32_ADD)
+            .i32_load8_u(0); // byte
         a.i32_store8(0);
         a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
         a.br(0);
@@ -2400,15 +3061,30 @@ fn build_str_concat() -> Vec<u8> {
     a.loop_();
     {
         a.lget(7).lget(5).op(op::I32_GE_U).br_if(1);
-        a.lget(6).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
-        a.lget(3).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(6)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .op(op::I32_ADD)
+            .lget(7)
+            .op(op::I32_ADD);
+        a.lget(3)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(7)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.i32_store8(0);
         a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
         a.br(0);
     }
     a.end();
     a.end();
-    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(6)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -2432,7 +3108,11 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32, closure_off: u32)
             a.tag_is(0, TAG_BOOL).if_i64();
             {
                 // (v>>3)!=0 → true
-                a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).if_i64();
+                a.lget(0)
+                    .i64c(4)
+                    .op(op::I64_SHR_U)
+                    .op(op::I32_WRAP_I64)
+                    .if_i64();
                 a.i64c(tag_str_of(true_off));
                 a.else_();
                 a.i64c(tag_str_of(false_off));
@@ -2501,12 +3181,12 @@ fn build_display(true_off: u32, false_off: u32, unit_off: u32, closure_off: u32)
                         a.end();
                     }
                     a.end();
+                }
+                a.end();
             }
             a.end();
         }
         a.end();
-    }
-    a.end();
     }
     a.b
 }
@@ -2532,7 +3212,14 @@ fn build_itoa() -> Vec<u8> {
     a.loop_();
     {
         a.lget(2).i32c(1).op(op::I32_SUB).lset(2);
-        a.lget(2).lget(1).i64c(10).op(op::I64_REM_U).i64c(48).op(op::I64_ADD).op(op::I32_WRAP_I64).i32_store8(0);
+        a.lget(2)
+            .lget(1)
+            .i64c(10)
+            .op(op::I64_REM_U)
+            .i64c(48)
+            .op(op::I64_ADD)
+            .op(op::I32_WRAP_I64)
+            .i32_store8(0);
         a.lget(1).i64c(10).op(op::I64_DIV_U).lset(1);
         a.lget(1).i64c(0).op(op::I64_GT_U).br_if(0);
     }
@@ -2545,7 +3232,12 @@ fn build_itoa() -> Vec<u8> {
     }
     a.end();
     // len = (buf+64) - pos
-    a.gget(1).i32c(64).op(op::I32_ADD).lget(2).op(op::I32_SUB).lset(4);
+    a.gget(1)
+        .i32c(64)
+        .op(op::I32_ADD)
+        .lget(2)
+        .op(op::I32_SUB)
+        .lset(4);
     // p = alloc(4 + len)；store len；正向拷贝
     a.lget(4).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(5);
     a.lget(5).lget(4).i32_store(0);
@@ -2562,7 +3254,11 @@ fn build_itoa() -> Vec<u8> {
     }
     a.end();
     a.end();
-    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(5)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -2586,7 +3282,11 @@ fn build_ftoa_str() -> Vec<u8> {
     }
     a.end();
     a.end();
-    a.lget(2).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(2)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -2602,7 +3302,12 @@ fn build_str_len() -> Vec<u8> {
     {
         a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
         // (b & 0xC0) != 0x80 → count++（非续字节 = 字符头）
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.i32c(0xC0).op(op::I32_AND).i32c(0x80).op(op::I32_NE).if_();
         {
             a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
@@ -2651,7 +3356,15 @@ fn build_stoi() -> Vec<u8> {
     {
         a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
         // c = byte - 48；c >u 9 → Unit（无符号比较同时挡掉负数）
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(48).op(op::I32_SUB).lset(5);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .i32_load8_u(0)
+            .i32c(48)
+            .op(op::I32_SUB)
+            .lset(5);
         a.lget(5).i32c(9).op(op::I32_GT_U).if_();
         a.i64c(V_UNIT).op(op::RETURN);
         a.end();
@@ -2659,7 +3372,13 @@ fn build_stoi() -> Vec<u8> {
         a.lget(6).i64c(1844674407370955161).op(op::I64_GT_U).if_();
         a.i64c(V_UNIT).op(op::RETURN);
         a.end();
-        a.lget(6).i64c(10).op(op::I64_MUL).lget(5).op(op::I64_EXTEND_I32_S).op(op::I64_ADD).lset(6);
+        a.lget(6)
+            .i64c(10)
+            .op(op::I64_MUL)
+            .lget(5)
+            .op(op::I64_EXTEND_I32_S)
+            .op(op::I64_ADD)
+            .lset(6);
         a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
         a.br(0);
     }
@@ -2706,7 +3425,13 @@ fn build_trim() -> Vec<u8> {
     a.loop_();
     {
         a.lget(3).lget(4).op(op::I32_GE_U).br_if(1);
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).lset(5);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .i32_load8_u(0)
+            .lset(5);
         emit_is_ws(&mut a, 5);
         a.op(op::I32_EQZ).br_if(1); // 非空白 → 停
         a.lget(3).i32c(1).op(op::I32_ADD).lset(3);
@@ -2719,7 +3444,15 @@ fn build_trim() -> Vec<u8> {
     a.loop_();
     {
         a.lget(4).lget(3).op(op::I32_LE_S).br_if(1);
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).i32c(1).op(op::I32_SUB).i32_load8_u(0).lset(5);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .op(op::I32_ADD)
+            .i32c(1)
+            .op(op::I32_SUB)
+            .i32_load8_u(0)
+            .lset(5);
         emit_is_ws(&mut a, 5);
         a.op(op::I32_EQZ).br_if(1);
         a.lget(4).i32c(1).op(op::I32_SUB).lset(4);
@@ -2728,22 +3461,44 @@ fn build_trim() -> Vec<u8> {
     a.end();
     a.end();
     // out = alloc(4 + (end-start))
-    a.lget(4).lget(3).op(op::I32_SUB).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(6);
+    a.lget(4)
+        .lget(3)
+        .op(op::I32_SUB)
+        .i32c(4)
+        .op(op::I32_ADD)
+        .call(RT_ALLOC)
+        .lset(6);
     a.lget(6).lget(4).lget(3).op(op::I32_SUB).i32_store(0);
     a.i32c(0).lset(7);
     a.block();
     a.loop_();
     {
-        a.lget(7).lget(4).lget(3).op(op::I32_SUB).op(op::I32_GE_U).br_if(1);
+        a.lget(7)
+            .lget(4)
+            .lget(3)
+            .op(op::I32_SUB)
+            .op(op::I32_GE_U)
+            .br_if(1);
         a.lget(6).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .lget(7)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.i32_store8(0);
         a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
         a.br(0);
     }
     a.end();
     a.end();
-    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(6)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -2762,7 +3517,13 @@ fn build_case(upper: bool) -> Vec<u8> {
     a.loop_();
     {
         a.lget(3).lget(2).op(op::I32_GE_U).br_if(1);
-        a.lget(1).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).lset(5);
+        a.lget(1)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .i32_load8_u(0)
+            .lset(5);
         // dest 地址先压栈
         a.lget(4).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD);
         // value：在范围内则 ±32
@@ -2779,7 +3540,11 @@ fn build_case(upper: bool) -> Vec<u8> {
     }
     a.end();
     a.end();
-    a.lget(4).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(4)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -2803,7 +3568,12 @@ fn build_contains() -> Vec<u8> {
     a.loop_();
     {
         // i + lsub > ls → break
-        a.lget(6).lget(5).op(op::I32_ADD).lget(3).op(op::I32_GT_S).br_if(1);
+        a.lget(6)
+            .lget(5)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_GT_S)
+            .br_if(1);
         // j 扫描：全部相等 → return true
         a.i32c(0).lset(7);
         a.block(); // $next
@@ -2812,8 +3582,20 @@ fn build_contains() -> Vec<u8> {
             a.lget(7).lget(5).op(op::I32_GE_U).if_();
             a.i64c(V_TRUE).op(op::RETURN);
             a.end();
-            a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
-            a.lget(4).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+            a.lget(2)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(6)
+                .op(op::I32_ADD)
+                .lget(7)
+                .op(op::I32_ADD)
+                .i32_load8_u(0);
+            a.lget(4)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(7)
+                .op(op::I32_ADD)
+                .i32_load8_u(0);
             a.op(op::I32_NE).br_if(1); // 不等 → 下一个 i
             a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
             a.br(0);
@@ -2853,7 +3635,12 @@ fn build_starts_ends(is_starts: bool) -> Vec<u8> {
             a.op(op::I32_ADD); // ps+4 + (ls-lsub)——曾漏这一个 ADD（地址算成 (ls-lsub)+i）
         }
         a.lget(6).op(op::I32_ADD).i32_load8_u(0);
-        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(4)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.op(op::I32_NE).if_();
         a.i64c(V_FALSE).op(op::RETURN);
         a.end();
@@ -2880,7 +3667,14 @@ fn build_replace() -> Vec<u8> {
     a.lget(6).op(op::I32_EQZ).if_();
     {
         // olen = ls + lt * (ls + 1)
-        a.lget(4).lget(8).lget(4).i32c(1).op(op::I32_ADD).op(op::I32_MUL).op(op::I32_ADD).lset(12);
+        a.lget(4)
+            .lget(8)
+            .lget(4)
+            .i32c(1)
+            .op(op::I32_ADD)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .lset(12);
         a.lget(12).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(13);
         a.lget(13).lget(12).i32_store(0);
         a.i32c(0).lset(9); // i
@@ -2896,7 +3690,12 @@ fn build_replace() -> Vec<u8> {
             {
                 a.lget(10).lget(8).op(op::I32_GE_U).br_if(1);
                 a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
-                a.lget(7).i32c(4).op(op::I32_ADD).lget(10).op(op::I32_ADD).i32_load8_u(0);
+                a.lget(7)
+                    .i32c(4)
+                    .op(op::I32_ADD)
+                    .lget(10)
+                    .op(op::I32_ADD)
+                    .i32_load8_u(0);
                 a.i32_store8(0);
                 a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
                 a.lget(10).i32c(1).op(op::I32_ADD).lset(10);
@@ -2908,7 +3707,12 @@ fn build_replace() -> Vec<u8> {
             a.lget(9).lget(4).op(op::I32_LT_S).if_();
             {
                 a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
-                a.lget(3).i32c(4).op(op::I32_ADD).lget(9).op(op::I32_ADD).i32_load8_u(0);
+                a.lget(3)
+                    .i32c(4)
+                    .op(op::I32_ADD)
+                    .lget(9)
+                    .op(op::I32_ADD)
+                    .i32_load8_u(0);
                 a.i32_store8(0);
                 a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
             }
@@ -2918,7 +3722,12 @@ fn build_replace() -> Vec<u8> {
         }
         a.end();
         a.end();
-        a.lget(13).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR).op(op::RETURN);
+        a.lget(13)
+            .op(op::I64_EXTEND_I32_S)
+            .tag_int()
+            .i64c(TAG_STR)
+            .op(op::I64_OR)
+            .op(op::RETURN);
     }
     a.end();
     // pass 1：数非重叠匹配
@@ -2927,7 +3736,12 @@ fn build_replace() -> Vec<u8> {
     a.loop_();
     {
         // i + lf > ls → break
-        a.lget(9).lget(6).op(op::I32_ADD).lget(4).op(op::I32_GT_S).br_if(1);
+        a.lget(9)
+            .lget(6)
+            .op(op::I32_ADD)
+            .lget(4)
+            .op(op::I32_GT_S)
+            .br_if(1);
         // match_at(i) → mf
         emit_match_at(&mut a, 3, 5, 6, 9, 10, 15);
         a.lget(15).if_();
@@ -2945,7 +3759,16 @@ fn build_replace() -> Vec<u8> {
     a.end();
     a.end();
     // olen = ls - cnt*lf + cnt*lt
-    a.lget(4).lget(11).lget(6).op(op::I32_MUL).op(op::I32_SUB).lget(11).lget(8).op(op::I32_MUL).op(op::I32_ADD).lset(12);
+    a.lget(4)
+        .lget(11)
+        .lget(6)
+        .op(op::I32_MUL)
+        .op(op::I32_SUB)
+        .lget(11)
+        .lget(8)
+        .op(op::I32_MUL)
+        .op(op::I32_ADD)
+        .lset(12);
     a.lget(12).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(13);
     a.lget(13).lget(12).i32_store(0);
     // pass 2：填充
@@ -2955,7 +3778,12 @@ fn build_replace() -> Vec<u8> {
     {
         a.lget(9).lget(4).op(op::I32_GE_U).br_if(1); // i >= ls → done
         // 可匹配？
-        a.lget(9).lget(6).op(op::I32_ADD).lget(4).op(op::I32_LE_S).if_();
+        a.lget(9)
+            .lget(6)
+            .op(op::I32_ADD)
+            .lget(4)
+            .op(op::I32_LE_S)
+            .if_();
         {
             emit_match_at(&mut a, 3, 5, 6, 9, 10, 15);
         }
@@ -2973,7 +3801,12 @@ fn build_replace() -> Vec<u8> {
             {
                 a.lget(10).lget(8).op(op::I32_GE_U).br_if(1);
                 a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
-                a.lget(7).i32c(4).op(op::I32_ADD).lget(10).op(op::I32_ADD).i32_load8_u(0);
+                a.lget(7)
+                    .i32c(4)
+                    .op(op::I32_ADD)
+                    .lget(10)
+                    .op(op::I32_ADD)
+                    .i32_load8_u(0);
                 a.i32_store8(0);
                 a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
                 a.lget(10).i32c(1).op(op::I32_ADD).lset(10);
@@ -2987,7 +3820,12 @@ fn build_replace() -> Vec<u8> {
         {
             // 抄一个字节
             a.lget(13).i32c(4).op(op::I32_ADD).lget(14).op(op::I32_ADD);
-            a.lget(3).i32c(4).op(op::I32_ADD).lget(9).op(op::I32_ADD).i32_load8_u(0);
+            a.lget(3)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(9)
+                .op(op::I32_ADD)
+                .i32_load8_u(0);
             a.i32_store8(0);
             a.lget(14).i32c(1).op(op::I32_ADD).lset(14);
             a.lget(9).i32c(1).op(op::I32_ADD).lset(9);
@@ -2997,7 +3835,11 @@ fn build_replace() -> Vec<u8> {
     }
     a.end();
     a.end();
-    a.lget(13).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(13)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -3010,8 +3852,20 @@ fn emit_match_at(a: &mut Asm, ps: u32, pf: u32, lf: u32, i: u32, j: u32, mf: u32
     a.loop_();
     {
         a.lget(j).lget(lf).op(op::I32_GE_U).br_if(1);
-        a.lget(ps).i32c(4).op(op::I32_ADD).lget(i).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
-        a.lget(pf).i32c(4).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(ps)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(i)
+            .op(op::I32_ADD)
+            .lget(j)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
+        a.lget(pf)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(j)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.op(op::I32_NE).if_();
         {
             a.i32c(0).lset(mf);
@@ -3034,15 +3888,31 @@ fn build_str_cmp() -> Vec<u8> {
     a.lget(2).i32_load(0).lset(3);
     a.lget(4).i32_load(0).lset(5);
     // min = la < lb ? la : lb
-    a.lget(3).lget(5).lget(3).lget(5).op(op::I32_LT_S).op(op::SELECT).lset(7);
+    a.lget(3)
+        .lget(5)
+        .lget(3)
+        .lget(5)
+        .op(op::I32_LT_S)
+        .op(op::SELECT)
+        .lset(7);
     a.i32c(0).lset(6);
     a.block();
     a.loop_();
     {
         a.lget(6).lget(7).op(op::I32_GE_U).br_if(1);
         // ca vs cb
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0); // ca
-        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0); // cb
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0); // ca
+        a.lget(4)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0); // cb
         // ca < cb → -1；ca > cb → 1
         a.op(op::I32_SUB); // ca - cb（栈上一个值）
         // 用 tee 思路：重复装入太啰嗦——直接两分支重算
@@ -3053,8 +3923,18 @@ fn build_str_cmp() -> Vec<u8> {
         a.i32c(-1).op(op::RETURN);
         a.end();
         // 重算 diff > 0
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
-        a.lget(4).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
+        a.lget(4)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.op(op::I32_SUB).i32c(0).op(op::I32_GT_S).if_();
         a.i32c(1).op(op::RETURN);
         a.end();
@@ -3082,15 +3962,39 @@ fn build_str_char_at() -> Vec<u8> {
     a.lget(1).op(op::I32_WRAP_I64).lset(3);
     // clen：0xF0+ → 4，0xE0+ → 3，0xC0+ → 2，否则 1
     a.i32c(1).lset(4);
-    a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xF0).op(op::I32_GE_U).if_();
+    a.lget(2)
+        .i32c(4)
+        .op(op::I32_ADD)
+        .lget(3)
+        .op(op::I32_ADD)
+        .i32_load8_u(0)
+        .i32c(0xF0)
+        .op(op::I32_GE_U)
+        .if_();
     a.i32c(4).lset(4);
     a.else_();
     {
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xE0).op(op::I32_GE_U).if_();
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .i32_load8_u(0)
+            .i32c(0xE0)
+            .op(op::I32_GE_U)
+            .if_();
         a.i32c(3).lset(4);
         a.else_();
         {
-            a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).i32_load8_u(0).i32c(0xC0).op(op::I32_GE_U).if_();
+            a.lget(2)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(3)
+                .op(op::I32_ADD)
+                .i32_load8_u(0)
+                .i32c(0xC0)
+                .op(op::I32_GE_U)
+                .if_();
             a.i32c(2).lset(4);
             a.end();
         }
@@ -3106,14 +4010,25 @@ fn build_str_char_at() -> Vec<u8> {
     {
         a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
         a.lget(5).i32c(4).op(op::I32_ADD).lget(6).op(op::I32_ADD);
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(3).op(op::I32_ADD).lget(6).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(3)
+            .op(op::I32_ADD)
+            .lget(6)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.i32_store8(0);
         a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
         a.br(0);
     }
     a.end();
     a.end();
-    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(5)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -3126,11 +4041,21 @@ fn build_enum_eq() -> Vec<u8> {
     emit_str_ptr(&mut a, 0, 2); // 复用：tagged → 堆指针（枚举对象同布局）
     emit_str_ptr(&mut a, 1, 3);
     // 变体 idx 不等 → 0
-    a.lget(2).i32_load(0).lget(3).i32_load(0).op(op::I32_NE).if_();
+    a.lget(2)
+        .i32_load(0)
+        .lget(3)
+        .i32_load(0)
+        .op(op::I32_NE)
+        .if_();
     a.i32c(0).op(op::RETURN);
     a.end();
     // 参数个数不等 → 0
-    a.lget(2).i32_load(4).lget(3).i32_load(4).op(op::I32_NE).if_();
+    a.lget(2)
+        .i32_load(4)
+        .lget(3)
+        .i32_load(4)
+        .op(op::I32_NE)
+        .if_();
     a.i32c(0).op(op::RETURN);
     a.end();
     a.lget(2).i32_load(4).lset(4); // na
@@ -3140,9 +4065,23 @@ fn build_enum_eq() -> Vec<u8> {
     {
         a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
         // rt_eq(arg_a_k, arg_b_k) == false → return 0
-        a.lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
-        a.lget(3).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
-        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.lget(2)
+            .lget(5)
+            .i32c(8)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(8);
+        a.lget(3)
+            .lget(5)
+            .i32c(8)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(8);
+        a.call(RT_EQ)
+            .untag()
+            .op(op::I32_WRAP_I64)
+            .op(op::I32_EQZ)
+            .if_();
         a.i32c(0).op(op::RETURN);
         a.end();
         a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
@@ -3162,23 +4101,46 @@ fn build_enum_print(table_off: u32, st: &Statics) -> Vec<u8> {
     a.lget(2).i32_load(0).lset(3); // idx
     a.lget(2).i32_load(4).lset(4); // n
     // name_off = load(table + idx*4)
-    a.i32c(table_off as i32).lget(3).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(6);
+    a.i32c(table_off as i32)
+        .lget(3)
+        .i32c(4)
+        .op(op::I32_MUL)
+        .op(op::I32_ADD)
+        .i32_load(0)
+        .lset(6);
     // lom_print(name_off+4, name_len)
-    a.lget(6).i32c(4).op(op::I32_ADD).lget(6).i32_load(0).call(IMP_PRINT_STR);
+    a.lget(6)
+        .i32c(4)
+        .op(op::I32_ADD)
+        .lget(6)
+        .i32_load(0)
+        .call(IMP_PRINT_STR);
     // 参数部分
     a.lget(4).i32c(0).op(op::I32_GT_S).if_();
     {
-        a.i32c((st.open_paren + 4) as i32).i32c(1).call(IMP_PRINT_STR); // "("
+        a.i32c((st.open_paren + 4) as i32)
+            .i32c(1)
+            .call(IMP_PRINT_STR); // "("
         a.i32c(0).lset(5);
         a.block();
         a.loop_();
         {
             a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
             // rt_print(arg_k, 0)
-            a.lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
+            a.lget(2)
+                .lget(5)
+                .i32c(8)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i64_load(8);
             a.i64c(0).call(RT_PRINT);
             // k+1 < n → ", "
-            a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
+            a.lget(5)
+                .i32c(1)
+                .op(op::I32_ADD)
+                .lget(4)
+                .op(op::I32_LT_S)
+                .if_();
             {
                 a.i32c((st.comma_sp + 4) as i32).i32c(2).call(IMP_PRINT_STR);
             }
@@ -3188,7 +4150,9 @@ fn build_enum_print(table_off: u32, st: &Statics) -> Vec<u8> {
         }
         a.end();
         a.end();
-        a.i32c((st.close_paren + 4) as i32).i32c(1).call(IMP_PRINT_STR); // ")"
+        a.i32c((st.close_paren + 4) as i32)
+            .i32c(1)
+            .call(IMP_PRINT_STR); // ")"
     }
     a.end();
     // 换行
@@ -3208,9 +4172,20 @@ fn build_enum_str(table_off: u32, st: &Statics) -> Vec<u8> {
     emit_str_ptr(&mut a, 0, 2);
     a.lget(2).i32_load(0).lset(3);
     a.lget(2).i32_load(4).lset(4);
-    a.i32c(table_off as i32).lget(3).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(6);
+    a.i32c(table_off as i32)
+        .lget(3)
+        .i32c(4)
+        .op(op::I32_MUL)
+        .op(op::I32_ADD)
+        .i32_load(0)
+        .lset(6);
     // acc = 变体名（静态串直接作值）
-    a.lget(6).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR).lset(7);
+    a.lget(6)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR)
+        .lset(7);
     a.lget(4).op(op::I32_EQZ).if_i64();
     {
         a.lget(7);
@@ -3218,18 +4193,38 @@ fn build_enum_str(table_off: u32, st: &Statics) -> Vec<u8> {
     a.else_();
     {
         // acc += "("
-        a.lget(7).i64c(tag_str(st.open_paren)).call(RT_STR_CONCAT).lset(7);
+        a.lget(7)
+            .i64c(tag_str(st.open_paren))
+            .call(RT_STR_CONCAT)
+            .lset(7);
         a.i32c(0).lset(5);
         a.block();
         a.loop_();
         {
             a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
             // acc += display(arg_k)
-            a.lget(7).lget(2).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(7);
+            a.lget(7)
+                .lget(2)
+                .lget(5)
+                .i32c(8)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i64_load(8)
+                .call(RT_DISPLAY)
+                .call(RT_STR_CONCAT)
+                .lset(7);
             // k+1 < n → acc += ", "
-            a.lget(5).i32c(1).op(op::I32_ADD).lget(4).op(op::I32_LT_S).if_();
+            a.lget(5)
+                .i32c(1)
+                .op(op::I32_ADD)
+                .lget(4)
+                .op(op::I32_LT_S)
+                .if_();
             {
-                a.lget(7).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(7);
+                a.lget(7)
+                    .i64c(tag_str(st.comma_sp))
+                    .call(RT_STR_CONCAT)
+                    .lset(7);
             }
             a.end();
             a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
@@ -3238,7 +4233,10 @@ fn build_enum_str(table_off: u32, st: &Statics) -> Vec<u8> {
         a.end();
         a.end();
         // acc += ")"
-        a.lget(7).i64c(tag_str(st.close_paren)).call(RT_STR_CONCAT).lset(7);
+        a.lget(7)
+            .i64c(tag_str(st.close_paren))
+            .call(RT_STR_CONCAT)
+            .lset(7);
         a.lget(7);
     }
     a.end();
@@ -3256,7 +4254,11 @@ fn build_map_new() -> Vec<u8> {
     a.lget(0).i32c(256).call(RT_ALLOC).i32_store(0); // buckets
     a.lget(0).i32c(16).i32_store(4); // cap
     a.lget(0).i32c(0).i32_store(8); // size
-    a.lget(0).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_MAP).op(op::I64_OR);
+    a.lget(0)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_MAP)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -3271,7 +4273,12 @@ fn emit_fnv_hash(a: &mut Asm, kp: u32, h: u32, j: u32) {
         a.lget(j).lget(kp).i32_load(0).op(op::I32_GE_U).br_if(1);
         // h = (h ^ byte) * 16777619
         a.lget(h);
-        a.lget(kp).i32c(4).op(op::I32_ADD).lget(j).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(kp)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(j)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.op(op::I32_XOR).i32c(16777619).op(op::I32_MUL).lset(h);
         a.lget(j).i32c(1).op(op::I32_ADD).lset(j);
         a.br(0);
@@ -3290,13 +4297,23 @@ fn build_map_probe() -> Vec<u8> {
     a.lget(2).i32_load(4).lset(5); // cap
     emit_fnv_hash(&mut a, 3, 6, 8);
     // i = h & (cap-1)
-    a.lget(6).lget(5).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(7);
+    a.lget(6)
+        .lget(5)
+        .i32c(1)
+        .op(op::I32_SUB)
+        .op(op::I32_AND)
+        .lset(7);
     a.i32c(-1).lset(9); // first_free = -1
     a.block(); // $done
     a.loop_();
     {
         // addr = buckets + i*16
-        a.lget(4).lget(7).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lset(10);
+        a.lget(4)
+            .lget(7)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .lset(10);
         let st = |a: &mut Asm| {
             a.lget(10).i32_load(0);
         };
@@ -3305,9 +4322,18 @@ fn build_map_probe() -> Vec<u8> {
         a.op(op::I32_EQZ).if_();
         {
             // select(ff, i, ff>=0)
-            a.lget(9).lget(7).lget(9).i32c(0).op(op::I32_GE_S).op(op::SELECT);
+            a.lget(9)
+                .lget(7)
+                .lget(9)
+                .i32c(0)
+                .op(op::I32_GE_S)
+                .op(op::SELECT);
             // → slot；return -(slot+1)
-            a.i32c(-1).op(op::I32_MUL).i32c(1).op(op::I32_SUB).op(op::RETURN);
+            a.i32c(-1)
+                .op(op::I32_MUL)
+                .i32c(1)
+                .op(op::I32_SUB)
+                .op(op::RETURN);
         }
         a.end();
         // st == 2（墓碑）→ 记 ff，继续
@@ -3326,7 +4352,13 @@ fn build_map_probe() -> Vec<u8> {
         a.i32c(1).op(op::I32_EQ).if_();
         {
             // key_off → tagged str，与 param 1 比内容
-            a.lget(10).i32_load(4).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(10)
+                .i32_load(4)
+                .op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
             a.lget(1).call(RT_STR_EQ).if_();
             {
                 a.lget(7).op(op::RETURN); // 命中
@@ -3335,7 +4367,14 @@ fn build_map_probe() -> Vec<u8> {
         }
         a.end();
         // i = (i+1) & (cap-1)
-        a.lget(7).i32c(1).op(op::I32_ADD).lget(5).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(7);
+        a.lget(7)
+            .i32c(1)
+            .op(op::I32_ADD)
+            .lget(5)
+            .i32c(1)
+            .op(op::I32_SUB)
+            .op(op::I32_AND)
+            .lset(7);
         a.br(0);
     }
     a.end();
@@ -3354,21 +4393,51 @@ fn build_map_set() -> Vec<u8> {
     // 命中 → 覆盖 val
     a.lget(3).i32c(0).op(op::I32_GE_S).if_();
     {
-        a.lget(4).i32_load(0).lget(3).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lget(2).i64_store(8);
+        a.lget(4)
+            .i32_load(0)
+            .lget(3)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .lget(2)
+            .i64_store(8);
         a.i64c(V_UNIT).op(op::RETURN);
     }
     a.end();
     // 插入槽 = -r-1
-    a.lget(3).i32c(-1).op(op::I32_MUL).i32c(1).op(op::I32_SUB).lset(3); // r 复用为 slot
+    a.lget(3)
+        .i32c(-1)
+        .op(op::I32_MUL)
+        .i32c(1)
+        .op(op::I32_SUB)
+        .lset(3); // r 复用为 slot
     // addr = buckets + slot*16
-    a.lget(4).i32_load(0).lget(3).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lset(5);
+    a.lget(4)
+        .i32_load(0)
+        .lget(3)
+        .i32c(16)
+        .op(op::I32_MUL)
+        .op(op::I32_ADD)
+        .lset(5);
     a.lget(5).i32c(1).i32_store(0); // state=1
     a.lget(5).lget(6).i32_store(4); // key_off
     a.lget(5).lget(2).i64_store(8); // val
     // size++
-    a.lget(4).lget(4).i32_load(8).i32c(1).op(op::I32_ADD).i32_store(8);
+    a.lget(4)
+        .lget(4)
+        .i32_load(8)
+        .i32c(1)
+        .op(op::I32_ADD)
+        .i32_store(8);
     // size*2 > cap → 扩容
-    a.lget(4).i32_load(8).i32c(2).op(op::I32_MUL).lget(4).i32_load(4).op(op::I32_GT_S).if_();
+    a.lget(4)
+        .i32_load(8)
+        .i32c(2)
+        .op(op::I32_MUL)
+        .lget(4)
+        .i32_load(4)
+        .op(op::I32_GT_S)
+        .if_();
     {
         // ncap = cap*2；nb = alloc(ncap*16)（零初始化）
         a.lget(4).i32_load(4).i32c(2).op(op::I32_MUL).lset(8); // ncap
@@ -3382,27 +4451,81 @@ fn build_map_set() -> Vec<u8> {
         {
             a.lget(9).lget(13).op(op::I32_GE_U).br_if(1);
             // state==1 才搬
-            a.lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+            a.lget(12)
+                .lget(9)
+                .i32c(16)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(0)
+                .i32c(1)
+                .op(op::I32_EQ)
+                .if_();
             {
                 // 重哈希：key 指针在 oldb+j*16+4
-                a.lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4).lset(6); // kp 复用
+                a.lget(12)
+                    .lget(9)
+                    .i32c(16)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .i32_load(4)
+                    .lset(6); // kp 复用
                 emit_fnv_hash(&mut a, 6, 10, 11);
                 // bi = h & (ncap-1)，线性探到空桶
-                a.lget(10).lget(8).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(11);
+                a.lget(10)
+                    .lget(8)
+                    .i32c(1)
+                    .op(op::I32_SUB)
+                    .op(op::I32_AND)
+                    .lset(11);
                 a.block();
                 a.loop_();
                 {
-                    a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).op(op::I32_EQZ).br_if(1);
-                    a.lget(11).i32c(1).op(op::I32_ADD).lget(8).i32c(1).op(op::I32_SUB).op(op::I32_AND).lset(11);
+                    a.lget(7)
+                        .lget(11)
+                        .i32c(16)
+                        .op(op::I32_MUL)
+                        .op(op::I32_ADD)
+                        .i32_load(0)
+                        .op(op::I32_EQZ)
+                        .br_if(1);
+                    a.lget(11)
+                        .i32c(1)
+                        .op(op::I32_ADD)
+                        .lget(8)
+                        .i32c(1)
+                        .op(op::I32_SUB)
+                        .op(op::I32_AND)
+                        .lset(11);
                     a.br(0);
                 }
                 a.end();
                 a.end();
                 // 写入 nb+bi*16：state=1, key, val（val 从旧桶拷）
-                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32c(1).i32_store(0);
-                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD).lget(6).i32_store(4);
-                a.lget(7).lget(11).i32c(16).op(op::I32_MUL).op(op::I32_ADD)
-                    .lget(12).lget(9).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8)
+                a.lget(7)
+                    .lget(11)
+                    .i32c(16)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .i32c(1)
+                    .i32_store(0);
+                a.lget(7)
+                    .lget(11)
+                    .i32c(16)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .lget(6)
+                    .i32_store(4);
+                a.lget(7)
+                    .lget(11)
+                    .i32c(16)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .lget(12)
+                    .lget(9)
+                    .i32c(16)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .i64_load(8)
                     .i64_store(8);
             }
             a.end();
@@ -3428,7 +4551,17 @@ fn build_map_get() -> Vec<u8> {
     a.lget(2).i32c(0).op(op::I32_GE_S).if_i64();
     {
         // v = load64(buckets + r*16 + 8)
-        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(2).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).lset(3);
+        a.lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0)
+            .lget(2)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(8)
+            .lset(3);
         // Some(v) = [idx=2][n=1][v]
         a.i32c(16).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(4);
         a.lget(4).op(op::I32_WRAP_I64).i32c(2).i32_store(0);
@@ -3464,10 +4597,30 @@ fn build_map_remove() -> Vec<u8> {
     a.lget(2).i32c(0).op(op::I32_GE_S).if_();
     {
         // state = 2
-        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(2).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32c(2).i32_store(0);
+        a.lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0)
+            .lget(2)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32c(2)
+            .i32_store(0);
         // size--
-        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64)
-            .lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(8).i32c(1).op(op::I32_SUB).i32_store(8);
+        a.lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(8)
+            .i32c(1)
+            .op(op::I32_SUB)
+            .i32_store(8);
     }
     a.end();
     a.i64c(V_UNIT);
@@ -3492,10 +4645,23 @@ fn build_map_keys() -> Vec<u8> {
     {
         a.lget(6).lget(2).op(op::I32_GE_U).br_if(1);
         // state==1 → arr[n++] = key_off
-        a.lget(3).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+        a.lget(3)
+            .lget(6)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32_load(0)
+            .i32c(1)
+            .op(op::I32_EQ)
+            .if_();
         {
             a.lget(5).lget(8).i32c(4).op(op::I32_MUL).op(op::I32_ADD);
-            a.lget(3).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
+            a.lget(3)
+                .lget(6)
+                .i32c(16)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(4);
             a.i32_store(0);
             a.lget(8).i32c(1).op(op::I32_ADD).lset(8);
         }
@@ -3512,7 +4678,13 @@ fn build_map_keys() -> Vec<u8> {
     {
         a.lget(6).lget(8).op(op::I32_GE_U).br_if(1);
         // key = arr[i]
-        a.lget(5).lget(6).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).lset(7); // key → 8
+        a.lget(5)
+            .lget(6)
+            .i32c(4)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32_load(0)
+            .lset(7); // key → 8
         a.lget(6).i32c(1).op(op::I32_SUB).lset(1); // j = i-1（mp 复用为 j）
         a.block();
         a.loop_();
@@ -3520,12 +4692,38 @@ fn build_map_keys() -> Vec<u8> {
             // j < 0 → break
             a.lget(1).i32c(0).op(op::I32_LT_S).br_if(1);
             // str_cmp(arr[j], key) <= 0 → break
-            a.lget(5).lget(1).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
-            a.lget(7).op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(5)
+                .lget(1)
+                .i32c(4)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(0)
+                .op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
+            a.lget(7)
+                .op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
             a.call(RT_STR_CMP).i32c(0).op(op::I32_LE_S).br_if(1);
             // arr[j+1] = arr[j]
-            a.lget(5).lget(1).i32c(1).op(op::I32_ADD).i32c(4).op(op::I32_MUL).op(op::I32_ADD);
-            a.lget(5).lget(1).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
+            a.lget(5)
+                .lget(1)
+                .i32c(1)
+                .op(op::I32_ADD)
+                .i32c(4)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD);
+            a.lget(5)
+                .lget(1)
+                .i32c(4)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(0);
             a.i32_store(0);
             a.lget(1).i32c(1).op(op::I32_SUB).lset(1);
             a.br(0);
@@ -3533,7 +4731,15 @@ fn build_map_keys() -> Vec<u8> {
         a.end();
         a.end();
         // arr[j+1] = key
-        a.lget(5).lget(1).i32c(1).op(op::I32_ADD).i32c(4).op(op::I32_MUL).op(op::I32_ADD).lget(7).i32_store(0);
+        a.lget(5)
+            .lget(1)
+            .i32c(1)
+            .op(op::I32_ADD)
+            .i32c(4)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .lget(7)
+            .i32_store(0);
         a.lget(6).i32c(1).op(op::I32_ADD).lset(6);
         a.br(0);
     }
@@ -3546,8 +4752,17 @@ fn build_map_keys() -> Vec<u8> {
     {
         a.lget(8).op(op::I32_EQZ).br_if(1); // n==0 → done
         a.lget(8).i32c(1).op(op::I32_SUB).lset(8);
-        a.lget(5).lget(8).i32c(4).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
-        a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+        a.lget(5)
+            .lget(8)
+            .i32c(4)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32_load(0);
+        a.op(op::I64_EXTEND_I32_S)
+            .i64c(4)
+            .op(op::I64_SHL)
+            .i64c(TAG_STR)
+            .op(op::I64_OR);
         a.lget(9).call(RT_CONS).lset(9);
         a.br(0);
     }
@@ -3569,12 +4784,31 @@ fn build_map_values() -> Vec<u8> {
         a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
         // r = probe(m, head)
         a.lget(0);
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0); // head（tagged str）
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0); // head（tagged str）
         a.call(RT_MAP_PROBE).lset(4);
         // val = load64(buckets + r*16 + 8)（probe 必命中）
-        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(4).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).lset(3);
+        a.lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0)
+            .lget(4)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(8)
+            .lset(3);
         a.lget(3).lget(2).call(RT_CONS).lset(2);
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(1);
         a.br(0);
     }
     a.end();
@@ -3598,22 +4832,50 @@ fn build_map_str(st: &Statics) -> Vec<u8> {
     {
         a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
         // k = head
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(5);
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .lset(5);
         // 分隔符
         a.lget(3).op(op::I64_EQZ).if_();
         {
-            a.lget(2).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(2);
+            a.lget(2)
+                .i64c(tag_str(st.comma_sp))
+                .call(RT_STR_CONCAT)
+                .lset(2);
         }
         a.end();
         // acc += key + ": "
-        a.lget(2).lget(5).call(RT_STR_CONCAT).i64c(tag_str(st.colon_sp)).call(RT_STR_CONCAT).lset(2);
+        a.lget(2)
+            .lget(5)
+            .call(RT_STR_CONCAT)
+            .i64c(tag_str(st.colon_sp))
+            .call(RT_STR_CONCAT)
+            .lset(2);
         // val = load64(buckets + probe(m,k)*16 + 8)；acc += display(val)
         a.lget(0).lget(5).call(RT_MAP_PROBE).lset(4);
         a.lget(2);
-        a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(4).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8).call(RT_DISPLAY);
+        a.lget(0)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0)
+            .lget(4)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(8)
+            .call(RT_DISPLAY);
         a.call(RT_STR_CONCAT).lset(2);
         a.i64c(0).lset(3);
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(1);
         a.br(0);
     }
     a.end();
@@ -3629,7 +4891,12 @@ fn build_map_eq() -> Vec<u8> {
     emit_str_ptr(&mut a, 0, 2);
     emit_str_ptr(&mut a, 1, 3);
     // size 不等 → 0
-    a.lget(2).i32_load(8).lget(3).i32_load(8).op(op::I32_NE).if_();
+    a.lget(2)
+        .i32_load(8)
+        .lget(3)
+        .i32_load(8)
+        .op(op::I32_NE)
+        .if_();
     a.i32c(0).op(op::RETURN);
     a.end();
     a.lget(2).i32_load(4).lset(4); // cap
@@ -3639,21 +4906,53 @@ fn build_map_eq() -> Vec<u8> {
     a.loop_();
     {
         a.lget(6).lget(4).op(op::I32_GE_U).br_if(1);
-        a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(0).i32c(1).op(op::I32_EQ).if_();
+        a.lget(5)
+            .lget(6)
+            .i32c(16)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32_load(0)
+            .i32c(1)
+            .op(op::I32_EQ)
+            .if_();
         {
             // key = tagged str；probe b
             a.lget(1);
-            a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i32_load(4);
-            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(5)
+                .lget(6)
+                .i32c(16)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(4);
+            a.op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
             a.call(RT_MAP_PROBE).lset(7);
             // 未命中 → 0
             a.lget(7).i32c(0).op(op::I32_LT_S).if_();
             a.i32c(0).op(op::RETURN);
             a.end();
             // 值不等 → 0
-            a.lget(5).lget(6).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
-            a.lget(3).i32_load(0).lget(7).i32c(16).op(op::I32_MUL).op(op::I32_ADD).i64_load(8);
-            a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+            a.lget(5)
+                .lget(6)
+                .i32c(16)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i64_load(8);
+            a.lget(3)
+                .i32_load(0)
+                .lget(7)
+                .i32c(16)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i64_load(8);
+            a.call(RT_EQ)
+                .untag()
+                .op(op::I32_WRAP_I64)
+                .op(op::I32_EQZ)
+                .if_();
             a.i32c(0).op(op::RETURN);
             a.end();
         }
@@ -3677,8 +4976,18 @@ fn build_char_from_code() -> Vec<u8> {
     a.tag_is(0, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
     a.lget(0).untag().lset(1);
     // 码点校验：0 <= cp <= 0x10FFFF 且不在代理区 D800-DFFF
-    a.lget(1).i64c(0).op(op::I64_LT_S).if_().op(op::UNREACHABLE).end();
-    a.lget(1).i64c(0x10FFFF).op(op::I64_GT_S).if_().op(op::UNREACHABLE).end();
+    a.lget(1)
+        .i64c(0)
+        .op(op::I64_LT_S)
+        .if_()
+        .op(op::UNREACHABLE)
+        .end();
+    a.lget(1)
+        .i64c(0x10FFFF)
+        .op(op::I64_GT_S)
+        .if_()
+        .op(op::UNREACHABLE)
+        .end();
     a.lget(1).i64c(0xD800).op(op::I64_GE_S);
     a.lget(1).i64c(0xDFFF).op(op::I64_LE_S);
     a.op(op::I32_AND).if_().op(op::UNREACHABLE).end();
@@ -3717,10 +5026,18 @@ fn build_char_from_code() -> Vec<u8> {
         {
             // 2B: [0xC0|cp>>6][0x80|cp&0x3F]
             a.lget(4).i32c(4).op(op::I32_ADD);
-            a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0xC0).op(op::I32_OR);
+            a.lget(2)
+                .i32c(6)
+                .op(op::I32_SHR_U)
+                .i32c(0xC0)
+                .op(op::I32_OR);
             a.i32_store8(0);
             a.lget(4).i32c(5).op(op::I32_ADD);
-            a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+            a.lget(2)
+                .i32c(0x3F)
+                .op(op::I32_AND)
+                .i32c(0x80)
+                .op(op::I32_OR);
             a.i32_store8(0);
         }
         a.else_();
@@ -3729,29 +5046,63 @@ fn build_char_from_code() -> Vec<u8> {
             {
                 // 3B: [0xE0|cp>>12][0x80|(cp>>6)&0x3F][0x80|cp&0x3F]
                 a.lget(4).i32c(4).op(op::I32_ADD);
-                a.lget(2).i32c(12).op(op::I32_SHR_U).i32c(0xE0).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(12)
+                    .op(op::I32_SHR_U)
+                    .i32c(0xE0)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
                 a.lget(4).i32c(5).op(op::I32_ADD);
-                a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(6)
+                    .op(op::I32_SHR_U)
+                    .i32c(0x3F)
+                    .op(op::I32_AND)
+                    .i32c(0x80)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
                 a.lget(4).i32c(6).op(op::I32_ADD);
-                a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(0x3F)
+                    .op(op::I32_AND)
+                    .i32c(0x80)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
             }
             a.else_();
             {
                 // 4B: [0xF0|cp>>18][0x80|(cp>>12)&0x3F][0x80|(cp>>6)&0x3F][0x80|cp&0x3F]
                 a.lget(4).i32c(4).op(op::I32_ADD);
-                a.lget(2).i32c(18).op(op::I32_SHR_U).i32c(0xF0).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(18)
+                    .op(op::I32_SHR_U)
+                    .i32c(0xF0)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
                 a.lget(4).i32c(5).op(op::I32_ADD);
-                a.lget(2).i32c(12).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(12)
+                    .op(op::I32_SHR_U)
+                    .i32c(0x3F)
+                    .op(op::I32_AND)
+                    .i32c(0x80)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
                 a.lget(4).i32c(6).op(op::I32_ADD);
-                a.lget(2).i32c(6).op(op::I32_SHR_U).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(6)
+                    .op(op::I32_SHR_U)
+                    .i32c(0x3F)
+                    .op(op::I32_AND)
+                    .i32c(0x80)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
                 a.lget(4).i32c(7).op(op::I32_ADD);
-                a.lget(2).i32c(0x3F).op(op::I32_AND).i32c(0x80).op(op::I32_OR);
+                a.lget(2)
+                    .i32c(0x3F)
+                    .op(op::I32_AND)
+                    .i32c(0x80)
+                    .op(op::I32_OR);
                 a.i32_store8(0);
             }
             a.end();
@@ -3760,7 +5111,11 @@ fn build_char_from_code() -> Vec<u8> {
     }
     a.end();
     // 返回 tagged Str（ptr 左移 4 位 | TAG_STR）
-    a.lget(4).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(4)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -3770,12 +5125,21 @@ fn build_char_from_code() -> Vec<u8> {
 /// f_local 是装着闭包值（tag5）的 i64 local；arg_locals 依次压参数
 fn emit_helper_call_closure(a: &mut Asm, f_local: u32, ty: u32, arg_locals: &[u32]) {
     // env（obj+4 的 i32 → i64）
-    a.lget(f_local).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(4).op(op::I64_EXTEND_I32_S);
+    a.lget(f_local)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .i32_load(4)
+        .op(op::I64_EXTEND_I32_S);
     for &al in arg_locals {
         a.lget(al);
     }
     // 表索引（obj+0 的 i32）
-    a.lget(f_local).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+    a.lget(f_local)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .i32_load(0);
     a.call_indirect(ty);
 }
 
@@ -3816,7 +5180,11 @@ fn build_range() -> Vec<u8> {
 /// locals: 1=cur(i64), 2=n(i64)
 fn build_list_len() -> Vec<u8> {
     let mut a = Asm::new();
-    a.tag_is(0, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(0, TAG_LIST)
+        .if_()
+        .else_()
+        .op(op::UNREACHABLE)
+        .end();
     a.lget(0).lset(1);
     a.i64c(0).lset(2);
     a.block();
@@ -3824,7 +5192,12 @@ fn build_list_len() -> Vec<u8> {
     {
         a.lget(1).i64c(9).op(op::I64_EQ).br_if(1);
         a.lget(2).i64c(1).op(op::I64_ADD).lset(2);
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(1);
         a.br(0);
     }
     a.end();
@@ -3837,7 +5210,11 @@ fn build_list_len() -> Vec<u8> {
 /// locals: 2=cur(i64), 3=k(i64)
 fn build_list_get() -> Vec<u8> {
     let mut a = Asm::new();
-    a.tag_is(0, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(0, TAG_LIST)
+        .if_()
+        .else_()
+        .op(op::UNREACHABLE)
+        .end();
     a.tag_is(1, TAG_INT).if_().else_().op(op::UNREACHABLE).end();
     a.lget(0).lset(2);
     a.lget(1).untag().lset(3);
@@ -3847,9 +5224,19 @@ fn build_list_get() -> Vec<u8> {
         a.op(op::UNREACHABLE); // 越界
         a.end();
         a.lget(3).op(op::I64_EQZ).if_();
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).op(op::RETURN);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .op(op::RETURN);
         a.end();
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(2);
         a.lget(3).i64c(1).op(op::I64_SUB).lset(3);
         a.br(0);
     }
@@ -3865,7 +5252,12 @@ fn build_substr() -> Vec<u8> {
     emit_str_ptr(&mut a, 0, 3);
     a.lget(1).untag().op(op::I32_WRAP_I64).lset(4); // st
     // len = end - start
-    a.lget(2).untag().op(op::I32_WRAP_I64).lget(4).op(op::I32_SUB).lset(6);
+    a.lget(2)
+        .untag()
+        .op(op::I32_WRAP_I64)
+        .lget(4)
+        .op(op::I32_SUB)
+        .lset(6);
     a.lget(6).i32c(4).op(op::I32_ADD).call(RT_ALLOC).lset(5);
     a.lget(5).lget(6).i32_store(0);
     a.i32c(0).lset(7);
@@ -3874,14 +5266,25 @@ fn build_substr() -> Vec<u8> {
     {
         a.lget(7).lget(6).op(op::I32_GE_U).br_if(1);
         a.lget(5).i32c(4).op(op::I32_ADD).lget(7).op(op::I32_ADD);
-        a.lget(3).i32c(4).op(op::I32_ADD).lget(4).op(op::I32_ADD).lget(7).op(op::I32_ADD).i32_load8_u(0);
+        a.lget(3)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .op(op::I32_ADD)
+            .lget(7)
+            .op(op::I32_ADD)
+            .i32_load8_u(0);
         a.i32_store8(0);
         a.lget(7).i32c(1).op(op::I32_ADD).lset(7);
         a.br(0);
     }
     a.end();
     a.end();
-    a.lget(5).op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
+    a.lget(5)
+        .op(op::I64_EXTEND_I32_S)
+        .tag_int()
+        .i64c(TAG_STR)
+        .op(op::I64_OR);
     a.b
 }
 
@@ -3892,9 +5295,18 @@ fn emit_list_reverse(a: &mut Asm, out: u32, res: u32) {
     a.loop_();
     {
         a.lget(out).i64c(9).op(op::I64_EQ).br_if(1);
-        a.lget(out).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
+        a.lget(out)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0);
         a.lget(res).call(RT_CONS).lset(res);
-        a.lget(out).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(out);
+        a.lget(out)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(out);
         a.br(0);
     }
     a.end();
@@ -3921,9 +5333,20 @@ fn build_split() -> Vec<u8> {
         {
             a.lget(6).lget(3).op(op::I32_GE_U).br_if(1);
             // ch = str_char_at(s, i)；cons；i += 字符字节数
-            a.lget(0).lget(6).op(op::I64_EXTEND_I32_S).call(RT_STR_CHAR_AT).lset(11);
+            a.lget(0)
+                .lget(6)
+                .op(op::I64_EXTEND_I32_S)
+                .call(RT_STR_CHAR_AT)
+                .lset(11);
             a.lget(11).lget(10).call(RT_CONS).lset(10);
-            a.lget(11).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0).lget(6).op(op::I32_ADD).lset(6);
+            a.lget(11)
+                .i64c(4)
+                .op(op::I64_SHR_U)
+                .op(op::I32_WRAP_I64)
+                .i32_load(0)
+                .lget(6)
+                .op(op::I32_ADD)
+                .lset(6);
             a.br(0);
         }
         a.end();
@@ -3936,12 +5359,25 @@ fn build_split() -> Vec<u8> {
         a.loop_();
         {
             // i + lsep > ls → break
-            a.lget(6).lget(5).op(op::I32_ADD).lget(3).op(op::I32_GT_S).br_if(1);
+            a.lget(6)
+                .lget(5)
+                .op(op::I32_ADD)
+                .lget(3)
+                .op(op::I32_GT_S)
+                .br_if(1);
             emit_match_at(&mut a, 2, 4, 5, 6, 8, 9);
             a.lget(9).if_();
             {
                 // piece = substr(s, start, i)
-                a.lget(0).lget(7).op(op::I64_EXTEND_I32_S).tag_int().lget(6).op(op::I64_EXTEND_I32_S).tag_int().call(RT_SUBSTR).lset(11);
+                a.lget(0)
+                    .lget(7)
+                    .op(op::I64_EXTEND_I32_S)
+                    .tag_int()
+                    .lget(6)
+                    .op(op::I64_EXTEND_I32_S)
+                    .tag_int()
+                    .call(RT_SUBSTR)
+                    .lset(11);
                 a.lget(11).lget(10).call(RT_CONS).lset(10);
                 a.lget(6).lget(5).op(op::I32_ADD).lset(6);
                 a.lget(6).lset(7);
@@ -3956,7 +5392,15 @@ fn build_split() -> Vec<u8> {
         a.end();
         a.end();
         // 尾段
-        a.lget(0).lget(7).op(op::I64_EXTEND_I32_S).tag_int().lget(3).op(op::I64_EXTEND_I32_S).tag_int().call(RT_SUBSTR).lset(11);
+        a.lget(0)
+            .lget(7)
+            .op(op::I64_EXTEND_I32_S)
+            .tag_int()
+            .lget(3)
+            .op(op::I64_EXTEND_I32_S)
+            .tag_int()
+            .call(RT_SUBSTR)
+            .lset(11);
         a.lget(11).lget(10).call(RT_CONS).lset(10);
     }
     a.end();
@@ -3970,7 +5414,11 @@ fn build_split() -> Vec<u8> {
 /// locals: 2=cur(i64), 3=out(i64), 4=tmp(i64)
 fn build_list_map(ty_call1: u32) -> Vec<u8> {
     let mut a = Asm::new();
-    a.tag_is(1, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(1, TAG_LIST)
+        .if_()
+        .else_()
+        .op(op::UNREACHABLE)
+        .end();
     a.lget(1).lset(2);
     a.i64c(9).lset(3);
     a.block();
@@ -3978,10 +5426,20 @@ fn build_list_map(ty_call1: u32) -> Vec<u8> {
     {
         a.lget(2).i64c(9).op(op::I64_EQ).br_if(1);
         // r = f(head)：head 先入 tmp
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(4);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .lset(4);
         emit_helper_call_closure(&mut a, 0, ty_call1, &[4]);
         a.lget(3).call(RT_CONS).lset(3); // cons(r, out)——call 结果在栈
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(2);
         a.br(0);
     }
     a.end();
@@ -3995,21 +5453,35 @@ fn build_list_map(ty_call1: u32) -> Vec<u8> {
 /// locals: 2=cur(i64), 3=out(i64), 4=tmp(i64)
 fn build_list_filter(ty_call1: u32) -> Vec<u8> {
     let mut a = Asm::new();
-    a.tag_is(1, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(1, TAG_LIST)
+        .if_()
+        .else_()
+        .op(op::UNREACHABLE)
+        .end();
     a.lget(1).lset(2);
     a.i64c(9).lset(3);
     a.block();
     a.loop_();
     {
         a.lget(2).i64c(9).op(op::I64_EQ).br_if(1);
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(4); // head
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .lset(4); // head
         emit_helper_call_closure(&mut a, 0, ty_call1, &[4]);
         a.call(RT_TRUTHY).if_(); // truthy(f(head)) → 保留
         {
             a.lget(4).lget(3).call(RT_CONS).lset(3);
         }
         a.end();
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(2);
         a.br(0);
     }
     a.end();
@@ -4023,7 +5495,11 @@ fn build_list_filter(ty_call1: u32) -> Vec<u8> {
 /// locals: 3=acc(i64), 4=cur(i64), 5=head(i64)
 fn build_list_fold(ty_call2: u32) -> Vec<u8> {
     let mut a = Asm::new();
-    a.tag_is(2, TAG_LIST).if_().else_().op(op::UNREACHABLE).end();
+    a.tag_is(2, TAG_LIST)
+        .if_()
+        .else_()
+        .op(op::UNREACHABLE)
+        .end();
     a.lget(1).lset(3); // acc = init
     a.lget(2).lset(4);
     a.block();
@@ -4031,10 +5507,20 @@ fn build_list_fold(ty_call2: u32) -> Vec<u8> {
     {
         a.lget(4).i64c(9).op(op::I64_EQ).br_if(1);
         // acc = f(acc, head)
-        a.lget(4).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).lset(5); // head
+        a.lget(4)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .lset(5); // head
         emit_helper_call_closure(&mut a, 0, ty_call2, &[3, 5]);
         a.lset(3);
-        a.lget(4).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(4);
+        a.lget(4)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(4);
         a.br(0);
     }
     a.end();
@@ -4058,17 +5544,35 @@ fn build_list_str(st: &Statics) -> Vec<u8> {
         // first 之外加 ", "
         a.lget(3).op(op::I64_EQZ).if_();
         {
-            a.lget(2).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(2);
+            a.lget(2)
+                .i64c(tag_str(st.comma_sp))
+                .call(RT_STR_CONCAT)
+                .lset(2);
         }
         a.end();
-        a.lget(2).lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(2);
+        a.lget(2)
+            .lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0)
+            .call(RT_DISPLAY)
+            .call(RT_STR_CONCAT)
+            .lset(2);
         a.i64c(0).lset(3);
-        a.lget(1).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(1);
+        a.lget(1)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(1);
         a.br(0);
     }
     a.end();
     a.end();
-    a.lget(2).i64c(tag_str(st.close_bracket)).call(RT_STR_CONCAT);
+    a.lget(2)
+        .i64c(tag_str(st.close_bracket))
+        .call(RT_STR_CONCAT);
     a.b
 }
 
@@ -4077,7 +5581,11 @@ fn build_list_str(st: &Statics) -> Vec<u8> {
 fn build_tuple_str(st: &Statics) -> Vec<u8> {
     let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
     let mut a = Asm::new();
-    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+    a.lget(0)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .lset(2);
     a.lget(2).i32_load(0).lset(3); // n
     a.i64c(tag_str(st.open_paren)).lset(1);
     a.i32c(0).lset(4);
@@ -4088,10 +5596,24 @@ fn build_tuple_str(st: &Statics) -> Vec<u8> {
         // k>0 → ", "
         a.lget(4).i32c(0).op(op::I32_GT_S).if_();
         {
-            a.lget(1).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(1);
+            a.lget(1)
+                .i64c(tag_str(st.comma_sp))
+                .call(RT_STR_CONCAT)
+                .lset(1);
         }
         a.end();
-        a.lget(1).lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(1);
+        a.lget(1)
+            .lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .i32c(8)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(0)
+            .call(RT_DISPLAY)
+            .call(RT_STR_CONCAT)
+            .lset(1);
         a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
         a.br(0);
     }
@@ -4100,7 +5622,10 @@ fn build_tuple_str(st: &Statics) -> Vec<u8> {
     // 单元素补 ","（对齐解释器 "(1,)"）
     a.lget(3).i32c(1).op(op::I32_EQ).if_();
     {
-        a.lget(1).i64c(tag_str(st.comma)).call(RT_STR_CONCAT).lset(1);
+        a.lget(1)
+            .i64c(tag_str(st.comma))
+            .call(RT_STR_CONCAT)
+            .lset(1);
     }
     a.end();
     a.lget(1).i64c(tag_str(st.close_paren)).call(RT_STR_CONCAT);
@@ -4112,7 +5637,11 @@ fn build_tuple_str(st: &Statics) -> Vec<u8> {
 fn build_record_str(st: &Statics) -> Vec<u8> {
     let tag_str = |off: u32| -> i64 { ((off as i64) << 4) | TAG_STR };
     let mut a = Asm::new();
-    a.lget(0).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).lset(2);
+    a.lget(0)
+        .i64c(4)
+        .op(op::I64_SHR_U)
+        .op(op::I32_WRAP_I64)
+        .lset(2);
     a.lget(2).i32_load(0).lset(3);
     a.i64c(tag_str(st.open_brace)).lset(1);
     a.i32c(0).lset(4);
@@ -4122,15 +5651,42 @@ fn build_record_str(st: &Statics) -> Vec<u8> {
         a.lget(4).lget(3).op(op::I32_GE_U).br_if(1);
         a.lget(4).i32c(0).op(op::I32_GT_S).if_();
         {
-            a.lget(1).i64c(tag_str(st.comma_sp)).call(RT_STR_CONCAT).lset(1);
+            a.lget(1)
+                .i64c(tag_str(st.comma_sp))
+                .call(RT_STR_CONCAT)
+                .lset(1);
         }
         a.end();
         // 字段名（静态串偏移 → tagged str）+ ": " + display(val)
         a.lget(1);
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
-        a.op(op::I64_EXTEND_I32_S).tag_int().i64c(TAG_STR).op(op::I64_OR);
-        a.call(RT_STR_CONCAT).i64c(tag_str(st.colon_sp)).call(RT_STR_CONCAT).lset(1);
-        a.lget(1).lget(2).i32c(4).op(op::I32_ADD).lget(4).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4).call(RT_DISPLAY).call(RT_STR_CONCAT).lset(1);
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .i32c(12)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i32_load(0);
+        a.op(op::I64_EXTEND_I32_S)
+            .tag_int()
+            .i64c(TAG_STR)
+            .op(op::I64_OR);
+        a.call(RT_STR_CONCAT)
+            .i64c(tag_str(st.colon_sp))
+            .call(RT_STR_CONCAT)
+            .lset(1);
+        a.lget(1)
+            .lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(4)
+            .i32c(12)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(4)
+            .call(RT_DISPLAY)
+            .call(RT_STR_CONCAT)
+            .lset(1);
         a.lget(4).i32c(1).op(op::I32_ADD).lset(4);
         a.br(0);
     }
@@ -4155,9 +5711,27 @@ fn build_tuple_eq() -> Vec<u8> {
     a.loop_();
     {
         a.lget(5).lget(4).op(op::I32_GE_U).br_if(1);
-        a.lget(2).i32c(4).op(op::I32_ADD).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0);
-        a.lget(3).i32c(4).op(op::I32_ADD).lget(5).i32c(8).op(op::I32_MUL).op(op::I32_ADD).i64_load(0);
-        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.lget(2)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(5)
+            .i32c(8)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(0);
+        a.lget(3)
+            .i32c(4)
+            .op(op::I32_ADD)
+            .lget(5)
+            .i32c(8)
+            .op(op::I32_MUL)
+            .op(op::I32_ADD)
+            .i64_load(0);
+        a.call(RT_EQ)
+            .untag()
+            .op(op::I32_WRAP_I64)
+            .op(op::I32_EQZ)
+            .if_();
         a.i32c(0).op(op::RETURN);
         a.end();
         a.lget(5).i32c(1).op(op::I32_ADD).lset(5);
@@ -4193,17 +5767,57 @@ fn build_record_eq() -> Vec<u8> {
         {
             a.lget(7).lget(5).op(op::I32_GE_U).br_if(1);
             // 字段名内容比较（7.7：宿主物化记录与编译期 intern 不同源）
-            a.lget(2).i32c(4).op(op::I32_ADD).lget(6).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
-            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
-            a.lget(3).i32c(4).op(op::I32_ADD).lget(7).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i32_load(0);
-            a.op(op::I64_EXTEND_I32_S).i64c(4).op(op::I64_SHL).i64c(TAG_STR).op(op::I64_OR);
+            a.lget(2)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(6)
+                .i32c(12)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(0);
+            a.op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
+            a.lget(3)
+                .i32c(4)
+                .op(op::I32_ADD)
+                .lget(7)
+                .i32c(12)
+                .op(op::I32_MUL)
+                .op(op::I32_ADD)
+                .i32_load(0);
+            a.op(op::I64_EXTEND_I32_S)
+                .i64c(4)
+                .op(op::I64_SHL)
+                .i64c(TAG_STR)
+                .op(op::I64_OR);
             a.call(RT_STR_EQ).if_();
             {
                 a.i32c(1).lset(8);
                 // 值递归相等？
-                a.lget(2).i32c(4).op(op::I32_ADD).lget(6).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4);
-                a.lget(3).i32c(4).op(op::I32_ADD).lget(7).i32c(12).op(op::I32_MUL).op(op::I32_ADD).i64_load(4);
-                a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+                a.lget(2)
+                    .i32c(4)
+                    .op(op::I32_ADD)
+                    .lget(6)
+                    .i32c(12)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .i64_load(4);
+                a.lget(3)
+                    .i32c(4)
+                    .op(op::I32_ADD)
+                    .lget(7)
+                    .i32c(12)
+                    .op(op::I32_MUL)
+                    .op(op::I32_ADD)
+                    .i64_load(4);
+                a.call(RT_EQ)
+                    .untag()
+                    .op(op::I32_WRAP_I64)
+                    .op(op::I32_EQZ)
+                    .if_();
                 a.i32c(0).op(op::RETURN); // 值不等 → 0
                 a.end();
                 a.br(2); // 跳出 $find（继续下一字段）
@@ -4248,13 +5862,35 @@ fn build_list_eq() -> Vec<u8> {
         }
         a.end();
         // head 不等 → 0
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
-        a.lget(3).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(0);
-        a.call(RT_EQ).untag().op(op::I32_WRAP_I64).op(op::I32_EQZ).if_();
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0);
+        a.lget(3)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(0);
+        a.call(RT_EQ)
+            .untag()
+            .op(op::I32_WRAP_I64)
+            .op(op::I32_EQZ)
+            .if_();
         a.i32c(0).op(op::RETURN);
         a.end();
-        a.lget(2).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(2);
-        a.lget(3).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i64_load(8).lset(3);
+        a.lget(2)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(2);
+        a.lget(3)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i64_load(8)
+            .lset(3);
         a.br(0);
     }
     a.end();
@@ -4312,20 +5948,34 @@ impl Codegen {
         for (i, p) in params.iter().enumerate() {
             cctx.scopes[0].push((p.name.clone(), (i + 1) as u32));
         }
-        cctx.captures = caps.iter().enumerate().map(|(i, (nm, _))| (nm.clone(), i as u32)).collect();
+        cctx.captures = caps
+            .iter()
+            .enumerate()
+            .map(|(i, (nm, _))| (nm.clone(), i as u32))
+            .collect();
         let mut ca = Asm::new();
         ca.block_i64();
         self.compile_block_value(&mut cctx, &mut ca, body)?;
         ca.end();
         let funcidx = N_IMPORTS + self.m.funcs.len() as u32;
-        self.m.funcs.push(Function { type_idx: ty, locals: cctx.locals, body: ca.b });
+        self.m.funcs.push(Function {
+            type_idx: ty,
+            locals: cctx.locals,
+            body: ca.b,
+        });
         let tslot = self.table_entries.len() as u32;
         self.table_entries.push(funcidx);
         // 3. 创建点：env 对象 [n][v0..vn] + 闭包对象 [tslot][env]
         let e = ctx.alloc();
         let p = ctx.alloc();
-        a.i32c(4 + 8 * caps.len() as i32).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(e);
-        a.lget(e).op(op::I32_WRAP_I64).i32c(caps.len() as i32).i32_store(0);
+        a.i32c(4 + 8 * caps.len() as i32)
+            .call(RT_ALLOC)
+            .op(op::I64_EXTEND_I32_S)
+            .lset(e);
+        a.lget(e)
+            .op(op::I32_WRAP_I64)
+            .i32c(caps.len() as i32)
+            .i32_store(0);
         for (i, (_, src)) in caps.iter().enumerate() {
             a.lget(e).op(op::I32_WRAP_I64);
             match src {
@@ -4339,8 +5989,15 @@ impl Codegen {
             a.i64_store(4 + 8 * i as u32);
         }
         a.i32c(8).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
-        a.lget(p).op(op::I32_WRAP_I64).i32c(tslot as i32).i32_store(0);
-        a.lget(p).op(op::I32_WRAP_I64).lget(e).op(op::I32_WRAP_I64).i32_store(4);
+        a.lget(p)
+            .op(op::I32_WRAP_I64)
+            .i32c(tslot as i32)
+            .i32_store(0);
+        a.lget(p)
+            .op(op::I32_WRAP_I64)
+            .lget(e)
+            .op(op::I32_WRAP_I64)
+            .i32_store(4);
         a.lget(p).tag_int().i64c(TAG_CLOSURE).op(op::I64_OR);
         Ok((e, caps.iter().map(|(n, _)| n.clone()).collect()))
     }
@@ -4362,7 +6019,11 @@ impl Codegen {
             }
             s.call(real);
             let funcidx = N_IMPORTS + self.m.funcs.len() as u32;
-            self.m.funcs.push(Function { type_idx: ty, locals: vec![], body: s.b });
+            self.m.funcs.push(Function {
+                type_idx: ty,
+                locals: vec![],
+                body: s.b,
+            });
             let ts = self.table_entries.len() as u32;
             self.table_entries.push(funcidx);
             self.shim_idx.insert(name.to_string(), (funcidx, ts));
@@ -4371,14 +6032,23 @@ impl Codegen {
         // 零捕获闭包对象：[tslot][env=0]
         let p = ctx.alloc();
         a.i32c(8).call(RT_ALLOC).op(op::I64_EXTEND_I32_S).lset(p);
-        a.lget(p).op(op::I32_WRAP_I64).i32c(tslot as i32).i32_store(0);
+        a.lget(p)
+            .op(op::I32_WRAP_I64)
+            .i32c(tslot as i32)
+            .i32_store(0);
         a.lget(p).op(op::I32_WRAP_I64).i32c(0).i32_store(4);
         a.lget(p).tag_int().i64c(TAG_CLOSURE).op(op::I64_OR);
         Ok(())
     }
 
     /// 闭包调用：求值顺序对齐解释器（先 args 后 callee），call_indirect 分派
-    fn emit_closure_call(&mut self, ctx: &mut FnCtx, a: &mut Asm, callee: &Expr, args: &[Expr]) -> Result<(), String> {
+    fn emit_closure_call(
+        &mut self,
+        ctx: &mut FnCtx,
+        a: &mut Asm,
+        callee: &Expr,
+        args: &[Expr],
+    ) -> Result<(), String> {
         // 1. args → 暂存（解释器 eval_call 先求值参数）
         let mut scratches = Vec::with_capacity(args.len());
         for arg in args {
@@ -4392,13 +6062,26 @@ impl Codegen {
         let cl = ctx.alloc();
         a.lset(cl);
         // 3. 必须是闭包值（解释器报"不能调用 X 类型的值"，7.3 用 trap 兜底）
-        a.tag_is(cl, TAG_CLOSURE).if_().else_().op(op::UNREACHABLE).end();
+        a.tag_is(cl, TAG_CLOSURE)
+            .if_()
+            .else_()
+            .op(op::UNREACHABLE)
+            .end();
         // 4. 压 env（obj+4 的 i32 → i64）→ 参数 → 表索引（最后压栈）
-        a.lget(cl).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(4).op(op::I64_EXTEND_I32_S);
+        a.lget(cl)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(4)
+            .op(op::I64_EXTEND_I32_S);
         for s in &scratches {
             a.lget(*s);
         }
-        a.lget(cl).i64c(4).op(op::I64_SHR_U).op(op::I32_WRAP_I64).i32_load(0);
+        a.lget(cl)
+            .i64c(4)
+            .op(op::I64_SHR_U)
+            .op(op::I32_WRAP_I64)
+            .i32_load(0);
         let ty = self.m.add_type(FuncType {
             params: vec![ValType::I64; args.len() + 1],
             results: vec![ValType::I64],
@@ -4430,7 +6113,10 @@ impl FvState {
 
 /// 闭包体的自由变量（按首次使用顺序，保证确定性）
 fn free_vars_block(body: &Block, params: &std::collections::HashSet<String>) -> Vec<String> {
-    let mut st = FvState { out: Vec::new(), seen: std::collections::HashSet::new() };
+    let mut st = FvState {
+        out: Vec::new(),
+        seen: std::collections::HashSet::new(),
+    };
     let mut bound = params.clone();
     fv_block(body, &mut bound, &mut st);
     st.out
@@ -4504,7 +6190,9 @@ fn fv_pattern(p: &Pattern, bound: &mut std::collections::HashSet<String>) {
 fn fv_expr(e: &Expr, bound: &mut std::collections::HashSet<String>, st: &mut FvState) {
     match &e.kind {
         ExprKind::Ident(n) => st.note(n, bound),
-        ExprKind::Binary { left, right, .. } | ExprKind::Logical { left, right, .. } | ExprKind::Pipe { left, right } => {
+        ExprKind::Binary { left, right, .. }
+        | ExprKind::Logical { left, right, .. }
+        | ExprKind::Pipe { left, right } => {
             fv_expr(left, bound, st);
             fv_expr(right, bound, st);
         }
@@ -4558,7 +6246,11 @@ fn fv_expr(e: &Expr, bound: &mut std::collections::HashSet<String>, st: &mut FvS
                 fv_expr(e, bound, st);
             }
         }
-        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) | ExprKind::Str(_) | ExprKind::Unit => {}
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Unit => {}
     }
 }
 
@@ -4588,7 +6280,11 @@ mod tests {
 
     #[test]
     fn missing_main_is_error() {
-        assert!(compile("fn f() -> Int\n    1\nend").unwrap_err().contains("main"));
+        assert!(
+            compile("fn f() -> Int\n    1\nend")
+                .unwrap_err()
+                .contains("main")
+        );
     }
 
     #[test]
@@ -4654,7 +6350,12 @@ mod e2e {
             .output()
             .expect("node 运行失败");
         let _ = std::fs::remove_file(&path);
-        assert!(out.status.success(), "[{}] wasm trap: {}", tag, String::from_utf8_lossy(&out.stderr));
+        assert!(
+            out.status.success(),
+            "[{}] wasm trap: {}",
+            tag,
+            String::from_utf8_lossy(&out.stderr)
+        );
         Some(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 

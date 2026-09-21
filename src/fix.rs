@@ -65,9 +65,9 @@
 //   true  — 至少有一个 fix 提供了可应用的修复（非 hint 动作，或 hint 带具体 text）
 //   false — 仅纯文字 hint，LLM 需自己理解后修复（retry 价值不大）
 
-use crate::json::escape_str;
 use crate::ast;
 use crate::diagnostics::{Diagnostic, Diagnostics, Severity, Stage};
+use crate::json::escape_str;
 
 // ===== 数据结构 =====
 
@@ -118,7 +118,9 @@ pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
             // 防御：容错解析下 span 可能异常（end < start），saturating 兜底
             let sig_end = f.span.end_line.max(f.span.line);
             let body_start = sig_end.saturating_sub(1) + 2; // sig_end + 1
-            let body_end = next_start.saturating_sub(1).max(body_start.saturating_sub(1));
+            let body_end = next_start
+                .saturating_sub(1)
+                .max(body_start.saturating_sub(1));
             out.push(FnInfo {
                 params: f.params.iter().map(|p| p.name.clone()).collect(),
                 sig_start_line: f.span.line,
@@ -133,9 +135,8 @@ pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
 
 /// 诊断行号落在哪个函数的体内（含签名行），返回其 FnInfo 引用
 fn owner_fn<'a>(d: &Diagnostic, fns: &'a [FnInfo]) -> Option<&'a FnInfo> {
-    fns.iter().find(|f| {
-        d.line >= f.sig_start_line && d.line <= f.body_end_line
-    })
+    fns.iter()
+        .find(|f| d.line >= f.sig_start_line && d.line <= f.body_end_line)
 }
 
 /// 修复计划（lom-fix/v1 顶层）
@@ -370,11 +371,19 @@ fn effect_from_action_text(t: &str) -> Option<String> {
         // " ! [IO]" → "IO"（去方括号）
         let inner = rest.trim().trim_start_matches('[').trim_end_matches(']');
         let name = inner.trim();
-        return if name.is_empty() { None } else { Some(name.to_string()) };
+        return if name.is_empty() {
+            None
+        } else {
+            Some(name.to_string())
+        };
     }
     if let Some(rest) = t.strip_prefix(',') {
         let name = rest.trim();
-        return if name.is_empty() { None } else { Some(name.to_string()) };
+        return if name.is_empty() {
+            None
+        } else {
+            Some(name.to_string())
+        };
     }
     None
 }
@@ -397,10 +406,7 @@ fn fix_for_diagnostic(
         "LEX002" => fix_lex_unclosed_string(d, source_lines),
         "LEX003" | "LEX004" => fix_lex_bad_number(d),
         "LEX005" => fix_lex_unexpected_char(d, source_lines),
-        "LEX000" => vec![hint_only(
-            "词法错误，检查字符是否合法",
-            Confidence::Low,
-        )],
+        "LEX000" => vec![hint_only("词法错误，检查字符是否合法", Confidence::Low)],
 
         // ===== 语法错误 =====
         "PARSE001" => fix_parse_expected_token(d, source_lines),
@@ -481,10 +487,7 @@ fn fix_for_diagnostic(
             "模块/符号不存在：标准库模块为 io/string/math，检查 import 声明",
             Confidence::Medium,
         )],
-        "RUNTIME000" => vec![hint_only(
-            "运行时错误，检查程序逻辑",
-            Confidence::Low,
-        )],
+        "RUNTIME000" => vec![hint_only("运行时错误，检查程序逻辑", Confidence::Low)],
 
         // ===== 未知错误码 =====
         _ => vec![hint_only(
@@ -523,7 +526,10 @@ fn fix_lex_unclosed_string(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixActi
 /// 低置信度：无法确定正确的数字值（可能是多打了字符、漏了小数点等）。
 fn fix_lex_bad_number(d: &Diagnostic) -> Vec<FixAction> {
     vec![hint_only(
-        &format!("无效数字格式（{}）：检查数字字面量是否含非法字符", d.message),
+        &format!(
+            "无效数字格式（{}）：检查数字字面量是否含非法字符",
+            d.message
+        ),
         Confidence::Low,
     )]
 }
@@ -675,10 +681,7 @@ fn prev_nonempty_line_end(source_lines: &[&str], err_line: usize) -> Option<(usi
 /// 低置信度：可能是调用方多传/少传，也可能是函数定义少写参数，方向不确定。
 fn fix_type_arg_count(d: &Diagnostic) -> Vec<FixAction> {
     vec![hint_only(
-        &format!(
-            "参数数量不符（{}）：调整调用参数数量或函数签名",
-            d.message
-        ),
+        &format!("参数数量不符（{}）：调整调用参数数量或函数签名", d.message),
         Confidence::Low,
     )]
 }
@@ -701,7 +704,7 @@ fn fix_mat_non_exhaustive(d: &Diagnostic) -> Vec<FixAction> {
                 return vec![hint_only(
                     "match 非穷尽：添加缺失的变体分支或 _ 通配符",
                     Confidence::Medium,
-                )]
+                )];
             }
         }
     } else if d.message.contains("未覆盖 Ok") {
@@ -817,7 +820,10 @@ fn fix_nam_unknown_member(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixActio
                 };
             if occ.is_empty() {
                 return vec![hint_only(
-                    &format!("'{}' 不存在：是否想用 '{}'？（未能定位出现位置）", name, sugg),
+                    &format!(
+                        "'{}' 不存在：是否想用 '{}'？（未能定位出现位置）",
+                        name, sugg
+                    ),
                     Confidence::Medium,
                 )];
             }
@@ -1023,7 +1029,7 @@ fn fix_eff_undeclared(
                     return vec![hint_only(
                         "效应未声明：无法定位函数签名行",
                         Confidence::Medium,
-                    )]
+                    )];
                 }
             };
 
@@ -1212,7 +1218,11 @@ fn precise_occurrence(
         return None;
     }
     // 字节列 → 字符列：col-1 之前有多少个 char
-    let char_col = std::str::from_utf8(&line_str[..byte_start]).ok()?.chars().count() + 1;
+    let char_col = std::str::from_utf8(&line_str[..byte_start])
+        .ok()?
+        .chars()
+        .count()
+        + 1;
     if dot_prefix {
         // 字段场景：字段名前一个字符必须是 '.'
         let before = std::str::from_utf8(&line_str[..byte_start]).ok()?;
@@ -1299,15 +1309,10 @@ fn extract_second_bracketed(msg: &str) -> Option<String> {
 
 // ===== JSON 序列化 =====
 
-
 /// 将 FixPlan 序列化为 lom-fix/v1 JSON
 pub fn to_json(plan: &FixPlan) -> String {
     let total = plan.plans.len();
-    let applicable = plan
-        .plans
-        .iter()
-        .filter(|p| p.retry)
-        .count();
+    let applicable = plan.plans.iter().filter(|p| p.retry).count();
     let skipped = total - applicable;
 
     let mut out = String::new();
@@ -1330,12 +1335,24 @@ pub fn to_json(plan: &FixPlan) -> String {
             // diagnostic
             out.push_str("    {\n");
             out.push_str("      \"diagnostic\": {\n");
-            out.push_str(&format!("        \"code\": \"{}\",\n", escape_str(&p.diagnostic.code)));
-            out.push_str(&format!("        \"severity\": \"{}\",\n", p.diagnostic.severity.as_str()));
-            out.push_str(&format!("        \"stage\": \"{}\",\n", p.diagnostic.stage.as_str()));
+            out.push_str(&format!(
+                "        \"code\": \"{}\",\n",
+                escape_str(&p.diagnostic.code)
+            ));
+            out.push_str(&format!(
+                "        \"severity\": \"{}\",\n",
+                p.diagnostic.severity.as_str()
+            ));
+            out.push_str(&format!(
+                "        \"stage\": \"{}\",\n",
+                p.diagnostic.stage.as_str()
+            ));
             out.push_str(&format!("        \"line\": {},\n", p.diagnostic.line));
             out.push_str(&format!("        \"col\": {},\n", p.diagnostic.col));
-            out.push_str(&format!("        \"message\": \"{}\"\n", escape_str(&p.diagnostic.message)));
+            out.push_str(&format!(
+                "        \"message\": \"{}\"\n",
+                escape_str(&p.diagnostic.message)
+            ));
             out.push_str("      },\n");
 
             // fixes
@@ -1346,8 +1363,14 @@ pub fn to_json(plan: &FixPlan) -> String {
                 out.push('\n');
                 for (j, f) in p.fixes.iter().enumerate() {
                     out.push_str("        {\n");
-                    out.push_str(&format!("          \"description\": \"{}\",\n", escape_str(&f.description)));
-                    out.push_str(&format!("          \"action\": \"{}\",\n", f.action.as_str()));
+                    out.push_str(&format!(
+                        "          \"description\": \"{}\",\n",
+                        escape_str(&f.description)
+                    ));
+                    out.push_str(&format!(
+                        "          \"action\": \"{}\",\n",
+                        f.action.as_str()
+                    ));
                     out.push_str(&format!("          \"line\": {},\n", f.line));
                     out.push_str(&format!("          \"col\": {},\n", f.col));
                     match f.end_line {
@@ -1359,10 +1382,15 @@ pub fn to_json(plan: &FixPlan) -> String {
                         None => out.push_str("          \"end_col\": null,\n"),
                     }
                     match &f.text {
-                        Some(t) => out.push_str(&format!("          \"text\": \"{}\",\n", escape_str(t))),
+                        Some(t) => {
+                            out.push_str(&format!("          \"text\": \"{}\",\n", escape_str(t)))
+                        }
                         None => out.push_str("          \"text\": null,\n"),
                     }
-                    out.push_str(&format!("          \"confidence\": \"{}\"\n", f.confidence.as_str()));
+                    out.push_str(&format!(
+                        "          \"confidence\": \"{}\"\n",
+                        f.confidence.as_str()
+                    ));
                     out.push_str("        }");
                     if j + 1 < p.fixes.len() {
                         out.push(',');
@@ -1434,9 +1462,7 @@ pub fn to_human(plan: &FixPlan) -> String {
                 if f.action != ActionKind::Hint {
                     out.push_str(&format!(
                         "      action: {} at {}:{}",
-                        action_tag,
-                        f.line,
-                        f.col
+                        action_tag, f.line, f.col
                     ));
                     if let (Some(el), Some(ec)) = (f.end_line, f.end_col) {
                         out.push_str(&format!("..{}:{}", el, ec));
@@ -1466,7 +1492,12 @@ mod tests {
     use crate::lexer::LexError;
     use crate::parser::ParseError;
 
-    fn make_lex_diag<'a>(message: &'a str, line: usize, col: usize, src: &'a str) -> (Diagnostic, Vec<&'a str>) {
+    fn make_lex_diag<'a>(
+        message: &'a str,
+        line: usize,
+        col: usize,
+        src: &'a str,
+    ) -> (Diagnostic, Vec<&'a str>) {
         let err = LexError {
             message: message.to_string(),
             line,
@@ -1554,7 +1585,10 @@ mod tests {
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
         assert_eq!(fixes[0].line, 2, "应插在 println 所在行");
-        assert_eq!(fixes[0].col, 22, "行末 +1（4 空格 + 17 字符 = 21，插入列 22）");
+        assert_eq!(
+            fixes[0].col, 22,
+            "行末 +1（4 空格 + 17 字符 = 21，插入列 22）"
+        );
         assert_eq!(fixes[0].text.as_deref(), Some(")"));
     }
 
@@ -1684,8 +1718,7 @@ mod tests {
             severity: Severity::Warning,
             stage: Stage::Type,
             code: "EFF001".to_string(),
-            message: "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'"
-                .to_string(),
+            message: "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'".to_string(),
             file: "test.lom".to_string(),
             line: 0,
             col: 0,
@@ -1706,8 +1739,7 @@ mod tests {
             severity: Severity::Warning,
             stage: Stage::Type,
             code: "EFF001".to_string(),
-            message: "纯函数或未声明效应 [IO] 的函数调用了带效应 [Clock] 的函数 'now'"
-                .to_string(),
+            message: "纯函数或未声明效应 [IO] 的函数调用了带效应 [Clock] 的函数 'now'".to_string(),
             file: "test.lom".to_string(),
             line: 0,
             col: 0,
@@ -1790,7 +1822,13 @@ mod tests {
                    fn unrelated() -> Int\n    let x = 10\n    x\nend\n\
                    fn main() -> Unit\n    println(f(unrelated()))\nend\n";
         // 诊断定位在 f 的赋值行（2:5，typechecker 真实形态）
-        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 2, 5);
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            2,
+            5,
+        );
         assert!(
             fixes.iter().all(|f| f.action == ActionKind::Hint),
             "跨作用域不得产出自动修改动作: {:?}",
@@ -1822,7 +1860,13 @@ mod tests {
     #[test]
     fn mut001_param_reassign_gives_param_hint() {
         let src = "fn f(n: Int) -> Int\n    n = n + 1\n    n\nend\nfn main() -> Unit\n    println(f(1))\nend\n";
-        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'n'（声明时未标 mut）", 2, 5);
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'n'（声明时未标 mut）",
+            2,
+            5,
+        );
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
@@ -1855,7 +1899,10 @@ mod tests {
              fn main() -> Unit\n    println(helper(7))\nend\n"
         );
         assert_eq!(
-            crate::parser::Parser::parse_recover(&patched).program.items.len(),
+            crate::parser::Parser::parse_recover(&patched)
+                .program
+                .items
+                .len(),
             2,
             "注解插在签名 end 行后必须仍可解析"
         );
@@ -1909,15 +1956,20 @@ mod tests {
         assert_eq!(inserts[0].text.as_deref(), Some(" ! [IO, Clock]"));
         assert_eq!(inserts[0].confidence, Confidence::High);
         // 另一条 plan 是说明性 hint
-        assert!(plan
-            .plans
-            .iter()
-            .any(|p| p.fixes.iter().all(|f| f.action == ActionKind::Hint)));
+        assert!(
+            plan.plans
+                .iter()
+                .any(|p| p.fixes.iter().all(|f| f.action == ActionKind::Hint))
+        );
 
         // 端到端：应用后源码可解析且注解唯一
         let result = crate::apply::apply_plan(&plan, src);
         assert_eq!(result.applied, 1);
-        assert!(result.patched_source.contains("fn helper() -> Unit ! [IO, Clock]"));
+        assert!(
+            result
+                .patched_source
+                .contains("fn helper() -> Unit ! [IO, Clock]")
+        );
         assert_eq!(
             crate::parser::Parser::parse_recover(&result.patched_source)
                 .program
@@ -1939,7 +1991,10 @@ mod tests {
             let line = lines[1];
             line.find('@').unwrap() + 1 // lexer 口径的 1-based 字节列
         };
-        assert!(byte_col > line_byte_len_prefix_check(&lines[1], 5), "前置：@ 前有多字节字符");
+        assert!(
+            byte_col > line_byte_len_prefix_check(&lines[1], 5),
+            "前置：@ 前有多字节字符"
+        );
         let d = Diagnostic {
             severity: Severity::Error,
             stage: Stage::Lex,
@@ -2053,11 +2108,7 @@ mod tests {
 
     #[test]
     fn json_empty_plan_has_empty_plans_array() {
-        let plan = generate_plan(
-            &Diagnostics::new("ok.lom"),
-            "fn main() -> Unit\nend\n",
-            &[],
-        );
+        let plan = generate_plan(&Diagnostics::new("ok.lom"), "fn main() -> Unit\nend\n", &[]);
         let json = to_json(&plan);
         assert!(json.contains("\"ok\": true"));
         assert!(json.contains("\"plans\": []"));
@@ -2165,11 +2216,7 @@ mod tests {
     fn nam003_suggestion_produces_replace() {
         let src = "fn main() -> Unit\n    println(lenght + 1)\nend\n";
         let lines: Vec<&str> = src.lines().collect();
-        let d = make_nam_diag(
-            "NAM003",
-            "未定义变量 'lenght'",
-            Some("是否想用 'length'？"),
-        );
+        let d = make_nam_diag("NAM003", "未定义变量 'lenght'", Some("是否想用 'length'？"));
         let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
@@ -2185,11 +2232,7 @@ mod tests {
     fn nam003_replace_skips_strings_and_comments() {
         let src = "println(lenght)\nprintln(\"lenght\")\n# lenght 注释\nlet x = lenght\n";
         let lines: Vec<&str> = src.lines().collect();
-        let d = make_nam_diag(
-            "NAM003",
-            "未定义变量 'lenght'",
-            Some("是否想用 'length'？"),
-        );
+        let d = make_nam_diag("NAM003", "未定义变量 'lenght'", Some("是否想用 'length'？"));
         let fixes = fix_for_diagnostic(&d, &lines, None);
         // 只有第 1、4 行的真实出现；字符串与注释里的不算
         assert_eq!(fixes.len(), 2);
@@ -2254,7 +2297,11 @@ mod tests {
         let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
-        assert_eq!((fixes[0].line, fixes[0].col), (2, 13), "应回退扫描找到真实位置");
+        assert_eq!(
+            (fixes[0].line, fixes[0].col),
+            (2, 13),
+            "应回退扫描找到真实位置"
+        );
     }
 
     #[test]
@@ -2363,7 +2410,13 @@ mod tests {
     fn mut001_unique_let_decl_replaces_with_let_mut() {
         let src = "fn main()\n    let x = 1\n    x = x + 1\nend\n";
         // R55：端到端构造（真实 parse 取 FnInfo；诊断在赋值行 3，typechecker 形态）
-        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 3, 5);
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].line, 2);
@@ -2377,7 +2430,13 @@ mod tests {
     fn mut001_word_boundary_rejects_longer_name() {
         // 声明是 let xy：'x' 的回扫不得命中（词边界）
         let src = "fn main()\n    let xy = 1\n    x = 2\nend\n";
-        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 3, 5);
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
     }
@@ -2386,12 +2445,24 @@ mod tests {
     fn mut001_multiple_or_zero_hits_fall_back_to_hint() {
         // 多处 let x 命中（shadowing）→ hint；注释行不算命中
         let src = "fn main()\n    let x = 1\n    let x = 2\n    x = 3\nend\n";
-        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 4, 5);
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            4,
+            5,
+        );
         assert_eq!(fixes[0].action, ActionKind::Hint);
 
         // 零命中（参数重赋值形态）→ hint（R55：文案点名参数）
         let src2 = "fn f(n: Int) -> Int\n    n = n + 1\n    n\nend\n";
-        let fixes2 = e2e_fixes(src2, "MUT001", "赋值给不可变变量 'n'（声明时未标 mut）", 2, 5);
+        let fixes2 = e2e_fixes(
+            src2,
+            "MUT001",
+            "赋值给不可变变量 'n'（声明时未标 mut）",
+            2,
+            5,
+        );
         assert_eq!(fixes2[0].action, ActionKind::Hint);
     }
 }

@@ -27,9 +27,9 @@
 //     ]
 //   }
 
-use crate::json::escape_str;
 use crate::ast::*;
 use crate::info::type_to_string;
+use crate::json::escape_str;
 
 /// 一个文档条目（顶层 fn 或 enum）
 pub struct DocItem {
@@ -216,7 +216,6 @@ pub fn to_json(module: &DocModule) -> String {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,7 +230,9 @@ mod tests {
     #[test]
     fn doc_fn_with_comment() {
         // 签名上方的连续 # 行成为文档注释
-        let m = doc_of("# 计算两个数的和\n# 第二行说明\nfn add(a: Int, b: Int) -> Int\n    a + b\nend\n");
+        let m = doc_of(
+            "# 计算两个数的和\n# 第二行说明\nfn add(a: Int, b: Int) -> Int\n    a + b\nend\n",
+        );
         assert_eq!(m.items.len(), 1);
         let item = &m.items[0];
         assert_eq!(item.kind, "fn");

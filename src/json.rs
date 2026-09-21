@@ -75,10 +75,7 @@ impl<'a> JsonParser<'a> {
         if self.depth > self.max_depth {
             self.depth -= 1;
             return Err(JsonError {
-                message: format!(
-                    "JSON 嵌套超过 {} 层（256MB 栈的安全上限）",
-                    self.max_depth
-                ),
+                message: format!("JSON 嵌套超过 {} 层（256MB 栈的安全上限）", self.max_depth),
                 pos: self.pos,
             });
         }
@@ -322,7 +319,10 @@ impl<'a> JsonParser<'a> {
         // 处理代理对（高代理 D800-DBFF + 低代理 DC00-DFFF）
         if (0xD800..=0xDBFF).contains(&cp) {
             // 期望紧跟 \uXXXX 低代理
-            if self.pos + 6 > self.src.len() || self.src[self.pos] != b'\\' || self.src[self.pos + 1] != b'u' {
+            if self.pos + 6 > self.src.len()
+                || self.src[self.pos] != b'\\'
+                || self.src[self.pos + 1] != b'u'
+            {
                 return Err(JsonError {
                     message: "高代理后缺少低代理 \\uXXXX".to_string(),
                     pos: self.pos,
@@ -473,19 +473,15 @@ impl<'a> JsonParser<'a> {
             pos: start,
         })?;
         if is_float {
-            s.parse::<f64>()
-                .map(Value::Float)
-                .map_err(|_| JsonError {
-                    message: format!("无效浮点数 '{}'", s),
-                    pos: start,
-                })
+            s.parse::<f64>().map(Value::Float).map_err(|_| JsonError {
+                message: format!("无效浮点数 '{}'", s),
+                pos: start,
+            })
         } else {
-            s.parse::<i64>()
-                .map(Value::Int)
-                .map_err(|_| JsonError {
-                    message: format!("无效整数 '{}'（可能溢出 i64）", s),
-                    pos: start,
-                })
+            s.parse::<i64>().map(Value::Int).map_err(|_| JsonError {
+                message: format!("无效整数 '{}'（可能溢出 i64）", s),
+                pos: start,
+            })
         }
     }
 
@@ -502,7 +498,10 @@ impl<'a> JsonParser<'a> {
     }
 
     fn skip_ws(&mut self) {
-        while matches!(self.peek(), Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')) {
+        while matches!(
+            self.peek(),
+            Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')
+        ) {
             self.advance();
         }
     }
@@ -517,9 +516,10 @@ impl<'a> JsonParser<'a> {
         }
         // 确保关键字后是分隔符（避免 trueX 被误匹配）
         if let Some(c) = self.src.get(self.pos + kw.len())
-            && (c.is_ascii_alphanumeric() || *c == b'_') {
-                return false;
-            }
+            && (c.is_ascii_alphanumeric() || *c == b'_')
+        {
+            return false;
+        }
         for _ in 0..kw.len() {
             self.advance();
         }
@@ -707,8 +707,11 @@ mod tests {
     #[test]
     fn parse_error_missing_comma_or_brace() {
         let e = super::parse("{\"a\": 1 \"b\": 2}").unwrap_err();
-        assert!(e.message.contains("','") || e.message.contains("'}'"),
-                "消息: {}", e.message);
+        assert!(
+            e.message.contains("','") || e.message.contains("'}'"),
+            "消息: {}",
+            e.message
+        );
     }
 
     #[test]
@@ -899,13 +902,16 @@ mod tests {
     /// "严格 JSON"宣称失实（九审以 char_from_code(34)+char_from_code(10) 复现）
     #[test]
     fn r59_raw_control_char_in_string_rejected() {
-        for raw in ['\n', '\r', '\t', '\u{0008}', '\u{000C}', '\u{0000}', '\u{001F}'] {
+        for raw in [
+            '\n', '\r', '\t', '\u{0008}', '\u{000C}', '\u{0000}', '\u{001F}',
+        ] {
             let src = format!("\"a{}b\"", raw);
             let err = super::parse(&src).expect_err("未转义控制字符必须拒绝");
             assert!(
                 err.message.contains("控制字符"),
                 "0x{:02X} 的错误消息: {}",
-                raw as u32, err.message
+                raw as u32,
+                err.message
             );
         }
     }

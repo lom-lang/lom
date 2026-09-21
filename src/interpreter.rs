@@ -353,7 +353,11 @@ pub enum RuntimeError {
     EarlyReturn(Value),
     /// 递归深度超限（N1）：自带触发位置（函数签名/调用点 span）——
     /// RuntimeError::Msg 没有位置通道，而深度错误的定位价值高（指向递归函数定义）
-    DepthLimit { msg: String, line: usize, col: usize },
+    DepthLimit {
+        msg: String,
+        line: usize,
+        col: usize,
+    },
 }
 
 impl fmt::Display for RuntimeError {
@@ -415,12 +419,7 @@ pub struct Interpreter {
 }
 
 /// 内置变体
-const BUILTIN_VARIANTS: &[(&str, usize)] = &[
-    ("Ok", 1),
-    ("Err", 1),
-    ("Some", 1),
-    ("None", 0),
-];
+const BUILTIN_VARIANTS: &[(&str, usize)] = &[("Ok", 1), ("Err", 1), ("Some", 1), ("None", 0)];
 
 /// Prelude：自动导入的符号（无需显式 from io import {println}）
 /// 保持向后兼容：现有代码不写 import 也能用 println/print
@@ -726,9 +725,7 @@ impl Interpreter {
     /// 执行语句
     fn exec_stmt(&mut self, stmt: &Stmt, env: ScopeRef) -> Result<ControlFlow, RuntimeError> {
         match stmt {
-            Stmt::Let {
-                name, value, ..
-            } => {
+            Stmt::Let { name, value, .. } => {
                 let v = self.eval_expr(value, env.clone())?;
                 env.borrow_mut().define(name.clone(), v);
                 Ok(ControlFlow::Normal(Value::Unit))
@@ -742,7 +739,7 @@ impl Interpreter {
                         return Err(RuntimeError::Msg(format!(
                             "元组解构要求右侧是元组，得到 {:?}",
                             other.type_name()
-                        )))
+                        )));
                     }
                 };
                 if elems.len() != names.len() {
@@ -760,10 +757,7 @@ impl Interpreter {
             Stmt::Assign { target, value, .. } => {
                 let v = self.eval_expr(value, env.clone())?;
                 if !env.borrow_mut().set_existing(target, v) {
-                    return Err(RuntimeError::Msg(format!(
-                        "赋值给未定义变量: '{}'",
-                        target
-                    )));
+                    return Err(RuntimeError::Msg(format!("赋值给未定义变量: '{}'", target)));
                 }
                 Ok(ControlFlow::Normal(Value::Unit))
             }
@@ -801,7 +795,9 @@ impl Interpreter {
                     Value::Str(s) => {
                         for ch in s.chars() {
                             let block_env = Scope::new(Some(env.clone()));
-                            block_env.borrow_mut().define(var.clone(), Value::Str(ch.to_string()));
+                            block_env
+                                .borrow_mut()
+                                .define(var.clone(), Value::Str(ch.to_string()));
                             match self.exec_block(body, block_env)? {
                                 ControlFlow::Return(v) => return Ok(ControlFlow::Return(v)),
                                 ControlFlow::Normal(_) => {}
@@ -938,7 +934,9 @@ impl Interpreter {
                 }
                 self.eval_call(callee, &arg_vals, env)
             }
-            ExprKind::Index { .. } => Err(RuntimeError::Msg("索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）".to_string())),
+            ExprKind::Index { .. } => Err(RuntimeError::Msg(
+                "索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）".to_string(),
+            )),
             ExprKind::Field { expr, name } => {
                 let v = self.eval_expr(expr, env)?;
                 match &v {
@@ -948,28 +946,20 @@ impl Interpreter {
                             .iter()
                             .find(|(k, _)| k == name)
                             .map(|(_, v)| v.clone())
-                            .ok_or_else(|| {
-                                RuntimeError::Msg(format!("记录没有字段 '{}'", name))
-                            })
+                            .ok_or_else(|| RuntimeError::Msg(format!("记录没有字段 '{}'", name)))
                     }
                     Value::Tuple { elems } => {
                         // 元组索引：.0 .1 ...
                         let idx: usize = name.parse().map_err(|_| {
-                            RuntimeError::Msg(format!(
-                                "元组索引必须是数字，得到 '{}'",
-                                name
-                            ))
+                            RuntimeError::Msg(format!("元组索引必须是数字，得到 '{}'", name))
                         })?;
-                        elems
-                            .get(idx)
-                            .cloned()
-                            .ok_or_else(|| {
-                                RuntimeError::Msg(format!(
-                                    "元组索引 {} 越界（长度 {}）",
-                                    idx,
-                                    elems.len()
-                                ))
-                            })
+                        elems.get(idx).cloned().ok_or_else(|| {
+                            RuntimeError::Msg(format!(
+                                "元组索引 {} 越界（长度 {}）",
+                                idx,
+                                elems.len()
+                            ))
+                        })
                     }
                     _ => Err(RuntimeError::Msg(format!(
                         "不能对 {} 使用字段访问 '.{}'",
@@ -1005,11 +995,7 @@ impl Interpreter {
                     Ok(Value::Unit)
                 }
             }
-            ExprKind::Closure {
-                params,
-                body,
-                ..
-            } => Ok(Value::Closure {
+            ExprKind::Closure { params, body, .. } => Ok(Value::Closure {
                 params: params.clone(),
                 body: (**body).clone(),
                 env,
@@ -1054,9 +1040,11 @@ impl Interpreter {
                         Ok(args.into_iter().next().unwrap())
                     }
                     // Err(e) / None：触发提前返回，携带原 Err/None 值
-                    Value::Enum { variant: e_var, args: e_args }
-                        if (e_var == "Err" && e_args.len() == 1)
-                            || (e_var == "None" && e_args.is_empty()) =>
+                    Value::Enum {
+                        variant: e_var,
+                        args: e_args,
+                    } if (e_var == "Err" && e_args.len() == 1)
+                        || (e_var == "None" && e_args.is_empty()) =>
                     {
                         Err(RuntimeError::EarlyReturn(Value::Enum {
                             variant: e_var,
@@ -1168,7 +1156,13 @@ impl Interpreter {
                     env: closure_env,
                 }) = env.borrow().get(name)
                 {
-                    return self.call_closure(&params, &body, closure_env.clone(), arg_vals, &callee.span);
+                    return self.call_closure(
+                        &params,
+                        &body,
+                        closure_env.clone(),
+                        arg_vals,
+                        &callee.span,
+                    );
                 }
                 Err(RuntimeError::Msg(format!("未定义函数: '{}'", name)))
             }
@@ -1203,9 +1197,7 @@ impl Interpreter {
                 // 若 name 是已知无参数变体（如 None、用户 Red），按变体匹配
                 if self.nullary_variants.contains(name) {
                     return match val {
-                        Value::Enum { variant, args } => {
-                            Ok(variant == name && args.is_empty())
-                        }
+                        Value::Enum { variant, args } => Ok(variant == name && args.is_empty()),
                         _ => Ok(false),
                     };
                 }
@@ -1220,42 +1212,32 @@ impl Interpreter {
                     ExprKind::Float(f) => Value::Float(*f),
                     ExprKind::Bool(b) => Value::Bool(*b),
                     ExprKind::Str(s) => Value::Str(s.clone()),
-                    _ => {
-                        return Err(RuntimeError::Msg(format!(
-                            "不支持的字面量模式: {:?}",
-                            e
-                        )))
-                    }
+                    _ => return Err(RuntimeError::Msg(format!("不支持的字面量模式: {:?}", e))),
                 };
                 Ok(self.values_eq(&lit_val, val))
             }
-            Pattern::Variant { name, sub, .. } => {
-                match val {
-                    Value::Enum {
-                        variant,
-                        args,
-                    } => {
-                        if variant != name {
+            Pattern::Variant { name, sub, .. } => match val {
+                Value::Enum { variant, args } => {
+                    if variant != name {
+                        return Ok(false);
+                    }
+                    if args.len() != sub.len() {
+                        return Err(RuntimeError::Msg(format!(
+                            "变体 {} 期望 {} 个子模式，得到 {} 个参数",
+                            name,
+                            sub.len(),
+                            args.len()
+                        )));
+                    }
+                    for (p, v) in sub.iter().zip(args.iter()) {
+                        if !self.match_pattern(p, v, env)? {
                             return Ok(false);
                         }
-                        if args.len() != sub.len() {
-                            return Err(RuntimeError::Msg(format!(
-                                "变体 {} 期望 {} 个子模式，得到 {} 个参数",
-                                name,
-                                sub.len(),
-                                args.len()
-                            )));
-                        }
-                        for (p, v) in sub.iter().zip(args.iter()) {
-                            if !self.match_pattern(p, v, env)? {
-                                return Ok(false);
-                            }
-                        }
-                        Ok(true)
                     }
-                    _ => Ok(false),
+                    Ok(true)
                 }
-            }
+                _ => Ok(false),
+            },
         }
     }
 
@@ -1282,9 +1264,7 @@ impl Interpreter {
             }
             BinOp::Eq => Ok(Value::Bool(self.values_eq(&l, &r))),
             BinOp::NotEq => Ok(Value::Bool(!self.values_eq(&l, &r))),
-            BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
-                self.eval_compare(op, l, r)
-            }
+            BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => self.eval_compare(op, l, r),
         }
     }
 
@@ -1315,7 +1295,8 @@ impl Interpreter {
                     }
                     if *a == i64::MIN && *b == -1 {
                         return Err(RuntimeError::Msg(
-                            "整数取模溢出：i64 最小值 (-9223372036854775808) 对 -1 取模".to_string(),
+                            "整数取模溢出：i64 最小值 (-9223372036854775808) 对 -1 取模"
+                                .to_string(),
                         ));
                     }
                     a % b
@@ -1359,7 +1340,9 @@ impl Interpreter {
     fn eval_compare(&self, op: &BinOp, l: Value, r: Value) -> Result<Value, RuntimeError> {
         let ord = match (&l, &r) {
             (Value::Int(a), Value::Int(b)) => a.cmp(b),
-            (Value::Float(a), Value::Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
+            (Value::Float(a), Value::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
             (Value::Str(a), Value::Str(b)) => a.cmp(b),
             (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
             _ => {
@@ -1400,27 +1383,21 @@ impl Interpreter {
                 if v1 != v2 || a1.len() != a2.len() {
                     return false;
                 }
-                a1.iter()
-                    .zip(a2.iter())
-                    .all(|(x, y)| self.values_eq(x, y))
+                a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
             }
             (Value::Tuple { elems: a1 }, Value::Tuple { elems: a2 }) => {
-                a1.len() == a2.len()
-                    && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
+                a1.len() == a2.len() && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
             }
             (Value::Record { fields: f1 }, Value::Record { fields: f2 }) => {
                 // 结构等价：字段集相同（顺序不敏感），对应值相等
                 if f1.len() != f2.len() {
                     return false;
                 }
-                f1.iter().all(|(k, v)| {
-                    f2.iter()
-                        .any(|(k2, v2)| k == k2 && self.values_eq(v, v2))
-                })
+                f1.iter()
+                    .all(|(k, v)| f2.iter().any(|(k2, v2)| k == k2 && self.values_eq(v, v2)))
             }
             (Value::List(a1), Value::List(a2)) => {
-                a1.len() == a2.len()
-                    && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
+                a1.len() == a2.len() && a1.iter().zip(a2.iter()).all(|(x, y)| self.values_eq(x, y))
             }
             (Value::Map(m1), Value::Map(m2)) => {
                 // 键集相同 + 对应值递归相等
@@ -1710,12 +1687,10 @@ impl Interpreter {
             "list_head" => {
                 expect_arity("list_head", 1, args)?;
                 match &args[0] {
-                    Value::List(l) => {
-                        match l.head() {
-                            Some(v) => Ok(Some(v.clone())),
-                            None => Err(RuntimeError::Msg("list_head 空列表无首元素".to_string())),
-                        }
-                    }
+                    Value::List(l) => match l.head() {
+                        Some(v) => Ok(Some(v.clone())),
+                        None => Err(RuntimeError::Msg("list_head 空列表无首元素".to_string())),
+                    },
                     _ => Err(RuntimeError::Msg("list_head 期望 List".to_string())),
                 }
             }
@@ -1740,7 +1715,9 @@ impl Interpreter {
                     Value::List(l) => {
                         Ok(Some(Value::List(ListVal::cons(args[0].clone(), l.clone()))))
                     }
-                    _ => Err(RuntimeError::Msg("list_cons 第二个参数期望 List".to_string())),
+                    _ => Err(RuntimeError::Msg(
+                        "list_cons 第二个参数期望 List".to_string(),
+                    )),
                 }
             }
             // v0.4.3 Phase 5.9: 高阶 list 函数（语言前提 Phase 5.8：闭包/具名函数作为值）
@@ -1748,13 +1725,16 @@ impl Interpreter {
                 // list_map(f, xs) → [f(x) for x in xs]
                 expect_arity("list_map", 2, args)?;
                 match (&args[0], &args[1]) {
-                    (
-                        Value::Closure { params, body, env },
-                        Value::List(l),
-                    ) => {
+                    (Value::Closure { params, body, env }, Value::List(l)) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            out.push(self.call_closure(params, body, env.clone(), std::slice::from_ref(e), &crate::ast::Span::at(0, 0))?);
+                            out.push(self.call_closure(
+                                params,
+                                body,
+                                env.clone(),
+                                std::slice::from_ref(e),
+                                &crate::ast::Span::at(0, 0),
+                            )?);
                         }
                         Ok(Some(Value::List(ListVal::from_vec(out))))
                     }
@@ -1772,13 +1752,16 @@ impl Interpreter {
                 // list_filter(f, xs) → 保留 f(x) 为 True 的元素
                 expect_arity("list_filter", 2, args)?;
                 match (&args[0], &args[1]) {
-                    (
-                        Value::Closure { params, body, env },
-                        Value::List(l),
-                    ) => {
+                    (Value::Closure { params, body, env }, Value::List(l)) => {
                         let mut out = Vec::new();
                         for e in l.iter() {
-                            let keep = self.call_closure(params, body, env.clone(), std::slice::from_ref(e), &crate::ast::Span::at(0, 0))?;
+                            let keep = self.call_closure(
+                                params,
+                                body,
+                                env.clone(),
+                                std::slice::from_ref(e),
+                                &crate::ast::Span::at(0, 0),
+                            )?;
                             if keep.is_truthy()? {
                                 out.push(e.clone());
                             }
@@ -1799,13 +1782,16 @@ impl Interpreter {
                 // list_fold(f, init, xs) → 左折叠：acc = f(acc, x)
                 expect_arity("list_fold", 3, args)?;
                 match (&args[0], &args[2]) {
-                    (
-                        Value::Closure { params, body, env },
-                        Value::List(l),
-                    ) => {
+                    (Value::Closure { params, body, env }, Value::List(l)) => {
                         let mut acc = args[1].clone();
                         for e in l.iter() {
-                            acc = self.call_closure(params, body, env.clone(), &[acc, e.clone()], &crate::ast::Span::at(0, 0))?;
+                            acc = self.call_closure(
+                                params,
+                                body,
+                                env.clone(),
+                                &[acc, e.clone()],
+                                &crate::ast::Span::at(0, 0),
+                            )?;
                         }
                         Ok(Some(acc))
                     }
@@ -1835,7 +1821,7 @@ impl Interpreter {
                                 return Err(RuntimeError::Msg(format!(
                                     "map_set 第二个参数期望 String 键，得到 {}",
                                     other.type_name()
-                                )))
+                                )));
                             }
                         };
                         m.borrow_mut().insert(key, args[2].clone());
@@ -1876,7 +1862,9 @@ impl Interpreter {
             "map_has" => {
                 expect_arity("map_has", 2, args)?;
                 match (&args[0], &args[1]) {
-                    (Value::Map(m), Value::Str(k)) => Ok(Some(Value::Bool(m.borrow().contains_key(k)))),
+                    (Value::Map(m), Value::Str(k)) => {
+                        Ok(Some(Value::Bool(m.borrow().contains_key(k))))
+                    }
                     (Value::Map(_), other) => Err(RuntimeError::Msg(format!(
                         "map_has 第二个参数期望 String 键，得到 {}",
                         other.type_name()
@@ -1908,11 +1896,8 @@ impl Interpreter {
                 expect_arity("map_keys", 1, args)?;
                 match &args[0] {
                     Value::Map(m) => {
-                        let mut ks: Vec<Value> = m
-                            .borrow()
-                            .keys()
-                            .map(|k| Value::Str(k.clone()))
-                            .collect();
+                        let mut ks: Vec<Value> =
+                            m.borrow().keys().map(|k| Value::Str(k.clone())).collect();
                         ks.sort_by(|a, b| match (a, b) {
                             (Value::Str(x), Value::Str(y)) => x.cmp(y),
                             _ => std::cmp::Ordering::Equal,
@@ -2071,19 +2056,16 @@ impl Interpreter {
                 expect_arity("file_append", 2, args)?;
                 match (&args[0], &args[1]) {
                     (Value::Str(path), Value::Str(content)) => {
-                        let mut file = match fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(path)
-                        {
-                            Ok(f) => f,
-                            Err(e) => {
-                                return Err(RuntimeError::Msg(format!(
-                                    "file_append 无法打开 '{}': {}",
-                                    path, e
-                                )))
-                            }
-                        };
+                        let mut file =
+                            match fs::OpenOptions::new().create(true).append(true).open(path) {
+                                Ok(f) => f,
+                                Err(e) => {
+                                    return Err(RuntimeError::Msg(format!(
+                                        "file_append 无法打开 '{}': {}",
+                                        path, e
+                                    )));
+                                }
+                            };
                         match file.write_all(content.as_bytes()) {
                             Ok(()) => Ok(Some(Value::Unit)),
                             Err(e) => Err(RuntimeError::Msg(format!(
@@ -2176,17 +2158,13 @@ pub(crate) fn module_of(name: &str) -> Option<&'static str> {
     match name {
         "println" | "print" => Some("io"),
         "len" | "int_to_string" | "string_to_int" | "trim" | "upper" | "lower" | "split"
-        | "contains" | "replace" | "starts_with" | "ends_with" | "char_from_code" => {
-            Some("string")
-        }
+        | "contains" | "replace" | "starts_with" | "ends_with" | "char_from_code" => Some("string"),
         "sqrt" | "abs" | "min" | "max" => Some("math"),
-        "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail" | "list_cons" | "list_map" | "list_filter" | "list_fold" => {
-            Some("list")
-        }
+        "list_empty" | "list_length" | "list_get" | "list_is_empty" | "list_head" | "list_tail"
+        | "list_cons" | "list_map" | "list_filter" | "list_fold" => Some("list"),
         "json_parse" | "json_stringify" => Some("json"),
-        "map_empty" | "map_set" | "map_get" | "map_has" | "map_remove" | "map_keys" | "map_values" | "map_size" => {
-            Some("map")
-        }
+        "map_empty" | "map_set" | "map_get" | "map_has" | "map_remove" | "map_keys"
+        | "map_values" | "map_size" => Some("map"),
         "file_read" | "file_write" | "file_append" | "file_exists" => Some("file"),
         "args" => Some("env"),
         _ => None,
@@ -2284,7 +2262,9 @@ end
         let program = Parser::parse(src).unwrap();
         let mut interp = Interpreter::new();
         interp.max_depth = 500;
-        interp.run(&program).expect("100 层递归在 max_depth=500 内应正常运行");
+        interp
+            .run(&program)
+            .expect("100 层递归在 max_depth=500 内应正常运行");
     }
 
     #[test]
@@ -2888,7 +2868,9 @@ end
         // 先处理导入（与 run 一致）
         for item in &program.items {
             if let Item::Import(imp) = item {
-                interp.process_import(imp).unwrap_or_else(|e| panic!("导入失败: {}", e));
+                interp
+                    .process_import(imp)
+                    .unwrap_or_else(|e| panic!("导入失败: {}", e));
             }
         }
         // 注册所有顶层函数 + 枚举变体（复用 run 的逻辑）
@@ -2944,7 +2926,8 @@ end
     #[test]
     fn test_pipeline_with_arithmetic_precedence() {
         // 1 + 2 |> double => double(1 + 2) = 6
-        let src = "fn double(x: Int) -> Int\n    x * 2\nend\nfn main() -> Int\n    1 + 2 |> double\nend";
+        let src =
+            "fn double(x: Int) -> Int\n    x * 2\nend\nfn main() -> Int\n    1 + 2 |> double\nend";
         let v = eval_main_tail(src);
         match v {
             Value::Int(n) => assert_eq!(n, 6),
@@ -3026,7 +3009,8 @@ end
 
     #[test]
     fn test_import_string_int_to_string() {
-        let src = "from string import { int_to_string }\nfn main() -> String\n    int_to_string(42)\nend";
+        let src =
+            "from string import { int_to_string }\nfn main() -> String\n    int_to_string(42)\nend";
         let v = eval_main_tail(src);
         match v {
             Value::Str(s) => assert_eq!(s, "42"),
@@ -3104,7 +3088,8 @@ end
     #[test]
     fn test_import_alias_returns_value() {
         // 别名导入 len as length，验证返回值正确
-        let src = "from string import { len as length }\nfn main() -> Int\n    length(\"hello\")\nend";
+        let src =
+            "from string import { len as length }\nfn main() -> Int\n    length(\"hello\")\nend";
         let v = eval_main_tail(src);
         match v {
             Value::Int(n) => assert_eq!(n, 5),
@@ -3169,7 +3154,8 @@ end
     #[test]
     fn test_import_dotted_module_errors() {
         // Phase 2.1.5 不支持用户点分模块路径
-        let src = "from utils.helpers import { format_date }\nfn main() -> Unit\n    println(1)\nend";
+        let src =
+            "from utils.helpers import { format_date }\nfn main() -> Unit\n    println(1)\nend";
         let err = run_src(src).unwrap_err();
         let msg = format!("{}", err);
         assert!(
@@ -3195,11 +3181,7 @@ end
                 interp.functions.insert(f.name.clone(), f.clone());
             }
         }
-        let main = interp
-            .functions
-            .get("main")
-            .cloned()
-            .expect("应有 fn main");
+        let main = interp.functions.get("main").cloned().expect("应有 fn main");
         let env = Scope::new(Some(interp.globals.clone()));
         let err = match interp.exec_block(&main.body, env) {
             Ok(_) => panic!("带洞程序执行应失败，但成功了"),
@@ -3703,7 +3685,11 @@ end
         let result = run_src(src);
         assert!(result.is_err(), "读取不存在的文件应报错");
         let msg = format!("{}", result.unwrap_err());
-        assert!(msg.contains("file_read"), "期望提及 file_read，得到: {}", msg);
+        assert!(
+            msg.contains("file_read"),
+            "期望提及 file_read，得到: {}",
+            msg
+        );
     }
 
     #[test]

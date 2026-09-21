@@ -35,7 +35,11 @@ pub enum PkgError {
     /// 循环依赖
     CircularDep { chain: Vec<String> },
     /// 包源码解析失败
-    SourceParse { pkg: String, file: String, reason: String },
+    SourceParse {
+        pkg: String,
+        file: String,
+        reason: String,
+    },
     /// 未知包导入（当前经字符串错误报告；变体为 API 完整性保留）
     #[allow(dead_code)]
     UnknownPackage { name: String },
@@ -57,10 +61,18 @@ impl std::fmt::Display for PkgError {
                 write!(f, "PKG003: 循环依赖: {}", chain.join(" -> "))
             }
             PkgError::SourceParse { pkg, file, reason } => {
-                write!(f, "PKG004: 包 '{}' 源码 '{}' 解析失败: {}", pkg, file, reason)
+                write!(
+                    f,
+                    "PKG004: 包 '{}' 源码 '{}' 解析失败: {}",
+                    pkg, file, reason
+                )
             }
             PkgError::UnknownPackage { name } => {
-                write!(f, "PKG005: 未知包 '{}'（未在 lom.toml dependencies 声明）", name)
+                write!(
+                    f,
+                    "PKG005: 未知包 '{}'（未在 lom.toml dependencies 声明）",
+                    name
+                )
             }
             PkgError::SymbolNotFound { pkg, symbol } => {
                 write!(f, "PKG006: 包 '{}' 不导出符号 '{}'", pkg, symbol)
@@ -577,21 +589,33 @@ lib = { version = "0.1.0" }
     fn resolve_single_dependency() {
         let tmp = make_temp_dir("single_dep");
         // 根项目
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 lib = { path = "lib" }
-"#);
+"#,
+        );
         // 依赖包 lib
         let lib_dir = tmp.join("lib");
         fs::create_dir_all(&lib_dir).unwrap();
-        write_file(&lib_dir, "lom.toml", r#"
+        write_file(
+            &lib_dir,
+            "lom.toml",
+            r#"
 name = "lib"
 version = "0.1.0"
-"#);
-        write_file(&lib_dir, "lib.lom", "fn add(a: Int, b: Int) -> Int\n    a + b\nend\n");
+"#,
+        );
+        write_file(
+            &lib_dir,
+            "lib.lom",
+            "fn add(a: Int, b: Int) -> Int\n    a + b\nend\n",
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let graph = resolve_dependencies(&manifest, &tmp).unwrap();
@@ -607,38 +631,62 @@ version = "0.1.0"
     fn resolve_nested_dependencies() {
         let tmp = make_temp_dir("nested_dep");
         // 根项目依赖 a，a 依赖 b
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 a = { path = "a" }
-"#);
+"#,
+        );
         let a_dir = tmp.join("a");
         fs::create_dir_all(&a_dir).unwrap();
-        write_file(&a_dir, "lom.toml", r#"
+        write_file(
+            &a_dir,
+            "lom.toml",
+            r#"
 name = "a"
 version = "0.1.0"
 
 [dependencies]
 b = { path = "b" }
-"#);
+"#,
+        );
         write_file(&a_dir, "a.lom", "fn func_a() -> Int\n    1\nend\n");
 
         let b_dir = a_dir.join("b");
         fs::create_dir_all(&b_dir).unwrap();
-        write_file(&b_dir, "lom.toml", r#"
+        write_file(
+            &b_dir,
+            "lom.toml",
+            r#"
 name = "b"
 version = "0.1.0"
-"#);
+"#,
+        );
         write_file(&b_dir, "b.lom", "fn func_b() -> Int\n    2\nend\n");
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let graph = resolve_dependencies(&manifest, &tmp).unwrap();
 
         assert_eq!(graph.packages.len(), 2);
-        assert!(graph.get_package("a").unwrap().public_symbols.contains("func_a"));
-        assert!(graph.get_package("b").unwrap().public_symbols.contains("func_b"));
+        assert!(
+            graph
+                .get_package("a")
+                .unwrap()
+                .public_symbols
+                .contains("func_a")
+        );
+        assert!(
+            graph
+                .get_package("b")
+                .unwrap()
+                .public_symbols
+                .contains("func_b")
+        );
         cleanup(&tmp);
     }
 
@@ -646,32 +694,44 @@ version = "0.1.0"
     fn resolve_circular_dependency_fails() {
         let tmp = make_temp_dir("circular_dep");
         // app -> a -> b -> a（循环）
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 a = { path = "a" }
-"#);
+"#,
+        );
         let a_dir = tmp.join("a");
         fs::create_dir_all(&a_dir).unwrap();
-        write_file(&a_dir, "lom.toml", r#"
+        write_file(
+            &a_dir,
+            "lom.toml",
+            r#"
 name = "a"
 version = "0.1.0"
 
 [dependencies]
 b = { path = "b" }
-"#);
+"#,
+        );
 
         let b_dir = a_dir.join("b");
         fs::create_dir_all(&b_dir).unwrap();
-        write_file(&b_dir, "lom.toml", r#"
+        write_file(
+            &b_dir,
+            "lom.toml",
+            r#"
 name = "b"
 version = "0.1.0"
 
 [dependencies]
 a = { path = "../../a" }
-"#);
+"#,
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let err = resolve_dependencies(&manifest, &tmp).unwrap_err();
@@ -683,13 +743,17 @@ a = { path = "../../a" }
     #[test]
     fn resolve_missing_path_fails() {
         let tmp = make_temp_dir("missing_path");
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 nonexistent = { path = "does_not_exist" }
-"#);
+"#,
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let err = resolve_dependencies(&manifest, &tmp).unwrap_err();
@@ -700,20 +764,28 @@ nonexistent = { path = "does_not_exist" }
     #[test]
     fn resolve_dependency_name_mismatch_fails() {
         let tmp = make_temp_dir("name_mismatch");
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 lib = { path = "libdir" }
-"#);
+"#,
+        );
         let lib_dir = tmp.join("libdir");
         fs::create_dir_all(&lib_dir).unwrap();
         // 清单 name 与依赖键名不一致
-        write_file(&lib_dir, "lom.toml", r#"
+        write_file(
+            &lib_dir,
+            "lom.toml",
+            r#"
 name = "different_name"
 version = "0.1.0"
-"#);
+"#,
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let err = resolve_dependencies(&manifest, &tmp).unwrap_err();
@@ -767,20 +839,32 @@ version = "0.1.0"
     #[test]
     fn package_import_resolves_external_symbol() {
         let tmp = make_temp_dir("import_external");
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
 
 [dependencies]
 mathlib = { path = "mathlib" }
-"#);
+"#,
+        );
         let lib_dir = tmp.join("mathlib");
         fs::create_dir_all(&lib_dir).unwrap();
-        write_file(&lib_dir, "lom.toml", r#"
+        write_file(
+            &lib_dir,
+            "lom.toml",
+            r#"
 name = "mathlib"
 version = "0.1.0"
-"#);
-        write_file(&lib_dir, "math.lom", "fn square(x: Int) -> Int\n    x * x\nend\n");
+"#,
+        );
+        write_file(
+            &lib_dir,
+            "math.lom",
+            "fn square(x: Int) -> Int\n    x * x\nend\n",
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let graph = resolve_dependencies(&manifest, &tmp).unwrap();
@@ -798,10 +882,14 @@ version = "0.1.0"
     #[test]
     fn unknown_package_import_returns_error() {
         let tmp = make_temp_dir("unknown_pkg");
-        write_file(&tmp, "lom.toml", r#"
+        write_file(
+            &tmp,
+            "lom.toml",
+            r#"
 name = "app"
 version = "0.1.0"
-"#);
+"#,
+        );
 
         let manifest = load_manifest_file(&tmp.join("lom.toml")).unwrap();
         let graph = resolve_dependencies(&manifest, &tmp).unwrap();

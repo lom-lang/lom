@@ -49,11 +49,16 @@ pub(crate) struct CliArgs {
 }
 
 pub(crate) fn print_help(prog: &str) {
-    eprintln!("Lom 解释器 v{} — AI 原生编程语言", env!("CARGO_PKG_VERSION"));
+    eprintln!(
+        "Lom 解释器 v{} — AI 原生编程语言",
+        env!("CARGO_PKG_VERSION")
+    );
     eprintln!();
     eprintln!("用法:");
     eprintln!("  {prog} <file.lom>                运行 .lom 程序（默认）");
-    eprintln!("  {prog} <file.lom> -- <args...>   运行 .lom 程序，传递参数（通过 env::args() 读取）");
+    eprintln!(
+        "  {prog} <file.lom> -- <args...>   运行 .lom 程序，传递参数（通过 env::args() 读取）"
+    );
     eprintln!("  {prog} <file.lom> --json         仅诊断，输出结构化 JSON（不执行）");
     eprintln!("  {prog} <file.lom> --check        仅诊断，输出人类可读格式（不执行）");
     eprintln!("  {prog} info <file.lom> [--json]  导出类型信息（函数/枚举/导入签名）");
@@ -64,28 +69,52 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  {prog} fix --history [--json]    查看修复历史记录");
     eprintln!("  {prog} repl                       启动交互式 REPL（Phase 4.2）");
     eprintln!("  {prog} lsp                        启动 LSP 服务器（Phase 4.3，stdio JSON-RPC）");
-    eprintln!("  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）");
+    eprintln!(
+        "  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）"
+    );
     eprintln!("  {prog} build <file> --target wasm [-o out.wasm]  编译为 WASM 二进制（Phase 7.2）");
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
     eprintln!();
     eprintln!("子命令:");
-    eprintln!("  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema");
-    eprintln!("  doc         生成 API 文档（Phase 6.4）。默认 Markdown；--json 输出 lom-doc/v1 schema。文档注释 = 签名上方连续的 # 行");
-    eprintln!("  fmt         格式化源码（Phase 6.5）。token 流驱动，注释/字符串内容保留，只规范化缩进（4 空格/层）");
+    eprintln!(
+        "  info        导出类型信息（Phase 2.6）。默认人类可读；--json 输出 lom-info/v1 schema"
+    );
+    eprintln!(
+        "  doc         生成 API 文档（Phase 6.4）。默认 Markdown；--json 输出 lom-doc/v1 schema。文档注释 = 签名上方连续的 # 行"
+    );
+    eprintln!(
+        "  fmt         格式化源码（Phase 6.5）。token 流驱动，注释/字符串内容保留，只规范化缩进（4 空格/层）"
+    );
     eprintln!("              默认预览到 stdout；--apply 就地改写；--check 用于 CI 门禁");
-    eprintln!("  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema");
+    eprintln!(
+        "  fix         生成/应用修复计划（Phase 2.7/3.1）。默认人类可读；--json 输出 lom-fix/v1 或 lom-apply/v1 schema"
+    );
     eprintln!("              --plan：仅生成计划不应用（默认行为）");
-    eprintln!("              --apply：应用高置信度修复到源文件（Phase 3.1；M2 起迭代至收敛，上限 5 轮）");
+    eprintln!(
+        "              --apply：应用高置信度修复到源文件（Phase 3.1；M2 起迭代至收敛，上限 5 轮）"
+    );
     eprintln!("              --dry-run：与 --apply 配合，只输出预览不写文件");
-    eprintln!("              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）");
-    eprintln!("  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令");
-    eprintln!("  lsp         启动 LSP 服务器（Phase 4.3）。stdio JSON-RPC 2.0，支持 hover/completion/diagnostics");
-    eprintln!("  build       解析 lom.toml 并对依赖包源码做类型检查（Phase 4.4）。--json 输出结构化结果");
+    eprintln!(
+        "              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）"
+    );
+    eprintln!(
+        "  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令"
+    );
+    eprintln!(
+        "  lsp         启动 LSP 服务器（Phase 4.3）。stdio JSON-RPC 2.0，支持 hover/completion/diagnostics"
+    );
+    eprintln!(
+        "  build       解析 lom.toml 并对依赖包源码做类型检查（Phase 4.4）。--json 输出结构化结果"
+    );
     eprintln!();
     eprintln!("选项:");
-    eprintln!("  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）");
-    eprintln!("  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费");
+    eprintln!(
+        "  --          参数分隔符：之后的所有参数传递给 Lom 程序（通过 env::args() 读取，Phase 3.5）"
+    );
+    eprintln!(
+        "  --json     结构化 JSON 输出（诊断用 lom-diag/v1；info 用 lom-info/v1；fix 用 lom-fix/v1；apply 用 lom-apply/v1），便于 LLM 消费"
+    );
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
     eprintln!("  --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查；Phase 8 自举验收工具）");
     eprintln!("  --dump-tokens 打印 token 流到 stdout（Phase 8.1 自举 lexer 对账工具）");
@@ -268,7 +297,11 @@ pub(crate) fn merge_packages_for_wasm(
 /// 收敛条件：一轮 applied==0（无可自动修复项）或修补后源码不再变化；
 /// `max_rounds` 是震荡死循环的最后防线（修复 A 引入诊断 B、修 B 又引入 A 的场景）。
 /// 返回 (最终源码, 各轮结果)。
-pub(crate) fn apply_iterative(src: &str, path: &str, max_rounds: usize) -> (String, Vec<apply::ApplyResult>) {
+pub(crate) fn apply_iterative(
+    src: &str,
+    path: &str,
+    max_rounds: usize,
+) -> (String, Vec<apply::ApplyResult>) {
     let mut current = src.to_string();
     let mut results: Vec<apply::ApplyResult> = Vec::new();
 
@@ -300,14 +333,14 @@ pub(crate) fn apply_iterative(src: &str, path: &str, max_rounds: usize) -> (Stri
 // （标准递归下降解析器，零依赖）按 LSP 规范结构提取。
 
 /// Value 树取字段
-fn vfield<'a>(v: &'a crate::interpreter::Value, key: &str) -> Option<&'a crate::interpreter::Value> {
+fn vfield<'a>(
+    v: &'a crate::interpreter::Value,
+    key: &str,
+) -> Option<&'a crate::interpreter::Value> {
     let crate::interpreter::Value::Record { fields } = v else {
         return None;
     };
-    fields
-        .iter()
-        .find(|(k, _)| k == key)
-        .map(|(_, val)| val)
+    fields.iter().find(|(k, _)| k == key).map(|(_, val)| val)
 }
 
 /// Value 树取字符串
@@ -385,7 +418,10 @@ mod tests {
         let params = "{ \"textDocument\": { \"uri\": \"file:///a.lom\", \"languageId\": \"lom\", \"version\": 1, \"text\": \"fn main() -> Unit\\n    println(1)\\nend\\n\" } }";
         let (uri, text) = extract_did_open_params(params).expect("带空格 payload 应可提取");
         assert_eq!(uri, "file:///a.lom");
-        assert_eq!(text, "fn main() -> Unit\n    println(1)\nend\n", "\\n 应反转义为真实换行");
+        assert_eq!(
+            text, "fn main() -> Unit\n    println(1)\nend\n",
+            "\\n 应反转义为真实换行"
+        );
     }
 
     /// didChange：嵌套 contentChanges 数组取最后 text；字符串内的花括号不干扰
@@ -394,7 +430,10 @@ mod tests {
         let params = "{ \"textDocument\": { \"uri\": \"file:///b.lom\" }, \"contentChanges\": [ { \"text\": \"let s = \\\"{ not code }\\\"\\n\" } ] }";
         let (uri, text) = extract_did_change_params(params).expect("didChange 应可提取");
         assert_eq!(uri, "file:///b.lom");
-        assert_eq!(text, "let s = \"{ not code }\"\n", "字符串内花括号不应干扰提取");
+        assert_eq!(
+            text, "let s = \"{ not code }\"\n",
+            "字符串内花括号不应干扰提取"
+        );
     }
 
     /// hover：嵌套 position 对象（v1.2.1 平铺扫描碰巧能命中，结构化提取后仍正确）
@@ -415,7 +454,6 @@ mod tests {
         assert_eq!(uri, "file:///d.lom");
         assert_eq!(text, "fn f()\nend\n");
     }
-
 
     /// 两轮收敛案例：第 1 轮删意外字符（LEX005，语法期），
     /// 第 2 轮解析通过后类型检查暴露 EFF001（插效应注解），第 3 轮收敛。
@@ -447,11 +485,8 @@ mod tests {
 
     #[test]
     fn iterative_apply_clean_source_single_round() {
-        let (final_src, results) = apply_iterative(
-            "fn main() -> Unit\n    println(1)\nend\n",
-            "test.lom",
-            5,
-        );
+        let (final_src, results) =
+            apply_iterative("fn main() -> Unit\n    println(1)\nend\n", "test.lom", 5);
         assert_eq!(results.len(), 1, "干净源码一轮即收敛");
         assert_eq!(results[0].applied, 0);
         assert_eq!(final_src, "fn main() -> Unit\n    println(1)\nend\n");
@@ -488,10 +523,13 @@ mylib = { path = \"mylib\" }
 ",
         )
         .expect("写主清单失败");
-        std::fs::write(tmp.join("mylib").join("lom.toml"), "name = \"mylib\"
+        std::fs::write(
+            tmp.join("mylib").join("lom.toml"),
+            "name = \"mylib\"
 version = \"0.1.0\"
-")
-            .expect("写包清单失败");
+",
+        )
+        .expect("写包清单失败");
         std::fs::write(
             tmp.join("mylib").join("lib.lom"),
             "fn pkg_double(x: Int) -> Int
@@ -592,11 +630,7 @@ end
             "必须合并为单条注解: {:?}",
             src2
         );
-        assert!(
-            !src2.contains("] ! ["),
-            "不得出现两段叠加注解: {:?}",
-            src2
-        );
+        assert!(!src2.contains("] ! ["), "不得出现两段叠加注解: {:?}", src2);
         let final2 = apply::FinalDiag::check(&src2, "test.lom");
         assert_eq!(final2.errors, 0);
         // EFF001 修复闭环：注解补齐后 warning 也应清零

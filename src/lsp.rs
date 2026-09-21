@@ -24,7 +24,7 @@
 //   - parse_message / make_response 用于 JSON-RPC 传输
 
 use crate::ast::*;
-use crate::diagnostics::{Diagnostics, Diagnostic, Severity};
+use crate::diagnostics::{Diagnostic, Diagnostics, Severity};
 use crate::parser::Parser;
 use crate::typechecker;
 
@@ -106,7 +106,13 @@ fn make_fn_hover(f: &FnDecl) -> HoverResult {
         format!(" ! [{}]", f.effects.join(", "))
     };
     HoverResult {
-        content: format!("```lom\nfn {}({}) -> {}{}\n```", f.name, params.join(", "), ret, effects),
+        content: format!(
+            "```lom\nfn {}({}) -> {}{}\n```",
+            f.name,
+            params.join(", "),
+            ret,
+            effects
+        ),
     }
 }
 
@@ -196,11 +202,11 @@ pub enum CompletionKind {
 impl CompletionKind {
     pub fn as_lsp_number(&self) -> u32 {
         match self {
-            CompletionKind::Function => 3,  // LSP Function = 3
-            CompletionKind::Enum => 13,     // LSP Enum = 13
-            CompletionKind::Variant => 22,  // LSP EnumMember = 22
-            CompletionKind::Keyword => 14,  // LSP Keyword = 14
-            CompletionKind::Module => 9,    // LSP Module = 9
+            CompletionKind::Function => 3, // LSP Function = 3
+            CompletionKind::Enum => 13,    // LSP Enum = 13
+            CompletionKind::Variant => 22, // LSP EnumMember = 22
+            CompletionKind::Keyword => 14, // LSP Keyword = 14
+            CompletionKind::Module => 9,   // LSP Module = 9
         }
     }
 }
@@ -290,7 +296,9 @@ pub fn handle_completion(src: &str) -> Vec<CompletionItem> {
     }
 
     // 关键字
-    for kw in &["fn", "enum", "if", "while", "for", "match", "let", "return", "end", "from", "import"] {
+    for kw in &[
+        "fn", "enum", "if", "while", "for", "match", "let", "return", "end", "from", "import",
+    ] {
         items.push(CompletionItem {
             label: kw.to_string(),
             kind: CompletionKind::Keyword,
@@ -405,7 +413,10 @@ pub fn diagnostic_to_lsp_json(d: &Diagnostic, _uri: &str) -> String {
     let col = d.col.saturating_sub(1) as i64;
     format!(
         "{{\"range\":{{\"start\":{{\"line\":{},\"character\":{}}},\"end\":{{\"line\":{},\"character\":{}}}}},\"severity\":{},\"code\":\"{}\",\"source\":\"lom\",\"message\":\"{}\"}}",
-        line, col, line, col + 1,
+        line,
+        col,
+        line,
+        col + 1,
         severity,
         crate::json::escape_str(&d.code),
         crate::json::escape_str(&d.message)
@@ -541,7 +552,8 @@ end
 
     #[test]
     fn completion_returns_imports() {
-        let src = "from string import { len, upper }\nfn main() -> Unit\n    println(\"hi\")\nend\n";
+        let src =
+            "from string import { len, upper }\nfn main() -> Unit\n    println(\"hi\")\nend\n";
         let items = handle_completion(src);
         let func_labels: Vec<&str> = items
             .iter()
@@ -556,7 +568,11 @@ end
     fn diagnostics_clean_source() {
         let diags = compute_diagnostics(SAMPLE_SRC, "test.lom");
         // 无错误时返回空列表
-        let debug = diags.iter().map(|d| format!("[{}:{}] {}: {}", d.line, d.col, d.code, d.message)).collect::<Vec<_>>().join("; ");
+        let debug = diags
+            .iter()
+            .map(|d| format!("[{}:{}] {}: {}", d.line, d.col, d.code, d.message))
+            .collect::<Vec<_>>()
+            .join("; ");
         assert!(diags.is_empty(), "干净源码不应有诊断，但得到: {}", debug);
     }
 

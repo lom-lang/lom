@@ -121,7 +121,13 @@ fn dump_block(block: &Block, depth: usize, out: &mut String) {
 
 fn dump_stmt(stmt: &Stmt, depth: usize, out: &mut String) {
     match stmt {
-        Stmt::Let { mutable, name, ty, value, .. } => {
+        Stmt::Let {
+            mutable,
+            name,
+            ty,
+            value,
+            ..
+        } => {
             let annot = ty
                 .as_ref()
                 .map(|t| format!(": {}", type_str(t)))
@@ -228,7 +234,11 @@ fn dump_expr(expr: &Expr, depth: usize, out: &mut String) {
             dump_expr(inner, depth + 1, out);
         }
         ExprKind::If(if_stmt) => dump_if(if_stmt, depth, out),
-        ExprKind::Closure { params, ret_type, body } => {
+        ExprKind::Closure {
+            params,
+            ret_type,
+            body,
+        } => {
             let ps: Vec<String> = params
                 .iter()
                 .map(|p| format!("{}: {}", p.name, type_str(&p.ty)))
@@ -237,7 +247,11 @@ fn dump_expr(expr: &Expr, depth: usize, out: &mut String) {
                 .as_ref()
                 .map(type_str)
                 .unwrap_or_else(|| "_".to_string());
-            line(depth, &format!("Closure ({}) -> {}", ps.join(", "), ret), out);
+            line(
+                depth,
+                &format!("Closure ({}) -> {}", ps.join(", "), ret),
+                out,
+            );
             dump_block(body, depth + 1, out);
         }
         ExprKind::Match(m) => {
@@ -381,9 +395,7 @@ mod tests {
                             j += 1;
                         }
                         // 后跟 .digit 才是 float（1..10 中 1 是 Int）
-                        if j + 1 < bytes.len()
-                            && bytes[j] == b'.'
-                            && bytes[j + 1].is_ascii_digit()
+                        if j + 1 < bytes.len() && bytes[j] == b'.' && bytes[j + 1].is_ascii_digit()
                         {
                             j += 1;
                             while j < bytes.len() && bytes[j].is_ascii_digit() {
@@ -465,7 +477,8 @@ Program
 
     #[test]
     fn dump_let_assign_call() {
-        let src = "fn main() -> Unit\n    let mut total = 0\n    total += 1\n    println(total)\nend\n";
+        let src =
+            "fn main() -> Unit\n    let mut total = 0\n    total += 1\n    println(total)\nend\n";
         let expected = "\
 Program
   Fn main() -> Unit
@@ -508,7 +521,8 @@ Program
 
     #[test]
     fn dump_effects_and_import() {
-        let src = "from string import { len as slen }\nfn f(s: String) -> Int ! [IO]\n    slen(s)\nend\n";
+        let src =
+            "from string import { len as slen }\nfn f(s: String) -> Int ! [IO]\n    slen(s)\nend\n";
         let expected = "\
 Program
   Import string {len as slen}

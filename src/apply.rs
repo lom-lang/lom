@@ -124,9 +124,18 @@ pub fn rounds_to_json(results: &[ApplyResult], file: &str, final_diag: &FinalDia
             s.push_str("    {\n");
             s.push_str(&format!("      \"line\": {},\n", c.line));
             s.push_str(&format!("      \"col\": {},\n", c.col));
-            s.push_str(&format!("      \"action\": \"{}\",\n", action_str(c.action)));
-            s.push_str(&format!("      \"description\": {},\n", json_str(&c.description)));
-            s.push_str(&format!("      \"code\": {},\n", json_str(&c.diagnostic_code)));
+            s.push_str(&format!(
+                "      \"action\": \"{}\",\n",
+                action_str(c.action)
+            ));
+            s.push_str(&format!(
+                "      \"description\": {},\n",
+                json_str(&c.description)
+            ));
+            s.push_str(&format!(
+                "      \"code\": {},\n",
+                json_str(&c.diagnostic_code)
+            ));
             s.push_str(&format!("      \"round\": {}\n", round));
             s.push_str("    }");
             if i + 1 < all_changes.len() {
@@ -149,7 +158,11 @@ pub fn rounds_to_json(results: &[ApplyResult], file: &str, final_diag: &FinalDia
 pub fn rounds_to_human(results: &[ApplyResult], file: &str, final_diag: &FinalDiag) -> String {
     let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let mut s = String::new();
-    s.push_str(&format!("lom apply: {}（迭代 {} 轮）\n", file, results.len()));
+    s.push_str(&format!(
+        "lom apply: {}（迭代 {} 轮）\n",
+        file,
+        results.len()
+    ));
     for (i, r) in results.iter().enumerate() {
         s.push_str(&format!(
             "  round {}: applied {}, skipped {}\n",
@@ -212,11 +225,7 @@ pub fn apply_plan(plan: &FixPlan, source: &str) -> ApplyResult {
     }
 
     // 按位置降序排序（从后往前应用）
-    applicable.sort_by(|a, b| {
-        b.0.line
-            .cmp(&a.0.line)
-            .then_with(|| b.0.col.cmp(&a.0.col))
-    });
+    applicable.sort_by(|a, b| b.0.line.cmp(&a.0.line).then_with(|| b.0.col.cmp(&a.0.col)));
 
     // 计算字节偏移并应用
     let mut patched = source.to_string();
@@ -473,8 +482,16 @@ mod tests {
         let source = "fn main() -> Unit\n    println(\"hello)\nend\n";
         let plan = make_plan(vec![make_insert(2, 19, "\"")]);
         let result = apply_plan(&plan, source);
-        assert_eq!(result.applied, 1, "应应用 1 个修复，实际 {}. patched: {:?}", result.applied, result.patched_source);
-        assert!(result.patched_source.contains("\"hello\")"), "patched: {:?}", result.patched_source);
+        assert_eq!(
+            result.applied, 1,
+            "应应用 1 个修复，实际 {}. patched: {:?}",
+            result.applied, result.patched_source
+        );
+        assert!(
+            result.patched_source.contains("\"hello\")"),
+            "patched: {:?}",
+            result.patched_source
+        );
     }
 
     #[test]
@@ -493,10 +510,7 @@ mod tests {
         // 两个修复：一个在第 2 行，一个在第 3 行
         // 从后往前应用，避免位置漂移
         let source = "line1\nline2\nline3\n";
-        let plan = make_plan(vec![
-            make_insert(2, 6, "X"),
-            make_insert(3, 6, "Y"),
-        ]);
+        let plan = make_plan(vec![make_insert(2, 6, "X"), make_insert(3, 6, "Y")]);
         let result = apply_plan(&plan, source);
         assert_eq!(result.applied, 2);
         assert!(result.patched_source.contains("line2X"));
@@ -505,8 +519,8 @@ mod tests {
 
     #[test]
     fn test_skip_hint_and_low_confidence() {
-        use crate::fix::{DiagRef, Plan};
         use crate::diagnostics::{Severity, Stage};
+        use crate::fix::{DiagRef, Plan};
 
         let hint_fix = FixAction {
             description: "just a hint".to_string(),
@@ -603,7 +617,10 @@ mod tests {
             patched_source: "fixed\n".to_string(),
         };
         // M2 起 CLI 只走多轮输出（rounds_to_json），单轮 to_json 已移除
-        let final_diag = FinalDiag { errors: 0, warnings: 0 };
+        let final_diag = FinalDiag {
+            errors: 0,
+            warnings: 0,
+        };
         let json = rounds_to_json(&[result], "test.lom", &final_diag);
         assert!(json.contains("\"schema\": \"lom-apply/v1\""));
         assert!(json.contains("\"applied\": 2"));
@@ -630,14 +647,20 @@ mod tests {
             }],
             patched_source: "fn helper( ! [IO]\nend\n".to_string(),
         };
-        let final_diag = FinalDiag { errors: 1, warnings: 0 };
+        let final_diag = FinalDiag {
+            errors: 1,
+            warnings: 0,
+        };
         let json = rounds_to_json(std::slice::from_ref(&result), "test.lom", &final_diag);
         assert!(json.contains("\"ok\": false"), "json: {}", json);
         assert!(json.contains("\"final\""));
         assert!(json.contains("\"errors\": 1"));
 
         // 干净源码 + 有应用 → ok:true
-        let final_clean = FinalDiag { errors: 0, warnings: 1 };
+        let final_clean = FinalDiag {
+            errors: 0,
+            warnings: 1,
+        };
         let json2 = rounds_to_json(std::slice::from_ref(&result), "test.lom", &final_clean);
         assert!(json2.contains("\"ok\": true"), "json: {}", json2);
 
@@ -756,7 +779,12 @@ mod tests {
         assert_eq!(entries[0].applied, result.applied);
         assert!(!entries[0].changes.is_empty());
         // 每个变更都应携带诊断码 LEX001
-        assert!(entries[0].changes.iter().all(|c| c.diagnostic_code == "LEX001"));
+        assert!(
+            entries[0]
+                .changes
+                .iter()
+                .all(|c| c.diagnostic_code == "LEX001")
+        );
 
         let _ = std::fs::remove_file(&history_path);
     }
@@ -804,4 +832,3 @@ mod tests {
         assert!(result.patched_source.contains("lenght"), "源码不应被改动");
     }
 }
-

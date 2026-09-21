@@ -290,15 +290,13 @@ fn parse_change(obj: &str) -> Option<HistoryChange> {
 pub fn append_history(entry: &FixHistoryEntry, path: &Path) -> io::Result<()> {
     // 确保父目录存在
     if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
 
     let line = entry_to_json(entry) + "\n";
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     file.write_all(line.as_bytes())?;
     Ok(())
 }
@@ -443,10 +441,7 @@ mod tests {
 
     #[test]
     fn test_entry_to_json_basic() {
-        let entry = make_entry(
-            "main.lom",
-            vec![make_change("LEX001", "insert", 3)],
-        );
+        let entry = make_entry("main.lom", vec![make_change("LEX001", "insert", 3)]);
         let json = entry_to_json(&entry);
         assert!(json.contains("\"timestamp\":\"2024-08-08T10:30:00Z\""));
         assert!(json.contains("\"file\":\"main.lom\""));
@@ -559,7 +554,8 @@ mod tests {
 
     #[test]
     fn test_append_creates_parent_dir() {
-        let dir = std::env::temp_dir().join(format!("lom_fix_history_test_dir_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("lom_fix_history_test_dir_{}", std::process::id()));
         let path = dir.join("fix-history.jsonl");
         let _ = fs::remove_dir_all(&dir);
 
@@ -575,7 +571,10 @@ mod tests {
 
     #[test]
     fn test_to_json_output() {
-        let entries = vec![make_entry("main.lom", vec![make_change("LEX001", "insert", 3)])];
+        let entries = vec![make_entry(
+            "main.lom",
+            vec![make_change("LEX001", "insert", 3)],
+        )];
         let json = to_json(&entries);
         assert!(json.contains("\"schema\": \"lom-fix-history/v1\""));
         assert!(json.contains("\"count\": 1"));
@@ -600,7 +599,10 @@ mod tests {
 
     #[test]
     fn test_to_human_output() {
-        let entries = vec![make_entry("main.lom", vec![make_change("LEX001", "insert", 3)])];
+        let entries = vec![make_entry(
+            "main.lom",
+            vec![make_change("LEX001", "insert", 3)],
+        )];
         let human = to_human(&entries);
         assert!(human.contains("修复历史"));
         assert!(human.contains("main.lom"));

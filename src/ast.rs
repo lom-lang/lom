@@ -24,7 +24,12 @@ impl Span {
     /// 保留给工具链/测试的便捷构造（解释器主路径未用）
     #[allow(dead_code)]
     pub fn at(line: usize, col: usize) -> Self {
-        Span { line, col, end_line: line, end_col: col }
+        Span {
+            line,
+            col,
+            end_line: line,
+            end_col: col,
+        }
     }
 }
 
@@ -120,10 +125,10 @@ pub enum Type {
     Bool,
     String,
     Unit,
-    Named(String),                  // 用户定义类型名（含枚举名）
-    Option(Box<Type>),              // Option<T>
-    Result(Box<Type>, Box<Type>),   // Result<T, E>
-    Generic(String, Vec<Type>),     // 用户泛型类型 Name<args>
+    Named(String),                // 用户定义类型名（含枚举名）
+    Option(Box<Type>),            // Option<T>
+    Result(Box<Type>, Box<Type>), // Result<T, E>
+    Generic(String, Vec<Type>),   // 用户泛型类型 Name<args>
     /// 结构记录类型：{x: Int, y: Int}
     Record(Vec<(String, Type)>),
     /// 元组类型：(Int, String)
@@ -167,10 +172,7 @@ pub enum Stmt {
     },
     /// Phase 5.1: 元组解构绑定 let (a, b, ...) = expr
     /// value 必须求值为元组，数量须与 names 一致；不支持 mut 与类型注解
-    LetDestruct {
-        names: Vec<String>,
-        value: Expr,
-    },
+    LetDestruct { names: Vec<String>, value: Expr },
     /// 赋值：name = expr（name 必须已声明，否则 NAM003；目标为不可变 let 时 typechecker 报 MUT001 warning）
     Assign {
         target: String,
@@ -183,7 +185,11 @@ pub enum Stmt {
     /// while expr block end
     While { cond: Expr, body: Block },
     /// for x in expr block end
-    For { var: String, iter: Expr, body: Block },
+    For {
+        var: String,
+        iter: Expr,
+        body: Block,
+    },
     /// return [expr]
     Return(Option<Expr>),
     /// 裸表达式语句
@@ -221,7 +227,10 @@ impl Expr {
     /// 保留给将来需要凭空造节点的工具链（LSP 补全、fix 动作展开）
     #[allow(dead_code)]
     pub fn placeholder(kind: ExprKind) -> Expr {
-        Expr { kind, span: Span::default() }
+        Expr {
+            kind,
+            span: Span::default(),
+        }
     }
 }
 
@@ -241,11 +250,19 @@ pub enum ExprKind {
     /// 标识符引用
     Ident(String),
     /// 二元运算：a op b
-    Binary { op: BinOp, left: Box<Expr>, right: Box<Expr> },
+    Binary {
+        op: BinOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     /// 一元运算：op a
     Unary { op: UnaryOp, expr: Box<Expr> },
     /// 逻辑运算：and / or（短路）
-    Logical { op: LogicalOp, left: Box<Expr>, right: Box<Expr> },
+    Logical {
+        op: LogicalOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     /// 函数调用：callee(args)
     Call { callee: Box<Expr>, args: Vec<Expr> },
     /// 索引：expr[index]
@@ -257,7 +274,11 @@ pub enum ExprKind {
     /// if 表达式（作为值使用）
     If(Box<IfStmt>),
     /// 闭包：fn(params) -> type block
-    Closure { params: Vec<Param>, ret_type: Option<Type>, body: Box<Block> },
+    Closure {
+        params: Vec<Param>,
+        ret_type: Option<Type>,
+        body: Box<Block>,
+    },
     /// match 表达式
     Match(Box<MatchExpr>),
     /// `?` 错误传播：expr? — Ok/Some 解包，Err/None 提前返回
@@ -322,23 +343,27 @@ pub enum Pattern {
     Wildcard,
     /// 枚举变体模式：Name(sub1, sub2) 或 Name（无参数）。
     /// name_span 定位变体名 token（M2：NAM004 变体版诊断与 fix 单点替换用）
-    Variant { name: String, sub: Vec<Pattern>, name_span: Span },
+    Variant {
+        name: String,
+        sub: Vec<Pattern>,
+        name_span: Span,
+    },
 }
 
 /// 二元运算符
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
-    Add,    // +
-    Sub,    // -
-    Mul,    // *
-    Div,    // /
-    Mod,    // %
-    Eq,     // ==
-    NotEq,  // !=
-    Lt,     // <
-    Gt,     // >
-    LtEq,   // <=
-    GtEq,   // >=
+    Add,   // +
+    Sub,   // -
+    Mul,   // *
+    Div,   // /
+    Mod,   // %
+    Eq,    // ==
+    NotEq, // !=
+    Lt,    // <
+    Gt,    // >
+    LtEq,  // <=
+    GtEq,  // >=
 }
 
 /// 一元运算符
