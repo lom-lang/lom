@@ -16,6 +16,10 @@ Thanks for your interest in Lom — an AI-native programming language. This docu
    ```
 5. **Comments and diagnostics are written for both humans and LLMs.** Keep them precise; error messages follow the `<CATEGORY><NUMBER>` diagnostic-code scheme (`NAM003`, `TYPE001`, ...).
 
+## Maintainer workflow
+
+The full maintainer loop (per-change regression gates, adversarial review cadence, and the handoff checklist centered on `docs/HANDOFF_PROMPT.md`) is codified in [`docs/HANDOVER.md` §12](docs/HANDOVER.md). Contributors proposing repeated changes will be held to the same regression trilogy above.
+
 ## Reporting bugs
 
 Open a GitHub issue with:
