@@ -224,6 +224,23 @@ pub fn apply_plan(plan: &FixPlan, source: &str) -> ApplyResult {
         };
     }
 
+    // R73（十二审）：等价动作去重——同一声明在同轮收到多条 MUT001 诊断时，
+    // 每条诊断独立产出同坐标/同文本/同类型的 Replace，不去重会叠加应用产出
+    // `let mut mut x`（PARSE001 损坏源码落盘）。完全等价（动作类型 + 起止
+    // 位置 + 文本全同）的动作只应用一次；不同文本/类型的同位置动作（如
+    // LEX001 与 PARSE001 同列插入的顺序依赖形态）不去重。
+    let mut seen = std::collections::HashSet::new();
+    applicable.retain(|(fix, _)| {
+        seen.insert((
+            action_str(fix.action),
+            fix.line,
+            fix.col,
+            fix.end_line,
+            fix.end_col,
+            &fix.text,
+        ))
+    });
+
     // 按位置降序排序（从后往前应用）
     applicable.sort_by(|a, b| b.0.line.cmp(&a.0.line).then_with(|| b.0.col.cmp(&a.0.col)));
 

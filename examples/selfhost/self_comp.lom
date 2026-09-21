@@ -2404,7 +2404,7 @@ fn vt_hex(vt: String) -> String
 end
 
 # ExCall 的类型辅助：println → void；用户函数 → 签名 ret
-fn infer_call(name: String, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn infer_call(name: String, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if name == "println"
         Ok("void")
     else
@@ -2416,7 +2416,7 @@ fn infer_call(name: String, fns: Map<String, {idx: Int, ret: String, nprm: Int}>
 end
 
 # 表达式类型综合；env: Map<name, {slot, vt}>；fns: Map<name, {idx, ret, nprm}>
-fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match e
         ExInt(_) => Ok("i64")
         ExFloat(_) => Ok("f64")
@@ -2461,7 +2461,7 @@ end
 
 # ---- X2：表达式编译（产物 hex；值留栈上；void 不产值） ----
 
-fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match e
         ExInt(n) => Ok("42" + sleb128_hex(n))
         ExFloat(s) => Ok("44" + f64_bits_le(parse_float_str(s)))
@@ -2491,7 +2491,7 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {i
     end
 end
 
-fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
         return Err(subset_err("二元运算 '" + op + "'"))
     end
@@ -2512,7 +2512,7 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     end
 end
 
-fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match callee
         ExIdent(name, _, _) =>
             if name == "println"
@@ -2521,10 +2521,27 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
             match map_get(fns, name)
                 None => Err("调用未知函数 '" + name + "'")
                 Some(fi) =>
+                    # R74（十二审）：调用点校验 arity 与逐实参类型——不符即
+                    # 拒绝，不产坏 wasm（此前 f(1) 传 Float 形参/多传参均
+                    # COMPILED，失败面推迟到实例化）。与 R68 同为编译期
+                    # 严格校验：宿主侧 TYPE003 warning + 运行提升的渐进式
+                    # 语义是子集外的信任边界（RFC-0004 修订 5 登记）。
+                    if list_length(args) != fi.nprm
+                        return Err(subset_err("调用 '" + name + "' 实参数不符（期望 " + fi.nprm + " 得 " + list_length(args) + "）"))
+                    end
+                    let want = split(fi.prms, ",")
                     let mut out = ""
                     let mut i = 0
                     while i < list_length(args)
-                        out = out + comp_ex(list_get(args, i), env, fns)?
+                        let a = list_get(args, i)
+                        let at = infer_ex(a, env, fns)?
+                        if fi.nprm > 0
+                            let w = list_get(want, i)
+                            if at != w
+                                return Err(subset_err("调用 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
+                            end
+                        end
+                        out = out + comp_ex(a, env, fns)?
                         i = i + 1
                     end
                     Ok(out + "10" + leb128_hex(fi.idx))
@@ -2535,7 +2552,7 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
     end
 end
 
-fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if list_length(args) != 1
         return Err("println 期望 1 个参数")
     end
@@ -2601,7 +2618,7 @@ end
 # （此前直接采信注解定槽位，`let x: Int = 1.5` 产 i64 槽存 f64 值的
 # 非法 wasm，失败面推迟到实例化）。与宿主"注解不匹配仅 TYPE001 warning、
 # 运行时值胜出"的渐进式语义是已登记的信任边界差异（RFC-0004 修订 4）。
-fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match tyo
         None => infer_ex(ex, env, fns)
         Some(tt) =>
@@ -2620,7 +2637,7 @@ end
 # 后 frag? 传播）——此前 match 位于语句位置，StReturn/_ 两臂（及 StAssign
 # 臂内层 match 的 None 臂）构造的 Err 是被丢弃的死值，if/while/for/return
 # 语句静默蒸发后照常 COMPILED，产出行为错误的 wasm。
-fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
             let mut out = ""
@@ -2664,7 +2681,7 @@ fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, 
     end
 end
 
-fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>, out: String, ret_vt: String) -> Result<String, String>
+fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, out: String, ret_vt: String) -> Result<String, String>
     match tail
         None => Ok(out)
         Some(te) =>
@@ -2686,7 +2703,7 @@ fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: M
 end
 
 # 编译单个函数体 → code section 条目（bodysize + locals 声明 + 指令 + end）
-fn comp_one_fn(params: List<Prm>, ret: Option<Ty>, body: Blk, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+fn comp_one_fn(params: List<Prm>, ret: Option<Ty>, body: Blk, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     let env = map_empty()
     let locals = map_empty()
     let localvt = map_empty()
@@ -2742,8 +2759,8 @@ fn sect(id: String, content: String) -> String
     id + leb128_hex(len(content) / 2) + content
 end
 
-# 收集签名：fns: Map<name, {idx, ret, nprm}>（idx = 2+序，前两个是 print 导入）
-fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+# 收集签名：fns: Map<name, {idx, ret, nprm, prms}>（idx = 2+序，前两个是 print 导入；prms = 形参 vt 逗号串——R74 调用点校验用）
+fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match prg
         Prg(items) =>
             let mut idx = 2
@@ -2754,7 +2771,32 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) 
                             return Err("用户函数不得命名 'println'")
                         end
                         let rv = tyopt_vt(ret)?
-                        map_set(fns, name, {idx: idx, ret: rv, nprm: list_length(params)})
+                        # R74（十二审）：摘要携带形参 vt 逗号串——调用点
+                        # 类型/arity 校验的事实源（Int→i64 / Float→f64，
+                        # 其余在签名层即拒，与 fn_type_entry 同文案）
+                        let mut pv = ""
+                        let mut k = 0
+                        for p in params
+                            match p
+                                Prm(_, TyInt) =>
+                                    if k > 0
+                                        pv = pv + ","
+                                    end
+                                    pv = pv + "i64"
+                                end
+                                Prm(_, TyFloat) =>
+                                    if k > 0
+                                        pv = pv + ","
+                                    end
+                                    pv = pv + "f64"
+                                end
+                                Prm(_, _) =>
+                                    return Err(subset_err("void/子集外参数类型"))
+                                end
+                            end
+                            k = k + 1
+                        end
+                        map_set(fns, name, {idx: idx, ret: rv, nprm: list_length(params), prms: pv})
                         idx = idx + 1
                     end
                     _ => ()
@@ -2833,7 +2875,7 @@ fn build_module(prg: Prg) -> Result<String, String>
             # export section：main
             let mi = match map_get(fns, "main")
                 Some(f) => f
-                None => {idx: 2, ret: "void", nprm: 0}
+                None => {idx: 2, ret: "void", nprm: 0, prms: ""}
             end
             let exp_c = "01" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
             # code section

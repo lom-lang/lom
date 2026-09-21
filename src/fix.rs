@@ -125,6 +125,9 @@ pub struct AssignBind {
     /// 绑定解析到函数顶层扁平作用域为 true（可走 let_decls 命中）；
     /// 闭包体/match 臂声明或 for 变量遮蔽等嵌套层为 false
     pub top_level: bool,
+    /// R75（十二审）：赋值行之前最近的同层同名绑定是解构绑定
+    /// （恒不可变且无 mut 语法）——该 MUT001 不可能由加 mut 治疗
+    pub destruct_shadowed: bool,
 }
 
 /// 收集块内全部非闭包 `let` 声明（R62）：
@@ -161,23 +164,54 @@ fn collect_let_decls(block: &ast::Block, out: &mut Vec<LetDecl>) {
     }
 }
 
-/// 收集一个扁平作用域块内的全部绑定名（let/解构/for 变量），**不进入
+/// 同层一条绑定的序信息（R75/十二审）：名字 + 声明行 + 绑定种类。
+/// 行号用于"赋值行之前最近的同名绑定"判定（Lom 语句换行分隔，同一层
+/// 内同名声明不会同行）；kind 区分解构绑定（恒不可变且无 mut 语法，
+/// 对它的 MUT001 不可能由加 mut 治疗）。
+#[derive(Clone, Copy, PartialEq)]
+enum FlatBindKind {
+    Let,
+    Destruct,
+    Other,
+}
+
+struct FlatBind {
+    name: String,
+    line: usize,
+    kind: FlatBindKind,
+}
+
+/// 收集一个扁平作用域块内的全部绑定（let/解构/for 变量，带序），**不进入
 /// 闭包体与 match 臂**（独立子作用域）；if/while/for 语句块共用当前层，
-/// 递归。绑定名集合与 typechecker 的 define 面对齐（整层集合，顺序无关
-/// ——MUT001 只在赋值处名字已解析命中时产生）。
-fn flat_binds(block: &ast::Block, out: &mut std::collections::HashSet<String>) {
+/// 递归。绑定面与 typechecker 的 define 对齐；行号取各语句自带的表达式
+/// span 首 token 行（LetDestruct/For 无语句 span，用初值/iter 表达式行）。
+fn flat_binds(block: &ast::Block, out: &mut Vec<FlatBind>) {
     for stmt in &block.stmts {
         match stmt {
-            ast::Stmt::Let { name, .. } => {
-                out.insert(name.clone());
+            ast::Stmt::Let { name, span, .. } => {
+                out.push(FlatBind {
+                    name: name.clone(),
+                    line: span.line,
+                    kind: FlatBindKind::Let,
+                });
             }
-            ast::Stmt::LetDestruct { names, .. } => {
+            ast::Stmt::LetDestruct { names, value } => {
                 for n in names {
-                    out.insert(n.clone());
+                    out.push(FlatBind {
+                        name: n.clone(),
+                        line: value.span.line,
+                        kind: FlatBindKind::Destruct,
+                    });
                 }
             }
-            ast::Stmt::For { var, body, .. } => {
-                out.insert(var.clone());
+            ast::Stmt::For {
+                var, iter, body, ..
+            } => {
+                out.push(FlatBind {
+                    name: var.clone(),
+                    line: iter.span.line,
+                    kind: FlatBindKind::Other,
+                });
                 flat_binds(body, out);
             }
             ast::Stmt::If(ifs) => {
@@ -202,7 +236,7 @@ fn flat_binds(block: &ast::Block, out: &mut std::collections::HashSet<String>) {
 /// for 变量在循环期间遮蔽外层同名绑定（define 覆盖、循环外恢复可见）。
 fn collect_assign_binds(
     block: &ast::Block,
-    path: &mut Vec<std::collections::HashSet<String>>,
+    path: &mut Vec<Vec<FlatBind>>,
     out: &mut Vec<AssignBind>,
 ) {
     for stmt in &block.stmts {
@@ -215,7 +249,7 @@ fn collect_assign_binds(
 
 fn collect_assign_binds_stmt(
     stmt: &ast::Stmt,
-    path: &mut Vec<std::collections::HashSet<String>>,
+    path: &mut Vec<Vec<FlatBind>>,
     out: &mut Vec<AssignBind>,
 ) {
     match stmt {
@@ -232,16 +266,29 @@ fn collect_assign_binds_stmt(
             // 该路径不产生 MUT001，防御性走既有零命中分支。
             let mut top_level = true;
             for (i, layer) in path.iter().enumerate().rev() {
-                if layer.contains(target.as_str()) {
+                if layer.iter().any(|b| b.name == target.as_str()) {
                     top_level = i == 0;
                     break;
                 }
+            }
+            // R75（十二审）：同层解构遮蔽——顶层内赋值行之前最近的同名绑定
+            // 是 LetDestruct（恒不可变且无 mut 语法）时，加 mut 修法无的
+            // 放矢，降级 hint。let/for 变量/参数的最近绑定行为不变（let
+            // 之间保持既有多命中 hint 保守面）。
+            let mut destruct_shadowed = false;
+            if top_level && let Some(layer) = path.first() {
+                let recent = layer
+                    .iter()
+                    .filter(|b| b.name == target.as_str() && b.line < span.line)
+                    .max_by_key(|b| b.line);
+                destruct_shadowed = matches!(recent, Some(b) if b.kind == FlatBindKind::Destruct);
             }
             out.push(AssignBind {
                 line: span.line,
                 col: span.col,
                 name: target.clone(),
                 top_level,
+                destruct_shadowed,
             });
             walk_expr_binds(value, path, out);
         }
@@ -262,9 +309,11 @@ fn collect_assign_binds_stmt(
             walk_expr_binds(iter, path, out);
             // for 变量遮蔽层：循环体内的重赋值绑定的是 for 变量（恒不可变），
             // 与外层同名 let 无关；iter 在外层求值（遮蔽层之外）
-            let mut layer = std::collections::HashSet::new();
-            layer.insert(var.clone());
-            path.push(layer);
+            path.push(vec![FlatBind {
+                name: var.clone(),
+                line: 0,
+                kind: FlatBindKind::Other,
+            }]);
             collect_assign_binds(body, path, out);
             path.pop();
         }
@@ -279,11 +328,7 @@ fn collect_assign_binds_stmt(
 }
 
 /// 遍历表达式的全部子节点收集赋值归属；闭包体与 match 臂切换子层
-fn walk_expr_binds(
-    expr: &ast::Expr,
-    path: &mut Vec<std::collections::HashSet<String>>,
-    out: &mut Vec<AssignBind>,
-) {
+fn walk_expr_binds(expr: &ast::Expr, path: &mut Vec<Vec<FlatBind>>, out: &mut Vec<AssignBind>) {
     use ast::ExprKind;
     match &expr.kind {
         ExprKind::Binary { left, right, .. }
@@ -331,9 +376,13 @@ fn walk_expr_binds(
             }
         }
         ExprKind::Closure { params, body, .. } => {
-            let mut layer = std::collections::HashSet::new();
+            let mut layer = Vec::new();
             for p in params {
-                layer.insert(p.name.clone());
+                layer.push(FlatBind {
+                    name: p.name.clone(),
+                    line: 0,
+                    kind: FlatBindKind::Other,
+                });
             }
             flat_binds(body, &mut layer);
             path.push(layer);
@@ -343,7 +392,7 @@ fn walk_expr_binds(
         ExprKind::Match(m) => {
             walk_expr_binds(&m.scrutinee, path, out);
             for arm in &m.arms {
-                let mut layer = std::collections::HashSet::new();
+                let mut layer = Vec::new();
                 pattern_binds(&arm.pattern, &mut layer);
                 if let ast::MatchArmBody::Block(b) = &arm.body {
                     flat_binds(b, &mut layer);
@@ -369,10 +418,14 @@ fn walk_expr_binds(
 }
 
 /// 提取模式绑定的名字（Binder 递归 Variant 子模式）
-fn pattern_binds(p: &ast::Pattern, out: &mut std::collections::HashSet<String>) {
+fn pattern_binds(p: &ast::Pattern, out: &mut Vec<FlatBind>) {
     match p {
         ast::Pattern::Binder(n) => {
-            out.insert(n.clone());
+            out.push(FlatBind {
+                name: n.clone(),
+                line: 0,
+                kind: FlatBindKind::Other,
+            });
         }
         ast::Pattern::Variant { sub, .. } => {
             for s in sub {
@@ -411,9 +464,13 @@ pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
             let mut let_decls = Vec::new();
             collect_let_decls(&f.body, &mut let_decls);
             // R65（十一审）：赋值绑定归属表——path[0] = 参数 + 函数体扁平 define 名
-            let mut top = std::collections::HashSet::new();
+            let mut top = Vec::new();
             for p in &f.params {
-                top.insert(p.name.clone());
+                top.push(FlatBind {
+                    name: p.name.clone(),
+                    line: 0,
+                    kind: FlatBindKind::Other,
+                });
             }
             flat_binds(&f.body, &mut top);
             let mut path = vec![top];
@@ -1216,11 +1273,23 @@ fn fix_mut001_add_mut(
     // 在"嵌套作用域内诊断 + 外层同名 let"边界错选目标，且已可变声明仍
     // 计入命中集导致迭代重应用把源码改坏成 let mut mut x（PARSE001）。
     // 归属表查不到（AST 遍历遗漏或异常形态）同样降级——保守方向。
-    let bind_top_level = owner
+    let bind = owner
         .assign_binds
         .iter()
-        .find(|b| b.line == d.line && b.col == d.col && b.name == name)
-        .map(|b| b.top_level);
+        .find(|b| b.line == d.line && b.col == d.col && b.name == name);
+    // R75（十二审）：同层解构遮蔽——最近的同名绑定是解构（恒不可变且无
+    // mut 语法）时降级 hint，v1.2.4 按名唯一命中外层 let 错选目标
+    // （诊断不消、ok:true 的无效修复）。
+    if bind.is_some_and(|b| b.destruct_shadowed) {
+        return vec![hint_only(
+            &format!(
+                "不可变变量 '{}' 被重赋值：最近的同名绑定是 let 解构（恒不可变，无 mut 语法）——改用普通 let mut 声明或新变量",
+                name
+            ),
+            Confidence::Medium,
+        )];
+    }
+    let bind_top_level = bind.map(|b| b.top_level);
     if bind_top_level != Some(true) {
         return vec![hint_only(
             &format!(
@@ -3051,6 +3120,180 @@ mod tests {
         let result = apply_one_diag(src, 5, 9);
         assert_eq!(result.applied, 0);
         assert_eq!(result.patched_source, src, "let mut mut 形态永不可能出现");
+    }
+
+    /// R73（十二审）探针：同一 let 变量被重赋两次——同轮两条 MUT001 诊断
+    /// 各自产出同坐标 High Replace。v1.2.4 的 apply_plan 不去重，单次
+    /// `--apply` 叠加应用两次产出 `let mut mut x`（PARSE001 损坏落盘）。
+    /// 绝不能这样修：等价动作（同类型+同起止位置+同文本）只应用一次；
+    /// applied=1、文件变 `let mut x`、`let mut mut` 永不出现在产物里。
+    #[test]
+    fn r73_same_round_duplicate_replaces_deduped() {
+        let src = "fn f() -> Int\n    let x = 1\n    x = 2\n    x = 3\n    x\nend\n";
+        // 两条诊断（3:5 与 4:5），同一份原文 AST——同轮双 Replace 形态
+        let mut diags = Diagnostics::new("test.lom");
+        for line in [3usize, 4usize] {
+            diags.diagnostics.push(Diagnostic {
+                severity: Severity::Warning,
+                stage: Stage::Type,
+                code: "MUT001".to_string(),
+                message: "赋值给不可变变量 'x'（声明时未标 mut）".to_string(),
+                file: "test.lom".to_string(),
+                line,
+                col: 5,
+                source_line: None,
+                is_hole: false,
+                hint: None,
+            });
+        }
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let plan = generate_plan(&diags, src, &fns);
+        let result = crate::apply::apply_plan(&plan, src);
+        assert_eq!(
+            result.applied, 1,
+            "等价 Replace 应去重为一次: {:?}",
+            result.changes
+        );
+        assert!(
+            result.patched_source.contains("let mut x = 1"),
+            "应产出合法的 let mut: {}",
+            result.patched_source
+        );
+        assert!(
+            !result.patched_source.contains("let mut mut"),
+            "let mut mut 形态不得出现在产物里: {}",
+            result.patched_source
+        );
+    }
+
+    /// R75（十二审）探针：同层解构遮蔽——`let x = 1` 后 `let (x, y) = ...`
+    /// 重新绑定 x（恒不可变且无 mut 语法），再 `x = x + 1`。v1.2.4 按名
+    /// 唯一命中外层 let 错选目标（applied=1 改行 2、原诊断不消、ok:true
+    /// 的无效修复）。绝不能这样修：不得产出任何非 Hint 动作。
+    #[test]
+    fn r75_mut001_destructure_shadowing_degrades_to_hint() {
+        let src = "fn f() -> Int
+    let x = 1
+    let (x, y) = (5, 6)
+    x = x + 1
+    x + y
+end
+";
+        // 诊断在解构后的赋值行（4:5）——最近的同名绑定是解构
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            4,
+            5,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "解构遮蔽的重赋值不得触发外层 let 改写: {:?}",
+            fixes
+        );
+        assert!(
+            fixes[0].description.contains("解构"),
+            "hint 应说明解构绑定不可加 mut: {}",
+            fixes[0].description
+        );
+        let result = apply_one_diag(src, 4, 5);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R75 正例不倒：解构在赋值**之后**（赋值绑定的是它前面的 let）——
+    /// 序判定不误伤，仍走唯一命中 High Replace。
+    #[test]
+    fn r75_mut001_assign_before_destructure_still_replaces() {
+        let src = "fn f() -> Int
+    let x = 1
+    x = 2
+    let (x, y) = (5, 6)
+    x + y
+end
+";
+        // 诊断在赋值行（3:5）——最近的同名绑定是行 2 的 let
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2, "应命中解构之前的 let 声明行");
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// R73 边界：不同文本的同位置动作**不去重**——LEX001 行尾补引号与
+    /// PARSE001 插 ')' 的同列插入是顺序依赖的既有形态（M4 教训），等价
+    /// 去重只合并完全相同（类型+位置+文本）的动作。
+    #[test]
+    fn r73_equivalent_only_exact_duplicates_merged() {
+        use crate::apply::{action_str, apply_plan};
+        use crate::fix::{DiagRef, Plan};
+        // 两条同位置同文本 Insert + 一条同位置不同文本 Insert：只有前两条合并
+        let plan = FixPlan {
+            file: "t.lom".to_string(),
+            ok: true,
+            plans: vec![
+                Plan {
+                    diagnostic: DiagRef {
+                        code: "LEX001".into(),
+                        severity: crate::diagnostics::Severity::Error,
+                        stage: crate::diagnostics::Stage::Lex,
+                        line: 1,
+                        col: 10,
+                        message: "m1".into(),
+                    },
+                    fixes: vec![FixAction {
+                        description: "d1".into(),
+                        action: ActionKind::Insert,
+                        line: 1,
+                        col: 10,
+                        end_line: None,
+                        end_col: None,
+                        text: Some("\"".into()),
+                        confidence: Confidence::High,
+                    }],
+                    retry: false,
+                },
+                Plan {
+                    diagnostic: DiagRef {
+                        code: "LEX001".into(),
+                        severity: crate::diagnostics::Severity::Error,
+                        stage: crate::diagnostics::Stage::Lex,
+                        line: 1,
+                        col: 10,
+                        message: "m2".into(),
+                    },
+                    fixes: vec![FixAction {
+                        description: "d2".into(),
+                        action: ActionKind::Insert,
+                        line: 1,
+                        col: 10,
+                        end_line: None,
+                        end_col: None,
+                        text: Some("\"".into()),
+                        confidence: Confidence::High,
+                    }],
+                    retry: false,
+                },
+            ],
+        };
+        let src = "println(\"abc";
+        let result = apply_plan(&plan, src);
+        assert_eq!(result.applied, 1, "同位置同文本 Insert 只应用一次");
+        // col 10（'a' 前）单次插入一个引号；未去重时该位置会叠出多个引号
+        assert_eq!(
+            result.patched_source, "println(\"\"abc",
+            "应恰好插入一个引号: {}",
+            result.patched_source
+        );
+        let _ = action_str(ActionKind::Insert);
     }
 
     /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan

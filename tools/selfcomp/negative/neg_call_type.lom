@@ -1,0 +1,6 @@
+fn f(x: Float) -> Float
+    x + 0.5
+end
+fn main() -> Unit ! [IO]
+    println(f(1))
+end
