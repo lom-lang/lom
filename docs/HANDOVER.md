@@ -118,7 +118,8 @@ python tools/diff_test.py --rounds 20 --seed-base 1 --ci   # D 包差分冒烟�
 python tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci   # D5 包模式冒烟（CI 同款；全量口径 --rounds 200 ×多 seed 段）
 # 覆盖率（按需）：rustup component add llvm-tools-preview 后
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
-python tools/eval_prompt_check.py --bin .	argetelease\lom.exe   # R60：error_repair prompt 内嵌诊断 vs 真实 lom --json（24/24）
+python tools/eval_prompt_check.py --bin .	arget
+elease\lom.exe   # R60：error_repair prompt 内嵌诊断 vs 真实 lom --json（24/24）
 python tools\doc_audit.py                               # 对账：文档数字 65 项（原 63 + 九审新增 SPEC_FOR_AI 当前 eval 口径 ×1 + ci.yml WASM eval step 计数 ×1；其余为 eval/dump/.lom/行数/版本/changelog/测试数/claims/源码计数/SPEC 尺寸/自指/门面版本位）——已在 CI doc-gates job 常驻
 ```
 
@@ -342,7 +343,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 513/513（另有 tests/ 集成 ×3）、零 warning、`./target/release/lom.exe --version` 显示 1.2.1
 3. 跑 §2.2 全量回归确认基线；注意 `cargo fmt --check` 是 R61 已知失败，不得误报成新回归
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
-5. **当前状态：v1.2.1、语言面/发布线冻结；九轮审查，R1-R54 已关闭；R55 已整改关闭（2026-09-21，九审三探针负向锁定 + apply ok 语义修正），R56-R61 open。第九轮把现状评级从 A- 校正为 B；R56（panic exit 0）/R57（缺 end 静默通过）/R58（LSP 传输）三项 P1 仍有真实最小复现，不要把 495/495 或 CI 绿解释为这些边界已覆盖。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5709 行；六模式 gate 在位）；doc_audit 现为 65 项。** L2 未授权，发布冻结不动。下一任只在用户裁决后按 R56→R61 顺序实施，历史基线与探针细节见本节前述文档。
+5. **当前状态：v1.2.1、语言面/发布线冻结；九轮审查，R1-R54 已关闭；R55 已整改关闭（2026-09-21，九审三探针负向锁定 + apply ok 语义修正），R56-R61 open。第九轮把现状评级从 A- 校正为 B；R56（panic exit 0）/R57（缺 end 静默通过）/R58（LSP 传输）三项 P1 仍有真实最小复现，不要把 495/495 或 CI 绿解释为这些边界已覆盖。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5714 行；六模式 gate 在位）；doc_audit 现为 65 项。** L2 未授权，发布冻结不动。下一任只在用户裁决后按 R56→R61 顺序实施，历史基线与探针细节见本节前述文档。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -552,5 +553,11 @@ end
   强制 stdout/stderr UTF-8；默认命令必须在提交前实跑。
 - `cargo fmt --check` 当前大量失败且不在 CI。格式化应另开机械提交，绝不混入 R55-R60
   语义修复，否则审查 diff 被淹没。
+- **R57 整改教训（CI 三连红，2026-09-21）**：宿主 parser 行为改动必须检查**自举对齐**——
+  R57 修宿主 parse_block 的 EOF 静默闭合时漏了 self_interp.lom 的同款逻辑，
+  `verify_selfhost --diags`（宿主 vs 自举诊断对账）当场 FAIL，而维护者提交前只跑了
+  dump/tokens/run/static 四模式、**漏跑 --diags**，三连提交三连红。处方：**§2.2 的
+  selfhost 六模式在提交前必须逐模式全跑**（--wasm 慢也要跑）；"宿主 parser/诊断
+  行为改动"要默认怀疑自举侧同款偏差（三实现：宿主/WASM/自举——R59 的 json 同理）。
 
 ---

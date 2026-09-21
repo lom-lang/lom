@@ -1660,6 +1660,11 @@ fn parse_block(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<Stri
     end
     if chk(ts, n, pm, TkEnd)
         adv(ts, n, pm)
+    elif chk(ts, n, pm, TkEof)
+        # R57（九审）：EOF 不得静默闭合块（与宿主 parse_block 对齐：
+        # 记录诊断但保留已解析块——带洞语义，fn 项不丢）
+        let t = tok_at(ts, n, get_pos(pm))
+        em_add(em, classify_parse_msg("期望 'end' (块闭合)，得到 文件结束"), t.ln, t.cl, "期望 'end' (块闭合)，得到 文件结束")
     end
     Ok(BlkOf(rev_st(stmts), tail))
 end

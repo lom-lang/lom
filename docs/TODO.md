@@ -85,6 +85,11 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   strict 模式 Err，容错模式记录错误但保留已解析块——带洞语义，fn 项不丢，
   深嵌套超限跳 EOF 场景无错误风暴）。这是把实现向冻结 grammar 对齐，
   不是语言面变化（不需 RFC）。WASM 侧同源 parser 修复自动传导。
+- **补丁（2026-09-21 晚）**：宿主修复后 `verify_selfhost --diags` 对
+  fix_corpus 07 出现宿主 2 条 vs 自举 1 条不对齐（自举 parse_block 漏同款
+  修复，CI 三连红暴露——维护者提交前漏跑 --diags 模式，教训入 HANDOVER
+  §11.6）。自举 `parse_block` 补 EOF 诊断分支（`tok_at` 取完整 token 的
+  ln/cl；带洞语义对齐），self_interp.lom 5709→5714 行；六模式全绿。
 - **验收（2026-09-21 实测）**：任务 089 原始源 `--json` 从 ok:true 零诊断
   变为 **ok:false + PARSE001 (4:1)**，运行 exit 1；fn/if/while/for/闭包
   五组 EOF 缺 end 反例 + 中途缺 end（fn b 顶替 fn a 的 end）+ 合法嵌套
