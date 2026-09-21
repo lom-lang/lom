@@ -28,10 +28,12 @@
   （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
   1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
   22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
-- 活跃工作包：无。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
+- 活跃工作包：**L2.3 进行中**（用户已裁决"执行"动工；按批交付——a 批
+  已收官，后续批次排队）。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
   spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**均完成
-  （self_comp.lom 3342 行，verify_selfcomp 25/25 = 10 对拍 + 15 负例拒绝）；
-  L2.3 后续批次（闭包/enum+match/String/List/Map/json/包）进行中。
+  （self_comp.lom 3342 行，verify_selfcomp 25/25 = 10 对拍 + 15 负例拒绝）。
+  后续批次：闭包与捕获（需堆/env 值表示，先出设计方案再动工）/ enum 与
+  match / String / List / Map / json / 包 / return 语句（块深度跟踪）。
 - 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -50,10 +52,10 @@
   制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成】
-1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部
-   R65-R72，docs/reviews/review-2026-09-21-3.html（十一审），
-   LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中）；
-   涉及架构时再读 RFC-0003。
+1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部，
+   docs/reviews/review-2026-09-22-2.html（十三审——最新轮），
+   LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
+   修订 1-6）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
    - cargo build --release
    - cargo test --release（期望 533/533；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
@@ -72,15 +74,20 @@
    json / 包，按"编译期校验 + 负例"成对交付）；发布不应出现在任何菜单
    项内（冻结未解）。
 
-【状态锚点（整改后行为，供复核）】
+【状态锚点（当前行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价
   Replace（x=2; x=3 → applied=1 产合法 let mut x、final 净 ok:true）；
   同位置不同文本动作不合并。
 - R74 修复后：self_comp 调用点类型/arity 不符即 COMPILE-ERROR 无 hex
-  （f(1) 传 Float 形参 → 第 1 参类型不符；add(1,2,3) → 实参数不符）；
-  verify_selfcomp 20/20（15 负例含 call 类型/arity 各一）。
+  （f(1) 传 Float 形参 → 第 1 参类型不符；add(1,2,3) → 实参数不符）。
 - R75 修复后：解构遮蔽的重赋值 → hint 不动源码；解构在赋值之后的
   正例仍 High Replace。
+- L2.3-a 后：if/while/for(Int)/Bool/比较/逻辑短路/块尾 if 表达式可编译
+  （verify_selfcomp 25/25）；return 语句/match/解构/闭包/String/List 仍
+  COMPILE-ERROR（后续批次）；for 迭代仅 Int。
+- 写 self_comp 代码的两大坑：宿主 dangling-else 贪婪归内（then 块首
+  元素嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
+  改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
