@@ -1,17 +1,20 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-22 刷新）**：本台账处于**交接就绪**状态。
-> 第十一轮开账的 **R65-R72 已于 2026-09-22 按用户裁决全量整改收官并升版
-> v1.2.4**——R1-R72 全部关闭；整改验收证据见各项下方；整改后状态需
-> 第十二轮独立复审重估。活跃工作包：**无**（L2.1/L2.2 已交付 + R66-R68
-> 整改完成——RFC-0004 修订 4；L2.3 待复审后裁决）。
+> **交接声明（2026-09-22 晚刷新）**：本台账处于**交接就绪**状态。
+> 第十二轮独立复审（[review-2026-09-22.html](reviews/review-2026-09-22.html)，
+> 总评 **B**，基线 `aab6f95`/v1.2.4）确认 R65-R72 整改**零失真（✓×8）**后
+> 新开 **R73（P1）/R74（P2）/R75-R76（P3）**——当前 **open：R73-R76**；
+> R1-R72 全部关闭；头条 P1 已由维护会话亲手复现确认（同轮两条 MUT001
+> 单次 apply 产出 `let mut mut x`）。活跃工作包：**无**（十二审建议
+> R73/R74 入 v1.2.5 整改包、L2.3 暂缓条件推进为 R74 收口，待用户裁决）。
 > 发布线维持冻结。新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
 > 再读 HANDOVER §0/§1/§2.2/§9/§11.6/§12，跑 §2.2 全量基线（六模式
 > 逐个），然后向用户呈现方向菜单。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
-> **来源**：十一轮审查报告（最新 [review-2026-09-21-3.html](reviews/review-2026-09-21-3.html)，
+> **来源**：十二轮审查报告（最新 [review-2026-09-22.html](reviews/review-2026-09-22.html)，
+> 基线 `aab6f95`；十一审 [review-2026-09-21-3.html](reviews/review-2026-09-21-3.html)，
 > 基线 `65e51dc`；十审 [review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)，
 > 基线 v1.2.2；九审 [review-2026-09-21.html](reviews/review-2026-09-21.html) 基线
 > `ce2c71e`）；历史从 [review-2026-09-03.html](reviews/review-2026-09-03.html)
@@ -410,6 +413,82 @@ elease` 的 `	`/`
 R65 入 v1.2.4 整改包；R69-R72 顺手收口；发布冻结维持（全部发现均不触
 语言面）。**（2026-09-22 用户裁决"R65-R72 整改包（推荐）"全量执行：
 八项全部关闭，升版 v1.2.4；L2.3 待第十二轮复审后裁决。）**
+
+## 第十二轮独立复审 + R73-R76 开账（2026-09-22）⚠️ review done / remediation open
+
+**报告**：[review-2026-09-22.html](reviews/review-2026-09-22.html)，基线
+`aab6f95`（HEAD，v1.2.4 = R65-R72 整改双提交）；总评 **B**。R65-R72
+八项整改在自列验收面上**逐条亲手复跑零失真（✓×8）**（含本轮扩展探针：
+elif/嵌套 for/赋值未定义目标语句拒绝、闭包捕获+外层重赋混合、注解一致
+正例）；基线复验清单全绿（529+8 / clippy / fmt / doc_audit 65/65 /
+spec / prompt 24/24 / 六模式 / verify_selfcomp 18/18 / eval 双后端
+121+121 / fmt gate 35 / golden / CI 六 job）。敌手探针另击穿四项新发现，
+维护会话已逐项亲手复现确认后开账。
+
+### R73 — fix 同轮多条 MUT001 诊断双 Replace 损坏源码（P1）⏳ open
+
+- **形态**：同一 let 变量被重赋 ≥2 次时 typechecker 产出 ≥2 条 MUT001
+  诊断，每条独立走 `fix_mut001_add_mut` 各产出一条**同坐标** High
+  Replace；`apply_plan` 收集全部 High 动作不去重、从后往前逐个应用——
+  两次替换叠加产出 `let mut mut x`（PARSE001），`--apply` 直接落盘。
+  R65 的两层防护都以"轮"为界（嵌套归属看单条诊断；滤 mutable 只在
+  第二轮重诊断的 AST 里生效——同轮内多条诊断基于同一份原文 AST）。
+  闭包捕获 + 外层重赋混合形态同样触发（applied=2）。触发面是常见编程
+  形态（变量初始化后多次更新）。**证伪 v1.2.4 宣称**"滤出已可变声明
+  断非幂等链（let mut mut x 永不可能）"（TODO R65 修法段/SPEC_FOR_AI
+  R62-R65 hardened 段同句——宣称句已随本轮开账改为如实口径）。
+- **维护会话复现（2026-09-22）**：`let x = 1 / x = 2 / x = 3` 单次
+  `fix --apply --json` → **applied=2（round 1 同轮 line 2 ×2）、
+  ok:false、final errors=1、文件第 2 行变 `let mut mut x = 1`**——
+  与十二审一致。
+- **验收方向**：等价动作（同 line/col/end/kind）在 apply 层去重或
+  plan 层合并；`x = 2; x = 3` 单次 apply applied=1、文件变
+  `let mut x`、final 净、ok:true；跨轮幂等保持；R65 六测试与
+  fix_corpus 11 对不倒。
+
+### R74 — self_comp 调用点不校验实参类型与 arity（P2）⏳ open
+
+- **形态**：① `fn f(x: Float)` 调 `f(1)`——实参 i64 推给 f64 参数槽，
+  COMPILED + 实例化 `call[0] expected type f64, found i64.const`；
+  ② `f(1, 2)` 多传参/少传参——COMPILED + 实例化栈校验错。根因：
+  `fns` 摘要只携带 `{idx, ret, nprm}`——**形参类型不在摘要里**，
+  `comp_call` 逐参 comp_ex 后直接 call（nprm 有字段也未比对）。
+  R68 姊妹残留：let 注解与尾表达式路径 v1.2.4 已加编译期校验，唯
+  call 路径漏；RFC-0004 修订 4 与 13 负例集均未覆盖。
+- **维护会话复现（2026-09-22）**：`f(1)` 探针 → `COMPILED 104 bytes`
+  + node `CompileError: call[0] expected type f64, found i64.const`。
+- **验收方向**：fns 摘要携带形参类型表 + comp_call 校验 arity 与逐参
+  类型一致（不符即 subset_err）；负例集补 call 类型/arity 各一；既有
+  18 项不倒。
+
+### R75 — MUT001 同层解构遮蔽错目标（P3）⏳ open
+
+- **形态**：`let x = 1` 后 `let (x, y) = (5, 6)`（同层解构重新 define
+  x，恒不可变无 mut 语法），再 `x = x + 1`——fix 唯一命中行 2 的
+  `let x` 产出 High Replace（错目标：赋值绑定的是解构 x）；诊断不消
+  （final 仍 1 warning）、ok:true。不损坏（加 mut 合法、跨轮幂等）。
+  R65 归属解析只建模嵌套层（path 链），未建模**同层遮蔽序**
+  （flat_binds 整层名集合、LetDestruct 进 flat_binds 不进 let_decls）。
+  v1.2.2 起即有（主观推断——collect_let_decls 从不收集解构），本轮
+  首次击穿。
+- **维护会话复现（2026-09-22）**：applied=1、行 2 变 `let mut x`、
+  final 1 warning、ok:true——与十二审一致。
+- **验收方向**：同层声明序建模（赋值位置之前最近的同名声明才是绑定
+  目标；LetDestruct 命中 → hint）；正例不倒。
+
+### R76 — self_comp 行数宣称位无 doc_audit 锚（P3）⏳ open
+
+- README L71 / HANDOFF_PROMPT 宣称 "2908-line self_comp"——doc_audit
+  行数锚只覆盖 self_interp 5727，self_comp 无锚；L2.3 行数再变时该位
+  会静默漂移（R69 同族）。**核实（2026-09-22）**：grep 2908
+  doc_audit.py 零命中。方向：I 类补 self_comp 行数锚（doc_audit
+  65→66）。
+
+**十二审裁决建议**：R73/R74 入 v1.2.5 整改包（apply 层等价动作去重 +
+comp_call 实参类型/arity 校验）；R75/R76 顺手；L2.3 暂缓条件自十一审
+的"R66-R68 收口"推进为"**R74 收口**"（call 校验是子集编译器行为正确性
+的地基）；发布冻结维持（新发现均不触语言面）；v1.2.4 tag 无需撤回
+（其自列验收宣称真实）。**待用户裁决整改顺序。**
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 

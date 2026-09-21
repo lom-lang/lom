@@ -22,29 +22,29 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.4（2026-09-22 升版：十一审 R65-R72 整改收官；tag 于 CI 绿
-  后切）；语言面与发布线冻结。
-- 审查状态：十一轮审查，R1-R72 全部关闭（R65-R72 已于 2026-09-22 按
-  用户裁决全量整改：R65 MUT001 作用域归属解析+幂等 / R66-R67 self_comp
-  语句分派值线程化+13 负例回归网 / R68 let 注解编译期一致性校验 /
-  R69-R72 顺手收口）。整改后状态需第十二轮独立复审重估（B 是十一审
-  时点评级，不得自行宣布回升）。事实源 docs/TODO.md 顶部。
+- 版本 v1.2.4（tag 已切，CI 绿）；语言面与发布线冻结。
+- 审查状态：十二轮审查，R1-R72 全部关闭、R73-R76 open（第十二轮独立
+  复审新开：R73 为 P1，R74 为 P2，R75/R76 为 P3）。十二审
+  （docs/reviews/review-2026-09-22.html，总评 B，基线 aab6f95/v1.2.4）
+  确认 R65-R72 八项整改零失真（✓×8）后开账；头条 P1 已由维护会话亲手
+  复现确认。事实源 docs/TODO.md 顶部。
 - 活跃工作包：无。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
   spike + L2.2 子集编译器 + R66-R68 整改均完成（self_comp.lom 2908
-  行，verify_selfcomp 18/18 = 5 对拍 + 13 负例拒绝）；L2.3 全语言面
-  待第十二轮复审后裁决。
-- 测试基线 529 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7——含 R71 ×1
-  + R72 ×2）；eval 双后端 121/121；selfhost 六模式；doc_audit 65/65；
-  spec_examples PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
+  行，verify_selfcomp 18/18 = 5 对拍 + 13 负例拒绝——但 R74 缺陷在案，
+  整改前 self_comp 不得当可靠编译器使用）；L2.3 暂缓条件为 R74 收口。
+- 测试基线 529 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
+  双后端 121/121；selfhost 六模式；doc_audit 65/65；spec_examples
+  PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
 - 最新教训（HANDOVER §11.6）：块尾裸表达式归 Tail 不归 stmts；Lom 语句
   位置 match 的 Err 值被丢弃（R66 根因——修法是值线程化 let frag =
-  match ... end + frag?）；Lom 侧 Result 消费必带 ? 解包（R68 报错消息
-  曾出现 'Ok(i64)' 字样）；Form B 臂 end 计数再应验（本轮 R68 再踩一次）；
-  新增 .lom 文件提交前必过 lom fmt --check。
-- 待用户裁决：第十二轮独立复审发起时机；L2.3 是否继续（建议复审后）；
-  typechecker for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk
-  是否立项（R65 关联观察，TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底
-  窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+  match ... end + frag?）；Lom 侧 Result 消费必带 ? 解包；Form B 臂 end
+  计数再应验；新增 .lom 文件提交前必过 lom fmt --check。十二审新教训：
+  fix 防护设计要以"apply 全轮次"为界（R73——同轮多诊断同坐标不去重）。
+- 待用户裁决：R73-R76 整改包（十二审建议 R73/R74 优先，收官升版
+  v1.2.5）；L2.3 是否继续（建议 R74 收口后）；typechecker for 变量
+  define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项（TODO R65
+  证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察
+  2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
@@ -67,17 +67,19 @@
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   第十二轮独立复审（R65-R72 整改需复审重估，十二审通过后 L2.3 菜单
-   才能呈现）；发布不应出现在任何菜单项内（冻结未解）。
+   R73-R76 整改包（十二审建议：R73 与 R74 优先，收官升版 v1.2.5）；
+   L2.3 建议 R74 收口后继续（十二审裁定暂缓）；发布不应出现在任何菜单
+   项内（冻结未解）。
 
-【当前状态锚点（整改后行为，供复核）】
-- R65 修复后：闭包/match 臂/for 遮蔽三形态 MUT001 诊断 → hint 不动源码
-  （applied=0 逐字不变）；闭包内重赋捕获外层、for 循环外重赋外层两正例
-  仍 High Replace；幂等（let mut mut 永不可能）。
-- R66/R67 修复后：if/while/for/return 语句经 self_comp 编译 →
-  COMPILE-ERROR 且无 hex（负例集 tools/selfcomp/negative/ 13 项为回归网）。
-- R71/R72 修复后：非 UTF-8 payload 回 -32700 存活；双 CL 头 exit 1；
-  exit 未经 shutdown rc=1、经 shutdown rc=0。
+【当前 open 项的最小复现要点（R73/R74 头条）】
+- R73/fix 同轮双 Replace：fn 内 let x = 1 后接 x = 2 与 x = 3 两行——
+  单次 fix --apply 即 applied=2 同轮同坐标两次 Replace，产出
+  let mut mut x（PARSE001 损坏落盘，ok:false 但文件已坏）。R65 的
+  跨轮幂等防护拦不住同轮多诊断。
+- R74/self_comp call 无校验：fn f(x: Float) 调 f(1)——COMPILED 但
+  实例化报 call[0] expected type f64, found i64.const；f(1, 2) 多传
+  参同理（COMPILED + 实例化栈校验错）。fns 摘要不携带形参类型、
+  comp_call 不比对 arity。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
