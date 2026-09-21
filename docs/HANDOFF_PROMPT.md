@@ -22,31 +22,43 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.2（tag 已切，CI 绿）；语言面与发布线冻结。
-- 审查状态：R1-R61 全部关闭。第九轮（B）整改经第十轮独立复审
+- 版本 v1.2.3（tag 于 CI 绿后切）；语言面与发布线冻结。
+- 审查状态：R1-R64 全部关闭，open 项为零。第十轮独立复审
   （docs/reviews/review-2026-09-21-2.html，总评 B+，基线 v1.2.2）确认
-  七项验收零失真；复审新开 R62（P2）/R63（P3）/R64（P3，已开账即修），
-  当前 open 仅 R62/R63，事实源 docs/TODO.md 顶部。
-- 测试基线 513 单元 + 3 集成（tests/：r56 CLI 退出码进程级、r58 LSP stdio
-  e2e ×2）；eval 双后端 121/121；selfhost 六模式；doc_audit 65/65；
-  spec_examples PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
+  九审整改零失真；其新开 R62/R63 已于 v1.2.3 整改关闭（事实源
+  docs/TODO.md 顶部）；R62/R63 整改后状态需下一轮独立复审重估，
+  不得自行宣布评级回升。
+- 活跃工作包：L2 自举编译器（用户 2026-09-21 裁决"执行 1，2"动工）。
+  RFC-0004 方案 A：hex 文本落盘 + 宿主 ~40 行解码桩（零语言面，
+  43 内建不动）；方案 B（file_write_bytes 44 号内建）属解冻菜单不作为
+  起步。阶段：L2.1 编码器 spike（LEB128 除模 / f64 位模式纯算术拆解 /
+  hex 发射通道三风险点先证，spike 失败即回 RFC 重议）→ L2.2 最小子集
+  （fn/let/算术/println，与宿主双产物行为级对拍）→ L2.3 全语言面 →
+  L2.4 自举闭环（三层自证，受 V8 栈深限制时按子集口径如实降级）。
+  交付物：examples/selfhost/self_comp.lom + tools/verify_selfcomp.py +
+  宿主解码桩。RFC-0004 状态需随动工补修订（draft→accepted + 方案 A 选定）。
+- 测试基线 523 单元 + 5 集成（tests/：r56 CLI 退出码进程级 ×1、
+  r58 LSP stdio e2e ×4——含 R63 传输边界对：超限 Content-Length 不
+  abort + 畸形 JSON 回 -32700/-32600 后存活）；eval 双后端 121/121；
+  selfhost 六模式；doc_audit 65/65；spec_examples PASS；
+  eval_prompt_check 24/24；cargo fmt --check 零 diff。
 - 两条最新教训（HANDOVER §11.6）：宿主 parser/诊断行为改动必须同步检查
   三实现（宿主/WASM/自举）且六模式逐个跑（R57 整改曾漏 --diags 致 CI 三连红）；
   含反斜杠路径的文档内容禁用 python 字符串直写（R64 曾致 §2.2 命令行坏字节，
   R15 同型第四次）。
-- 待用户裁决：R62/R63 整改包（十审建议 R62 前置/并行、R63 顺手收口）；
-  L2 动工菜单（十审裁定九审条件已满足，可重新呈现）；MoonBit 1.0 Q3 复核
-  等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+- 待办窗口：MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察
+  2026-10-19；doc_audit 命令行完整性锚（R64 根治方向，待下轮 gate 扩展）。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成】
-1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部 R62-R63，
+1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部交接声明，
    docs/reviews/review-2026-09-21-2.html（十审）与 review-2026-09-21.html（九审），
-   LANGUAGE_SPEC §14；涉及架构时再读 RFC-0003，涉及 L2 时读 RFC-0004。
+   LANGUAGE_SPEC §14 与 docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
+   方案 A 已定）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
    - cargo build --release
-   - cargo test --release（期望 513/513；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×3）
+   - cargo test --release（期望 523/523；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×5）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（零 diff——R61 起机械格式化；若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复）
    - python tools/doc_audit.py（期望 65/65）
@@ -55,17 +67,19 @@
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是 R62/R63
-   整改包；L2 动工菜单可呈现（十审裁定条件已满足，建议 R62 前置/并行）；
+3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前活跃工作包是
+   L2（L2.1 spike 起步或按进行度继续）；菜单其余项：下一轮独立复审
+   （R62/R63 整改后重估）、MoonBit 月底窗口、ubuntu-26 迁移观察；
    发布不应出现在任何菜单项内（冻结未解）。
 
-【当前 open 项（R62/R63）的最小复现要点】
-- R62/闭包遮蔽：外层参数 x 重赋值 + 函数内闭包 let x = 10 遮蔽；apply 会把闭包内
-  声明改成 let mut（原诊断未治、final 仍 1 warning 而 ok:true）。
-- R62/行内注释：x = x + 1 # let x = 0；注释文本被当声明命中改写。
-- R63：向 lom lsp 发 Content-Length: 999999999999 的 header 即
-  memory allocation failed abort（rc=0xC0000409）；畸形 JSON payload 被静默
-  丢弃（无 -32700 响应）。
+【v1.2.3 修复要点（供复审探针参考）】
+- R62/闭包遮蔽：外层参数 x 重赋值 + 函数内闭包 let x 遮蔽——v1.2.2 会把
+  闭包内声明错改 let mut（ok:true）；v1.2.3 结构化定位后 applied=0、
+  源码逐字不变、ok:false、参数 hint。
+- R62/行内注释：x = x + 1 # let x = 0——注释文本不再被改写（同上四点验收）。
+- R63：向 lom lsp 发 Content-Length: 999999999999 的 header——v1.2.2 为
+  memory allocation failed abort（rc=0xC0000409）；v1.2.3 显式 exit 1 +
+  stderr 说明。畸形 JSON payload 收到 -32700/-32600（id:null），服务器存活。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```

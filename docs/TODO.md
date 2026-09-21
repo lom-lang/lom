@@ -1,14 +1,12 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-21 深夜刷新）**：本台账处于**交接就绪**状态——五件套
-> 全过（HANDOFF_PROMPT 已刷新/HANDOVER 已对齐/本声明/doc_audit 65/65/CI 绿）。
-> 当前 open 仅 **R62（P2）/R63（P3）**（第十轮复审新开，复现要点在
-> HANDOFF_PROMPT）；R1-R61 全部关闭。**无已获用户授权的实施工作包**；待裁决
-> 菜单：R62/R63 整改包（十审建议 R62 前置/并行、R63 顺手收口）、L2 动工
-> （十审裁定九审条件已满足，可呈现菜单）。发布线维持冻结。
-> 新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，再读 HANDOVER
-> §0/§1/§2.2/§9/§11.6/§12，跑 §2.2 全量基线（六模式逐个），然后向用户
-> 呈现方向菜单。
+> **交接声明（2026-09-21 深夜三刷新）**：R62/R63 已于同日按用户裁决整改
+> 关闭（升版 v1.2.3，测试 523 单元 + 5 集成）；当前 **open 项为零**——
+> R1-R64 全部关闭。活跃工作包：**L2 自举编译器动工**（用户裁决"执行 1，2"；
+> RFC-0004 方案 A——hex 文本 + 宿主解码桩，零语言面；L2.1 spike 起步）。
+> 发布线维持冻结。新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
+> 再读 HANDOVER §0/§1/§2.2/§9/§11.6/§12，跑 §2.2 全量基线（六模式
+> 逐个），然后向用户呈现方向菜单。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
@@ -199,14 +197,14 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
 R60 ✅ → R61 ✅（2026-09-21 全部关闭）。至少 R55-R58 关闭并经下一轮独立
 复审前，L2 与一切发布动作继续后置——**复审尚未进行，L2/发布维持冻结**。
 
-## 第十轮独立复审 + R62-R64 开账（2026-09-21）⚠️ review done / remediation open
+## 第十轮独立复审 + R62-R64 开账（2026-09-21）✅ review done / remediation done（同日）
 
 **报告**：[review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)，基线
 v1.2.2（十审 agent 实查 HEAD）；总评 **B+**。九审 R55-R61 整改逐条复审
 **七项全部 ✓、验收宣称零失真**（九轮来首次）；敌手探针另击穿三项新发现，
 维护会话已逐项亲手复现证实后开账。
 
-### R62 — MUT001 同函数嵌套作用域残留错改（P2）⏳ open
+### R62 — MUT001 同函数嵌套作用域残留错改（P2）✅ done（2026-09-21）
 
 - **形态 1（闭包遮蔽）**：外层参数 `x` 重赋值、闭包内 `let x = 10` 遮蔽——
   R55 的函数体范围回扫命中闭包声明，apply 改闭包内声明（`let mut x = 10`），
@@ -214,21 +212,45 @@ v1.2.2（十审 agent 实查 HEAD）；总评 **B+**。九审 R55-R61 整改逐�
   `target/probes/r62a.lom` 形态（十审 §3 + 维护会话复现一致）。
 - **形态 2（行内注释）**：`x = x + 1 # let x = 0`——回扫只跳**行首注释**
   （trim_start starts_with '#'），行内注释的 `let x` 文本被当声明命中改写。
-- **方向**：MUT001 的声明定位需结构化（Stmt::Let 的 span/作用域层级）而非
-  文本回扫；过渡安全修法=命中行再校验 AST let 节点位置（fix 侧已有 FnInfo
-  管线，可扩展为携带函数体内全部 let 声明行）+ 负向探针（闭包遮蔽/行内注释/
-  字符串字面量内 "let x" 文本）。
-- **验收**：两探针 apply 后源码逐字不变、applied=0；既有 fix_corpus 09 不倒。
+- **修法（2026-09-21 用户裁决 R62/R63 整改 + L2 动工，本项先行）**：
+  **结构化定位彻底替代文本回扫**——`FnInfo` 新增 `let_decls`
+  （`fn_infos` 遍历函数体扁平作用域的 `Stmt::Let`：if/while/for 语句块
+  与函数体共用环境故递归收集；闭包体/match 臂块是独立作用域**不收集**，
+  其内声明遮蔽外层绑定、与外层 MUT001 诊断无关——对齐 typechecker
+  `TypeEnv::closure_child` 边界语义）。`fix_mut001_add_mut` 不再扫描源码
+  文本，直接在 `let_decls` 按名过滤：唯一命中 High Replace（列经
+  `byte_col_to_char_col` 换算）；零命中 → 参数/循环绑定/闭包内声明 hint；
+  多命中 → 遮蔽 hint。`find_substring_in_chars`（文本回扫辅助）删除；
+  `body_start_line` 字段因无人读一并删除。闭包内/match 臂内的 MUT001
+  降级 hint——宁可不自动修，不可错改（窄保守面，hint 文案如实）。
+- **验收（2026-09-21 实测）**：真实 CLI 双探针（`target/probes/r62a.lom`
+  闭包遮蔽 / `r62b.lom` 行内注释）`fix --apply` 后 **applied=0、changes 空、
+  源码逐字不变、ok:false、final 如实报 1 warning**（v1.2.2 为错改
+  applied=1 + ok:true）。+6 测试：三负向（闭包遮蔽/行内注释/字符串字面量
+  `let s = "let x = 0"`——apply 后逐字不变 + 全 Hint）+ 两正向不倒
+  （if 块内 let 扁平作用域仍 Replace、体内 let 遮蔽参数仍 Replace）+
+  降级面锁定（闭包内诊断 hint）。fix_corpus 11 对端到端不倒；cargo test
+  **523 单元 + 5 集成**；clippy/fmt 零。
 
-### R63 — LSP Content-Length 无上限（P3）⏳ open
+### R63 — LSP Content-Length 无上限（P3）✅ done（2026-09-21）
 
 - 声称 `Content-Length: 999999999999` 单 header 即触发
   `memory allocation failed` abort（rc=0xC0000409），单条消息杀死服务器。
   维护会话复现：rc=3221226505、stderr 实证。随附：畸形 JSON payload 被
   静默丢弃（无 JSON-RPC -32700 错误响应）。
-- **方向**：Content-Length 上限（如 10MB，超限报错或断连）+ 畸形 JSON 回
-  -32700；单测 + stdio e2e。
-- **验收**：超限 header 不崩（优雅错误/断连）；畸形 payload 收到 -32700。
+- **修法（2026-09-21）**：① `run_lsp` 主循环 Content-Length 上限 **16 MiB**
+  （`MAX_LSP_CONTENT_LENGTH`）——超限拒绝分配、stderr 说明、`exit(1)`
+  断连（payload 未读、流已不可信，无法续会话）；② `parse_rpc_message`
+  签名改为 `Result<_, RpcParseError>`（`InvalidJson` → **-32700 Parse
+  error**；`NotARpcRequest`——合法 JSON 但根非对象/缺 method → **-32600
+  Invalid Request**），传输层回 `make_null_id_error_response`（id 为
+  null——JSON-RPC 2.0 规范形态）后 continue，服务器存活。
+- **验收（2026-09-21 实测）**：进程级 `tests/r58_lsp_process.rs` +2——
+  超限 header 断言 **exit code 1**（v1.2.2 为 abort 码 3221226505）+
+  stderr 含拒绝说明且无 "memory allocation"；畸形 JSON 收到 -32700/
+  -32600 帧（id:null）且**错误响应后 initialize 正常响应**（服务器存活）。
+  单元 +4（坏 JSON/数组根/缺 method/null-id 格式）；既有 r58 e2e 全过。
+  合计 **523 单元 + 5 集成**；clippy/fmt 零。
 
 ### R64 — HANDOVER §2.2 命令行坏字节（P3）✅ done（2026-09-21 开账即修）
 
@@ -243,6 +265,9 @@ v1.2.2（十审 agent 实查 HEAD）；总评 **B+**。九审 R55-R61 整改逐�
 
 **十审裁决建议**：九审条件"R55-R58 关闭并经复审"已满足——L2 动工菜单
 可重新呈现用户（建议 R62 前置/并行、R63 顺手收口）；发布冻结维持。
+**（2026-09-21 用户裁决"执行 1，2"：R62/R63 已整改关闭 + L2 动工授权——
+方案 A（hex + 宿主桩，零语言面）按 RFC-0004 预研推荐执行；十审的
+"R62 作为 L2 开工前置"建议已先行满足。）**
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 
