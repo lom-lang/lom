@@ -1,17 +1,19 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-16）**：本台账处于**交接就绪**状态——四连包（八审/L2 预研/
-> 修复闭环 v1.2.1/文档工程）全部收官，**无活跃工作包、无未关闭整改**；待令项清单
-> 见 HANDOVER §1"下一步"行（L2 动工裁决/MoonBit Q3 复核/差分按需/发布线冻结）。
-> 新任维护者：先读 HANDOVER §0/§1/§9 与本文件头部，跑 HANDOVER §2.2 三件套
-> 验证基线，再向用户呈现方向菜单。
+> **交接声明（2026-09-21）**：本台账处于**交接就绪但有未关闭整改**状态。
+> 第九轮维护者独立敌手式审查已完成（总评 **B**），新开 **R55-R61**；当前没有
+> 已获用户授权的实施工作包，但不得再宣称“无未关闭整改”。最高优先级是 R55-R58，
+> L2 RFC-0004 仍为 draft、未获动工授权，审查建议至少在四项 P1 关闭并复审前继续后置。
+> 新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，再读 HANDOVER §0/§1/§9/
+> §11.6 与本节，跑 HANDOVER §2.2 全量基线，然后向用户呈现“整改优先/L2 继续后置”菜单。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
-> **来源**：独立审查报告 [review-2026-09-03.html](reviews/review-2026-09-03.html)（基线 v1.0.0）
-> 的逐条裁决，见文末"驳回/挂起登记"。
-> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**当前活跃**（2026-09-16
-> 用户裁决四连包，按序执行）：**① 第八轮审查 A-（四连）+ 整改 R46-R54 关闭 ✓ →
+> **来源**：九轮审查报告（最新 [review-2026-09-21.html](reviews/review-2026-09-21.html)，
+> 基线 `ce2c71e`）；历史从 [review-2026-09-03.html](reviews/review-2026-09-03.html)
+> 起，逐条裁决及驳回/挂起登记均在本文件。
+> **创建**：2026-09-03（v1.0.0 + 1 docs 提交之后）。**上一已完成序列**（2026-09-16
+> 用户裁决四连包）：**① 第八轮审查 A-（四连）+ 整改 R46-R54 关闭 ✓ →
 > ② L2 预研 ✓（RFC-0004 draft，动工待用户裁决）→ ③ 修复闭环资产深化 ✓
 > （v1.2.1：fix 动作面 NAM005/MUT001 双 High 模板 + fix_corpus 11 对 +
 > eval 121/error_repair 24 题 + 高温补测 480/480）→ ④ 文档工程小包 ✓
@@ -21,6 +23,80 @@
 > 此前（2026-09-15/16）：ⒶⒷⒸ 三项收官（七审 A-+R39-R45 / 第 2 轮调研 /
 > positioning 一页纸）+ 第 3/4 轮调研 + B 包 v1.2.0 + D 四期（累计 10000）。
 > 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 八轮审查整改 R1-R54 与 T1-T7（档案见下）。
+> **当前未关闭：R55-R61；状态均为 open，尚未实施。**
+
+## 第九轮维护者独立审查 + R55-R61（2026-09-21）⚠️ review done / remediation open
+
+**报告**：[review-2026-09-21.html](reviews/review-2026-09-21.html)，基线
+`ce2c71e` / v1.2.1；总评 **B**。本轮不是按既有矩阵复跑后续评级，而是从真实 CLI、
+LSP、repair apply、异常退出和协议边界构造反例。审查阶段不改产品源码；交接包只修正
+现行文档、扩大数字锚点并修 Windows 文档检查器输出编码。
+
+### R55 — High 自动修复错误应用（P1）⏳ open
+
+- **MUT001 跨作用域错改**：参数 `x` 重赋值触发诊断；另一函数存在全文唯一
+  `let x` 时，`fix_mut001_add_mut` 将无关声明改为 `let mut x`，仍标 High。
+- **EFF001 多行签名错位**：签名跨行时按 `current_fn_span.line` 的首行行末插入，生成
+  `fn helper( ! [IO]`；下一轮 PARSE001。
+- **EFF001 同位置双插入**：纯函数分别调用 `[IO]`/`[Clock]` 函数，两条 High action
+  在同一列应用成 `! [Clock] ! [IO]`；下一轮 PARSE001。
+- 三例中 `lom-apply/v1.ok` 仍为 true，因为现实现只判断 `total_applied > 0`，不表示
+  最终源码干净。另有已知 LEX001 吞右括号组合误修、LEX005 多字节 byte/char 列风险。
+- **最低安全修法**：在结构化声明 span/作用域信息到位前，将 MUT001 降 Medium；
+  EFF001 聚合同函数缺失效应并用签名 end span；apply 输出最终诊断状态；负向 corpus 锁定。
+- **验收**：上述三探针旧实现必失败、新实现 dry-run 后语法与诊断均干净；既有 11 对
+  fix_corpus 不倒；新增错误修复不得仅测“能应用”，必须测“没有改无关代码”。
+
+### R56 — worker panic 被吞为退出码 0（P1）⏳ open
+
+- `src/main.rs` 丢弃 `child.join()`；实测 `let min = 9223372036854775807 + 1` 后
+  `min / -1` 在 `src/interpreter.rs:1301` Rust panic，进程却 exit 0。
+- SECURITY 旧句“release 溢出静默回绕”只对 add/sub/mul 等成立；MIN/-1 与 MIN%-1
+  是 Rust 特殊 panic 边界。WASM 同程序受 §11f-7 载荷截断影响输出 0，形成新对拍差异。
+- **验收**：join panic 必映射非零；两个特殊算术边界产结构化 RUNTIME000、exit 1；
+  进程级测试断言 stdout/stderr/rc，不能只在单元函数层捕获。
+
+### R57 — EOF 静默闭合必需 `end`（P1）⏳ open
+
+- `parse_block` 将 EOF 当正常终止并仅“有则消费”End。任务 089 原始缺 end 源实测
+  `--json ok:true`、0 诊断、默认运行输出 5；违反 SPEC_FOR_AI 核心规则与冻结 grammar。
+- **验收**：fn/if/while/for/closure 各一组 EOF 缺 end 反例必须 PARSE001/Hole；合法嵌套
+  不回归；更新 error_repair 089/090 等历史 prompt，诊断 JSON 必由真实命令生成。
+
+### R58 — LSP JSON-RPC 传输不符合真实客户端（P1）⏳ open
+
+- compact 合法 didOpen 的三行源码因 `text` 未 JSON 反转义，`\\n` 被 lexer 当反斜杠，
+  返回 3 条 LEX005；合法带空格 initialize 被精确字符串扫描完全忽略（0 字节响应）。
+- 输出字符串也未完整转义反斜杠/控制字符；现有 19 测试均是理想化纯函数/compact payload。
+- **验收**：真实 stdio e2e 覆盖 initialize→didOpen multiline→diagnostics→hover/
+  completion→didChange→shutdown；JSON 空白、转义、嵌套对象、字符串内花括号均覆盖。
+
+### R59 — json_parse 接受未转义控制字符（P2）⏳ open
+
+- 源码注释称“严格 JSON”，但引号内真实换行被接受，程序 exit 0 并输出含换行字符串。
+- **验收**：U+0000..U+001F 未转义形态拒绝；合法 `\\n` 保持；宿主/WASM/自举对齐。
+
+### R60 — 文档/安全/评测 gate 盲区（P2）⏳ open
+
+- 本交接已修：SPEC_FOR_AI 118→121 两处、fix 动作表、README LSP/High caveat、
+  SECURITY 第三方 CI action/递归/算术/缺 end、positioning v1.2.0→v1.2.1 与审查状态；
+  doc_audit 新增 SPEC_FOR_AI 当前 eval + CI WASM step 两锚，63→65。
+- 仍待代码侧：zero-dependency awk 覆盖 target-specific/workspace TOML；parse_type/
+  parse_pattern 深度守卫；eval 诊断 prompt 自动从真实输出生成或校验。
+- 历史 LLM raw/summary 默认 gitignore：本机复算数字成立，但 fresh clone 不能认证来源；
+  对外宣称必须保留限定或以后产出隐私审查过的证据包。
+
+### R61 — 维护工具毛边（P3）⏳ open
+
+- `cargo fmt --all -- --check` 在 Rust 1.97.1/rustfmt 1.9.0 下产生大规模 diff；当前 CI
+  只跑 Lom formatter，不跑 rustfmt。应单独机械包处理，避免与语义修复混提交。
+- `spec_examples_check.py` 在 Windows GBK 因 `✓` 崩溃：本交接已在脚本入口统一 stdout/
+  stderr UTF-8，提交前实测默认命令。
+- CI #122 的 6 条 warning 均为 checkout/cache Node.js 20 弃用提示；升级 action 前查
+  官方迁移说明，推送后看首跑。
+
+**推荐顺序（尚待用户裁决）**：R55 → R56 → R57 → R58 → R59 → R60 → R61。
+至少 R55-R58 关闭并经下一轮独立复审前，L2 与一切发布动作继续后置。
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 

@@ -27,7 +27,7 @@ eval/
     07_records_tuples.json   # 10 tasks — records, tuples, field access
     08_effects.json          #  6 tasks — ! [IO, Clock] annotations
     09_modules.json          #  6 tasks — from ... import
-    10_error_repair.json     # 22 tasks — fix broken code (lom fix flow)
+    10_error_repair.json     # 24 tasks — fix broken code / warning-guided repair
   runner/
     run.ps1                  # PowerShell runner (Windows, no deps)
     run.sh                   # Bash runner (requires jq + lom on PATH)
@@ -94,7 +94,7 @@ eval/runner/run.sh --candidates-dir eval/candidates
 
 The runner runs `lom eval/candidates/<id>.lom` for each task, compares stdout to `expected`, and reports pass-rate by category and overall.
 
-### Error-repair category (22)
+### Error-repair category (24)
 
 Tasks in `10_error_repair.json` have a different flow:
 1. The prompt contains **broken `.lom` code** and the **`lom-diag/v1` JSON** for that code.
@@ -102,6 +102,8 @@ Tasks in `10_error_repair.json` have a different flow:
 3. The runner treats the LLM output the same way: run through `lom`, compare stdout to `expected`.
 
 This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses → LLM repairs → Lom runs**.
+
+> **Audit caveat (2026-09-21, R60):** the runner validates candidate stdout + exit code; it does not validate that diagnostic JSON embedded in a prompt is still emitted by the current compiler. Tasks 089/090 claim a missing-function-`end` PARSE001, while the current parser silently accepts EOF as the block terminator. These are historical repair prompts, not a current diagnostic-conformance corpus, until R57/R60 refresh them from real `--check --json` output. New diagnostic-bearing tasks must continue to be generated from real output, never hand-written.
 
 ## Adding tasks
 
@@ -117,3 +119,5 @@ Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/10
 **2026-08-31 multi-model retest** (`REPORT-2026-08-31-multimodel.md`, via `llm_eval.py`): deepseek-v4-pro+thinking **113/113 (100%)**, deepseek-v4-flash 112/113, glm-4.7 112/113 — the project's "≥3 LLMs" bar (guide §3.3) is now met, and tasks 101-113 have their first LLM measurements. Only task 078 fails (same prompt-ambiguity failure as the 2026-08-03 baseline).
 
 **2026-09-07 pass@k retest** (`REPORT-2026-09-07-passk.md`, via `llm_eval.py --samples 10 --temperature 1.0` + `passk_summarize.py`): deepseek-v4-pro+thinking and glm-5.3, 10 samples each on the full 116-task set (first LLM measurements for tasks 115-117). **pass@1 = pass@5 = pass@10 = 99.1% for both models** (unbiased estimator `1 - C(n-c,k)/C(n,k)`; scorer unchanged: `run.ps1 -CandidatesDir`). Only 078 fails systematically (0/10 both models) — the single-sample pass-rate is robust to sampling variance, closing the "single sample" honesty caveat of the 2026-08-31 report. Candidates + per-task pass matrices: `eval/candidates_rerun/<model>_passk10/`.
+
+The multi-sample `candidates_rerun/` raw replies and summaries are intentionally gitignored. On the handoff machine they were present and the ninth review independently recomputed 1149/1160 for each pass@k model and 240/240 per model for the 24-task repair patch. A fresh clone cannot verify raw provenance from the repository alone; published claims must retain that qualification or archive a privacy-reviewed evidence bundle later.

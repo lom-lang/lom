@@ -48,6 +48,14 @@ import shutil
 import subprocess
 import sys
 
+# Windows PowerShell/无控制台宿主可能让 Python 默认使用 GBK；本工具输出含 ✓，
+# 未显式 UTF-8 时会在第一条通过项直接 UnicodeEncodeError。交接审查 2026-09-21
+# 实测复现，统一输出编码后默认命令即可跨平台执行。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 DEFAULT_DOCS = ['SPEC_FOR_AI.md', 'LANGUAGE_SPEC.md', 'docs/lom-tutorial.html']
 TMP_DIR = '.spec_check_tmp'
 TIMEOUT_RUN = 10          # 正例实跑超时（秒）——文档示例不应有长循环

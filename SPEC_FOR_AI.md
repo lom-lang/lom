@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 37,851 characters ≈ 9.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md (88,578 characters). Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 38,111 characters ≈ 9.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -665,24 +665,29 @@ Key points:
 |---|---|---|---|
 | `LEX001`/`LEX002` | Insert `"` at end of error line | `insert` | high |
 | `LEX005` | Delete the unexpected char | `delete` | high |
+| `PARSE001` | Missing `)` at an unambiguous line boundary → insert; other syntax cases → hint | `insert` or `hint` | high/medium/low |
 | `PARSE002` | `Result<T, E>` needs 2 type params | `hint` | medium |
 | `PARSE003` | `Option<T>` needs 1 type param | `hint` | medium |
-| `MAT001` | Missing branch text (e.g. `Green => ()`) | `hint` with `text` | medium |
-| `EFF001` | Effect annotation snippet (e.g. `! [IO]`) | `hint` with `text` | high |
+| `MAT001` | Built-in Result/Option branch → precise insert; user enum → hint with text | `insert` or `hint` | high/medium |
+| `EFF001` | Insert `! [E]` or merge `, E` into an existing effect list | `insert` | high (R55 caveats below) |
 | `TYPE002` | Condition must be `Bool` | `hint` | medium |
 | `TYPE020` | `?` misuse (operand not Result/Option, or return incompatible) | `hint` | medium |
-| `NAM003` | Undefined variable — check spelling / import | `hint` | low |
+| `NAM003`/`NAM004` | Spelling suggestion at the diagnostic span | `replace` | medium (never auto-applied) |
+| `NAM005` | Insert the exact missing builtin import at file start | `insert` | high |
+| `MUT001` | Unique-name `let` rescan and `let` → `let mut` | `replace` | high (R55 caveats below) |
 | Other | Code-specific guidance | `hint` | low/medium |
 
 **Recommended workflow** when you (the LLM) are writing Lom code:
 1. Write the file.
 2. Run `lom <file> --json` to get diagnostics.
 3. If `ok == false`, run `lom fix <file> --json` to get the repair plan.
-4. Apply the fixes — either yourself (`fix` plan mode does not auto-edit) or via `lom fix <file> --apply` (applies high-confidence non-hint fixes in place). For `hint`-with-`text` fixes like EFF001/MAT001, the `text` is a ready-to-paste snippet.
+4. Apply the fixes yourself, or preview automation with `lom fix <file> --apply --dry-run`. **Until audit item R55 is closed, do not apply High fixes blindly**: inspect the patch and re-run `--check`/`--json`. EFF001 is now an `insert` action; user-enum MAT001 remains a hint-with-text.
 5. Re-run `lom <file> --json` to verify. Repeat until `ok == true`.
 6. Run `lom <file>` to execute.
 
 **Limitations**:
+- **Open handoff blocker R55 (2026-09-21)**: High does not currently guarantee a semantics-preserving edit. Reproduced counterexamples include MUT001 changing an unrelated same-name `let`, EFF001 inserting into a multiline signature, and two missing effects producing two adjacent effect annotations. `lom-apply/v1.ok` currently means “at least one edit was applied,” not “the final source is diagnostic-clean.” Use `--dry-run` plus explicit re-check.
+- LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 positions originate as byte columns; a multibyte unexpected character after earlier non-ASCII text can be skipped or target the wrong character. These rules must not be treated as mathematically certain.
 - NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Since Phase 3.2b (v0.21.0) positions come from **expression-level spans** on the diagnostic (single-point replace); the whole-token source scan remains only as a fallback for span-less diagnostics (e.g. variant names in `match` patterns — `Pattern` carries no span).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
 - Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE001-3/TYPE020/NAM004-field point at the exact expression/assign-target; note the Field diagnostic points at the field-name token via the span's `end`); runtime positions remain coarse. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
@@ -691,7 +696,7 @@ Key points:
 
 ## 11f. Compiling to WebAssembly (Phase 7, v0.15.0)
 
-`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 118 eval tasks (the eight known divergences are listed below).
+`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 121 eval tasks (the eight known divergences are listed below).
 
 - Type checking runs before compilation (diagnostics on stderr, never blocking — the same gradual-typing promise as the interpreter).
 - Running the `.wasm` requires a host providing the `env.lom_*` imports (print / file / env / json); the repo ships a Node.js harness at `eval/runner/run_wasm.mjs`.
@@ -732,4 +737,4 @@ Key points:
 
 ---
 
-*End of Lom Spec for AI v1.0. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parser with holey AST (`Stmt::Hole` on parse error, all errors collected, sync-point recovery). Phase 2.3 adds: structured JSON diagnostics (`lom-diag/v1` schema), `--json` / `--check` / `--help` CLI flags, error code namespaces (LEX/PARSE/RUNTIME implemented; TYPE/EFF/MAT/NAM reserved for 2.4-2.5). Phase 2.4 adds: gradual type checker (`--check` / `--json` emits TYPE/MAT/NAM diagnostics; warnings are non-fatal — the program still runs). Phase 2.5 adds: explicit effect system (`! [IO, Clock]` annotation, `EFF001` warning when a pure function calls an effectful one; `main` is exempt). Phase 2.6 adds: `lom info <file> [--json]` type info export (`lom-info/v1` schema — functions/enums/imports; no type-check, no run; parse failure falls back to `lom-diag/v1`). Since then: MAT001 non-exhaustive-match compile warnings, the `fix`/`retry` diagnostic fields with `lom fix --plan` / `--apply` / `--history` (Phases 2.7 / 3.1 / 4.1.3), the 118-task eval suite (`eval/`), the `list` / `json` / `map` / `file` / `env` stdlib modules, user packages via `lom.toml` path dependencies (Phase 4.4), `lom doc` / `lom fmt` / `lom repl` / `lom lsp`, and type checking visible on the default run path (diagnostics on stderr, never blocking execution). Phase 7 (v0.7.0–v0.15.0) adds the WASM compiler backend (`lom build --target wasm`, §11f) — the interpreter remains the reference implementation and default run path. Phase 8 (v0.23.0–v0.26.0) delivers full self-hosting: a complete Lom frontend, checker subset, and tree-walking interpreter written in Lom (`examples/selfhost/self_interp.lom`, ~5700 lines — the largest LLM-readable Lom codebase in existence and the best reference for real-world Lom style). v0.27.0 adds `string.char_from_code` (§4). **v1.0 (2026-09-02): the language surface is frozen** — syntax / 20 reserved words / diagnostic codes / 43 builtins; nothing in this spec will change within v1.x without a new RFC. When unsure, prefer the explicit form (annotate types, handle all match cases with `_`).*
+*End of Lom Spec for AI v1.0. Phase 2.1 implements: everything in Phase 1 plus `match` (Form A single-expr + Form B block arms), `enum` declarations (single-line `enum Name = V1 | V2` and multi-line `enum Name\n V1\n V2\n end`), built-in variants `Ok(v)`/`Err(e)`/`Some(v)`/`None`, `Result<T, E>` and `Option<T>` type annotations, pattern matching (literals, binders, `_` wildcard, variant patterns `Ok(n)`/`None`), `|>` pipeline (left value as first arg of right function), `?` error propagation (Result/Option), structural records `{x: Int, y: Int}`, tuples `(Int, String)` with `.0`/`.1` indexing, explicit imports `from mod import {name as alias}` (stdlib io/string/math modules; prelude `println`/`print` auto-available). Phase 2.2 adds: tolerant parsing with hole nodes and sync-point recovery; audit R57 records that EOF currently closes several block forms without diagnosing a missing `end`. Phase 2.3 adds structured JSON diagnostics. Phase 2.4 adds the gradual type checker; Phase 2.5 adds explicit effects; Phase 2.6 adds `lom info`. Since then the repository has the 121-task eval suite, list/json/map/file/env modules, local-path packages, doc/fmt/repl/LSP tools, the WASM backend, and the 5703-line self-hosted reference interpreter. The self-hosted program is the repository's largest real-world Lom style reference; no world-wide “largest in existence” claim is made. v0.27.0 adds `string.char_from_code` (§4). **v1.0 (2026-09-02): the language surface is frozen** — syntax / 20 reserved words / diagnostic codes / 43 builtins; nothing in this spec will change within v1.x without a new RFC. Current implementation blockers are tracked as R55-R61 and do not redefine the frozen language. When unsure, prefer the explicit form and verify tool-generated edits before applying them.*

@@ -27,11 +27,11 @@
 
 <div class="meta">
 <strong>性质</strong>：对外定位材料（发布解冻时的弹药库——当前 Lom <strong>未发布</strong>，语言面 v1.0 冻结中）。
-<strong>数字口径</strong>：截至 <strong>2026-09-16（v1.2.1）</strong> 的时点快照，全部可溯源到本仓库（README / LANGUAGE_SPEC §12-13 / docs/TODO.md / docs/archive/ 调研档）；现值数字以仓库为准。
+<strong>数字口径</strong>：截至 <strong>2026-09-21（v1.2.1）</strong> 的时点快照，全部可溯源到本仓库（README / LANGUAGE_SPEC §12-13 / docs/TODO.md / docs/archive/ 调研档）；现值数字以仓库为准。第九轮审查已把可复现的产品阻塞项 R55-R61 公开登记，本页不得脱离该限制单独用于发布宣传。
 <strong>竞品事实来源</strong>：docs/archive/ 第 1-4 轮调研（research-2026-09-1*.html，全一手原文核对；第 4 轮含 agentlanguages.dev 目录 35 家广域扫描，2026-09-16）。
 </div>
 
-<p class="lede">一句话：在"为 AI agent 造编程语言"的赛道上，诊断计划层正在成为行业标配——<strong>修复的执行自动化与文本源码主权，是 Lom 独有且未被占据的定位</strong>。</p>
+<p class="lede">一句话：在"为 AI agent 造编程语言"的赛道上，诊断计划层正在成为行业标配——<strong>修复执行闭环 + 文本源码主权，是 Lom 选择的差异化方向</strong>；当前 High 自动修复仍有 R55 正确性阻塞，方向成立不等于实现已经可发布。</p>
 
 <h2>1. 三种范式，Lom 走中间道路</h2>
 
@@ -48,25 +48,25 @@
 <tr><th>能力</th><th>Lom</th><th>Zero</th><th>Vera</th></tr>
 <tr><th>机器可读诊断</th><td class="lom">✅ <code>lom-diag/v1</code>：稳定码（LEX/PARSE/TYPE/NAM/EFF/MAT/RUNTIME）+ span + hint + <code>--json</code></td><td>✅ JSON + 稳定码（同款三字母+三位命名法）</td><td>✅ <code>--json</code> + E001-E702</td></tr>
 <tr><th>修复计划</th><td class="lom">✅ <code>lom fix --plan</code>：结构化动作（replace/insert + span + text + 置信度）</td><td>✅ <code>zero fix --plan --json</code>（"a repair plan, not an automatic edit"）</td><td>❌（Fix: 文档性建议段落）</td></tr>
-<tr><th><strong>修复执行自动化</strong></th><td class="lom"><strong>✅ <code>--apply</code> 迭代闭环（多轮收敛三刹车）+ 置信度分级（High 才自动改）+ fix-history 留档 + fix_corpus 回归网</strong></td><td>❌（应用交给 agent patch + 人工审查）</td><td>❌</td></tr>
+<tr><th><strong>修复执行自动化</strong></th><td class="lom"><strong>⚠️ <code>--apply</code> 迭代闭环 + 置信度分级 + fix-history + fix_corpus 已实现；R55 已复现 High 错改，整改前必须 dry-run + 人工/LLM 复核 + 重新诊断</strong></td><td>❌（应用交给 agent patch + 人工审查）</td><td>❌</td></tr>
 <tr><th>渐进式承诺</th><td class="lom">✅ warning 永不拦截执行（渐进式类型哲学）</td><td>—</td><td>❌（契约编译期硬约束）</td></tr>
 </table>
 
-<h2>3. 证据链（每一条都可机器复验）</h2>
+<h2>3. 证据链（按各自限定口径复验）</h2>
 <ul>
-<li><strong>修复闭环实测</strong>：error_repair 评测任务 <span class="num">24</span> 个（含 4 个 warning 级修复题）双模型 × 10 采样 temperature=1.0 全过（<span class="num">480/480</span>，2026-09-16 补测——20 题于 09-07、119/120 于 09-16、121/122 于 09-16 新题即测）——repair-native 闭环在高温下依然有效。</li>
+<li><strong>LLM 修复题实测</strong>：error_repair 评测任务 <span class="num">24</span> 个（含 4 个 warning 级修复题）双模型 × 10 采样 temperature=1.0 全过（<span class="num">480/480</span>，2026-09-16 补测——20 题于 09-07、119/120 于 09-16、121/122 于 09-16 新题即测）。该数字证明模型候选按任务预期输出通过，不证明 <code>lom fix --apply</code> 的 High 动作安全，也不证明历史 prompt 内嵌诊断仍与当前编译器一致（R55/R60）。</li>
 <li><strong>双后端语义对齐</strong>：树遍历解释器 + 手写零依赖 WASM 后端，<span class="num">10000</span> 个随机生成程序/项目实例 stdout+退出码<strong>逐字一致</strong>（差分测试四期，含递归 enum、三包依赖链、file/env 深形态）；已知分歧全部文档化（§11f 八条）并有探针守护白名单不腐坏。</li>
 <li><strong>自举自证</strong>：用 Lom 写的 <span class="num">5703</span> 行解释器（lexer/parser/checker/evaluator/json）三层自证——WASM 载体上的自举解释器解析自身源码，dump 与宿主原生<strong>逐字一致</strong>。</li>
 <li><strong>LLM 实测</strong>：评测集现值 <span class="num">121</span> 任务，实测分层带时点——113 任务集四模型单采样（2026-08-31）、116 任务集双模型 × 10 采样（2026-09-07）<strong>pass@1 = pass@5 = pass@10 = 99.1%</strong>（无偏估计）、error_repair 24 题双模型 × 10 补测全过（2026-09-16，含全部后补修复题）；唯一系统性失败是刻意的 prompt 歧义锚点题 078；唯一无采样记录的是其明确版对照题 118（Q4 单采样对照 10/10）。</li>
-<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；<strong>八轮独立对抗性审查</strong>（R1-R54 整改全关闭）；宣称数字由 CI 机器对账（doc_audit <span class="num">63</span> 项 + claims.json 分项回加）。</li>
-<li><strong>供应链</strong>：Rust 实现<strong>零第三方依赖、零 unsafe</strong>——JSON/JSON-RPC/时间戳全部手写，工具链本身 LLM 可读可修。</li>
+<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；九轮维护者对抗性审查——R1-R54 已关闭，第九轮总评 B、R55-R61 待整改；宣称数字由 CI 机器对账（doc_audit <span class="num">65</span> 项 + claims.json 分项回加）。</li>
+<li><strong>供应链</strong>：Rust crate <strong>零第三方依赖、零 unsafe</strong>；CI 仍依赖 GitHub Actions 与第三方 rust-toolchain action，不能把 crate 零依赖扩大成“全部供应链风险为零”。手写 JSON/LSP 的可审计性真实存在，其协议正确性缺口也已由 R58/R59 证明。</li>
 </ul>
 
 <h2>4. 判定边界（本页宣称的适用范围——必读）</h2>
 <ul>
 <li><strong>"只此一家"= 在已调研样本中</strong>：深读竞品 Zero 与 Vera 两家（docs/archive/ 第 2 轮，一手原文）+ 第 4 轮发现的社区目录 agentlanguages.dev（35 家"为 AI agent 写"的语言，2026-06-14 时点快照，描述层面全量扫描）——目录三营（表征/验证/编排）的共同底色是"防错"，以修复闭环为核心卖点的条目为零；Codong（"fix/retry fields"）与 X07（"quickfixes … deterministically"）有修复部分元素（描述层）。宣称的准确含义是"<strong>在已扫描的新兴 agent-native 语言样本（2 家深读 + 35 家目录）里，修复执行闭环完成度领先</strong>"，非世界范围的概念独占。</li>
 <li><strong>机制层无原创</strong>（第 3 轮调研结论）：结构化建议（span+替换文本）、置信度分级（rustc 的 applicability <strong>四级</strong> vs Lom 三级）、迭代自动应用到不动点（cargo fix 的 fixpoint 循环）——<strong>机制三件套在 Rust 生态已完整存在多年</strong>；ESLint <code>--fix</code>/TS code fixes/Roslyn 为同类。Lom 的真实差异是<strong>四维组合</strong>：把修复闭环作为语言的存在理由（repair-native，非工具链附属）+ lom-diag/lom-fix schema 作为语言契约 + fix_corpus 修复语料回归网 + 高温 LLM 实测口径——该组合截至第 4 轮检索（rustc/TS 生态 + 35 家 agent 语言目录描述层面）未见先例；目录内 Codong/X07 具备修复机制的部分元素，为该判断再添两个机制层例证（相对 Rust/TS 生态的成熟度与规模，Lom 均为后来者——如实记录；详见 docs/archive/ 第 3/4 轮调研）。</li>
-<li><strong>"独有"的最终检验在发布后的外部反应</strong>：Lom 当前未发布，七轮独立审查均为内部委托（对抗深度真实、外部独立性相对）。</li>
+<li><strong>"独有"的最终检验在发布后的外部反应</strong>：Lom 当前未发布；前八轮为内部委托审查，第九轮为新维护者独立敌手式审查，均不等于外部同行审计。R55 等阻塞项关闭前，本页不得单独作为对外完成度证明。</li>
 </ul>
 
 <h2>5. 如实标注：对方领先项</h2>
@@ -78,8 +78,8 @@
 
 <h2>6. 当前状态（如实）</h2>
 <ul>
-<li>v1.2.0（checker capability：NAM005 未导入内建静态预警）；<strong>未发布</strong>——按用户裁决"优化到完美前不发布"，语言面冻结、发布线冻结。</li>
-<li>本页不是营销材料：所有竞品描述来自其官方一手文档（见 docs/archive/ 第 2 轮逐字引文与第 4 轮目录条目），所有自家数字可由本仓库 CI 复验。</li>
+<li>v1.2.1（repair-loop asset tag）；<strong>未发布</strong>——按用户裁决"优化到完美前不发布"，语言面冻结、发布线冻结。第九轮审查发现 R55-R61，L2 仍未获动工授权。</li>
+<li>本页不是发布材料：竞品描述来自其官方一手文档；自家仓库数字可由 CI/本地档案复算，但历史 LLM raw 默认被 Git 忽略，外部克隆不能单独验证模型来源。发布前必须先关闭第九轮阻塞项并重新审查本页。</li>
 </ul>
 
 </body>

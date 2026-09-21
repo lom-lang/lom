@@ -9,7 +9,7 @@
 #
 # 监控清单（计算真值 → 文档现值逐处比对；真值变了只改数字不再靠人肉清单）：
 #   A. eval 任务总数：tasks/*.json 求和 → manifest total_tasks + eval/README ×3
-#      + README + LANGUAGE_SPEC ×3 + HANDOVER ×2
+#      + README + LANGUAGE_SPEC ×3 + HANDOVER ×2 + SPEC_FOR_AI 当前口径 + CI WASM step
 #   B. 自举 dump 计数：examples 顶层 + bootstrap + eval 总数 → HANDOVER §2.2 + ci.yml 步骤名
 #   C. .lom 文件拆分：glob 实数（总数/顶层/bootstrap/pkg_demo/selfhost）→ README 状态段
 #   D. self_interp 行数：wc 口径（换行符计数）→ HANDOVER §9
@@ -131,6 +131,13 @@ def main():
     # HANDOVER §2.2 的 eval 行锚定 run.ps1（同文件的 "期望 456/456" 是 cargo test 行，测试数不在监控范围）
     expect_all('HANDOVER §2.2 期望', 'docs/HANDOVER.md',
                r'run\.ps1 -Verify[^\n]*# 期望 (\d+)/(\d+)', [eval_total, eval_total])
+    # 第九轮审查：SPEC_FOR_AI 当前态两处仍停在 118，且 ci.yml step 名停在 119；
+    # 原 A 类只盯主 README/spec/HANDOVER，导致 63/63 仍放过现行 LLM 规范漂移。
+    expect_all('SPEC_FOR_AI 当前 eval 口径', 'SPEC_FOR_AI.md',
+               r'all (\d+) eval tasks.*?the (\d+)-task eval suite',
+               [eval_total, eval_total], re.S)
+    expect_all('ci.yml WASM eval step 计数', '.github/workflows/ci.yml',
+               r'WASM eval parity \((\d+) tasks', [eval_total])
 
     # ---- B. 自举 dump 计数 ----
     print('B. 自举 dump 计数')
@@ -164,9 +171,9 @@ def main():
     # 存量腐坏位，E 类此前只盯 HANDOVER 不覆盖此处
     expect_all('README Current release', 'README.md',
                r'Current release: v([\d.]+)', [cargo_ver])
-    # Ⓒ 一页纸（2026-09-15；日期位随八审 R54 校准 2026-09-16）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
+    # Ⓒ 一页纸（2026-09-15；日期位随九审交接校准 2026-09-21）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
     expect_all('positioning 版本位', 'docs/positioning.html',
-               r'截至 <strong>2026-09-16（v([\d.]+)）</strong>', [cargo_ver])
+               r'截至 <strong>2026-09-21（v([\d.]+)）</strong>', [cargo_ver])
 
     # ---- F. changelog 对账（N3）----
     print('F. changelog 对账（LANGUAGE_SPEC §13）')

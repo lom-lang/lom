@@ -753,9 +753,9 @@ Per-fix fields:
 | Action | Semantics | When used |
 |---|---|---|
 | `insert` | Insert `text` at `(line, col)` | LEX001/LEX002 (insert `"` at line end); EFF001 (insert `! [E]` or `, E`) |
-| `replace` | Replace `(line,col)..(end_line,end_col)` with `text` | Implemented in Phase 3.1 `apply.rs` (no current fix generator uses it, but the executor supports it) |
+| `replace` | Replace `(line,col)..(end_line,end_col)` with `text` | NAM003/NAM004 spelling suggestions (medium); MUT001 `let` → `let mut` rescan (high, with R55 caveat) |
 | `delete` | Delete `(line,col)..(end_line,end_col)` | LEX005 (delete unexpected char) |
-| `hint` | Text guidance only; `line`/`col` may be `0` | Most type/name/runtime errors; MAT001 provides `text` snippet |
+| `hint` | Text guidance only; `line`/`col` may be `0` | Most type/runtime errors; user-enum MAT001 and ambiguous name/mutability cases |
 
 #### 6.9.3 Fix strategies by error code
 
@@ -764,7 +764,7 @@ Per-fix fields:
 | `LEX001`/`LEX002` | Insert `"` at end of error line | high | insert |
 | `LEX003`/`LEX004` | Hint: check number format | low | hint |
 | `LEX005` | Delete the unexpected char | high | delete |
-| `PARSE001` | Hint: check syntax structure | low | hint |
+| `PARSE001` | Missing `)` at a line boundary → precise insert; ambiguous/missing-`end` cases remain advisory | high/medium/low | insert or hint |
 | `PARSE002` | Hint: `Result<T, E>` needs 2 type params | medium | hint |
 | `PARSE003` | Hint: `Option<T>` needs 1 type param | medium | hint |
 | `PARSE099` | Hint: hole, complete syntax | low | hint |
@@ -773,10 +773,12 @@ Per-fix fields:
 | `TYPE003` | Hint: arg count mismatch | low | hint |
 | `TYPE010` | Hint: return type mismatch | low | hint |
 | `TYPE020` | Hint: `?` misuse | medium | hint |
-| `MAT001` | Provide missing branch text (e.g. `Green => ()`) | medium | hint (with text) |
+| `MAT001` | Missing Result/Option branch → insert before match `end`; user enum → text hint | high/medium | insert or hint |
 | `NAM002` | Hint: duplicate definition | low | hint |
-| `NAM003` | Hint: undefined variable | low | hint |
-| `NAM004` | Hint: no such field/variant | low | hint |
+| `NAM003` | Did-you-mean spelling replacement when available; otherwise hint | medium/low | replace or hint |
+| `NAM004` | Field/variant spelling replacement when available; otherwise hint | medium/low | replace or hint |
+| `NAM005` | Insert exact missing builtin import at file start | high | insert |
+| `MUT001` | Unique-name declaration rescan, replace `let` with `let mut`; otherwise hint | high/medium | replace or hint |
 | `EFF001` | Insert effect annotation: `! [E]` at line end (pure fn) or `, E` before `]` (partial effects) | high | insert |
 | `RUNTIME000` | Hint: generic runtime error (div/mod by zero; recursion depth > 80,000 since 2026-09-08 — structured message with the recursive fn's signature position) | low | hint |
 | `RUNTIME001` | Hint: runtime type mismatch | low | hint |
@@ -788,7 +790,7 @@ Per-fix fields:
 
 `lom fix <file> --apply [--dry-run] [--json]` auto-applies high-confidence fixes to the source file.
 
-- **Safety filter**: only `confidence=High` AND `action≠Hint` fixes are applied. Low-confidence fixes are left for the LLM to decide.
+- **Safety filter**: only `confidence=High` AND `action≠Hint` fixes are applied. Low-confidence fixes are left for the LLM to decide. This is an intent, not a current proof of safety: audit R55 (2026-09-21) reproduced incorrect High edits for cross-scope MUT001, multiline-signature EFF001, and multiple effects inserted at the same source position. Until R55 closes, use `--dry-run`, inspect, and re-run diagnostics.
 - **Text patching**: fixes are applied via `(line, col)` → byte-offset translation; `insert`/`delete`/`replace` all supported.
 - **Reverse-order application**: multiple fixes are sorted by `(line, col)` descending and applied back-to-front to avoid offset drift.
 - **`--dry-run`**: outputs the apply result (`lom-apply/v1` schema or human-readable) without writing the file.
@@ -808,6 +810,8 @@ Per-fix fields:
   "ok": true
 }
 ```
+
+Current implementation note (R55): `lom-apply/v1.ok` is computed as `applied > 0`; it does **not** certify that the final source parses or has zero diagnostics. This field must not be used as a repair-success oracle until the open remediation changes its semantics or adds an explicit final-diagnostics field.
 
 #### 6.9.5 Current limitations
 

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第九轮维护者独立审查 — 2026-09-21</title>
+<style>
+body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;max-width:1080px;margin:0 auto;padding:2rem;line-height:1.7;color:#202030}
+h1{border-bottom:3px solid #7c3aed;padding-bottom:.5rem}h2{margin-top:2rem;border-left:4px solid #7c3aed;padding-left:.7rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #d7d7e0;padding:.5rem;vertical-align:top;text-align:left}th{background:#f4f1ff}
+code{background:#f4f4f7;padding:.1rem .25rem;border-radius:3px}.p1{color:#b91c1c;font-weight:700}.p2{color:#b45309;font-weight:700}.p3{color:#475569;font-weight:700}
+.ok{color:#15803d;font-weight:700}.meta{background:#f7f7fb;border:1px solid #ddd;padding:.8rem 1rem;border-radius:8px}.warn{background:#fff7ed;border-left:4px solid #ea580c;padding:.7rem 1rem}
+</style>
+</head>
+<body>
+<h1>Lom 第九轮维护者独立审查</h1>
+<div class="meta">
+<strong>日期</strong>：2026-09-17 至 2026-09-21　
+<strong>审查基线</strong>：<code>ce2c71e</code>（v1.2.1）　
+<strong>性质</strong>：维护者接任后的全项目敌手式审查；不是外部机构审计。Git 历史只有一个统一作者身份，无法把产物可靠归因到多位维护者个人。<br>
+<strong>范围</strong>：核心源码、repair loop、LSP/JSON、parser/runtime 边界、CI/文档 gate、自举、差分、eval 与本机 LLM 留档。审查阶段不修改产品源码；交接整理只修正文档与文档工具。
+</div>
+
+<h2>1. 结论</h2>
+<p><strong>总评 B</strong>。此前连续 A/A- 评级偏高：核心编译器、自举与差分验证扎实，但审查重心偏向既有命令复跑、数字核账和增量范围，缺少从真实用户入口构造的敌手式反例。当前是强实验型语言工程，不是可发布的可靠产品。用户 2026-09-07 的发布冻结裁决完全正确。</p>
+<table>
+<tr><th>维度</th><th>评级</th><th>理由</th></tr>
+<tr><td>六模式自举</td><td class="ok">A</td><td>dump/tokens/diags/static/run/wasm 全部实测通过，含 layer3 golden 与 self-apply。</td></tr>
+<tr><td>WASM + 差分</td><td class="ok">A-</td><td>手写后端、已知分歧探针和类型感知生成器是真资产；正常模式有意避开八条已知分歧，不能外推为全语义等价。</td></tr>
+<tr><td>核心语言</td><td>B+</td><td>测试面广，但 EOF 静默闭块与 panic 退出码破坏冻结语法/CLI 契约。</td></tr>
+<tr><td>repair-native</td><td>C</td><td>计划/schema/迭代闭环设计正确；High 自动修复存在可复现错改，是定位核心的直接阻塞。</td></tr>
+<tr><td>LSP/协议</td><td>C-</td><td>纯函数层存在，真实 stdio JSON-RPC 传输不能正确处理常规客户端 payload。</td></tr>
+<tr><td>文档治理</td><td>B</td><td>自账机制有价值，但登记锚点通过不等于全文语义正确，63/63 仍漏现行规范漂移。</td></tr>
+</table>
+
+<h2>2. 发现（R55-R61）</h2>
+<table>
+<tr><th>ID</th><th>级别</th><th>发现与实测证据</th><th>建议验收</th></tr>
+<tr><td>R55</td><td class="p1">P1</td><td><strong>High 自动修复不安全</strong>。① 参数 <code>x</code> 重赋值 + 另一函数唯一 <code>let x</code>：MUT001 把无关声明自动改为 <code>let mut</code>；② 多行签名的 EFF001 插成 <code>fn helper( ! [IO]</code>；③ 同一纯函数缺 IO/Clock 时生成 <code>! [Clock] ! [IO]</code>。三例均由当前 release 二进制复现；后二者下一轮变 PARSE001，而 apply JSON 仍 <code>ok:true</code>。另有既知 LEX001 组合误修与 LEX005 多字节列风险。</td><td>作用域/声明 span 定位；多行签名按 <code>FnDecl.span.end</code>；同函数多效应合并；final diagnostics 写入 apply 结果；新增负向 fix_corpus。未修前降级为 Medium 或禁自动应用。</td></tr>
+<tr><td>R56</td><td class="p1">P1</td><td><strong>Rust panic 被报告为成功</strong>。<code>main</code> 丢弃 <code>child.join()</code>；<code>9223372036854775807 + 1</code> 得 i64::MIN 后除以 -1，解释器在 <code>interpreter.rs:1301</code> panic，但进程退出码为 0。WASM 因 60 位载荷分歧输出 0。</td><td>join panic → exit 1；MIN/-1 与 MIN%-1 走结构化 RUNTIME000；进程级回归同时断言 stderr 与退出码。</td></tr>
+<tr><td>R57</td><td class="p1">P1</td><td><strong>缺 <code>end</code> 静默成功</strong>。<code>parse_block</code> 把 EOF 当普通终止；任务 089 原始源码实测 <code>--json ok:true</code>、零诊断、直接输出 5。违反 SPEC_FOR_AI 核心规则和冻结 grammar。</td><td>fn/if/while/for/闭包分别强制闭合；容错模式产 Hole/PARSE001；刷新 089/090 等历史 prompt。</td></tr>
+<tr><td>R58</td><td class="p1">P1</td><td><strong>LSP 真实协议不可用</strong>。compact JSON-RPC 的合法三行 <code>didOpen.text</code> 因未反转义 <code>\n</code> 返回 3 条 LEX005；带正常 JSON 空格的 initialize 被完全忽略（0 字节响应）；输出转义也不完整。</td><td>统一 JSON parser/decoder；字符串、对象、空白、嵌套、转义全覆盖；以真实 stdio framing 做 initialize→didOpen→diagnostics→shutdown e2e。</td></tr>
+<tr><td>R59</td><td class="p2">P2</td><td><strong>“严格 JSON”不严格</strong>。引号内放真实未转义换行，<code>json_parse</code> 退出 0，输出含换行字符串；RFC 8259 控制字符边界未执行。</td><td>拒绝 U+0000..U+001F 的未转义形态；宿主/WASM/自举三实现与 eval 回归对齐。</td></tr>
+<tr><td>R60</td><td class="p2">P2</td><td><strong>文档/安全 gate 的覆盖面被高估</strong>。SPEC_FOR_AI 仍写 118 任务和旧 fix 动作；SECURITY 将第三方浮动 action 称“官方/已 pin”，并自相矛盾地宣称所有递归入口有 guard；zero-dependency awk 漏 target-specific TOML；任务 089/090 的诊断与当前实现不符。</td><td>本交接先修现行文字并把 SPEC_FOR_AI/CI 当前 eval 数纳入 doc_audit；后续补 dependency gate、诊断 prompt 生成/校验和 type/pattern 深度测试。</td></tr>
+<tr><td>R61</td><td class="p3">P3</td><td><strong>维护工具毛边</strong>：当前 Rust 1.97.1 下 <code>cargo fmt --check</code> 大量失败；Windows 默认命令运行 spec_examples_check 因 <code>✓</code> + GBK 抛 UnicodeEncodeError；CI #122 有 6 条 Node.js 20 action 弃用提示。</td><td>先修 UTF-8 输出（本交接完成）；另立机械 rustfmt 包；核官方 action 迁移文档后升级并看首跑。</td></tr>
+</table>
+
+<h3>可直接重建的最小复现（旧 v1.2.1 二进制）</h3>
+<p>把以下每段分别保存为工作区临时 <code>.lom</code> 文件；先运行 <code>target/release/lom.exe &lt;file&gt; --check</code>，修复类探针再运行 <code>target/release/lom.exe fix &lt;file&gt; --apply --dry-run --json</code>。不要对用户源码直接执行非 dry-run。</p>
+<table>
+<tr><th>问题</th><th>源码</th><th>旧实现关键结果</th></tr>
+<tr><td>R55/MUT001</td><td><pre>fn f(x: Int) -&gt; Int
+    x = x + 1
+    x
+end
+fn unrelated() -&gt; Int
+    let x = 10
+    x
+end
+fn main() -&gt; Unit
+    println(f(unrelated()))
+end</pre></td><td>参数 x 的诊断，把 unrelated 的 let x 改为 let mut x。</td></tr>
+<tr><td>R55/EFF001 多行</td><td><pre>fn helper(
+    x: Int
+) -&gt; Int
+    println(x)
+    x
+end
+fn main() -&gt; Unit
+    println(helper(7))
+end</pre></td><td>插入点在首行 fn helper( 之后，生成 PARSE001。</td></tr>
+<tr><td>R55/EFF001 同位</td><td><pre>fn io_work() -&gt; Unit ! [IO]
+    println("io")
+end
+fn clock_work() -&gt; Unit ! [Clock]
+    ()
+end
+fn helper() -&gt; Unit
+    io_work()
+    clock_work()
+end
+fn main() -&gt; Unit
+    helper()
+end</pre></td><td>两条 [9:20] insert，生成 ! [Clock] ! [IO]，apply JSON 仍 ok:true。</td></tr>
+<tr><td>R56/溢出退出码</td><td><pre>fn main() -&gt; Unit
+    let min = 9223372036854775807 + 1
+    println(min / -1)
+end</pre></td><td>worker Rust panic，Lom 进程退出码 0。</td></tr>
+<tr><td>R57/缺 end</td><td><pre>fn main() -&gt; Unit
+    let x = 5
+    println(x)</pre></td><td><code>--json</code> 为 ok:true、diagnostics:[]；直接运行输出 5。</td></tr>
+</table>
+<p>R58 的进程级探针使用 UTF-8 JSON-RPC 消息，按 payload 的<strong>字节长度</strong>写 Content-Length；紧凑格式的 didOpen.text 含 JSON 转义换行，合法空格格式的 initialize 含 <code>"jsonrpc": "2.0"</code>。前者使干净三行源码误报三条 LEX005，后者 0 字节响应。R59 用 <code>char_from_code(34)</code> 和 <code>char_from_code(10)</code> 在 Lom 运行时组装“引号 + 未转义真实换行 + 引号”再传给 json_parse，旧实现 exit 0 且返回含换行字符串。详尽调用与源码位置见 TODO R55-R59；上述探针在审查后均已清理。</p>
+
+<h2>3. 独立复验的正面证据</h2>
+<ul>
+<li><code>cargo test --release</code>：487/487；<code>cargo clippy --release -- -D warnings</code>：通过。</li>
+<li>eval：解释器 121/121，WASM 121/121；bootstrap golden 39/39 逐字。</li>
+<li>selfhost：dump 154、tokens 154、diags 12、static 坏文件 22 + 干净集 154、run 31、wasm layer2 151 + layer3 + self-apply，全 PASS。</li>
+<li>文档示例对账：51 正例 + 5 反例通过（Windows 需 UTF-8，R61 修补前默认命令会崩）；fuzz 80 轮；差分 CI 冒烟 20 + 包模式 10；探针 6/6。</li>
+<li>Cargo metadata 显示零第三方 Rust crate；源码无 <code>unsafe</code>。</li>
+<li>本机 gitignored LLM 留档复算：两模型 pass@k 均 1149/1160，078 均 0/10，051/104 各一组 9/10；err24 两模型各 240/240，故报告 99.1% 与 480/480 在本机档案上成立。raw 来源无法由新 clone 独立认证，报告须保留限定。</li>
+</ul>
+
+<h2>4. 对此前维护决策的裁定</h2>
+<ul>
+<li class="ok">正确：先 L1 自举再冻结语言面；解释器作参考、WASM 作交叉验证；建立差分、golden、自举 gate；warning 作为冻结安全区；记录后端分歧；发布线冻结。</li>
+<li>合理但需收口：零 Rust crate 依赖提升了可审计性，但不应把手写协议代码自动等同于正确，也不应扩张为“零 CI 供应链风险”。</li>
+<li class="p1">错误：v1.2.1 在只测理想样例后把 MUT001 宣布为 High；Phase 4/LSP 宣布完成却没有传输 e2e；发现 fn 缺 end 静默接受后只围绕 fix 规则记录，没有修 grammar 偏差。</li>
+<li>优先级失衡：10,000 个安全子集差分实例有价值，但继续堆数量的边际收益低于补 High 修复边界、真实 LSP、进程退出码和 parser delimiter。</li>
+<li>八轮报告不是无价值：它们抓到大量真问题并推动自账制度；但“独立”是同一维护体系内的 agent 分工，不等于外部同行审计，评级不能作为正确性证明。</li>
+</ul>
+
+<h2>5. 交接裁决建议</h2>
+<div class="warn"><strong>不要启动 L2。</strong> RFC-0004 方案 A 的技术判断仍合理，但 L2 会复制并放大 parser/type/fix/runtime 现有问题。下一维护者应先向用户申请按 R55→R56→R57→R58→R59→R60→R61 顺序整改；至少 R55-R58 关闭并经第十轮复审后，再重新呈现 L2 动工菜单。发布线继续冻结。</div>
+
+<h2>6. 审查局限</h2>
+<ul>
+<li>本轮没有重跑历史 10,000 个差分实例；复验的是当前 CI 冒烟、探针、生成器/claims 结构与既有报告。不得把本报告写成“独立重放 10,000”。</li>
+<li>LLM raw 在本机存在且矩阵可复算，但被 Git 忽略；没有服务商签名或不可篡改时间证明。</li>
+<li>没有安装竞品，也没有改变语言面、运行时或发布状态。</li>
+</ul>
+
+<p><small>报告：docs/reviews/review-2026-09-21.html · 基线 ce2c71e · 第九轮维护者独立敌手式审查 · 自包含 HTML · UTF-8</small></p>
+</body>
+</html>
