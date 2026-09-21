@@ -329,6 +329,31 @@ pub fn compute_diagnostics(src: &str, file: &str) -> Vec<Diagnostic> {
 
 // ===== JSON-RPC 消息处理 =====
 
+/// JSON-RPC 消息解析失败的原因（R63/十审：区分 -32700 与 -32600）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RpcParseError {
+    /// payload 不是合法 JSON → JSON-RPC -32700 Parse error
+    InvalidJson,
+    /// 合法 JSON 但不是请求/通知对象（根非 object / 缺 method）→ -32600 Invalid Request
+    NotARpcRequest,
+}
+
+impl RpcParseError {
+    pub fn json_rpc_code(self) -> i32 {
+        match self {
+            RpcParseError::InvalidJson => -32700,
+            RpcParseError::NotARpcRequest => -32600,
+        }
+    }
+
+    pub fn message(self) -> &'static str {
+        match self {
+            RpcParseError::InvalidJson => "Parse error",
+            RpcParseError::NotARpcRequest => "Invalid Request",
+        }
+    }
+}
+
 /// 解析 JSON-RPC 消息（从 JSON 字符串提取 method 和 params）
 ///
 /// 返回 (id, method, params_json)
@@ -337,10 +362,14 @@ pub fn compute_diagnostics(src: &str, file: &str) -> Vec<Diagnostic> {
 /// R58（九审）：改走 crate::json::parse（标准递归下降解析器）。v1.2.1 的
 /// 精确字符串扫描对合法带空格 JSON（`"jsonrpc": "2.0"`）完全失明——真实
 /// 客户端（VS Code 等）默认带空格，initialize 被静默忽略（0 字节响应）。
-pub fn parse_rpc_message(json: &str) -> Option<(Option<u64>, String, String)> {
-    let v = crate::json::parse(json).ok()?;
+///
+/// R63（十审）：解析失败返回结构化错误（InvalidJson / NotARpcRequest），
+/// 由传输层回 JSON-RPC 错误响应——v1.2.2 静默丢弃畸形 payload，客户端
+/// 收不到 -32700/-32600，无法感知请求未被执行。
+pub fn parse_rpc_message(json: &str) -> Result<(Option<u64>, String, String), RpcParseError> {
+    let v = crate::json::parse(json).map_err(|_| RpcParseError::InvalidJson)?;
     let crate::interpreter::Value::Record { fields } = &v else {
-        return None;
+        return Err(RpcParseError::NotARpcRequest);
     };
     let mut id = None;
     let mut method = None;
@@ -361,7 +390,10 @@ pub fn parse_rpc_message(json: &str) -> Option<(Option<u64>, String, String)> {
             _ => {}
         }
     }
-    Some((id, method?, params))
+    match method {
+        Some(m) => Ok((id, m, params)),
+        None => Err(RpcParseError::NotARpcRequest),
+    }
 }
 
 /// 构造 JSON-RPC 响应
@@ -377,6 +409,18 @@ pub fn make_error_response(id: u64, code: i32, message: &str) -> String {
     format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":{},\"error\":{{\"code\":{},\"message\":\"{}\"}}}}",
         id,
+        code,
+        crate::json::escape_str(message)
+    )
+}
+
+/// 构造 id 为 null 的 JSON-RPC 错误响应（R63）
+///
+/// payload 无法解析时请求 id 不可知——JSON-RPC 2.0 规范：Parse error /
+/// Invalid Request 的响应 id 必须为 null（服务器侧无法关联原请求）。
+pub fn make_null_id_error_response(code: i32, message: &str) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{{\"code\":{},\"message\":\"{}\"}}}}",
         code,
         crate::json::escape_str(message)
     )
@@ -630,6 +674,42 @@ end
         let (id, method, _params) = parse_rpc_message(msg).expect("解析失败");
         assert_eq!(id, None); // 通知无 id
         assert_eq!(method, "initialized");
+    }
+
+    // ===== R63（十审）：畸形 payload 的结构化错误 =====
+
+    /// R63：坏 JSON（截断对象）→ InvalidJson → -32700 Parse error
+    #[test]
+    fn r63_malformed_json_is_invalid_json_error() {
+        let err = parse_rpc_message("{\"jsonrpc\":\"2.0\",\"id\":1").unwrap_err();
+        assert_eq!(err, RpcParseError::InvalidJson);
+        assert_eq!(err.json_rpc_code(), -32700);
+        assert_eq!(err.message(), "Parse error");
+    }
+
+    /// R63：合法 JSON 但根是数组（不是请求对象）→ NotARpcRequest → -32600
+    #[test]
+    fn r63_json_array_root_is_invalid_request_error() {
+        let err = parse_rpc_message("[1, 2, 3]").unwrap_err();
+        assert_eq!(err, RpcParseError::NotARpcRequest);
+        assert_eq!(err.json_rpc_code(), -32600);
+        assert_eq!(err.message(), "Invalid Request");
+    }
+
+    /// R63：对象但缺 method 字段 → NotARpcRequest → -32600
+    #[test]
+    fn r63_object_without_method_is_invalid_request_error() {
+        let err = parse_rpc_message("{\"jsonrpc\":\"2.0\",\"id\":5,\"params\":{}}").unwrap_err();
+        assert_eq!(err, RpcParseError::NotARpcRequest);
+    }
+
+    /// R63：null-id 错误响应格式（JSON-RPC 2.0：解析失败时 id 必为 null）
+    #[test]
+    fn r63_null_id_error_response_format() {
+        let resp = make_null_id_error_response(-32700, "Parse error");
+        assert!(resp.contains("\"id\":null"), "id 应为 null: {}", resp);
+        assert!(resp.contains("\"code\":-32700"), "{}", resp);
+        assert!(resp.contains("\"jsonrpc\":\"2.0\""), "{}", resp);
     }
 
     #[test]

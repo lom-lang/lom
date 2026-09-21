@@ -236,3 +236,83 @@ fn crate_json_check(s: &str) -> bool {
     }
     depth_curly == 0 && depth_square == 0 && !in_str
 }
+
+// ===== R63（十审）：LSP 传输边界 =====
+
+/// R63 探针 1：超限 Content-Length——v1.2.2 按声称长度直接分配，
+/// `Content-Length: 999999999999` 单 header 即 memory allocation failed
+/// abort（Windows rc=0xC0000409 / 3221226505）。绝不能这样修的锁定：
+/// 进程必须显式拒绝（exit code 1 + stderr 说明），不得以 abort 码崩溃。
+#[test]
+fn r63_oversized_content_length_rejected_not_aborted() {
+    use std::process::Stdio;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_lom"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("启动 lom lsp 失败");
+    let mut stdin = child.stdin.take().expect("stdin");
+    // 超限 header + 少量 payload 字节（服务器应在读 payload 前拒绝）
+    stdin
+        .write_all(b"Content-Length: 999999999999\r\n\r\n{\"x\":1")
+        .expect("写 stdin");
+    stdin.flush().expect("flush stdin");
+    let output = child.wait_with_output().expect("等待进程退出");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "超限 header 应显式 exit 1（v1.2.2 为 abort 码 3221226505）"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Content-Length") && stderr.contains("上限"),
+        "stderr 应说明拒绝原因: {}",
+        stderr
+    );
+    assert!(
+        !stderr.contains("memory allocation"),
+        "不得出现分配失败崩溃: {}",
+        stderr
+    );
+}
+
+/// R63 探针 2：畸形 JSON payload——v1.2.2 静默丢弃（无任何响应）。
+/// 客户端必须收到 -32700 Parse error / -32600 Invalid Request（id 为 null）。
+#[test]
+fn r63_malformed_json_gets_error_response() {
+    let mut lsp = LspProc::start();
+
+    // 截断 JSON → -32700
+    lsp.send("{\"jsonrpc\": \"2.0\", \"id\": 9, \"method\": ");
+    let resp = lsp.recv();
+    assert!(
+        resp.contains("\"code\":-32700"),
+        "坏 JSON 应回 -32700: {}",
+        resp
+    );
+    assert!(
+        resp.contains("\"id\":null"),
+        "解析失败时 id 应为 null: {}",
+        resp
+    );
+
+    // 合法 JSON 但根是数组 → -32600
+    lsp.send("[1, 2, 3]");
+    let resp2 = lsp.recv();
+    assert!(
+        resp2.contains("\"code\":-32600"),
+        "非请求对象应回 -32600: {}",
+        resp2
+    );
+
+    // 错误响应后服务器必须存活：正常 initialize 仍有响应
+    lsp.send("{\"jsonrpc\": \"2.0\", \"id\": 10, \"method\": \"initialize\", \"params\": {}}");
+    let init = lsp.recv();
+    assert!(
+        init.contains("\"id\":10") && init.contains("capabilities"),
+        "错误响应后服务器应继续服务: {}",
+        init
+    );
+}

@@ -813,6 +813,13 @@ fn run_repl() {
 ///   - textDocument/completion：代码补全
 ///
 /// 消息格式：Content-Length: N\r\n\r\n + JSON payload
+///
+/// R63（十审）：Content-Length 上限 16MB——声称超限的 header 拒绝分配并
+/// 断连。v1.2.2 按声称长度直接 `vec![0u8; len]`，`Content-Length: 999999999999`
+/// 单 header 即 `memory allocation failed` abort（rc=0xC0000409），损坏/
+/// 恶意对端可用 20 字节杀死服务器。
+const MAX_LSP_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
+
 fn run_lsp() {
     use std::io::{self, BufRead, Read, Write};
 
@@ -847,7 +854,15 @@ fn run_lsp() {
         }
 
         let len = match content_len {
-            Some(n) => n,
+            Some(n) if n <= MAX_LSP_CONTENT_LENGTH => n,
+            Some(n) => {
+                // 拒绝分配即断连：payload 未读，流已不可信，无法继续会话
+                eprintln!(
+                    "[lsp] Content-Length {} 超过上限 {} 字节——拒绝分配并断连",
+                    n, MAX_LSP_CONTENT_LENGTH
+                );
+                process::exit(1);
+            }
             None => continue,
         };
 
@@ -862,9 +877,17 @@ fn run_lsp() {
         };
 
         // 3. 解析 JSON-RPC 消息
+        // R63：解析失败回 JSON-RPC 错误响应（-32700/-32600，id 为 null——
+        // 规范形态）。v1.2.2 静默 continue，客户端无从得知请求未被执行。
         let (id, method, params) = match lsp::parse_rpc_message(&json) {
-            Some(m) => m,
-            None => continue,
+            Ok(m) => m,
+            Err(e) => {
+                let resp = lsp::make_null_id_error_response(e.json_rpc_code(), e.message());
+                let msg = lsp::make_lsp_message(&resp);
+                let _ = stdout.write_all(msg.as_bytes());
+                let _ = stdout.flush();
+                continue;
+            }
         };
 
         // 4. 处理请求
