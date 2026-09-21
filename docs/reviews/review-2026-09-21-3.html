@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第十一轮维护者独立审查 — 2026-09-21-3</title>
+<style>
+body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;max-width:1080px;margin:0 auto;padding:2rem;line-height:1.7;color:#202030}
+h1{border-bottom:3px solid #0e7490;padding-bottom:.5rem}h2{margin-top:2rem;border-left:4px solid #0e7490;padding-left:.7rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #d7d7e0;padding:.5rem;vertical-align:top;text-align:left}th{background:#eef7fa}
+code{background:#f4f4f7;padding:.1rem .25rem;border-radius:3px}.p1{color:#b91c1c;font-weight:700}.p2{color:#b45309;font-weight:700}.p3{color:#475569;font-weight:700}
+.ok{color:#15803d;font-weight:700}.part{color:#b45309;font-weight:700}.bad{color:#b91c1c;font-weight:700}.meta{background:#f6fbfd;border:1px solid #d5e8ee;padding:.8rem 1rem;border-radius:8px}.warn{background:#fff7ed;border-left:4px solid #ea580c;padding:.7rem 1rem}
+pre{background:#f6f6f9;padding:.6rem;overflow-x:auto;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lom 第十一轮维护者独立审查（十审整改复审 + L2.1/L2.2 审计）</h1>
+<div class="meta">
+<strong>日期</strong>：2026-09-21（同日深夜，第十一轮）　
+<strong>审查基线</strong>：<code>65e51dc</code>（HEAD，v1.2.3 = tag <code>fcfa8d5</code> 之后 4 提交：R62/R63 整改升版 1 + L2.1 spike 2 + L2.2 1；工作树干净）　
+<strong>性质</strong>：体系内 agent 分工的独立审查（非外部同行审计——该边界如实标注）。本轮复跑十审 R62/R63 整改验收宣称、审计 RFC-0004 修订 2/3（L2.1/L2.2）交付，并对 fix 引擎 / LSP 传输 / self_comp 子集边界构造敌手探针。审查阶段未修改任何产品源码、CI 配置与治理文档；唯一写盘物为本报告；全部探针置于 <code>target/probes/</code>（gitignored），报告完成前已清理。<br>
+<strong>增量</strong>：<code>bcf324a</code>（R62）/ <code>4bcf4d9</code>（R63）/ <code>fcfa8d5</code>（升版 v1.2.3）/ <code>eafe6b3+a2d327c</code>（L2.1）/ <code>4e0511f+65e51dc</code>（L2.2 + 文档成对）。
+</div>
+
+<h2>1. 结论与总评</h2>
+<p><strong>总评 B（评级只针对本轮时点 HEAD 65e51dc）</strong>。十审开出的 R62/R63 两项整改在其自列验收面上<strong>零失真</strong>：十审三探针亲手复现全部符合（applied=0 / 源码逐字不变 / ok:false / final 如实）；R63 超限断连、畸形 JSON 回错、存活语义全部按宣称工作，进程级测试 4/4。基线九件套全部亲手复跑全绿（523+5 / clippy / fmt / doc_audit 65 / spec / prompt 24 / 六模式 / eval 双后端 121+121 / fmt gate / golden / CI 六 job success）。L2.1 spike 双载体 24 向量 + 39 字节 wasm node 实例化 <code>answer()===42</code> 亲手复证；L2.2 验收器 5/5 复跑通过，行数/计数锚点全部对上。</p>
+<p><strong>但</strong>敌手探针击穿两处 P1 与三处 P2：① R65——MUT001 修复引擎在"嵌套作用域内诊断 + 外层同名 <code>let</code>"边界上错选目标并<strong>两轮重复应用把用户源码改坏成 <code>let mut mut x</code> 解析错误</strong>（三种实例化：闭包体 / match 臂块 / for 变量遮蔽），直接证伪 v1.2.3 "闭包内/match 臂内的 MUT001 降级 hint——宁可不自动修，不可错改"的宣称（SPEC_FOR_AI L690 同句）；② R66——self_comp 的语句级子集拒绝是<strong>死代码</strong>（comp_blk 语句分派 match 位于语句位置，<code>_ =&gt; Err(...)</code>/<code>StReturn(_) =&gt; Err(...)</code> 两臂的 Err 值被丢弃）：if/while/for/return 四种语句静默蒸发后照常"COMPILED"，产出可实例化但行为错误的 wasm（<code>while i&lt;3</code> → host 3 / L2 0；<code>if True</code> 语句 → 1,2,3 / 1,3；<code>while True</code> → 死循环 / 零输出）——"控制流留 L2.3"的拒绝在表达式路径生效、语句路径全部失效；③ R67/R68——裸 <code>return</code> 与 <code>let x: Int = 1.5</code> 注解信任边界同样"COMPILED"后产出无法实例化的坏 wasm；④ R69——RFC-0004/HANDOVER 的 case1 字节锚 9746/121 实测 9852/169，五用例无一匹配（陈旧数字）；⑤ R70-R72 毛边三条。未达 B+：本轮出现新的 P1（十审基线为 1×P2+2×P3）。</p>
+
+<table>
+<tr><th>维度</th><th>评级（十审→本轮）</th><th>理由</th></tr>
+<tr><td>六模式自举</td><td>A → <span class="ok">A</span></td><td>dump 154/154、tokens/diags/static/run/wasm 五模式逐个全 PASS；self_interp 5727 行（-0.0 修复后）与 self_comp 2895 行 <code>--check</code> 零诊断、fmt gate 过。本轮未击穿。</td></tr>
+<tr><td>WASM + 差分 + <strong>L2 新增</strong></td><td>A- → <span class="part">B+</span></td><td>eval 双后端 121/121 维持；L2.1 spike 三风险点双载体实证（24 向量 + hex 逐字一致 + node answer()===42 本轮亲手复证）。扣分：L2.2 语句级子集拒绝是死臂（Err 值丢弃）——if/while/for/return 语句静默蒸发（R66 if/while/for 静默错行为 wasm、R67 return 坏 wasm）+ R68 注解信任坏 wasm——"子集外必须明确报错而非产坏 wasm"的底线被击穿。</td></tr>
+<tr><td>核心语言</td><td>A- → <span class="ok">A-</span></td><td>语言面 v1.0 冻结未动（R62/R63 均为工具行为）；本轮未测出语言面回归。</td></tr>
+<tr><td>repair-native</td><td>B+ → <span class="bad">B-</span></td><td>十审三探针（闭包遮蔽/行内注释/字符串字面量）全部按宣称工作；扁平作用域正例（while/for 块内 let + 块外重赋值）仍 High Replace、多命中 hint、解构 hint、已可变无动作、捕获变量闭包内重赋值正确修目标、fix_corpus 09 不倒。扣分：<strong>R65（P1）</strong>——嵌套作用域诊断 + 外层同名 let 时 High 错改且多轮重复应用把源码改坏成解析错误；这是 MUT001 定位面连续第三轮被击穿（R55 全文回扫→R62 函数内回扫→R62 结构化收集），根因是"按名过滤收集集"而非"解析诊断处实际绑定的作用域归属"。</td></tr>
+<tr><td>LSP/协议</td><td>B → <span class="ok">B+</span></td><td>R63 全部宣称复现：超限 16MiB 拒绝分配 exit 1（非 abort 码、无 memory allocation）、-32700/-32600 id:null、错误后 initialize 正常响应、r58 进程级 4/4；本轮另测 CL:0、恰 16MiB（放行，<code>&lt;=</code> 口径）、16MiB+1（exit 1）、缺 CL 头、双 CL 头、exit 通知——服务器均存活。残留 P3：非 UTF-8 payload 静默丢弃无 -32700（R71）；双 CL last-wins 不拒（R72）；exit 未经 shutdown 恒 rc=0（LSP 3.17 建议 1，并入 R72）。</td></tr>
+<tr><td>文档治理</td><td>B+ → <span class="part">B</span></td><td>doc_audit 65/65、spec_examples PASS、eval_prompt 24/24、README .lom 计数 38（29+4+2+3）实数核对。扣分：RFC-0004 L150 + HANDOVER 顶部 case1 字节锚 9746/121 与实产 9852/169 不符（R69，五用例全测无一匹配，验收器自身输出就打印 169）；HANDOVER §2.2 仍留"cargo fmt 当前为 R61 已知失败"陈旧句（R70）。</td></tr>
+</table>
+
+<h2>2. R62/R63 整改复审裁定</h2>
+<p>裁定口径：TODO R62/R63"验收（实测）"宣称<strong>逐条亲手复跑</strong>（真实 CLI / 真实子进程，探针用后即弃）；✓ = 宣称与实测一致；△ = 基本一致但有保留；✗ = 失真。</p>
+<table>
+<tr><th>ID</th><th>宣称 vs 实测</th><th>裁定</th><th>证据（本轮亲手复跑）</th></tr>
+<tr>
+<td>R62<br>MUT001 结构化定位</td>
+<td>十审三探针 apply 后源码逐字不变、applied=0、ok:false、final 如实报 warning</td>
+<td class="ok">✓<br><span class="p1">残留 R65</span></td>
+<td>
+三探针真实 <code>fix --apply --json</code>（md5 前后对比）：<br>
+① 闭包遮蔽（外层参数 x 重赋值 + 闭包内 <code>let x</code>）：<code>applied=0 / changes=[] / ok:false / final 1 warning</code>，源码逐字不变 ✓<br>
+② 行内注释（<code>let z = 1 # let x = 0</code>）：同上四点全符 ✓<br>
+③ 字符串字面量（<code>let s = "let x = 0"</code>）：applied=0 / 不变 / ok:false ✓；final 报 2 warning = MUT001 + 本探针自身的 <code>s + x</code> 类型不符 TYPE010（十审原探针形态所致，非 fix 引擎行为）——如实登记。<br>
+<b>边界扩展（本轮自构）：</b>while/for 块内 let + 块外重赋值（扁平作用域正例）仍 High Replace 且 final 全净 ok:true ✓；match 臂 Form B 内对外层变量赋值 → 正确改外层声明 ✓；同函数双 <code>let x</code> 遮蔽 → 多命中 Medium hint ✓；<code>let mut</code> 重赋值 → 无 MUT001 零动作 ✓；<code>let (a,b)</code> 解构后 <code>a=1</code> → hint 非 Replace ✓（hint 文案点名"for/match/闭包内声明"未点名解构绑定，语义无害）；闭包捕获外层变量重赋值 → 正确改外层声明 ok:true ✓；fix_corpus 09 正例 → <code>let mut count</code> final 全净 ✓。<br>
+<b>作用域集合对齐审计：</b>读 <code>collect_let_decls</code>（fix.rs L115-136）vs typechecker（mod.rs L291-462/949-986）——if/while/for 语句块传同一 env（扁平）、闭包 <code>closure_child</code>、match 臂 <code>child</code>：收集面与作用域边界确实对齐，match 臂内 let + 块外重赋值的交互实测正确。<b>不对齐处在反方向</b>：诊断行位于嵌套作用域内时，命中集合按名过滤仍会选中外层同名声明（见 R65）。
+</td>
+</tr>
+<tr>
+<td>R63<br>LSP 传输边界</td>
+<td>超限 exit 1 + stderr 说明 + 无 abort；畸形 JSON 回 -32700/-32600（id:null）后存活；进程级 +2 测试</td>
+<td class="ok">✓<br><span class="p3">边角 R71/R72</span></td>
+<td>
+① <code>Content-Length: 999999999999</code> 单帧 → <strong>rc=1</strong>（非 3221226505）、stderr <code>[lsp] Content-Length 999999999999 超过上限 16777216 字节——拒绝分配并断连</code>、无 "memory allocation"、stdout 0 字节 ✓<br>
+② 截断 JSON → <code>{"jsonrpc":"2.0","id":null,"error":{"code":-32700,...}}</code> ✓；<code>[1,2,3]</code> → -32600 ✓；合法对象缺 method → -32600 ✓；三错误帧之后 initialize 正常响应 ✓；shutdown+exit → rc=0 ✓<br>
+③ <code>cargo test --release --test r58_lsp_process</code> → 4/4（含 r63 两测试）✓<br>
+<b>敌手边界（本轮自构）：</b>CL:0 → -32700 后存活 ✓；CL 恰 16777216（== 上限）→ 放行并正常响应（实现为 <code>n &lt;= MAX</code>，口径与文档"上限 16 MiB"一致）✓；16777217 → exit 1 ✓；无 CL 头（仅 Content-Type）后跟正常帧 → 跳过该 header 块、正常响应 ✓；双 CL 头 → last-wins 读 5 字节 → -32700、存活（R72 登记口径问题）；非 UTF-8 payload → <strong>静默丢弃无 -32700</strong>、存活（R71）。
+</td>
+</tr>
+</table>
+<p><strong>小结</strong>：R62/R63 在各自开账验收面上零失真；R62 的"降级 hint"宣称在"外层存在同名 let"的可达边界被 R65 证伪——按十审口径这属于整改残留新边界而非验收谎报（验收探针本身真实通过）。</p>
+
+<h2>3. 基线复验清单（全部亲手跑，HEAD 65e51dc）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测</th><th>裁定</th></tr>
+<tr><td>cargo build --release</td><td>零 warning</td><td>touch 后全量重编，warning/error 计 0</td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>523 单元 + 5 集成</td><td>523 passed（单元）；r56 ×1 + r58 ×4 = 5 集成</td><td class="ok">✓</td></tr>
+<tr><td>cargo clippy --release -- -D warnings</td><td>通过</td><td>Finished 零告警</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --all -- --check</td><td>零 diff</td><td>退出 0（R61 已修；§2.2 陈旧句见 R70）</td><td class="ok">✓</td></tr>
+<tr><td>python tools/doc_audit.py</td><td>65/65</td><td>RESULT: PASS（65/65，含 Z 类自指互锁）</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 51 / 反例 5 / skip 附摘要，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>24/24</td><td>校验 24 / 失真 0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfhost 六模式</td><td>全 PASS</td><td>dump 154/154 + tokens/diags/static/run/wasm 逐个 RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>121/121 ×2</td><td>run.ps1 -Verify：解释器 121/121；-Backend wasm 121/121</td><td class="ok">✓</td></tr>
+<tr><td>examples fmt gate</td><td>全过（apply_test 豁免）</td><td>examples/bootstrap/selfhost 全部 --check 退出 0</td><td class="ok">✓</td></tr>
+<tr><td>golden stmt_interp</td><td>逐字一致</td><td>diff 为空</td><td class="ok">✓</td></tr>
+<tr><td>git status / tag</td><td>干净 / v1.2.3 已切</td><td>工作树干净；tag v1.2.3 → fcfa8d5（升版提交），HEAD 为其后 4 提交（L2.1/L2.2）</td><td class="ok">✓</td></tr>
+<tr><td>CI（GitHub API）</td><td>HEAD success</td><td>run #142（65e51dc）六 check-run 全 success；annotations 仅 4 条 ubuntu-latest→Ubuntu 26 迁移 notice（已挂账项，Node 20 弃用 warning 确已消除）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>4. L2.1 / L2.2 审计（RFC-0004 修订 2/3）</h2>
+
+<h3>4.1 L2.1 编码器 spike——宣称逐条复证</h3>
+<table>
+<tr><th>宣称</th><th>实测</th><th>裁定</th></tr>
+<tr><td>LEB128 8 权威向量（含 u32 max → ffffffff0f）宿主层逐字节一致</td><td>宿主层 8 行 <code>PASS leb ...</code> 含 <code>PASS leb 4294967295 ffffffff0f</code></td><td class="ok">✓</td></tr>
+<tr><td>f64 位模式 16 向量（规约/±0/±inf/NaN/非规约，纯算术链路）</td><td>16 行 <code>PASS f64 ...</code>（含 0.1 → 9a9999999999b93f、min-denormal 0100000000000000、min-normal 0000000000001000），合计 24 PASS</td><td class="ok">✓</td></tr>
+<tr><td>hex 通道：39 字节最小 wasm，node 实例化 answer()===42</td><td>spike 输出 <code>min_wasm hex (39 bytes): 0061736d...</code>；本轮经 hex2wasm.py 落盘 + node 实实例化：<code>answer() === 42</code></td><td class="ok">✓</td></tr>
+<tr><td>自举层产的 hex 与宿主层逐字一致</td><td>self_interp -- l2_spike.lom --run 与宿主直跑的 min_wasm 行 diff 为空，且自举层同样 SPIKE: ALL PASS</td><td class="ok">✓</td></tr>
+<tr><td>-0.0 修复：self_interp 5714→5727 行</td><td>wc -l = 5727 ✓；f64 -0.0 → 0000000000000080 两层一致</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>4.2 L2.2 最小子集编译器——验收宣称复证</h3>
+<table>
+<tr><th>宣称</th><th>实测</th><th>裁定</th></tr>
+<tr><td>verify_selfcomp.py 5/5 双产物（stdout+rc）一致</td><td>5/5 PASS 复跑</td><td class="ok">✓</td></tr>
+<tr><td>self_comp.lom 2895 行</td><td>wc -l = 2895</td><td class="ok">✓</td></tr>
+<tr><td>self_comp --check 零诊断 + fmt gate 过</td><td>--check total 0；fmt --check 退出 0（l2_spike 同过）</td><td class="ok">✓</td></tr>
+<tr><td>case1 宿主 9746B vs L2 121B</td><td>实测 <strong>9852B vs 169B</strong>；五用例全测（host 9805-9900 / l2 169-254）无一匹配宣称对</td><td class="bad">✗（R69）</td></tr>
+<tr><td>fmtFloat 口径与宿主 run_wasm.mjs 一致</td><td>两文件函数体逐字符 diff 相同（同源拷贝）——对拍目的（比较编译器而非格式器）下成立</td><td class="ok">✓</td></tr>
+<tr><td>已知边界① Float 字面量近似解析、测试集限精确可表示值</td><td>实测<strong>登记如实且边界真实</strong>：<code>println(0.1)</code>/<code>0.1+0.2</code>/<code>0.30000000000000004</code> 双产物一致；19 位字面量 <code>0.1234567890123456789</code> 分叉（host …568 正确舍入 vs L2 …566 近似）——分叉存在且 RFC 已登记 = 如实</td><td class="ok">✓（边界如实）</td></tr>
+<tr><td>已知边界② 对拍避开宿主 tagged-i64 值域 ±2^59（§11f-7）</td><td>实测登记如实：<code>println(2305843009213693951)</code> host-wasm 打 -1（tagged 回绕）vs L2 打原值——分歧真实且属已登记类</td><td class="ok">✓（边界如实）</td></tr>
+<tr><td>无限递归行为</td><td>双侧 wasm 均 trap（stdout 空、rc=1）——双产物一致；宿主解释器同程序为结构化 RUNTIME000（在 wasm-vs-wasm 对拍口径外，§11f 域，见 §7 局限）</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>4.3 子集外构造拒绝矩阵（本轮敌手探针，self_comp -- &lt;in&gt; &lt;out.hex&gt;）</h3>
+<table>
+<tr><th>构造</th><th>结果</th><th>裁定</th></tr>
+<tr><td>if 尾表达式 / 闭包 / String println / Bool 参数 / Float % / 比较运算 &lt; / 缺 main / 调用未知函数 / 嵌套 println / match 表达式（let 初值处）/ enum 参数</td><td>全部 <code>codegen error: L2.2 子集不支持…</code> + <code>COMPILE-ERROR</code>，不产 wasm（表达式路径经 <code>?</code> 传播，拒绝真实生效）</td><td class="ok">✓</td></tr>
+<tr><td>fn f() -&gt; Int 尾表达式 1.5</td><td><code>codegen error: 尾表达式类型与返回类型不符</code></td><td class="ok">✓</td></tr>
+<tr><td><b>while 语句</b>（含条件 <code>i &lt; 3</code>）</td><td><b>COMPILED 87 bytes</b>；host-wasm 打印 3、L2-wasm 打印 <strong>0</strong>——可实例化、静默错误行为</td><td class="bad">✗（R66）</td></tr>
+<tr><td><b>if 语句</b>（非尾位置）/ for 语句</td><td><b>COMPILED</b>；<code>println(1) / if True println(2) end / println(3)</code> → L2-wasm 打印 <strong>1,3</strong>（host 1,2,3）——if/for 语句同样静默蒸发；<code>while True println(9) end</code> → L2-wasm <strong>零输出</strong>（host 死循环）</td><td class="bad">✗（R66）</td></tr>
+<tr><td><b>裸 return</b> <code>return x + 1</code></td><td><b>COMPILED 92 bytes</b>；node 实例化即 <code>CompileError: expected 1 elements on the stack for fallthru, found 0</code></td><td class="bad">✗（R67）</td></tr>
+<tr><td><b>let 注解信任</b> <code>let x: Int = 1.5</code></td><td><b>COMPILED 94 bytes</b>；<code>CompileError: local.set[0] expected type i64, found f64.const</code>；宿主侧同程序打印 1.5（运行时值胜出，TYPE001 仅 warning）</td><td class="bad">✗（R68）</td></tr>
+</table>
+<p><strong>根因定位（对 self_comp 探针副本动态插桩实证，未改产品源码）</strong>：comp_blk 的语句分派 <code>match s</code> 位于<strong>语句位置</strong>——<code>StReturn(_) =&gt; Err(...)</code> 与 <code>_ =&gt; Err(...)</code>（承接 if/while/for/match 语句）两臂构造的 Err 值是 match 的值，<strong>被直接丢弃</strong>（语句位置的表达式值不求值用途）；只有臂内经 <code>?</code> 的调用（<code>let_vt(...)?</code>/<code>comp_ex(...)?</code> 等）才会使函数失败。所以源码里"写了"的语句级拒绝是<strong>死代码</strong>——if/while/for/return 四种语句形态整体静默蒸发（本轮实证 if/while/for/return 四组 + 语句蒸发后余下合法代码照常编译）；表达式路径（if/match 作尾或 let 初值、运算符、类型）经 comp_ex/infer_ex 的 <code>?</code> 传播，拒绝真实生效（p_if/p_cmp/p_fmod/w7 等实证）。let 注解信任是另一个独立缺陷：<code>let_vt</code> 对 <code>Some(tt)</code> 直接采信注解类型（<code>ty_vt(tt)</code>），不与值类型比对——与宿主"注解不匹配仅 TYPE001 warning、运行时值胜出"的信任模型不一致，且该边界 RFC-0004 修订 3 未登记。动态插桩方法：把 self_comp.lom 拷贝到 target/probes/ 后在 comp_blk 入口/各 match 臂加 println——语句被看到、无任何臂执行、无错误传播，三事实锁定死臂结论。</p>
+
+<h2>5. 新发现（R65 起；只开账不修复）</h2>
+<table>
+<tr><th>ID</th><th>级别</th><th>发现</th><th>最小复现</th></tr>
+<tr>
+<td><a name="r65"></a><strong>R65</strong></td>
+<td class="p1">P1</td>
+<td><strong>MUT001 错目标 + 非幂等重复应用把用户源码改坏成解析错误。</strong>诊断行位于闭包体/match 臂/for 绑定等嵌套作用域内、而外层函数扁平作用域存在同名 <code>let</code> 时，<code>fix_mut001_add_mut</code> 按名过滤命中外层声明（唯一命中 → High Replace），改错对象且原诊断不消；下一轮重诊断时已改为 <code>let mut</code> 的声明仍被收集（<code>collect_let_decls</code> 不过滤 <code>mutable</code> 标志），同坐标再次 Replace → <code>let mut mut x</code> → PARSE001。<code>apply --apply</code> 直接改写磁盘文件，用户源码损坏（ok:false 如实报告，但文件已坏）。三种实例化均验证：闭包体、match 臂块、for 变量遮蔽（后者 applied=3，EFF001 合法修 + MUT001 错改 ×2）。证伪 v1.2.3 宣称"闭包内/match 臂内的 MUT001 降级 hint——宁可不自动修，不可错改"（TODO L228 / SPEC_FOR_AI L690"whose declaration lives inside a closure body or match arm degrades to a Medium hint"——该形态下声明恰在闭包/match 臂内，实际却是 High Replace）。<br><b>根因（两个独立缺陷叠加）</b>：① 命中过滤不看诊断行的作用域归属——无法区分"闭包内重赋捕获的外层 x"（应 Replace 外层，实测正确）与"闭包内重赋闭包自己的遮蔽 x"（不应动外层）；② 已可变声明仍计入命中集 → 非幂等重应用。二者任一修掉即可阻断损坏链（① 使其正确降级 hint；② 使 round2 零命中转 hint），但只修 ② 仍残留一次错改。</td>
+<td><pre>fn f() -&gt; Int
+    let x = 1
+    let g = fn(y: Int) -&gt; Int
+        let x = y + 1
+        x = x + 1
+        x
+    end
+    g(1)
+end
+fn main() -&gt; Unit
+    println(f())
+end</pre>
+<code>./target/release/lom.exe fix p.lom --apply --json</code> → <code>applied=2, ok:false, final errors=1</code>，文件第 2 行变为 <code>let mut mut x = 1</code>。match 臂版：Form B 臂内 <code>let x = 5 / x = x + 1</code>；for 版：<code>let x = 1 / for x in 3 … end / x = 5</code>（applied=3）。</td>
+</tr>
+<tr>
+<td><a name="r66"></a><strong>R66</strong></td>
+<td class="p1">P1</td>
+<td><strong>self_comp 对子集外控制流语句（if/while/for）与裸 return 产出静默丢弃或坏 wasm。</strong>根因：comp_blk 语句分派 <code>match s</code> 在语句位置，<code>_ =&gt; Err(...)</code> 与 <code>StReturn(_) =&gt; Err(...)</code> 两臂的 Err 值被丢弃（拒绝是死代码）——if/while/for 语句连体蒸发（<code>if True println(2) end</code> → L2 打 1,3；<code>while True …</code> → 零输出；<code>let i=0; while i&lt;3 … println(i)</code> → 打 0），产出的 wasm 可实例化、运行不报错——差分与运行都探不到的静默错误。RFC-0004 修订 3 声称"控制流留 L2.3"且其余入口均有真实拒绝（表达式路径经 <code>?</code> 生效），唯语句路径死臂。静默错误行为是编译器最危险失败模式，L2.4 若以该编译器自举会放大。</td>
+<td><pre>fn main() -&gt; Unit
+    println(1)
+    if True
+        println(2)
+    end
+    println(3)
+end</pre>
+self_comp → <code>COMPILED 85 bytes</code>；L2-wasm 打 <code>1,3</code>、host 打 <code>1,2,3</code>。while 版（<code>let i = 0 / while i &lt; 3 / i = i + 1 / end / println(i)</code>）：L2 打 <code>0</code> vs host <code>3</code>；<code>while True</code> 版：L2 零输出 vs host 死循环。</td>
+</tr>
+<tr>
+<td><a name="r67"></a><strong>R67</strong></td>
+<td class="p2">P2</td>
+<td><strong>裸 return 编译为非法 wasm（打印 COMPILED）。</strong>与 R66 同根因（StReturn 臂的 Err 死值）：return 语句蒸发后函数体为空，非 void 函数产物栈校验失败无法实例化——失败面从编译期推迟到运行期。RFC 修订 2 已登记"尾部裸 return 使函数块值为 Unit"的语言面事实，self_comp 源码也写了拒绝臂但未生效。</td>
+<td><pre>fn f(x: Int) -&gt; Int
+    return x + 1
+end
+fn main() -&gt; Unit
+    println(f(1))
+end</pre>
+→ <code>COMPILED 92 bytes</code>；node 实例化 <code>CompileError: expected 1 elements on the stack for fallthru, found 0</code>（host 打 2）。</td>
+</tr>
+<tr>
+<td><a name="r68"></a><strong>R68</strong></td>
+<td class="p2">P2</td>
+<td><strong>let 显式注解信任边界未登记且产坏 wasm。</strong><code>let x: Int = 1.5</code>：self_comp 的类型综合直接采信注解（槽位 i64）而值是 f64 → <code>local.set expected i64, found f64</code> 非法 wasm。宿主语义是注解不匹配仅 TYPE001 warning、运行时值胜出（打 1.5）。RFC-0004 修订 3 的"已知边界"清单未登记该信任差异——编译器信任输入的边界失账。</td>
+<td><pre>fn main() -&gt; Unit
+    let x: Int = 1.5
+    println(x)
+end</pre>
+→ <code>COMPILED 94 bytes</code>；实例化 CompileError（host 打 <code>1.5</code>）。</td>
+</tr>
+<tr>
+<td><a name="r69"></a><strong>R69</strong></td>
+<td class="p2">P2</td>
+<td><strong>case1 字节锚陈旧失真。</strong>RFC-0004 L150 与 HANDOVER 顶部宣称"case1 宿主产物 9746 字节 vs L2 产物 121 字节"；HEAD 实测 01_arith_int 为 <strong>9852 / 169</strong>（verify_selfcomp 自身输出即打印 169），五用例（host 9805-9900 / l2 169-254）无一匹配。量级方向（≈9.8KB vs ≈0.17KB）成立，但锚点数字未随用例定稿重测。doc_audit 不覆盖该数字。</td>
+<td><code>python tools/verify_selfcomp.py</code> 首行 <code>PASS 01_arith_int.lom 169 bytes</code>；<code>lom build 01_arith_int.lom --target wasm</code> → 9852 字节。</td>
+</tr>
+<tr>
+<td><a name="r70"></a><strong>R70</strong></td>
+<td class="p3">P3</td>
+<td>HANDOVER §2.2 残留陈旧句："<code>cargo fmt --all -- --check</code> 当前为 R61 已知失败，尚不是 CI gate"——R61 已于同日关闭（rustfmt 机械包 5f2930a），fmt 现零 diff。误导下任维护者跳过 fmt 或以为未设门。</td>
+<td>读 HANDOVER §2.2 末段 + <code>cargo fmt --all -- --check</code> 实跑退出 0。</td>
+</tr>
+<tr>
+<td><a name="r71"></a><strong>R71</strong></td>
+<td class="p3">P3</td>
+<td>LSP 非 UTF-8 payload 静默丢弃：R63 的"畸形 JSON 回错误响应"只覆盖合法 UTF-8 文本；payload 含无效 UTF-8 字节时 <code>from_utf8</code> 失败走 <code>continue</code>，客户端收不到任何 -32700（v1.2.2 行为残留）。服务器存活。</td>
+<td>发 CL 正确、payload 含 <code>\xff\xfe</code> 的帧 → 无响应帧；后续 initialize 正常。</td>
+</tr>
+<tr>
+<td><a name="r72"></a><strong>R72</strong></td>
+<td class="p3">P3</td>
+<td>LSP 传输边角两枚：① 双 <code>Content-Length</code> 头 last-wins 不拒（实测第二头 5 覆盖第一头，读 5 字节 → -32700，剩余字节按 header 行消化，无永久失步但 LSP 规范建议拒收重复头）；② <code>exit</code> 未经 <code>shutdown</code> 恒 rc=0（LSP 3.17 建议 error code 1）。均为规范柔顺性毛边，非可达性/稳定性问题。</td>
+<td>双头帧实测；<code>printf '...method":"exit"}' | lom lsp</code> → rc=0。</td>
+</tr>
+</table>
+
+<h2>6. 对交接裁决的建议（供用户决策，非本审查越权裁定）</h2>
+<ul>
+<li><strong>L2.3 暂缓放行，先收口 R66/R67/R68（一个整改小包）</strong>。理由：L2.3 全语言面将把更多构造叠在当前语句级拒绝死臂上，而 R66 的失败模式（可实例化的静默错误 wasm）是差分/运行都探不到的盲区；L2.4 自举闭环会用 self_comp 编译 self_comp 自身，错误行为会被链式固化。整改方向（供参考，只登记不开方）：comp_blk 语句分派的 match 需把各臂 Result 经 <code>?</code> 线程化（如臂产出 code 字符串、错误显式 return Err），并补<strong>子集外负例集</strong>到 verify_selfcomp（本轮探针矩阵——if/while/for/return 语句、注解不匹配、Float %、比较、缺 main、未知函数、嵌套 println——可直接复用为回归用例）；R68 在 RFC-0004 已知边界清单补登记并决定语义（建议：注解与综合值类型不一致即 subset_err 拒绝，与"编译器信任输入"的边界一起明示）。R65 修复属 v1.2.4 工具面整改包（见下），不阻塞 L2 也可以并行——但两者都应在 L2.3 前落账。</li>
+<li><strong>R65 建议入 v1.2.4 整改包（P1）</strong>。语言面不动（纯 fix 引擎行为），符合发布线冻结政策下的工具面小版本惯例（v1.2.2/v1.2.3 同型）。修复方向（只登记不开方）：① <code>collect_let_decls</code>/命中过滤补 <code>!mutable</code>（断非幂等链，独立可测）；② 诊断行作用域归属判定——诊断行位于闭包/match 臂/for 绑定的嵌套区域时，若同名命中指向外层声明则降级 hint（对齐"宁可不自动修"）。①②齐修后补三类负向锁定测试（本轮三探针即现成用例）。</li>
+<li><strong>R69/R70 文档锚修正随整改包顺带</strong>：字节锚按实产重测（或改为区间口径并纳入 doc_audit 锚点面）；§2.2 删除 fmt 陈旧句。R71/R72 可挂账入 LSP 边角清单，不阻塞。</li>
+<li><strong>发布冻结维持</strong>：本轮全部新发现均为工具行为（fix 引擎/LSP 毛边）、实验性 L2 里程碑产物与文档数字，无一触及语言面；v1.2.3 tag 无需撤回（其自列验收宣称真实），R65 以 v1.2.4 收口即可。</li>
+<li><strong>流程观察（不计级）</strong>：MUT001 定位面三轮递进收敛（全文回扫 → 函数内 → AST 扁平收集），每轮修掉上一形态又留下一形态——建议下轮整改时把"诊断-声明作用域归属解析"作为终态方案评估（与 typechecker 共享一次 Env 解析），而非继续按名过滤的窄化路线；同一模式也适用于 EFF001 等 span 推算类动作。</li>
+</ul>
+
+<h2>7. 审查局限（如实列出本轮没测的面）</h2>
+<ul>
+<li><strong>体系内边界</strong>：本审查是体系内 agent 分工的独立复审，非外部同行审计；复现与读码均由同一 agent 完成，存在与维护会话同源盲区的风险。</li>
+<li><strong>平台</strong>：全部本地实测在 Windows（Git Bash + PowerShell）单机完成；Linux/macOS 仅经 GitHub API 对账 CI 结论（六 job success），未本地复跑。</li>
+<li><strong>v1.2.2 对照</strong>：十审对 v1.2.2 行为的描述（错改 applied=1 + ok:true 等）取自十审报告，本轮未重建 v1.2.2 二进制独立复核。</li>
+<li><strong>未跑项</strong>：fuzz_smoke / diff_test（探针与冒烟）本轮清单未列、未本地执行（CI doc-gates 常驻且 #142 绿，间接覆盖）；LSP 的 hover/completion/didChange 语义深度、并发与性能、Windows 管道特异行为未展开（R63 审计聚焦传输边界）。</li>
+<li><strong>L2.2 对拍广度</strong>：5 用例是既有验收设计，本轮敌手探针是其补充而非对"5/5"宣称本身的否定；未做随机程序对拍（那是 L2.3 后差分验收的既定议程）。精度分歧只定位一个 19 位字面量实例，未系统扫描最小分歧样本与分歧密度。</li>
+<li><strong>解释器-编译器三方口径</strong>：观察到宿主解释器对超大浮点显示（<code>1234567890123456800000.0</code>）与两个 wasm 后端（<code>1.2345678901234568e+21</code>）不同——经查属 LANGUAGE_SPEC §13 已登记的 §11f 大浮点显示分歧（SPEC_FOR_AI §11f），非新发现；L2.2 对拍口径（wasm vs wasm，同一 JS fmtFloat）不受影响，但三方口径差异未做系统对账。</li>
+</ul>
+
+<p style="margin-top:2rem;color:#64748b">第十一轮维护者独立审查 · 2026-09-21 · 基线 <code>65e51dc</code>（v1.2.3=fcfa8d5 + L2.1/L2.2 四提交）· 唯一写盘物：本报告 · 探针已清理（target/probes/ 清空）</p>
+</body>
+</html>
