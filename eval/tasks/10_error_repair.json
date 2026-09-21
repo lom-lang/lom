@@ -30,7 +30,7 @@
     "id": "089",
     "category": "error_repair",
     "difficulty": "easy",
-    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfn main() -> Unit\n    let x = 5\n    println(x)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 结束函数体，得到 EOF\",\"line\":3,\"col\":1,\"hint\":\"函数体需要以 end 闭合\"}]}\n\n请输出修复后的完整代码。",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfn main() -> Unit\n    let x = 5\n    println(x)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t089.lom\",\"ok\":false,\"summary\":{\"total\":1,\"errors\":1,\"warnings\":0,\"holes\":0},\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' (块闭合)，得到 文件结束\",\"file\":\"t089.lom\",\"line\":4,\"col\":1,\"source_line\":null,\"is_hole\":false,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
     "solution": "fn main() -> Unit\n    let x = 5\n    println(x)\nend\n",
     "expected": "5\n",
     "notes": "PARSE001: 函数体缺少 end。修复：末尾加 end。"
@@ -39,7 +39,7 @@
     "id": "090",
     "category": "error_repair",
     "difficulty": "easy",
-    "prompt": "以下 .lom 代码有错误。请修复使其输出 10。\n\n错误代码：\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = double(5)\n    println(result)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 结束函数体，得到 EOF\",\"line\":7,\"col\":1,\"hint\":\"函数体需要以 end 闭合\"}]}\n\n请输出修复后的完整代码。",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 10。\n\n错误代码：\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = double(5)\n    println(result)\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t090.lom\",\"ok\":false,\"summary\":{\"total\":1,\"errors\":1,\"warnings\":0,\"holes\":0},\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' (块闭合)，得到 文件结束\",\"file\":\"t090.lom\",\"line\":8,\"col\":1,\"source_line\":null,\"is_hole\":false,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
     "solution": "fn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let result = double(5)\n    println(result)\nend\n",
     "expected": "10\n",
     "notes": "PARSE001: main 函数缺少 end。修复：末尾加 end。"

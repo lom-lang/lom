@@ -727,9 +727,28 @@ impl Parser {
                 }
             }
         }
-        // 只消费 end；elif/else 留给 parse_if
+        // 块终止符三态：
+        //   End  —— 消费（正常闭合）
+        //   Elif/Else —— 留给 parse_if（if 分支块的合法终止）
+        //   Eof  —— R57（九审）：不得静默闭合块。冻结 grammar 要求块以 end
+        //           闭合；v1.2.1 把 EOF 当正常终点，缺最终 end 的程序
+        //           ok:true 零诊断直接执行。消息走 expect 风格（"期望 'end'，
+        //           得到 文件结束"），与 PARSE001 的 missing-end fix 通路对接。
+        //           容错模式记录错误但保留已解析块（带洞语义：fn 项不丢）。
         if self.check(&Token::End) {
             self.advance();
+        } else if self.check(&Token::Eof) {
+            let t = self.current();
+            let e = ParseError {
+                message: "期望 'end' (块闭合)，得到 文件结束".to_string(),
+                line: t.line,
+                col: t.col,
+            };
+            if self.recover {
+                self.errors.push(e);
+            } else {
+                return Err(e);
+            }
         }
         Ok(Block { stmts, tail })
     }
@@ -1451,7 +1470,9 @@ end
         assert!(p.parse_program().is_ok(), "50 层嵌套在 max=100 内应正常");
     }
 
-    /// Q3：容错模式下超限 = 单条诊断后终止（pos 跳 Eof，不产生错误风暴）
+    /// Q3：容错模式下超限 = 深度错误后终止（pos 跳 Eof，不产生错误风暴）。
+    /// R57 起：跳 EOF 后 parse_block 不再静默闭合块——最多追加一条
+    /// "期望 'end'"（块未闭合是真实状态），仍无错误风暴。
     #[test]
     fn deep_nesting_recover_mode_single_error() {
         use crate::lexer::Lexer;
@@ -1467,9 +1488,19 @@ end
         p.max_expr_depth = 100;
         let program = p.parse_program().expect("容错模式应返回带洞 AST");
         let errors = p.errors;
-        assert_eq!(errors.len(), 1, "应恰好 1 条错误（终止防御），得 {}",
-                   errors.len());
+        assert!(
+            errors.len() <= 2,
+            "深度错误 + 至多一条缺 end，不应有错误风暴，得 {}",
+            errors.len()
+        );
         assert!(errors[0].message.contains("嵌套超过"));
+        if errors.len() == 2 {
+            assert!(
+                errors[1].message.contains("期望 'end'"),
+                "第二条应是缺 end 诊断: {}",
+                errors[1].message
+            );
+        }
         assert!(!program.items.is_empty(), "带洞 AST 应保留 fn main 项");
     }
 
@@ -1748,6 +1779,77 @@ end
         let r = recover("fn add(x: Int, y: Int) -> Int\n    x + y\nend");
         assert!(r.is_ok(), "合法程序不应有错误，得到: {:?}", r.errors);
         assert_eq!(r.program.items.len(), 1);
+    }
+
+    // ===== R57（九审）：EOF 不得静默闭合块——冻结 grammar 要求 end =====
+
+    /// 五种块形态的 EOF 缺 end 反例：v1.2.1 全部 ok:true 零诊断静默执行
+    /// （九审以任务 089 原始源实测）。修复后必须 PARSE001。
+    #[test]
+    fn r57_missing_end_eof_all_block_forms_report_parse001() {
+        let probes = [
+            // fn 体
+            ("fn", "fn main() -> Unit\n    let x = 5\n    println(x)\n"),
+            // if 体
+            (
+                "if",
+                "fn main() -> Unit\n    if True\n        println(1)\n",
+            ),
+            // while 体
+            (
+                "while",
+                "fn main() -> Unit\n    let i = 0\n    while i < 3\n        i = i + 1\n",
+            ),
+            // for 体（迭代 Int——宿主无 [..] List 字面量）
+            (
+                "for",
+                "fn main() -> Unit\n    for i in 3\n        println(i)\n",
+            ),
+            // 闭包体
+            (
+                "closure",
+                "fn main() -> Unit\n    let f = fn(x: Int) -> Int\n        x + 1\n    println(f(1))\nend\n",
+            ),
+        ];
+        for (name, src) in probes {
+            let r = recover(src);
+            assert!(
+                !r.is_ok(),
+                "{}：EOF 缺 end 不得静默通过，errors: {:?}",
+                name, r.errors
+            );
+            assert!(
+                r.errors.iter().any(|e| e.message.contains("期望 'end'")),
+                "{}：应报缺 end 诊断，errors: {:?}",
+                name, r.errors
+            );
+            // 严格模式同样拒绝
+            assert!(
+                Parser::parse(src).is_err(),
+                "{}：严格模式应返回 Err",
+                name
+            );
+        }
+    }
+
+    /// 合法嵌套/多块程序不回归：所有块闭合时零诊断
+    /// （for 迭代 Int——宿主无 [..] List 字面量，§4.5b）
+    #[test]
+    fn r57_closed_blocks_still_parse_clean() {
+        let src = "fn outer() -> Int\n    let mut acc = 0\n    for i in 3\n        if i > 1\n            acc = acc + i\n        else\n            acc = acc + 1\n        end\n    end\n    acc\nend\nfn main() -> Unit\n    let f = fn(x: Int) -> Int\n        x * 2\n    end\n    println(outer() + f(1))\nend\n";
+        let r = recover(src);
+        assert!(r.is_ok(), "合法嵌套不应有错误: {:?}", r.errors);
+        assert_eq!(r.program.items.len(), 2);
+        // 严格模式同样通过
+        assert!(Parser::parse(src).is_ok());
+    }
+
+    /// 中途缺 end（下一个顶层声明顶掉了闭合）也必须报错——不是只有 EOF 形态
+    #[test]
+    fn r57_missing_end_mid_file_reports_error() {
+        let src = "fn a() -> Unit\n    println(1)\nfn b() -> Unit\n    println(2)\nend\n";
+        let r = recover(src);
+        assert!(!r.is_ok(), "fn a 缺 end（被 fn b 顶替）应报错: {:?}", r.errors);
     }
 
     #[test]

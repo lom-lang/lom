@@ -77,12 +77,26 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   clippy 零 warning；doc_audit 65/65（锚点 495→498）；SECURITY 限制 4/5
   与 memory-safety 行改写为修复后口径（含可执行验证命令）；eval 121/121。
 
-### R57 — EOF 静默闭合必需 `end`（P1）⏳ open
+### R57 — EOF 静默闭合必需 `end`（P1）✅ done（2026-09-21）
 
-- `parse_block` 将 EOF 当正常终止并仅“有则消费”End。任务 089 原始缺 end 源实测
-  `--json ok:true`、0 诊断、默认运行输出 5；违反 SPEC_FOR_AI 核心规则与冻结 grammar。
-- **验收**：fn/if/while/for/closure 各一组 EOF 缺 end 反例必须 PARSE001/Hole；合法嵌套
-  不回归；更新 error_repair 089/090 等历史 prompt，诊断 JSON 必由真实命令生成。
+- **修法**：`parse_block` 终止三态明确——End 消费（正常）；Elif/Else 留给
+  parse_if（if 分支块合法终止）；**Eof 报 `PARSE001 期望 'end' (块闭合)，
+  得到 文件结束`**（消息走 expect 风格，与 missing-end fix 通路对接；
+  strict 模式 Err，容错模式记录错误但保留已解析块——带洞语义，fn 项不丢，
+  深嵌套超限跳 EOF 场景无错误风暴）。这是把实现向冻结 grammar 对齐，
+  不是语言面变化（不需 RFC）。WASM 侧同源 parser 修复自动传导。
+- **验收（2026-09-21 实测）**：任务 089 原始源 `--json` 从 ok:true 零诊断
+  变为 **ok:false + PARSE001 (4:1)**，运行 exit 1；fn/if/while/for/闭包
+  五组 EOF 缺 end 反例 + 中途缺 end（fn b 顶替 fn a 的 end）+ 合法嵌套
+  不回归三组测试锁定（+3 测试 **501 单元 + 1 集成 = 502**）；既有
+  fix_corpus 07_missing_end 不倒（Medium insert 不被 apply，源码不变
+  语义保持）；**089/090 历史 prompt 诊断 JSON 换成真实命令生成**
+  （`期望 'end' (块闭合)，得到 文件结束` 4:1/8:1，v1.2.1 手写 JSON 与
+  实际诊断不符——runner 只验 stdout+rc 掩盖了这一点）；deep_nesting
+  恢复测试更新为"深度错误 + 至多一条缺 end"。doc_audit 65/65（锚点
+  498→501）、eval 121/121、selfhost dump 154/154、golden 逐字、
+  clippy 零 warning；SPEC_FOR_AI Phase 2.2 行与 SECURITY 限制 6 改写
+  为修复后口径（含验证命令）。
 
 ### R58 — LSP JSON-RPC 传输不符合真实客户端（P1）⏳ open
 
