@@ -16,14 +16,17 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.1；语言面与发布线冻结。
-- 第九轮维护者独立敌手式审查已完成，总评 B：docs/reviews/review-2026-09-21.html。
-- R1-R54 已关闭；R55-R61 open，尚无获授权实施包。唯一事实源是 docs/TODO.md 顶部。
-- 四项 P1：R55 High 自动修复可错改；R56 worker panic 被吞为 exit 0；R57 EOF 静默闭合必需 end；R58 LSP JSON-RPC 真实传输不可用。
-- 两项 P2：R59 strict JSON 接受未转义控制字符；R60 文档/安全/评测 gate 盲区。
-- 一项 P3：R61 rustfmt/Windows 编码/CI action warning；其中 spec_examples_check UTF-8 已在交接提交修补，其余未做。
-- L2 RFC-0004 仍为 draft、未获动工授权。审查建议至少 R55-R58 关闭并复审前继续后置。
-- 发布线不动；差分扩展按需；MoonBit 1.0 Q3 复核仍等月底窗口。
+- 版本 v1.2.2；语言面与发布线冻结。
+- 第九轮维护者独立敌手式审查（总评 B，docs/reviews/review-2026-09-21.html）的
+  R55-R61 已于 2026-09-21 按用户裁决全量整改关闭（四项 P1 + P2×2 + P3×1），
+  各项验收与证据见 docs/TODO.md；九审 B 是审查时点评级，第十轮独立复审未进行。
+- 测试基线 513 单元 + 3 集成（tests/：r56 CLI 退出码进程级、r58 LSP stdio e2e ×2）；
+  eval 双后端 121/121；doc_audit 65 项含新增 eval_prompt_check 24/24。
+- 教训：宿主 parser/诊断行为改动必须同步检查自举对齐（三实现）且 selfhost 六模式
+  逐个跑——R57 曾因此 CI 三连红（教训档 HANDOVER §11.6）。
+- L2 RFC-0004 仍为 draft、未获动工授权。九审建议第十轮复审后再呈现 L2 菜单。
+- 发布线不动；差分扩展按需；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移
+  观察 2026-10-19。
 
 【第一回合必须完成】
 1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6，docs/TODO.md 顶部 R55-R61，docs/reviews/review-2026-09-21.html，LANGUAGE_SPEC §14；涉及架构时再读 RFC-0003，涉及 L2 时读 RFC-0004。
