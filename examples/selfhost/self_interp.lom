@@ -4694,8 +4694,14 @@ fn jp_string(rest: List<String>, st: Map<String, Int>) -> Result<(String, List<S
                     end
                 end
             else
-                s = s + c
-                r = list_tail(r)
+                # R59（九审）：RFC 8259 要求字符串内 U+0000..U+001F 必须转义。
+                # 字典序判定：全部控制字符都小于空格 U+0020（与宿主 c < 0x20 对齐）
+                if c < " "
+                    err = jp_err(r, st, "字符串内含未转义控制字符（RFC 8259 要求转义）")
+                else
+                    s = s + c
+                    r = list_tail(r)
+                end
             end
         end
     end

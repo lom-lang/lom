@@ -120,10 +120,23 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   warning；doc_audit 65/65（锚点 501→507）；eval 121/121；selfhost
   dump 154/154；README LSP 段从 ⚠️ prototype 改写为修复后口径。
 
-### R59 — json_parse 接受未转义控制字符（P2）⏳ open
+### R59 — json_parse 接受未转义控制字符（P2）✅ done（2026-09-21）
 
-- 源码注释称“严格 JSON”，但引号内真实换行被接受，程序 exit 0 并输出含换行字符串。
-- **验收**：U+0000..U+001F 未转义形态拒绝；合法 `\\n` 保持；宿主/WASM/自举对齐。
+- **修法**：宿主 `src/json.rs::parse_string` 在字符串内容分支前拒绝
+  `c < 0x20`（RFC 8259：字符串内 U+0000..U+001F 必须转义；v1.2.1 接受
+  引号内真实换行并返回含换行字符串，"严格 JSON"宣称失实）；自举
+  `self_interp.lom::jp_string` 同款（字典序 `c < " "` 判定，+6 行 →
+  5709 行）；WASM 走 Node `JSON.parse` 本就严格（trap 形态），无改动。
+- **验收（2026-09-21 实测）**：九审探针（`char_from_code(34)+char_from_code(10)`
+  组装引号+真实换行+引号）三层对齐——宿主 `[RUNTIME000] json_parse 失败:
+  …未转义控制字符 0x0A` exit 1；自举 `[self-runtime] …未转义控制字符`；
+  WASM trap `Bad control character in string literal`。合法 `\n`/`\t`/
+  `\u000A` 转义与结构层空白（值间换行/制表）不受影响（单测 ×3：全 32
+  控制字符逐个拒绝 / 转义保持 / 结构空白合法）。cargo test --release
+  **510 单元 + 3 集成 = 513**；双后端 eval 121/121；selfhost dump/run/
+  static PASS；doc_audit 65/65（self_interp 5703→5709 与测试数 507→510
+  锚点同步；SPEC_FOR_AI 行数同步）；LANGUAGE_SPEC §9.4 补 RFC 8259
+  边界描述。
 
 ### R60 — 文档/安全/评测 gate 盲区（P2）⏳ open
 

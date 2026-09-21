@@ -1102,7 +1102,7 @@ A hand-written, zero-dependency JSON parser and serializer (`src/json.rs`). Maps
 | `json_parse(s)` | `String -> _Any` | Parse a JSON string into a Lom value; runtime error on malformed JSON (carries the parser's position) |
 | `json_stringify(v)` | `_Any -> String` | Serialize a Lom value to JSON; `Record` → object, `List`/`Tuple` → array, `Str` → string (with `"` escaping), `Int`/`Float` → number, `Bool` → `true`/`false`, `Unit` → `null`, closures/enums fall back to a best-effort string form |
 
-The parser supports `\uXXXX` Unicode escapes, including surrogate pairs (e.g. `\uD83D\uDE00` → 😀). Both functions are pure (no `! [...]` effect). Examples: [examples/json_demo.lom](examples/json_demo.lom).
+The parser supports `\uXXXX` Unicode escapes, including surrogate pairs (e.g. `\uD83D\uDE00` → 😀). Strings follow RFC 8259: raw (unescaped) control characters U+0000..U+001F inside string literals are rejected (audit R59, 2026-09-21; structural whitespace between values remains legal); the same boundary is enforced on all three implementations (host, WASM host binding, self-hosted interpreter). Both functions are pure (no `! [...]` effect). Examples: [examples/json_demo.lom](examples/json_demo.lom).
 
 > **Known limitation**: `json_stringify` of nested `Record`/`List` produces compact output (no pretty-printing); enum and closure values are not round-trippable through JSON. These are acceptable for the Phase 3 MVP scope.
 

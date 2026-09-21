@@ -239,6 +239,17 @@ impl<'a> JsonParser<'a> {
                     }
                 }
                 _ => {
+                    // R59（九审）：RFC 8259 要求字符串内 U+0000..U+001F 必须转义
+                    // （v1.2.1 接受引号内真实换行——"严格 JSON"宣称失实）
+                    if c < 0x20 {
+                        return Err(JsonError {
+                            message: format!(
+                                "字符串内含未转义控制字符 0x{:02X}（RFC 8259 要求转义）",
+                                c
+                            ),
+                            pos: self.pos,
+                        });
+                    }
                     // UTF-8 多字节字符：直接按字节复制
                     // 简化处理：ASCII 直接 push，非 ASCII 按字节序列处理
                     if c < 0x80 {
@@ -880,5 +891,43 @@ mod tests {
     fn stringify_nan_as_null() {
         let v = Value::Float(f64::NAN);
         assert_eq!(stringify(&v), "null");
+    }
+
+    // ===== R59（九审）：RFC 8259 控制字符边界 =====
+
+    /// 字符串内真实（未转义）换行必须拒绝——v1.2.1 接受并返回含换行字符串，
+    /// "严格 JSON"宣称失实（九审以 char_from_code(34)+char_from_code(10) 复现）
+    #[test]
+    fn r59_raw_control_char_in_string_rejected() {
+        for raw in ['\n', '\r', '\t', '\u{0008}', '\u{000C}', '\u{0000}', '\u{001F}'] {
+            let src = format!("\"a{}b\"", raw);
+            let err = super::parse(&src).expect_err("未转义控制字符必须拒绝");
+            assert!(
+                err.message.contains("控制字符"),
+                "0x{:02X} 的错误消息: {}",
+                raw as u32, err.message
+            );
+        }
+    }
+
+    /// 合法转义形态不受影响："\n"/"\t"/"\u000A" 照常解析
+    #[test]
+    fn r59_escaped_control_chars_still_accepted() {
+        assert!(super::parse(r#""a\nb""#).is_ok());
+        assert!(super::parse(r#""a\tb""#).is_ok());
+        assert!(super::parse(r#""a\u000Ab""#).is_ok());
+        let v = super::parse(r#""a\nb""#).unwrap();
+        assert!(
+            matches!(v, Value::Str(ref s) if s == "a\nb"),
+            "转义换行应解码为真实换行: {:?}",
+            v
+        );
+    }
+
+    /// 结构层空白（值之间的真实换行/制表）仍合法——只有字符串**内部**受限
+    #[test]
+    fn r59_structural_whitespace_still_fine() {
+        let v = super::parse("{\n\t\"a\": 1,\r\n\t\"b\": [2, 3]\n}").expect("结构空白合法");
+        let _ = v;
     }
 }
