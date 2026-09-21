@@ -174,10 +174,10 @@ fn min_wasm_hex() -> String
     let body = "00" + "41" + leb128_hex(42) + "0b"
     let codes = "01" + leb128_hex(len(body) / 2) + body
     "0061736d01000000"
-        + sect("01", types)
-        + sect("03", funcs)
-        + sect("07", exports)
-        + sect("0a", codes)
+    + sect("01", types)
+    + sect("03", funcs)
+    + sect("07", exports)
+    + sect("0a", codes)
 end
 
 # ===== main：向量自验证 + hex 落盘 =====
