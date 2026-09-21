@@ -1,0 +1,36 @@
+fn in_range(v: Float, lo: Float, hi: Float) -> Bool
+    v >= lo and v <= hi
+end
+fn main() -> Unit ! [IO]
+    let a = 3
+    let b = 5
+    if a < b and !(a == b)
+        println(1)
+    end
+    if a > b or a + 2 == b
+        println(2)
+    end
+    if !True
+        println(99)
+    end
+    if !False
+        println(3)
+    end
+    let c = 1.5
+    if c > 1.0 and c < 2.0
+        println(4)
+    end
+    if in_range(2.5, 1.0, 5.0)
+        println(5)
+    end
+    if in_range(0.5, 1.0, 5.0)
+        println(99)
+    end
+    if 3 == a and 5 == b or False
+        println(6)
+    end
+    let flag = a != b
+    if flag
+        println(7)
+    end
+end

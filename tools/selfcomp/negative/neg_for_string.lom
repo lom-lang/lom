@@ -1,5 +1,5 @@
 fn main() -> Unit ! [IO]
-    for i in 3
-        println(i)
+    for c in "ab"
+        println(1)
     end
 end

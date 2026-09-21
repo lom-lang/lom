@@ -1,0 +1,5 @@
+fn main() -> Unit ! [IO]
+    if 1
+        println(1)
+    end
+end

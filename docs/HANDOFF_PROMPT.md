@@ -23,15 +23,15 @@
 
 【当前真实状态】
 - 版本 v1.2.5（tag 已切，CI 绿）；语言面与发布线冻结。
-- 审查状态：十三轮审查，R1-R77 全部关闭、R78 open（十三审新开 P3：
-  README 存量 "20/20 each" 算术残留）。第十三轮复审
+- 审查状态：十三轮审查，R1-R78 全部关闭（R78 README 存量算术残留已随
+  L2.3-a 包顺手收口）。第十三轮复审
   （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
   1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
   22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：无。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
-  spike + L2.2 子集编译器 + R66-R68/R74 整改均完成（self_comp.lom 2950
-  行，verify_selfcomp 20/20 = 5 对拍 + 15 负例拒绝）。**L2.3 放行裁定
-  成立（十三审：R74 收口达成），动工授权待用户**。
+  spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**均完成
+  （self_comp.lom 3342 行，verify_selfcomp 25/25 = 10 对拍 + 15 负例拒绝）；
+  L2.3 后续批次（闭包/enum+match/String/List/Map/json/包）进行中。
 - 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -42,8 +42,8 @@
   要以"apply 全轮次"为界（R73——同轮多诊断同坐标不去重）；含反斜杠
   转义的批量文本替换禁用 heredoc（本轮 doc_audit 修改再应验一次，改用
   Edit 落盘解决）。
-- 待用户裁决：L2.3 全语言面动工（十三审放行裁定成立）；R78 顺手收口
-  （README 机械一行）；typechecker for 变量 define 覆盖同名外层可变性标记不恢复的
+- 待用户裁决：L2.3 后续批次推进节奏（控制流批已交付）；typechecker
+  for 变量 define 覆盖同名外层可变性标记不恢复的
   既有 quirk 是否立项（TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底
   窗口；ubuntu-26 镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
@@ -63,19 +63,14 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 20/20 = 5 用例双产物行为一致 + 15 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 25/25 = 10 用例双产物行为一致 + 15 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   L2.3 全语言面动工（十三审放行裁定成立）；R78 顺手收口为次项；发布
-   不应出现在任何菜单项内（冻结未解）。
-
-【当前 open 项的最小复现要点（R78）】
-- R78/README 算术残留：评估段 "24/24 tasks × both models = 20/20 each"
-  ——24 题每模型应各 24/24（"20/20 each" 是 err22 轮 22 题的旧值残留，
-  2026-09-16 ③ 包扩容 24 题时漏改）。修法：机械一行 20/20 each →
-  24/24 each。
+   L2.3 后续批次（闭包与捕获 / enum 与 match / String / List / Map /
+   json / 包，按"编译期校验 + 负例"成对交付）；发布不应出现在任何菜单
+   项内（冻结未解）。
 
 【状态锚点（整改后行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价

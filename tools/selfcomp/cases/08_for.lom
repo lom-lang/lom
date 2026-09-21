@@ -1,0 +1,23 @@
+fn main() -> Unit ! [IO]
+    let mut acc = 0
+    for i in 4
+        acc = acc + i
+    end
+    println(acc)
+    let x = 100
+    for x in 3
+        println(x)
+    end
+    println(x)
+    for k in 0
+        println(99)
+    end
+    let n = 5
+    let mut fact = 1
+    for i in n + 1
+        if i > 0
+            fact = fact * i
+        end
+    end
+    println(fact)
+end

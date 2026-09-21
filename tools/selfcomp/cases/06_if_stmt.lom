@@ -1,0 +1,28 @@
+fn classify(n: Int) -> Int
+    if n > 100
+        1
+    elif n > 10
+        2
+    else
+        3
+    end
+end
+fn main() -> Unit ! [IO]
+    println(classify(500))
+    println(classify(50))
+    println(classify(5))
+    let a = 7
+    if a > 10
+        println(10)
+    elif a > 5
+        println(20)
+    else
+        println(30)
+    end
+    if a < 10
+        println(40)
+    end
+    if a > 10
+        println(99)
+    end
+end

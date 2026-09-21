@@ -1,0 +1,3 @@
+fn main() -> Unit ! [IO]
+    println(1 < 2)
+end

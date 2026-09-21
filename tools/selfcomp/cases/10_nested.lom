@@ -1,0 +1,45 @@
+fn add(x: Int, y: Int) -> Int
+    x + y
+end
+fn gcd(a: Int, b: Int) -> Int
+    let mut x = a
+    let mut y = b
+    while y != 0
+        let t = y
+        y = x - x / y * y
+        x = t
+    end
+    x
+end
+fn main() -> Unit ! [IO]
+    println(gcd(48, 36))
+    println(gcd(17, 5))
+    let mut total = 0
+    for i in 3
+        let mut j = i
+        while j < 3
+            if i != j
+                total = total + add(i, j)
+            end
+            j = j + 1
+        end
+    end
+    println(total)
+    let mut primes = 0
+    for n in 30
+        if n >= 2
+            let mut d = 2
+            let mut is_p = True
+            while d * d <= n
+                if n - n / d * d == 0
+                    is_p = False
+                end
+                d = d + 1
+            end
+            if is_p
+                primes = primes + 1
+            end
+        end
+    end
+    println(primes)
+end

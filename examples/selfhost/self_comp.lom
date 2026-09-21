@@ -2377,13 +2377,14 @@ fn subset_err(msg: String) -> String
     "L2.2 子集不支持: " + msg
 end
 
-# Ty → 值类型（"i64"|"f64"|"void"）
+# Ty → 值类型（"i64"|"f64"|"i32"|"void"；L2.3-a 起 Bool → i32）
 fn ty_vt(t: Ty) -> Result<String, String>
     match t
         TyInt => Ok("i64")
         TyFloat => Ok("f64")
+        TyBool => Ok("i32")
         TyUnit => Ok("void")
-        _ => Err(subset_err("参数/返回类型只支持 Int/Float/Unit"))
+        _ => Err(subset_err("参数/返回类型只支持 Int/Float/Bool/Unit"))
     end
 end
 
@@ -2399,7 +2400,11 @@ fn vt_hex(vt: String) -> String
     if vt == "i64"
         "7e"
     else
-        "7c"
+        if vt == "i32"
+            "7f"
+        else
+            "7c"
+        end
     end
 end
 
@@ -2420,6 +2425,7 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {
     match e
         ExInt(_) => Ok("i64")
         ExFloat(_) => Ok("f64")
+        ExBool(_) => Ok("i32")
         ExUnit => Ok("void")
         ExGroup(inner) => infer_ex(inner, env, fns)
         ExIdent(x, _, _) =>
@@ -2429,12 +2435,30 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {
             end
         end
         ExUnary(op, inner) =>
+            if op == "Not"
+                # L2.3-a：! 综合 Bool（操作数须 Bool）
+                let it = infer_ex(inner, env, fns)?
+                if it != "i32"
+                    return Err(subset_err("逻辑非操作数须为 Bool"))
+                end
+                return Ok("i32")
+            end
             if op != "Neg"
                 return Err(subset_err("一元运算 '" + op + "'"))
             end
             infer_ex(inner, env, fns)
         end
         ExBinary(op, l, r) =>
+            if is_cmp_op(op)
+                # L2.3-a：比较运算产 Bool（i32）——操作数 void 拒绝，
+                # Int/Float 混合按宿主提升语义比较
+                let lt = infer_ex(l, env, fns)?
+                let rt = infer_ex(r, env, fns)?
+                if lt == "void" or rt == "void"
+                    return Err(subset_err("void 参与比较"))
+                end
+                return Ok("i32")
+            end
             if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
                 return Err(subset_err("二元运算 '" + op + "'"))
             end
@@ -2449,6 +2473,16 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {
                 Ok("f64")
             end
         end
+        ExLogical(_, l, r) =>
+            # L2.3-a：and/or 短路——操作数须 Bool（宿主静态口径对齐）
+            let lt = infer_ex(l, env, fns)?
+            let rt = infer_ex(r, env, fns)?
+            if lt != "i32" or rt != "i32"
+                return Err(subset_err("逻辑运算操作数须为 Bool"))
+            end
+            Ok("i32")
+        end
+        ExIf(ifr) => infer_if_expr(ifr, env, fns)
         ExCall(callee, _) =>
             match callee
                 ExIdent(name, _, _) => infer_call(name, fns)
@@ -2456,6 +2490,49 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {
             end
         end
         _ => Err(subset_err("该表达式形态"))
+    end
+end
+
+# L2.3-a：块尾 if 表达式的类型综合——带 else 时各分支值类型须一致；
+# 无 else 时仅 void 语境合法（各分支值类型须 void——宿主运行时"条件假
+# 得 Unit"的渐进式语义收紧为编译期一致，非 void 值语境必须写全 else）。
+fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match ifr
+        IfR(branches, else_b) =>
+            match else_b
+                None =>
+                    for pair in branches
+                        let bt = blk_val_ty(pair.1, env, fns)?
+                        if bt != "void"
+                            return Err(subset_err("非 void 语境的 if 必须带 else（分支值类型 '" + bt + "'）"))
+                        end
+                    end
+                    Ok("void")
+                end
+                Some(eb) =>
+                    let mut t = blk_val_ty(eb, env, fns)?
+                    for pair in branches
+                        let bt = blk_val_ty(pair.1, env, fns)?
+                        if bt != t
+                            return Err(subset_err("if 表达式各分支值类型不一致（'" + t + "' vs '" + bt + "'）"))
+                        end
+                    end
+                    Ok(t)
+                end
+            end
+        end
+    end
+end
+
+# 块的值类型：有尾表达式 → 尾综合；无尾 → void（语句性块）
+fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match b
+        BlkOf(_, tail) =>
+            match tail
+                None => Ok("void")
+                Some(te) => infer_ex(te, env, fns)
+            end
+        end
     end
 end
 
@@ -2473,7 +2550,23 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {i
                 None => Err("未定义变量 '" + x + "'")
             end
         end
+        ExBool(b) =>
+            # L2.3-a：Bool 字面量 = i32 0/1（untagged 值表示的 Bool 约定）
+            if b
+                Ok("4101")
+            else
+                Ok("4100")
+            end
+        end
         ExUnary(op, inner) =>
+            if op == "Not"
+                # L2.3-a：! = i32.eqz（操作数须 Bool）
+                let it = infer_ex(inner, env, fns)?
+                if it != "i32"
+                    return Err(subset_err("逻辑非操作数须为 Bool"))
+                end
+                return Ok(comp_ex(inner, env, fns)? + "45")
+            end
             if op != "Neg"
                 return Err(subset_err("一元运算 '" + op + "'"))
             end
@@ -2485,13 +2578,106 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {i
                 Ok(code + "9a")
             end
         end
+        ExLogical(op, l, r) => comp_logical(op, l, r, env, fns)
         ExBinary(op, l, r) => comp_binary(op, l, r, env, fns)
         ExCall(callee, args) => comp_call(callee, args, env, fns)
         _ => Err(subset_err("该表达式形态"))
     end
 end
 
+# L2.3-a：and/or 短路编译——if (result i32) 结构保证右侧仅在必要时求值
+# （宿主 WASM 后端同为短路；and：左假产 0 不看右；or：左真产 1 不看右）
+fn comp_logical(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let lc = comp_ex(l, env, fns)?
+    let rc = comp_ex(r, env, fns)?
+    if op == "And"
+        Ok(lc + "047f" + rc + "05" + "4100" + "0b")
+    else
+        Ok(lc + "047f" + "4101" + "05" + rc + "0b")
+    end
+end
+
+# L2.3-a：比较运算判别（token 判别名）
+fn is_cmp_op(op: String) -> Bool
+    op == "Eq" or op == "NotEq" or op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
+end
+
+# L2.3-a：i64 比较操作码（eq 51 / ne 52 / lt_s 53 / gt_s 55 / le_s 57 / ge_s 59）
+fn i64_cmp_op(op: String) -> Result<String, String>
+    if op == "Eq"
+        Ok("51")
+    else
+        if op == "NotEq"
+            Ok("52")
+        else
+            if op == "Lt"
+                Ok("53")
+            else
+                if op == "Gt"
+                    Ok("55")
+                else
+                    if op == "LtEq"
+                        Ok("57")
+                    else
+                        if op == "GtEq"
+                            Ok("59")
+                        else
+                            Err(subset_err("比较运算 '" + op + "'"))
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# L2.3-a：f64 比较操作码（eq 61 / ne 62 / lt 63 / gt 64 / le 65 / ge 66）
+fn f64_cmp_op(op: String) -> Result<String, String>
+    if op == "Eq"
+        Ok("61")
+    else
+        if op == "NotEq"
+            Ok("62")
+        else
+            if op == "Lt"
+                Ok("63")
+            else
+                if op == "Gt"
+                    Ok("64")
+                else
+                    if op == "LtEq"
+                        Ok("65")
+                    else
+                        if op == "GtEq"
+                            Ok("66")
+                        else
+                            Err(subset_err("比较运算 '" + op + "'"))
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if is_cmp_op(op)
+        # L2.3-a：比较——i64 直接比 / f64 直接比 / 混合提升 f64 后比（对齐宿主）
+        let lt = infer_ex(l, env, fns)?
+        let rt = infer_ex(r, env, fns)?
+        let lc = comp_ex(l, env, fns)?
+        let rc = comp_ex(r, env, fns)?
+        if lt == "i64" and rt == "i64"
+            return Ok(lc + rc + i64_cmp_op(op)?)
+        end
+        if lt == "i64" and rt == "f64"
+            return Ok(lc + "b9" + rc + f64_cmp_op(op)?)
+        end
+        if lt == "f64" and rt == "i64"
+            return Ok(lc + rc + "b9" + f64_cmp_op(op)?)
+        end
+        return Ok(lc + rc + f64_cmp_op(op)?)
+    end
     if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
         return Err(subset_err("二元运算 '" + op + "'"))
     end
@@ -2632,72 +2818,269 @@ fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String}>, fn
     end
 end
 
+# 单条语句编译（comp_blk/comp_stmt_blk 共用；L2.3-a 起含控制流语句）
+# R66/R67（十一审）：语句分派的 match 值必须线程化（? 传播）——此前
+# match 位于语句位置，拒绝臂的 Err 是被丢弃的死值，子集外语句静默蒸发
+# 后照常 COMPILED，产出行为错误的 wasm。
+fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    match s
+        StLet(_, name, tyo, ex) =>
+            let vt = let_vt(tyo, ex, env, fns)?
+            if vt == "void"
+                return Err(subset_err("let 绑定 void 值"))
+            end
+            let code = comp_ex(ex, env, fns)?
+            let slot = new_slot(locals, localvt, vt)
+            map_set(env, name, {slot: slot, vt: vt})
+            Ok(code + "21" + leb128_hex(slot))
+        end
+        StAssign(name, _, _, ex) =>
+            match map_get(env, name)
+                None => Err("赋值给未定义变量 '" + name + "'")
+                Some(bnd) => Ok(comp_ex(ex, env, fns)? + "21" + leb128_hex(bnd.slot))
+            end
+        end
+        StExpr(ex) =>
+            let t = infer_ex(ex, env, fns)?
+            let code = comp_ex(ex, env, fns)?
+            if t == "void"
+                Ok(code)
+            else
+                Ok(code + "1a")
+            end
+        end
+        StIf(ifr) => comp_if_stmt(ifr, env, fns, locals, localvt, ret_vt)
+        StWhile(cond, body) => comp_while(cond, body, env, fns, locals, localvt, ret_vt)
+        StFor(var, iter, body) => comp_for(var, iter, body, env, fns, locals, localvt, ret_vt)
+        StReturn(_) => Err(subset_err("return 语句（块深度跟踪留后续批次）"))
+        _ => Err(subset_err("该语句形态（match/解构留后续批次）"))
+    end
+end
+
 # 编译块：语句（值丢弃：非 void 的裸表达式 drop）+ 尾表达式（= 返回值）
-# R66/R67（十一审）：语句分派的 match 值必须线程化（let frag = match ... end
-# 后 frag? 传播）——此前 match 位于语句位置，StReturn/_ 两臂（及 StAssign
-# 臂内层 match 的 None 臂）构造的 Err 是被丢弃的死值，if/while/for/return
-# 语句静默蒸发后照常 COMPILED，产出行为错误的 wasm。
 fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                let s = list_get(stmts, si)
-                let frag = match s
-                    StLet(_, name, tyo, ex) =>
-                        let vt = let_vt(tyo, ex, env, fns)?
-                        if vt == "void"
-                            return Err(subset_err("let 绑定 void 值"))
-                        end
-                        let code = comp_ex(ex, env, fns)?
-                        let slot = new_slot(locals, localvt, vt)
-                        map_set(env, name, {slot: slot, vt: vt})
-                        Ok(code + "21" + leb128_hex(slot))
-                    end
-                    StAssign(name, _, _, ex) =>
-                        match map_get(env, name)
-                            None => Err("赋值给未定义变量 '" + name + "'")
-                            Some(bnd) => Ok(comp_ex(ex, env, fns)? + "21" + leb128_hex(bnd.slot))
-                        end
-                    end
-                    StExpr(ex) =>
-                        let t = infer_ex(ex, env, fns)?
-                        let code = comp_ex(ex, env, fns)?
-                        if t == "void"
-                            Ok(code)
-                        else
-                            Ok(code + "1a")
-                        end
-                    end
-                    StReturn(_) => Err(subset_err("return 语句（L2.2 用尾表达式）"))
-                    _ => Err(subset_err("该语句形态（if/while/for/match 留 L2.3）"))
-                end
-                out = out + frag?
+                out = out + comp_one_stmt(list_get(stmts, si), env, fns, locals, localvt, ret_vt)?
                 si = si + 1
             end
-            comp_tail(tail, env, fns, out, ret_vt)
+            comp_tail(tail, env, fns, out, ret_vt, locals, localvt)
         end
     end
 end
 
-fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, out: String, ret_vt: String) -> Result<String, String>
+# 语句体块编译（if/while/for 的 body）：块值丢弃——尾表达式 void 时编译
+# 执行（副作用，R66 教训），非 void 时补 drop
+fn comp_stmt_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    match b
+        BlkOf(stmts, tail) =>
+            let mut out = ""
+            let mut si = 0
+            while si < list_length(stmts)
+                out = out + comp_one_stmt(list_get(stmts, si), env, fns, locals, localvt, ret_vt)?
+                si = si + 1
+            end
+            match tail
+                None => Ok(out)
+                Some(te) =>
+                    match te
+                        ExIf(ifr) =>
+                            # L2.3-a：语句体块尾的 if——按语句执行（分支值
+                            # 丢弃），走 comp_if_stmt 的 void 形态
+                            Ok(out + comp_if_stmt(ifr, env, fns, locals, localvt, ret_vt)?)
+                        end
+                        _ =>
+                            let tt = infer_ex(te, env, fns)?
+                            let code = comp_ex(te, env, fns)?
+                            if tt == "void"
+                                Ok(out + code)
+                            else
+                                Ok(out + code + "1a")
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# L2.3-a：if 语句（含 elif 链）——分支链按嵌套 else 展开；条件须 Bool。
+# 语句位 if 的块值丢弃（comp_stmt_blk）。
+fn comp_if_stmt(ifr: IfR, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    match ifr
+        IfR(branches, else_b) =>
+            comp_if_from(branches, else_b, 0, env, fns, locals, localvt, ret_vt)
+        end
+    end
+end
+
+fn comp_if_from(branches: List<(Ex, Blk)>, else_b: Option<Blk>, bi: Int, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    if bi >= list_length(branches)
+        match else_b
+            None => Ok("")
+            Some(eb) => comp_stmt_blk(eb, env, fns, locals, localvt, ret_vt)
+        end
+    else
+        let pair = list_get(branches, bi)
+        let ct = infer_ex(pair.0, env, fns)?
+        if ct != "i32"
+            return Err(subset_err("if 条件须为 Bool（得到 '" + ct + "'）"))
+        end
+        let cc = comp_ex(pair.0, env, fns)?
+        let bc = comp_stmt_blk(pair.1, env, fns, locals, localvt, ret_vt)?
+        let rest = comp_if_from(branches, else_b, bi + 1, env, fns, locals, localvt, ret_vt)?
+        Ok(cc + "0440" + bc + "05" + rest + "0b")
+    end
+end
+
+# L2.3-a：块尾 if 表达式编译——(result bt) 形态产值；bt 由综合类型定。
+# 分支体产值（comp_val_blk：语句照常 + 尾值留栈；void 分支不产值）。
+fn comp_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    match ifr
+        IfR(branches, else_b) =>
+            let t = infer_if_expr(ifr, env, fns)?
+            let bt = vt_bt(t)
+            comp_if_expr_from(branches, else_b, bt, 0, env, fns, locals, localvt)
+        end
+    end
+end
+
+fn comp_if_expr_from(branches: List<(Ex, Blk)>, else_b: Option<Blk>, bt: String, bi: Int, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if bi >= list_length(branches)
+        match else_b
+            None => Ok("")
+            Some(eb) => comp_val_blk(eb, env, fns, locals, localvt)
+        end
+    else
+        let pair = list_get(branches, bi)
+        let ct = infer_ex(pair.0, env, fns)?
+        if ct != "i32"
+            return Err(subset_err("if 条件须为 Bool（得到 '" + ct + "'）"))
+        end
+        let cc = comp_ex(pair.0, env, fns)?
+        let bc = comp_val_blk(pair.1, env, fns, locals, localvt)?
+        let rest = comp_if_expr_from(branches, else_b, bt, bi + 1, env, fns, locals, localvt)?
+        Ok(cc + "04" + bt + bc + "05" + rest + "0b")
+    end
+end
+
+# 值位块编译：语句照常（let 开槽走同一 locals/localvt）+ 尾表达式值留栈
+# （无尾 = void 不产值）
+fn comp_val_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    match b
+        BlkOf(stmts, tail) =>
+            let mut out = ""
+            let mut si = 0
+            while si < list_length(stmts)
+                out = out + comp_one_stmt(list_get(stmts, si), env, fns, locals, localvt, "void")?
+                si = si + 1
+            end
+            match tail
+                None => Ok(out)
+                Some(te) => Ok(out + comp_ex(te, env, fns)?)
+            end
+        end
+    end
+end
+
+# L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f）
+fn vt_bt(vt: String) -> String
+    if vt == "i64"
+        "7e"
+    else
+        if vt == "i32"
+            "7f"
+        else
+            if vt == "f64"
+                "7c"
+            else
+                "40"
+            end
+        end
+    end
+end
+
+# L2.3-a：while——block/loop + 条件取反 br_if 退出 + br 0 回环
+fn comp_while(cond: Ex, body: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    let ct = infer_ex(cond, env, fns)?
+    if ct != "i32"
+        return Err(subset_err("while 条件须为 Bool（得到 '" + ct + "'）"))
+    end
+    let cc = comp_ex(cond, env, fns)?
+    let bc = comp_stmt_blk(body, env, fns, locals, localvt, ret_vt)?
+    Ok("0240" + "0340" + cc + "45" + "0d01" + bc + "0c00" + "0b" + "0b")
+end
+
+# L2.3-a：for x in <Int>（0..n 左闭右开，对齐宿主 Int 迭代）。循环变量
+# 遮蔽 = 新槽（对齐宿主：循环后外层同名绑定不变）；String/List 迭代
+# 留后续批次。iter 表达式循环前求值一次存槽。
+fn comp_for(var: String, iter: Ex, body: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    let it = infer_ex(iter, env, fns)?
+    if it != "i64"
+        return Err(subset_err("for 迭代仅支持 Int（String/List 留后续批次，得到 '" + it + "'）"))
+    end
+    let ic = comp_ex(iter, env, fns)?
+    let n_slot = new_slot(locals, localvt, "i64")
+    let x_slot = new_slot(locals, localvt, "i64")
+    # 作用域恢复：for 变量仅在循环内可见（对齐宿主——循环后外层同名绑定
+    # 不变、无外层同名时不可见）。body 编译后恢复旧绑定或移除新绑定。
+    let saved = map_get(env, var)
+    map_set(env, var, {slot: x_slot, vt: "i64"})
+    let bc = comp_stmt_blk(body, env, fns, locals, localvt, ret_vt)?
+    match saved
+        Some(old) => map_set(env, var, old)
+        None => map_remove(env, var)
+    end
+    let xl = leb128_hex(x_slot)
+    Ok(ic + "21" + leb128_hex(n_slot)
+        + "4200" + "21" + xl
+        + "0240" + "0340"
+        + "20" + xl + "20" + leb128_hex(n_slot) + "53"
+        + "45" + "0d01"
+        + bc
+        + "20" + xl + "4201" + "7c" + "21" + xl
+        + "0c00" + "0b" + "0b")
+end
+
+fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, out: String, ret_vt: String, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     match tail
         None => Ok(out)
         Some(te) =>
-            let tt = infer_ex(te, env, fns)?
-            if ret_vt == "void"
-                if tt == "void"
-                    # void 函数的 void 尾（如 println 调用）有副作用——
-                    # 必须编译执行（块尾裸表达式归 Tail 不归 stmts）
-                    return Ok(out + comp_ex(te, env, fns)?)
+            match te
+                ExIf(ifr) =>
+                    # L2.3-a：块尾 if 表达式——(result bt) 产值（类型校验走
+                    # infer_if_expr 综合口径）。注：then 块首元素不得是嵌套
+                    # if（宿主 dangling-else 贪婪归内会吞外层 else），
+                    # 校验写为提前 return 链。
+                    let t = infer_if_expr(ifr, env, fns)?
+                    if ret_vt == "void" and t != "void"
+                        return Err(subset_err("void 函数的尾表达式产值"))
+                    end
+                    if ret_vt != "void" and t != ret_vt
+                        return Err("尾表达式类型与返回类型不符")
+                    end
+                    Ok(out + comp_if_expr(ifr, env, fns, locals, localvt)?)
                 end
-                return Err(subset_err("void 函数的尾表达式产值"))
+                _ =>
+                    let tt = infer_ex(te, env, fns)?
+                    if ret_vt == "void"
+                        if tt == "void"
+                            # void 函数的 void 尾（如 println 调用）有副作用——
+                            # 必须编译执行（块尾裸表达式归 Tail 不归 stmts）
+                            return Ok(out + comp_ex(te, env, fns)?)
+                        end
+                        return Err(subset_err("void 函数的尾表达式产值"))
+                    end
+                    if tt != ret_vt
+                        return Err("尾表达式类型与返回类型不符")
+                    end
+                    Ok(out + comp_ex(te, env, fns)?)
+                end
             end
-            if tt != ret_vt
-                return Err("尾表达式类型与返回类型不符")
-            end
-            Ok(out + comp_ex(te, env, fns)?)
         end
     end
 end
@@ -2790,6 +3173,12 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                     end
                                     pv = pv + "f64"
                                 end
+                                Prm(_, TyBool) =>
+                                    if k > 0
+                                        pv = pv + ","
+                                    end
+                                    pv = pv + "i32"
+                                end
                                 Prm(_, _) =>
                                     return Err(subset_err("void/子集外参数类型"))
                                 end
@@ -2817,6 +3206,9 @@ fn fn_type_entry(params: List<Prm>, ret_vt: String) -> Result<String, String>
             end
             Prm(_, TyFloat) =>
                 ps = ps + "7c"
+            end
+            Prm(_, TyBool) =>
+                ps = ps + "7f"
             end
             Prm(_, _) =>
                 return Err(subset_err("void/子集外参数类型"))

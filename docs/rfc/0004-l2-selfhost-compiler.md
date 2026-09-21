@@ -192,3 +192,31 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   路径自此一致；宿主warning式语义留给 L2.3 全语言面再评估是否对齐。
   子集外参数类型（Unit 等）自签名收集层即拒（与 fn_type_entry 同文案，
   报错时机提前）。十二审的 L2.3 放行条件（R74 收口）就此达成。
+- **修订 6（2026-09-22）：L2.3-a 控制流批交付——Bool/比较/逻辑短路 +
+  if/while/for(Int) 语句与块尾 if 表达式。** 用户裁决 L2.3 动工后首批：
+  - **值类型扩展**：Bool → i32（vt "i32"/参数类型 7f/blocktype 7f）；
+    比较运算（i64: 51/52/53/55/57/59，f64: 61-66，混合提升 b9 后 f64 比）
+    产 i32；`!` = i32.eqz；and/or = `if (result i32)` 短路结构（对齐宿主
+    WASM 后端短路语义）；逻辑操作数须 Bool（编译期校验）。
+  - **语句编译**：comp_one_stmt 抽出（comp_blk/comp_stmt_blk/comp_val_blk
+    共用）；if 语句（elif 链嵌套 else 展开，条件须 Bool）；while
+    （block/loop + eqz br_if 1 + br 0）；for x in Int（0..n，循环变量
+    新槽 + 编译后 env 恢复/移除——对齐宿主"循环后外层同名不变"）；
+    return 语句与 match/解构仍拒（后续批次）。
+  - **块尾 if 表达式**（ExIf）：(result bt) 产值形态；带 else 时各分支
+    值类型须一致，无 else 时仅 void 语境合法（宿主"条件假得 Unit"的
+    渐进式语义收紧为编译期一致）。
+  - **验收**：verify_selfcomp 20→**25 项**（10 对拍全过——新增
+    06_if_stmt/07_while（collatz）/08_for（含遮蔽与空区间）/09_bool_ops/
+    10_nested（gcd+筛法）；15 负例——if/while/for 语句负例转为可用、
+    neg_cmp 改造为 println(Bool) 拒绝、新增 for String 迭代/if 非 Bool
+    条件/逻辑非 Bool 操作数拒绝）；self_comp 2950→3342 行；全量回归
+    （六模式/533+8/eval 双后端/golden/fmt gate）全绿。
+  - **开发踩坑登记**：① **宿主 dangling-else 贪婪归内**——then 块首
+    元素是嵌套 if 时外层 else 被内层 if 吞（AST 实证；缩进不敏感的
+    既定语法行为，非 bug）——嵌套 if 需自带 else 或改写为提前 return
+    链；② Form B 臂 end 计数与"裸语句杀尾"（Lom 侧 if 值丢弃需 return）
+    再应验；③ for 变量 env 恢复用 map_remove（内建已有）。
+  - **剩余批次**：闭包与捕获 / enum 与 match / String / List / Map /
+    json / 包 / return 语句（块深度跟踪）——按"编译期校验 + 负例"成对
+    交付。
