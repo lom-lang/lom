@@ -1,0 +1,4 @@
+fn main() -> Unit ! [IO]
+    let b = 1 < 2
+    println(1)
+end

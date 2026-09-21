@@ -1,0 +1,3 @@
+fn helper() -> Int
+    42
+end

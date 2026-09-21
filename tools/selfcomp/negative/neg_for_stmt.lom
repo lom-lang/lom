@@ -1,0 +1,5 @@
+fn main() -> Unit ! [IO]
+    for i in 3
+        println(i)
+    end
+end

@@ -316,3 +316,182 @@ fn r63_malformed_json_gets_error_response() {
         init
     );
 }
+
+// ===== R71/R72（十一审）：LSP 传输边角 =====
+
+/// R71：非 UTF-8 payload——v1.2.3 静默 continue 丢弃（客户端收不到任何
+/// 响应帧）。必须回 -32700 Parse error（id:null）且服务器存活。
+#[test]
+fn r71_non_utf8_payload_gets_parse_error_and_survives() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_lom"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("启动 lom lsp 失败");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let mut stdout = child.stdout.take().expect("stdout");
+
+    // 非法 UTF-8 序列 payload（\xff\xfe 不是合法 UTF-8）
+    let payload: &[u8] = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\xff\xfe\"}";
+    let frame = format!("Content-Length: {}\r\n\r\n", payload.len());
+    stdin.write_all(frame.as_bytes()).expect("写 header");
+    stdin.write_all(payload).expect("写 payload");
+    stdin.flush().expect("flush stdin");
+
+    // 读一帧响应：应含 -32700 且 id:null
+    let mut header = String::new();
+    let mut byte = [0u8; 1];
+    loop {
+        match stdout.read(&mut byte) {
+            Ok(0) | Err(_) => panic!("服务器提前关闭"),
+            Ok(_) => {
+                header.push(byte[0] as char);
+                if header.ends_with("\r\n\r\n") {
+                    break;
+                }
+            }
+        }
+    }
+    let len: usize = header
+        .lines()
+        .find_map(|l| l.strip_prefix("Content-Length: "))
+        .and_then(|v| v.trim().parse().ok())
+        .expect("响应应有 Content-Length");
+    let mut buf = vec![0u8; len];
+    let mut read = 0;
+    while read < len {
+        match stdout.read(&mut buf[read..]) {
+            Ok(0) | Err(_) => panic!("读取响应体失败"),
+            Ok(n) => read += n,
+        }
+    }
+    let resp = String::from_utf8_lossy(&buf).to_string();
+    assert!(
+        resp.contains("\"code\":-32700") && resp.contains("\"id\":null"),
+        "非 UTF-8 payload 应回 -32700（id:null）: {}",
+        resp
+    );
+
+    // 服务器存活：后续 initialize 正常响应
+    let init = b"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"initialize\",\"params\":{}}";
+    let frame = format!("Content-Length: {}\r\n\r\n", init.len());
+    stdin.write_all(frame.as_bytes()).expect("写 init");
+    stdin.write_all(init).expect("写 init payload");
+    stdin.flush().expect("flush");
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// R72-①：双 Content-Length 头——v1.2.3 last-wins（第二头覆盖第一头），
+/// LSP 规范建议拒收重复头。必须显式拒绝（exit 1 + stderr 说明）。
+#[test]
+fn r72_duplicate_content_length_rejected() {
+    use std::process::Stdio;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_lom"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("启动 lom lsp 失败");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin
+        .write_all(b"Content-Length: 5\r\nContent-Length: 50\r\n\r\n{\"x\":")
+        .expect("写 stdin");
+    stdin.flush().expect("flush stdin");
+    let output = child.wait_with_output().expect("等待进程退出");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "重复 Content-Length 头应显式 exit 1"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Content-Length") && stderr.contains("重复"),
+        "stderr 应说明拒绝原因: {}",
+        stderr
+    );
+}
+
+/// R72-②：exit 未经 shutdown——LSP 3.17 建议 error code 1（v1.2.3 恒 0）；
+/// shutdown 后 exit 保持 0（既有形态不倒）。
+#[test]
+fn r72_exit_code_depends_on_shutdown() {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    // 未经 shutdown 直接 exit → rc=1
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_lom"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("启动 lom lsp 失败");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let exit_body = "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}";
+    let exit_frame = format!("Content-Length: {}\r\n\r\n{}", exit_body.len(), exit_body);
+    stdin.write_all(exit_frame.as_bytes()).expect("写 exit 帧");
+    stdin.flush().expect("flush stdin");
+    let output = child.wait_with_output().expect("等待退出");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "未经 shutdown 的 exit 应 rc=1（v1.2.3 恒 0）"
+    );
+
+    // shutdown → exit → rc=0（既有形态）
+    let mut child2 = std::process::Command::new(env!("CARGO_BIN_EXE_lom"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("启动 lom lsp 失败");
+    let mut stdin2 = child2.stdin.take().expect("stdin");
+    let sd_body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"shutdown\"}";
+    let sd = format!("Content-Length: {}\r\n\r\n{}", sd_body.len(), sd_body);
+    stdin2.write_all(sd.as_bytes()).expect("写 shutdown 帧");
+    stdin2.flush().expect("flush stdin");
+    // 等 shutdown 响应被处理（读一帧）
+    let mut stdout2 = child2.stdout.take().expect("stdout");
+    let mut header = String::new();
+    let mut byte = [0u8; 1];
+    loop {
+        match stdout2.read(&mut byte) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {
+                header.push(byte[0] as char);
+                if header.ends_with("\r\n\r\n") {
+                    // 读响应体
+                    let len: usize = header
+                        .lines()
+                        .find_map(|l| l.strip_prefix("Content-Length: "))
+                        .and_then(|v| v.trim().parse().ok())
+                        .unwrap_or(0);
+                    let mut buf = vec![0u8; len];
+                    let mut r = 0;
+                    while r < len {
+                        match stdout2.read(&mut buf[r..]) {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => r += n,
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    stdin2.write_all(exit_frame.as_bytes()).expect("写 exit 帧");
+    stdin2.flush().expect("flush stdin");
+    let output2 = child2.wait_with_output().expect("等待退出");
+    assert_eq!(
+        output2.status.code(),
+        Some(0),
+        "shutdown 后的 exit 应保持 rc=0"
+    );
+}

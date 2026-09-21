@@ -1,0 +1,6 @@
+fn f(x: Int) -> Int
+    return x + 1
+end
+fn main() -> Unit ! [IO]
+    println(f(1))
+end

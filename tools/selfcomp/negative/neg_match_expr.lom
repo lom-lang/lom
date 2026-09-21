@@ -1,0 +1,9 @@
+fn pick(x: Int) -> Int
+    match x
+        0 => 10
+        _ => 20
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

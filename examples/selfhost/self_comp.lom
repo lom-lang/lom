@@ -2597,14 +2597,29 @@ fn new_slot(locals: Map<String, Int>, localvt: Map<String, String>, vt: String) 
 end
 
 # StLet 的类型：显式注解优先，否则综合
+# R68（十一审）：注解与综合值类型做编译期一致性校验——不一致即拒绝
+# （此前直接采信注解定槽位，`let x: Int = 1.5` 产 i64 槽存 f64 值的
+# 非法 wasm，失败面推迟到实例化）。与宿主"注解不匹配仅 TYPE001 warning、
+# 运行时值胜出"的渐进式语义是已登记的信任边界差异（RFC-0004 修订 4）。
 fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
     match tyo
         None => infer_ex(ex, env, fns)
-        Some(tt) => ty_vt(tt)
+        Some(tt) =>
+            let av = ty_vt(tt)?
+            let iv = infer_ex(ex, env, fns)?
+            if iv != av
+                return Err(subset_err("let 注解类型 '" + av + "' 与值类型 '" + iv + "' 不符（编译期拒绝；宿主侧仅 warning）"))
+            end
+            Ok(av)
+        end
     end
 end
 
 # 编译块：语句（值丢弃：非 void 的裸表达式 drop）+ 尾表达式（= 返回值）
+# R66/R67（十一审）：语句分派的 match 值必须线程化（let frag = match ... end
+# 后 frag? 传播）——此前 match 位于语句位置，StReturn/_ 两臂（及 StAssign
+# 臂内层 match 的 None 臂）构造的 Err 是被丢弃的死值，if/while/for/return
+# 语句静默蒸发后照常 COMPILED，产出行为错误的 wasm。
 fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
@@ -2612,7 +2627,7 @@ fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, 
             let mut si = 0
             while si < list_length(stmts)
                 let s = list_get(stmts, si)
-                match s
+                let frag = match s
                     StLet(_, name, tyo, ex) =>
                         let vt = let_vt(tyo, ex, env, fns)?
                         if vt == "void"
@@ -2620,30 +2635,28 @@ fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, 
                         end
                         let code = comp_ex(ex, env, fns)?
                         let slot = new_slot(locals, localvt, vt)
-                        out = out + code + "21" + leb128_hex(slot)
                         map_set(env, name, {slot: slot, vt: vt})
+                        Ok(code + "21" + leb128_hex(slot))
                     end
                     StAssign(name, _, _, ex) =>
                         match map_get(env, name)
                             None => Err("赋值给未定义变量 '" + name + "'")
-                            Some(bnd) =>
-                                let code = comp_ex(ex, env, fns)?
-                                out = out + code + "21" + leb128_hex(bnd.slot)
-                            end
+                            Some(bnd) => Ok(comp_ex(ex, env, fns)? + "21" + leb128_hex(bnd.slot))
                         end
                     end
                     StExpr(ex) =>
                         let t = infer_ex(ex, env, fns)?
                         let code = comp_ex(ex, env, fns)?
                         if t == "void"
-                            out = out + code
+                            Ok(code)
                         else
-                            out = out + code + "1a"
+                            Ok(code + "1a")
                         end
                     end
                     StReturn(_) => Err(subset_err("return 语句（L2.2 用尾表达式）"))
                     _ => Err(subset_err("该语句形态（if/while/for/match 留 L2.3）"))
                 end
+                out = out + frag?
                 si = si + 1
             end
             comp_tail(tail, env, fns, out, ret_vt)

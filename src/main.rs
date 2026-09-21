@@ -829,6 +829,9 @@ fn run_lsp() {
 
     // 文档状态：uri -> 源码文本
     let mut docs: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    // R72（十一审）：shutdown 是否已收到——exit 分支的退出码依据
+    // （LSP 3.17：未经 shutdown 的 exit 建议以 error code 1 退出）
+    let mut shutdown_seen = false;
 
     loop {
         // 1. 读取 Content-Length header
@@ -846,6 +849,13 @@ fn run_lsp() {
                 break;
             }
             if let Some(pos) = line.find("Content-Length: ") {
+                // R72（十一审）：重复的 Content-Length 头说明帧格式损坏——
+                // 无法确定该读多少字节，流已不可信，拒绝并断连（LSP 规范
+                // 建议拒收重复头）。v1.2.3 的 last-wins 会错读 payload 长度。
+                if content_len.is_some() {
+                    eprintln!("[lsp] 重复的 Content-Length 头——帧格式损坏，拒绝并断连");
+                    process::exit(1);
+                }
                 let len_str = &line[pos + 16..];
                 if let Ok(n) = len_str.trim().parse::<usize>() {
                     content_len = Some(n);
@@ -873,7 +883,16 @@ fn run_lsp() {
         }
         let json = match String::from_utf8(payload) {
             Ok(s) => s,
-            Err(_) => continue,
+            Err(_) => {
+                // R71（十一审）：非 UTF-8 payload 回 -32700（id:null 规范形态）
+                // 后继续服务——v1.2.3 静默 continue 丢弃，客户端无从得知。
+                // 与 R63 的畸形 JSON 同款处理路径。
+                let resp = lsp::make_null_id_error_response(-32700, "Parse error");
+                let msg = lsp::make_lsp_message(&resp);
+                let _ = stdout.write_all(msg.as_bytes());
+                let _ = stdout.flush();
+                continue;
+            }
         };
 
         // 3. 解析 JSON-RPC 消息
@@ -891,7 +910,7 @@ fn run_lsp() {
         };
 
         // 4. 处理请求
-        let response = handle_lsp_method(&method, id, &params, &mut docs);
+        let response = handle_lsp_method(&method, id, &params, &mut docs, &mut shutdown_seen);
 
         // 5. 输出响应（如果有 id 才发响应，通知无响应）
         if let Some(resp) = response {
@@ -908,6 +927,7 @@ fn handle_lsp_method(
     id: Option<u64>,
     params: &str,
     docs: &mut std::collections::HashMap<String, String>,
+    shutdown_seen: &mut bool,
 ) -> Option<String> {
     match method {
         "initialize" => {
@@ -927,10 +947,13 @@ fn handle_lsp_method(
         }
         "shutdown" => {
             let id = id?;
+            *shutdown_seen = true;
             Some(lsp::make_response(id, "null"))
         }
         "exit" => {
-            process::exit(0);
+            // R72（十一审）：LSP 3.17 建议——未经 shutdown 的 exit 以
+            // error code 1 退出（v1.2.3 恒 0）
+            process::exit(if *shutdown_seen { 0 } else { 1 });
         }
         "textDocument/didOpen" => {
             // 提取 uri 和 text

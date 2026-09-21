@@ -1,0 +1,6 @@
+fn main() -> Unit ! [IO]
+    let g = fn(x: Int) -> Int
+        x + 1
+    end
+    println(g(1))
+end

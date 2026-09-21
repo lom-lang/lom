@@ -96,7 +96,14 @@ pub struct FnInfo {
     /// 闭包体（closure_child 独立作用域）与 match 臂块（child 子作用域）内的
     /// let 遮蔽外层绑定、不属于本函数顶层绑定链，**不收集**——其内的 MUT001
     /// 降级为 hint（宁可不自动修，不可错改）。
+    /// R65（十一审）：已可变声明（let mut）不再收集——重赋可变绑定不产生
+    /// MUT001 诊断，留在命中集只会让迭代 apply 第二轮对同坐标再 Replace
+    /// （`let mut mut x` 非幂等损坏链）。
     pub let_decls: Vec<LetDecl>,
+    /// 函数体内每个赋值语句的目标绑定归属（R65/十一审）：诊断行所在赋值的
+    /// 名字实际解析到哪层作用域。绑定到闭包体/match 臂/for 变量等嵌套层的
+    /// MUT001 与外层同名 let 无关——按名过滤命中外层声明是错选目标。
+    pub assign_binds: Vec<AssignBind>,
 }
 
 /// 函数体内一条 `let` 声明的定位（R62：MUT001 结构化定位的事实源）
@@ -108,14 +115,33 @@ pub struct LetDecl {
     pub col: usize,
 }
 
+/// 一条赋值语句的目标绑定归属（R65/十一审：诊断-声明作用域归属解析）
+pub struct AssignBind {
+    /// 赋值目标标识符位置（= MUT001 诊断的 line/col：Stmt::Assign 的 span）
+    pub line: usize,
+    pub col: usize,
+    /// 赋值目标名
+    pub name: String,
+    /// 绑定解析到函数顶层扁平作用域为 true（可走 let_decls 命中）；
+    /// 闭包体/match 臂声明或 for 变量遮蔽等嵌套层为 false
+    pub top_level: bool,
+}
+
 /// 收集块内全部非闭包 `let` 声明（R62）：
 /// 递归 if/while/for 的语句块（扁平作用域），**不深入任何表达式**——
 /// 闭包体（ExprKind::Closure）、match 臂（表达式内部）内的声明不收集。
 /// LetDestruct 绑定恒不可变且无 mut 语法，不是 MUT001 的加 mut 对象，跳过。
+/// R65（十一审）：`let mut` 声明不收集——可变绑定不是 MUT001 目标，
+/// 留在命中集会让迭代 apply 第二轮同坐标再 Replace（非幂等损坏链）。
 fn collect_let_decls(block: &ast::Block, out: &mut Vec<LetDecl>) {
     for stmt in &block.stmts {
         match stmt {
-            ast::Stmt::Let { name, span, .. } => out.push(LetDecl {
+            ast::Stmt::Let {
+                name,
+                span,
+                mutable,
+                ..
+            } if !*mutable => out.push(LetDecl {
                 name: name.clone(),
                 line: span.line,
                 col: span.col,
@@ -132,6 +158,228 @@ fn collect_let_decls(block: &ast::Block, out: &mut Vec<LetDecl>) {
             ast::Stmt::For { body, .. } => collect_let_decls(body, out),
             _ => {}
         }
+    }
+}
+
+/// 收集一个扁平作用域块内的全部绑定名（let/解构/for 变量），**不进入
+/// 闭包体与 match 臂**（独立子作用域）；if/while/for 语句块共用当前层，
+/// 递归。绑定名集合与 typechecker 的 define 面对齐（整层集合，顺序无关
+/// ——MUT001 只在赋值处名字已解析命中时产生）。
+fn flat_binds(block: &ast::Block, out: &mut std::collections::HashSet<String>) {
+    for stmt in &block.stmts {
+        match stmt {
+            ast::Stmt::Let { name, .. } => {
+                out.insert(name.clone());
+            }
+            ast::Stmt::LetDestruct { names, .. } => {
+                for n in names {
+                    out.insert(n.clone());
+                }
+            }
+            ast::Stmt::For { var, body, .. } => {
+                out.insert(var.clone());
+                flat_binds(body, out);
+            }
+            ast::Stmt::If(ifs) => {
+                for (_, body) in &ifs.branches {
+                    flat_binds(body, out);
+                }
+                if let Some(else_b) = &ifs.else_branch {
+                    flat_binds(else_b, out);
+                }
+            }
+            ast::Stmt::While { body, .. } => flat_binds(body, out),
+            _ => {}
+        }
+    }
+}
+
+/// 遍历函数体收集每个赋值语句的目标绑定归属（R65）。
+/// `path` 是作用域层链：path[0] = 函数顶层扁平层（含参数 + 体内全部
+/// define 名）；其后依次是词法嵌套的闭包体层、match 臂层、for 变量
+/// 遮蔽层。对齐 typechecker 语义：if/while/for 语句块与 if 表达式分支
+/// 共用当前层（扁平）；闭包 closure_child、match 臂 child 是独立子层；
+/// for 变量在循环期间遮蔽外层同名绑定（define 覆盖、循环外恢复可见）。
+fn collect_assign_binds(
+    block: &ast::Block,
+    path: &mut Vec<std::collections::HashSet<String>>,
+    out: &mut Vec<AssignBind>,
+) {
+    for stmt in &block.stmts {
+        collect_assign_binds_stmt(stmt, path, out);
+    }
+    if let Some(t) = &block.tail {
+        walk_expr_binds(t, path, out);
+    }
+}
+
+fn collect_assign_binds_stmt(
+    stmt: &ast::Stmt,
+    path: &mut Vec<std::collections::HashSet<String>>,
+    out: &mut Vec<AssignBind>,
+) {
+    match stmt {
+        ast::Stmt::Let { value, .. } => walk_expr_binds(value, path, out),
+        ast::Stmt::LetDestruct { value, .. } => walk_expr_binds(value, path, out),
+        ast::Stmt::Assign {
+            target,
+            value,
+            span,
+            ..
+        } => {
+            // 绑定解析：从最近层向外找第一个含目标名的层；命中 path[0]（顶层）
+            // 才可走 let_decls 命中。名字不存在（NAM003 域）按顶层处理——
+            // 该路径不产生 MUT001，防御性走既有零命中分支。
+            let mut top_level = true;
+            for (i, layer) in path.iter().enumerate().rev() {
+                if layer.contains(target.as_str()) {
+                    top_level = i == 0;
+                    break;
+                }
+            }
+            out.push(AssignBind {
+                line: span.line,
+                col: span.col,
+                name: target.clone(),
+                top_level,
+            });
+            walk_expr_binds(value, path, out);
+        }
+        ast::Stmt::If(ifs) => {
+            for (cond, body) in &ifs.branches {
+                walk_expr_binds(cond, path, out);
+                collect_assign_binds(body, path, out);
+            }
+            if let Some(else_b) = &ifs.else_branch {
+                collect_assign_binds(else_b, path, out);
+            }
+        }
+        ast::Stmt::While { cond, body } => {
+            walk_expr_binds(cond, path, out);
+            collect_assign_binds(body, path, out);
+        }
+        ast::Stmt::For { var, iter, body } => {
+            walk_expr_binds(iter, path, out);
+            // for 变量遮蔽层：循环体内的重赋值绑定的是 for 变量（恒不可变），
+            // 与外层同名 let 无关；iter 在外层求值（遮蔽层之外）
+            let mut layer = std::collections::HashSet::new();
+            layer.insert(var.clone());
+            path.push(layer);
+            collect_assign_binds(body, path, out);
+            path.pop();
+        }
+        ast::Stmt::Return(e) => {
+            if let Some(e) = e {
+                walk_expr_binds(e, path, out);
+            }
+        }
+        ast::Stmt::Expr(e) => walk_expr_binds(e, path, out),
+        ast::Stmt::Hole { .. } => {}
+    }
+}
+
+/// 遍历表达式的全部子节点收集赋值归属；闭包体与 match 臂切换子层
+fn walk_expr_binds(
+    expr: &ast::Expr,
+    path: &mut Vec<std::collections::HashSet<String>>,
+    out: &mut Vec<AssignBind>,
+) {
+    use ast::ExprKind;
+    match &expr.kind {
+        ExprKind::Binary { left, right, .. }
+        | ExprKind::Logical { left, right, .. }
+        | ExprKind::Pipe { left, right }
+        | ExprKind::Range {
+            start: left,
+            end: right,
+        } => {
+            walk_expr_binds(left, path, out);
+            walk_expr_binds(right, path, out);
+        }
+        ExprKind::Unary { expr, .. } | ExprKind::Group(expr) | ExprKind::Try(expr) => {
+            walk_expr_binds(expr, path, out);
+        }
+        ExprKind::Call { callee, args } => {
+            walk_expr_binds(callee, path, out);
+            for a in args {
+                walk_expr_binds(a, path, out);
+            }
+        }
+        ExprKind::Index { expr, index } => {
+            walk_expr_binds(expr, path, out);
+            walk_expr_binds(index, path, out);
+        }
+        ExprKind::Field { expr, .. } => walk_expr_binds(expr, path, out),
+        ExprKind::Record { fields } => {
+            for (_, e) in fields {
+                walk_expr_binds(e, path, out);
+            }
+        }
+        ExprKind::Tuple { elems } => {
+            for e in elems {
+                walk_expr_binds(e, path, out);
+            }
+        }
+        ExprKind::If(ifs) => {
+            // if 表达式的分支块共用当前层（typechecker check_block(body, env) 同 env）
+            for (cond, body) in &ifs.branches {
+                walk_expr_binds(cond, path, out);
+                collect_assign_binds(body, path, out);
+            }
+            if let Some(else_b) = &ifs.else_branch {
+                collect_assign_binds(else_b, path, out);
+            }
+        }
+        ExprKind::Closure { params, body, .. } => {
+            let mut layer = std::collections::HashSet::new();
+            for p in params {
+                layer.insert(p.name.clone());
+            }
+            flat_binds(body, &mut layer);
+            path.push(layer);
+            collect_assign_binds(body, path, out);
+            path.pop();
+        }
+        ExprKind::Match(m) => {
+            walk_expr_binds(&m.scrutinee, path, out);
+            for arm in &m.arms {
+                let mut layer = std::collections::HashSet::new();
+                pattern_binds(&arm.pattern, &mut layer);
+                if let ast::MatchArmBody::Block(b) = &arm.body {
+                    flat_binds(b, &mut layer);
+                }
+                path.push(layer);
+                if let Some(g) = &arm.guard {
+                    walk_expr_binds(g, path, out);
+                }
+                match &arm.body {
+                    ast::MatchArmBody::Expr(e) => walk_expr_binds(e, path, out),
+                    ast::MatchArmBody::Block(b) => collect_assign_binds(b, path, out),
+                }
+                path.pop();
+            }
+        }
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Unit
+        | ExprKind::Ident(_) => {}
+    }
+}
+
+/// 提取模式绑定的名字（Binder 递归 Variant 子模式）
+fn pattern_binds(p: &ast::Pattern, out: &mut std::collections::HashSet<String>) {
+    match p {
+        ast::Pattern::Binder(n) => {
+            out.insert(n.clone());
+        }
+        ast::Pattern::Variant { sub, .. } => {
+            for s in sub {
+                pattern_binds(s, out);
+            }
+        }
+        ast::Pattern::Lit(_) | ast::Pattern::Wildcard => {}
     }
 }
 
@@ -162,12 +410,22 @@ pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
             let body_end = next_start.saturating_sub(1).max(sig_end);
             let mut let_decls = Vec::new();
             collect_let_decls(&f.body, &mut let_decls);
+            // R65（十一审）：赋值绑定归属表——path[0] = 参数 + 函数体扁平 define 名
+            let mut top = std::collections::HashSet::new();
+            for p in &f.params {
+                top.insert(p.name.clone());
+            }
+            flat_binds(&f.body, &mut top);
+            let mut path = vec![top];
+            let mut assign_binds = Vec::new();
+            collect_assign_binds(&f.body, &mut path, &mut assign_binds);
             out.push(FnInfo {
                 params: f.params.iter().map(|p| p.name.clone()).collect(),
                 sig_start_line: f.span.line,
                 sig_end_line: sig_end,
                 body_end_line: body_end,
                 let_decls,
+                assign_binds,
             });
         }
     }
@@ -952,6 +1210,28 @@ fn fix_mut001_add_mut(
             Confidence::Medium,
         )];
     };
+    // R65（十一审）：诊断-声明作用域归属——诊断行所在赋值的绑定解析到
+    // 闭包体/match 臂/for 变量遮蔽等嵌套层时，外层同名 let 不是该诊断的
+    // 治疗目标，降级 hint（宁可不自动修，不可错改）。v1.2.3 的按名过滤
+    // 在"嵌套作用域内诊断 + 外层同名 let"边界错选目标，且已可变声明仍
+    // 计入命中集导致迭代重应用把源码改坏成 let mut mut x（PARSE001）。
+    // 归属表查不到（AST 遍历遗漏或异常形态）同样降级——保守方向。
+    let bind_top_level = owner
+        .assign_binds
+        .iter()
+        .find(|b| b.line == d.line && b.col == d.col && b.name == name)
+        .map(|b| b.top_level);
+    if bind_top_level != Some(true) {
+        return vec![hint_only(
+            &format!(
+                "不可变变量 '{}' 被重赋值：赋值目标绑定在闭包/match 臂/for 变量等\
+                 嵌套作用域内（或无法定位赋值的作用域归属）——人工确认嵌套内声明处\
+                 加 mut，或改用新变量",
+                name
+            ),
+            Confidence::Medium,
+        )];
+    }
     // R62（十审）：结构化定位替代文本回扫——同名 let 直接取自 AST
     // （fn_infos 的 let_decls 只含函数体扁平作用域内的声明）。v1.2.2 的
     // 文本回扫会把闭包内遮蔽声明、行内注释、字符串字面量里的 "let x"
@@ -2621,6 +2901,156 @@ mod tests {
         let result = apply_one_diag(src, 5, 9);
         assert_eq!(result.applied, 0);
         assert_eq!(result.patched_source, src, "闭包内外的源码都必须逐字不变");
+    }
+
+    /// R65（十一审）探针 1：闭包遮蔽 + 外层同名 let——诊断行位于闭包体内、
+    /// 闭包内 `let x` 遮蔽、外层函数扁平作用域存在唯一同名 `let x` 时，
+    /// v1.2.3 按名过滤命中外层声明（High Replace），迭代 apply 两轮把外层
+    /// 改成 `let mut mut x`（PARSE001 损坏源码，applied=2）。
+    /// 绝不能这样修：诊断的赋值绑定在闭包层——不得产出任何非 Hint 动作；
+    /// apply 后源码逐字不变。
+    #[test]
+    fn r65_mut001_nested_closure_diag_with_outer_same_name_let_never_touched() {
+        let src = "fn f() -> Int\n    let x = 1\n    let g = fn(y: Int) -> Int\n        let x = y + 1\n        x = x + 1\n        x\n    end\n    g(1)\nend\n\
+                   fn main() -> Unit\n    println(f())\nend\n";
+        // 诊断在闭包体内的赋值行（5:9）；外层 let x 在行 2——绝不能命中
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            5,
+            9,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "嵌套作用域内的诊断不得触发外层声明改写: {:?}",
+            fixes
+        );
+        assert!(
+            fixes[0].description.contains("嵌套"),
+            "hint 应说明声明在嵌套作用域: {}",
+            fixes[0].description
+        );
+        let result = apply_one_diag(src, 5, 9);
+        assert_eq!(result.applied, 0, "不应有任何应用: {:?}", result.changes);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R65 探针 2：match 臂块遮蔽 + 外层同名 let——Form B 臂内 `let x` 遮蔽
+    /// + 臂内重赋值，外层唯一同名 let 被 v1.2.3 错选中目标（applied=2 损坏）。
+    /// 绝不能这样修：臂内绑定不触外层；源码逐字不变。
+    #[test]
+    fn r65_mut001_match_arm_shadowing_never_touched() {
+        let src = "fn f() -> Int\n    let x = 1\n    match Ok(1)\n        Ok(v) =>\n            let x = 5\n            x = x + 1\n            x\n        end\n        _ => 0\n    end\nend\n\
+                   fn main() -> Unit\n    println(f())\nend\n";
+        // 诊断在臂块内的赋值行（6:13）
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            6,
+            13,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "match 臂内诊断不得触发外层声明改写: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 6, 13);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R65 探针 3（for 变量遮蔽，负向半）：循环体内重赋 for 变量——
+    /// for 变量在循环期间遮蔽外层同名 let（typechecker define 覆盖语义），
+    /// 该重赋值与外层 let 无关。v1.2.3 命中外层唯一声明错改。
+    /// 绝不能这样修：循环内赋值 → hint，不 Replace 外层。
+    #[test]
+    fn r65_mut001_for_var_shadowing_inner_assign_is_hint() {
+        let src = "fn f() -> Int\n    let x = 1\n    for x in 3\n        x = x + 1\n    end\n    x\nend\n";
+        // 诊断在循环体内的赋值行（4:9）
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            4,
+            9,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "循环内重赋 for 变量不得触发外层声明改写: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 4, 9);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R65 正例（for 遮蔽的另一半）：循环外重赋外层 let——for 变量的遮蔽
+    /// 只在循环体内生效（typechecker 的 define 无弹出是既有 quirk，fix 侧
+    /// 按词法区域判定），循环后的重赋值绑定外层声明，唯一命中 Replace
+    /// 是正确修复（对齐"闭包内重赋捕获外层变量仍 Replace"原则）。
+    #[test]
+    fn r65_mut001_for_outer_assign_still_replaces() {
+        let src = "fn f() -> Int\n    let x = 1\n    for x in 3\n        x\n    end\n    x = 5\n    x\nend\n";
+        // 诊断在循环外的赋值行（6:5）；外层 let x 在行 2——必须命中
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            6,
+            5,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2, "应命中外层声明行");
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// R65 正例不倒：闭包内重赋**捕获的外层**变量（闭包内无同名声明）——
+    /// 绑定解析到函数顶层，唯一命中 Replace 外层声明（十一审确认 v1.2.3
+    /// 正确的既有行为，作用域归属判定不得误伤）。
+    #[test]
+    fn r65_mut001_closure_reassign_captured_outer_still_replaces() {
+        let src = "fn f() -> Int\n    let x = 1\n    let g = fn() -> Int\n        x = x + 1\n        x\n    end\n    g()\nend\n";
+        // 诊断在闭包体内的赋值行（4:9）；闭包层无 x → 解析到外层 let x
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            4,
+            9,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2, "应命中外层声明行");
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// R65 幂等锁定：外层声明已改为 `let mut`（第一轮修复后形态）+ 闭包内
+    /// 遮蔽诊断仍在——已可变声明必须被滤出命中集（v1.2.3 不过滤 mutable，
+    /// 第二轮同坐标再 Replace 产出 `let mut mut x` PARSE001 损坏）。
+    /// 绝不能这样修：任何已可变声明永不再被 Replace。
+    #[test]
+    fn r65_mut001_already_mutable_never_replaced() {
+        let src = "fn f() -> Int\n    let mut x = 1\n    let g = fn(y: Int) -> Int\n        let x = y + 1\n        x = x + 1\n        x\n    end\n    g(1)\nend\n";
+        // 诊断在闭包体内的赋值行（5:9）——双保险都不应产出 Replace：
+        // 作用域归属（闭包层）拦截 + mutable 声明已滤出 let_decls
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            5,
+            9,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "已可变声明不得再次被 Replace: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 5, 9);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "let mut mut 形态永不可能出现");
     }
 
     /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan

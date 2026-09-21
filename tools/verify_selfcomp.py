@@ -9,6 +9,12 @@
           + tools/selfcomp/run_selfcomp.mjs（L2 专用 harness）
   断言：两侧 stdout 逐字一致 + 退出码一致 + L2 编译输出 COMPILED 行。
 
+负例集（R66-R68/十一审）：tools/selfcomp/negative/ 下的子集外构造
+（if/while/for/return 语句、闭包、比较、String、Float %、let 注解不符、
+match、缺 main、未知函数、嵌套 println）必须 COMPILE-ERROR 且不产 hex
+——语句级拒绝曾是死臂（Err 值在语句位置被丢弃，R66），负例集是它的
+回归网。
+
 用法：python tools/verify_selfcomp.py [--lom-bin PATH]
 """
 import os
@@ -18,6 +24,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, 'tools', 'selfcomp', 'cases')
+NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 
 
@@ -77,7 +84,25 @@ def main():
                 fail += 1
                 print('FAIL %s: 行为不一致\n  host: %r\n  L2:   %r\n  rc host=%d L2=%d' %
                       (name, rh.stdout[:300], rl.stdout[:300], rh.returncode, rl.returncode))
-    print('RESULT: %s（%d/%d 用例双产物行为一致）' %
+
+        # 负例集：子集外构造必须 COMPILE-ERROR 且不产 hex（R66-R68 回归网）
+        negatives = sorted(glob.glob(os.path.join(NEGATIVES, '*.lom')))
+        for case in negatives:
+            name = os.path.basename(case)
+            hex_out = os.path.join(td, name + '.neg.hex')
+            rc = run([lom, SELF_COMP, '--', case, hex_out], cwd=ROOT)
+            if 'COMPILE-ERROR' not in rc.stdout:
+                print('FAIL-NEG %s: 期望 COMPILE-ERROR，实际: %s' % (name, rc.stdout.strip()[:200]))
+                fail += 1
+                continue
+            if os.path.exists(hex_out):
+                print('FAIL-NEG %s: 拒绝输入仍产出 hex' % name)
+                fail += 1
+                continue
+            ok += 1
+            print('PASS-NEG %-24s COMPILE-ERROR, no hex' % name)
+
+    print('RESULT: %s（%d/%d 项通过：正例对拍 + 负例拒绝）' %
           ('PASS' if fail == 0 else 'FAIL', ok, ok + fail))
     return 0 if fail == 0 else 1
 

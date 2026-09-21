@@ -1,0 +1,4 @@
+fn main() -> Unit ! [IO]
+    let x: Int = 1.5
+    println(x)
+end

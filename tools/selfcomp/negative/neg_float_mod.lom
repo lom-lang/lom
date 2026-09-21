@@ -1,0 +1,4 @@
+fn main() -> Unit ! [IO]
+    let x = 7.5 % 2.0
+    println(x)
+end
