@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第十轮维护者独立审查 — 2026-09-21-2</title>
+<style>
+body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;max-width:1080px;margin:0 auto;padding:2rem;line-height:1.7;color:#202030}
+h1{border-bottom:3px solid #0e7490;padding-bottom:.5rem}h2{margin-top:2rem;border-left:4px solid #0e7490;padding-left:.7rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #d7d7e0;padding:.5rem;vertical-align:top;text-align:left}th{background:#eef7fa}
+code{background:#f4f4f7;padding:.1rem .25rem;border-radius:3px}.p1{color:#b91c1c;font-weight:700}.p2{color:#b45309;font-weight:700}.p3{color:#475569;font-weight:700}
+.ok{color:#15803d;font-weight:700}.part{color:#b45309;font-weight:700}.meta{background:#f6fbfd;border:1px solid #d5e8ee;padding:.8rem 1rem;border-radius:8px}.warn{background:#fff7ed;border-left:4px solid #ea580c;padding:.7rem 1rem}
+pre{background:#f6f6f9;padding:.6rem;overflow-x:auto;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lom 第十轮维护者独立审查（九审整改复审）</h1>
+<div class="meta">
+<strong>日期</strong>：2026-09-21　
+<strong>审查基线</strong>：<code>ca32fb4</code>（v1.2.2 + 1 docs 提交；九审基线 <code>ce2c71e</code>，增量 <code>git log ce2c71e..HEAD --oneline</code> 共 12 提交——R55-R61 语义整改 7 + rustfmt 机械包 1 + CI action 升级 1 + TODO 翻牌 1 + 升版 1 + HANDOVER §12 1）　
+<strong>性质</strong>：九审建议的"R55-R58 关闭并经下一轮复审"之复审轮——逐条亲手复跑 TODO R55-R61 全部验收宣称 + 基线复验 + 整改 diff 敌手式审计。体系内 agent 分工，非外部审计。审查阶段未修改任何产品源码；唯一写盘物为本报告。<br>
+<strong>范围</strong>：R55-R61 验收宣称复跑（真实 CLI 进程 / LSP stdio / fix apply / 退出码 / 三实现）、六维基线、CI 逐 run 对账、整改 diff 新边界（FnInfo 边界、EOF 误伤面、LSP 超限 payload、深度守卫对称性）。
+</div>
+
+<h2>1. 结论与总评</h2>
+<p><strong>总评 B+（本轮评级针对 v1.2.2 时点）</strong>。九审开出的四项 P1（R55 自动修复错改 / R56 panic 吞退出码 / R57 EOF 静默闭块 / R58 LSP 传输失明）全部真实修复，七项验收宣称逐条亲手复跑<strong>无一项失真</strong>——这是九轮以来整改验收与宣称首次零偏差。但本轮敌手探针仍击穿两处：MUT001 High 自动修复在同函数嵌套作用域的残留错改（R62，P2），以及 LSP 对超限 Content-Length 的 OOM abort（R63，P3）；另有 R60 提交引入的 HANDOVER 命令行控制字符损坏（R64，P3）。未达 A-：A- 要求重点面上敌手探针找不到新的 P2。</p>
+<table>
+<tr><th>维度</th><th>评级（九审→本轮）</th><th>理由</th></tr>
+<tr><td>六模式自举</td><td>A → <span class="ok">A</span></td><td>dump 154 / tokens 154 / diags 12 / static 22+154 / run 31 / wasm 三段（layer2 151 + layer3 golden + 自施加）全绿；R57 自举 parse_block 补丁与宿主对齐（CI 三连红教训收口有效）。</td></tr>
+<tr><td>WASM + 差分</td><td>A- → <span class="ok">A-</span></td><td>eval WASM 后端 121/121；差分探针 6/6、冒烟 20/20；wasm_codegen 2503 行改动全部来自 rustfmt 机械提交（零语义，git show 5f2930a 实证）；Int 值域 ±2^59 分歧维持 RFC 级挂账。</td></tr>
+<tr><td>核心语言</td><td>B+ → <span class="ok">A-</span></td><td>EOF 缺 end 五组反例全报 PARSE001 + exit 1，合法 match Form A/B、enum 多行、深嵌套、repl 跨行均不误伤；i64 除/模溢出结构化 RUNTIME000 + exit 1，加減乘回绕三形态正确；类型/模式深度守卫 40k 层结构化 PARSE000 无风暴；RFC 8259 三实现（宿主/自举/WASM）拒绝形态对齐。本轮未再击穿。</td></tr>
+<tr><td>repair-native</td><td>C → <span class="part">B+</span></td><td>R55 主宣称全落地：跨作用域不再错改、多行签名定位正确、同函数双效应合并、final 语义如实、多字节字符列正确；fix_corpus 11 对端到端不倒。扣分：同函数闭包遮蔽绑定仍被 High 错改且 ok:true 掩盖（R62）——九审同族问题的残留面。</td></tr>
+<tr><td>LSP/协议</td><td>C- → <span class="part">B</span></td><td>标准客户端会话 e2e（initialize 带空格 / multiline didOpen 零 LEX005 / hover / didChange / shutdown / 中文输出转义）经真实 stdio 进程验证；5000 层深 JSON 守卫生效不崩。扣分：Content-Length 无上限，单 header 可 OOM abort 杀死进程（R63）；畸形 JSON 静默丢弃无 -32700 error response。</td></tr>
+<tr><td>文档治理</td><td>B → <span class="part">B+</span></td><td>doc_audit 65/65、eval_prompt_check 24/24（首跑抓 4 失真并修——机制有效）、spec_examples 51+5。扣分：HANDOVER §2.2 的 eval_prompt_check 命令行被 R60 提交写成 TAB+断行的损坏字节（R64），doc_audit 数字锚点不覆盖命令行完整性，65/65 仍绿——控制字符咬字同型至少第三次复发。</td></tr>
+</table>
+
+<h3>基线复验（全部亲手实测）</h3>
+<ul>
+<li><code>cargo clean --release -p lom &amp;&amp; cargo build --release</code>：零 warning；<code>cargo clippy --release -- -D warnings</code> 通过；<code>cargo fmt --all -- --check</code> 零 diff（R61）。</li>
+<li><code>cargo test --release</code>：<strong>513/513</strong> 单元 + 集成 <strong>1+2</strong>（r56_process / r58_lsp_process 两套件单独复跑均过）= 516，与 HANDOVER §1 宣称一致。</li>
+<li>golden：<code>./target/release/lom.exe examples/bootstrap/stmt_interp.lom</code> 与 expected.txt <strong>逐字一致</strong>，stderr 0 字节。</li>
+<li>eval：<code>run.ps1 -Verify</code> 解释器 <strong>121/121</strong>；<code>-Backend wasm</code> <strong>121/121</strong>。</li>
+<li>selfhost 六模式逐个：dump 154 / tokens 154 / diags 12 / static 坏 22 + 干净 154 / run 31 / wasm 三段全 PASS。</li>
+<li>文档三件套：doc_audit <strong>65/65</strong>、spec_examples_check PASS（51 正 + 5 反）、eval_prompt_check <strong>24/24</strong>。</li>
+<li>fuzz_smoke 80 轮零崩溃；diff_test --probe 6/6；--rounds 20 --ci 冒烟 20/20。</li>
+<li>CI（GitHub API 实查）：#131-#135 五连绿；#135（HEAD ca32fb4）六 job 全 success、无失败步骤；annotations 仅剩 4 条 ubuntu-latest→Ubuntu 26 迁移 notice（2026-10-19 窗口，与 R61 挂账一致）——Node.js 20 弃用 warning 确已随 checkout@v5/cache@v5 消除。</li>
+</ul>
+
+<h2>2. R55-R61 整改复审裁定</h2>
+<p>裁定口径：TODO 各条"验收（实测）"宣称<strong>逐条亲手复跑</strong>；✓ = 宣称与实测一致；△ = 基本一致但有保留；✗ = 失真。</p>
+<table>
+<tr><th>ID</th><th>宣称 vs 实测</th><th>裁定</th><th>证据（本轮亲手复跑）</th></tr>
+<tr>
+<td>R55<br>High 自动修复</td>
+<td>九审三探针经真实 CLI 复验均按新语义工作</td>
+<td class="ok">✓<br><span class="p2">残留 R62</span></td>
+<td>① MUT001 跨作用域：apply 后 <code>applied=0</code>、源码 diff 逐字为空、<code>ok:false</code>、final 如实报 1 warning——四点全符。② 多行签名：插入点 <code>{line:3, col:9}</code>（<code>) -&gt; Int</code> 行），真实 apply 产出 <code>) -&gt; Int ! [IO]</code>，final 全净 ok:true。③ 同位双效应：合并为单条 insert <code>! [IO, Clock]</code>，产出 <code>fn helper() -&gt; Unit ! [IO, Clock]</code> 合法源码。fix_corpus 11 对全部 FIXED-MATCH（04/07/08 ok:false 是 Medium 不应用语义，bad==fixed 钉行为，非倒退）。多字节行 LEX005：<code>println("你好"）</code> 的 delete col 17 为<strong>字符列</strong>，修复后运行正常。边界补充：import 混排 FnInfo 边界推算正确（body 止于 import 行）；空文件/纯空行 fix 无 panic 正常返回。<strong>但</strong>同函数闭包遮蔽与行内注释两形态仍错改（见 R62）。</td>
+</tr>
+<tr>
+<td>R56<br>panic 吞退出码</td>
+<td>MIN/-1 结构化 RUNTIME000 + exit 1；加减乘回绕</td>
+<td class="ok">✓</td>
+<td><code>9223372036854775807 + 1</code> 后 <code>/ -1</code>：输出 <code>[RUNTIME000] 整数除法溢出：i64 最小值…除以 -1</code>，rc=1；<code>% -1</code> 同；直接 <code>(-9223372036854775807 - 1) / -1</code>（不经加法）同——第三形态额外覆盖。回绕：MAX+1=MIN、MIN-2=MAX、MAX*3 回绕值，rc=0。<code>tests/r56_process.rs</code> 集成（spawn 真实二进制断言 rc/stderr/stdout）复跑通过。</td>
+</tr>
+<tr>
+<td>R57<br>EOF 静默闭块</td>
+<td>缺 end 必报 PARSE001；五组反例 + 不回归</td>
+<td class="ok">✓</td>
+<td>五组 EOF 缺 end（fn/if/while/for/闭包）全部 <code>ok:false</code> + PARSE001 <code>期望 'end' (块闭合)，得到 文件结束</code> + 运行 rc=1。任务 089 原始三行源：ok:false + PARSE001 (4:1)，与 prompt 内嵌诊断 JSON 逐字一致（eval_prompt_check 24/24 机器对账）。误伤面专项：合法 match Form A、match Form B（双 end 形态）、enum 多行、三层嵌套 if、repl 跨行 fn 定义（<code>..&gt;</code> 续行，f(21)=42）全部正常零误报。for 探针另见列表字面量形态的 PARSE001（语法面不支持，非 R57 范畴）。</td>
+</tr>
+<tr>
+<td>R58<br>LSP 传输</td>
+<td>真实 stdio e2e 全链 + 输出转义合法</td>
+<td class="ok">✓<br><span class="p3">新增 R63</span></td>
+<td><code>tests/r58_lsp_process.rs</code> 两测试复跑通过（带空格 initialize 有响应且声明 capabilities；JSON 转义 multiline didOpen 干净源码 <code>diagnostics:[]</code>；hover 嵌套 position 返回签名；didChange 缺 end 报 PARSE001——与 R57 联动验证成立；shutdown 返回 null；中文+引号诊断输出合法性校验过）。本轮加测敌手边界：5000 层深 JSON 不崩不挂（守卫生效，后续消息正常处理）；<code>Content-Length: abc</code> / <code>-5</code> 畸形态不崩、后续 initialize 可恢复响应。<strong>但</strong>声称 999999999999 字节触发分配失败 abort（见 R63）；畸形 JSON 被静默丢弃（无 -32700 Parse error 响应，协议瑕疵随附记录）。</td>
+</tr>
+<tr>
+<td>R59<br>json 控制字符</td>
+<td>三实现拒绝未转义控制字符；合法转义不受影响</td>
+<td class="ok">✓</td>
+<td>九审探针（char_from_code(34)+char_from_code(10) 组装引号+真实换行+引号）三实现亲手复跑：宿主 <code>[RUNTIME000] json_parse 失败: …未转义控制字符 0x0A（RFC 8259）</code> rc=1；自举 <code>[self-runtime] json_parse 失败: …未转义控制字符（RFC 8259）</code>；WASM <code>wasm trap: Bad control character in string literal</code> rc=1。合法 <code>\n</code>/<code>\t</code>/<code>\u000A</code> 转义三形态宿主与自举输出 1,1,1（len==1）不受影响。</td>
+</tr>
+<tr>
+<td>R60<br>gate 盲区三件</td>
+<td>零依赖双层 gate + 深度守卫 + prompt 校验</td>
+<td class="ok">✓<br><span class="p3">新增 R64</span></td>
+<td>① awk gate 本机五形态坏 TOML 全拦（[dependencies] / [target.'cfg(windows)'.dependencies] / [workspace.dependencies] / [dev-dependencies.x] / [build-dependencies]），真实 Cargo.toml 通过，<code>cargo metadata --no-deps</code> 事实源断言 resolved:[] 通过。② 深度守卫：40,000 层 <code>List&lt;…&gt;</code> 报 <code>PARSE000 类型嵌套超过 30000 层（256MB 栈的安全上限）</code> rc=1 无风暴；深模式同（+2 条连带 PARSE001）；中段深类型不影响其他函数（250 层全绿）；300/600/1000/2000 层合法深度不拦。③ eval_prompt_check 24/24（093/095/100/113 四处失真的修复经机器对账）。<strong>但</strong>R60 代码提交本身在 HANDOVER §2.2 写下损坏命令行（见 R64——整改执行中的新毛边，非 gate 宣称失真）。</td>
+</tr>
+<tr>
+<td>R61<br>维护工具毛边</td>
+<td>rustfmt 清零 + UTF-8 输出 + action 升级</td>
+<td class="ok">✓</td>
+<td><code>cargo fmt --all -- --check</code> 零 diff（本机 Rust 1.97.1）；clippy <code>-D warnings</code> 零 warning；<code>python tools/spec_examples_check.py</code> 默认命令直跑无 UnicodeEncodeError；CI #135 annotations 中 Node.js 20 弃用 warning 确已消除，仅剩 4 条 Ubuntu 26 迁移 notice（挂账口径一致）。rustfmt 提交 5f2930a 独立成包、wasm_codegen 等大 diff 均属该机械包（git show 实证），语义整改 diff 未被淹没。</td>
+</tr>
+</table>
+
+<h3>可直接重建的最小复现（v1.2.2 二进制，target/release/lom.exe）</h3>
+<table>
+<tr><th>问题</th><th>源码 / 输入</th><th>关键结果</th></tr>
+<tr><td>R62a 闭包遮蔽</td><td><pre>fn f(x: Int) -> Int
+    let g = fn(y: Int) -> Int
+        let x = y + 1
+        x
+    end
+    x = x + 1
+    g(x)
+end
+fn main() -> Unit
+    println(f(1))
+end</pre></td><td><code>fix --apply</code> 把 <strong>第 3 行闭包内</strong> <code>let x</code> 改为 <code>let mut x</code>（High Replace）；apply 后 --check 仍报 MUT001 (6:5)（参数 x 重赋值未治疗），但 apply JSON <code>ok:true</code>。</td></tr>
+<tr><td>R62b 行内注释</td><td><pre>fn f(x: Int) -> Int
+    let z = 1 # let x = 0
+    x = x + 1
+    z + x
+end
+fn main() -> Unit
+    println(f(1))
+end</pre></td><td>回扫命中<strong>注释文本</strong>里的 <code>let x</code>：apply 把注释改为 <code># let mut x = 0</code>（line 2 col 17）；警告未除，apply JSON 仍 <code>ok:true</code>。</td></tr>
+<tr><td>R63 超限 Content-Length</td><td><pre>Content-Length: 999999999999\r\n\r\n{"x":1</pre></td><td>lsp 进程 stderr：<code>memory allocation of 999999999999 bytes failed</code>，rc=<code>0xC0000409</code>（abort）——单 header 杀死服务器。</td></tr>
+<tr><td>R64 命令行损坏</td><td><code>sed -n '122,123p' docs/HANDOVER.md | od -c</code></td><td>§2.2 eval_prompt_check 行原始字节为 <code>--bin .&lt;TAB&gt;arget&lt;LF&gt;elease\lom.exe</code>——字面 <code>\t</code>/<code>\r</code> 被写成真实 TAB/LF，命令断成两行，复制即坏。</td></tr>
+</table>
+<p>探针文件均建于 <code>target/probes/</code>（gitignored），报告完成后已清理。</p>
+
+<h2>3. 新发现（R62 起）</h2>
+<table>
+<tr><th>ID</th><th>级别</th><th>发现与证据</th><th>建议验收方向（只记录，不开账）</th></tr>
+<tr>
+<td>R62</td>
+<td class="p2">P2</td>
+<td><strong>MUT001 High Replace 的同函数嵌套作用域残留错改（R55 整改盲区）</strong>。R55 把 <code>let {name}</code> 回扫从全文收窄到"诊断所属函数体内"，但未到绑定作用域粒度：① 函数参数 x 重赋值 + <strong>同函数内闭包</strong> <code>let x</code> 遮蔽时，回扫"体内唯一命中"落在闭包声明上，High Replace 把闭包内绑定错改 <code>let mut</code>——诊断对象（参数）未治疗，final 仍 1 warning，<code>ok:true</code>（applied&gt;0 且 errors==0）宣称修复成功；② 行内注释 <code>let z = 1 # let x = 0</code>——回扫跳过 <code>#</code> 起始行但不感知行中注释边界，注释文本被当声明命中，apply 改注释（无效修复）仍 ok:true。两形态实测复现（上表）。ok 语义本身与 TODO 宣称一致（非失真），但本案暴露"warning 未消除仍报 ok"的误导面。import 混排/空文件/多字节列等其余边界本轮未击穿。</td>
+<td>回扫排除嵌套闭包体内与行内注释区间（lexer 层 token 边界可用）；可选：ok 语义对"原诊断未消除"收紧（warning 级修复要求该 code 清零才算 ok）；负向测试锁定两形态（"绝不能这样修"）。</td>
+</tr>
+<tr>
+<td>R63</td>
+<td class="p3">P3</td>
+<td><strong>LSP Content-Length 无上限 → 单 header OOM abort</strong>。<code>run_lsp</code> 主循环 <code>vec![0u8; len]</code> 直接按声称长度分配：发送 <code>Content-Length: 999999999999</code> 即 <code>memory allocation of 999999999999 bytes failed</code>，进程 abort（rc=0xC0000409）。真实客户端不发此值，但 LSP 是对外协议面，损坏/恶意对端可用 20 字节杀死服务器。随附记录：畸形 JSON 静默丢弃无 -32700 Parse error 响应（LSP 规范建议）；<code>Content-Length: abc</code>/<code>-5</code> 畸形态不崩、流错位后经后续消息可恢复（实测）。5000 层深 JSON 守卫生效不崩（正面）。</td>
+<td>Content-Length 上限（如 16MB，超限发 error response 或断连）；畸形 JSON 补 -32700 响应；进程级测试锁定（声称超限不 abort）。</td>
+</tr>
+<tr>
+<td>R64</td>
+<td class="p3">P3</td>
+<td><strong>HANDOVER §2.2 命令行控制字符损坏（R60 提交引入）</strong>。<code>8178d33</code>（fix(r60)，git blame 实证）在 §2.2 写入 eval_prompt_check 命令时，<code>.\target\release\lom.exe</code> 的字面 <code>\t</code>/<code>\r</code> 被写成真实 TAB(0x09)/LF(0x0A)，命令断成两行（od -c 实证），复制即不可执行。与第四轮 R15 的 0x0C 咬字、CI #92 教训同型复发；§12.1 第 8 条自家纪律"含反斜杠转义的内容只用 Write/Edit 落盘"在该提交中被违反。全仓 md 控制字符扫描（TAB/CR/FF/VT/BS/NUL）为唯一实例；doc_audit 65/65 仍绿——数字锚点 gate 不覆盖命令行完整性。</td>
+<td>修复该两行；考虑 doc_audit 或 CI 加"代码块内控制字符扫描"位（md 代码块中 TAB/CR/FF 即红）；整改纪律重申。</td>
+</tr>
+</table>
+<p>其他观察（不计入编号）：① eval_prompt_check / HANDOVER 的 <code>--bin</code> 参数形态（相对 <code>./target</code>）在 Git Bash 下可用，本轮两种调用均成功；② LSP didOpen 4.4MB 源码 20 秒内完成诊断推送且服务器存活，但 13 万同名函数触发约 21MB 诊断输出——诊断量无上限，正常客户端不会出现，主观推测仅极端场景有感；③ 深类型守卫触发后跳 EOF 会连带吞掉文件后续函数的诊断（设计取舍"防风暴优先"，30000 层阈值内无感）。</p>
+
+<h2>4. 对九审"交接裁决建议"的更新</h2>
+<div class="warn">
+<p><strong>L2 动工菜单可以重新呈现给用户</strong>。九审设定的条件"至少 R55-R58 关闭并经第十轮复审"已满足：四项 P1 整改真实、验收宣称零失真、本轮在冻结语法/CLI 契约/标准客户端路径上未再击穿。建议呈现菜单时附两条边界信息，由用户裁决：① R62（P2）属 fix 引擎作用域粒度问题——L2（RFC-0004 方案 A 复用 parser/fix 面）会原样继承并在更复杂的嵌套形态中放大，建议作为 L2 开工前置或并行项；② R63（P3）属对外协议面，工作量小，可随手收口。<strong>发布线继续维持 2026-09-07 冻结裁决</strong>——本轮三项新发现均不构成解冻理由，但 R62/R63 建议在任何对外动作前关闭。RFC-0004 仍为 draft，动工与否仍需用户明示；ubuntu-latest→Ubuntu 26 迁移（2026-10-19）维持挂账观察。</p>
+</div>
+
+<h2>5. 审查局限（如实）</h2>
+<ul>
+<li>本轮没有重放历史 10,000 个差分实例；复验的是 CI 同款冒烟（20 轮）、探针（6/6）与既有报告结构。"差分全量一致"不得引用本轮。</li>
+<li>LLM raw 留档为 gitignored 本机档案，本轮未复算 pass@k 矩阵，只沿用九审"本机档案支持、fresh clone 无法认证来源"的口径。</li>
+<li>"独立"是同一维护体系内的 agent 分工，不是外部同行审计；Git 历史单一作者身份，无法归因到个人。</li>
+<li>LSP 验证基于自构造 stdio 帧（对齐 LSP 规范与 VSCode 常见行为），未接入真实 VSCode 客户端进程。</li>
+<li>CI 对账基于 GitHub API 的 runs/jobs/annotations 快照（#131-#135），未逐条重放 job 日志。</li>
+<li>探针临时文件建于 target/probes/ 并已于报告完成前清理（git status 零残留）；审查阶段未修改任何产品源码、CI 配置与治理文档，未提交未推送。</li>
+</ul>
+
+<p><small>报告：docs/reviews/review-2026-09-21-2.html · 基线 ca32fb4（v1.2.2）· 第十轮维护者独立复审（九审 R55-R61 整改验收）· 自包含 HTML · UTF-8</small></p>
+</body>
+</html>
