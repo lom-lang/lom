@@ -1,12 +1,10 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-21 深夜六刷新）**：本台账处于**交接就绪**状态。
-> 第十一轮独立复审（[review-2026-09-21-3.html](reviews/review-2026-09-21-3.html)，
-> 总评 B，基线 `65e51dc`）确认 R62/R63 整改零失真后新开 **R65-R72**——
-> 当前 **open：R65（P1）/R66（P1）/R67-R69（P2）/R70-R72（P3）**；
-> R1-R64 全部关闭；头条两条 P1 已由维护会话亲手复现确认。
-> 活跃工作包：**无**（L2.1/L2.2 已交付——RFC-0004 修订 2/3；十一审
-> 建议 L2.3 暂缓，先收口 R65-R72，待用户裁决）。
+> **交接声明（2026-09-22 刷新）**：本台账处于**交接就绪**状态。
+> 第十一轮开账的 **R65-R72 已于 2026-09-22 按用户裁决全量整改收官并升版
+> v1.2.4**——R1-R72 全部关闭；整改验收证据见各项下方；整改后状态需
+> 第十二轮独立复审重估。活跃工作包：**无**（L2.1/L2.2 已交付 + R66-R68
+> 整改完成——RFC-0004 修订 4；L2.3 待复审后裁决）。
 > 发布线维持冻结。新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
 > 再读 HANDOVER §0/§1/§2.2/§9/§11.6/§12，跑 §2.2 全量基线（六模式
 > 逐个），然后向用户呈现方向菜单。
@@ -283,7 +281,7 @@ elease` 的 `	`/`
 24 向量复证、L2.2 验收器 5/5 复跑。敌手探针另击穿八项新发现，维护会话
 已亲手复现头条两条 P1 后开账。
 
-### R65 — MUT001 嵌套作用域错目标 + 非幂等重复应用（P1）⏳ open
+### R65 — MUT001 嵌套作用域错目标 + 非幂等重复应用（P1）✅ done（2026-09-22，v1.2.4）
 
 - **形态**：诊断行位于闭包体/match 臂/for 绑定等嵌套作用域内、外层函数
   扁平作用域存在同名 `let` 时，`fix_mut001_add_mut` 按名过滤命中外层声明
@@ -301,8 +299,31 @@ elease` 的 `	`/`
 - **验收方向**：三实例化 apply 后源码逐字不变、applied=0、hint 形态；
   "闭包内重赋捕获外层 x"正例仍 Replace 外层（既有行为不倒）；
   `let mut mut` 形态永不可能出现（幂等锁定）；fix_corpus 09 不倒。
+- **修法（2026-09-22 用户裁决 R65-R72 全量整改）**：① 作用域归属解析
+  （主）——`FnInfo` 新增 `assign_binds`（fix.rs 两遍式收集：`flat_binds`
+  收集各层 define 名集合，遍历时维护词法作用域链 path——顶层=参数+函数体
+  扁平绑定，闭包体/match 臂（含 pattern 绑定）push 子层，**for 变量在
+  循环体内 push 遮蔽层**（对齐 typechecker 的 define 覆盖语义）；每条
+  `Stmt::Assign` 从最近层向外解析绑定，命中非顶层即降级 hint）；② 幂等
+  （辅）——`collect_let_decls` 滤出 `mutable == true` 声明（重赋可变绑定
+  不产生 MUT001，留在命中集只会让第二轮同坐标再 Replace）。十一审流程
+  观察建议的"与 typechecker 共享 Env 解析"终态以"镜像 env 语义的独立
+  遍历"落地（fix 层不侵入 typechecker）。
+- **验收（2026-09-22 实测）**：三探针（`target/probes/r65{a,b,c}*`）真实
+  `fix --apply --json`——闭包版/match 臂版 applied=0、源码逐字不变、
+  ok:false、final 如实报 1 warning；for 遮蔽版循环内赋值 hint、循环外
+  重赋外层 Replace（**正确修复**，applied=1 后第二轮 applied=0 幂等）。
+  +6 测试：`r65_mut001_nested_closure_diag_with_outer_same_name_let_never_touched`
+  /`..._match_arm_shadowing_never_touched`/`..._for_var_shadowing_inner_assign_is_hint`
+  （三负向）/`..._for_outer_assign_still_replaces`/`..._closure_reassign_captured_outer_still_replaces`
+  （两正例不倒）/`..._already_mutable_never_replaced`（幂等锁定）。
+  fix_corpus 11 对端到端不倒；cargo test 529 单元全绿。
+- **关联观察（如实登记，超出 R65 范围未动）**：typechecker 的 for 变量
+  `env.define` 覆盖同名外层绑定的可变性标记且循环后不恢复——`let mut x`
+  + `for x in ...` 后循环外 `x = 5` 仍报 MUT001（v1.2.3 既有 quirk，
+  warning 级不拦截；修复需 env 快照/恢复语义，留待下轮裁决）。
 
-### R66 — self_comp 语句级子集拒绝是死臂（P1）⏳ open
+### R66 — self_comp 语句级子集拒绝是死臂（P1）✅ done（2026-09-22，v1.2.4）
 
 - **形态**：`comp_blk` 语句分派 match 位于**语句位置**，`_ => Err(...)`
   与 `StReturn(_) => Err(...)` 两臂的 Err 值被语句值丢弃（Lom 语句值
@@ -315,44 +336,80 @@ elease` 的 `	`/`
   String/Float % 各一，断言 COMPILE-ERROR 且无 wasm 产出）。
 - **验收**：负例集全 COMPILE-ERROR；既有 5 用例不倒；hex 产物对坏输入
   不落盘。
+- **修法+验收（2026-09-22 实测）**：comp_blk 语句 match 值线程化
+  （`let frag = match s ... end` + `out = out + frag?`——StAssign 臂内层
+  match 的 None 臂 Err 同链激活）。探针复现四形态（if/while/for/return）
+  全部 `codegen error: L2.2 子集不支持...` + COMPILE-ERROR + 无 hex；
+  `tools/selfcomp/negative/` 13 负例进 verify_selfcomp——**18/18 项**
+  （5 对拍不倒 + 13 拒绝）；self_comp 自身 --check 零诊断、fmt gate 过。
 
-### R67 — 裸 return 死臂产非法 wasm（P2）⏳ open
+### R67 — 裸 return 死臂产非法 wasm（P2）✅ done（2026-09-22，随 R66 一并，v1.2.4）
 
 - 同 R66 死臂路径：`return` 蒸发后函数尾缺值 → fallthru 栈校验错，
   失败面推迟到实例化（node 报错）而非编译期。随 R66 一并修。
+- **验收（2026-09-22 实测）**：`return x + 1` 探针 → `codegen error:
+  L2.2 子集不支持: return 语句（L2.2 用尾表达式）` + COMPILE-ERROR +
+  无 hex（v1.2.3 为 COMPILED 92 bytes + node 实例化 CompileError）。
+  负例 neg_return_stmt 进 verify_selfcomp 回归网。
 
-### R68 — let 类型注解信任边界未登记（P2）⏳ open
+### R68 — let 类型注解信任边界未登记（P2）✅ done（2026-09-22，v1.2.4）
 
 - `let x: Int = 1.5`：`let_vt` 显式注解直接采信不做一致性检查 →
   i64/f64 混型非法 wasm。子集编译器信任输入（已过宿主 --check）的
   边界成立，但 RFC-0004 未登记。方向：或编译期一致性校验（注解 vs
   综合），或 RFC 修订 3 补登记（择一，随 R66 包裁决）。
+- **修法+验收（2026-09-22，采纳十一审建议：编译期一致性校验拒绝）**：
+  `let_vt` 对显式注解先综合值类型，不一致即 subset_err——探针
+  `let x: Int = 1.5` → `codegen error: L2.2 子集不支持: let 注解类型
+  'i64' 与值类型 'f64' 不符（编译期拒绝；宿主侧仅 warning）` +
+  COMPILE-ERROR + 无 hex。信任边界差异登记 RFC-0004 修订 4（负例
+  neg_annot_mismatch 进回归网）。开发踩坑：Lom 侧 Result 忘 `?` 解包
+  使报错消息出现 'Ok(i64)'（Result 值字符串化）+ Form B 臂漏 end——
+  均当场修正。
 
-### R69 — case1 字节锚陈旧（P2）⏳ open
+### R69 — case1 字节锚陈旧（P2）✅ done（2026-09-22，v1.2.4）
 
 - RFC-0004 修订 2/3 与 HANDOVER 深夜五条目的 "9746B vs 121B" 实测
   9852/169（fmt gate 修复与用例演进后漂移），五用例无一匹配。
 - **修法**：删字节锚或改为非时点口径（"~10KB vs ~200B"）——时点数字
   不入长期文档（R42/E 类教训同族）。
+- **验收（2026-09-22）**：RFC-0004 修订 3 与 HANDOVER 深夜五条目两处
+  均改量级口径（~10KB vs ~0.2KB + R69 撤注）；全仓 grep "9746" 清零
+  （仅 TODO 本条目与 RFC 修订 4 的整改记录保留时点数字作历史证据）。
 
-### R70 — HANDOVER §2.2 陈旧句（P3）⏳ open（交接刷新时收口）
+### R70 — HANDOVER §2.2 陈旧句（P3）✅ done（交接刷新时修正，2026-09-22 本轮核实收口）
 
 - "cargo fmt --all -- --check 当前为 R61 已知失败"句残留（R61 已闭、
   fmt 现零 diff）——交接五件套刷新时顺手修正。
+- **验收（2026-09-22）**：交接刷新（3bedab5/5ef6575）时已替换为如实句
+  （"自 R61 机械包起零 diff 且是 CI gate"）；本轮 `cargo fmt --all --
+  --check` 实跑退出 0 复核收口。
 
-### R71 — LSP 非 UTF-8 payload 静默丢弃（P3）⏳ open
+### R71 — LSP 非 UTF-8 payload 静默丢弃（P3）✅ done（2026-09-22，v1.2.4）
 
 - 非 UTF-8 字节流 `continue` 丢弃（无 -32700），服务器存活。随下轮
   LSP 包或顺手收口。
+- **修法+验收（2026-09-22 实测）**：`from_utf8` 失败分支回 -32700
+  （id:null）后 continue（对齐 R63 畸形 JSON 路径）。进程级测试
+  `r71_non_utf8_payload_gets_parse_error_and_survives`：ÿþ
+  payload → 收到 -32700 帧 → 后续 initialize 正常响应（存活）。
 
-### R72 — LSP 双 Content-Length/退出码毛边（P3）⏳ open
+### R72 — LSP 双 Content-Length/退出码毛边（P3）✅ done（2026-09-22，v1.2.4）
 
 - 双 CL 头 last-wins 不拒；`exit` 未经 shutdown 恒 rc=0（LSP 规范
   建议 1）。低危，随 R71 一并。
+- **修法+验收（2026-09-22 实测）**：① 双 CL 头 → stderr 说明 +
+  exit 1（帧格式损坏流不可信，无法重新同步——与超限同款断连策略）；
+  ② `handle_lsp_method` 加 `shutdown_seen` 状态——exit 分支
+  `exit(if *shutdown_seen { 0 } else { 1 })`（LSP 3.17 建议）。
+  进程级测试 ×2：`r72_duplicate_content_length_rejected`（rc=1 +
+  stderr 含"重复"）、`r72_exit_code_depends_on_shutdown`（未经
+  shutdown rc=1；shutdown 后 rc=0 既有形态不倒）。
 
 **十一审裁决建议**：L2.3 暂缓——先收口 R66-R68（含 verify 负例集）；
 R65 入 v1.2.4 整改包；R69-R72 顺手收口；发布冻结维持（全部发现均不触
-语言面）。**待用户裁决整改顺序。**
+语言面）。**（2026-09-22 用户裁决"R65-R72 整改包（推荐）"全量执行：
+八项全部关闭，升版 v1.2.4；L2.3 待第十二轮复审后裁决。）**
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 

@@ -147,14 +147,36 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   算术（混合提升 Float 对齐宿主）/ 一元负 / 括号 / 调用（含前向引用）/
   println(Int|Float)；块值=尾表达式。值表示（实现自由度）：**untagged
   原生 i64/f64** + env.print_i64/print_f64 宿主导入——case1 宿主产物
-  9746 字节 vs L2 产物 121 字节，stdout 逐字一致。验收：**5/5 用例
-  双产物（stdout+rc）一致**；self_comp 自身 --check 零诊断、lom fmt
-  gate 过；六模式/523+5 测试/doc_audit 65/65 全绿复验。已知边界
-  （如实登记）：① Float 字面量解析为从右往左除法近似，测试集限定
-  二进制精确可表示值，任意字面量正确舍入留 L2.3 精度专项；② 对拍
-  避开宿主 tagged-i64 值域 ±2^59（§11f-7 既有分歧，用例界内取值）；
+  ~10KB vs L2 产物 ~0.2KB（量级口径——tagged 完整运行时 vs 裸值编码；
+  R69/十一审撤除时点字节锚，时点数字不入长期文档），stdout 逐字一致。
+  验收：**5/5 用例双产物（stdout+rc）一致**；self_comp 自身 --check
+  零诊断、lom fmt gate 过；六模式/523+5 测试/doc_audit 65/65 全绿复验。
+  已知边界（如实登记）：① Float 字面量解析为从右往左除法近似，测试集限定
+  二进制精确可表示值，任意字面量正确舍入留 L2.3 精度专项；② 对拍避开
+  宿主 tagged-i64 值域 ±2^59（§11f-7 既有分歧，用例界内取值）；
   ③ Float % / 控制流 / String 留 L2.3。开发踩坑登记（HANDOVER §11.6）：
   前端复用的块尾裸表达式归 Tail 不归 stmts（void 尾有副作用必须编译
   执行——首版静默丢弃）；Form B 臂 end 计数（§4.1 再应验，5 处漏补）；
   ExBinary 的 op 是 token 判别名（"Add"）非符号（"+"）。下一步 L2.3
   全语言面（控制流/闭包/enum/match/字符串/list/map/json/包）。
+- **修订 4（2026-09-22）：R66-R68 整改——语句级拒绝死臂根治 +
+  let 注解一致性校验 + 负例集回归网。** 十一审（review-2026-09-21-3）
+  击穿三处并经维护会话复现确认后修复：
+  - **R66/R67（P1/P2）**：`comp_blk` 语句分派 match 位于语句位置，
+    `StReturn(_)`/`_`（及 StAssign 臂内层 match 的 None 臂）构造的 Err
+    是被丢弃的死值——if/while/for/return 语句静默蒸发后照常 COMPILED，
+    产出可实例化但行为错误的 wasm（while 计数 host 3 / L2 0）。修复：
+    语句 match 值线程化（`let frag = match ... end` 后 `frag?` 传播），
+    拒绝真实生效。
+  - **R68（P2）**：`let_vt` 对显式注解直接采信（`let x: Int = 1.5` 产
+    i64 槽存 f64 值的非法 wasm，失败面推迟到实例化）。修复：注解与
+    综合值类型**编译期一致性校验，不一致即 subset_err 拒绝**——这是与
+    宿主"注解不匹配仅 TYPE001 warning、运行时值胜出"渐进式语义的
+    **已登记信任边界差异**（子集编译器收紧身：注解与值不符时用
+    `let x = 1.5`/`let x: Float = 1.5` 显式一致写法）。
+  - **负例集回归网**：`tools/selfcomp/negative/` 13 个子集外构造
+    （if/while/for/return 语句、闭包、比较、String、Float %、let 注解
+    不符、match、缺 main、未知函数、嵌套 println），verify_selfcomp
+    断言 COMPILE-ERROR 且无 hex 产出——语句级拒绝的回归防线自此在位。
+  - **R69（P2，同包）**：修订 3 的 case1 时点字节锚（9746/121）随
+    用例定稿漂移（实产 9852/169），改为量级口径（见修订 3 正文）。
