@@ -12,7 +12,8 @@
 #      + README + LANGUAGE_SPEC ×3 + HANDOVER ×2 + SPEC_FOR_AI 当前口径 + CI WASM step
 #   B. 自举 dump 计数：examples 顶层 + bootstrap + eval 总数 → HANDOVER §2.2 + ci.yml 步骤名
 #   C. .lom 文件拆分：glob 实数（总数/顶层/bootstrap/pkg_demo/selfhost）→ README 状态段
-#   D. self_interp 行数：wc 口径（换行符计数）→ HANDOVER §9
+#   D. self_interp/self_comp 行数：wc 口径（换行符计数）→ HANDOVER §9 +
+#      README/HANDOFF_PROMPT 的 self_comp 行数宣称位（R76/十二审）
 #   E. 版本号：Cargo.toml（+ Cargo.lock 一致性）→ HANDOVER §1/§9
 #   G. 测试数（Q4，2026-09-08）：源码 #[test] 静态计数 → HANDOVER §2.2 期望行 /
 #      §9 检查单 / README 状态段（测试数同步教训三连——R 审查两抓 + N1 三处手改）
@@ -94,6 +95,8 @@ def main():
 
     self_interp = 'examples/selfhost/self_interp.lom'
     self_lines = read(self_interp).count('\n')
+    self_comp = 'examples/selfhost/self_comp.lom'
+    comp_lines = read(self_comp).count('\n')
 
     cargo_ver = re.search(r'^version\s*=\s*"([^"]+)"', read('Cargo.toml'),
                           re.M).group(1)
@@ -103,11 +106,11 @@ def main():
         lock_ver = m.group(1)
 
     print('真值：eval %d 任务 | dump %d 文件（%d 顶层 + %d bootstrap + %d eval）| '
-          '.lom 拆分 %d=%d+%d+%d+%d | self_interp %d 行 | 版本 %s（lock %s）'
+          '.lom 拆分 %d=%d+%d+%d+%d | self_interp %d 行 | self_comp %d 行 | 版本 %s（lock %s）'
           % (eval_total, dump_expect, len(top_lom), len(boot_lom), eval_total,
              len(top_lom) + len(boot_lom) + len(pkg_lom) + len(self_lom),
              len(top_lom), len(boot_lom), len(pkg_lom), len(self_lom),
-             self_lines, cargo_ver, lock_ver))
+             self_lines, comp_lines, cargo_ver, lock_ver))
 
     # ---- A. eval 任务总数 ----
     print('A. eval 任务总数')
@@ -154,10 +157,16 @@ def main():
                [len(top_lom) + len(boot_lom) + len(pkg_lom) + len(self_lom),
                 len(top_lom), len(boot_lom), len(pkg_lom), len(self_lom)])
 
-    # ---- D. self_interp 行数 ----
-    print('D. self_interp 行数')
+    # ---- D. self_interp / self_comp 行数 ----
+    print('D. self_interp / self_comp 行数')
     expect_all('HANDOVER §9-5', 'docs/HANDOVER.md',
                r'self_interp\.lom（(\d+) 行', [self_lines])
+    # R76（十二审）：self_comp 行数宣称位（README/HANDOFF_PROMPT）——
+    # L2.3 行数再变时钉住，R69 同族漂移点根治
+    expect_all('README self_comp 行数', 'README.md',
+               r'(\d+)-line L2\.2 subset compiler', [comp_lines])
+    expect_all('HANDOFF_PROMPT self_comp 行数', 'docs/HANDOFF_PROMPT.md',
+               r'self_comp\.lom (\d+)', [comp_lines])
 
     # ---- E. 版本号 ----
     print('E. 版本号')
