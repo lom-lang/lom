@@ -98,13 +98,27 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   clippy 零 warning；SPEC_FOR_AI Phase 2.2 行与 SECURITY 限制 6 改写
   为修复后口径（含验证命令）。
 
-### R58 — LSP JSON-RPC 传输不符合真实客户端（P1）⏳ open
+### R58 — LSP JSON-RPC 传输不符合真实客户端（P1）✅ done（2026-09-21）
 
-- compact 合法 didOpen 的三行源码因 `text` 未 JSON 反转义，`\\n` 被 lexer 当反斜杠，
-  返回 3 条 LEX005；合法带空格 initialize 被精确字符串扫描完全忽略（0 字节响应）。
-- 输出字符串也未完整转义反斜杠/控制字符；现有 19 测试均是理想化纯函数/compact payload。
-- **验收**：真实 stdio e2e 覆盖 initialize→didOpen multiline→diagnostics→hover/
-  completion→didChange→shutdown；JSON 空白、转义、嵌套对象、字符串内花括号均覆盖。
+- **修法**：消息解析全面改走 `crate::json::parse`（库内标准递归下降
+  解析器，零依赖）：`lsp::parse_rpc_message` 与 cli.rs 的四个参数提取
+  （didOpen/didChange/hover/completion，按 LSP 规范结构 textDocument/
+  position/contentChanges 取值）——v1.2.1 的精确字符串扫描（needle
+  `"key":"`）对合法带空格 JSON 完全失明且不反转义；嵌套 depth 计数也
+  不感知字符串内花括号。输出侧转义统一 `crate::json::escape_str`
+  （错误响应/诊断 message/code/uri/hover markdown/completion detail——
+  v1.2.1 只替换单/双引号与换行，反斜杠与控制字符会产出非法 JSON）。
+  Content-Length 维持字节口径（LSP 规范，本就正确）。
+- **验收（2026-09-21 实测）**：**真实 stdio e2e**（`tests/r58_lsp_process.rs`
+  spawn `lom lsp` 全帧交互）：带空格 initialize 有响应（v1.2.1 为 0 字节）；
+  JSON 转义 multiline didOpen 的干净三行源码 `diagnostics:[]`（v1.2.1 为
+  3 条 LEX005）；hover 嵌套 position 返回签名；didChange 全量变更报
+  PARSE001（与 R57 联动）；shutdown 响应 null；含中文诊断的输出经
+  合法性校验（括号配平+转义完整）。单元层 +6：parse_rpc_message 带空格/
+  字符串内花括号、extract_* 四函数带空格/转义/嵌套 payload + compact
+  向后兼容。cargo test --release **507 单元 + 3 集成 = 510**；clippy 零
+  warning；doc_audit 65/65（锚点 501→507）；eval 121/121；selfhost
+  dump 154/154；README LSP 段从 ⚠️ prototype 改写为修复后口径。
 
 ### R59 — json_parse 接受未转义控制字符（P2）⏳ open
 

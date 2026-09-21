@@ -293,102 +293,128 @@ pub(crate) fn apply_iterative(src: &str, path: &str, max_rounds: usize) -> (Stri
 }
 
 // ===== LSP JSON 参数提取（serve 于 main.rs 的 LSP 粘合层）=====
+//
+// R58（九审）：此前是精确字符串扫描（needle `"key":"`）——合法带空格的
+// JSON（`"key": "value"`）完全匹配不到；字符串值也不反转义（didOpen.text
+// 的 \n 保留字面反斜杠+n，下游 lexer 报 LEX005）。现统一走 crate::json::parse
+// （标准递归下降解析器，零依赖）按 LSP 规范结构提取。
 
-/// 从 didOpen params 提取 uri 和 text
+/// Value 树取字段
+fn vfield<'a>(v: &'a crate::interpreter::Value, key: &str) -> Option<&'a crate::interpreter::Value> {
+    let crate::interpreter::Value::Record { fields } = v else {
+        return None;
+    };
+    fields
+        .iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, val)| val)
+}
+
+/// Value 树取字符串
+fn vstr(v: &crate::interpreter::Value) -> Option<&str> {
+    match v {
+        crate::interpreter::Value::Str(s) => Some(s),
+        _ => None,
+    }
+}
+
+/// Value 树取整数
+fn vint(v: &crate::interpreter::Value) -> Option<i64> {
+    match v {
+        crate::interpreter::Value::Int(n) => Some(*n),
+        _ => None,
+    }
+}
+
+/// didOpen params: { textDocument: { uri, text } }
 pub(crate) fn extract_did_open_params(params: &str) -> Option<(String, String)> {
-    let uri = extract_json_string_field(params, "uri")?;
-    let text = extract_json_string_field(params, "text")?;
+    let v = crate::json::parse(params).ok()?;
+    let td = vfield(&v, "textDocument")?;
+    let uri = vstr(vfield(td, "uri")?)?.to_string();
+    let text = vstr(vfield(td, "text")?)?.to_string();
     Some((uri, text))
 }
 
-/// 从 didChange params 提取 uri 和新文本（简化：取最后一个全量变更）
+/// didChange params: { textDocument: { uri }, contentChanges: [{ text }] }
+/// （全量同步模式：取最后一个变更的 text）
 pub(crate) fn extract_did_change_params(params: &str) -> Option<(String, String)> {
-    let uri = extract_json_string_field(params, "uri")?;
-    // didChange 的 text 在 changes[].text 中，简化提取最后一个 "text":"..." 的值
-    let text = extract_last_text_field(params)?;
-    Some((uri, text))
+    let v = crate::json::parse(params).ok()?;
+    let td = vfield(&v, "textDocument")?;
+    let uri = vstr(vfield(td, "uri")?)?.to_string();
+    let changes = match vfield(&v, "contentChanges")? {
+        crate::interpreter::Value::List(items) => items.iter().collect::<Vec<_>>(),
+        _ => return None,
+    };
+    // 取最后一个有 text 的变更（LSP 全量同步下 contentChanges 恰有一条）
+    let mut text = None;
+    for c in changes {
+        if let Some(t) = vfield(c, "text").and_then(vstr) {
+            text = Some(t.to_string());
+        }
+    }
+    Some((uri, text?))
 }
 
-/// 从 hover params 提取 uri, line, col
+/// hover params: { textDocument: { uri }, position: { line, character } }
 pub(crate) fn extract_hover_params(params: &str) -> Option<(String, usize, usize)> {
-    let uri = extract_json_string_field(params, "uri")?;
-    let line = extract_json_number_field(params, "line")?;
-    let col = extract_json_number_field(params, "character")?;
-    Some((uri, line, col))
+    let v = crate::json::parse(params).ok()?;
+    let td = vfield(&v, "textDocument")?;
+    let uri = vstr(vfield(td, "uri")?)?.to_string();
+    let pos = vfield(&v, "position")?;
+    let line = vint(vfield(pos, "line")?)?;
+    let col = vint(vfield(pos, "character")?)?;
+    Some((uri, line as usize, col as usize))
 }
 
-/// 从 completion params 提取 uri
+/// completion params: { textDocument: { uri } }
 pub(crate) fn extract_completion_uri(params: &str) -> Option<String> {
-    extract_json_string_field(params, "uri")
-}
-
-/// 简单提取 JSON 字符串字段
-pub(crate) fn extract_json_string_field(json: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{}\":\"", key);
-    let start = json.find(&needle)? + needle.len();
-    let bytes = json.as_bytes();
-    let mut end = start;
-    let mut i = start;
-    while i < bytes.len() {
-        if bytes[i] == b'\\' {
-            i += 2;
-            continue;
-        }
-        if bytes[i] == b'"' {
-            end = i;
-            break;
-        }
-        i += 1;
-    }
-    Some(json[start..end].to_string())
-}
-
-/// 简单提取 JSON 数字字段
-pub(crate) fn extract_json_number_field(json: &str, key: &str) -> Option<usize> {
-    let needle = format!("\"{}\":", key);
-    let start = json.find(&needle)? + needle.len();
-    let bytes = json.as_bytes();
-    let mut end = start;
-    while end < bytes.len() && bytes[end].is_ascii_whitespace() {
-        end += 1;
-    }
-    let num_start = end;
-    while end < bytes.len() && bytes[end].is_ascii_digit() {
-        end += 1;
-    }
-    json[num_start..end].parse().ok()
-}
-
-/// 提取最后一个 "text":"..." 字段的值（用于 didChange 的 changes 数组）
-pub(crate) fn extract_last_text_field(json: &str) -> Option<String> {
-    let needle = "\"text\":\"";
-    let mut last_text = None;
-    let mut search_from = 0;
-    while let Some(pos) = json[search_from..].find(needle) {
-        let start = search_from + pos + needle.len();
-        let bytes = json.as_bytes();
-        let mut end = start;
-        let mut i = start;
-        while i < bytes.len() {
-            if bytes[i] == b'\\' {
-                i += 2;
-                continue;
-            }
-            if bytes[i] == b'"' {
-                end = i;
-                break;
-            }
-            i += 1;
-        }
-        last_text = Some(json[start..end].to_string());
-        search_from = end + 1;
-    }
-    last_text
+    let v = crate::json::parse(params).ok()?;
+    let td = vfield(&v, "textDocument")?;
+    vstr(vfield(td, "uri")?).map(|s| s.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== R58（九审）：LSP 参数提取——带空格/转义/嵌套 payload =====
+
+    /// 合法带空格 + JSON 转义 multiline text 的 didOpen（v1.2.1 精确扫描失明 + 不反转义）
+    #[test]
+    fn r58_did_open_spaces_and_escapes() {
+        let params = "{ \"textDocument\": { \"uri\": \"file:///a.lom\", \"languageId\": \"lom\", \"version\": 1, \"text\": \"fn main() -> Unit\\n    println(1)\\nend\\n\" } }";
+        let (uri, text) = extract_did_open_params(params).expect("带空格 payload 应可提取");
+        assert_eq!(uri, "file:///a.lom");
+        assert_eq!(text, "fn main() -> Unit\n    println(1)\nend\n", "\\n 应反转义为真实换行");
+    }
+
+    /// didChange：嵌套 contentChanges 数组取最后 text；字符串内的花括号不干扰
+    #[test]
+    fn r58_did_change_nested_changes() {
+        let params = "{ \"textDocument\": { \"uri\": \"file:///b.lom\" }, \"contentChanges\": [ { \"text\": \"let s = \\\"{ not code }\\\"\\n\" } ] }";
+        let (uri, text) = extract_did_change_params(params).expect("didChange 应可提取");
+        assert_eq!(uri, "file:///b.lom");
+        assert_eq!(text, "let s = \"{ not code }\"\n", "字符串内花括号不应干扰提取");
+    }
+
+    /// hover：嵌套 position 对象（v1.2.1 平铺扫描碰巧能命中，结构化提取后仍正确）
+    #[test]
+    fn r58_hover_nested_position() {
+        let params = "{ \"textDocument\": { \"uri\": \"file:///c.lom\" }, \"position\": { \"line\": 3, \"character\": 7 } }";
+        let (uri, line, col) = extract_hover_params(params).expect("hover 应可提取");
+        assert_eq!(uri, "file:///c.lom");
+        assert_eq!(line, 3);
+        assert_eq!(col, 7);
+    }
+
+    /// compact payload（无空格）向后兼容不回归
+    #[test]
+    fn r58_compact_payload_still_works() {
+        let params = "{\"textDocument\":{\"uri\":\"file:///d.lom\",\"text\":\"fn f()\\nend\\n\"}}";
+        let (uri, text) = extract_did_open_params(params).expect("compact 应可提取");
+        assert_eq!(uri, "file:///d.lom");
+        assert_eq!(text, "fn f()\nend\n");
+    }
 
 
     /// 两轮收敛案例：第 1 轮删意外字符（LEX005，语法期），

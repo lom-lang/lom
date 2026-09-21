@@ -325,13 +325,35 @@ pub fn compute_diagnostics(src: &str, file: &str) -> Vec<Diagnostic> {
 ///
 /// 返回 (id, method, params_json)
 /// id 为 None 表示通知（无 id 字段）
+///
+/// R58（九审）：改走 crate::json::parse（标准递归下降解析器）。v1.2.1 的
+/// 精确字符串扫描对合法带空格 JSON（`"jsonrpc": "2.0"`）完全失明——真实
+/// 客户端（VS Code 等）默认带空格，initialize 被静默忽略（0 字节响应）。
 pub fn parse_rpc_message(json: &str) -> Option<(Option<u64>, String, String)> {
-    // 简单提取 "id", "method", "params" 字段
-    let id = extract_json_number_field(json, "id");
-    let method = extract_json_string_field(json, "method")?;
-    // params 可能是对象或数组，提取整个值
-    let params = extract_json_object_field(json, "params").unwrap_or_default();
-    Some((id, method, params))
+    let v = crate::json::parse(json).ok()?;
+    let crate::interpreter::Value::Record { fields } = &v else {
+        return None;
+    };
+    let mut id = None;
+    let mut method = None;
+    let mut params = String::new();
+    for (k, val) in fields {
+        match k.as_str() {
+            "id" => {
+                if let crate::interpreter::Value::Int(n) = val {
+                    id = Some(*n as u64);
+                }
+            }
+            "method" => {
+                if let crate::interpreter::Value::Str(s) = val {
+                    method = Some(s.clone());
+                }
+            }
+            "params" => params = crate::json::stringify(val),
+            _ => {}
+        }
+    }
+    Some((id, method?, params))
 }
 
 /// 构造 JSON-RPC 响应
@@ -346,7 +368,9 @@ pub fn make_response(id: u64, result_json: &str) -> String {
 pub fn make_error_response(id: u64, code: i32, message: &str) -> String {
     format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":{},\"error\":{{\"code\":{},\"message\":\"{}\"}}}}",
-        id, code, message.replace('"', "\\\"")
+        id,
+        code,
+        crate::json::escape_str(message)
     )
 }
 
@@ -354,88 +378,22 @@ pub fn make_error_response(id: u64, code: i32, message: &str) -> String {
 pub fn make_notification(method: &str, params_json: &str) -> String {
     format!(
         "{{\"jsonrpc\":\"2.0\",\"method\":\"{}\",\"params\":{}}}",
-        method, params_json
+        crate::json::escape_str(method),
+        params_json
     )
 }
 
-/// 构造 LSP 消息（带 Content-Length header）
+/// 构造 LSP 消息（带 Content-Length header；长度按 UTF-8 字节数——LSP 规范）
 pub fn make_lsp_message(json: &str) -> String {
     format!("Content-Length: {}\r\n\r\n{}", json.len(), json)
-}
-
-// ===== JSON 辅助（简单字符串扫描，与 fix_history.rs 风格一致）=====
-
-fn extract_json_string_field(json: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{}\":\"", key);
-    let start = json.find(&needle)? + needle.len();
-    let bytes = json.as_bytes();
-    let mut end = start;
-    let mut i = start;
-    while i < bytes.len() {
-        if bytes[i] == b'\\' {
-            i += 2;
-            continue;
-        }
-        if bytes[i] == b'"' {
-            end = i;
-            break;
-        }
-        i += 1;
-    }
-    Some(json[start..end].to_string())
-}
-
-fn extract_json_number_field(json: &str, key: &str) -> Option<u64> {
-    let needle = format!("\"{}\":", key);
-    let start = json.find(&needle)? + needle.len();
-    let bytes = json.as_bytes();
-    let mut end = start;
-    // 跳过空白
-    while end < bytes.len() && bytes[end].is_ascii_whitespace() {
-        end += 1;
-    }
-    let num_start = end;
-    while end < bytes.len() && bytes[end].is_ascii_digit() {
-        end += 1;
-    }
-    json[num_start..end].parse().ok()
-}
-
-fn extract_json_object_field(json: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{}\":", key);
-    let start = json.find(&needle)? + needle.len();
-    let bytes = json.as_bytes();
-    let mut i = start;
-    // 跳过空白
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    if i >= bytes.len() {
-        return None;
-    }
-    let opener = bytes[i];
-    let closer = match opener {
-        b'{' => b'}',
-        b'[' => b']',
-        _ => return None,
-    };
-    let mut depth = 1;
-    let obj_start = i;
-    i += 1;
-    while i < bytes.len() && depth > 0 {
-        if bytes[i] == opener {
-            depth += 1;
-        } else if bytes[i] == closer {
-            depth -= 1;
-        }
-        i += 1;
-    }
-    Some(json[obj_start..i].to_string())
 }
 
 // ===== Diagnostic → JSON-RPC =====
 
 /// 将 Diagnostic 转为 LSP Diagnostic JSON
+///
+/// R58：消息/码转义统一走 crate::json::escape_str（v1.2.1 只替换单引号对与
+/// 换行——反斜杠、制表符等控制字符会产出非法 JSON）
 pub fn diagnostic_to_lsp_json(d: &Diagnostic, _uri: &str) -> String {
     let severity = match d.severity {
         Severity::Error => 1,
@@ -449,8 +407,8 @@ pub fn diagnostic_to_lsp_json(d: &Diagnostic, _uri: &str) -> String {
         "{{\"range\":{{\"start\":{{\"line\":{},\"character\":{}}},\"end\":{{\"line\":{},\"character\":{}}}}},\"severity\":{},\"code\":\"{}\",\"source\":\"lom\",\"message\":\"{}\"}}",
         line, col, line, col + 1,
         severity,
-        d.code.replace('"', "\\\""),
-        d.message.replace('"', "\\\"").replace('\n', "\\n")
+        crate::json::escape_str(&d.code),
+        crate::json::escape_str(&d.message)
     )
 }
 
@@ -462,7 +420,7 @@ pub fn make_publish_diagnostics(uri: &str, diags: &[Diagnostic]) -> String {
     }
     let params = format!(
         "{{\"uri\":\"{}\",\"diagnostics\":[{}]}}",
-        uri,
+        crate::json::escape_str(uri),
         diag_jsons.join(",")
     );
     make_notification("textDocument/publishDiagnostics", &params)
@@ -628,6 +586,26 @@ end
         let (id, method, _params) = parse_rpc_message(msg).expect("解析失败");
         assert_eq!(id, Some(1));
         assert_eq!(method, "initialize");
+    }
+
+    /// R58：合法带空格 JSON（真实客户端默认格式；v1.2.1 完全失明 → 0 字节响应）
+    #[test]
+    fn parse_rpc_request_with_spaces() {
+        let msg = r#"{"jsonrpc": "2.0", "id": 7, "method": "initialize", "params": { "capabilities": {}, "processId": null }}"#;
+        let (id, method, params) = parse_rpc_message(msg).expect("带空格 JSON 应可解析");
+        assert_eq!(id, Some(7));
+        assert_eq!(method, "initialize");
+        assert!(params.contains("capabilities"), "params 应保留: {}", params);
+    }
+
+    /// R58：method 含转义/params 字符串内花括号不受字符串扫描分叉影响
+    #[test]
+    fn parse_rpc_nested_params_braces_in_strings() {
+        let msg = r#"{"jsonrpc":"2.0","id":2,"method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///x.lom","text":"let s = \"{ oops }\"\n"}}}"#;
+        let (id, method, params) = parse_rpc_message(msg).expect("嵌套 params 应可解析");
+        assert_eq!(id, Some(2));
+        assert_eq!(method, "textDocument/didOpen");
+        assert!(params.contains("file:///x.lom"));
     }
 
     #[test]

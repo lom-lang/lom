@@ -916,9 +916,10 @@ fn handle_lsp_method(
             if let Some((uri, line, col)) = extract_hover_params(params)
                 && let Some(src) = docs.get(&uri)
                     && let Some(hover) = lsp::handle_hover(src, line, col) {
+                        // R58：转义统一走 escape_str（含反斜杠/控制字符）
                         let result = format!(
                             "{{\"contents\":{{\"kind\":\"markdown\",\"value\":\"{}\"}}}}",
-                            hover.content.replace('"', "\\\"").replace('\n', "\\n")
+                            crate::json::escape_str(&hover.content)
                         );
                         return Some(lsp::make_response(id, &result));
                     }
@@ -937,11 +938,11 @@ fn handle_lsp_method(
                     let detail = item
                         .detail
                         .as_ref()
-                        .map(|d| format!(",\"detail\":\"{}\"", d.replace('"', "\\\"")))
+                        .map(|d| format!(",\"detail\":\"{}\"", crate::json::escape_str(d)))
                         .unwrap_or_default();
                     format!(
                         "{{\"label\":\"{}\",\"kind\":{}{}}}",
-                        item.label,
+                        crate::json::escape_str(&item.label),
                         item.kind.as_lsp_number(),
                         detail
                     )
