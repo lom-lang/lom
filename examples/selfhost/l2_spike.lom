@@ -1,0 +1,231 @@
+# examples/selfhost/l2_spike.lom —— L2.1 编码器 spike（RFC-0004 方案 A，修订 1）
+#
+# 三风险点闭环（spike 失败即回 RFC-0004 重议）：
+#   ① LEB128 unsigned 除模编码（无位运算语言面下的 WASM 基础编码）
+#   ② f64 IEEE754 位模式纯算术拆解（无 to_bits 内建；规约/非规约/零/inf/NaN）
+#   ③ hex 发射通道（纯 ASCII hex 文本经 file_write 落盘，宿主桩
+#      tools/hex2wasm.py 转二进制，node 实例化执行）
+#
+# 验收：本程序 stdout 向量自验证（LEB128 ×8 + f64 ×16 + 最小 wasm 构造），
+# 产出 target/probes/l2_spike_min.wasm.hex；宿主桩转换后 node 跑
+# exports.answer() === 42。
+#
+# 语言面事实（spike 踩到，登记在案）：
+#   - Lom 无科学计数法浮点字面量（1e2 是 PARSE001），极端值向量用 pow2
+#     除法构造；
+#   - Int 无 2^63 以上余量，64 位组装按字节分解（bits_from_parts）；
+#   - 无 List 字面量（§4.5b，spike 又踩一次）——list_cons 链构造；
+#   - 尾部裸 return 使函数块值为 Unit（TYPE010 warning；return 是语句，
+#     块值取尾表达式）——函数值统一用尾表达式风格，if 内提前 return 保留。
+#
+# 本文件不在 verify_selfhost 验收集内（该脚本只扫 examples/*.lom 与
+# examples/bootstrap/*.lom）；spike 是实验性代码但保持 --check 干净。
+
+from io import {println}
+from string import {split, string_to_int, char_from_code, len}
+from list import {list_get, list_cons, list_empty}
+from file import {file_write}
+
+# ===== 通用：字节 → 两位 hex =====
+
+fn hex_digit(n: Int) -> String
+    if n < 10
+        return char_from_code(48 + n)
+    end
+    char_from_code(97 + n - 10)
+end
+
+fn byte_hex(b: Int) -> String
+    hex_digit(b / 16) + hex_digit(b % 16)
+end
+
+# ===== ① LEB128 unsigned（除模循环，无位运算） =====
+
+fn leb128_hex(n: Int) -> String
+    let mut out = ""
+    let mut v = n
+    let mut go = True
+    while go
+        let mut b = v % 128
+        v = v / 128
+        if v > 0
+            b = b + 128
+        else
+            go = False
+        end
+        out = out + byte_hex(b)
+    end
+    out
+end
+
+# ===== ② f64 IEEE754 位模式（纯算术拆解） =====
+
+# 整数值 Float（< 2^53）→ Int：经 to_display 最短往返 + split + string_to_int。
+# 精度依据：f64 对 < 2^53 整数精确；Rust Display 不用科学计数法，
+# 整数值显示为完整数字（宿主实测 4503599627370496.0 形态，小数部分恒 ".0"）。
+fn float_int_part(fx: Float) -> Int
+    let s = "" + fx
+    let parts = split(s, ".")
+    string_to_int(list_get(parts, 0))
+end
+
+# sign(1) + E(11) + mantissa(52) → 8 字节小端字节流 hex（byte0 在前）
+fn bits_from_parts(sign: Int, ef: Int, mant: Int) -> String
+    let mut out = ""
+    # byte0..byte5：mantissa 低 48 位，小端逐字节（256^i 除模取字节）
+    let pows = list_cons(1, list_cons(256, list_cons(65536, list_cons(16777216, list_cons(4294967296, list_cons(1099511627776, list_empty()))))))
+    let mut i = 0
+    while i < 6
+        out = out + byte_hex(mant / list_get(pows, i) % 256)
+        i = i + 1
+    end
+    # byte6：E 低 4 位 <<4 | mantissa 高 4 位（mant / 2^48）
+    # byte7：sign <<7 | E 高 7 位
+    out + byte_hex((ef % 16) * 16 + mant / 281474976710656) + byte_hex(sign * 128 + ef / 16)
+end
+
+fn f64_bits_le(x: Float) -> String
+    # NaN（NaN != NaN，quiet NaN 的标准载荷）
+    if x != x
+        return "000000000000f87f"
+    end
+    # 符号（-0.0 == 0.0 为 True，用 1/x 的符号区分）
+    let mut sign = 0
+    let mut ax = x
+    if x < 0.0 or (x == 0.0 and 1.0 / x < 0.0)
+        sign = 1
+        ax = -x
+    end
+    # inf：inf * 0.0 = NaN != 0.0；有限值 * 0.0 == 0.0（NaN 已排除）
+    if ax * 0.0 != 0.0
+        if sign == 1
+            return "000000000000f0ff"
+        end
+        return "000000000000f07f"
+    end
+    # 零
+    if ax == 0.0
+        if sign == 1
+            return "0000000000000080"
+        end
+        return "0000000000000000"
+    end
+    # 规约化：ax → m ∈ [1,2)、指数 e（乘除 2.0 均精确）
+    let mut m = ax
+    let mut e = 0
+    while m >= 2.0
+        m = m / 2.0
+        e = e + 1
+    end
+    while m < 1.0
+        m = m * 2.0
+        e = e - 1
+    end
+    # 非规约数（ax < 2^-1022 → e ≤ -1023）：E=0，mantissa = ax × 2^1074
+    # （逐步乘 2 精确；结果 ∈ [1, 2^52) 恰为整数值）
+    if e < -1022
+        let mut f = ax
+        let mut i = 0
+        while i < 1074
+            f = f * 2.0
+            i = i + 1
+        end
+        return bits_from_parts(sign, 0, float_int_part(f))
+    end
+    # 规约数：mantissa = (m - 1.0) × 2^52（Sterbenz 区减法精确，
+    # 52 位小数 × 2^52 恰为 < 2^52 的整数，f64 精确表示）
+    let mant = float_int_part((m - 1.0) * 4503599627370496.0)
+    bits_from_parts(sign, e + 1023, mant)
+end
+
+# 2^n（n 可负；除法构造，供无科学计数法字面量的极端值向量用）
+fn pow2(n: Int) -> Float
+    let mut r = 1.0
+    if n >= 0
+        let mut i = 0
+        while i < n
+            r = r * 2.0
+            i = i + 1
+        end
+    else
+        let mut i = 0
+        while i < -n
+            r = r / 2.0
+            i = i + 1
+        end
+    end
+    r
+end
+
+# ===== ③ 最小 wasm 模块构造（hex 通道） =====
+# (module (func (export "answer") (result i32) i32.const 42))
+# opcode/布局常量是编码知识输入（硬编码）；section size 与 LEB 值由
+# spike 编码器动态构造——这是本通道的验证点。
+
+fn sect(id: String, content: String) -> String
+    id + leb128_hex(len(content) / 2) + content
+end
+
+fn min_wasm_hex() -> String
+    let types = "01" + "60" + byte_hex(0) + "01" + "7f"
+    let funcs = "01" + "00"
+    let answer_hex = "616e73776572"
+    let exports = "01" + byte_hex(len(answer_hex) / 2) + answer_hex + "00" + "00"
+    let body = "00" + "41" + leb128_hex(42) + "0b"
+    let codes = "01" + leb128_hex(len(body) / 2) + body
+    "0061736d01000000"
+        + sect("01", types)
+        + sect("03", funcs)
+        + sect("07", exports)
+        + sect("0a", codes)
+end
+
+# ===== main：向量自验证 + hex 落盘 =====
+
+fn check(label: String, got: String, want: String) -> Int ! [IO]
+    if got == want
+        println("PASS " + label + " " + got)
+        return 0
+    end
+    println("FAIL " + label + " got=" + got + " want=" + want)
+    1
+end
+
+fn main() -> Unit ! [IO]
+    let mut fails = 0
+    # ① LEB128（权威向量：Python 参照实现生成）
+    fails = fails + check("leb 0", leb128_hex(0), "00")
+    fails = fails + check("leb 1", leb128_hex(1), "01")
+    fails = fails + check("leb 127", leb128_hex(127), "7f")
+    fails = fails + check("leb 128", leb128_hex(128), "8001")
+    fails = fails + check("leb 600", leb128_hex(600), "d804")
+    fails = fails + check("leb 624485", leb128_hex(624485), "e58e26")
+    fails = fails + check("leb 3000000000", leb128_hex(3000000000), "80bcc1960b")
+    fails = fails + check("leb 4294967295", leb128_hex(4294967295), "ffffffff0f")
+    # ② f64 位模式（权威向量：Python struct.pack('<d') 生成）
+    fails = fails + check("f64 +0.0", f64_bits_le(0.0), "0000000000000000")
+    fails = fails + check("f64 -0.0", f64_bits_le(-0.0), "0000000000000080")
+    fails = fails + check("f64 1.0", f64_bits_le(1.0), "000000000000f03f")
+    fails = fails + check("f64 2.0", f64_bits_le(2.0), "0000000000000040")
+    fails = fails + check("f64 0.5", f64_bits_le(0.5), "000000000000e03f")
+    fails = fails + check("f64 -2.0", f64_bits_le(-2.0), "00000000000000c0")
+    fails = fails + check("f64 1.5", f64_bits_le(1.5), "000000000000f83f")
+    fails = fails + check("f64 42.0", f64_bits_le(42.0), "0000000000004540")
+    fails = fails + check("f64 0.1", f64_bits_le(0.1), "9a9999999999b93f")
+    fails = fails + check("f64 123456789.125", f64_bits_le(123456789.125), "00008054346f9d41")
+    fails = fails + check("f64 pi", f64_bits_le(3.141592653589793), "182d4454fb210940")
+    fails = fails + check("f64 inf", f64_bits_le(1.0 / 0.0), "000000000000f07f")
+    fails = fails + check("f64 -inf", f64_bits_le(-1.0 / 0.0), "000000000000f0ff")
+    fails = fails + check("f64 nan", f64_bits_le(0.0 / 0.0), "000000000000f87f")
+    fails = fails + check("f64 min-denormal", f64_bits_le(pow2(-1074)), "0100000000000000")
+    fails = fails + check("f64 min-normal", f64_bits_le(pow2(-1022)), "0000000000001000")
+    # ③ 最小 wasm hex 落盘（宿主桩 tools/hex2wasm.py 转二进制，node 验证）
+    let w = min_wasm_hex()
+    println("min_wasm hex (" + len(w) / 2 + " bytes): " + w)
+    file_write("target/probes/l2_spike_min.wasm.hex", w)
+    if fails == 0
+        println("SPIKE: ALL PASS")
+    else
+        println("SPIKE: " + fails + " FAIL")
+    end
+end

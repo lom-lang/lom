@@ -3770,7 +3770,20 @@ fn ev(e: Ex, env: Env, fns: Map<String, FnD>, variants: Map<String, Int>, nullar
             else
                 match v
                     VInt(n) => Ok(VInt(0 - n))
-                    VFloat(f) => Ok(VFloat(0.0 - f))
+                    VFloat(f) =>
+                        # IEEE 取负翻符号位（宿主 Rust -x 语义；L2.1 spike 发现：
+                        # 减法 0.0 - 0.0 = +0.0 丢 -0.0 符号——宿主/自举分歧根因）。
+                        # 零值经除法链构造：1/(-1/0) = -0.0、-(-0.0) = +0.0。
+                        if f == 0.0
+                            if 1.0 / f < 0.0
+                                Ok(VFloat(0.0))
+                            else
+                                Ok(VFloat(1.0 / (-1.0 / 0.0)))
+                            end
+                        else
+                            Ok(VFloat(0.0 - f))
+                        end
+                    end
                     _ => Err(EMsg("负号不支持 " + vtype_name(v)))
                 end
             end
