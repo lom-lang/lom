@@ -23,8 +23,8 @@
 > 此前（2026-09-15/16）：ⒶⒷⒸ 三项收官（七审 A-+R39-R45 / 第 2 轮调研 /
 > positioning 一页纸）+ 第 3/4 轮调研 + B 包 v1.2.0 + D 四期（累计 10000）。
 > 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 八轮审查整改 R1-R54 与 T1-T7（档案见下）。
-> **当前未关闭：R56-R61（open）；R55 已于 2026-09-21 整改关闭（用户裁决
-> R55-R61 全量整改，按 R55→R56→R57→R58→R59→R60→R61 顺序执行）。**
+> **R55-R61 已于 2026-09-21 全量整改关闭（用户裁决顺序执行）；唯一挂账
+> 观察项：ubuntu-latest→Ubuntu 26 镜像迁移（2026-10-19 窗口）。**
 
 ## 第九轮维护者独立审查 + R55-R61（2026-09-21）⚠️ review done / remediation open
 
@@ -173,17 +173,25 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   awk 拦截 + cargo metadata 断言本机双绿；SECURITY 限制 1 与审计程序 1
   改写为收口后口径。
 
-### R61 — 维护工具毛边（P3）⏳ open
+### R61 — 维护工具毛边（P3）✅ done（2026-09-21）
 
-- `cargo fmt --all -- --check` 在 Rust 1.97.1/rustfmt 1.9.0 下产生大规模 diff；当前 CI
-  只跑 Lom formatter，不跑 rustfmt。应单独机械包处理，避免与语义修复混提交。
-- `spec_examples_check.py` 在 Windows GBK 因 `✓` 崩溃：本交接已在脚本入口统一 stdout/
-  stderr UTF-8，提交前实测默认命令。
-- CI #122 的 6 条 warning 均为 checkout/cache Node.js 20 弃用提示；升级 action 前查
-  官方迁移说明，推送后看首跑。
+- **rustfmt 机械包**：`cargo fmt --all` 全仓格式化（25 文件，Rust 1.97.1/
+  rustfmt 1.9.0 的 586 处 diff 清零）——独立机械提交（5f2930a），零语义
+  变化（513+3 测试/eval/selfhost/prompt_check/doc_audit 全绿复跑）。
+- **spec_examples_check UTF-8**：交接包已修（脚本入口强制 stdout/stderr
+  UTF-8），本轮每提交前实跑无异常。
+- **CI action 升级**：checkout@v4→v5、cache@v4→v5（Node 24 运行时；版本
+  核对一手 release notes：checkout v5.0.0 "Update actions checkout to
+  use node 24"、cache v5.0.0 "runs on the Node.js 24 runtime requires
+  runner 2.327.1+"）。6 条 Node.js 20 弃用 warning 应随之消除（首跑
+  复核 annotations）。
+- **ubuntu-latest→Ubuntu 26 迁移 notice**（2026-10-19 生效，4 条）：非
+  弃用告警而是未来镜像切换，到期前评估 pin 或直接顺迁——挂账观察项，
+  不阻塞 R61 关闭。
 
-**顺序（用户已裁决执行）**：R55 ✅ → R56 → R57 → R58 → R59 → R60 → R61。
-至少 R55-R58 关闭并经下一轮独立复审前，L2 与一切发布动作继续后置。
+**顺序（用户已裁决执行）**：R55 ✅ → R56 ✅ → R57 ✅ → R58 ✅ → R59 ✅ →
+R60 ✅ → R61 ✅（2026-09-21 全部关闭）。至少 R55-R58 关闭并经下一轮独立
+复审前，L2 与一切发布动作继续后置——**复审尚未进行，L2/发布维持冻结**。
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 
