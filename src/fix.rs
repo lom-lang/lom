@@ -87,10 +87,52 @@ pub struct FnInfo {
     /// 多行签名时 sig_end_line 是 `)`/返回类型所在行——效应注解的正确插入行。
     pub sig_start_line: usize,
     pub sig_end_line: usize,
-    /// 函数体行范围（含两端，1-based）：sig_end_line+1 到下一个顶层 item 前
-    /// （或文件末行）。MUT001 的 `let` 回扫限定在此范围内。
-    pub body_start_line: usize,
+    /// 函数体结束行（1-based，含）：下一个顶层 item 前一行（或文件末行）。
+    /// owner_fn 据此判定诊断归属（R62 起声明定位走 let_decls，体起点不再需要）。
     pub body_end_line: usize,
+    /// 函数体内全部非闭包 `let` 声明（R62/十审）：名字 + `let` 关键字位置。
+    /// 遍历范围与 typechecker 的扁平作用域精确对应——if/while/for 语句块共用
+    /// 函数环境（Stmt::If/While/For 分支传同一 env），块内 let 对块外赋值可见；
+    /// 闭包体（closure_child 独立作用域）与 match 臂块（child 子作用域）内的
+    /// let 遮蔽外层绑定、不属于本函数顶层绑定链，**不收集**——其内的 MUT001
+    /// 降级为 hint（宁可不自动修，不可错改）。
+    pub let_decls: Vec<LetDecl>,
+}
+
+/// 函数体内一条 `let` 声明的定位（R62：MUT001 结构化定位的事实源）
+pub struct LetDecl {
+    pub name: String,
+    /// `let` 关键字所在行（1-based）
+    pub line: usize,
+    /// `let` 关键字列（1-based，lexer 字节列——消费时经 byte_col_to_char_col 换算）
+    pub col: usize,
+}
+
+/// 收集块内全部非闭包 `let` 声明（R62）：
+/// 递归 if/while/for 的语句块（扁平作用域），**不深入任何表达式**——
+/// 闭包体（ExprKind::Closure）、match 臂（表达式内部）内的声明不收集。
+/// LetDestruct 绑定恒不可变且无 mut 语法，不是 MUT001 的加 mut 对象，跳过。
+fn collect_let_decls(block: &ast::Block, out: &mut Vec<LetDecl>) {
+    for stmt in &block.stmts {
+        match stmt {
+            ast::Stmt::Let { name, span, .. } => out.push(LetDecl {
+                name: name.clone(),
+                line: span.line,
+                col: span.col,
+            }),
+            ast::Stmt::If(ifs) => {
+                for (_, body) in &ifs.branches {
+                    collect_let_decls(body, out);
+                }
+                if let Some(else_b) = &ifs.else_branch {
+                    collect_let_decls(else_b, out);
+                }
+            }
+            ast::Stmt::While { body, .. } => collect_let_decls(body, out),
+            ast::Stmt::For { body, .. } => collect_let_decls(body, out),
+            _ => {}
+        }
+    }
 }
 
 /// 从顶层 AST 提取 FnInfo 列表
@@ -117,16 +159,15 @@ pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
             let next_start = starts[i + 1];
             // 防御：容错解析下 span 可能异常（end < start），saturating 兜底
             let sig_end = f.span.end_line.max(f.span.line);
-            let body_start = sig_end.saturating_sub(1) + 2; // sig_end + 1
-            let body_end = next_start
-                .saturating_sub(1)
-                .max(body_start.saturating_sub(1));
+            let body_end = next_start.saturating_sub(1).max(sig_end);
+            let mut let_decls = Vec::new();
+            collect_let_decls(&f.body, &mut let_decls);
             out.push(FnInfo {
                 params: f.params.iter().map(|p| p.name.clone()).collect(),
                 sig_start_line: f.span.line,
                 sig_end_line: sig_end,
-                body_start_line: body_start,
                 body_end_line: body_end,
+                let_decls,
             });
         }
     }
@@ -870,23 +911,25 @@ fn fix_nam005_import(d: &Diagnostic) -> Vec<FixAction> {
     }
 }
 
-/// MUT001 不可变重赋值（③ 包升级）：声明处 `let` → `let mut`
-///
-/// 诊断定位在赋值行，声明点按名回扫：`let {name}` 后跟 :/=/空格（词边界防
-/// `let x` 误配 `let xy`），注释行跳过。全文唯一命中 → Replace（High，可
-/// --apply）；多处命中（shadowing 近似，或字符串字面量干扰）或零命中（参数/
-/// for 变量重赋值）→ hint（Medium）。字面量含 "let x" 的误命中由唯一性判据
-/// 自然降级，不单做字符串状态机。
 /// MUT001 不可变重赋值：把声明 `let` 改为 `let mut`
 ///
-/// R55（九审）作用域限定：`let {name}` 回扫范围 = 诊断所属函数体内
-/// （owner.body_start_line..=body_end_line）。v1.2.1 的全文唯一命中会
-/// 把别的函数的同名声明错改成 `let mut`（跨作用域错改，仍标 High）。
+/// R55（九审）作用域限定：定位范围 = 诊断所属函数体内（owner_fn 按函数体
+/// 行范围归属）。v1.2.1 的全文唯一命中会把别的函数的同名声明错改成
+/// `let mut`（跨作用域错改，仍标 High）。
+///
+/// R62（十审）结构化定位：同名声明直接取自 AST（`FnInfo::let_decls`——
+/// fn_infos 遍历函数体扁平作用域内的 Stmt::Let），彻底替代文本回扫。
+/// v1.2.2 的体内文本回扫仍会错改：① 同函数闭包内 `let x` 遮蔽声明
+/// （闭包是独立作用域边界，其内声明与外层诊断无关）；② 行内注释
+/// `let z = 1 # let x = 0` 的注释文本；③ 字符串字面量内的 "let x" 文本。
+/// 三形态下 v1.2.2 均 applied=1 错改 + final 仍带原 warning + ok:true。
 ///
 /// 分支：
-///   - 体内唯一命中 → High Replace（正例：fix_corpus 09）
-///   - 体内零命中（参数/for 变量/match 绑定恒不可变）→ Medium hint
-///   - 体内多命中 / owner 缺失（解析失败无 AST）→ Medium hint
+///   - 扁平作用域内唯一同名声明 → High Replace（正例：fix_corpus 09、
+///     if/while/for 块内声明——块共用函数环境）
+///   - 零命中（参数/for 变量/match 绑定恒不可变；或声明在闭包/match 臂
+///     嵌套作用域内，未收集）→ Medium hint
+///   - 多命中 / owner 缺失（解析失败无 AST）→ Medium hint
 fn fix_mut001_add_mut(
     d: &Diagnostic,
     source_lines: &[&str],
@@ -909,52 +952,35 @@ fn fix_mut001_add_mut(
             Confidence::Medium,
         )];
     };
-    let pat: Vec<char> = format!("let {}", name).chars().collect();
-    let mut hits: Vec<(usize, usize)> = vec![]; // (0-based 行, 0-based "let" 字符列)
-    let scan_start = owner.body_start_line.saturating_sub(1);
-    let scan_end = owner.body_end_line.min(source_lines.len());
-    for (idx, line) in source_lines
-        .iter()
-        .enumerate()
-        .take(scan_end)
-        .skip(scan_start)
-    {
-        if line.trim_start().starts_with('#') {
-            continue;
-        }
-        // 字符列扫描（fix 动作约定 1-based 字符列；v1.2.1 用 byte 偏移，
-        // 含非 ASCII 的行会错位——R55 一并修正）
-        let chars: Vec<char> = line.chars().collect();
-        let mut from = 0;
-        while let Some(rel) = find_substring_in_chars(&chars[from..], &pat) {
-            let abs = from + rel;
-            let after: String = chars[abs + pat.len()..].iter().collect();
-            if after.starts_with(':') || after.starts_with('=') || after.starts_with(' ') {
-                hits.push((idx, abs));
-            }
-            from = abs + 1;
-        }
-    }
+    // R62（十审）：结构化定位替代文本回扫——同名 let 直接取自 AST
+    // （fn_infos 的 let_decls 只含函数体扁平作用域内的声明）。v1.2.2 的
+    // 文本回扫会把闭包内遮蔽声明、行内注释、字符串字面量里的 "let x"
+    // 文本当声明命中错改（applied=1 而 final 仍带原 warning）。
+    let hits: Vec<&LetDecl> = owner.let_decls.iter().filter(|l| l.name == name).collect();
     match hits.as_slice() {
-        [(li, c)] => vec![FixAction {
-            description: format!("声明改为可变：let mut {}", name),
-            action: ActionKind::Replace,
-            line: li + 1,
-            col: c + 1,
-            end_line: Some(li + 1),
-            end_col: Some(c + 1 + 3), // "let" 3 字符
-            text: Some("let mut".to_string()),
-            confidence: Confidence::High,
-        }],
+        [one] => {
+            let line_str = source_lines.get(one.line - 1).copied().unwrap_or("");
+            let col = byte_col_to_char_col(line_str, one.col);
+            vec![FixAction {
+                description: format!("声明改为可变：let mut {}", name),
+                action: ActionKind::Replace,
+                line: one.line,
+                col,
+                end_line: Some(one.line),
+                end_col: Some(col + 3), // "let" 3 字符
+                text: Some("let mut".to_string()),
+                confidence: Confidence::High,
+            }]
+        }
         [] => {
             let kind = if owner.params.iter().any(|p| p == &name) {
                 format!("函数参数 '{}'", name)
             } else {
-                format!("for 循环变量/match 绑定 '{}'", name)
+                format!("for 循环变量/match 绑定/闭包内声明 '{}'", name)
             };
             vec![hint_only(
                 &format!(
-                    "不可变绑定（{}）恒不可变：在首次重赋值前引入局部副本 \
+                    "不可变绑定（{}）恒不可变或在嵌套作用域内：在首次重赋值前引入局部副本 \
                      let mut {n} = {n}，或改用新变量",
                     kind,
                     n = name
@@ -971,14 +997,6 @@ fn fix_mut001_add_mut(
             Confidence::Medium,
         )],
     }
-}
-
-/// 在 char 切片中找子串首次出现位置（字符下标）；找不到返回 None
-fn find_substring_in_chars(haystack: &[char], needle: &[char]) -> Option<usize> {
-    if needle.is_empty() || haystack.len() < needle.len() {
-        return None;
-    }
-    (0..=haystack.len() - needle.len()).find(|&i| &haystack[i..i + needle.len()] == needle)
 }
 
 /// EFF001 效应未声明：在函数签名行插入效应注解
@@ -2428,7 +2446,7 @@ mod tests {
 
     #[test]
     fn mut001_word_boundary_rejects_longer_name() {
-        // 声明是 let xy：'x' 的回扫不得命中（词边界）
+        // 声明是 let xy：'x' 的定位不得命中（名字精确匹配）
         let src = "fn main()\n    let xy = 1\n    x = 2\nend\n";
         let fixes = e2e_fixes(
             src,
@@ -2443,7 +2461,7 @@ mod tests {
 
     #[test]
     fn mut001_multiple_or_zero_hits_fall_back_to_hint() {
-        // 多处 let x 命中（shadowing）→ hint；注释行不算命中
+        // 多处 let x 命中（shadowing）→ hint
         let src = "fn main()\n    let x = 1\n    let x = 2\n    x = 3\nend\n";
         let fixes = e2e_fixes(
             src,
@@ -2464,5 +2482,165 @@ mod tests {
             5,
         );
         assert_eq!(fixes2[0].action, ActionKind::Hint);
+    }
+
+    // ===== R62（十审）：MUT001 结构化定位——同函数嵌套作用域不再错改 =====
+
+    /// R62 探针 1：闭包遮蔽——参数 x 重赋值 + 同函数闭包内 `let x` 遮蔽。
+    /// v1.2.2 的体内文本回扫命中闭包内声明，High Replace 错改 `let mut`，
+    /// 原诊断（参数重赋值）未治、final 仍 1 warning 而 ok:true。
+    /// 绝不能这样修：不得产出任何非 Hint 动作；apply_plan 后源码逐字不变。
+    #[test]
+    fn r62_mut001_closure_shadowing_never_touched() {
+        let src = "fn f(x: Int) -> Int\n    let g = fn(y: Int) -> Int\n        let x = y + 1\n        x\n    end\n    x = x + 1\n    g(x)\nend\n\
+                   fn main() -> Unit\n    println(f(1))\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            6,
+            5,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "闭包内遮蔽声明不得被自动修改: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 6, 5);
+        assert_eq!(result.applied, 0, "不应有任何应用: {:?}", result.changes);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R62 探针 2：行内注释——`let z = 1 # let x = 0`。v1.2.2 只跳行首
+    /// 注释行，注释文本里的 `let x` 被当声明命中改写（无效修复）。
+    /// 绝不能这样修：不得改注释；参数 hint 保持；源码逐字不变。
+    #[test]
+    fn r62_mut001_inline_comment_text_never_touched() {
+        let src = "fn f(x: Int) -> Int\n    let z = 1 # let x = 0\n    x = x + 1\n    z + x\nend\n\
+                   fn main() -> Unit\n    println(f(1))\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "注释文本不得被当声明修改: {:?}",
+            fixes
+        );
+        assert!(
+            fixes[0].description.contains("参数 'x'"),
+            "应点名参数: {}",
+            fixes[0].description
+        );
+        let result = apply_one_diag(src, 3, 5);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R62 探针 3（十审建议补）：字符串字面量——`let s = "let x = 0"`。
+    /// 该行 AST 声明名是 s；字符串内 "let x" 文本绝不能被命中改写。
+    #[test]
+    fn r62_mut001_string_literal_text_never_touched() {
+        let src = "fn f(x: Int) -> Int\n    let s = \"let x = 0\"\n    x = x + 1\n    s\nend\n\
+                   fn main() -> Unit\n    println(f(1))\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "字符串字面量文本不得被当声明修改: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 3, 5);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R62 正例保持 1：if/while/for 语句块内的 let 与函数体共用扁平作用域
+    /// （typechecker 传同一 env），块内声明 + 块外重赋值必须仍能自动修复。
+    #[test]
+    fn r62_mut001_let_inside_if_block_still_replaces() {
+        let src = "fn f() -> Int\n    if True\n        let x = 1\n    end\n    x = 2\n    x\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            5,
+            5,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 3, "应命中 if 块内的声明行");
+        assert_eq!(fixes[0].col, 9); // 8 空格缩进后
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// R62 正例保持 2：体内 let 遮蔽参数后重赋值——重赋值对象就是遮蔽后的
+    /// 体内声明，唯一命中 Replace 是正确修复（扁平作用域语义）。
+    #[test]
+    fn r62_mut001_body_let_shadowing_param_still_replaces() {
+        let src = "fn f(x: Int) -> Int\n    let x = x + 1\n    x = 2\n    x\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            3,
+            5,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Replace);
+        assert_eq!(fixes[0].line, 2);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+    }
+
+    /// R62 降级面：闭包体内的 let + 闭包体内重赋值——声明位于独立作用域，
+    /// 未收集 → 降级 hint（宁可不自动修，不可错改外层任何声明）。
+    #[test]
+    fn r62_mut001_closure_body_diag_degrades_to_hint() {
+        let src = "fn f() -> Int\n    let outer = 1\n    let g = fn(y: Int) -> Int\n        let x = 1\n        x = x + 1\n        x\n    end\n    g(outer)\nend\n";
+        // 诊断在闭包体内的赋值行（5:9，typechecker 定位赋值目标标识符）
+        let fixes = e2e_fixes(
+            src,
+            "MUT001",
+            "赋值给不可变变量 'x'（声明时未标 mut）",
+            5,
+            9,
+        );
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "闭包体内声明不得产出自动修改: {:?}",
+            fixes
+        );
+        let result = apply_one_diag(src, 5, 9);
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.patched_source, src, "闭包内外的源码都必须逐字不变");
+    }
+
+    /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan
+    fn apply_one_diag(src: &str, line: usize, col: usize) -> crate::apply::ApplyResult {
+        let mut diags = Diagnostics::new("test.lom");
+        diags.diagnostics.push(Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: "MUT001".to_string(),
+            message: "赋值给不可变变量 'x'（声明时未标 mut）".to_string(),
+            file: "test.lom".to_string(),
+            line,
+            col,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        });
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let plan = generate_plan(&diags, src, &fns);
+        crate::apply::apply_plan(&plan, src)
     }
 }
