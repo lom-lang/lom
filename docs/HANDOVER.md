@@ -128,6 +128,7 @@ for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./t
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
+python tools\verify_selfcomp.py                         # L2.2/L2.3-a 编译器验收：25/25（10 用例双产物行为一致 + 15 负例拒绝；RFC-0004）
 python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
 python tools/fuzz_smoke.py                             # Q4 随机冲击冒烟（固定种子 80 轮正常终态断言；CI doc-gates 常驻）
 python tools/diff_test.py --probe                      # D 包探针：验证 §11f 八条中六条可执行分歧仍如档案（trim Unicode 需非 ASCII 不在探针集；守护白名单）
@@ -360,7 +361,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 533/533（另有 tests/ 集成 ×8）、零 warning、`./target/release/lom.exe --version` 显示 1.2.5
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
-5. **当前状态：v1.2.5、语言面/发布线冻结；十三轮审查，R1-R77 全部关闭（十三审确认 R73-R76 零失真、代码面零击穿、总评 B+ 回升）、R78 open（README 存量算术残留 P3，事实源 docs/TODO.md 顶部）。L2.3 放行裁定成立（动工授权待用户）。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行；六模式 gate 在位）；doc_audit 现为 67 项。** 发布冻结不动；维护流程与交接规范见 §12。
+5. **当前状态：v1.2.5、语言面/发布线冻结；十三轮审查，R1-R78 全部关闭（十三审总评 B+ 回升、R77 开账即修、R78 随 L2.3-a 包收口）。活跃工作包：L2.3 进行中——用户已裁决动工，a 控制流批已交付（RFC-0004 修订 6，verify_selfcomp 25/25），后续批次闭包/enum+match/String/List/Map/json/包/return 按"编译期校验 + 负例"成对交付。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行；六模式 gate 在位）；doc_audit 现为 67 项。** 发布冻结不动；维护流程与交接规范见 §12。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
