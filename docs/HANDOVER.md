@@ -114,6 +114,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 
 ```powershell
 cargo test --release                                    # 期望 523/523（2026-09-21 v1.2.3 R62/R63 整改：513 + R62 ×6 + R63 ×4；另有 tests/ 集成 ×5——r56 ×1 + r58 套件 ×4（原 2 + R63 ×2），合计 528）
+for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done   # CI fmt gate 同款（apply_test 豁免）——**新增/修改 .lom 文件提交前必查**（L2.1 会话只跑 cargo fmt 漏了 Lom 自己的 fmt gate，CI 三平台红一次）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -562,6 +563,11 @@ end
   （±0/±inf/NaN）逐点实测，不能拿算术恒等式当语义等价**；L2 复用
   self_interp 求值/编码路径前，同类边界（负零参与比较/字符串化/位模式）
   都要过向量。
+- **新增 .lom 文件提交前必过 `lom fmt --check`（2026-09-21 L2.1 会话
+  CI 三平台红）**：CI 的 fmt gate 覆盖 examples/ 全部 .lom（含
+  selfhost/ 子目录），cargo fmt 只是 Rust 侧——两者都要跑；本会话
+  l2_spike.lom 续行缩进 8→4 的机械差异漏检一次。命令见 §2.2（CI 同款
+  逐文件循环；apply_test.lom 是故意坏文件有豁免）。
 - `spec_examples_check.py` 的 `✓` 在 Windows GBK 会抛 UnicodeEncodeError，本交接已在脚本入口
   强制 stdout/stderr UTF-8；默认命令必须在提交前实跑。
 - `cargo fmt --check` 当前大量失败且不在 CI。格式化应另开机械提交，绝不混入 R55-R60
