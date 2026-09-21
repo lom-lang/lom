@@ -1,0 +1,16 @@
+fn main() -> Unit
+    let x = 10
+    let mut y = 0
+    y = x + 5
+    println(y)
+    let z = y * 2
+    println(z)
+    let x = z + 1
+    println(x)
+    let f = 1.5
+    let mut g = 0.25
+    g = g + f
+    println(g)
+    y = y - 1
+    println(y + x)
+end

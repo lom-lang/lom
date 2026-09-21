@@ -1,0 +1,14 @@
+fn later(a: Int, b: Int) -> Int
+    a * b + 1
+end
+fn twice(x: Int) -> Int
+    later(x, x)
+end
+fn main() -> Unit
+    println(twice(7))
+    println(later(twice(2), 3))
+    println(sum3(1.5, 2.25, 0.125))
+end
+fn sum3(a: Float, b: Float, c: Float) -> Float
+    a + b + c
+end

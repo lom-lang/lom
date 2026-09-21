@@ -1,0 +1,12 @@
+fn main() -> Unit
+    println(3.5 + 1.25)
+    println(3.5 - 0.25)
+    println(2.5 * 4.0)
+    println(7.5 / 2.5)
+    println(-0.5)
+    println(42.0)
+    println(1 + 0.5)
+    println(2.5 + 3)
+    println(123456789.125)
+    println(0.001953125)
+end

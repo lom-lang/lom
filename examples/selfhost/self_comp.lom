@@ -1,0 +1,2895 @@
+# ============================================================================
+# self_comp.lom — L2 自举编译器（RFC-0004 方案 A，L2.2 最小子集）
+#
+# 用途：把 Lom 子集程序编译为 .wasm（经纯 ASCII hex 文本落盘，宿主桩
+#       tools/hex2wasm.py 转二进制——方案 A 通道，RFC-0004）。
+# 用法：
+#   lom self_comp.lom -- <input.lom> <output.hex>
+#   成功打印 "COMPILED <n> bytes -> <path>"；失败打印诊断 + "COMPILE-ERROR"
+#
+# L2.2 子集范围（超出即报错，留给 L2.3+）：
+#   - fn 声明（参数/返回类型限 Int/Float/Unit；显式效应注解允许但忽略）
+#   - let（含 let mut）/ 赋值（扁平作用域，遮蔽 = 新槽）
+#   - 整数与浮点算术（+ - * / %；Int+Float 混合提升 Float——对齐宿主语义；
+#     Float % 不支持——f64 无 rem 指令的合成留给 L2.3）
+#   - 一元负、括号、函数调用（含递归/前向引用）、println(Int|Float)
+#   - 块值 = 尾表达式（return/if/while/for/match/闭包/字符串等全部不支持）
+#
+# 值表示（编译器实现自由度，RFC-0004：不做字节级一致，行为级对拍）：
+#   Int = 原生 i64（untagged）；Float = 原生 f64。宿主导入（env 模块）：
+#   print_i64(i64) / print_f64(f64)——换行由 harness 隐式处理（每调用一行）。
+#   专用 harness：tools/selfcomp/run_selfcomp.mjs（与宿主 run_wasm.mjs 的
+#   fmtFloat 口径一致：整数值补 .0、inf/-inf/NaN 字面）。
+#
+# 前端（Part A-C4）自 self_interp.lom 物理复用（L2.1 决策：token/lexer/
+# AST/parser 全家平移）；Float 字面量经 parse_float_str 从右往左除法解析
+# （Lom 无 string_to_float）——已知精度边界：测试程序集的字面量限定
+# 二进制可精确表示的十进制值（.5/.25/.125 等），任意字面量的正确舍入
+# 留 L2.3 精度专项（挂账）。
+# ============================================================================
+
+from string import { split, contains, len, string_to_int, int_to_string, starts_with, ends_with, trim, upper, lower, replace, char_from_code }
+from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_get }
+from map import { map_empty, map_set, map_get, map_has, map_size, map_keys, map_remove }
+from file import { file_read, file_exists, file_write, file_append }
+from math import { sqrt }
+from env import { args }
+from io import { println }
+
+# ============================================================================
+# Part A：Token 定义（对齐宿主 src/lexer.rs Token 枚举，Tk 前缀避免变体名冲突）
+# ============================================================================
+
+enum Tok
+    # 关键字（20 个，宿主保留字全表）
+    | TkFn
+    | TkLet
+    | TkMut
+    | TkIf
+    | TkElif
+    | TkElse
+    | TkWhile
+    | TkFor
+    | TkIn
+    | TkReturn
+    | TkEnd
+    | TkTrue
+    | TkFalse
+    | TkAnd
+    | TkOr
+    | TkFrom
+    | TkImport
+    | TkAs
+    | TkMatch
+    | TkEnum
+    # 字面量（Float 存规范化文本——见文件头契约）
+    | TkInt(Int)
+    | TkFloat(String)
+    | TkStr(String)
+    | TkIdent(String)
+    # 运算符
+    | TkPlus
+    | TkMinus
+    | TkStar
+    | TkSlash
+    | TkPercent
+    | TkPlusEq
+    | TkMinusEq
+    | TkStarEq
+    | TkSlashEq
+    | TkEq
+    | TkNotEq
+    | TkLt
+    | TkGt
+    | TkLtEq
+    | TkGtEq
+    | TkAssign
+    | TkBang
+    | TkQuestion
+    | TkPipe
+    | TkBar
+    | TkArrow
+    | TkFatArrow
+    # 标点
+    | TkLParen
+    | TkRParen
+    | TkLBrace
+    | TkRBrace
+    | TkLBracket
+    | TkRBracket
+    | TkComma
+    | TkColon
+    | TkDot
+    | TkDotDot
+    | TkSemi
+    # 结束
+    | TkEof
+end
+
+# ============================================================================
+# Part B：字符串辅助 + 字面量规范化
+# ============================================================================
+
+# 前缀截取：s 的前 k 个字符（k 超长返回全串）
+fn str_take(s: String, k: Int) -> String
+    let mut out = ""
+    let mut i = 0
+    for c in split(s, "")
+        if i < k
+            out = out + c
+        end
+        i += 1
+    end
+    out
+end
+
+# 从右去 '0'（小数部分规范化用）
+fn rstrip_zero(s: String) -> String
+    let mut last_nz = -1
+    let mut i = 0
+    for c in split(s, "")
+        if c != "0"
+            last_nz = i
+        end
+        i += 1
+    end
+    if last_nz < 0
+        ""
+    else
+        str_take(s, last_nz + 1)
+    end
+end
+
+# 从左去 '0'（全零收敛为 "0"；整数部分规范化用）
+fn lstrip_zero(s: String) -> String
+    let mut out = ""
+    let mut started = False
+    for c in split(s, "")
+        if started or c != "0"
+            started = True
+            out = out + c
+        end
+    end
+    if len(out) == 0
+        "0"
+    else
+        out
+    end
+end
+
+# Float 字面量规范化（宿主 Rust Display 契约的验收集实现，见文件头）
+#   "5.20" -> "5.2"；"2.0" -> "2"；"3.14" -> "3.14"；"0.50" -> "0.5"
+fn norm_float(ip: String, fp: String) -> String
+    let f2 = rstrip_zero(fp)
+    let i2 = lstrip_zero(ip)
+    if len(f2) == 0
+        i2
+    else
+        i2 + "." + f2
+    end
+end
+
+# 转义字符还原（宿主 lex_string 的 Some(c) => push(c as char) 泛化规则）
+fn unesc(nc: String) -> String
+    if nc == "n"
+        "\n"
+    elif nc == "t"
+        "\t"
+    elif nc == "r"
+        "\r"
+    elif nc == "\""
+        "\""
+    elif nc == "\\"
+        "\\"
+    else
+        nc
+    end
+end
+
+# 字符分类（纯 ASCII；宿主按字节判定，纯 ASCII 源下语义一致）
+fn is_digit(c: String) -> Bool
+    contains("0123456789", c)
+end
+
+fn is_alpha(c: String) -> Bool
+    contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", c)
+end
+
+fn is_alnum(c: String) -> Bool
+    if is_alpha(c)
+        True
+    elif is_digit(c)
+        True
+    else
+        False
+    end
+end
+
+# 关键字识别（宿主 lex_ident 的 match 全表，20 个保留字）
+fn keyword_or_ident(s: String) -> Tok
+    if s == "fn"
+        TkFn
+    elif s == "let"
+        TkLet
+    elif s == "mut"
+        TkMut
+    elif s == "if"
+        TkIf
+    elif s == "elif"
+        TkElif
+    elif s == "else"
+        TkElse
+    elif s == "while"
+        TkWhile
+    elif s == "for"
+        TkFor
+    elif s == "in"
+        TkIn
+    elif s == "return"
+        TkReturn
+    elif s == "end"
+        TkEnd
+    elif s == "True"
+        TkTrue
+    elif s == "False"
+        TkFalse
+    elif s == "and"
+        TkAnd
+    elif s == "or"
+        TkOr
+    elif s == "from"
+        TkFrom
+    elif s == "import"
+        TkImport
+    elif s == "as"
+        TkAs
+    elif s == "match"
+        TkMatch
+    elif s == "enum"
+        TkEnum
+    else
+        TkIdent(s)
+    end
+end
+
+# ---- 循环版 reverse（各类型一份；线性递归版在万级 token 上会爆 ~10^4 栈深天花板）----
+
+fn rev_tok(xs: List<{t: Tok, ln: Int, cl: Int}>) -> List<{t: Tok, ln: Int, cl: Int}>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_err(xs: List<{code: String, msg: String, ln: Int, cl: Int}>) -> List<{code: String, msg: String, ln: Int, cl: Int}>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_str(xs: List<String>) -> List<String>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+# ============================================================================
+# Part B2：lexer 主循环（对齐宿主 Lexer::tokenize_recover 的容错语义）
+#   产出 {toks: Map<索引, TokR>, n: Int, errs: List<ErrR>}；EOF 也入表（key = n-1）
+#   错误对齐宿主：记录错误 + 回退跳 1 字节继续（意外字符 / 未闭合字符串 / 无效整数）
+# ============================================================================
+
+fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, errs: List<{code: String, msg: String, ln: Int, cl: Int}>}
+    let chars = split(src, "")
+    let mut rest = chars
+    let mut ln = 1
+    let mut cl = 1
+    let mut acc = list_empty()
+    let mut errs = list_empty()
+    while !list_is_empty(rest)
+        let c = list_head(rest)
+        let ln0 = ln
+        let cl0 = cl
+        if c == " " or c == "\t" or c == "\r"
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "\n"
+            rest = list_tail(rest)
+            ln += 1
+            cl = 1
+        elif c == "#"
+            # 注释：# 行注释 / #- 块注释 -#
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "-"
+                # 块注释：跳过 #- 后找 -#（未闭合静默结束，宿主语义）
+                let mut r2 = list_tail(list_tail(rest))
+                cl += 2
+                let mut done = False
+                while !list_is_empty(r2) and done == False
+                    if !list_is_empty(list_tail(r2)) and list_head(r2) == "-" and list_head(list_tail(r2)) == "#"
+                        r2 = list_tail(list_tail(r2))
+                        cl += 2
+                        done = True
+                    else
+                        if list_head(r2) == "\n"
+                            ln += 1
+                            cl = 1
+                        else
+                            cl += 1
+                        end
+                        r2 = list_tail(r2)
+                    end
+                end
+                rest = r2
+            else
+                # 行注释：跳到换行前（换行留给主循环计数）
+                let mut r2 = list_tail(rest)
+                cl += 1
+                let mut done = False
+                while !list_is_empty(r2) and done == False
+                    if list_head(r2) == "\n"
+                        done = True
+                    else
+                        cl += 1
+                        r2 = list_tail(r2)
+                    end
+                end
+                rest = r2
+            end
+        elif is_digit(c)
+            # 数字字面量（对齐宿主 lex_number：digit+ [ . digit+ ]）
+            let mut ip = ""
+            let mut r2 = rest
+            while !list_is_empty(r2) and is_digit(list_head(r2))
+                ip = ip + list_head(r2)
+                r2 = list_tail(r2)
+                cl += 1
+            end
+            # 浮点前瞻：'.' 后必须紧跟 digit（1..10 中 1 是 Int）
+            if !list_is_empty(r2) and list_head(r2) == "."
+                let r3 = list_tail(r2)
+                if !list_is_empty(r3) and is_digit(list_head(r3))
+                    let mut fp = ""
+                    let mut r4 = r3
+                    while !list_is_empty(r4) and is_digit(list_head(r4))
+                        fp = fp + list_head(r4)
+                        r4 = list_tail(r4)
+                        cl += 1
+                    end
+                    cl += 1
+                    acc = list_cons({t: TkFloat(norm_float(ip, fp)), ln: ln0, cl: cl0}, acc)
+                    rest = r4
+                else
+                    match try_sti(ip)
+                        Some(v) =>
+                            acc = list_cons({t: TkInt(v), ln: ln0, cl: cl0}, acc)
+                            rest = r2
+                        end
+                        None =>
+                            errs = list_cons({msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
+                            rest = list_tail(rest)
+                            cl = cl0 + 1
+                        end
+                    end
+                end
+            else
+                match try_sti(ip)
+                    Some(v) =>
+                        acc = list_cons({t: TkInt(v), ln: ln0, cl: cl0}, acc)
+                        rest = r2
+                    end
+                    None =>
+                        errs = list_cons({msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
+                        rest = list_tail(rest)
+                        cl = cl0 + 1
+                    end
+                end
+            end
+        elif c == "\""
+            # 字符串字面量（对齐宿主 lex_string 的容错：未闭合 → 错误 + 回退跳 1 字节）
+            let mut r2 = list_tail(rest)
+            let mut s = ""
+            let mut cl2 = cl + 1
+            let mut ln2 = ln
+            let mut closed = False
+            let mut esc_eof = False
+            while !list_is_empty(r2) and closed == False
+                let ch = list_head(r2)
+                if ch == "\""
+                    r2 = list_tail(r2)
+                    cl2 += 1
+                    closed = True
+                elif ch == "\\"
+                    let r3 = list_tail(r2)
+                    if list_is_empty(r3)
+                        # \ 后 EOF：未闭合的字符串转义（宿主 LEX002）
+                        esc_eof = True
+                        r2 = list_empty()
+                    else
+                        s = s + unesc(list_head(r3))
+                        r2 = list_tail(r3)
+                        cl2 += 2
+                    end
+                else
+                    s = s + ch
+                    r2 = list_tail(r2)
+                    if ch == "\n"
+                        ln2 += 1
+                        cl2 = 1
+                    else
+                        cl2 += 1
+                    end
+                end
+            end
+            if closed
+                acc = list_cons({t: TkStr(s), ln: ln0, cl: cl0}, acc)
+                rest = r2
+                ln = ln2
+                cl = cl2
+            else
+                # 未闭合：记录错误，回退跳过开头引号（宿主 saved_pos 回退 + advance 1）
+                let unclosed_msg =
+                if esc_eof
+                    "未闭合的字符串转义"
+                else
+                    "未闭合的字符串"
+                end
+                errs = list_cons({msg: unclosed_msg, ln: ln0, cl: cl0}, errs)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif is_alpha(c)
+            # 标识符 / 关键字
+            let mut word = ""
+            let mut r2 = rest
+            while !list_is_empty(r2) and is_alnum(list_head(r2))
+                word = word + list_head(r2)
+                r2 = list_tail(r2)
+                cl += 1
+            end
+            acc = list_cons({t: keyword_or_ident(word), ln: ln0, cl: cl0}, acc)
+            rest = r2
+        elif c == "+"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkPlusEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkPlus, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "-"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == ">"
+                acc = list_cons({t: TkArrow, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            elif !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkMinusEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkMinus, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "*"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkStarEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkStar, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "/"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkSlashEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkSlash, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "%"
+            acc = list_cons({t: TkPercent, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "!"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkNotEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkBang, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "="
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            elif !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == ">"
+                acc = list_cons({t: TkFatArrow, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkAssign, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "<"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkLtEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkLt, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == ">"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "="
+                acc = list_cons({t: TkGtEq, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkGt, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "|"
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == ">"
+                acc = list_cons({t: TkPipe, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkBar, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == "?"
+            acc = list_cons({t: TkQuestion, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "("
+            acc = list_cons({t: TkLParen, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "{"
+            acc = list_cons({t: TkLBrace, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == ")"
+            acc = list_cons({t: TkRParen, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "}"
+            acc = list_cons({t: TkRBrace, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "["
+            acc = list_cons({t: TkLBracket, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "]"
+            acc = list_cons({t: TkRBracket, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == ","
+            acc = list_cons({t: TkComma, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == ":"
+            acc = list_cons({t: TkColon, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        elif c == "."
+            if !list_is_empty(list_tail(rest)) and list_head(list_tail(rest)) == "."
+                acc = list_cons({t: TkDotDot, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(list_tail(rest))
+                cl += 2
+            else
+                acc = list_cons({t: TkDot, ln: ln0, cl: cl0}, acc)
+                rest = list_tail(rest)
+                cl += 1
+            end
+        elif c == ";"
+            acc = list_cons({t: TkSemi, ln: ln0, cl: cl0}, acc)
+            rest = list_tail(rest)
+            cl += 1
+        else
+            # 意外字符（宿主 LexError "意外字符 'x'"，tokenize_recover 跳过该字节）
+            errs = list_cons({msg: "意外字符 '" + c + "'", ln: ln0, cl: cl0}, errs)
+            rest = list_tail(rest)
+            cl += 1
+        end
+    end
+    # EOF token（宿主：is_at_end 时 push Eof，位置 = 结束时的 line/col）
+    acc = list_cons({t: TkEof, ln: ln, cl: cl}, acc)
+    # 逆序 → 正序 → Map 索引表
+    let ordered = rev_tok(acc)
+    let toks = map_empty()
+    let mut i = 0
+    for tk in ordered
+        map_set(toks, int_to_string(i), tk)
+        i += 1
+    end
+    {toks: toks, n: i, errs: rev_err(errs)}
+end
+
+# 整数字面量辅助：string_to_int 的返回约定是裸 Int（成功）或 Unit（失败）——
+# 内建协议层 Ok(Some(Value)) 解包后用户拿到的不是 Option 枚举（与 map_get 不同）。
+# 无 type_of 反射（RFC-0003 冻结），用拼接提升的 to_display 形态判定：Unit 显示为 "()"
+fn try_sti(s: String) -> Option<Int>
+    if "" + string_to_int(s) == "()"
+        None
+    else
+        Some(string_to_int(s))
+    end
+end
+
+# ============================================================================
+# Part C：AST 定义（对齐宿主 src/ast.rs；span 不建模——dump 契约不含位置）
+#   Blk/IfR/Prm/ArmR/ArmB/VarR/ImpI 用单变体 enum 包装（签名书写一个词，
+#   且避开匿名记录类型在深层泛型参数里的书写负担）
+# ============================================================================
+
+enum Ty
+    | TyInt
+    | TyFloat
+    | TyBool
+    | TyString
+    | TyUnit
+    | TyNamed(String)
+    | TyOption(Ty)
+    | TResult(Ty, Ty)
+    | TyGeneric(String, List<Ty>)
+    | TyRecord(List<(String, Ty)>)
+    | TyTuple(List<Ty>)
+end
+
+enum Blk
+    | BlkOf(List<St>, Option<Ex>)
+end
+
+enum St
+    | StLet(Bool, String, Option<Ty>, Ex)
+    | StDestruct(List<String>, Ex)
+    | StAssign(String, Int, Int, Ex)
+    | StIf(IfR)
+    | StWhile(Ex, Blk)
+    | StFor(String, Ex, Blk)
+    | StReturn(Option<Ex>)
+    | StExpr(Ex)
+    | StHole(Int, Int)
+end
+
+enum IfR
+    | IfR(List<(Ex, Blk)>, Option<Blk>)
+end
+
+enum Ex
+    | ExInt(Int)
+    | ExFloat(String)
+    | ExBool(Bool)
+    | ExStr(String)
+    | ExUnit
+    | ExIdent(String, Int, Int)
+    | ExBinary(String, Ex, Ex)
+    | ExUnary(String, Ex)
+    | ExLogical(String, Ex, Ex)
+    | ExCall(Ex, List<Ex>)
+    | ExIndex(Ex, Ex)
+    | ExField(Ex, String)
+    | ExGroup(Ex)
+    | ExIf(IfR)
+    | ExClosure(List<Prm>, Option<Ty>, Blk)
+    | ExMatch(Ex, List<ArmR>, Int)
+    | ExTry(Ex)
+    | ExPipe(Ex, Ex)
+    | ExRange(Ex, Ex)
+    | ExRecord(List<(String, Ex)>)
+    | ExTuple(List<Ex>)
+end
+
+enum Prm
+    | Prm(String, Ty)
+end
+
+enum ArmR
+    | ArmR(Pat, Option<Ex>, ArmB)
+end
+
+enum ArmB
+    | ABExpr(Ex)
+    | ABBlock(Blk)
+end
+
+enum Pat
+    | PatLit(Ex)
+    | PatBinder(String)
+    | PatWildcard
+    | PatVariant(String, List<Pat>)
+end
+
+enum Itm
+    | ItFn(String, List<Prm>, Option<Ty>, List<String>, Blk, Int, Int)
+    | ItEnum(String, List<String>, List<VarR>)
+    | ItImport(String, List<ImpI>)
+end
+
+enum VarR
+    | VarR(String, List<Ty>)
+end
+
+enum ImpI
+    | ImpI(String, String)
+end
+
+enum Prg
+    | Prg(List<Itm>)
+end
+
+# 块元素（parse_block 循环体产出；对齐宿主 BlockEl）
+enum Bel
+    | BStmt(St)
+    | BTail(Ex)
+end
+
+# ---- 各类型循环版 reverse（构建一律头插逆序）----
+
+fn rev_itm(xs: List<Itm>) -> List<Itm>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_st(xs: List<St>) -> List<St>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_ex(xs: List<Ex>) -> List<Ex>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_pat(xs: List<Pat>) -> List<Pat>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_prm(xs: List<Prm>) -> List<Prm>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_branch(xs: List<(Ex, Blk)>) -> List<(Ex, Blk)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_arm(xs: List<ArmR>) -> List<ArmR>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_var(xs: List<VarR>) -> List<VarR>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_impi(xs: List<ImpI>) -> List<ImpI>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_sfld(xs: List<(String, Ex)>) -> List<(String, Ex)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_sfty(xs: List<(String, Ty)>) -> List<(String, Ty)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+fn rev_ty(xs: List<Ty>) -> List<Ty>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
+# ============================================================================
+# Part C2：parser 基础设施（对齐宿主 Parser 的游标模型）
+#   ts = token 索引表（lex 产出）；pm = Map 持 "pos"（引用语义跨函数共享，对齐 &mut self）
+#   错误走 Result<_, String>（打包 "ln|cl|msg"，? 传播；Hole 插入点解包）
+# ============================================================================
+
+# token 判别编号（对齐宿主 std::mem::discriminant 的判等用途；只对无载荷变体比较判别）
+fn tok_disc(t: Tok) -> Int
+    match t
+        TkFn => 1
+        TkLet => 2
+        TkMut => 3
+        TkIf => 4
+        TkElif => 5
+        TkElse => 6
+        TkWhile => 7
+        TkFor => 8
+        TkIn => 9
+        TkReturn => 10
+        TkEnd => 11
+        TkTrue => 12
+        TkFalse => 13
+        TkAnd => 14
+        TkOr => 15
+        TkFrom => 16
+        TkImport => 17
+        TkAs => 18
+        TkMatch => 19
+        TkEnum => 20
+        TkInt(_) => 21
+        TkFloat(_) => 22
+        TkStr(_) => 23
+        TkIdent(_) => 24
+        TkPlus => 25
+        TkMinus => 26
+        TkStar => 27
+        TkSlash => 28
+        TkPercent => 29
+        TkPlusEq => 30
+        TkMinusEq => 31
+        TkStarEq => 32
+        TkSlashEq => 33
+        TkEq => 34
+        TkNotEq => 35
+        TkLt => 36
+        TkGt => 37
+        TkLtEq => 38
+        TkGtEq => 39
+        TkAssign => 40
+        TkBang => 41
+        TkQuestion => 42
+        TkPipe => 43
+        TkBar => 44
+        TkArrow => 45
+        TkFatArrow => 46
+        TkLParen => 47
+        TkRParen => 48
+        TkLBrace => 49
+        TkRBrace => 50
+        TkLBracket => 51
+        TkRBracket => 52
+        TkComma => 53
+        TkColon => 54
+        TkDot => 55
+        TkDotDot => 56
+        TkSemi => 57
+        TkEof => 58
+    end
+end
+
+# 无载荷 token 的 Rust Debug 名（宿主 token_name 的 `{:?}` 分支，去 Tk 前缀即宿主变体名）
+fn tk_dbg(t: Tok) -> String
+    match t
+        TkFn => "Fn"
+        TkLet => "Let"
+        TkMut => "Mut"
+        TkIf => "If"
+        TkElif => "Elif"
+        TkElse => "Else"
+        TkWhile => "While"
+        TkFor => "For"
+        TkIn => "In"
+        TkReturn => "Return"
+        TkEnd => "End"
+        TkTrue => "True"
+        TkFalse => "False"
+        TkAnd => "And"
+        TkOr => "Or"
+        TkFrom => "From"
+        TkImport => "Import"
+        TkAs => "As"
+        TkMatch => "Match"
+        TkEnum => "Enum"
+        TkInt(_) => "Int"
+        TkFloat(_) => "Float"
+        TkStr(_) => "Str"
+        TkIdent(_) => "Ident"
+        TkPlus => "Plus"
+        TkMinus => "Minus"
+        TkStar => "Star"
+        TkSlash => "Slash"
+        TkPercent => "Percent"
+        TkPlusEq => "PlusEq"
+        TkMinusEq => "MinusEq"
+        TkStarEq => "StarEq"
+        TkSlashEq => "SlashEq"
+        TkEq => "Eq"
+        TkNotEq => "NotEq"
+        TkLt => "Lt"
+        TkGt => "Gt"
+        TkLtEq => "LtEq"
+        TkGtEq => "GtEq"
+        TkAssign => "Assign"
+        TkBang => "Bang"
+        TkQuestion => "Question"
+        TkPipe => "Pipe"
+        TkBar => "Bar"
+        TkArrow => "Arrow"
+        TkFatArrow => "FatArrow"
+        TkLParen => "LParen"
+        TkRParen => "RParen"
+        TkLBrace => "LBrace"
+        TkRBrace => "RBrace"
+        TkLBracket => "LBracket"
+        TkRBracket => "RBracket"
+        TkComma => "Comma"
+        TkColon => "Colon"
+        TkDot => "Dot"
+        TkDotDot => "DotDot"
+        TkSemi => "Semi"
+        TkEof => "Eof"
+    end
+end
+
+# token 的诊断名（对齐宿主 token_name：字面量有值形态，其余 Rust Debug 名）
+fn tok_name(t: Tok) -> String
+    match t
+        TkEof => "文件结束"
+        TkInt(v) => "整数 " + int_to_string(v)
+        TkFloat(s) => "浮点数 " + s
+        TkStr(s) => "字符串 \"" + s + "\""
+        TkIdent(s) => "标识符 '" + s + "'"
+        _ => tk_dbg(t)
+    end
+end
+
+# ---- 游标操作 ----
+
+fn get_pos(pm: Map<String, Int>) -> Int
+    match map_get(pm, "pos")
+        Some(v) => v
+        None => 0
+    end
+end
+
+# 按索引取 token（越界回落到 EOF——对齐宿主 tokens 向量以 Eof 收尾且 advance 不越过）
+fn tok_at(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, i: Int) -> {t: Tok, ln: Int, cl: Int}
+    let k = if i < n - 1
+        i
+    else
+        n - 1
+    end
+    match map_get(ts, int_to_string(k))
+        Some(r) => r
+        None => {t: TkEof, ln: 0, cl: 0}
+    end
+end
+
+# 当前 token 的 Tok 部分（宿主 peek）
+fn pk_tk(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Tok
+    tok_at(ts, n, get_pos(pm)).t
+end
+
+# advance：Eof 不前进（对齐宿主）
+fn adv(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Unit
+    match pk_tk(ts, n, pm)
+        TkEof => ()
+        _ => map_set(pm, "pos", get_pos(pm) + 1)
+    end
+end
+
+# check：判别相等（只对无载荷 token 使用，对齐宿主 discriminant 比较）
+fn chk(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, t: Tok) -> Bool
+    tok_disc(pk_tk(ts, n, pm)) == tok_disc(t)
+end
+
+# matches：check + advance
+fn mt(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, t: Tok) -> Bool
+    if chk(ts, n, pm, t)
+        adv(ts, n, pm)
+        True
+    else
+        False
+    end
+end
+
+# 错误打包（"ln|cl|msg"）与解包
+fn perr(ln: Int, cl: Int, msg: String) -> String
+    int_to_string(ln) + "|" + int_to_string(cl) + "|" + msg
+end
+
+fn unpack_err(e: String) -> {ln: Int, cl: Int, msg: String}
+    let parts = split(e, "|")
+    if list_length(parts) >= 3
+        {ln: or_zero(list_get(parts, 0)), cl: or_zero(list_get(parts, 1)), msg: list_get(parts, 2)}
+    else
+        {ln: 0, cl: 0, msg: e}
+    end
+end
+
+fn or_zero(s: String) -> Int
+    match try_sti(s)
+        Some(v) => v
+        None => 0
+    end
+end
+
+# 当前位置错误（宿主 self.err：位置 = 当前 token）
+fn err_here(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, msg: String) -> String
+    let cur = tok_at(ts, n, get_pos(pm))
+    perr(cur.ln, cur.cl, msg)
+end
+
+# expect（宿主：期望 X，得到 Y；位置 = 当前 token）
+fn expt(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, want: Tok, what: String) -> Result<Unit, String>
+    if chk(ts, n, pm, want)
+        adv(ts, n, pm)
+        Ok(())
+    else
+        Err(err_here(ts, n, pm, "期望 " + what + "，得到 " + tok_name(pk_tk(ts, n, pm))))
+    end
+end
+
+# is_newline_before：当前 token 与前一个 token 不同行（宿主换行守卫的判定）
+fn newline_before(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Bool
+    let p = get_pos(pm)
+    if p == 0
+        False
+    else
+        tok_at(ts, n, p).ln != tok_at(ts, n, p - 1).ln
+    end
+end
+
+# 错误累积（em 的 value 记录；map_size 计数键）
+fn em_add(em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>, code: String, ln: Int, cl: Int, msg: String) -> Unit
+    map_set(em, int_to_string(map_size(em)), {code: code, msg: msg, ln: ln, cl: cl})
+end
+
+# 错误码分类（对齐宿主 diagnostics.rs 的关键字匹配；lex 与 parse 分表——宿主按阶段分，这里按记录点分）
+fn classify_lex_msg(msg: String) -> String
+    if contains(msg, "未闭合的字符串转义")
+        "LEX002"
+    elif contains(msg, "未闭合的字符串")
+        "LEX001"
+    elif contains(msg, "无效浮点数")
+        "LEX003"
+    elif contains(msg, "无效整数")
+        "LEX004"
+    elif contains(msg, "意外字符")
+        "LEX005"
+    else
+        "LEX000"
+    end
+end
+
+fn classify_parse_msg(msg: String) -> String
+    if contains(msg, "Result") and contains(msg, "类型参数")
+        "PARSE002"
+    elif contains(msg, "Option") and contains(msg, "类型参数")
+        "PARSE003"
+    elif starts_with(msg, "期望")
+        "PARSE001"
+    else
+        "PARSE000"
+    end
+end
+
+# ---- 容错同步点（宿主 Phase 2.2）----
+
+# 同步到顶层 item 起点：跳到 fn/enum/from/EOF
+fn sync_to_top(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Unit
+    let mut d = tok_disc(pk_tk(ts, n, pm))
+    while d != tok_disc(TkEof) and d != tok_disc(TkFn) and d != tok_disc(TkEnum) and d != tok_disc(TkFrom)
+        adv(ts, n, pm)
+        d = tok_disc(pk_tk(ts, n, pm))
+    end
+end
+
+# 语句起始 token 判定（宿主 is_block_stmt_start；不含 fn/enum/from——顶层声明留给 sync_to_top）
+# 带载荷变体的判别值用哨兵构造（_ 只能出现在模式位置，表达式位置不合法）
+fn d_int_lit() -> Int
+    tok_disc(TkInt(0))
+end
+
+fn d_float_lit() -> Int
+    tok_disc(TkFloat("0"))
+end
+
+fn d_str_lit() -> Int
+    tok_disc(TkStr(""))
+end
+
+fn d_ident() -> Int
+    tok_disc(TkIdent(""))
+end
+
+fn is_block_stmt_start(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Bool
+    let d = tok_disc(pk_tk(ts, n, pm))
+    if d == tok_disc(TkLet) or d == tok_disc(TkIf) or d == tok_disc(TkWhile) or d == tok_disc(TkFor) or d == tok_disc(TkReturn) or d == tok_disc(TkMatch) or d == d_ident() or d == d_int_lit() or d == d_float_lit() or d == d_str_lit() or d == tok_disc(TkTrue) or d == tok_disc(TkFalse) or d == tok_disc(TkLParen) or d == tok_disc(TkLBrace)
+        True
+    else
+        False
+    end
+end
+
+# 同步到语句边界：跳到块终止符或新行上的语句起始 token（Lom 无 break，用 flag 退出）
+fn sync_to_stmt_boundary(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Unit
+    let mut go = True
+    while go and !chk(ts, n, pm, TkEof) and !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkElif) and !chk(ts, n, pm, TkElse)
+        if newline_before(ts, n, pm) and is_block_stmt_start(ts, n, pm)
+            go = False
+        else
+            adv(ts, n, pm)
+        end
+    end
+end
+
+# 保证解析进度（宿主 ensure_progress）
+fn ensure_progress(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, saved: Int) -> Unit
+    if get_pos(pm) <= saved
+        adv(ts, n, pm)
+    end
+end
+
+# ============================================================================
+# Part C3：顶层与声明解析（对齐宿主 parse_program / parse_item / 声明族）
+# ============================================================================
+
+fn parse_program(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Prg
+    let mut items = list_empty()
+    while !chk(ts, n, pm, TkEof)
+        let saved = get_pos(pm)
+        match parse_item(ts, n, pm, em)
+            Ok(it) =>
+                items = list_cons(it, items)
+            end
+            Err(e) =>
+                let r = unpack_err(e)
+                em_add(em, classify_parse_msg(r.msg), r.ln, r.cl, r.msg)
+                sync_to_top(ts, n, pm)
+                ensure_progress(ts, n, pm, saved)
+            end
+        end
+    end
+    Prg(rev_itm(items))
+end
+
+fn parse_item(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Itm, String>
+    let d = tok_disc(pk_tk(ts, n, pm))
+    if d == tok_disc(TkFn)
+        parse_fn_decl(ts, n, pm, em)
+    elif d == tok_disc(TkEnum)
+        parse_enum_decl(ts, n, pm)
+    elif d == tok_disc(TkFrom)
+        parse_import_decl(ts, n, pm)
+    else
+        Err(err_here(ts, n, pm, "期望函数声明 'fn'、枚举声明 'enum' 或导入声明 'from'，得到 " + tok_name(pk_tk(ts, n, pm))))
+    end
+end
+
+# 解析标识符（宿主 parse_ident）
+fn parse_ident(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<String, String>
+    let tk = pk_tk(ts, n, pm)
+    adv(ts, n, pm)
+    match tk
+        TkIdent(s) => Ok(s)
+        _ => Err(err_here(ts, n, pm, "期望标识符，得到 " + tok_name(tk)))
+    end
+end
+
+# 点分模块路径（宿主 parse_module_path）
+fn parse_module_path(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<String, String>
+    let first = parse_ident(ts, n, pm)?
+    let mut path = first
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkDot)
+            path = path + "." + parse_ident(ts, n, pm)?
+        else
+            go = False
+        end
+    end
+    Ok(path)
+end
+
+# 导入声明（宿主 parse_import_decl：from mod import { a, b as c }，允许尾随逗号与空列表）
+fn parse_import_decl(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<Itm, String>
+    adv(ts, n, pm)
+    let module = parse_module_path(ts, n, pm)?
+    expt(ts, n, pm, TkImport, "'import'")?
+    expt(ts, n, pm, TkLBrace, "'{' (导入列表开始)")?
+    let mut items = list_empty()
+    if !chk(ts, n, pm, TkRBrace)
+        let mut go = True
+        while go
+            if chk(ts, n, pm, TkRBrace)
+                go = False
+            else
+                let iname = parse_ident(ts, n, pm)?
+                let alias =
+                if mt(ts, n, pm, TkAs)
+                    parse_ident(ts, n, pm)?
+                else
+                    iname
+                end
+                items = list_cons(ImpI(iname, alias), items)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                end
+            end
+        end
+    end
+    expt(ts, n, pm, TkRBrace, "'}' (导入列表结束)")?
+    Ok(ItImport(module, rev_impi(items)))
+end
+
+# 参数列表（宿主 parse_params：name: type 逗号分隔）
+fn parse_params(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<List<Prm>, String>
+    let mut params = list_empty()
+    if !chk(ts, n, pm, TkRParen)
+        let mut go = True
+        while go
+            let pname = parse_ident(ts, n, pm)?
+            expt(ts, n, pm, TkColon, "':'")?
+            let pty = parse_type(ts, n, pm)?
+            params = list_cons(Prm(pname, pty), params)
+            if !mt(ts, n, pm, TkComma)
+                go = False
+            end
+        end
+    end
+    expt(ts, n, pm, TkRParen, "')'")?
+    Ok(rev_prm(params))
+end
+
+# 效应注解（宿主 parse_effects：可选 ! [E1, E2]，空列表允许）
+fn parse_effects(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<List<String>, String>
+    if !mt(ts, n, pm, TkBang)
+        Ok(list_empty())
+    else
+        expt(ts, n, pm, TkLBracket, "'[' (效应列表开始)")?
+        let mut effs = list_empty()
+        if !chk(ts, n, pm, TkRBracket)
+            let mut go = True
+            while go
+                let e = parse_ident(ts, n, pm)?
+                effs = list_cons(e, effs)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                end
+            end
+        end
+        expt(ts, n, pm, TkRBracket, "']' (效应列表结束)")?
+        Ok(rev_str(effs))
+    end
+end
+
+# 函数声明（宿主 parse_fn_decl；span 省略）
+fn parse_fn_decl(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Itm, String>
+    let fn_rec = tok_at(ts, n, get_pos(pm))
+    adv(ts, n, pm)
+    let name = parse_ident(ts, n, pm)?
+    expt(ts, n, pm, TkLParen, "'('")?
+    let params = parse_params(ts, n, pm)?
+    let ret =
+    if mt(ts, n, pm, TkArrow)
+        Some(parse_type(ts, n, pm)?)
+    else
+        None
+    end
+    let effs = parse_effects(ts, n, pm)?
+    let body = parse_block(ts, n, pm, em)?
+    Ok(ItFn(name, params, ret, effs, body, fn_rec.ln, fn_rec.cl))
+end
+
+# 标识符 → 基础类型（宿主 Type::from_name）
+fn ty_from_name(s: String) -> Ty
+    if s == "Int"
+        TyInt
+    elif s == "Float"
+        TyFloat
+    elif s == "Bool"
+        TyBool
+    elif s == "String"
+        TyString
+    elif s == "Unit"
+        TyUnit
+    else
+        TyNamed(s)
+    end
+end
+
+# 类型的 Debug 名（宿主 "类型 {:?} 不支持泛型参数" 消息用；仅覆盖所需形态）
+fn ty_dbg(t: Ty) -> String
+    match t
+        TyInt => "Int"
+        TyFloat => "Float"
+        TyBool => "Bool"
+        TyString => "String"
+        TyUnit => "Unit"
+        TyNamed(s) => "Named(\"" + s + "\")"
+        TyOption(_) => "Option"
+        TResult(_, _) => "Result"
+        TyGeneric(_, _) => "Generic"
+        TyRecord(_) => "Record"
+        TyTuple(_) => "Tuple"
+    end
+end
+
+# 类型解析（宿主 parse_type：记录/元组/命名+泛型，Result/Option 特判）
+fn parse_type(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<Ty, String>
+    if chk(ts, n, pm, TkLBrace)
+        adv(ts, n, pm)
+        let mut fields = list_empty()
+        if !chk(ts, n, pm, TkRBrace)
+            let mut go = True
+            while go
+                let fname = parse_ident(ts, n, pm)?
+                expt(ts, n, pm, TkColon, "':' (记录字段类型分隔)")?
+                let fty = parse_type(ts, n, pm)?
+                fields = list_cons((fname, fty), fields)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                end
+            end
+        end
+        expt(ts, n, pm, TkRBrace, "'}' (闭合记录类型)")?
+        Ok(TyRecord(rev_sfty(fields)))
+    elif chk(ts, n, pm, TkLParen)
+        let _ = adv(ts, n, pm)
+        if mt(ts, n, pm, TkRParen)
+            Ok(TyUnit)
+        else
+            let first = parse_type(ts, n, pm)?
+            if mt(ts, n, pm, TkComma)
+                let mut elems = list_cons(first, list_empty())
+                let mut go = True
+                while go
+                    elems = list_cons(parse_type(ts, n, pm)?, elems)
+                    if !mt(ts, n, pm, TkComma)
+                        go = False
+                    end
+                end
+                expt(ts, n, pm, TkRParen, "')' (闭合元组类型)")?
+                Ok(TyTuple(rev_ty(elems)))
+            else
+                expt(ts, n, pm, TkRParen, "')'")?
+                Ok(first)
+            end
+        end
+    else
+        let name = parse_ident(ts, n, pm)?
+        let base = ty_from_name(name)
+        if chk(ts, n, pm, TkLt)
+            adv(ts, n, pm)
+            let mut args = list_cons(parse_type(ts, n, pm)?, list_empty())
+            let mut go = True
+            while go
+                if mt(ts, n, pm, TkComma)
+                    args = list_cons(parse_type(ts, n, pm)?, args)
+                else
+                    go = False
+                end
+            end
+            expt(ts, n, pm, TkGt, "'>' (闭合泛型参数)")?
+            let args2 = rev_ty(args)
+            match base
+                TyNamed(bn) =>
+                    if bn == "Result"
+                        if list_length(args2) != 2
+                            Err(err_here(ts, n, pm, "Result 期望 2 个类型参数，得到 " + int_to_string(list_length(args2)) + " 个"))
+                        else
+                            Ok(TResult(list_get(args2, 0), list_get(args2, 1)))
+                        end
+                    elif bn == "Option"
+                        if list_length(args2) != 1
+                            Err(err_here(ts, n, pm, "Option 期望 1 个类型参数，得到 " + int_to_string(list_length(args2)) + " 个"))
+                        else
+                            Ok(TyOption(list_get(args2, 0)))
+                        end
+                    else
+                        Ok(TyGeneric(bn, args2))
+                    end
+                end
+                _ => Err(err_here(ts, n, pm, "类型 " + ty_dbg(base) + " 不支持泛型参数"))
+            end
+        else
+            Ok(base)
+        end
+    end
+end
+
+# 枚举声明（宿主 parse_enum_decl：单行 = 形式 / 多行 end 形式）
+fn parse_enum_decl(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<Itm, String>
+    adv(ts, n, pm)
+    let name = parse_ident(ts, n, pm)?
+    let mut tparams = list_empty()
+    if chk(ts, n, pm, TkLt)
+        adv(ts, n, pm)
+        let mut go = True
+        while go
+            tparams = list_cons(parse_ident(ts, n, pm)?, tparams)
+            if !mt(ts, n, pm, TkComma)
+                go = False
+            end
+        end
+        expt(ts, n, pm, TkGt, "'>' (闭合类型参数)")?
+    end
+    let mut variants = list_empty()
+    if mt(ts, n, pm, TkAssign)
+        # 单行形式：V1 | V2 | V3（无 end）
+        let mut go = True
+        while go
+            variants = list_cons(parse_enum_variant(ts, n, pm)?, variants)
+            if mt(ts, n, pm, TkBar)
+                ()
+            else
+                go = False
+            end
+        end
+    else
+        # 多行形式：每行一个变体（可选 | 前缀），以 end 闭合
+        while !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkEof)
+            mt(ts, n, pm, TkBar)
+            variants = list_cons(parse_enum_variant(ts, n, pm)?, variants)
+        end
+        expt(ts, n, pm, TkEnd, "'end' (闭合 enum)")?
+    end
+    Ok(ItEnum(name, rev_str(tparams), rev_var(variants)))
+end
+
+# 枚举变体（宿主 parse_enum_variant：Name 或 Name(Types)；跨行 ( 不视为参数）
+fn parse_enum_variant(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Result<VarR, String>
+    let vname = parse_ident(ts, n, pm)?
+    if chk(ts, n, pm, TkLParen) and !newline_before(ts, n, pm)
+        adv(ts, n, pm)
+        let mut fs = list_empty()
+        if !chk(ts, n, pm, TkRParen)
+            let mut go = True
+            while go
+                fs = list_cons(parse_type(ts, n, pm)?, fs)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                end
+            end
+        end
+        expt(ts, n, pm, TkRParen, "')' (闭合变体参数)")?
+        Ok(VarR(vname, rev_ty(fs)))
+    else
+        Ok(VarR(vname, list_empty()))
+    end
+end
+
+# ============================================================================
+# Part C4：块 / 语句 / 表达式 / 模式解析（对齐宿主 parse_block 族 + Pratt 链）
+#   注意：Lom 无 break/continue，循环提前退出一律用 flag；无 TCO，链式左结合
+#   在宿主是循环、这里也保持循环（不递归）
+# ============================================================================
+
+# stmts 中是否存在裸表达式语句（parse_block 的 if_can_be_tail 判定用）
+fn has_expr_stmt(stmts: List<St>) -> Bool
+    let mut cur = stmts
+    let mut found = False
+    while !list_is_empty(cur) and found == False
+        match list_head(cur)
+            StExpr(_) =>
+                found = True
+            end
+            _ =>
+                cur = list_tail(cur)
+            end
+        end
+    end
+    found
+end
+
+# 复合赋值（宿主 match_compound_assign：换行守卫 + op 映射；返回 dump 形态 op 名）
+fn match_compound_assign(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Option<String>
+    if newline_before(ts, n, pm)
+        None
+    else
+        match pk_tk(ts, n, pm)
+            TkPlusEq =>
+                adv(ts, n, pm)
+                Some("Add")
+            end
+            TkMinusEq =>
+                adv(ts, n, pm)
+                Some("Sub")
+            end
+            TkStarEq =>
+                adv(ts, n, pm)
+                Some("Mul")
+            end
+            TkSlashEq =>
+                adv(ts, n, pm)
+                Some("Div")
+            end
+            _ => None
+        end
+    end
+end
+
+# 块元素解析（宿主 parse_block_el；ict = if_can_be_tail）
+fn parse_block_el(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>, ict: Bool) -> Result<Bel, String>
+    let d = tok_disc(pk_tk(ts, n, pm))
+    if d == tok_disc(TkLet) or d == tok_disc(TkWhile) or d == tok_disc(TkFor) or d == tok_disc(TkReturn)
+        match parse_stmt(ts, n, pm, em)
+            Ok(s) => Ok(BStmt(s))
+            Err(e) => Err(e)
+        end
+    elif d == tok_disc(TkIf)
+        let ifr = parse_if(ts, n, pm, em)?
+        let d2 = tok_disc(pk_tk(ts, n, pm))
+        if ict and (d2 == tok_disc(TkEnd) or d2 == tok_disc(TkElif) or d2 == tok_disc(TkElse) or d2 == tok_disc(TkEof))
+            Ok(BTail(ExIf(ifr)))
+        else
+            Ok(BStmt(StIf(ifr)))
+        end
+    else
+        let e = parse_expr(ts, n, pm, em)?
+        if chk(ts, n, pm, TkAssign)
+            adv(ts, n, pm)
+            let value = parse_expr(ts, n, pm, em)?
+            match e
+                ExIdent(name, tln, tcl) => Ok(BStmt(StAssign(name, tln, tcl, value)))
+                _ => Err(err_here(ts, n, pm, "赋值目标必须是变量"))
+            end
+        else
+            match match_compound_assign(ts, n, pm)
+                Some(op) =>
+                    let rhs = parse_expr(ts, n, pm, em)?
+                    match e
+                        ExIdent(name, tln, tcl) => Ok(BStmt(StAssign(name, tln, tcl, ExBinary(op, ExIdent(name, tln, tcl), rhs))))
+                        _ => Err(err_here(ts, n, pm, "复合赋值目标必须是变量"))
+                    end
+                end
+                None =>
+                    let d3 = tok_disc(pk_tk(ts, n, pm))
+                    if d3 == tok_disc(TkEnd) or d3 == tok_disc(TkElif) or d3 == tok_disc(TkElse) or d3 == tok_disc(TkEof)
+                        Ok(BTail(e))
+                    else
+                        Ok(BStmt(StExpr(e)))
+                    end
+                end
+            end
+        end
+    end
+end
+
+# 块解析（宿主 parse_block：终止于 end/elif/else/eof，只消费 end；容错插 Hole）
+fn parse_block(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Blk, String>
+    let mut stmts = list_empty()
+    let mut tail = None
+    let mut has_tail = False
+    let mut go = True
+    while go and !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkElif) and !chk(ts, n, pm, TkElse) and !chk(ts, n, pm, TkEof)
+        let ict = has_tail == False and has_expr_stmt(stmts) == False
+        let saved = get_pos(pm)
+        match parse_block_el(ts, n, pm, em, ict)
+            Ok(BStmt(s)) =>
+                stmts = list_cons(s, stmts)
+            end
+            Ok(BTail(e)) =>
+                tail = Some(e)
+                has_tail = True
+                go = False
+            end
+            Err(e) =>
+                let r = unpack_err(e)
+                em_add(em, classify_parse_msg(r.msg), r.ln, r.cl, r.msg)
+                stmts = list_cons(StHole(r.ln, r.cl), stmts)
+                sync_to_stmt_boundary(ts, n, pm)
+                ensure_progress(ts, n, pm, saved)
+            end
+        end
+    end
+    if chk(ts, n, pm, TkEnd)
+        adv(ts, n, pm)
+    elif chk(ts, n, pm, TkEof)
+        # R57（九审）：EOF 不得静默闭合块（与宿主 parse_block 对齐：
+        # 记录诊断但保留已解析块——带洞语义，fn 项不丢）
+        let t = tok_at(ts, n, get_pos(pm))
+        em_add(em, classify_parse_msg("期望 'end' (块闭合)，得到 文件结束"), t.ln, t.cl, "期望 'end' (块闭合)，得到 文件结束")
+    end
+    Ok(BlkOf(rev_st(stmts), tail))
+end
+
+# 语句解析（宿主 parse_stmt）
+fn parse_stmt(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
+    let d = tok_disc(pk_tk(ts, n, pm))
+    if d == tok_disc(TkLet)
+        parse_let(ts, n, pm, em)
+    elif d == tok_disc(TkIf)
+        Ok(StIf(parse_if(ts, n, pm, em)?))
+    elif d == tok_disc(TkWhile)
+        parse_while(ts, n, pm, em)
+    elif d == tok_disc(TkFor)
+        parse_for(ts, n, pm, em)
+    elif d == tok_disc(TkReturn)
+        parse_return(ts, n, pm, em)
+    else
+        Ok(StExpr(parse_expr(ts, n, pm, em)?))
+    end
+end
+
+# let [mut] name [: type] = expr / let (a, b) = expr（宿主 parse_let + parse_let_destruct）
+fn parse_let(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
+    let _ = adv(ts, n, pm)
+    let mutable = mt(ts, n, pm, TkMut)
+    if chk(ts, n, pm, TkLParen)
+        if mutable
+            Err(err_here(ts, n, pm, "元组解构不支持 mut（解构绑定不可变）"))
+        else
+            adv(ts, n, pm)
+            let mut names = list_empty()
+            let mut go = True
+            while go
+                names = list_cons(parse_ident(ts, n, pm)?, names)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                elif chk(ts, n, pm, TkRParen)
+                    go = False
+                else
+                    ()
+                end
+            end
+            expt(ts, n, pm, TkRParen, "')'")?
+            expt(ts, n, pm, TkAssign, "'='")?
+            let value = parse_expr(ts, n, pm, em)?
+            Ok(StDestruct(rev_str(names), value))
+        end
+    else
+        let name = parse_ident(ts, n, pm)?
+        let ty =
+        if mt(ts, n, pm, TkColon)
+            Some(parse_type(ts, n, pm)?)
+        else
+            None
+        end
+        expt(ts, n, pm, TkAssign, "'='")?
+        let value = parse_expr(ts, n, pm, em)?
+        Ok(StLet(mutable, name, ty, value))
+    end
+end
+
+# if/elif/else（宿主 parse_if：分支与 else 块都由 parse_block 闭合）
+fn parse_if(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<IfR, String>
+    adv(ts, n, pm)
+    let cond = parse_expr(ts, n, pm, em)?
+    let body = parse_block(ts, n, pm, em)?
+    let mut branches = list_cons((cond, body), list_empty())
+    let mut els = None
+    let mut has_else = False
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkElif)
+            let c = parse_expr(ts, n, pm, em)?
+            let b = parse_block(ts, n, pm, em)?
+            branches = list_cons((c, b), branches)
+        else
+            go = False
+        end
+    end
+    if mt(ts, n, pm, TkElse)
+        els = Some(parse_block(ts, n, pm, em)?)
+        has_else = True
+    else
+        ()
+    end
+    Ok(IfR(rev_branch(branches), els))
+end
+
+fn parse_while(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
+    adv(ts, n, pm)
+    let cond = parse_expr(ts, n, pm, em)?
+    let body = parse_block(ts, n, pm, em)?
+    Ok(StWhile(cond, body))
+end
+
+fn parse_for(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
+    adv(ts, n, pm)
+    let var = parse_ident(ts, n, pm)?
+    expt(ts, n, pm, TkIn, "'in'")?
+    let iter = parse_expr(ts, n, pm, em)?
+    let body = parse_block(ts, n, pm, em)?
+    Ok(StFor(var, iter, body))
+end
+
+fn parse_return(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
+    let _ = adv(ts, n, pm)
+    if chk(ts, n, pm, TkEnd) or chk(ts, n, pm, TkEof)
+        Ok(StReturn(None))
+    else
+        Ok(StReturn(Some(parse_expr(ts, n, pm, em)?)))
+    end
+end
+
+# ============================================================================
+# Pratt 优先级链（宿主 parse_expr 族；span 逻辑全部省略——dump 契约无位置）
+#   range(最低，非结合) < or < and < comparison < pipeline < add < mul < unary < ? < postfix
+# ============================================================================
+
+fn parse_expr(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    parse_range(ts, n, pm, em)
+end
+
+# range：a..b 非结合，换行守卫（宿主 parse_range）
+fn parse_range(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let start = parse_or(ts, n, pm, em)?
+    if newline_before(ts, n, pm) == False and mt(ts, n, pm, TkDotDot)
+        let end_e = parse_or(ts, n, pm, em)?
+        Ok(ExRange(start, end_e))
+    else
+        Ok(start)
+    end
+end
+
+fn parse_or(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_and(ts, n, pm, em)?
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkOr)
+            let right = parse_and(ts, n, pm, em)?
+            left = ExLogical("Or", left, right)
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+fn parse_and(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_comparison(ts, n, pm, em)?
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkAnd)
+            let right = parse_comparison(ts, n, pm, em)?
+            left = ExLogical("And", left, right)
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+fn parse_comparison(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_pipeline(ts, n, pm, em)?
+    let mut go = True
+    while go
+        let d = tok_disc(pk_tk(ts, n, pm))
+        if d == tok_disc(TkEq)
+            adv(ts, n, pm)
+            left = ExBinary("Eq", left, parse_pipeline(ts, n, pm, em)?)
+        elif d == tok_disc(TkNotEq)
+            adv(ts, n, pm)
+            left = ExBinary("NotEq", left, parse_pipeline(ts, n, pm, em)?)
+        elif d == tok_disc(TkLt)
+            adv(ts, n, pm)
+            left = ExBinary("Lt", left, parse_pipeline(ts, n, pm, em)?)
+        elif d == tok_disc(TkGt)
+            adv(ts, n, pm)
+            left = ExBinary("Gt", left, parse_pipeline(ts, n, pm, em)?)
+        elif d == tok_disc(TkLtEq)
+            adv(ts, n, pm)
+            left = ExBinary("LtEq", left, parse_pipeline(ts, n, pm, em)?)
+        elif d == tok_disc(TkGtEq)
+            adv(ts, n, pm)
+            left = ExBinary("GtEq", left, parse_pipeline(ts, n, pm, em)?)
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+# pipeline：|> 左结合（宿主 parse_pipeline）
+fn parse_pipeline(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_addition(ts, n, pm, em)?
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkPipe)
+            let right = parse_addition(ts, n, pm, em)?
+            left = ExPipe(left, right)
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+fn parse_addition(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_multiplication(ts, n, pm, em)?
+    let mut go = True
+    while go
+        let d = tok_disc(pk_tk(ts, n, pm))
+        if d == tok_disc(TkPlus)
+            adv(ts, n, pm)
+            left = ExBinary("Add", left, parse_multiplication(ts, n, pm, em)?)
+        elif d == tok_disc(TkMinus)
+            # 跨行的 - 视为一元取负（宿主：避免 "0\n-1" 解析为 "0 - 1"）
+            if newline_before(ts, n, pm)
+                go = False
+            else
+                adv(ts, n, pm)
+                left = ExBinary("Sub", left, parse_multiplication(ts, n, pm, em)?)
+            end
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+fn parse_multiplication(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut left = parse_unary(ts, n, pm, em)?
+    let mut go = True
+    while go
+        let d = tok_disc(pk_tk(ts, n, pm))
+        if d == tok_disc(TkStar)
+            adv(ts, n, pm)
+            left = ExBinary("Mul", left, parse_unary(ts, n, pm, em)?)
+        elif d == tok_disc(TkSlash)
+            adv(ts, n, pm)
+            left = ExBinary("Div", left, parse_unary(ts, n, pm, em)?)
+        elif d == tok_disc(TkPercent)
+            adv(ts, n, pm)
+            left = ExBinary("Mod", left, parse_unary(ts, n, pm, em)?)
+        else
+            go = False
+        end
+    end
+    Ok(left)
+end
+
+fn parse_unary(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let d = tok_disc(pk_tk(ts, n, pm))
+    if d == tok_disc(TkBang)
+        adv(ts, n, pm)
+        let inner = parse_unary(ts, n, pm, em)?
+        Ok(ExUnary("Not", inner))
+    elif d == tok_disc(TkMinus)
+        adv(ts, n, pm)
+        let inner = parse_unary(ts, n, pm, em)?
+        Ok(ExUnary("Neg", inner))
+    else
+        parse_question(ts, n, pm, em)
+    end
+end
+
+# ? 后缀（宿主 parse_question：比 postfix 低、比 unary 高）
+fn parse_question(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut expr = parse_postfix(ts, n, pm, em)?
+    let mut go = True
+    while go
+        if mt(ts, n, pm, TkQuestion)
+            expr = ExTry(expr)
+        else
+            go = False
+        end
+    end
+    Ok(expr)
+end
+
+# 后缀：调用 / 索引 / 字段（宿主 parse_postfix；跨行 ( 与 [ 不视为后缀）
+fn parse_postfix(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let mut expr = parse_primary(ts, n, pm, em)?
+    let mut go = True
+    while go
+        let d = tok_disc(pk_tk(ts, n, pm))
+        if d == tok_disc(TkLParen)
+            if newline_before(ts, n, pm)
+                go = False
+            else
+                adv(ts, n, pm)
+                let args = parse_args(ts, n, pm, em)?
+                expr = ExCall(expr, args)
+            end
+        elif d == tok_disc(TkLBracket)
+            if newline_before(ts, n, pm)
+                go = False
+            else
+                adv(ts, n, pm)
+                let index = parse_expr(ts, n, pm, em)?
+                expt(ts, n, pm, TkRBracket, "']'")?
+                expr = ExIndex(expr, index)
+            end
+        elif d == tok_disc(TkDot)
+            adv(ts, n, pm)
+            match pk_tk(ts, n, pm)
+                TkInt(idx) =>
+                    adv(ts, n, pm)
+                    if idx < 0
+                        return Err(err_here(ts, n, pm, "元组索引不能为负"))
+                    else
+                        expr = ExField(expr, int_to_string(idx))
+                    end
+                end
+                _ =>
+                    let fname = parse_ident(ts, n, pm)?
+                    expr = ExField(expr, fname)
+                end
+            end
+        else
+            go = False
+        end
+    end
+    Ok(expr)
+end
+
+# 实参列表（宿主 parse_args）
+fn parse_args(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<List<Ex>, String>
+    let mut args = list_empty()
+    if !chk(ts, n, pm, TkRParen)
+        let mut go = True
+        while go
+            args = list_cons(parse_expr(ts, n, pm, em)?, args)
+            if !mt(ts, n, pm, TkComma)
+                go = False
+            end
+        end
+    end
+    expt(ts, n, pm, TkRParen, "')'")?
+    Ok(rev_ex(args))
+end
+
+# 主表达式（宿主 parse_primary）
+fn parse_primary(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    match pk_tk(ts, n, pm)
+        TkInt(v) =>
+            adv(ts, n, pm)
+            Ok(ExInt(v))
+        end
+        TkFloat(s) =>
+            adv(ts, n, pm)
+            Ok(ExFloat(s))
+        end
+        TkTrue =>
+            adv(ts, n, pm)
+            Ok(ExBool(True))
+        end
+        TkFalse =>
+            adv(ts, n, pm)
+            Ok(ExBool(False))
+        end
+        TkStr(s) =>
+            adv(ts, n, pm)
+            Ok(ExStr(s))
+        end
+        TkIdent(s) =>
+            let tpos = tok_at(ts, n, get_pos(pm))
+            adv(ts, n, pm)
+            Ok(ExIdent(s, tpos.ln, tpos.cl))
+        end
+        TkLParen =>
+            let _ = adv(ts, n, pm)
+            if mt(ts, n, pm, TkRParen)
+                Ok(ExUnit)
+            else
+                let first = parse_expr(ts, n, pm, em)?
+                if mt(ts, n, pm, TkComma)
+                    let mut elems = list_cons(first, list_empty())
+                    let mut go = True
+                    while go
+                        if chk(ts, n, pm, TkRParen)
+                            go = False
+                        else
+                            elems = list_cons(parse_expr(ts, n, pm, em)?, elems)
+                            if !mt(ts, n, pm, TkComma)
+                                go = False
+                            end
+                        end
+                    end
+                    expt(ts, n, pm, TkRParen, "')' (闭合元组)")?
+                    Ok(ExTuple(rev_ex(elems)))
+                else
+                    expt(ts, n, pm, TkRParen, "')'")?
+                    Ok(ExGroup(first))
+                end
+            end
+        end
+        TkLBrace => parse_record(ts, n, pm, em)
+        TkFn => parse_closure(ts, n, pm, em)
+        TkIf =>
+            let ifr = parse_if(ts, n, pm, em)?
+            Ok(ExIf(ifr))
+        end
+        TkMatch => parse_match(ts, n, pm, em)
+        _ => Err(err_here(ts, n, pm, "期望表达式，得到 " + tok_name(pk_tk(ts, n, pm))))
+    end
+end
+
+# 闭包字面量（宿主 parse_closure）
+fn parse_closure(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    adv(ts, n, pm)
+    expt(ts, n, pm, TkLParen, "'('")?
+    let params = parse_params(ts, n, pm)?
+    let ret =
+    if mt(ts, n, pm, TkArrow)
+        Some(parse_type(ts, n, pm)?)
+    else
+        None
+    end
+    let body = parse_block(ts, n, pm, em)?
+    Ok(ExClosure(params, ret, body))
+end
+
+# 记录字面量（宿主 parse_record；尾随逗号允许）
+fn parse_record(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    adv(ts, n, pm)
+    let mut fields = list_empty()
+    if !chk(ts, n, pm, TkRBrace)
+        let mut go = True
+        while go
+            if chk(ts, n, pm, TkRBrace)
+                go = False
+            else
+                let fname = parse_ident(ts, n, pm)?
+                expt(ts, n, pm, TkColon, "':' (记录字段分隔)")?
+                let value = parse_expr(ts, n, pm, em)?
+                fields = list_cons((fname, value), fields)
+                if !mt(ts, n, pm, TkComma)
+                    go = False
+                end
+            end
+        end
+    end
+    expt(ts, n, pm, TkRBrace, "'}' (闭合记录)")?
+    Ok(ExRecord(rev_sfld(fields)))
+end
+
+# match 表达式（宿主 parse_match：容错臂级恢复——丢弃坏臂余下臂，保证 match 自闭合）
+fn parse_match(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Ex, String>
+    let _ = adv(ts, n, pm)
+    let scrutinee = parse_expr(ts, n, pm, em)?
+    let mut arms = list_empty()
+    let mut go = True
+    while go and !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkEof)
+        let saved = get_pos(pm)
+        match parse_match_arm(ts, n, pm, em)
+            Ok(arm) =>
+                arms = list_cons(arm, arms)
+            end
+            Err(e) =>
+                let r = unpack_err(e)
+                em_add(em, classify_parse_msg(r.msg), r.ln, r.cl, r.msg)
+                # 保守同步：跳到 match 的 end（或 eof），放弃后续臂
+                while !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkEof)
+                    adv(ts, n, pm)
+                end
+                ensure_progress(ts, n, pm, saved)
+                go = False
+            end
+        end
+    end
+    if chk(ts, n, pm, TkEnd)
+        let end_rec = tok_at(ts, n, get_pos(pm))
+        adv(ts, n, pm)
+        Ok(ExMatch(scrutinee, rev_arm(arms), end_rec.ln))
+    else
+        Err(err_here(ts, n, pm, "期望 'end' 闭合 match"))
+    end
+end
+
+# match 臂（宿主 parse_match_arm：Form A 同行单表达式 / Form B 跨行块）
+fn parse_match_arm(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<ArmR, String>
+    let pattern = parse_pattern(ts, n, pm, em)?
+    let guard =
+    if mt(ts, n, pm, TkIf)
+        Some(parse_expr(ts, n, pm, em)?)
+    else
+        None
+    end
+    let _ = expt(ts, n, pm, TkFatArrow, "'=>'")?
+    if newline_before(ts, n, pm)
+        let b = parse_block(ts, n, pm, em)?
+        Ok(ArmR(pattern, guard, ABBlock(b)))
+    else
+        let e = parse_expr(ts, n, pm, em)?
+        Ok(ArmR(pattern, guard, ABExpr(e)))
+    end
+end
+
+# 模式（宿主 parse_pattern：字面量 / _ / 绑定 / 变体（同行 ( 才是变体））
+fn parse_pattern(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Pat, String>
+    match pk_tk(ts, n, pm)
+        TkInt(v) =>
+            adv(ts, n, pm)
+            Ok(PatLit(ExInt(v)))
+        end
+        TkFloat(s) =>
+            adv(ts, n, pm)
+            Ok(PatLit(ExFloat(s)))
+        end
+        TkStr(s) =>
+            adv(ts, n, pm)
+            Ok(PatLit(ExStr(s)))
+        end
+        TkTrue =>
+            adv(ts, n, pm)
+            Ok(PatLit(ExBool(True)))
+        end
+        TkFalse =>
+            adv(ts, n, pm)
+            Ok(PatLit(ExBool(False)))
+        end
+        TkIdent(s) =>
+            let _ = adv(ts, n, pm)
+            if s == "_"
+                Ok(PatWildcard)
+            elif chk(ts, n, pm, TkLParen) and !newline_before(ts, n, pm)
+                adv(ts, n, pm)
+                let mut subs = list_empty()
+                if !chk(ts, n, pm, TkRParen)
+                    let mut go = True
+                    while go
+                        subs = list_cons(parse_pattern(ts, n, pm, em)?, subs)
+                        if !mt(ts, n, pm, TkComma)
+                            go = False
+                        end
+                    end
+                end
+                expt(ts, n, pm, TkRParen, "')' (闭合变体模式)")?
+                Ok(PatVariant(s, rev_pat(subs)))
+            else
+                Ok(PatBinder(s))
+            end
+        end
+        _ => Err(err_here(ts, n, pm, "期望模式，得到 " + tok_name(pk_tk(ts, n, pm))))
+    end
+end
+
+# ============================================================================
+
+# ============================================================================
+# Part X：L2.2 子集 codegen（本文件新增——前端 A-C4 之上）
+# ============================================================================
+
+# ---- X0：字节/编码基元（自 L2.1 spike 移植） ----
+
+fn hex_digit(n: Int) -> String
+    if n < 10
+        return char_from_code(48 + n)
+    end
+    char_from_code(97 + n - 10)
+end
+
+fn byte_hex(b: Int) -> String
+    hex_digit(b / 16) + hex_digit(b % 16)
+end
+
+# LEB128 unsigned（section size / 索引 / 计数）
+fn leb128_hex(n: Int) -> String
+    let mut out = ""
+    let mut v = n
+    let mut go = True
+    while go
+        let mut b = v % 128
+        v = v / 128
+        if v > 0
+            b = b + 128
+        else
+            go = False
+        end
+        out = out + byte_hex(b)
+    end
+    out
+end
+
+# LEB128 signed（i64.const 操作数）——无位运算实现：
+#   byte = n 的非负模 128（% 截断语义下 n%128 ∈ (-128,128)，负数 +128）；
+#   n' = (n - byte) / 128（精确 = 算术右移 7）；
+#   停止：n'==0 且 byte<64，或 n'==-1 且 byte>=64
+fn sleb128_hex(n: Int) -> String
+    let mut out = ""
+    let mut v = n
+    let mut go = True
+    while go
+        let mut b = v % 128
+        if b < 0
+            b = b + 128
+        end
+        v = (v - b) / 128
+        if (v == 0 and b < 64) or (v == -1 and b >= 64)
+            go = False
+        else
+            b = b + 128
+        end
+        out = out + byte_hex(b)
+    end
+    out
+end
+
+# 整数字符串 → Float（逐位 val*10+d，< 2^53 精确）
+fn int_str_to_float(s: String) -> Float
+    let digits = split(s, "")
+    let mut v = 0.0
+    let mut i = 0
+    while i < list_length(digits)
+        v = v * 10.0 + string_to_int(list_get(digits, i))
+        i = i + 1
+    end
+    v
+end
+
+# Float 字面量字符串 → Float（无 string_to_float 内建的替代实现）：
+# 整数部分逐位累加；小数部分从右往左 (val+d)/10（值域 [0,1)，精度最优）。
+# 已知边界：非二进制精确字面量与 Rust 正确舍入可能差——L2.2 测试集限定
+# 精确可表示值，任意字面量的正确舍入留 L2.3 挂账。
+fn parse_float_str(s: String) -> Float
+    let parts = split(s, ".")
+    let ip = int_str_to_float(list_get(parts, 0))
+    if list_length(parts) == 1
+        return ip
+    end
+    let mut frac = 0.0
+    let digits = split(list_get(parts, 1), "")
+    let mut i = list_length(digits) - 1
+    while i >= 0
+        frac = (frac + string_to_int(list_get(digits, i))) / 10.0
+        i = i - 1
+    end
+    ip + frac
+end
+
+# 整数值 Float（< 2^53）→ Int（to_display + split + string_to_int）
+fn float_int_part(fx: Float) -> Int
+    let s = "" + fx
+    let parts = split(s, ".")
+    string_to_int(list_get(parts, 0))
+end
+
+# f64 → 8 字节小端 hex（L2.1 spike 的纯算术拆解，16 向量已验证）
+fn f64_bits_le(x: Float) -> String
+    if x != x
+        return "000000000000f87f"
+    end
+    let mut sign = 0
+    let mut ax = x
+    if x < 0.0 or (x == 0.0 and 1.0 / x < 0.0)
+        sign = 1
+        ax = -x
+    end
+    if ax * 0.0 != 0.0
+        if sign == 1
+            return "000000000000f0ff"
+        end
+        return "000000000000f07f"
+    end
+    if ax == 0.0
+        if sign == 1
+            return "0000000000000080"
+        end
+        return "0000000000000000"
+    end
+    let mut m = ax
+    let mut e = 0
+    while m >= 2.0
+        m = m / 2.0
+        e = e + 1
+    end
+    while m < 1.0
+        m = m * 2.0
+        e = e - 1
+    end
+    if e < -1022
+        let mut f = ax
+        let mut i = 0
+        while i < 1074
+            f = f * 2.0
+            i = i + 1
+        end
+        return bits_from_parts(sign, 0, float_int_part(f))
+    end
+    let mant = float_int_part((m - 1.0) * 4503599627370496.0)
+    bits_from_parts(sign, e + 1023, mant)
+end
+
+fn bits_from_parts(sign: Int, ef: Int, mant: Int) -> String
+    let mut out = ""
+    let pows = list_cons(1, list_cons(256, list_cons(65536, list_cons(16777216, list_cons(4294967296, list_cons(1099511627776, list_empty()))))))
+    let mut i = 0
+    while i < 6
+        out = out + byte_hex(mant / list_get(pows, i) % 256)
+        i = i + 1
+    end
+    out + byte_hex((ef % 16) * 16 + mant / 281474976710656) + byte_hex(sign * 128 + ef / 16)
+end
+
+# ---- X1：子集类型系统 ----
+
+fn subset_err(msg: String) -> String
+    "L2.2 子集不支持: " + msg
+end
+
+# Ty → 值类型（"i64"|"f64"|"void"）
+fn ty_vt(t: Ty) -> Result<String, String>
+    match t
+        TyInt => Ok("i64")
+        TyFloat => Ok("f64")
+        TyUnit => Ok("void")
+        _ => Err(subset_err("参数/返回类型只支持 Int/Float/Unit"))
+    end
+end
+
+# Option<Ty> → 值类型（None = 无返回 = void）
+fn tyopt_vt(t: Option<Ty>) -> Result<String, String>
+    match t
+        None => Ok("void")
+        Some(tt) => ty_vt(tt)
+    end
+end
+
+fn vt_hex(vt: String) -> String
+    if vt == "i64"
+        "7e"
+    else
+        "7c"
+    end
+end
+
+# ExCall 的类型辅助：println → void；用户函数 → 签名 ret
+fn infer_call(name: String, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    if name == "println"
+        Ok("void")
+    else
+        match map_get(fns, name)
+            Some(fi) => Ok(fi.ret)
+            None => Err("调用未知函数 '" + name + "'（内建只支持 println）")
+        end
+    end
+end
+
+# 表达式类型综合；env: Map<name, {slot, vt}>；fns: Map<name, {idx, ret, nprm}>
+fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    match e
+        ExInt(_) => Ok("i64")
+        ExFloat(_) => Ok("f64")
+        ExUnit => Ok("void")
+        ExGroup(inner) => infer_ex(inner, env, fns)
+        ExIdent(x, _, _) =>
+            match map_get(env, x)
+                Some(b) => Ok(b.vt)
+                None => Err("未定义变量 '" + x + "'")
+            end
+        end
+        ExUnary(op, inner) =>
+            if op != "Neg"
+                return Err(subset_err("一元运算 '" + op + "'"))
+            end
+            infer_ex(inner, env, fns)
+        end
+        ExBinary(op, l, r) =>
+            if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
+                return Err(subset_err("二元运算 '" + op + "'"))
+            end
+            let lt = infer_ex(l, env, fns)?
+            let rt = infer_ex(r, env, fns)?
+            if lt == "void" or rt == "void"
+                return Err(subset_err("void 参与算术"))
+            end
+            if lt == "i64" and rt == "i64"
+                Ok("i64")
+            else
+                Ok("f64")
+            end
+        end
+        ExCall(callee, _) =>
+            match callee
+                ExIdent(name, _, _) => infer_call(name, fns)
+                _ => Err(subset_err("非标识符 callee 的调用"))
+            end
+        end
+        _ => Err(subset_err("该表达式形态"))
+    end
+end
+
+# ---- X2：表达式编译（产物 hex；值留栈上；void 不产值） ----
+
+fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    match e
+        ExInt(n) => Ok("42" + sleb128_hex(n))
+        ExFloat(s) => Ok("44" + f64_bits_le(parse_float_str(s)))
+        ExUnit => Ok("")
+        ExGroup(inner) => comp_ex(inner, env, fns)
+        ExIdent(x, _, _) =>
+            match map_get(env, x)
+                Some(b) => Ok("20" + leb128_hex(b.slot))
+                None => Err("未定义变量 '" + x + "'")
+            end
+        end
+        ExUnary(op, inner) =>
+            if op != "Neg"
+                return Err(subset_err("一元运算 '" + op + "'"))
+            end
+            let it = infer_ex(inner, env, fns)?
+            let code = comp_ex(inner, env, fns)?
+            if it == "i64"
+                Ok("4200" + code + "7d")
+            else
+                Ok(code + "9a")
+            end
+        end
+        ExBinary(op, l, r) => comp_binary(op, l, r, env, fns)
+        ExCall(callee, args) => comp_call(callee, args, env, fns)
+        _ => Err(subset_err("该表达式形态"))
+    end
+end
+
+fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
+        return Err(subset_err("二元运算 '" + op + "'"))
+    end
+    let lt = infer_ex(l, env, fns)?
+    let rt = infer_ex(r, env, fns)?
+    let lc = comp_ex(l, env, fns)?
+    let rc = comp_ex(r, env, fns)?
+    if lt == "i64" and rt == "i64"
+        Ok(lc + rc + i64_op(op))
+    else
+        if lt == "i64" and rt == "f64"
+            return Ok(lc + "b9" + rc + f64_op(op)?)
+        end
+        if lt == "f64" and rt == "i64"
+            return Ok(lc + rc + "b9" + f64_op(op)?)
+        end
+        Ok(lc + rc + f64_op(op)?)
+    end
+end
+
+fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    match callee
+        ExIdent(name, _, _) =>
+            if name == "println"
+                return comp_println(args, env, fns)
+            end
+            match map_get(fns, name)
+                None => Err("调用未知函数 '" + name + "'")
+                Some(fi) =>
+                    let mut out = ""
+                    let mut i = 0
+                    while i < list_length(args)
+                        out = out + comp_ex(list_get(args, i), env, fns)?
+                        i = i + 1
+                    end
+                    Ok(out + "10" + leb128_hex(fi.idx))
+                end
+            end
+        end
+        _ => Err(subset_err("非标识符 callee 的调用"))
+    end
+end
+
+fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    if list_length(args) != 1
+        return Err("println 期望 1 个参数")
+    end
+    let at = infer_ex(list_get(args, 0), env, fns)?
+    let ac = comp_ex(list_get(args, 0), env, fns)?
+    if at == "i64"
+        Ok(ac + "1000")
+    else
+        if at == "f64"
+            Ok(ac + "1001")
+        else
+            Err(subset_err("println 只接受 Int/Float（String/Bool 留 L2.3）"))
+        end
+    end
+end
+
+# i64 算术操作码（WASM 数值指令：add 7c / sub 7d / mul 7e / div_s 7f / rem_s 81；
+# node 验证器为最终权威）
+fn i64_op(op: String) -> String
+    if op == "Add"
+        "7c"
+    elif op == "Sub"
+        "7d"
+    elif op == "Mul"
+        "7e"
+    elif op == "Div"
+        "7f"
+    else
+        "81"
+    end
+end
+
+# f64 算术操作码（add a0 / sub a1 / mul a2 / div a3）；% 无指令——L2.3 合成
+fn f64_op(op: String) -> Result<String, String>
+    if op == "Mod"
+        Err(subset_err("Float %（f64 rem 合成留 L2.3）"))
+    elif op == "Add"
+        Ok("a0")
+    elif op == "Sub"
+        Ok("a1")
+    elif op == "Mul"
+        Ok("a2")
+    else
+        Ok("a3")
+    end
+end
+
+# ---- X3：块/函数编译 ----
+
+# 分配 let 槽（locals: Map<"n",Int> 计数；localvt: Map<绝对槽, vt>）
+fn new_slot(locals: Map<String, Int>, localvt: Map<String, String>, vt: String) -> Int
+    let s = match map_get(locals, "n")
+        Some(v) => v
+        None => 0
+    end
+    map_set(locals, "n", s + 1)
+    map_set(localvt, int_to_string(s), vt)
+    s
+end
+
+# StLet 的类型：显式注解优先，否则综合
+fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    match tyo
+        None => infer_ex(ex, env, fns)
+        Some(tt) => ty_vt(tt)
+    end
+end
+
+# 编译块：语句（值丢弃：非 void 的裸表达式 drop）+ 尾表达式（= 返回值）
+fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    match b
+        BlkOf(stmts, tail) =>
+            let mut out = ""
+            let mut si = 0
+            while si < list_length(stmts)
+                let s = list_get(stmts, si)
+                match s
+                    StLet(_, name, tyo, ex) =>
+                        let vt = let_vt(tyo, ex, env, fns)?
+                        if vt == "void"
+                            return Err(subset_err("let 绑定 void 值"))
+                        end
+                        let code = comp_ex(ex, env, fns)?
+                        let slot = new_slot(locals, localvt, vt)
+                        out = out + code + "21" + leb128_hex(slot)
+                        map_set(env, name, {slot: slot, vt: vt})
+                    end
+                    StAssign(name, _, _, ex) =>
+                        match map_get(env, name)
+                            None => Err("赋值给未定义变量 '" + name + "'")
+                            Some(bnd) =>
+                                let code = comp_ex(ex, env, fns)?
+                                out = out + code + "21" + leb128_hex(bnd.slot)
+                            end
+                        end
+                    end
+                    StExpr(ex) =>
+                        let t = infer_ex(ex, env, fns)?
+                        let code = comp_ex(ex, env, fns)?
+                        if t == "void"
+                            out = out + code
+                        else
+                            out = out + code + "1a"
+                        end
+                    end
+                    StReturn(_) => Err(subset_err("return 语句（L2.2 用尾表达式）"))
+                    _ => Err(subset_err("该语句形态（if/while/for/match 留 L2.3）"))
+                end
+                si = si + 1
+            end
+            comp_tail(tail, env, fns, out, ret_vt)
+        end
+    end
+end
+
+fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String}>, fns: Map<String, {idx: Int, ret: String, nprm: Int}>, out: String, ret_vt: String) -> Result<String, String>
+    match tail
+        None => Ok(out)
+        Some(te) =>
+            let tt = infer_ex(te, env, fns)?
+            if ret_vt == "void"
+                if tt == "void"
+                    # void 函数的 void 尾（如 println 调用）有副作用——
+                    # 必须编译执行（块尾裸表达式归 Tail 不归 stmts）
+                    return Ok(out + comp_ex(te, env, fns)?)
+                end
+                return Err(subset_err("void 函数的尾表达式产值"))
+            end
+            if tt != ret_vt
+                return Err("尾表达式类型与返回类型不符")
+            end
+            Ok(out + comp_ex(te, env, fns)?)
+        end
+    end
+end
+
+# 编译单个函数体 → code section 条目（bodysize + locals 声明 + 指令 + end）
+fn comp_one_fn(params: List<Prm>, ret: Option<Ty>, body: Blk, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    let env = map_empty()
+    let locals = map_empty()
+    let localvt = map_empty()
+    let k = bind_params(params, env)
+    map_set(locals, "n", k)
+    let rv = tyopt_vt(ret)?
+    let code = comp_blk(body, env, fns, locals, localvt, rv)?
+    # local 声明段：只声明 let 槽（绝对槽 k..n），每组 count=1
+    let total = match map_get(locals, "n")
+        Some(v) => v
+        None => 0
+    end
+    let mut ldecl = leb128_hex(total - k)
+    let mut i = k
+    while i < total
+        ldecl = ldecl + "01" + vt_hex(slot_vt(localvt, i))
+        i = i + 1
+    end
+    let bodyhex = ldecl + code + "0b"
+    Ok(leb128_hex(len(bodyhex) / 2) + bodyhex)
+end
+
+# 参数绑定到槽 0..k-1；返回参数数（子集外类型由 fn_type_entry 报错）
+# 槽 vt（None 不可达——new_slot 先 set；兜底 "i64"）
+fn slot_vt(localvt: Map<String, String>, i: Int) -> String
+    match map_get(localvt, int_to_string(i))
+        Some(v) => v
+        None => "i64"
+    end
+end
+
+fn bind_params(params: List<Prm>, env: Map<String, {slot: Int, vt: String}>) -> Int
+    let mut k = 0
+    for p in params
+        match p
+            Prm(pn, TyInt) =>
+                map_set(env, pn, {slot: k, vt: "i64"})
+                k = k + 1
+            end
+            Prm(pn, TyFloat) =>
+                map_set(env, pn, {slot: k, vt: "f64"})
+                k = k + 1
+            end
+            Prm(_, _) => ()
+        end
+    end
+    k
+end
+
+# ---- X4：模块组装 ----
+
+fn sect(id: String, content: String) -> String
+    id + leb128_hex(len(content) / 2) + content
+end
+
+# 收集签名：fns: Map<name, {idx, ret, nprm}>（idx = 2+序，前两个是 print 导入）
+fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int}>) -> Result<String, String>
+    match prg
+        Prg(items) =>
+            let mut idx = 2
+            for it in items
+                match it
+                    ItFn(name, params, ret, _, _, _, _) =>
+                        if name == "println"
+                            return Err("用户函数不得命名 'println'")
+                        end
+                        let rv = tyopt_vt(ret)?
+                        map_set(fns, name, {idx: idx, ret: rv, nprm: list_length(params)})
+                        idx = idx + 1
+                    end
+                    _ => ()
+                end
+            end
+            Ok("")
+        end
+    end
+end
+
+# 函数类型条目：60 <nprm> <vt...> <0|1> <ret>
+fn fn_type_entry(params: List<Prm>, ret_vt: String) -> Result<String, String>
+    let mut ps = leb128_hex(list_length(params))
+    for p in params
+        match p
+            Prm(_, TyInt) =>
+                ps = ps + "7e"
+            end
+            Prm(_, TyFloat) =>
+                ps = ps + "7c"
+            end
+            Prm(_, _) =>
+                return Err(subset_err("void/子集外参数类型"))
+            end
+        end
+    end
+    if ret_vt == "void"
+        Ok("60" + ps + "00")
+    else
+        Ok("60" + ps + "01" + vt_hex(ret_vt))
+    end
+end
+
+# 从 Itm 提取该函数的返回值类型
+fn sig_ret(it: Itm) -> Result<String, String>
+    match it
+        ItFn(_, _, ret, _, _, _, _) => tyopt_vt(ret)
+        _ => Err("内部错误：sig_ret 只接受 ItFn")
+    end
+end
+
+# Prg → 模块 hex
+fn build_module(prg: Prg) -> Result<String, String>
+    let fns = map_empty()
+    collect_sigs(prg, fns)?
+    if map_has(fns, "main") == False
+        return Err("程序缺少 main 函数")
+    end
+    match prg
+        Prg(items) =>
+            # pass 2（items 正序）：type 条目 + function typeidx + 函数体
+            let mut tentries = ""
+            let mut fidxs = ""
+            let mut bodies = ""
+            let mut nfun = 0
+            for it in items
+                match it
+                    ItFn(_, params, ret, _, body, _, _) =>
+                        let rv = sig_ret(it)?
+                        tentries = tentries + fn_type_entry(params, rv)?
+                        fidxs = fidxs + leb128_hex(2 + nfun)
+                        bodies = bodies + comp_one_fn(params, ret, body, fns)?
+                        nfun = nfun + 1
+                    end
+                    _ => ()
+                end
+            end
+            # type section：t0=(i64)->()、t1=(f64)->() 供 print 导入；用户 t2+
+            let types_c = leb128_hex(2 + nfun) + "60" + "01" + "7e" + "00" + "60" + "01" + "7c" + "00" + tentries
+            # import section：env.print_i64(t0) / env.print_f64(t1)
+            let imp_c = leb128_hex(2)
+            + "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
+            + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
+            # function section
+            let func_c = leb128_hex(nfun) + fidxs
+            # export section：main
+            let mi = match map_get(fns, "main")
+                Some(f) => f
+                None => {idx: 2, ret: "void", nprm: 0}
+            end
+            let exp_c = "01" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            # code section
+            let code_c = leb128_hex(nfun) + bodies
+            Ok("0061736d01000000"
+                + sect("01", types_c)
+                + sect("02", imp_c)
+                + sect("03", func_c)
+                + sect("07", exp_c)
+                + sect("0a", code_c))
+        end
+    end
+end
+
+# ---- X5：驱动 ----
+
+# 打印词法/语法错误；有错返回 True
+fn report_errors(errs: List<{code: String, msg: String, ln: Int, cl: Int}>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Bool ! [IO]
+    let mut bad = False
+    for e in errs
+        println("lex error " + e.ln + ":" + e.cl + " [" + e.code + "] " + e.msg)
+        bad = True
+    end
+    let en = map_size(em)
+    let mut i = 0
+    while i < en
+        let e = match map_get(em, int_to_string(i))
+            Some(ev) => ev
+            None => {code: "?", msg: "", ln: 0, cl: 0}
+        end
+        println("parse error " + e.ln + ":" + e.cl + " [" + e.code + "] " + e.msg)
+        bad = True
+        i = i + 1
+    end
+    bad
+end
+
+fn main() -> Unit ! [IO]
+    let argv = args()
+    if list_length(argv) < 3
+        println("usage: lom self_comp.lom -- <input.lom> <output.hex>")
+    else
+        let input = list_get(argv, 1)
+        let outpath = list_get(argv, 2)
+        if file_exists(input) == False
+            println("error: file not found: " + input)
+            println("COMPILE-ERROR")
+        else
+            let src = file_read(input)
+            let r = lex(src)
+            let pm = map_empty()
+            map_set(pm, "pos", 0)
+            let em = map_empty()
+            let prg = parse_program(r.toks, r.n, pm, em)
+            let bad = report_errors(r.errs, em)
+            if bad
+                println("COMPILE-ERROR")
+            else
+                match build_module(prg)
+                    Ok(hex) =>
+                        file_write(outpath, hex)
+                        println("COMPILED " + len(hex) / 2 + " bytes -> " + outpath)
+                    end
+                    Err(msg) =>
+                        println("codegen error: " + msg)
+                        println("COMPILE-ERROR")
+                    end
+                end
+            end
+        end
+    end
+end

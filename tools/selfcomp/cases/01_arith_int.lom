@@ -1,0 +1,12 @@
+fn main() -> Unit
+    println(1 + 2)
+    println(10 - 3)
+    println(6 * 7)
+    println(17 / 5)
+    println(17 % 5)
+    println(-5)
+    println(-(2 + 3))
+    println((1 + 2) * (3 + 4))
+    println(1099511627776 + 1)
+    println(0 - 288230376151711744)
+end

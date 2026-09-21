@@ -1,0 +1,17 @@
+fn area(w: Float, h: Float) -> Float
+    w * h
+end
+fn volume(w: Float, h: Float, d: Int) -> Float
+    area(w, h) + d
+end
+fn main() -> Unit
+    println(volume(2.5, 4.0, 3))
+    let mut acc = 0
+    acc = acc + 100
+    acc = acc * 3
+    acc = acc - 40
+    println(acc)
+    println(area(0.5, 0.5))
+    println(-area(2.0, 3.5) + 10)
+    println(volume(1.25, 2.0, 1) / 2.0)
+end
