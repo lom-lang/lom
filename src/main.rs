@@ -50,8 +50,13 @@ fn main() {
         .stack_size(256 * 1024 * 1024) // 256MB
         .spawn(main_inner)
         .expect("failed to spawn interpreter thread");
-    // process::exit 在线程内会直接终止进程，join 仅作同步点
-    let _ = child.join();
+    // process::exit 在线程内会直接终止进程；正常路径 main_inner 已自带退出码。
+    // R56（九审）：worker 线程 panic（join 返回 Err）不得被吞成 exit 0——
+    // 默认 panic hook 已把 panic 信息打到 stderr，这里补一行结论并映射非零退出码。
+    if let Err(_panic_payload) = child.join() {
+        eprintln!("内部错误：解释器线程异常终止（见上方 panic）");
+        process::exit(1);
+    }
 }
 
 fn main_inner() {
@@ -954,6 +959,8 @@ fn handle_lsp_method(
 }
 
 // ===== 单元测试（修复引擎深化 M2：迭代闭环）=====
+// R56 进程级回归（spawn 二进制断言退出码/stderr）在 tests/r56_process.rs
+// 集成测试目录——CARGO_BIN_EXE_lom 仅在集成测试中由 cargo 注入。
 
 #[cfg(test)]
 mod tests {

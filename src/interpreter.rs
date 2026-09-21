@@ -1291,18 +1291,32 @@ impl Interpreter {
     fn eval_arith(&self, op: &BinOp, l: Value, r: Value) -> Result<Value, RuntimeError> {
         match (&l, &r) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(match op {
-                BinOp::Add => a + b,
-                BinOp::Sub => a - b,
-                BinOp::Mul => a * b,
+                // R56（九审）：加减乘显式回绕（release 历史行为；debug 构建
+                // 此前会 panic——与 release 语义分叉，统一为文档口径的回绕）
+                BinOp::Add => a.wrapping_add(*b),
+                BinOp::Sub => a.wrapping_sub(*b),
+                BinOp::Mul => a.wrapping_mul(*b),
                 BinOp::Div => {
                     if *b == 0 {
                         return Err(RuntimeError::Msg("整数除以零".to_string()));
+                    }
+                    // R56（九审）：i64::MIN / -1 在 Rust 下是 panic 边界
+                    // （除法/取模不回绕），必须走结构化 RUNTIME000 而非线程崩溃
+                    if *a == i64::MIN && *b == -1 {
+                        return Err(RuntimeError::Msg(
+                            "整数除法溢出：i64 最小值 (-9223372036854775808) 除以 -1".to_string(),
+                        ));
                     }
                     a / b
                 }
                 BinOp::Mod => {
                     if *b == 0 {
                         return Err(RuntimeError::Msg("整数取模零".to_string()));
+                    }
+                    if *a == i64::MIN && *b == -1 {
+                        return Err(RuntimeError::Msg(
+                            "整数取模溢出：i64 最小值 (-9223372036854775808) 对 -1 取模".to_string(),
+                        ));
                     }
                     a % b
                 }
@@ -3715,5 +3729,35 @@ end
         assert!(result.is_err(), "未导入的 file_exists 应报错");
         let msg = format!("{}", result.unwrap_err());
         assert!(msg.contains("未导入"), "期望提及未导入，得到: {}", msg);
+    }
+
+    // ===== R56（九审）：i64 算术 panic 边界 → 结构化 RUNTIME000 =====
+
+    /// i64::MIN / -1 在 Rust 下 panic（除法不回绕）——必须转为结构化错误。
+    /// v1.2.1 在 release 下线程 panic 且被 main 的 join 丢弃成 exit 0。
+    #[test]
+    fn r56_int_div_min_over_neg_one_is_structured_error() {
+        let src = "fn main() -> Unit\n    let min = 9223372036854775807 + 1\n    println(min / -1)\nend\n";
+        let result = run_src(src);
+        let msg = format!("{}", result.expect_err("MIN / -1 必须报错而非 panic"));
+        assert!(msg.contains("除法溢出"), "消息应含除法溢出: {}", msg);
+    }
+
+    /// i64::MIN % -1 同为 panic 边界
+    #[test]
+    fn r56_int_mod_min_over_neg_one_is_structured_error() {
+        let src = "fn main() -> Unit\n    let min = 9223372036854775807 + 1\n    println(min % -1)\nend\n";
+        let result = run_src(src);
+        let msg = format!("{}", result.expect_err("MIN % -1 必须报错而非 panic"));
+        assert!(msg.contains("取模溢出"), "消息应含取模溢出: {}", msg);
+    }
+
+    /// 加减乘回绕是文档化语义（debug 与 release 统一；SECURITY 口径）
+    #[test]
+    fn r56_int_wraparound_documented_semantics() {
+        // i64::MAX + 1 回绕为 i64::MIN，再 -1 回绕回 i64::MAX——全程不报错
+        let src = "fn main() -> Unit\n    let max = 9223372036854775807\n    println((max + 1) - 1 == max)\nend\n";
+        let result = run_src(src);
+        assert!(result.is_ok(), "回绕算术不应报错: {:?}", result.err());
     }
 }

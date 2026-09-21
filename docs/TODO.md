@@ -60,14 +60,22 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   doc_audit 65/65（测试数锚点 487→495 三处同步 + SPEC_FOR_AI 尺寸 38,640）、
   eval 121/121、golden 逐字、selfhost dump 154/154。
 
-### R56 — worker panic 被吞为退出码 0（P1）⏳ open
+### R56 — worker panic 被吞为退出码 0（P1）✅ done（2026-09-21）
 
-- `src/main.rs` 丢弃 `child.join()`；实测 `let min = 9223372036854775807 + 1` 后
-  `min / -1` 在 `src/interpreter.rs:1301` Rust panic，进程却 exit 0。
-- SECURITY 旧句“release 溢出静默回绕”只对 add/sub/mul 等成立；MIN/-1 与 MIN%-1
-  是 Rust 特殊 panic 边界。WASM 同程序受 §11f-7 载荷截断影响输出 0，形成新对拍差异。
-- **验收**：join panic 必映射非零；两个特殊算术边界产结构化 RUNTIME000、exit 1；
-  进程级测试断言 stdout/stderr/rc，不能只在单元函数层捕获。
+- **修法**：① `main` 对 `child.join()` 的 Err（worker panic）打 stderr 结论行
+  并 `process::exit(1)`——不再丢弃；② `interpreter::eval_arith` 对
+  `i64::MIN / -1` 与 `i64::MIN % -1` 两个 Rust panic 边界返回结构化
+  `RuntimeError`（走既有 RUNTIME000 + exit 1 通道）；③ 加减乘显式
+  `wrapping_*`（debug/release 统一为文档口径的回绕——原 debug 构建会
+  panic 与 release 分叉）。WASM 侧值域截断是 §11f-7 已知分歧，不在本项。
+- **验收（2026-09-21 实测）**：真实 CLI 复验——`9223372036854775807 + 1`
+  后 `/ -1` 输出 `[RUNTIME000] 整数除法溢出…` 且 **exit 1**（v1.2.1 为
+  线程 panic + exit 0）；`% -1` 同。**进程级测试** `tests/r56_process.rs`
+  （spawn 真实二进制断言 rc/stderr/无 panic 字样/stdout 空；集成测试目录
+  是 CARGO_BIN_EXE_lom 唯一可用位置）+ interpreter 单元 ×3（两边界结构化
+  错误 + 回绕语义锁定）。cargo test --release **498 单元 + 1 集成 = 499**；
+  clippy 零 warning；doc_audit 65/65（锚点 495→498）；SECURITY 限制 4/5
+  与 memory-safety 行改写为修复后口径（含可执行验证命令）；eval 121/121。
 
 ### R57 — EOF 静默闭合必需 `end`（P1）⏳ open
 
