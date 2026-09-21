@@ -22,38 +22,50 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.2；语言面与发布线冻结。
-- 第九轮维护者独立敌手式审查（总评 B，docs/reviews/review-2026-09-21.html）的
-  R55-R61 已于 2026-09-21 按用户裁决全量整改关闭（四项 P1 + P2×2 + P3×1），
-  各项验收与证据见 docs/TODO.md；九审 B 是审查时点评级，第十轮独立复审未进行。
-- 测试基线 513 单元 + 3 集成（tests/：r56 CLI 退出码进程级、r58 LSP stdio e2e ×2）；
-  eval 双后端 121/121；doc_audit 65 项含新增 eval_prompt_check 24/24。
-- 教训：宿主 parser/诊断行为改动必须同步检查自举对齐（三实现）且 selfhost 六模式
-  逐个跑——R57 曾因此 CI 三连红（教训档 HANDOVER §11.6）。
-- L2 RFC-0004 仍为 draft、未获动工授权。九审建议第十轮复审后再呈现 L2 菜单。
-- 发布线不动；差分扩展按需；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移
-  观察 2026-10-19。
+- 版本 v1.2.2（tag 已切，CI 绿）；语言面与发布线冻结。
+- 审查状态：R1-R61 全部关闭。第九轮（B）整改经第十轮独立复审
+  （docs/reviews/review-2026-09-21-2.html，总评 B+，基线 v1.2.2）确认
+  七项验收零失真；复审新开 R62（P2）/R63（P3）/R64（P3，已开账即修），
+  当前 open 仅 R62/R63，事实源 docs/TODO.md 顶部。
+- 测试基线 513 单元 + 3 集成（tests/：r56 CLI 退出码进程级、r58 LSP stdio
+  e2e ×2）；eval 双后端 121/121；selfhost 六模式；doc_audit 65/65；
+  spec_examples PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
+- 两条最新教训（HANDOVER §11.6）：宿主 parser/诊断行为改动必须同步检查
+  三实现（宿主/WASM/自举）且六模式逐个跑（R57 整改曾漏 --diags 致 CI 三连红）；
+  含反斜杠路径的文档内容禁用 python 字符串直写（R64 曾致 §2.2 命令行坏字节，
+  R15 同型第四次）。
+- 待用户裁决：R62/R63 整改包（十审建议 R62 前置/并行、R63 顺手收口）；
+  L2 动工菜单（十审裁定九审条件已满足，可重新呈现）；MoonBit 1.0 Q3 复核
+  等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+- 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
+  制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成】
-1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6，docs/TODO.md 顶部 R55-R61，docs/reviews/review-2026-09-21.html，LANGUAGE_SPEC §14；涉及架构时再读 RFC-0003，涉及 L2 时读 RFC-0004。
+1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部 R62-R63，
+   docs/reviews/review-2026-09-21-2.html（十审）与 review-2026-09-21.html（九审），
+   LANGUAGE_SPEC §14；涉及架构时再读 RFC-0003，涉及 L2 时读 RFC-0004。
 2. 顺序跑基线：
    - cargo build --release
-   - cargo test --release（期望 487/487）
-   - cargo clippy --release -- -D warnings
+   - cargo test --release（期望 513/513；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×3）
+   - cargo clippy --release -- -D warnings（零 warning）
+   - cargo fmt --all -- --check（零 diff——R61 起机械格式化；若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复）
    - python tools/doc_audit.py（期望 65/65）
-   - python tools/spec_examples_check.py（期望 RESULT: PASS；Windows 默认命令应不再因 ✓/GBK 崩）
-   - python tools/verify_selfhost.py（dump 154/154）
-   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin .\target\release\lom.exe（121/121）
+   - python tools/spec_examples_check.py（期望 RESULT: PASS）
+   - python tools/eval_prompt_check.py（期望 24/24）
+   - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
+   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-   `cargo fmt --all -- --check` 当前是 R61 已知失败，不要误报成新回归，也不要混在语义修复中顺手全仓格式化。
-3. 如实报告基线，然后只给用户方向菜单，不自行修码。推荐菜单首项是按 R55→R61 顺序整改；L2/发布不应排在 P1 前。
+3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是 R62/R63
+   整改包；L2 动工菜单可呈现（十审裁定条件已满足，建议 R62 前置/并行）；
+   发布不应出现在任何菜单项内（冻结未解）。
 
-【四个 P1 的最小复现要点】
-- R55/MUT001：参数 x 被重赋值，另一函数只有一个无关 let x；dry-run 会改错声明。
-- R55/EFF001：多行 fn 签名会把 ! [IO] 插进 fn helper(；同一纯函数缺 IO+Clock 会叠成两段 ! [...]。
-- R56：先算 9223372036854775807 + 1，再除以 -1；Rust panic，但旧入口 exit 0。
-- R57：fn main 缺最终 end；旧 parser --json 返回 ok:true 并执行。
-- R58：真实 JSON 编码的 multiline didOpen.text；旧 LSP 把 \n 当源码反斜杠并报 LEX005。
+【当前 open 项（R62/R63）的最小复现要点】
+- R62/闭包遮蔽：外层参数 x 重赋值 + 函数内闭包 let x = 10 遮蔽；apply 会把闭包内
+  声明改成 let mut（原诊断未治、final 仍 1 warning 而 ok:true）。
+- R62/行内注释：x = x + 1 # let x = 0；注释文本被当声明命中改写。
+- R63：向 lom lsp 发 Content-Length: 999999999999 的 header 即
+  memory allocation failed abort（rc=0xC0000409）；畸形 JSON payload 被静默
+  丢弃（无 -32700 响应）。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
@@ -62,4 +74,6 @@
 
 - 上述路径使用 Windows 形态，是本项目当前主维护环境。
 - 提示词故意不写固定 HEAD SHA；新任必须以 `git log -1`、`git status` 和最新 CI 实查。
-- 若本交接提交的 CI 首跑不是绿色，先处理 CI，不得把交接状态宣称为完成。
+- 若交接提交的 CI 首跑不是绿色，先处理 CI，不得把交接状态宣称为完成。
+- 交接更新规范见 HANDOVER §12.3（五件套）；本文件【当前真实状态】与
+  【第一回合必须完成】两段在每次交接时整体重写，铁律段只在数字过时时点改。
