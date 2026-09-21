@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第十三轮维护者独立审查 — 2026-09-22</title>
+<style>
+body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;max-width:1080px;margin:0 auto;padding:2rem;line-height:1.7;color:#202030}
+h1{border-bottom:3px solid #0e7490;padding-bottom:.5rem}h2{margin-top:2rem;border-left:4px solid #0e7490;padding-left:.7rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #d7d7e0;padding:.5rem;vertical-align:top;text-align:left}th{background:#eef7fa}
+code{background:#f4f4f7;padding:.1rem .25rem;border-radius:3px}.p1{color:#b91c1c;font-weight:700}.p2{color:#b45309;font-weight:700}.p3{color:#475569;font-weight:700}
+.ok{color:#15803d;font-weight:700}.part{color:#b45309;font-weight:700}.bad{color:#b91c1c;font-weight:700}.meta{background:#f6fbfd;border:1px solid #d5e8ee;padding:.8rem 1rem;border-radius:8px}.warn{background:#fff7ed;border-left:4px solid #ea580c;padding:.7rem 1rem}
+pre{background:#f6f6f9;padding:.6rem;overflow-x:auto;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lom 第十三轮维护者独立审查（十二审整改复审：R73-R76）</h1>
+<div class="meta">
+<strong>日期</strong>：2026-09-22（第十三轮）　
+<strong>审查基线</strong>：<code>1418536</code>（HEAD，v1.2.5 = tag，工作树干净）。本轮增量两提交：<code>5d9c56a</code>（fix(review-12)：R73-R76 整改代码面——apply 等价去重 + self_comp 调用校验 + 解构遮蔽 hint）+ <code>1418536</code>（chore(release)：升版 v1.2.5 + 文档成对）。　
+<strong>性质</strong>：体系内 agent 分工的独立审查（<strong>非外部同行审计——该边界如实标注</strong>；复现与读码由同一 agent 完成）。本轮复跑十二审 R73-R76 整改的全部验收宣称（真实 CLI / self_comp 编译探针 / hex→wasm→node 实例化全链路），复跑全量基线 14 项，并对 R73 去重面、R74 调用校验面、R75 同层序建模面与 self_comp 更广构造面执行敌手探针（自构 22 个探针形态）。审查阶段未修改任何产品源码、CI 配置与治理文档；唯一写盘物为本报告；全部探针置于 <code>target/probes/</code>（gitignored），报告完成前已清理。
+</div>
+
+<h2>1. 结论与总评</h2>
+<p><strong>总评 B+（评级只针对本轮时点 HEAD 1418536；历史评级不得外推，整改后状态只能由本轮重估）</strong>。十二审开账的 R73-R76 四项整改在各自自列验收面上<strong>全部零失真（✓×4）</strong>，本轮逐条亲手复跑：R73 主形态（<code>x=2; x=3</code> 单次 <code>--apply</code>）applied=1、行 2 变合法 <code>let mut x</code>、final 全净 ok:true（v1.2.4 为 applied=2 产 <code>let mut mut x</code> 损坏），跨轮幂等、四重赋、闭包混合、双变量互不干扰、EFF001/NAM005 共存全部正确；R74 两原始形态（<code>f(1)</code> 传 Float 形参 / <code>add(1,2,3)</code> 多传参）报错文案与 TODO 宣称<strong>逐字一致</strong>且 COMPILE-ERROR 无 hex，verify_selfcomp 20/20；R75 解构遮蔽探针 applied=0 / md5 逐字不变 / final 如实 1 warning，解构在后的正例仍 High Replace，let 之间多命中保守面保持；R76 doc_audit 67/67、self_comp 行数锚（README/HANDOFF_PROMPT 宣称位 2950）真实钉住、Z 类自指 67 同步。基线复验 14 项全部亲手复跑全绿（533+8 / clippy / fmt / doc_audit 67 / spec / prompt 24 / selfhost 六模式 / verify_selfcomp 20 / eval 双后端 121+121 / fmt gate 35 有效文件 / golden 逐字 / CI #148 六 job success）。</p>
+<p><strong>本轮代码面零击穿</strong>——这是九审以来五轮审查中首次：自构 22 个敌手探针（R73 去重边界 7 形态、R74 调用校验 13 形态、R75 同层序建模 7 形态，含组合形态）全部行为正确；MUT001 定位面自 R55→R62→R65→R73/R75 连续四轮被击穿的链条在本轮首次干净。<strong>但</strong>文档对账击穿两条 P3：① <strong>R77</strong>——R76 整改宣称"doc_audit 65→67 项 + 文档成对"，同一提交（1418536）漏改 4 处 doc_audit 数字/口径残留（HANDOVER §9.5 句内自相矛盾"R76 doc_audit 67 项……doc_audit 现为 65 项"、§12.3 交接门禁"65/65"、HANDOFF_PROMPT 头部定位段"（65/65）"、§1 挂账行"L2.3 暂缓待 R65-R72 收口"陈旧口径），数字同步病灶（R22→R39→R42→R48→R69 一族）第五次复发；② <strong>R78</strong>——README 状态段存量句 "24/24 tasks × both models = <strong>20/20 each</strong>"（2026-09-16 ③ 包收官 2de1a30 引入）与同句 "all 24 error_repair tasks" 算术矛盾（每模型应为 24/24 each；480/480 = 24 题 × 2 模型 × 10 采样），本轮全仓数字对账扫出的存量失真，非本轮增量引入。<strong>未达 A-：R77 是本轮整改提交自身的"文档成对"漏改（增量性失误）且数字同步病灶呈系统性复发；十审先例口径下 B+ 是"验收零失真 + 无 P1/P2 新开"的档位。</strong>问题面较十二审（1×P1 + 1×P2 + 2×P3）收窄至 2×P3（其一为存量）。</p>
+
+<table>
+<tr><th>维度</th><th>评级（十二审→本轮）</th><th>理由</th></tr>
+<tr><td>六模式自举</td><td>A → <span class="ok">A</span></td><td>dump 154/154、tokens/diags/static/run/wasm 五模式逐个 RESULT: PASS；self_interp 5727 行、self_comp 2950 行 <code>--check</code> 零诊断、fmt gate 过。本轮未击穿。</td></tr>
+<tr><td>WASM + 差分 + L2</td><td>B+ → <span class="ok">A-</span></td><td>R74 收口真实生效且<strong>显著强于验收宣称面</strong>：本轮自构 13 个调用校验敌手形态全部正确——递归调用/前向引用（签名两遍式收集，前向引用精确报类型错而非"未知函数"）/嵌套调用 f(g(1)) 内层综合与外层期望逐参比对/<code>f(1+2.0)</code> 综合为 f64 过 Float 形参（放行正确）而 <code>h(2.0)</code> 传 Int 形参拒（双向正确）/Bool 形参签名层拒（"void/子集外参数类型"与 fn_type_entry 同文案）/Bool 字面量实参表达式层拒/零参函数多传拒（prms="" 的 split 边界安全）/void 函数值拒/main 无效应注解合法 COMPILED；递归/前向引用正例经 hex→wasm→node 实例化运行输出正确（1 / 7.0）。verify_selfcomp 20/20；深嵌套实参表达式（151 bytes）双后端输出一致。注解/尾表达式/调用点三路编译期校验一致（RFC-0004 修订 5 登记如实）。扣分：L2.2 仍为小子集（对拍 5 正例），随机程序对拍未做（L2.3 议程）。</td></tr>
+<tr><td>核心语言</td><td>A- → <span class="ok">A-</span></td><td>语言面 v1.0 冻结未动（R73-R76 全为 fix 引擎 apply 层/L2.2 实验编译器/审计工具行为）；spec_examples PASS、golden 逐字、eval 121×2。本轮未测出语言面回归。</td></tr>
+<tr><td>repair-native</td><td>B- → <span class="part">B+</span></td><td>R73/R75 整改真实生效：去重只合并完全等价动作（同类型+同起止位置+同文本），四重赋/双变量/EFF001+NAM005 共存/迭代收敛/fix_history 面全部正确；R75 同层序建模本轮自构 7 形态（if 块内解构+块外赋值/闭包内解构/for 体内解构/三明治 let→解构→let/解构→let/双解构/解构+双 MUT001 组合）全部 hint 或正确 Replace、源码逐字不变——R65"嵌套层"+R75"同层序"两维均干净，连续四轮击穿链本轮断。plan 层如实展示两条等价动作（诊断→动作映射完整），apply 层去重——分层正确。扣分：同层多命中恒 hint 的保守面（三明治形态 r75g 中最近绑定虽是 let，let_decls 双同名命中仍 hint）是设计保守而非精确定位，如实登记不扣行为分但距离"精确修复"仍有一步；repair-native 维度的信任恢复需要一个轮次以上的干净记录。</td></tr>
+<tr><td>LSP/协议</td><td>A- → <span class="ok">A-</span></td><td>本轮按任务书低优先处理，未展开新边角探针（R71/R72 十二审已过 9 边角形态）；r58 套件 7/7 在 cargo test 内通过。维持十二审评级（本轮无新证据，如实声明）。</td></tr>
+<tr><td>文档治理</td><td>B+ → <span class="part">B</span></td><td>doc_audit 67/67、spec PASS、prompt 24/24；SPEC_FOR_AI L690 的 R73-hardened 句（"exactly-equivalent actions … deduplicated at the apply layer"）与实测一致，v1.2.4 被证伪的"永不可能"宣称已收口；LANGUAGE_SPEC §13 v1.2.5 条目与 TODO 验收宣称逐条对账一致（533+8/20 项/121×2/R73-R76 行为描述）；2950 行数锚真实钉住。扣分：<strong>R77（P3）</strong>——R76 整改自身的"文档成对"漏改 4 处（含一处句内 67 vs 65 自相矛盾），doc_audit 的 Z 类自指只锁 §2.2 宣称位、其余出现面无锚——数字同步病灶第五次复发（R32"gate 覆盖面 ≠ 全部出现面"教训再现）；<strong>R78（P3）</strong>——README "20/20 each" 存量算术矛盾。正分：2908 旧值残留仅 TODO 档案与十二审历史报告（时点证据，符合惯例）；HANDOFF_PROMPT 代码块内 20/20、67/67、533+8 全部正确。</td></tr>
+</table>
+
+<h2>2. R73-R76 整改复审裁定</h2>
+<p>裁定口径：TODO 第十二轮节"各项修法与验收"段宣称<strong>逐条亲手复跑</strong>（真实 CLI / self_comp 编译探针，探针 <code>target/probes/r73*/r74*/r75*</code> 用后即弃）；✓ = 宣称与实测一致；△ = 基本一致但有保留；✗ = 失真。</p>
+<table>
+<tr><th>ID</th><th>宣称 vs 实测</th><th>裁定</th><th>证据（本轮亲手复跑）</th></tr>
+<tr>
+<td>R73<br>apply 等价动作去重<br>（P1）</td>
+<td><code>x=2; x=3</code> 单次 <code>--apply</code> applied=1、行 2 变合法 <code>let mut x</code>、final 全净 ok:true；同位置不同文本不合并；跨轮幂等保持；+2 测试；533+8</td>
+<td class="ok">✓<br><span class="p3">残留 R77 文档面</span></td>
+<td>
+① 主探针（<code>target/probes/r73a.lom</code>）：真实 <code>fix --apply --json</code> → <code>applied=1, changes=[(2,replace,MUT001,round 1)], final {errors:0, warnings:0}, ok:true</code>；文件行 2 = <code>let mut x = 1</code>；第二轮 <code>applied=0</code> 幂等 ✓（rounds=2 收敛）<br>
+② 四重赋（r73b，同轮 4 条 MUT001）：applied=1、行 2 变 <code>let mut x</code>、final 全净 ✓<br>
+③ 闭包捕获+外层重赋×2 混合（r73c，十二审 r73e 形态）：applied=1（v1.2.4 为 applied=2 损坏）、行 2 变 <code>let mut x</code>；final 2 warnings 为 MUT002 闭包捕获 mut 绑定的设计内 warning（R65 验收④同款），errors=0 ok:true ✓<br>
+④ 双变量独立重赋（r73d）：applied=2，行 2/行 3 各自 <code>let mut</code>——<strong>去重不误伤不同声明</strong> ✓<br>
+⑤ 同位置不同文本不合并：单元测试 <code>r73_equivalent_only_exact_duplicates_merged</code> 在 533 内（本轮实跑通过）；去重键为 (action_str, line, col, end_line, end_col, text) 全等（读码确认 apply.rs L224-241）——不同文本/类型天然不合并 ✓<br>
+⑥ 共存面：MUT×2+Diagnostics 混合（r73e）applied=1 后 final 全净；NAM005 插入（r73f）applied=1 正常；<code>fix --history</code> 可读（60 条记录）无异常 ✓；plan 层（<code>--plan --json</code>）如实展示两条等价 Replace（诊断 3:5/4:5 → 同坐标 2:5），apply 层去重——分层正确、API 语义无失真 ✓<br>
+<b>残留（R77 证据）</b>：整改代码面与验收宣称全部真实；"文档成对"面的漏改见 §4 R77（不属本项验收谎报）。
+</td>
+</tr>
+<tr>
+<td>R74<br>self_comp 调用校验<br>（P2）</td>
+<td><code>f(1)</code> 传 Float 形参 → <code>调用 'f' 第 1 参类型不符（期望 f64 得 i64）</code> COMPILE-ERROR 无 hex；<code>add(1,2,3)</code> → 实参数不符同拒；verify_selfcomp 20/20（5 对拍 + 15 负例）；子集外参数类型提前到签名层（与 fn_type_entry 同文案）</td>
+<td class="ok">✓</td>
+<td>
+① <code>target/probes/r74a.lom</code>（f(x: Float) 调 f(1)）→ <code>codegen error: L2.2 子集不支持: 调用 'f' 第 1 参类型不符（期望 f64 得 i64）</code> + COMPILE-ERROR + 无 hex ✓（<strong>文案与 TODO 宣称逐字一致</strong>）<br>
+② r74b（add(1,2,3) 三传二）→ <code>调用 'add' 实数量不符（期望 2 得 3）</code> + COMPILE-ERROR + 无 hex ✓<br>
+③ <code>python tools/verify_selfcomp.py</code> → <code>RESULT: PASS（20/20 项通过：正例对拍 + 负例拒绝）</code>（5 对拍 stdout/rc 一致 + 15 负例全拒且无 hex）✓<br>
+④ 签名层：Bool 形参（r74g）→ <code>void/子集外参数类型</code>（与 fn_type_entry 同文案，报错时机在 collect_sigs）✓<br>
+⑤ 读码确认（self_comp.lom collect_sigs/comp_call L2759-2795/L2521-2545）：prms 逗号串为事实源，arity 先校验、nprm=0 时循环不执行（split("") 边界安全）✓<br>
+⑥ 本轮扩展 13 形态（§4 敌手探针详表）全部正确，无新击穿。
+</td>
+</tr>
+<tr>
+<td>R75<br>同层解构遮蔽<br>（P3）</td>
+<td>解构在赋值前 → hint 不动源码（applied=0、final 如实 1 warning）；解构在赋值后 → 仍 High Replace 行 2；let 之间保持多命中 hint；+2 测试</td>
+<td class="ok">✓</td>
+<td>
+① r75a（<code>let x = 1 / let (x,y) = (5,6) / x = x+1</code>）：applied=0、skipped=1、md5 前后逐字相同、final {errors:0, warnings:1}、ok:false ✓<br>
+② r75b 正例（<code>x = 2</code> 在 <code>let (x,y)</code> 前）：applied=1、changes=[(2,replace)]、行 2 变 <code>let mut x</code>、final 全净 ✓——序判定不误伤<br>
+③ r75c（同层双 <code>let x</code>）：applied=0、源码不变——多命中 hint 保守面保持 ✓<br>
+④ 单元测试 <code>r75_mut001_destructure_shadowing_degrades_to_hint</code> / <code>r75_mut001_assign_before_destructure_still_replaces</code> 在 533 内 ✓<br>
+⑤ 本轮扩展 7 形态（§4 详表）全部正确。
+</td>
+</tr>
+<tr>
+<td>R76<br>doc_audit 行数锚<br>（P3）</td>
+<td>doc_audit D 类补 self_comp 行数锚（README/HANDOFF_PROMPT 宣称位）+ 真值打印 + 头注释；65→67 项；Z 类自指 67</td>
+<td class="ok">✓<br><span class="p3">残留 R77 文档面</span></td>
+<td>
+① <code>python tools/doc_audit.py</code> → <code>RESULT: PASS（67/67 项通过）</code> ✓；真值行 <code>self_comp 2950 行 | 版本 1.2.5</code> ✓（wc -l 实测 2950/5727 一致）<br>
+② D 类两锚 <code>README self_comp 行数 2950</code> / <code>HANDOFF_PROMPT self_comp 行数 2950</code> OK——锚位真实钉住（试漂移即 FAIL 的结构）✓<br>
+③ Z 类自指 <code>HANDOVER 宣称 67 vs 本脚本总项数 67（含本项）</code> ✓<br>
+<b>残留（R77 证据）</b>：锚本身真实有效，但 65→67 的<strong>全出现面同步</strong>漏改 4 处（§4 R77）——锚机制（gate）与其余宣称面（gate 外）的差 = R32 教训再现。
+</td>
+</tr>
+<tr>
+<td>测试宣称</td>
+<td>533 单元 + 8 集成（r56 ×1 + r58 ×7）</td>
+<td class="ok">✓</td>
+<td><code>cargo test --release</code> → 533 passed（单元）+ r56_process ×1 + r58_lsp_process ×7 = 8 集成全过 ✓（+4 = 529 + R73×2 + R75×2 分解与宣称一致）。</td>
+</tr>
+</table>
+<p><strong>小结</strong>：R73-R76 四项整改在各自开账验收面上零失真（十一审 R62/R63、十二审 R65-R72 之后连续第三次全 ✓）；R77 属 R76"文档成对"宣称面的残留缺口（锚与脚本侧真实，文档出现面漏扫），按十审/十一审/十二审口径不计入验收谎报——开新账处理。</p>
+
+<h2>3. 基线复验清单（全部亲手跑，HEAD 1418536）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测</th><th>裁定</th></tr>
+<tr><td>cargo build --release</td><td>零 warning</td><td>touch src/main.rs 后全量重编，warning 计 0</td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>533 单元 + 8 集成</td><td>533 passed（单元）+ r56 ×1 + r58 ×7 = 8 集成全过</td><td class="ok">✓</td></tr>
+<tr><td>cargo clippy --release -- -D warnings</td><td>通过</td><td>Finished 零告警</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --all -- --check</td><td>零 diff</td><td>退出 0</td><td class="ok">✓</td></tr>
+<tr><td>python tools/doc_audit.py</td><td>67/67</td><td>RESULT: PASS（67/67，含 Z 类自指互锁；真值行 eval 121 / dump 154 / .lom 38=29+4+2+3 / self_interp 5727 / self_comp 2950 / 版本 1.2.5）</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 51 / 反例 5 / skip 附摘要，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>24/24</td><td>校验 24 / 失真 0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfhost 六模式</td><td>全 PASS</td><td>dump 154/154 + tokens/diags/static/run/wasm 逐个 RESULT: PASS（--wasm 三段：layer2 151 / layer3 golden 39 条逐字 / 自施加）</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>20/20</td><td>RESULT: PASS（20/20：5 对拍 + 15 负例拒绝）</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>121/121 ×2</td><td>run.ps1 -Verify：解释器 Total 121 / Passed 121；-Backend wasm 121/121</td><td class="ok">✓</td></tr>
+<tr><td>examples fmt gate</td><td>全过（apply_test 豁免）</td><td>36 文件循环仅 apply_test.lom 失败（豁免项），35 有效文件 0 失败</td><td class="ok">✓</td></tr>
+<tr><td>golden stmt_interp</td><td>逐字一致</td><td>diff 为空</td><td class="ok">✓</td></tr>
+<tr><td>git status / tag</td><td>干净 / v1.2.5 已切</td><td>porcelain 0 行（探针在 target/probes/、fix-history 在 .lom/，均 gitignored 实证）；git describe = v1.2.5，tag 指向 HEAD</td><td class="ok">✓</td></tr>
+<tr><td>CI（GitHub API）</td><td>HEAD success</td><td>run #148（1418536）六 check-run 全 success（clippy/windows/selfhost verify/doc gates/macos/ubuntu）；annotations 共 4 条，逐条取回实证全部为 ubuntu-latest→Ubuntu 26 迁移 notice（2026-10-19，已挂账项 R61）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>4. 敌手探针发现（R77 起；只开账不修复）</h2>
+
+<h3>4.1 代码面探针（全部未击穿，如实记录）</h3>
+<table>
+<tr><th>组</th><th>形态</th><th>结果</th></tr>
+<tr><td rowspan="5">R73 去重面<br>（6 形态）</td><td>四重赋（同轮 4 条 MUT001 同坐标）</td><td>applied=1 产合法 let mut，final 全净——三条以上同轮去重正确</td></tr>
+<tr><td>闭包捕获 + 外层重赋×2 混合（十二审 r73e 形态）</td><td>applied=1（v1.2.4 applied=2 损坏）；final 2 warnings 为设计内 MUT002</td></tr>
+<tr><td>双变量独立重赋</td><td>applied=2 各自替换——去重不误伤不同声明</td></tr>
+<tr><td>MUT×2 与 EFF001/NAM005 动作共存</td><td>各自正常应用；plan 层如实展示等价动作对、apply 层合并——分层无失真</td></tr>
+<tr><td>同轮不同诊断码产出等价动作（读码推演）</td><td>去重键不含 code，等价动作合并保留首遇一条（changes 展示面差异，无行为影响）；自然语言内难以构造（MUT001 的坐标/文本由声明行唯一决定），低风险不开账</td></tr>
+<tr><td rowspan="9">R74 校验面<br>（13 形态）</td><td>递归调用传错类型 f(1.5)→f(n: Int)</td><td>COMPILE-ERROR 第 1 参类型不符 ✓</td></tr>
+<tr><td>递归正确类型 + main 正确调用</td><td>COMPILED 97 bytes → node 实例化输出 1 ✓（递归 prms 校验不误伤）</td></tr>
+<tr><td>前向引用（f 调后定义的 g）+ 类型错</td><td>精确报 g 的第 1 参类型不符（非"未知函数"）——两遍式签名收集正确 ✓</td></tr>
+<tr><td>前向引用 + 类型正确</td><td>COMPILED 134 bytes → node 实例化输出 7.0 ✓</td></tr>
+<tr><td>嵌套调用 f(g(1))（g 返 Int、f 期望 Float）</td><td>拒，精确指认外层 f 的第 1 参 ✓</td></tr>
+<tr><td>混合综合 f(1+2.0) 传 Float 形参（应过）+ h(2.0) 传 Int 形参（应拒）</td><td>前者放行、后者拒——综合类型双向正确 ✓（同文件双向对照）</td></tr>
+<tr><td>Bool 形参（fn f(x: Bool)）</td><td>签名层拒："void/子集外参数类型"（与 fn_type_entry 同文案，时机提前）✓</td></tr>
+<tr><td>Bool 字面量实参 f(True)</td><td>表达式层拒："该表达式形态" ✓</td></tr>
+<tr><td>零参函数 z() 多传 z(1) / 正确调用 / void 函数值 let b = v(1) / main 无注解 / 深嵌套实参</td><td>多传拒（期望 0 得 1）；正确调用 COMPILED 91 bytes；void 值拒（let 绑定 void 值）；main 无注解 COMPILED 81 bytes（EFF main 豁免一致）；深嵌套 151 bytes 双后端输出一致（210）✓</td></tr>
+<tr><td rowspan="7">R75 序建模面<br>（7 形态）</td><td>if 块内解构 + 块外赋值</td><td>hint、源码不变（扁平作用域下静态序建模最近绑定是解构——保守正确）✓</td></tr>
+<tr><td>闭包内解构 + 闭包内赋值</td><td>hint（闭包独立层，top_level=false）✓</td></tr>
+<tr><td>for 体内解构 + 体内赋值</td><td>hint ✓</td></tr>
+<tr><td>三明治 let→解构→let→赋值</td><td>hint（let_decls 双同名多命中保守面）——不损坏不误改 ✓</td></tr>
+<tr><td>解构→let→赋值</td><td>High Replace 命中 let 行（最近绑定是 let 且唯一命中）——精确 ✓</td></tr>
+<tr><td>双解构→赋值</td><td>hint（最近绑定是第二个解构）✓</td></tr>
+<tr><td>解构遮蔽 + 同轮双 MUT001 组合</td><td>applied=0、skipped=2、final 2 warnings 如实 ✓</td></tr>
+</table>
+
+<h3>4.2 新开账（R77 起）</h3>
+<table>
+<tr><th>ID</th><th>级别</th><th>发现</th><th>最小复现</th></tr>
+<tr>
+<td><a name="r77"></a><strong>R77</strong></td>
+<td class="p3">P3</td>
+<td><strong>R76 整改"文档成对"漏改 4 处 doc_audit 数字/口径残留——数字同步病灶第五次复发。</strong>R76 把 doc_audit 从 65 扩到 67 项并宣称"Z 类自指同步"，但同一提交（1418536）的全出现面未同步：① <strong>HANDOVER §9 检查单第 5 条句内自相矛盾</strong>——前半句刚写"R76 doc_audit <strong>67</strong> 项"、句尾仍是"doc_audit 现为 <strong>65</strong> 项"（1418536 改写了该条目前半段却保留句尾旧值）；② HANDOVER <strong>§12.3 交接清单门禁</strong>第 4 条"<code>python tools/doc_audit.py</code> <strong>65/65</strong>"——这是"五件必刷"的机器证明门禁数字，新会话按此自查会对错数字；③ HANDOFF_PROMPT 头部"文档定位"段"通过 <code>python tools/doc_audit.py</code>（<strong>65/65</strong>）"（代码块内三处已是 67/67，头部段漏改）；④ HANDOVER §1"遗留挂账"行"<strong>L2.3 暂缓待 R65-R72 收口</strong>"——v1.2.4 时点的陈旧口径（R65-R72 早已关闭，当前口径是"R74 收口达成、L2.3 动工待用户裁决"，与同文件顶部条目、TODO 顶部、HANDOFF_PROMPT 三处现行口径矛盾；aab6f95 引入、1418536 更新该行前半段时仍未改）。<br><b>根因</b>：doc_audit 的 Z 类自指锚只锁 HANDOVER §2.2 的宣称位与脚本自身项数，其余出现面（§9/§12.3/HANDOFF_PROMPT 头部）无锚；"65→67"作为对账数字变更时未执行全仓 grep（R32 教训"gate 覆盖面 ≠ 全部出现面"；R22 算术→R39 时点值→R42 门面→R48 自愈史→R69 字节锚同族第五次）。<br><b>影响</b>：不触代码行为；交接门禁数字（§12.3）会误导新维护者按 65 自查。</td>
+<td><code>grep -n "65" docs/HANDOVER.md docs/HANDOFF_PROMPT.md</code> → §9.5"doc_audit 现为 65 项"（同句前文"R76 doc_audit 67 项"）；§12.3 "**65/65**"；HANDOFF_PROMPT L5"（65/65）"；§1 挂账行"L2.3 暂缓待 R65-R72 收口"。实测真值 67/67。</td>
+</tr>
+<tr>
+<td><a name="r78"></a><strong>R78</strong></td>
+<td class="p3">P3</td>
+<td><strong>README 状态段存量句 "24/24 tasks × both models = 20/20 each" 算术矛盾。</strong>README L71（评估段）："error_repair hot-patch sampling (2026-09-16): the same 2 models × 10 samples … on <strong>all 24 error_repair tasks</strong> … — <strong>24/24 tasks × both models = 20/20 each</strong>, zero failures"。同句内 "all 24 tasks / 24/24 tasks" 与 "20/20 each" 矛盾：480/480 = 24 题 × 2 模型 × 10 采样，每模型口径应为 <strong>24/24 each</strong>；"20/20" 是 09-07 pass@k 时点 error_repair 任务数（20 任务）的旧值残留。引入时点：2de1a30（2026-09-16 ③ 包收官，git log -S 实证），非本轮增量——本轮全仓数字对账扫出（十二审局限里声明过"gate 覆盖面 ≠ 全部出现面"，本轮兑现补扫）。对外 README 材料的数字句，doc_audit 无此锚。</td>
+<td><code>grep -n "20/20 each" README.md</code>；同句上文 "all 24 error_repair tasks"；对照 TODO ③ 包证据区 "24 题 × 2 模型 × 10 采样 = 480/480"。</td>
+</tr>
+</table>
+
+<h2>5. 对交接裁决的建议（供用户决策，非本审查越权裁定）</h2>
+<ul>
+<li><strong>L2.3 放行裁定（本轮特有任务）：建议放行</strong>。十二审的暂缓条件是"R74 收口"，本轮证据链：① R74 验收宣称零失真（两原始形态文案逐字一致 + 20/20）；② 本轮自构 13 个调用校验敌手形态（递归/前向引用/嵌套调用/双向综合/签名层与表达式层分拒/零参边界/void 值）<strong>全部正确，无新击穿</strong>；③ self_comp 的编译期校验三路（let 注解/尾表达式/调用点）自此一致，RFC-0004 修订 5 的信任边界登记如实覆盖（宿主 TYPE003-warning + 运行提升 vs 子集编译期严格拒绝）；④ 基线全绿（533+8/六模式/eval 双后端/CI #148）。"子集外必须明确报错而非产坏 wasm"的底线在 call 边界本轮未再击穿。<strong>动工授权仍归用户。</strong>附带两条建议：L2.3 扩子集时每个新表达式/语句路径（方法调用、内建调用、泛型实例化、match 语句等）按 R74 教训"编译期校验 + 负例进 verify_selfcomp"成对交付，避免再造 R68/R74 式的"漏网路径"；Float 字面量正确舍入精度专项（挂账）在 L2.3 内一并排期。</li>
+<li><strong>整改优先级建议</strong>：R77/R78 均为 P3 文档面，半小时量级可顺手收口（grep "65" 三文件 + 改 4 处 + README "20/20 each"→"24/24 each" + doc_audit 补锚或至少全仓 grep 复验）；建议与 L2.3 动工前置或并行，不构成放行阻塞。根治方向（与 R64 的"命令行完整性锚"同菜单）：doc_audit 对"67/65"这类项数自指增加多文件锚（§12.3 门禁数字 + HANDOFF_PROMPT 头部），或把处方固化为"doc_audit 项数变更时全仓 grep 新旧两个数字"。</li>
+<li><strong>发布冻结维持</strong>：本轮全部新发现（R77/R78 文档数字/口径残留）均不触语言面与代码行为；v1.2.5 tag 无需撤回（四项整改自列验收宣称全部真实，R77 属整改提交的文档成对面漏改而非验收谎报——与十审/十一审/十二审对"修复面残留"的口径一致）。</li>
+<li><strong>流程观察（不计级）</strong>：R73-R75 三项整改连续两轮"验收零失真 + 修复面敌手零击穿"，十二审 §5 建议的"独立遍历 + 同层声明序 + apply 去重"三件小改路线已经收敛（本轮 R75 序建模 7 形态 + R73 去重 6 形态全绿）——维持不开"与 typechecker 共享 Env"重构的评估（十二审同判）。repair-native 维度连续四轮击穿链（R55→R62→R65→R73/R75）本轮首次干净，但维度评级仅回到 B+：若下一轮（L2.3 期间或之后）MUT001/apply 面再次全绿，可评估回 A-。</li>
+</ul>
+
+<h2>6. 审查局限（如实列出本轮没测的面）</h2>
+<ul>
+<li><strong>体系内边界</strong>：本审查是体系内 agent 分工的独立复审，非外部同行审计；复现与读码均由同一 agent 完成，存在与维护会话同源盲区的风险。</li>
+<li><strong>平台</strong>：全部本地实测在 Windows（Git Bash + PowerShell）单机完成；Linux/macOS 仅经 GitHub API 对账 CI 结论（#148 六 job success + 4 条挂账 notice 逐条取回），未本地复跑。</li>
+<li><strong>v1.2.4 对照</strong>：十二审对 v1.2.4 错改形态（applied=2 / let mut mut / COMPILED 104 bytes 等）的描述取自十二审报告与 TODO 证据区，本轮未重建 v1.2.4 二进制独立复核；本轮全部对照基准是行为断言（applied=1/合法 let mut/COMPILE-ERROR 无 hex）与宣称文案逐字比对。</li>
+<li><strong>LSP 深度面</strong>：按任务书低优先处理，本轮未对 R71/R72 后的 LSP 传输/语义新边角构造探针（十二审已过 9 边角形态；r58 套件 7/7 在 cargo test 内）。hover/completion/didChange 语义深度、并发与性能未展开。</li>
+<li><strong>未跑项</strong>：fuzz_smoke / diff_test（探针与冒烟）本轮未本地执行（CI doc-gates 常驻且 #148 绿，间接覆盖）；coverage 未复测。</li>
+<li><strong>L2.2 对拍广度</strong>：5 正例 + 15 负例（验收设计）+ 本轮 15 个敌手探针方向扩展；随机程序对拍未做（L2.3 后差分验收的既定议程）。R74 的 Float 传 Int 形参（反向）经 h(2.0) 同文件双向对照覆盖；i64 字面量溢出值（&gt;2^63-1）传参未单独展开（同根因，主观推断同形态）。</li>
+<li><strong>数字对账面</strong>：本轮对账覆盖 533/8/20/2950/5727/121/38/67/24/154、"65"残留面（grep 三文件）、"2908"残留面（全仓）、"529/18"残留面（历史档案区分）、"20/20 each"（README）；doc_audit 登记面之外的全仓数字全扫仍未做（gate 覆盖面 ≠ 全部出现面——R32/R77 教训持续有效）。</li>
+</ul>
+
+<p style="margin-top:2rem;color:#64748b">第十三轮维护者独立审查 · 2026-09-22 · 基线 <code>1418536</code>（v1.2.5）· 唯一写盘物：本报告 · 探针已清理（target/probes/ 删除）</p>
+</body>
+</html>

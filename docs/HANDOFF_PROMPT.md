@@ -2,7 +2,7 @@
 
 > **文档定位（2026-09-21 用户裁决）**：本文件是 Lom 的**持续维护文档**与交接
 > 必要流程——每个维护周期收官/交接时必须刷新【当前真实状态】段与基线数字，
-> 并通过 `python tools/doc_audit.py`（65/65）与 CI 全绿两道门禁；完整维护
+> 并通过 `python tools/doc_audit.py`（67/67）与 CI 全绿两道门禁；完整维护
 > 流程、审查节奏与交接五件套规范见 [HANDOVER §12](HANDOVER.md)。新会话
 > 第一回合从复制下方代码块开始。
 
@@ -22,17 +22,16 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.5（2026-09-22 升版：十二审 R73-R76 整改收官；tag 于 CI 绿
-  后切）；语言面与发布线冻结。
-- 审查状态：十二轮审查，R1-R76 全部关闭（R73-R76 已于 2026-09-22 按
-  用户裁决全量整改：R73 apply 等价动作去重 / R74 self_comp 调用点
-  类型与 arity 校验 / R75 同层解构遮蔽 hint / R76 doc_audit 67 项）。
-  整改后状态需第十三轮独立复审重估（B 是十二审时点评级，不得自行宣布
-  回升）。事实源 docs/TODO.md 顶部。
+- 版本 v1.2.5（tag 已切，CI 绿）；语言面与发布线冻结。
+- 审查状态：十三轮审查，R1-R77 全部关闭、R78 open（十三审新开 P3：
+  README 存量 "20/20 each" 算术残留）。第十三轮复审
+  （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
+  1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
+  22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：无。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
   spike + L2.2 子集编译器 + R66-R68/R74 整改均完成（self_comp.lom 2950
-  行，verify_selfcomp 20/20 = 5 对拍 + 15 负例拒绝）；**十二审的 L2.3
-  放行条件（R74 收口）已达成，动工待用户裁决**。
+  行，verify_selfcomp 20/20 = 5 对拍 + 15 负例拒绝）。**L2.3 放行裁定
+  成立（十三审：R74 收口达成），动工授权待用户**。
 - 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -43,8 +42,8 @@
   要以"apply 全轮次"为界（R73——同轮多诊断同坐标不去重）；含反斜杠
   转义的批量文本替换禁用 heredoc（本轮 doc_audit 修改再应验一次，改用
   Edit 落盘解决）。
-- 待用户裁决：第十三轮独立复审发起时机；L2.3 全语言面动工（放行条件已
-  满足）；typechecker for 变量 define 覆盖同名外层可变性标记不恢复的
+- 待用户裁决：L2.3 全语言面动工（十三审放行裁定成立）；R78 顺手收口
+  （README 机械一行）；typechecker for 变量 define 覆盖同名外层可变性标记不恢复的
   既有 quirk 是否立项（TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底
   窗口；ubuntu-26 镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
@@ -69,11 +68,16 @@
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   第十三轮独立复审（R73-R76 整改需复审重估，通过后 L2.3 动工菜单才能
-   呈现——放行条件 R74 收口已达成）；发布不应出现在任何菜单项内
-   （冻结未解）。
+   L2.3 全语言面动工（十三审放行裁定成立）；R78 顺手收口为次项；发布
+   不应出现在任何菜单项内（冻结未解）。
 
-【当前状态锚点（整改后行为，供复核）】
+【当前 open 项的最小复现要点（R78）】
+- R78/README 算术残留：评估段 "24/24 tasks × both models = 20/20 each"
+  ——24 题每模型应各 24/24（"20/20 each" 是 err22 轮 22 题的旧值残留，
+  2026-09-16 ③ 包扩容 24 题时漏改）。修法：机械一行 20/20 each →
+  24/24 each。
+
+【状态锚点（整改后行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价
   Replace（x=2; x=3 → applied=1 产合法 let mut x、final 净 ok:true）；
   同位置不同文本动作不合并。
