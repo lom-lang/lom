@@ -10,6 +10,7 @@
 > - [docs/HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) — **可直接复制给下一任 AI 的交接提示词**
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
+> 最后更新：2026-09-21（**第九轮整改第一项 R55 关闭**——用户裁决 R55-R61 全量整改。High 自动修复安全性根治：MUT001 作用域限定（`FnInfo` 结构化函数摘要，`let` 回扫收窄到所属函数体内，跨作用域错改不可能再现）/ EFF001 签名 end 行定位（多行签名不再插成 `fn helper( ! [IO]`）+ 同函数多效应聚合（` ! [IO, Clock]` 单条注解）/ `lom-apply/v1` 新增 `final` 块且 `ok` = 应用数>0 且最终零 error（错改成 PARSE001 必报 ok:false）/ fix 列基准统一字符列（LEX005/MUT001 多字节行不再错位）。+8 测试 **495/495**（九审三探针负向锁定 + cli 端到端）；fix_corpus 11 对不倒；doc_audit 65/65（锚点同步 487→495）；eval 121/121；SPEC_FOR_AI R55 caveat 改写为 hardened 口径（尺寸 38,640）。**R56-R61 继续 open，顺序整改中**。发布线冻结、L2 未授权不变。）
 > 最后更新：2026-09-21（**第九轮维护者独立敌手式审查 + 交接刷新**。基线 `ce2c71e`/v1.2.1，总评 **B**，报告 `docs/reviews/review-2026-09-21.html`；新开 R55-R61：P1×4（High 自动修复错改 / worker panic exit 0 / EOF 静默闭块 / LSP JSON-RPC 不可正常接入）+ P2×2（严格 JSON 控制字符 / 文档安全评测 gate 盲区）+ P3×1（rustfmt/Windows 编码/CI action warning）。本轮只修交接与事实口径，不改产品语义：README/SPEC_FOR_AI/LANGUAGE_SPEC/SECURITY/positioning/eval README 如实化；doc_audit 现行 eval 锚点扩为 65 项；Windows spec_examples_check 输出强制 UTF-8；新增可复制 HANDOFF_PROMPT。**当前没有已授权实施包，但有 7 项未关闭整改；L2 继续未授权，审查建议至少 R55-R58 关闭并复审前不动工；发布线继续冻结**。）
 > 最后更新：2026-09-16 晚二（**④ 文档工程小包收官——用户裁决四连包（①八审→②L2 预研→③修复闭环 v1.2.1→④文档工程）全部完成**。④ 两条线：SPEC_FOR_AI 头部新增 Context budget 行 **37,851 字符 ≈ 9.5k tokens**（字符口径，对照 Mog 3,200）+ **doc_audit 新增 I 类尺寸监控位 62→63 项**（宣称==实际 len()，自引用悖论同宽替换收敛）；Ronacher "A Language For Agents"（2026-02-09）一手深读关闭第 4 轮最后复核项——**独立收敛证据**（effect markers `needs{time,rng}`+格式化自动传播注解 ≈ Lom `![IO,Clock]`+EFF001 自动插入；Results over exceptions；无宏无 barrel）+ **repair-native 预言**（"mechanical fixing for as many linting failures as possible"）+ 两未对齐点（Go 式前缀/aliasing 存疑——挂账无动作）。验收 doc_audit **63/63**；纯文档+监控不升版。**下一状态：无活跃工作包**——待令项：L2 动工裁决（RFC-0004 方案 A/B）、MoonBit 1.0 Q3 复核（月底窗口）、差分按需、发布线维持冻结）
 > 2026-09-16 晚（**③ 修复闭环资产深化收官，升版 v1.2.1**——四连包第三项。四条线：① fix 动作面 NAM005 修复动作化（消息自带 import 语句顶部插入，High）+ MUT001 升级（声明按名回扫唯一命中 let→let mut，High；多/零命中降 Medium hint），+5 测试 **487/487**；② fix_corpus **8→11 对**（09 MUT001/10 NAM005/11 LEX005，--apply golden 逐字验收）；③ error_repair **22→24 题**（121 LEX005 全角标点、122 TYPE002 真值 warning 预告 RUNTIME001——120 同款 warning-as-prophecy 形态），eval **121/121**；④ **高温补测闭环 R46 留口：error_repair 24 题双模型 ×10 采样 t=1.0 全过 480/480**（报告 REPORT-2026-09-16-err-repair-patch.md；119/120 于 err22 轮、121/122 新题即测于 err24 轮、119/120 跨两轮 20 采样零失败）——positioning §3 两条实测句升回全量口径（118 为唯一无采样任务，Q4 单采样对照在档）。验收：doc_audit 62/62、dump 154/154、static 坏 22/干净 154（新对+新参考解入集）、clippy 零 warning。冻结面零变更（纯 lom fix 行为）。tag v1.2.1 已打（main CI 绿依据））
@@ -49,8 +50,8 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.2.1**（Cargo.toml/lock 一致，2026-09-16 升版：repair-loop asset——③ 包。NAM005/MUT001 修复动作被当时定为 High，fix_corpus 8→11 对，eval 119→121，Rust 测试 487；但第九轮 R55 已实测 MUT001/EFF001 High 可错误改写，**不可将当时的 High 宣称当作当前安全保证**）。此前 v1.2.0 为 NAM005 检查器 warning，v1.1.4/v1.1.3 为包/别名/差分相关修复。详见 spec §13 changelog；历史 tag 至 v1.2.1；本交接纯文档/工具维护不升版、不切新 tag，发布线依旧冻结。 |
-| Rust 测试 | **487/487 通过**（v1.2.1 fix 动作面 +5：NAM005 插 import ×2 + MUT001 唯一声明/词边界/多零命中 ×3；v1.2.0 NAM005 +5：未导入内建 warning 组；v1.1.3 D 包 +2：Logical 操作数 NAM003；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| 版本 | **v1.2.1**（Cargo.toml/lock 一致，2026-09-16 升版：repair-loop asset——③ 包。NAM005/MUT001 修复动作被当时定为 High，fix_corpus 8→11 对，eval 119→121；**2026-09-21 R55 整改已修复 MUT001 跨作用域错改 / EFF001 多行签名与同位双插 / apply ok 语义，High 自动修改按九审三探针负向锁定**；v1.2.1 当时把 MUT001 宣为 High 未经敌手样例检验的教训见 §11.6）。此前 v1.2.0 为 NAM005 检查器 warning，v1.1.4/v1.1.3 为包/别名/差分相关修复。详见 spec §13 changelog；历史 tag 至 v1.2.1；本交接纯文档/工具维护不升版、不切新 tag，发布线依旧冻结。 |
+| Rust 测试 | **495/495 通过**（2026-09-21 R55 整改 +8：MUT001 跨作用域/参数 hint/EFF001 多行签名/EFF001 同函数聚合/LEX005 多字节列/apply ok 语义/cli 端到端 ×2；v1.2.1 fix 动作面 +5：NAM005 插 import ×2 + MUT001 唯一声明/词边界/多零命中 ×3；v1.2.0 NAM005 +5：未导入内建 warning 组；v1.1.3 D 包 +2：Logical 操作数 NAM003；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4：parser 嵌套 ×3 + json 嵌套 ×1；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e（v1.1.1 +3：return/? 在 for 体内、Binder 臂对 0 参 scrutinee）+ M2 Pattern span 定位 ×1+ fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **121/121**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
 | CI | **三平台全绿**（含 golden 逐字比对、fmt gate、零依赖 gate） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
@@ -106,7 +107,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 487/487（2026-09-16 v1.2.1 基线：482 + fix 动作面 ×5）
+cargo test --release                                    # 期望 495/495（2026-09-21 R55 整改：487 + MUT001/EFF001/apply-ok ×8）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -337,10 +338,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6、TODO 的 R55-R61、第九轮报告；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
-2. `cargo build --release && cargo test --release` 确认 487/487、零 warning、`./target/release/lom.exe --version` 显示 1.2.1
+2. `cargo build --release && cargo test --release` 确认 495/495、零 warning、`./target/release/lom.exe --version` 显示 1.2.1
 3. 跑 §2.2 全量回归确认基线；注意 `cargo fmt --check` 是 R61 已知失败，不得误报成新回归
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
-5. **当前状态：v1.2.1、语言面/发布线冻结；九轮审查，R1-R54 已关闭，R55-R61 open。第九轮把现状评级从 A- 校正为 B，四项 P1 均有真实最小复现；不要把 487/487 或 CI 绿解释为这些边界已覆盖。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5703 行；六模式 gate 在位）；doc_audit 现为 65 项。** L2 未授权，发布冻结不动。下一任只在用户裁决后按 R55→R61 顺序实施，历史基线与探针细节见本节前述文档。
+5. **当前状态：v1.2.1、语言面/发布线冻结；九轮审查，R1-R54 已关闭；R55 已整改关闭（2026-09-21，九审三探针负向锁定 + apply ok 语义修正），R56-R61 open。第九轮把现状评级从 A- 校正为 B；R56（panic exit 0）/R57（缺 end 静默通过）/R58（LSP 传输）三项 P1 仍有真实最小复现，不要把 495/495 或 CI 绿解释为这些边界已覆盖。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5703 行；六模式 gate 在位）；doc_audit 现为 65 项。** L2 未授权，发布冻结不动。下一任只在用户裁决后按 R56→R61 顺序实施，历史基线与探针细节见本节前述文档。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）

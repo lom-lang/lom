@@ -326,7 +326,7 @@ fn mat001_fix_apply_inserts_missing_err_branch() {
         "应报 MAT001 未覆盖 Err"
     );
     // 生成修复计划并应用（端到端：typechecker → fix → apply）
-    let plan = crate::fix::generate_plan(&diags, src);
+    let plan = crate::fix::generate_plan(&diags, src, &[]);
     let result = crate::apply::apply_plan(&plan, src);
     assert!(
         result.applied >= 1,
@@ -354,7 +354,7 @@ fn mat001_fix_apply_inserts_missing_none_branch() {
             .any(|d| d.code == "MAT001" && d.message.contains("None")),
         "应报 MAT001 未覆盖 None"
     );
-    let plan = crate::fix::generate_plan(&diags, src);
+    let plan = crate::fix::generate_plan(&diags, src, &[]);
     let result = crate::apply::apply_plan(&plan, src);
     assert!(
         result.applied >= 1,
@@ -385,7 +385,7 @@ fn mat001_user_enum_not_auto_applied() {
             .any(|d| d.code == "MAT001" && d.message.contains("Green")),
         "应报 MAT001 未覆盖 Green"
     );
-    let plan = crate::fix::generate_plan(&diags, src);
+    let plan = crate::fix::generate_plan(&diags, src, &[]);
     let result = crate::apply::apply_plan(&plan, src);
     // 用户枚举变体是 Hint + Medium，不应被 --apply 自动应用
     assert_eq!(

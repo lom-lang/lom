@@ -35,6 +35,7 @@
 use crate::fix::{ActionKind, Confidence, FixAction, FixPlan};
 
 /// 应用结果
+#[derive(Debug)]
 pub struct ApplyResult {
     pub applied: usize,
     pub skipped: usize,
@@ -44,6 +45,7 @@ pub struct ApplyResult {
 }
 
 /// 单个已应用的变更记录
+#[derive(Debug)]
 pub struct AppliedChange {
     pub line: usize,
     pub col: usize,
@@ -55,16 +57,51 @@ pub struct AppliedChange {
 
 // ===== 迭代修复的多轮输出（修复引擎深化 M2；单轮 to_json/to_human 已并入多轮版）=====
 
-/// 多轮 apply 的 JSON 输出（lom-apply/v1 + rounds 扩展字段）
+/// R55（九审）：apply 后对最终源码重跑完整诊断的摘要
+///
+/// v1.2.1 的 `ok` 只等于 `total_applied > 0`——错改成 PARSE001 的源码也
+/// 报 ok:true。现语义：`ok` = 应用数 > 0 **且** 最终源码零 error 级诊断
+/// （词法/语法/类型全量重查）；warning 不拦截 ok，但计数如实输出。
+pub struct FinalDiag {
+    pub errors: usize,
+    pub warnings: usize,
+}
+
+impl FinalDiag {
+    /// 对修复后的源码跑完整诊断（词法+语法+类型），产出最终状态
+    pub fn check(src: &str, path: &str) -> FinalDiag {
+        let mut diags = crate::diagnostics::Diagnostics::from_parse_result(src, path);
+        if diags.ok {
+            let program = crate::parser::Parser::parse_recover(src).program;
+            crate::typechecker::check_program(&program, src, path, &mut diags);
+        }
+        let mut errors = 0;
+        let mut warnings = 0;
+        for d in &diags.diagnostics {
+            match d.severity {
+                crate::diagnostics::Severity::Error => errors += 1,
+                crate::diagnostics::Severity::Warning | crate::diagnostics::Severity::Info => {
+                    warnings += 1
+                }
+            }
+        }
+        FinalDiag { errors, warnings }
+    }
+}
+
+/// 多轮 apply 的 JSON 输出（lom-apply/v1 + rounds/final 扩展字段）
 ///
 /// 字段语义：
 ///   applied — 所有轮次应用的修复总数
 ///   skipped — 最后一轮的 skipped（迭代收敛后剩余不可自动修复项）
 ///   rounds  — 实际执行的轮数（含最后一轮 applied==0 的收敛判定轮）
 ///   changes — 全部轮次的变更，每条多一个 "round" 字段
-pub fn rounds_to_json(results: &[ApplyResult], file: &str) -> String {
+///   final   — 修复后源码的完整诊断计数（R55：errors/warnings）
+///   ok      — applied > 0 且 final.errors == 0（R55 起含最终状态）
+pub fn rounds_to_json(results: &[ApplyResult], file: &str, final_diag: &FinalDiag) -> String {
     let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let final_skipped: usize = results.last().map(|r| r.skipped).unwrap_or(0);
+    let ok = total_applied > 0 && final_diag.errors == 0;
 
     let mut s = String::new();
     s.push_str("{\n");
@@ -99,13 +136,17 @@ pub fn rounds_to_json(results: &[ApplyResult], file: &str) -> String {
         }
         s.push_str("  ],\n");
     }
-    s.push_str(&format!("  \"ok\": {}\n", total_applied > 0));
+    s.push_str(&format!(
+        "  \"final\": {{\n    \"errors\": {},\n    \"warnings\": {}\n  }},\n",
+        final_diag.errors, final_diag.warnings
+    ));
+    s.push_str(&format!("  \"ok\": {}\n", ok));
     s.push_str("}\n");
     s
 }
 
 /// 多轮 apply 的人类可读输出（按轮分组）
-pub fn rounds_to_human(results: &[ApplyResult], file: &str) -> String {
+pub fn rounds_to_human(results: &[ApplyResult], file: &str, final_diag: &FinalDiag) -> String {
     let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let mut s = String::new();
     s.push_str(&format!("lom apply: {}（迭代 {} 轮）\n", file, results.len()));
@@ -128,6 +169,10 @@ pub fn rounds_to_human(results: &[ApplyResult], file: &str) -> String {
         }
     }
     s.push_str(&format!("  总计: applied {}\n", total_applied));
+    s.push_str(&format!(
+        "  最终诊断（修复后源码）: {} 错误 / {} 警告\n",
+        final_diag.errors, final_diag.warnings
+    ));
     s
 }
 
@@ -558,7 +603,8 @@ mod tests {
             patched_source: "fixed\n".to_string(),
         };
         // M2 起 CLI 只走多轮输出（rounds_to_json），单轮 to_json 已移除
-        let json = rounds_to_json(&[result], "test.lom");
+        let final_diag = FinalDiag { errors: 0, warnings: 0 };
+        let json = rounds_to_json(&[result], "test.lom", &final_diag);
         assert!(json.contains("\"schema\": \"lom-apply/v1\""));
         assert!(json.contains("\"applied\": 2"));
         assert!(json.contains("\"rounds\": 1"));
@@ -566,6 +612,44 @@ mod tests {
         assert!(json.contains("\"action\": \"delete\""));
         assert!(json.contains("\"action\": \"insert\""));
         assert!(json.contains("删除意外字符"));
+    }
+
+    /// R55：ok 语义 = 应用数 > 0 且最终源码零 error——错改成 PARSE001 的
+    /// 源码不得再报 ok:true
+    #[test]
+    fn rounds_json_ok_false_when_final_has_errors() {
+        let result = ApplyResult {
+            applied: 1,
+            skipped: 0,
+            changes: vec![AppliedChange {
+                line: 2,
+                col: 12,
+                action: ActionKind::Insert,
+                description: "在函数签名行末添加效应注解".to_string(),
+                diagnostic_code: "EFF001".to_string(),
+            }],
+            patched_source: "fn helper( ! [IO]\nend\n".to_string(),
+        };
+        let final_diag = FinalDiag { errors: 1, warnings: 0 };
+        let json = rounds_to_json(std::slice::from_ref(&result), "test.lom", &final_diag);
+        assert!(json.contains("\"ok\": false"), "json: {}", json);
+        assert!(json.contains("\"final\""));
+        assert!(json.contains("\"errors\": 1"));
+
+        // 干净源码 + 有应用 → ok:true
+        let final_clean = FinalDiag { errors: 0, warnings: 1 };
+        let json2 = rounds_to_json(std::slice::from_ref(&result), "test.lom", &final_clean);
+        assert!(json2.contains("\"ok\": true"), "json: {}", json2);
+
+        // 零应用 → ok:false（无可验证的修复效果）
+        let result_zero = ApplyResult {
+            applied: 0,
+            skipped: 1,
+            changes: vec![],
+            patched_source: String::new(),
+        };
+        let json3 = rounds_to_json(&[result_zero], "test.lom", &final_clean);
+        assert!(json3.contains("\"ok\": false"), "json: {}", json3);
     }
 
     #[test]
@@ -637,7 +721,7 @@ mod tests {
         diags.ok = false;
 
         // 2. 生成修复计划并应用
-        let plan = crate::fix::generate_plan(&diags, src);
+        let plan = crate::fix::generate_plan(&diags, src, &[]);
         let result = apply_plan(&plan, src);
         assert!(result.applied >= 1, "应至少应用 1 个修复");
 

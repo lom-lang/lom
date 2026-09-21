@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 38,111 characters ≈ 9.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 38,640 characters ≈ 9.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -669,25 +669,25 @@ Key points:
 | `PARSE002` | `Result<T, E>` needs 2 type params | `hint` | medium |
 | `PARSE003` | `Option<T>` needs 1 type param | `hint` | medium |
 | `MAT001` | Built-in Result/Option branch → precise insert; user enum → hint with text | `insert` or `hint` | high/medium |
-| `EFF001` | Insert `! [E]` or merge `, E` into an existing effect list | `insert` | high (R55 caveats below) |
+| `EFF001` | Insert `! [E]` at the **signature end line** (correct for multiline signatures), or merge `, E` into an existing effect list; same-function multiple missing effects merge into one action | `insert` | high (R55-hardened 2026-09-21) |
 | `TYPE002` | Condition must be `Bool` | `hint` | medium |
 | `TYPE020` | `?` misuse (operand not Result/Option, or return incompatible) | `hint` | medium |
 | `NAM003`/`NAM004` | Spelling suggestion at the diagnostic span | `replace` | medium (never auto-applied) |
 | `NAM005` | Insert the exact missing builtin import at file start | `insert` | high |
-| `MUT001` | Unique-name `let` rescan and `let` → `let mut` | `replace` | high (R55 caveats below) |
+| `MUT001` | `let` → `let mut`, rescanned **within the enclosing function only** (unique in-scope hit); param/loop/match rebinding → hint with local-copy advice | `replace` or `hint` | high (unique in-scope hit) / medium |
 | Other | Code-specific guidance | `hint` | low/medium |
 
 **Recommended workflow** when you (the LLM) are writing Lom code:
 1. Write the file.
 2. Run `lom <file> --json` to get diagnostics.
 3. If `ok == false`, run `lom fix <file> --json` to get the repair plan.
-4. Apply the fixes yourself, or preview automation with `lom fix <file> --apply --dry-run`. **Until audit item R55 is closed, do not apply High fixes blindly**: inspect the patch and re-run `--check`/`--json`. EFF001 is now an `insert` action; user-enum MAT001 remains a hint-with-text.
+4. Apply the fixes yourself, or preview automation with `lom fix <file> --apply --dry-run`. Since the 2026-09-21 R55 hardening, High `insert`/`replace` actions are scope- and position-guarded (see Limitations for what remains uncertain); `--dry-run` plus an explicit re-check is still the safest loop. User-enum MAT001 remains a hint-with-text.
 5. Re-run `lom <file> --json` to verify. Repeat until `ok == true`.
 6. Run `lom <file>` to execute.
 
 **Limitations**:
-- **Open handoff blocker R55 (2026-09-21)**: High does not currently guarantee a semantics-preserving edit. Reproduced counterexamples include MUT001 changing an unrelated same-name `let`, EFF001 inserting into a multiline signature, and two missing effects producing two adjacent effect annotations. `lom-apply/v1.ok` currently means “at least one edit was applied,” not “the final source is diagnostic-clean.” Use `--dry-run` plus explicit re-check.
-- LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 positions originate as byte columns; a multibyte unexpected character after earlier non-ASCII text can be skipped or target the wrong character. These rules must not be treated as mathematically certain.
+- **R55 hardened (2026-09-21)**: the v1.2.1 counterexamples are fixed and locked by negative tests — MUT001 no longer rewrites a same-name `let` outside the enclosing function; EFF001 inserts at the signature **end** line (multiline signatures stay parseable) and merges same-function missing effects into one annotation; `lom-apply/v1` now reports a `final` block (`errors`/`warnings` recomputed on the patched source) and `ok` means *applied > 0 AND final errors == 0* — a patch that breaks parsing reports `ok: false`. Remaining caution: High still means "mechanically precise", not "semantically what you intended" — review `--dry-run` diffs for logic-bearing edits.
+- LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 diagnostic columns arrive as byte columns and are converted to char columns before use (R55); multibyte-line positions are covered by tests. These rules must not be treated as mathematically certain.
 - NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Since Phase 3.2b (v0.21.0) positions come from **expression-level spans** on the diagnostic (single-point replace); the whole-token source scan remains only as a fallback for span-less diagnostics (e.g. variant names in `match` patterns — `Pattern` carries no span).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
 - Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE001-3/TYPE020/NAM004-field point at the exact expression/assign-target; note the Field diagnostic points at the field-name token via the span's `end`); runtime positions remain coarse. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).

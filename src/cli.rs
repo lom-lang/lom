@@ -274,11 +274,13 @@ pub(crate) fn apply_iterative(src: &str, path: &str, max_rounds: usize) -> (Stri
 
     for _round in 1..=max_rounds {
         let mut round_diags = diagnostics::Diagnostics::from_parse_result(&current, path);
+        let mut round_fns: Vec<fix::FnInfo> = Vec::new();
         if round_diags.ok {
             let program = parser::Parser::parse_recover(&current).program;
+            round_fns = fix::fn_infos(&program, &current);
             typechecker::check_program(&program, &current, path, &mut round_diags);
         }
-        let round_plan = fix::generate_plan(&round_diags, &current);
+        let round_plan = fix::generate_plan(&round_diags, &current, &round_fns);
         let result = apply::apply_plan(&round_plan, &current);
         let no_progress = result.applied == 0 || result.patched_source == current;
         current = result.patched_source.clone();
@@ -522,5 +524,56 @@ end
                 bad_path
             );
         }
+    }
+
+    /// R55（九审）端到端 1：MUT001 跨作用域探针穿过完整迭代闭环——
+    /// 参数 x 重赋值 + 另一函数唯一 let x，apply_iterative 全程一字不改。
+    #[test]
+    fn r55_mut001_cross_scope_apply_iterative_is_noop() {
+        let src = "fn f(x: Int) -> Int\n    x = x + 1\n    x\nend\n\
+                   fn unrelated() -> Int\n    let x = 10\n    x\nend\n\
+                   fn main() -> Unit\n    println(f(unrelated()))\nend\n";
+        let (final_src, results) = apply_iterative(src, "test.lom", 5);
+        let total: usize = results.iter().map(|r| r.applied).sum();
+        assert_eq!(total, 0, "跨作用域不得有任何应用: {:?}", results);
+        assert_eq!(final_src, src, "源码必须逐字不变");
+    }
+
+    /// R55（九审）端到端 2：EFF001 多行签名 + 同函数双效应探针穿过完整
+    /// 迭代闭环——修复后源码可解析、注解落在签名结束行、最终零 error。
+    #[test]
+    fn r55_eff001_probes_apply_iterative_clean() {
+        // 多行签名探针：注解必须插在 `) -> Int` 行末，而非 `fn helper(` 行
+        let multiline = "fn helper(\n    x: Int\n) -> Int\n    println(x)\n    x\nend\n\
+                         fn main() -> Unit\n    println(helper(7))\nend\n";
+        let (src1, _r1) = apply_iterative(multiline, "test.lom", 5);
+        assert!(
+            src1.lines().nth(2).unwrap().contains(") -> Int ! [IO]"),
+            "注解必须在第 3 行行末: {:?}",
+            src1
+        );
+        let final1 = apply::FinalDiag::check(&src1, "test.lom");
+        assert_eq!(final1.errors, 0, "修复后不得有 error: {:?}", src1);
+
+        // 同函数双效应探针：必须是一段合并注解，不是两段叠加
+        let dup = "fn io_work() -> Unit ! [IO]\n    println(\"io\")\nend\n\
+                   fn clock_work() -> Unit ! [Clock]\n    ()\nend\n\
+                   fn helper() -> Unit\n    io_work()\n    clock_work()\nend\n\
+                   fn main() -> Unit\n    helper()\nend\n";
+        let (src2, _r2) = apply_iterative(dup, "test.lom", 5);
+        assert!(
+            src2.contains("fn helper() -> Unit ! [IO, Clock]"),
+            "必须合并为单条注解: {:?}",
+            src2
+        );
+        assert!(
+            !src2.contains("] ! ["),
+            "不得出现两段叠加注解: {:?}",
+            src2
+        );
+        let final2 = apply::FinalDiag::check(&src2, "test.lom");
+        assert_eq!(final2.errors, 0);
+        // EFF001 修复闭环：注解补齐后 warning 也应清零
+        assert_eq!(final2.warnings, 0, "注解补齐后不应残留 EFF001: {:?}", src2);
     }
 }

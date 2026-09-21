@@ -330,7 +330,7 @@ impl Parser {
     /// module 为点分路径（如 io、string、math、utils.helpers）
     /// 每项可带别名：name as alias
     fn parse_import_decl(&mut self) -> Result<ImportDecl, ParseError> {
-        self.advance(); // from
+        let from_tok = self.advance(); // from（记录位置用于 span）
         let module = self.parse_module_path()?;
         self.expect(&Token::Import, "'import'")?;
         self.expect(&Token::LBrace, "'{' (导入列表开始)")?;
@@ -355,7 +355,17 @@ impl Parser {
             }
         }
         self.expect(&Token::RBrace, "'}' (导入列表结束)")?;
-        Ok(ImportDecl { module, items })
+        let (end_line, end_col) = self.prev_token_pos();
+        Ok(ImportDecl {
+            module,
+            items,
+            span: Span {
+                line: from_tok.line,
+                col: from_tok.col,
+                end_line,
+                end_col,
+            },
+        })
     }
 
     /// 解析点分模块路径：io / utils.helpers / a.b.c

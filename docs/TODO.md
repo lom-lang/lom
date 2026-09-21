@@ -23,7 +23,8 @@
 > 此前（2026-09-15/16）：ⒶⒷⒸ 三项收官（七审 A-+R39-R45 / 第 2 轮调研 /
 > positioning 一页纸）+ 第 3/4 轮调研 + B 包 v1.2.0 + D 四期（累计 10000）。
 > 已收官：B/D 四期/D 三期/V/D 两期/Q/N/M/L/W 工作包线 + 八轮审查整改 R1-R54 与 T1-T7（档案见下）。
-> **当前未关闭：R55-R61；状态均为 open，尚未实施。**
+> **当前未关闭：R56-R61（open）；R55 已于 2026-09-21 整改关闭（用户裁决
+> R55-R61 全量整改，按 R55→R56→R57→R58→R59→R60→R61 顺序执行）。**
 
 ## 第九轮维护者独立审查 + R55-R61（2026-09-21）⚠️ review done / remediation open
 
@@ -32,20 +33,32 @@
 LSP、repair apply、异常退出和协议边界构造反例。审查阶段不改产品源码；交接包只修正
 现行文档、扩大数字锚点并修 Windows 文档检查器输出编码。
 
-### R55 — High 自动修复错误应用（P1）⏳ open
+### R55 — High 自动修复错误应用（P1）✅ done（2026-09-21）
 
-- **MUT001 跨作用域错改**：参数 `x` 重赋值触发诊断；另一函数存在全文唯一
-  `let x` 时，`fix_mut001_add_mut` 将无关声明改为 `let mut x`，仍标 High。
-- **EFF001 多行签名错位**：签名跨行时按 `current_fn_span.line` 的首行行末插入，生成
-  `fn helper( ! [IO]`；下一轮 PARSE001。
-- **EFF001 同位置双插入**：纯函数分别调用 `[IO]`/`[Clock]` 函数，两条 High action
-  在同一列应用成 `! [Clock] ! [IO]`；下一轮 PARSE001。
-- 三例中 `lom-apply/v1.ok` 仍为 true，因为现实现只判断 `total_applied > 0`，不表示
-  最终源码干净。另有已知 LEX001 吞右括号组合误修、LEX005 多字节 byte/char 列风险。
-- **最低安全修法**：在结构化声明 span/作用域信息到位前，将 MUT001 降 Medium；
-  EFF001 聚合同函数缺失效应并用签名 end span；apply 输出最终诊断状态；负向 corpus 锁定。
-- **验收**：上述三探针旧实现必失败、新实现 dry-run 后语法与诊断均干净；既有 11 对
-  fix_corpus 不倒；新增错误修复不得仅测“能应用”，必须测“没有改无关代码”。
+- **修法（用户裁决 R55–R61 全量整改第一项）**：
+  - **MUT001 作用域限定**：`fix::generate_plan` 新增顶层函数摘要参数
+    （`FnInfo`，由 parse 结果经 `fix::fn_infos` 提取；`ImportDecl` 补 span
+    字段以界定顶层 item 边界）。`let {name}` 回扫范围从**全文**收窄到
+    **诊断所属函数体内**；体内唯一命中保持 High Replace（fix_corpus 09
+    正例不倒），零命中（参数/for/match 绑定）→ Medium hint 且文案点名
+    参数与 `let mut x = x` 局部副本修法，多命中/owner 缺失 → Medium hint。
+  - **EFF001 签名 end 定位 + 同函数聚合**：插入行改用 `FnDecl.span.end_line`
+    （签名最后一个 token 所在行）——多行签名插在 `) -> T` 行末而非首行；
+    `merge_eff001_same_fn` 把同签名行的多条 EFF001 合并为一条注解动作
+    （` ! [IO, Clock]` / `, E1, E2`），其余 plan 降为说明性 hint。
+  - **apply ok 语义**：`lom-apply/v1` 新增 `final` 块（修复后源码全量重诊
+    断的 errors/warnings），`ok` = 应用数 > 0 **且** final errors == 0
+    （v1.2.1 的 `ok` 只看应用数——错改成 PARSE001 也报 ok:true）。
+  - **列基准统一**：LEX005/PARSE001-rparen/MUT001 的列从 lexer 字节列
+    统一换算为 apply 约定的字符列（`byte_col_to_char_col`，多字节行不再错位）。
+- **验收（2026-09-21 实测）**：cargo test --release **495/495**（+8：三探针
+  负向/正向锁定 + apply ok 语义 + LEX005 多字节列 + cli 端到端 ×2）；
+  九审三探针经真实 CLI 复验——MUT001 跨作用域 apply 后 applied=0、源码
+  逐字不变、ok:false 且 final 如实报 1 warning；EFF001 多行签名注解落在
+  `) -> Int ! [IO]`、同位双效应合并为 `! [IO, Clock]`，两例 final 全净
+  ok:true。既有 11 对 fix_corpus 不倒（端到端测试含内）。clippy 零 warning、
+  doc_audit 65/65（测试数锚点 487→495 三处同步 + SPEC_FOR_AI 尺寸 38,640）、
+  eval 121/121、golden 逐字、selfhost dump 154/154。
 
 ### R56 — worker panic 被吞为退出码 0（P1）⏳ open
 
@@ -95,7 +108,7 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
 - CI #122 的 6 条 warning 均为 checkout/cache Node.js 20 弃用提示；升级 action 前查
   官方迁移说明，推送后看首跑。
 
-**推荐顺序（尚待用户裁决）**：R55 → R56 → R57 → R58 → R59 → R60 → R61。
+**顺序（用户已裁决执行）**：R55 ✅ → R56 → R57 → R58 → R59 → R60 → R61。
 至少 R55-R58 关闭并经下一轮独立复审前，L2 与一切发布动作继续后置。
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done

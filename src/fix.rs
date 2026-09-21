@@ -66,9 +66,77 @@
 //   false — 仅纯文字 hint，LLM 需自己理解后修复（retry 价值不大）
 
 use crate::json::escape_str;
+use crate::ast;
 use crate::diagnostics::{Diagnostic, Diagnostics, Severity, Stage};
 
 // ===== 数据结构 =====
+
+/// R55（九审）：修复定位用的顶层函数摘要
+///
+/// 背景：v1.2.1 的 MUT001 按全文唯一 `let` 命中回扫声明，会跨作用域错改
+/// （诊断在函数 A、唯一 let 在函数 B）；EFF001 按签名首行行末插入，多行
+/// 签名会插成 `fn helper( ! [IO]`。两者都需要结构化的函数边界/签名结束
+/// 位置——由调用方（main.rs / cli.rs，已持有 parse 结果）从 AST 提取传入。
+///
+/// 解析失败的源码没有可靠 AST，调用方传空切片；此时 MUT001/EFF001 走
+/// 保守路径（仅 hint，不产出 High 自动修改）。
+pub struct FnInfo {
+    /// 函数参数名（参数恒不可变——MUT001 参数场景的判定依据之一）
+    pub params: Vec<String>,
+    /// 签名 span：`fn` 关键字所在行（1-based）到签名最后一个 token 所在行。
+    /// 多行签名时 sig_end_line 是 `)`/返回类型所在行——效应注解的正确插入行。
+    pub sig_start_line: usize,
+    pub sig_end_line: usize,
+    /// 函数体行范围（含两端，1-based）：sig_end_line+1 到下一个顶层 item 前
+    /// （或文件末行）。MUT001 的 `let` 回扫限定在此范围内。
+    pub body_start_line: usize,
+    pub body_end_line: usize,
+}
+
+/// 从顶层 AST 提取 FnInfo 列表
+///
+/// 函数体行范围按"本声明起点 .. 下一个顶层 item 起点"推算（顶层 items
+/// 有序且各占独立行块；Import 行是单行声明，取其行号）。
+pub fn fn_infos(program: &ast::Program, src: &str) -> Vec<FnInfo> {
+    let total_lines = src.lines().count().max(1);
+    let mut starts: Vec<usize> = program
+        .items
+        .iter()
+        .map(|item| match item {
+            ast::Item::Fn(f) => f.span.line,
+            ast::Item::Enum(e) => e.span.line,
+            ast::Item::Import(imp) => imp.span.line,
+        })
+        .collect();
+    // 尾部哨兵：最后一个 item 的体范围到文件末行
+    starts.push(total_lines + 1);
+
+    let mut out = Vec::new();
+    for (i, item) in program.items.iter().enumerate() {
+        if let ast::Item::Fn(f) = item {
+            let next_start = starts[i + 1];
+            // 防御：容错解析下 span 可能异常（end < start），saturating 兜底
+            let sig_end = f.span.end_line.max(f.span.line);
+            let body_start = sig_end.saturating_sub(1) + 2; // sig_end + 1
+            let body_end = next_start.saturating_sub(1).max(body_start.saturating_sub(1));
+            out.push(FnInfo {
+                params: f.params.iter().map(|p| p.name.clone()).collect(),
+                sig_start_line: f.span.line,
+                sig_end_line: sig_end,
+                body_start_line: body_start,
+                body_end_line: body_end,
+            });
+        }
+    }
+    out
+}
+
+/// 诊断行号落在哪个函数的体内（含签名行），返回其 FnInfo 引用
+fn owner_fn<'a>(d: &Diagnostic, fns: &'a [FnInfo]) -> Option<&'a FnInfo> {
+    fns.iter().find(|f| {
+        d.line >= f.sig_start_line && d.line <= f.body_end_line
+    })
+}
 
 /// 修复计划（lom-fix/v1 顶层）
 pub struct FixPlan {
@@ -95,6 +163,7 @@ pub struct DiagRef {
 }
 
 /// 修复动作
+#[derive(Debug)]
 pub struct FixAction {
     pub description: String,
     pub action: ActionKind,
@@ -154,14 +223,21 @@ impl Confidence {
 /// 为诊断集合生成修复计划
 ///
 /// 对每条诊断调用 `fix_for_diagnostic` 生成修复动作列表。
-/// `ok` 字段：true 当且仅当 plans 为空（无诊断）或所有诊断都有修复建议。
-pub fn generate_plan(diags: &Diagnostics, src: &str) -> FixPlan {
+/// `fns` 是顶层函数摘要（fix::fn_infos 从 AST 提取；解析失败的源码传空切片，
+/// 此时 MUT001/EFF001 走保守 hint 路径）。
+/// `ok` 字段：true 当且仅当 plans 为空（无诊断）。
+///
+/// R55（九审）：EFF001 生成后做同函数聚合——同一签名行的多条 EFF001
+/// 合并为一条注解动作（` ! [E1, E2]` 或 `, E1, E2`），其余 plan 降为
+/// 说明性 hint，杜绝同位置叠加两段 ` ! [...]` 产生 PARSE001。
+pub fn generate_plan(diags: &Diagnostics, src: &str, fns: &[FnInfo]) -> FixPlan {
     let source_lines: Vec<&str> = src.lines().collect();
-    let plans: Vec<Plan> = diags
+    let mut plans: Vec<Plan> = diags
         .diagnostics
         .iter()
         .map(|d| {
-            let fixes = fix_for_diagnostic(d, &source_lines);
+            let owner = owner_fn(d, fns);
+            let fixes = fix_for_diagnostic(d, &source_lines, owner);
             // retry=true 当至少有一个 fix 满足：
             //   1. action 非 hint（insert/replace/delete，有具体位置和操作），或
             //   2. action 为 hint 但有具体 text（如 EFF001 的 "! [IO]"、MAT001 的分支文本）
@@ -184,6 +260,8 @@ pub fn generate_plan(diags: &Diagnostics, src: &str) -> FixPlan {
         })
         .collect();
 
+    merge_eff001_same_fn(&mut plans, &source_lines);
+
     FixPlan {
         file: diags.file.clone(),
         ok: plans.is_empty(),
@@ -191,12 +269,128 @@ pub fn generate_plan(diags: &Diagnostics, src: &str) -> FixPlan {
     }
 }
 
+/// R55：聚合同一函数（同 diagnostic.line）的多条 EFF001 修复动作
+///
+/// typechecker 对同一函数的每个缺失效应各发一条 EFF001（诊断 line 均为
+/// 签名行）。逐条独立生成会在同一位置叠加 `! [Clock]` 与 `! [IO]` 两段
+/// 注解，下一轮解析即 PARSE001。聚合规则：
+///   - 组内首条 plan 持有合并动作（效应按诊断出现顺序去重）；
+///   - 其余 plan 的 fixes 替换为说明性 hint（"已并入 N 行的合并注解"）。
+fn merge_eff001_same_fn(plans: &mut [Plan], source_lines: &[&str]) {
+    // 收集 EFF001 分组：diagnostic.line -> 组内 plan 下标（保持顺序）
+    let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
+    for (i, p) in plans.iter().enumerate() {
+        if p.diagnostic.code != "EFF001" {
+            continue;
+        }
+        let line = p.diagnostic.line;
+        if line == 0 {
+            continue;
+        }
+        match groups.iter_mut().find(|(l, _)| *l == line) {
+            Some((_, idxs)) => idxs.push(i),
+            None => groups.push((line, vec![i])),
+        }
+    }
+
+    for (line, idxs) in groups {
+        if idxs.len() < 2 {
+            continue; // 单条：fix_eff_undeclared 已按签名 end 行产出正确动作
+        }
+        // 从各 plan 现有动作的 text 提取效应名（" ! [IO]" / ", Clock"）——
+        // 不再从 message 重解析，避免二次提取口径分叉
+        let mut effects: Vec<String> = Vec::new();
+        for &i in &idxs {
+            for f in &plans[i].fixes {
+                if f.action == ActionKind::Insert
+                    && let Some(t) = &f.text
+                    && let Some(eff) = effect_from_action_text(t)
+                    && !effects.contains(&eff)
+                {
+                    effects.push(eff);
+                }
+            }
+        }
+        if effects.is_empty() {
+            continue;
+        }
+        let joined = effects.join(", ");
+        // 插入行：沿用首条动作的 line（fix_eff_undeclared 已用签名 end 行）
+        let first = &plans[idxs[0]];
+        let action_line = first
+            .fixes
+            .iter()
+            .find(|f| f.action == ActionKind::Insert)
+            .map(|f| f.line)
+            .unwrap_or(line);
+        let line_str = source_lines.get(action_line.saturating_sub(1)).copied();
+        let merged = match line_str.map(find_effect_close_bracket) {
+            // 已有注解：在 `]` 前合并追加
+            Some(Some(close_col)) => FixAction {
+                description: format!("在现有效应列表中合并添加缺失效应: {}", joined),
+                action: ActionKind::Insert,
+                line: action_line,
+                col: close_col + 1,
+                end_line: None,
+                end_col: None,
+                text: Some(format!(", {}", joined)),
+                confidence: Confidence::High,
+            },
+            // 纯函数：签名 end 行行末插入完整注解
+            _ => FixAction {
+                description: format!("在函数签名行末添加效应注解: ! [{}]", joined),
+                action: ActionKind::Insert,
+                line: action_line,
+                col: line_str.map(|s| s.chars().count()).unwrap_or(0) + 1,
+                end_line: None,
+                end_col: None,
+                text: Some(format!(" ! [{}]", joined)),
+                confidence: Confidence::High,
+            },
+        };
+        plans[idxs[0]].fixes = vec![merged];
+        plans[idxs[0]].retry = true;
+        for &i in &idxs[1..] {
+            plans[i].fixes = vec![hint_only(
+                &format!(
+                    "同函数缺失效应已并入第 {} 行的合并注解（{}）",
+                    action_line, joined
+                ),
+                Confidence::Low,
+            )];
+            plans[i].retry = false;
+        }
+    }
+}
+
+/// 从 EFF001 动作 text（" ! [IO]" 或 ", Clock"）提取效应名
+fn effect_from_action_text(t: &str) -> Option<String> {
+    let t = t.trim();
+    if let Some(rest) = t.strip_prefix('!') {
+        // " ! [IO]" → "IO"（去方括号）
+        let inner = rest.trim().trim_start_matches('[').trim_end_matches(']');
+        let name = inner.trim();
+        return if name.is_empty() { None } else { Some(name.to_string()) };
+    }
+    if let Some(rest) = t.strip_prefix(',') {
+        let name = rest.trim();
+        return if name.is_empty() { None } else { Some(name.to_string()) };
+    }
+    None
+}
+
 // ===== 修复策略表（按错误码分发）=====
 
 /// 为单条诊断生成修复动作列表
 ///
+/// `owner` 是诊断行所属的顶层函数摘要（R55 起 MUT001/EFF001 的定位依据；
+/// None 时这两类降级为保守 hint）。
 /// 返回空 Vec 表示该诊断无法生成修复（罕见，目前所有码都有至少 hint）。
-fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+fn fix_for_diagnostic(
+    d: &Diagnostic,
+    source_lines: &[&str],
+    owner: Option<&FnInfo>,
+) -> Vec<FixAction> {
     match d.code.as_str() {
         // ===== 词法错误 =====
         "LEX001" => fix_lex_unclosed_string(d, source_lines),
@@ -260,13 +454,14 @@ fn fix_for_diagnostic(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
         "NAM005" => fix_nam005_import(d),
 
         // ===== 效应系统（Phase 2.5）=====
-        "EFF001" => fix_eff_undeclared(d, source_lines),
+        "EFF001" => fix_eff_undeclared(d, source_lines, owner),
 
-        // ===== 可变性（v0.20.0；③ 包升级为可应用动作）=====
-        // 声明点按变量名回扫（诊断在赋值处、声明在别处）：全文唯一 `let {name}`
-        // 命中 → Replace let → let mut（High，重赋值已发生，语义忠实）；
-        // 多处声明（shadowing 定位近似）或无 let 命中（参数/for 变量）→ hint。
-        "MUT001" => fix_mut001_add_mut(d, source_lines),
+        // ===== 可变性（v0.20.0；③ 包升级为可应用动作；R55 作用域限定）=====
+        // 声明点回扫限定在**诊断所属函数体内**（R55：此前全文唯一命中会跨
+        // 作用域错改无关函数的 let）；体内唯一 `let {name}` 命中 → Replace
+        // let → let mut（High，重赋值已发生，语义忠实）；体内零命中（参数/
+        // for 变量/match 绑定）或多命中 → hint（不自动改）。
+        "MUT001" => fix_mut001_add_mut(d, source_lines, owner),
 
         // ===== 运行时错误 =====
         "RUNTIME001" => vec![hint_only(
@@ -337,16 +532,21 @@ fn fix_lex_bad_number(d: &Diagnostic) -> Vec<FixAction> {
 ///
 /// 高置信度：意外字符通常是误输入（如 BOM、全角符号），删除即可。
 /// 位置：(line, col) .. (line, col+1)
-fn fix_lex_unexpected_char(d: &Diagnostic, _source_lines: &[&str]) -> Vec<FixAction> {
+/// R55：d.col 是字节列（lexer 口径），换算为字符列再交给 apply（字符列口径）
+fn fix_lex_unexpected_char(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
     // 解析 message 中的字符（格式："意外字符 'X'"）
     let ch = extract_quoted_char(&d.message).unwrap_or('?');
+    let char_col = source_lines
+        .get(d.line.saturating_sub(1))
+        .map(|line| byte_col_to_char_col(line, d.col))
+        .unwrap_or(d.col);
     vec![FixAction {
         description: format!("删除意外字符 '{}'", ch),
         action: ActionKind::Delete,
         line: d.line,
-        col: d.col,
+        col: char_col,
         end_line: Some(d.line),
-        end_col: Some(d.col + 1),
+        end_col: Some(char_col + 1),
         text: None,
         confidence: Confidence::High,
     }]
@@ -378,14 +578,19 @@ fn fix_parse_expected_token(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAct
 
 /// PARSE001 期望 ')'：在正确的位置补闭括号
 fn fix_parse_missing_rparen(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+    // R55：d.col 是字节列（lexer 口径），行内比较/插入前换算字符列
+    let char_col = source_lines
+        .get(d.line.wrapping_sub(1))
+        .map(|line| byte_col_to_char_col(line, d.col))
+        .unwrap_or(d.col);
     // 违规 token 是否在其所在行的行首（首个非空白字符）——是则它是"下一条语句"，
     // 缺失的 ')' 属于上一非空行的行末；否则是行内情况，直接插在出错位置。
     let at_line_start = match source_lines.get(d.line.wrapping_sub(1)) {
         Some(line) => {
             let first_non_ws = line.chars().position(|c| !c.is_whitespace());
             match first_non_ws {
-                Some(idx) => idx + 1 == d.col, // col 是 1-based
-                None => true,                  // 空行（异常输入，按行首处理）
+                Some(idx) => idx + 1 == char_col, // 均为 1-based 字符列
+                None => true,                     // 空行（异常输入，按行首处理）
             }
         }
         None => true, // d.line 超出源码行数 = 文件结束
@@ -411,7 +616,7 @@ fn fix_parse_missing_rparen(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAct
         description: "在出错位置插入 ')'（也可能是缺 ','——请确认）".to_string(),
         action: ActionKind::Insert,
         line: d.line,
-        col: d.col,
+        col: char_col,
         end_line: None,
         end_col: None,
         text: Some(")".to_string()),
@@ -666,23 +871,58 @@ fn fix_nam005_import(d: &Diagnostic) -> Vec<FixAction> {
 /// --apply）；多处命中（shadowing 近似，或字符串字面量干扰）或零命中（参数/
 /// for 变量重赋值）→ hint（Medium）。字面量含 "let x" 的误命中由唯一性判据
 /// 自然降级，不单做字符串状态机。
-fn fix_mut001_add_mut(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+/// MUT001 不可变重赋值：把声明 `let` 改为 `let mut`
+///
+/// R55（九审）作用域限定：`let {name}` 回扫范围 = 诊断所属函数体内
+/// （owner.body_start_line..=body_end_line）。v1.2.1 的全文唯一命中会
+/// 把别的函数的同名声明错改成 `let mut`（跨作用域错改，仍标 High）。
+///
+/// 分支：
+///   - 体内唯一命中 → High Replace（正例：fix_corpus 09）
+///   - 体内零命中（参数/for 变量/match 绑定恒不可变）→ Medium hint
+///   - 体内多命中 / owner 缺失（解析失败无 AST）→ Medium hint
+fn fix_mut001_add_mut(
+    d: &Diagnostic,
+    source_lines: &[&str],
+    owner: Option<&FnInfo>,
+) -> Vec<FixAction> {
     let Some(name) = extract_last_quoted(&d.message) else {
         return vec![hint_only(
             "不可变重赋值：删除该赋值或改用新变量",
             Confidence::Low,
         )];
     };
-    let pat = format!("let {}", name);
-    let mut hits: Vec<(usize, usize)> = vec![]; // (0-based 行, 0-based "let" 列)
-    for (idx, line) in source_lines.iter().enumerate() {
+    let Some(owner) = owner else {
+        // 无 AST（解析失败）：MUT001 不会在此场景出现（typecheck 只在解析
+        // 成功后跑），防御性降级为 hint，绝不全文盲扫
+        return vec![hint_only(
+            &format!(
+                "不可变变量 '{}' 被重赋值：无法定位所属函数——人工确认声明处加 mut，或改用新变量",
+                name
+            ),
+            Confidence::Medium,
+        )];
+    };
+    let pat: Vec<char> = format!("let {}", name).chars().collect();
+    let mut hits: Vec<(usize, usize)> = vec![]; // (0-based 行, 0-based "let" 字符列)
+    let scan_start = owner.body_start_line.saturating_sub(1);
+    let scan_end = owner.body_end_line.min(source_lines.len());
+    for (idx, line) in source_lines
+        .iter()
+        .enumerate()
+        .take(scan_end)
+        .skip(scan_start)
+    {
         if line.trim_start().starts_with('#') {
             continue;
         }
+        // 字符列扫描（fix 动作约定 1-based 字符列；v1.2.1 用 byte 偏移，
+        // 含非 ASCII 的行会错位——R55 一并修正）
+        let chars: Vec<char> = line.chars().collect();
         let mut from = 0;
-        while let Some(rel) = line[from..].find(&pat) {
+        while let Some(rel) = find_substring_in_chars(&chars[from..], &pat) {
             let abs = from + rel;
-            let after = &line[abs + pat.len()..];
+            let after: String = chars[abs + pat.len()..].iter().collect();
             if after.starts_with(':') || after.starts_with('=') || after.starts_with(' ') {
                 hits.push((idx, abs));
             }
@@ -700,31 +940,59 @@ fn fix_mut001_add_mut(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
             text: Some("let mut".to_string()),
             confidence: Confidence::High,
         }],
+        [] => {
+            let kind = if owner.params.iter().any(|p| p == &name) {
+                format!("函数参数 '{}'", name)
+            } else {
+                format!("for 循环变量/match 绑定 '{}'", name)
+            };
+            vec![hint_only(
+                &format!(
+                    "不可变绑定（{}）恒不可变：在首次重赋值前引入局部副本 \
+                     let mut {n} = {n}，或改用新变量",
+                    kind,
+                    n = name
+                ),
+                Confidence::Medium,
+            )]
+        }
         _ => vec![hint_only(
             &format!(
-                "不可变变量 '{}' 被重赋值：未唯一定位到 let 声明——人工确认声明处加 mut，或改用新变量",
-                name
+                "不可变变量 '{}' 被重赋值：所属函数内有多处 let {} 声明（遮蔽），\
+                 未能唯一定位——人工确认声明处加 mut，或改用新变量",
+                name, name
             ),
             Confidence::Medium,
         )],
     }
 }
 
+/// 在 char 切片中找子串首次出现位置（字符下标）；找不到返回 None
+fn find_substring_in_chars(haystack: &[char], needle: &[char]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    (0..=haystack.len() - needle.len()).find(|&i| &haystack[i..i + needle.len()] == needle)
+}
+
 /// EFF001 效应未声明：在函数签名行插入效应注解
 ///
 /// Phase 3.1 升级：从 Hint 改为精确 Insert。
-/// typechecker 现在把函数签名行号填入诊断的 line 字段（Phase 3.1 改造），
-/// fix 据此在签名行插入效应注解。
+/// R55（九审）修正：插入行用 **owner.sig_end_line**（FnDecl 签名 span 的
+/// 结束行，即 `)`/返回类型/已有注解所在行）。v1.2.1 用诊断行（签名首行）
+/// 行末插入，多行签名会插成 `fn helper( ! [IO]` → 下一轮 PARSE001。
+/// 同函数多条 EFF001 的合并见 generate_plan 的 merge_eff001_same_fn。
 ///
-/// 两种情况：
+/// 两种情况（均在 sig_end_line 行上操作）：
 ///   1. 签名行无 `! [`（纯函数）：在行末插入 ` ! [Effect]`
 ///      例：`fn helper(x: Int) -> Int` → `fn helper(x: Int) -> Int ! [IO]`
 ///   2. 签名行已有 `! [`（部分效应声明）：在 `]` 前插入 `, Effect`
 ///      例：`fn bad(x: Int) -> Int ! [IO]` → `fn bad(x: Int) -> Int ! [IO, Clock]`
-///
-/// 高置信度：EFF001 的修复明确——给函数加缺失的效应。
-/// 从 message 提取缺失的效应名（格式："纯函数或未声明效应 [...] 的函数调用了带效应 [IO] 的函数 '...'"）。
-fn fix_eff_undeclared(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
+fn fix_eff_undeclared(
+    d: &Diagnostic,
+    source_lines: &[&str],
+    owner: Option<&FnInfo>,
+) -> Vec<FixAction> {
     let effect = extract_second_bracketed(&d.message);
     match effect {
         Some(eff) => {
@@ -741,7 +1009,14 @@ fn fix_eff_undeclared(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
                     confidence: Confidence::High,
                 }];
             }
-            let line_idx = d.line.saturating_sub(1);
+            // R55：owner 缺失（解析失败无 AST）→ 保守 hint，不做行末插入
+            let Some(owner) = owner else {
+                return vec![hint_only(
+                    "效应未声明：无法定位函数签名——人工在返回类型后加 ! [Effect] 注解",
+                    Confidence::Medium,
+                )];
+            };
+            let line_idx = owner.sig_end_line.saturating_sub(1);
             let line_str = match source_lines.get(line_idx) {
                 Some(s) => *s,
                 None => {
@@ -759,7 +1034,7 @@ fn fix_eff_undeclared(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
                 return vec![FixAction {
                     description: format!("在现有效应列表中添加缺失效应: {}", eff),
                     action: ActionKind::Insert,
-                    line: d.line,
+                    line: owner.sig_end_line,
                     col: close_col + 1,
                     end_line: None,
                     end_col: None,
@@ -773,7 +1048,7 @@ fn fix_eff_undeclared(d: &Diagnostic, source_lines: &[&str]) -> Vec<FixAction> {
             vec![FixAction {
                 description: format!("在函数签名行末添加效应注解: ! [{}]", eff),
                 action: ActionKind::Insert,
-                line: d.line,
+                line: owner.sig_end_line,
                 col: line_len + 1,
                 end_line: None,
                 end_col: None,
@@ -847,6 +1122,24 @@ fn hint_only(text: &str, confidence: Confidence) -> FixAction {
         text: None,
         confidence,
     }
+}
+
+/// R55（九审）：诊断/lexer 列（1-based 字节列）→ fix 动作列（1-based 字符列）
+///
+/// lexer 按字节推进（`Lexer::advance` 逐 byte 且 col+=1），诊断的 col 因此是
+/// 字节列；fix 动作与 apply 的行列定位约定字符列（apply::line_col_to_offset
+/// 按 chars 计数）。纯 ASCII 行两者一致；含非 ASCII 的行会分叉——LEX005 的
+/// delete 与 MUT001 的 replace 在 v1.2.1 直接透传字节列，多字节行会错位。
+/// byte_col 落在多字节字符中间时向前取整字符边界（保守对齐）。
+fn byte_col_to_char_col(line: &str, byte_col: usize) -> usize {
+    let mut b = byte_col.saturating_sub(1);
+    if b > line.len() {
+        b = line.len();
+    }
+    while b > 0 && !line.is_char_boundary(b) {
+        b -= 1;
+    }
+    line[..b].chars().count() + 1
 }
 
 /// 从 message 中提取单引号内的字符串（如 "意外字符 'X'" → "X"，"未覆盖变体 'Green'" → "Green"）
@@ -1187,7 +1480,7 @@ mod tests {
     #[test]
     fn lex001_generates_insert_quote_fix() {
         let (d, lines) = make_lex_diag("未闭合的字符串", 1, 9, "let s = \"hello");
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
@@ -1200,7 +1493,7 @@ mod tests {
     #[test]
     fn lex002_generates_insert_quote_fix() {
         let (d, lines) = make_lex_diag("未闭合的字符串转义", 2, 5, "let x = 1\nlet s = \"a\\");
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
     }
@@ -1208,7 +1501,7 @@ mod tests {
     #[test]
     fn lex005_generates_delete_char_fix() {
         let (d, lines) = make_lex_diag("意外字符 '#'", 1, 1, "# bad");
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Delete);
         assert_eq!(fixes[0].confidence, Confidence::High);
@@ -1222,7 +1515,7 @@ mod tests {
     #[test]
     fn lex003_generates_hint_only() {
         let (d, lines) = make_lex_diag("无效浮点数 '3.'", 1, 5, "let x = 3.");
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Low);
     }
@@ -1237,7 +1530,7 @@ mod tests {
         };
         let lines: Vec<&str> = vec!["fn f()", "  1", "} end"];
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
         assert_eq!(fixes[0].text.as_deref(), Some(")"));
@@ -1257,7 +1550,7 @@ mod tests {
             col: 1,
         };
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
         assert_eq!(fixes[0].line, 2, "应插在 println 所在行");
@@ -1276,7 +1569,7 @@ mod tests {
             col: 1,
         };
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
         assert_eq!(fixes[0].line, 2);
@@ -1294,7 +1587,7 @@ mod tests {
             col: 1,
         };
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].line, 2, "应跳过第 3 行的空行");
         assert_eq!(fixes[0].confidence, Confidence::High);
     }
@@ -1310,7 +1603,7 @@ mod tests {
             col: 1,
         };
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
         assert_eq!(fixes[0].text.as_deref(), Some("\nend\n"));
@@ -1327,7 +1620,7 @@ mod tests {
         };
         let lines: Vec<&str> = vec!["f(a x)"];
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Low);
     }
@@ -1341,7 +1634,7 @@ mod tests {
         };
         let lines: Vec<&str> = vec!["Result<Int>"];
         let d = Diagnostic::from_parse(&err, "test.lom", &lines);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
         assert!(fixes[0].description.contains("Result<T, E>"));
     }
@@ -1360,7 +1653,7 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
@@ -1381,7 +1674,7 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert!(fixes[0].text.as_ref().unwrap().contains("Ok(_)"));
     }
 
@@ -1400,7 +1693,7 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].confidence, Confidence::High);
         assert_eq!(fixes[0].text.as_deref(), Some("! [IO]"));
@@ -1422,28 +1715,15 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes[0].text.as_deref(), Some("! [Clock]"));
     }
 
     /// Phase 3.1: EFF001 纯函数 → 行末 Insert ` ! [IO]`
     #[test]
     fn eff001_pure_fn_inserts_at_line_end() {
-        let d = Diagnostic {
-            severity: Severity::Warning,
-            stage: Stage::Type,
-            code: "EFF001".to_string(),
-            message: "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'"
-                .to_string(),
-            file: "test.lom".to_string(),
-            line: 1,
-            col: 0,
-            source_line: None,
-            is_hole: false,
-            hint: None,
-        };
-        let lines = vec!["fn helper(x: Int) -> Int"];
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let src = "fn helper(x: Int) -> Int\n    println(x)\n    x\nend\n";
+        let fixes = e2e_fixes(src, "EFF001", EFF001_PURE_IO_MSG, 1, 1);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
@@ -1456,21 +1736,14 @@ mod tests {
     /// Phase 3.1: EFF001 部分效应 → `]` 前 Insert `, Clock`
     #[test]
     fn eff001_partial_effects_inserts_before_close_bracket() {
-        let d = Diagnostic {
-            severity: Severity::Warning,
-            stage: Stage::Type,
-            code: "EFF001".to_string(),
-            message: "纯函数或未声明效应 [IO] 的函数调用了带效应 [Clock] 的函数 'now'"
-                .to_string(),
-            file: "test.lom".to_string(),
-            line: 1,
-            col: 0,
-            source_line: None,
-            is_hole: false,
-            hint: None,
-        };
-        let lines = vec!["fn bad(x: Int) -> Int ! [IO]"];
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let src = "fn bad(x: Int) -> Int ! [IO]\n    now()\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "EFF001",
+            "纯函数或未声明效应 [IO] 的函数调用了带效应 [Clock] 的函数 'now'",
+            1,
+            1,
+        );
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].confidence, Confidence::High);
@@ -1478,6 +1751,233 @@ mod tests {
         // `]` 在 0-based col 27，1-based col 28
         assert_eq!(fixes[0].col, 28);
         assert_eq!(fixes[0].text.as_deref(), Some(", Clock"));
+    }
+
+    // ===== R55（九审）：High 自动修复错误应用——三个探针的负向/正向锁定 =====
+
+    const EFF001_PURE_IO_MSG: &str =
+        "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'println'";
+
+    /// R55：端到端修复辅助——真实 parse 源码提取 FnInfo，按诊断行定位 owner。
+    /// 单元层直接传 None owner 测不到定位路径，与 CLI 行为分叉（九审教训：
+    /// 探针要穿过真实管线）。
+    fn e2e_fixes(src: &str, code: &str, message: &str, line: usize, col: usize) -> Vec<FixAction> {
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let lines: Vec<&str> = src.lines().collect();
+        let d = Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: code.to_string(),
+            message: message.to_string(),
+            file: "test.lom".to_string(),
+            line,
+            col,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        };
+        let owner = owner_fn(&d, &fns);
+        fix_for_diagnostic(&d, &lines, owner)
+    }
+
+    /// R55 探针 1：MUT001 跨作用域——参数 x 重赋值 + 另一函数唯一 let x，
+    /// v1.2.1 会把无关声明错改成 let mut（仍标 High）。新实现必须：
+    /// 不产出任何非 Hint 动作；apply_plan 后源码逐字不变。
+    #[test]
+    fn mut001_cross_scope_never_touches_other_fn_let() {
+        let src = "fn f(x: Int) -> Int\n    x = x + 1\n    x\nend\n\
+                   fn unrelated() -> Int\n    let x = 10\n    x\nend\n\
+                   fn main() -> Unit\n    println(f(unrelated()))\nend\n";
+        // 诊断定位在 f 的赋值行（2:5，typechecker 真实形态）
+        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 2, 5);
+        assert!(
+            fixes.iter().all(|f| f.action == ActionKind::Hint),
+            "跨作用域不得产出自动修改动作: {:?}",
+            fixes
+        );
+        // apply_plan 全程不改一字
+        let mut diags = Diagnostics::new("test.lom");
+        diags.diagnostics.push(Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: "MUT001".to_string(),
+            message: "赋值给不可变变量 'x'（声明时未标 mut）".to_string(),
+            file: "test.lom".to_string(),
+            line: 2,
+            col: 5,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        });
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let plan = generate_plan(&diags, src, &fns);
+        let result = crate::apply::apply_plan(&plan, src);
+        assert_eq!(result.applied, 0, "不应有任何应用: {:?}", result.changes);
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// R55：参数重赋值（体内零 let 命中）→ Medium hint，文案点名参数与局部副本修法
+    #[test]
+    fn mut001_param_reassign_gives_param_hint() {
+        let src = "fn f(n: Int) -> Int\n    n = n + 1\n    n\nend\nfn main() -> Unit\n    println(f(1))\nend\n";
+        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'n'（声明时未标 mut）", 2, 5);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert!(
+            fixes[0].description.contains("参数 'n'"),
+            "hint 应点名参数: {}",
+            fixes[0].description
+        );
+        assert!(fixes[0].description.contains("let mut n = n"));
+    }
+
+    /// R55 探针 2：EFF001 多行签名——v1.2.1 按签名首行行末插入生成
+    /// `fn helper( ! [IO]`（下一轮 PARSE001）。新实现必须插在签名结束行
+    /// （`) -> Int` 所在行）行末。
+    #[test]
+    fn eff001_multiline_signature_inserts_at_sig_end_line() {
+        let src = "fn helper(\n    x: Int\n) -> Int\n    println(x)\n    x\nend\n\
+                   fn main() -> Unit\n    println(helper(7))\nend\n";
+        let fixes = e2e_fixes(src, "EFF001", EFF001_PURE_IO_MSG, 1, 1);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Insert);
+        assert_eq!(fixes[0].confidence, Confidence::High);
+        // 插入行必须是第 3 行（`) -> Int`），不是第 1 行（`fn helper(`）
+        assert_eq!(fixes[0].line, 3);
+        assert_eq!(fixes[0].col, 9); // ") -> Int" 长度 8，行末后一位
+        assert_eq!(fixes[0].text.as_deref(), Some(" ! [IO]"));
+        // 应用后必须仍是合法源码（可解析）
+        let patched = format!(
+            "fn helper(\n    x: Int\n) -> Int ! [IO]\n    println(x)\n    x\nend\n\
+             fn main() -> Unit\n    println(helper(7))\nend\n"
+        );
+        assert_eq!(
+            crate::parser::Parser::parse_recover(&patched).program.items.len(),
+            2,
+            "注解插在签名 end 行后必须仍可解析"
+        );
+    }
+
+    /// R55 探针 3：同一纯函数缺 IO+Clock——v1.2.1 生成两条同位 insert 叠成
+    /// `! [Clock] ! [IO]`。新实现必须聚合成一条（首条 Insert 合并、其余 Hint）。
+    #[test]
+    fn eff001_same_fn_two_effects_merged_into_one_action() {
+        let src = "fn io_work() -> Unit ! [IO]\n    println(\"io\")\nend\n\
+                   fn clock_work() -> Unit ! [Clock]\n    ()\nend\n\
+                   fn helper() -> Unit\n    io_work()\n    clock_work()\nend\n\
+                   fn main() -> Unit\n    helper()\nend\n";
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let mut diags = Diagnostics::new("test.lom");
+        for (msg, line, col) in [
+            (
+                "纯函数或未声明效应 [] 的函数调用了带效应 [IO] 的函数 'io_work'",
+                7,
+                1,
+            ),
+            (
+                "纯函数或未声明效应 [] 的函数调用了带效应 [Clock] 的函数 'clock_work'",
+                7,
+                1,
+            ),
+        ] {
+            diags.diagnostics.push(Diagnostic {
+                severity: Severity::Warning,
+                stage: Stage::Type,
+                code: "EFF001".to_string(),
+                message: msg.to_string(),
+                file: "test.lom".to_string(),
+                line,
+                col,
+                source_line: None,
+                is_hole: false,
+                hint: None,
+            });
+        }
+        let plan = generate_plan(&diags, src, &fns);
+        let inserts: Vec<&FixAction> = plan
+            .plans
+            .iter()
+            .flat_map(|p| p.fixes.iter())
+            .filter(|f| f.action == ActionKind::Insert)
+            .collect();
+        assert_eq!(inserts.len(), 1, "同函数两效应必须聚合成一条 insert");
+        assert_eq!(inserts[0].line, 7);
+        assert_eq!(inserts[0].text.as_deref(), Some(" ! [IO, Clock]"));
+        assert_eq!(inserts[0].confidence, Confidence::High);
+        // 另一条 plan 是说明性 hint
+        assert!(plan
+            .plans
+            .iter()
+            .any(|p| p.fixes.iter().all(|f| f.action == ActionKind::Hint)));
+
+        // 端到端：应用后源码可解析且注解唯一
+        let result = crate::apply::apply_plan(&plan, src);
+        assert_eq!(result.applied, 1);
+        assert!(result.patched_source.contains("fn helper() -> Unit ! [IO, Clock]"));
+        assert_eq!(
+            crate::parser::Parser::parse_recover(&result.patched_source)
+                .program
+                .items
+                .len(),
+            4,
+            "修复后必须仍可解析出 4 个顶层项"
+        );
+    }
+
+    /// R55：LEX005 多字节行列换算——lexer col 是字节列，fix 动作是字符列。
+    /// 含中文的行上删除意外字符必须删对位置（v1.2.1 byte/char 混用会错删）。
+    #[test]
+    fn lex005_multibyte_line_converts_byte_col_to_char_col() {
+        // 行内容：`说点中文 1 @`——"@" 的字节列：中文 4 字 = 12 字节 + 空格 1 + "1" 1 + 空格 1 = 15 字节处（1-based 16）
+        let src = "fn main() -> Unit\n    说点中文 1 @\nend\n";
+        let lines: Vec<&str> = src.lines().collect();
+        let byte_col = {
+            let line = lines[1];
+            line.find('@').unwrap() + 1 // lexer 口径的 1-based 字节列
+        };
+        assert!(byte_col > line_byte_len_prefix_check(&lines[1], 5), "前置：@ 前有多字节字符");
+        let d = Diagnostic {
+            severity: Severity::Error,
+            stage: Stage::Lex,
+            code: "LEX005".to_string(),
+            message: "意外字符 '@'".to_string(),
+            file: "test.lom".to_string(),
+            line: 2,
+            col: byte_col,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        };
+        let fixes = fix_for_diagnostic(&d, &lines, None);
+        assert_eq!(fixes[0].action, ActionKind::Delete);
+        let result = crate::apply::apply_plan(
+            &crate::fix::generate_plan(
+                &{
+                    let mut dd = Diagnostics::new("test.lom");
+                    dd.diagnostics.push(d);
+                    dd
+                },
+                src,
+                &[],
+            ),
+            src,
+        );
+        assert_eq!(result.applied, 1);
+        assert!(
+            result.patched_source.contains("说点中文 1"),
+            "中文必须完好: {:?}",
+            result.patched_source
+        );
+        assert!(!result.patched_source.contains('@'), "@ 必须被删除");
+    }
+
+    /// 测试辅助：字节列是否超过前 n 个字符的字节宽（用于断言"确实存在多字节前缀"）
+    fn line_byte_len_prefix_check(line: &str, n_chars: usize) -> usize {
+        line.chars().take(n_chars).map(|c| c.len_utf8()).sum()
     }
 
     #[test]
@@ -1491,6 +1991,7 @@ mod tests {
                 diagnostics: vec![d],
             },
             "let s = \"hello",
+            &[],
         );
         let _ = lines;
         assert_eq!(plan.plans.len(), 1);
@@ -1508,6 +2009,7 @@ mod tests {
                 diagnostics: vec![d],
             },
             "let x = 3.",
+            &[],
         );
         assert_eq!(plan.plans.len(), 1);
         assert!(!plan.plans[0].retry);
@@ -1518,6 +2020,7 @@ mod tests {
         let plan = generate_plan(
             &Diagnostics::new("ok.lom"),
             "fn main() -> Unit\n    println(\"hi\")\nend\n",
+            &[],
         );
         assert!(plan.ok);
         assert!(plan.plans.is_empty());
@@ -1534,6 +2037,7 @@ mod tests {
                 diagnostics: vec![d],
             },
             "let s = \"hello",
+            &[],
         );
         let json = to_json(&plan);
         assert!(json.contains("\"schema\": \"lom-fix/v1\""));
@@ -1552,6 +2056,7 @@ mod tests {
         let plan = generate_plan(
             &Diagnostics::new("ok.lom"),
             "fn main() -> Unit\nend\n",
+            &[],
         );
         let json = to_json(&plan);
         assert!(json.contains("\"ok\": true"));
@@ -1570,6 +2075,7 @@ mod tests {
                 diagnostics: vec![d],
             },
             "let s = \"hello",
+            &[],
         );
         let human = to_human(&plan);
         assert!(human.contains("LEX001"));
@@ -1613,7 +2119,7 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Low);
@@ -1633,7 +2139,7 @@ mod tests {
             is_hole: false,
             hint: None,
         };
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert!(fixes[0].description.contains("fooo"));
     }
@@ -1664,7 +2170,7 @@ mod tests {
             "未定义变量 'lenght'",
             Some("是否想用 'length'？"),
         );
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].confidence, Confidence::Medium); // 猜测性修复不自动应用
@@ -1684,7 +2190,7 @@ mod tests {
             "未定义变量 'lenght'",
             Some("是否想用 'length'？"),
         );
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         // 只有第 1、4 行的真实出现；字符串与注释里的不算
         assert_eq!(fixes.len(), 2);
         assert_eq!(fixes[0].line, 1);
@@ -1697,7 +2203,7 @@ mod tests {
         let src = "let length = 1\nprintln(len)\n";
         let lines: Vec<&str> = src.lines().collect();
         let d = make_nam_diag("NAM003", "未定义变量 'len'", Some("是否想用 'lenx'？"));
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].line, 2);
         assert_eq!(fixes[0].col, 9);
@@ -1713,7 +2219,7 @@ mod tests {
         let mut d = make_nam_diag("NAM003", "未定义变量 'toatl'", Some("是否想用 'total'？"));
         d.line = 3;
         d.col = 13; // lexer 字节列（纯 ASCII 行与字符列一致）
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1, "精确位置应只产出单点 Replace");
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].line, 3);
@@ -1731,7 +2237,7 @@ mod tests {
         let mut d = make_nam_diag("NAM003", "未定义变量 'toatl'", Some("是否想用 'total'？"));
         d.line = 1;
         d.col = 24;
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].col, 20, "字节列 24 应换算为字符列 20");
         assert_eq!(fixes[0].end_col, Some(25));
@@ -1745,7 +2251,7 @@ mod tests {
         let mut d = make_nam_diag("NAM003", "未定义变量 'lenght'", Some("是否想用 'length'？"));
         d.line = 2;
         d.col = 5; // 该位置是 println，不是 lenght —— 校验失败，回退扫描
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!((fixes[0].line, fixes[0].col), (2, 13), "应回退扫描找到真实位置");
@@ -1759,7 +2265,7 @@ mod tests {
         let mut d = make_nam_diag("NAM004", "记录无字段 'nam'", Some("是否想用 'name'？"));
         d.line = 3;
         d.col = 15; // println(p.nam)：p 在 13，. 在 14，nam 在 15
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!((fixes[0].line, fixes[0].col), (3, 15));
@@ -1771,7 +2277,7 @@ mod tests {
         let src = "println(zzz)\n";
         let lines: Vec<&str> = src.lines().collect();
         let d = make_nam_diag("NAM003", "未定义变量 'zzz'", None);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Low);
@@ -1783,7 +2289,7 @@ mod tests {
         let src = "println(p.nam)\nlet nam = 1\nprintln(nam)\n";
         let lines: Vec<&str> = src.lines().collect();
         let d = make_nam_diag("NAM004", "记录无字段 'nam'", Some("是否想用 'name'？"));
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].line, 1);
@@ -1802,7 +2308,7 @@ mod tests {
             "枚举 Shape 无变体 'Circl'",
             Some("是否想用 'Circle'？"),
         );
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].line, 2);
@@ -1832,7 +2338,7 @@ mod tests {
             "内建 'starts_with' 未导入——需在文件顶部声明：from string import {starts_with}",
             None,
         );
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = fix_for_diagnostic(&d, &lines, None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Insert);
         assert_eq!(fixes[0].line, 1);
@@ -1847,7 +2353,7 @@ mod tests {
     #[test]
     fn nam005_message_without_stmt_falls_back_to_hint() {
         let d = make_nam_diag("NAM005", "内建 'foo' 未导入", None);
-        let fixes = fix_for_diagnostic(&d, &[]);
+        let fixes = fix_for_diagnostic(&d, &[], None);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
         assert_eq!(fixes[0].confidence, Confidence::Medium);
@@ -1856,9 +2362,8 @@ mod tests {
     #[test]
     fn mut001_unique_let_decl_replaces_with_let_mut() {
         let src = "fn main()\n    let x = 1\n    x = x + 1\nend\n";
-        let lines: Vec<&str> = src.lines().collect();
-        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        // R55：端到端构造（真实 parse 取 FnInfo；诊断在赋值行 3，typechecker 形态）
+        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 3, 5);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Replace);
         assert_eq!(fixes[0].line, 2);
@@ -1872,9 +2377,7 @@ mod tests {
     fn mut001_word_boundary_rejects_longer_name() {
         // 声明是 let xy：'x' 的回扫不得命中（词边界）
         let src = "fn main()\n    let xy = 1\n    x = 2\nend\n";
-        let lines: Vec<&str> = src.lines().collect();
-        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 3, 5);
         assert_eq!(fixes.len(), 1);
         assert_eq!(fixes[0].action, ActionKind::Hint);
     }
@@ -1883,15 +2386,12 @@ mod tests {
     fn mut001_multiple_or_zero_hits_fall_back_to_hint() {
         // 多处 let x 命中（shadowing）→ hint；注释行不算命中
         let src = "fn main()\n    let x = 1\n    let x = 2\n    x = 3\nend\n";
-        let lines: Vec<&str> = src.lines().collect();
-        let d = make_nam_diag("MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", None);
-        let fixes = fix_for_diagnostic(&d, &lines);
+        let fixes = e2e_fixes(src, "MUT001", "赋值给不可变变量 'x'（声明时未标 mut）", 4, 5);
         assert_eq!(fixes[0].action, ActionKind::Hint);
 
-        // 零命中（参数重赋值形态）→ hint
+        // 零命中（参数重赋值形态）→ hint（R55：文案点名参数）
         let src2 = "fn f(n: Int) -> Int\n    n = n + 1\n    n\nend\n";
-        let lines2: Vec<&str> = src2.lines().collect();
-        let fixes2 = fix_for_diagnostic(&d, &lines2);
+        let fixes2 = e2e_fixes(src2, "MUT001", "赋值给不可变变量 'n'（声明时未标 mut）", 2, 5);
         assert_eq!(fixes2[0].action, ActionKind::Hint);
     }
 }

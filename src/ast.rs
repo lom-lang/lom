@@ -52,6 +52,9 @@ pub struct ImportDecl {
     pub module: String,
     /// 导入项列表
     pub items: Vec<ImportItem>,
+    /// 声明 span（`from` 关键字到 `}`）；R55（九审）起供 fix::fn_infos
+    /// 推算顶层 item 边界（函数体行范围）
+    pub span: Span,
 }
 
 /// 单个导入项：name 或 name as alias

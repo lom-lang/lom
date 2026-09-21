@@ -619,13 +619,16 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
 
     // 解析通过后追加类型检查诊断（与 --json 模式一致）
+    // R55：同时提取顶层函数摘要（MUT001 作用域限定 / EFF001 签名 end 定位）
+    let mut fns: Vec<fix::FnInfo> = Vec::new();
     if diags.ok {
         let program = parser::Parser::parse_recover(src).program;
+        fns = fix::fn_infos(&program, src);
         typechecker::check_program(&program, src, path, &mut diags);
     }
 
     // 生成修复计划
-    let plan = fix::generate_plan(&diags, src);
+    let plan = fix::generate_plan(&diags, src, &fns);
 
     // Phase 3.1: --apply 模式 — 应用修复到源文件
     // 修复引擎深化 M2：从单趟升级为**迭代闭环**——应用后重新诊断再修，
@@ -634,10 +637,13 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
         const MAX_ROUNDS: usize = 5;
         let (current, results) = apply_iterative(src, path, MAX_ROUNDS);
 
+        // R55（九审）：对修复后的源码重跑完整诊断，ok 含最终状态
+        let final_diag = apply::FinalDiag::check(&current, path);
+
         if cli.json {
-            print!("{}", apply::rounds_to_json(&results, path));
+            print!("{}", apply::rounds_to_json(&results, path, &final_diag));
         } else {
-            print!("{}", apply::rounds_to_human(&results, path));
+            print!("{}", apply::rounds_to_human(&results, path, &final_diag));
         }
 
         let total_applied: usize = results.iter().map(|r| r.applied).sum();
