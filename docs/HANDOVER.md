@@ -107,7 +107,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 510/510（2026-09-21 R55-R59 整改：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3；另有 tests/ 集成 ×3，合计 513）
+cargo test --release                                    # 期望 513/513（2026-09-21 R55-R60 整改：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 守卫 ×3；另有 tests/ 集成 ×3，合计 516）
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -118,6 +118,7 @@ python tools/diff_test.py --rounds 20 --seed-base 1 --ci   # D 包差分冒烟�
 python tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci   # D5 包模式冒烟（CI 同款；全量口径 --rounds 200 ×多 seed 段）
 # 覆盖率（按需）：rustup component add llvm-tools-preview 后
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
+python tools/eval_prompt_check.py --bin .	argetelease\lom.exe   # R60：error_repair prompt 内嵌诊断 vs 真实 lom --json（24/24）
 python tools\doc_audit.py                               # 对账：文档数字 65 项（原 63 + 九审新增 SPEC_FOR_AI 当前 eval 口径 ×1 + ci.yml WASM eval step 计数 ×1；其余为 eval/dump/.lom/行数/版本/changelog/测试数/claims/源码计数/SPEC 尺寸/自指/门面版本位）——已在 CI doc-gates job 常驻
 ```
 
@@ -338,7 +339,7 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6、TODO 的 R55-R61、第九轮报告；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
-2. `cargo build --release && cargo test --release` 确认 510/510（另有 tests/ 集成 ×3）、零 warning、`./target/release/lom.exe --version` 显示 1.2.1
+2. `cargo build --release && cargo test --release` 确认 513/513（另有 tests/ 集成 ×3）、零 warning、`./target/release/lom.exe --version` 显示 1.2.1
 3. 跑 §2.2 全量回归确认基线；注意 `cargo fmt --check` 是 R61 已知失败，不得误报成新回归
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
 5. **当前状态：v1.2.1、语言面/发布线冻结；九轮审查，R1-R54 已关闭；R55 已整改关闭（2026-09-21，九审三探针负向锁定 + apply ok 语义修正），R56-R61 open。第九轮把现状评级从 A- 校正为 B；R56（panic exit 0）/R57（缺 end 静默通过）/R58（LSP 传输）三项 P1 仍有真实最小复现，不要把 495/495 或 CI 绿解释为这些边界已覆盖。历史资产仍成立：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101），§11f 八条分歧全档案，探针 6/6；self_interp.lom（5709 行；六模式 gate 在位）；doc_audit 现为 65 项。** L2 未授权，发布冻结不动。下一任只在用户裁决后按 R56→R61 顺序实施，历史基线与探针细节见本节前述文档。

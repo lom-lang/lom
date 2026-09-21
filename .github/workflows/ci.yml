@@ -53,14 +53,22 @@ jobs:
 
       - name: Zero-dependency gate
         # SECURITY.md 承诺：Cargo.toml 引入任何依赖即构建失败（零依赖是永久设计决策，例外需 RFC）
-        # 只扫描 [dependencies] section 内、非注释非空白的条目行（跨 section 即停）
+        # 只扫描依赖表内、非注释非空白的条目行（跨 section 即停）
         shell: bash
         run: |
-          # 覆盖 [dependencies] 与 [dependencies.foo] 表形态（TOML 合法写法都拦）
-          if awk '/^\[(dev-|build-)?dependencies(\..*)?\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+ *=/{found=1; print "  found dependency: " $0} END{exit found}' Cargo.toml; then
-            echo "zero-dependency gate: OK"
+          # R60（九审）：表形态扩展——[dependencies] / [dev|build-dependencies] /
+          # [dependencies.foo] / [target.'cfg(...)'.dependencies] / [workspace.dependencies]
+          # （v1.2.1 只拦前两类，target-specific 与 workspace 形态漏网）
+          if awk '/^\[(target\.'"'"'.*'"'"'\.)?(workspace\.)?(dev-|build-)?dependencies(\..*)?\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+ *=/{found=1; print "  found dependency: " $0} END{exit found}' Cargo.toml; then
+            echo "zero-dependency gate (TOML forms): OK"
           else
-            echo "ERROR: Cargo.toml [dependencies] 非空——零依赖政策被破坏（例外需 RFC）"; exit 1
+            echo "ERROR: Cargo.toml 依赖表非空——零依赖政策被破坏（例外需 RFC）"; exit 1
+          fi
+          # R60：事实源级断言——cargo metadata 的解析结果（拦 TOML 文本扫描覆盖不到的写法）
+          if cargo metadata --no-deps --format-version 1 | python3 -c "import json,sys; d=json.load(sys.stdin); bad=[p['name']+' -> '+dep['name'] for p in d['packages'] for dep in p['dependencies']]; print('  resolved: '+('; '.join(bad))) if bad else None; sys.exit(1 if bad else 0)"; then
+            echo "zero-dependency gate (cargo metadata): OK"
+          else
+            echo "ERROR: cargo metadata 解析出非空依赖——零依赖政策被破坏（例外需 RFC）"; exit 1
           fi
 
       - name: lom fmt gate
@@ -163,6 +171,10 @@ jobs:
         run: python3 tools/spec_examples_check.py
       - name: Doc numbers audit (R8)
         run: python3 tools/doc_audit.py
+      - name: Eval prompt diagnostic check (R60)
+        # error_repair 任务 prompt 内嵌诊断与真实 lom --json 输出对账
+        # （九审 R60：runner 只验 stdout+rc 掩盖了 prompt 诊断漂移）
+        run: python3 tools/eval_prompt_check.py --bin ./target/release/lom
       - name: Fuzz smoke (Q4, fixed seeds)
         run: python3 tools/fuzz_smoke.py
       - name: Diff test (D 包, fixed seeds + §11f probes)

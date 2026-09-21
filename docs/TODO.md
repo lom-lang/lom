@@ -138,15 +138,35 @@ LSP、repair apply、异常退出和协议边界构造反例。审查阶段不�
   锚点同步；SPEC_FOR_AI 行数同步）；LANGUAGE_SPEC §9.4 补 RFC 8259
   边界描述。
 
-### R60 — 文档/安全/评测 gate 盲区（P2）⏳ open
+### R60 — 文档/安全/评测 gate 盲区（P2）✅ done（2026-09-21）
 
-- 本交接已修：SPEC_FOR_AI 118→121 两处、fix 动作表、README LSP/High caveat、
-  SECURITY 第三方 CI action/递归/算术/缺 end、positioning v1.2.0→v1.2.1 与审查状态；
-  doc_audit 新增 SPEC_FOR_AI 当前 eval + CI WASM step 两锚，63→65。
-- 仍待代码侧：zero-dependency awk 覆盖 target-specific/workspace TOML；parse_type/
-  parse_pattern 深度守卫；eval 诊断 prompt 自动从真实输出生成或校验。
-- 历史 LLM raw/summary 默认 gitignore：本机复算数字成立，但 fresh clone 不能认证来源；
-  对外宣称必须保留限定或以后产出隐私审查过的证据包。
+- **本交接已修**（2026-09-21 交接包）：SPEC_FOR_AI 118→121 两处、fix 动作表、
+  README LSP/High caveat、SECURITY 第三方 CI action/递归/算术/缺 end、
+  positioning v1.2.0→v1.2.1 与审查状态；doc_audit 新增 SPEC_FOR_AI 当前
+  eval + CI WASM step 两锚，63→65。
+- **本轮代码侧三项**：
+  1. **零依赖 gate 双层**（ci.yml）：awk 表形态扩展覆盖
+     `[target.'cfg(…)'.dependencies]` 与 `[workspace.dependencies]`（本地
+     四形态坏 TOML 全拦实测）+ 新增 `cargo metadata` 事实源断言（解析结果
+     级，不再依赖文本扫描）。
+  2. **parse_type/parse_pattern 深度守卫**：与表达式守卫同模式（软件计数、
+     超限结构化 PARSE001、跳 EOF 防风暴；包裹法保证 `?` 早退计数对称）——
+     v1.2.1 手工构造 `List<List<…>>`×300 或 `A(A(…(x)))`×300 直接栈溢出。
+     +3 测试（深类型/深模式/合法深度不拦）。
+  3. **eval prompt 诊断校验 gate**（tools/eval_prompt_check.py，CI doc-gates
+     常驻）：对 10_error_repair 全部 24 题提取 prompt 内嵌代码与诊断 JSON，
+     跑真实 `lom --json` 比对诊断码多重集合。**首跑抓出 4 个真实失真并
+     修复**——093（内嵌 MAT001 假警告，Int match 不做穷尽检查——内嵌与
+     措辞改为真实零警告）/095/100（"静态零诊断"设计过时：NAM003 检查增强
+     后静态即报，prompt 改为真实 NAM003）/113（R57 修复直接影响：缺 end
+     现在 2 条 PARSE001，prompt 同步）。修复后 **24/24 PASS**。
+- **LLM raw 留档边界**（维持交接口径）：本机 gitignored raw/matrix 支持已
+  报告数字，fresh clone 不能认证来源；对外宣称保留限定（八审报告口径不变）。
+- **验收（2026-09-21 实测）**：cargo test --release **513 单元 + 3 集成 =
+  516**；eval_prompt_check 24/24；doc_audit 65/65（锚点 510→513）；
+  eval 121/121；selfhost dump PASS；clippy 零 warning；坏 TOML 四形态
+  awk 拦截 + cargo metadata 断言本机双绿；SECURITY 限制 1 与审计程序 1
+  改写为收口后口径。
 
 ### R61 — 维护工具毛边（P3）⏳ open
 

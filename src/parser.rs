@@ -64,6 +64,9 @@ pub struct Parser {
     recover: bool,
     /// Q3 深度守卫：表达式嵌套递归的当前深度（parse_expr 计数）
     expr_depth: usize,
+    /// R60（九审）：类型/模式递归深度计数（parse_type/parse_pattern 守卫）
+    type_depth: usize,
+    pattern_depth: usize,
     /// 表达式嵌套上限（测试注入小阈值用；生产 = DEFAULT_MAX_EXPR_DEPTH）
     max_expr_depth: usize,
 }
@@ -76,6 +79,8 @@ impl Parser {
             errors: Vec::new(),
             recover: false,
             expr_depth: 0,
+            type_depth: 0,
+            pattern_depth: 0,
             max_expr_depth: DEFAULT_MAX_EXPR_DEPTH,
         }
     }
@@ -462,6 +467,32 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Result<Type, ParseError> {
+        // R60（九审）：类型递归深度守卫（Record/Tuple/泛型互相嵌套无界）。
+        // 包裹法：内层逻辑的多处 `?` 早退不影响计数对称；超限跳 EOF 防错误风暴
+        // （与表达式守卫同模式，共用量级阈值）。
+        self.type_depth += 1;
+        if self.type_depth > self.max_expr_depth {
+            self.type_depth -= 1;
+            let (line, col) = {
+                let tok = self.current();
+                (tok.line, tok.col)
+            };
+            self.pos = self.tokens.len().saturating_sub(1);
+            return Err(ParseError {
+                message: format!(
+                    "类型嵌套超过 {} 层（256MB 栈的安全上限）：检查是否缺少 '>' 或 '}}'",
+                    self.max_expr_depth
+                ),
+                line,
+                col,
+            });
+        }
+        let r = self.parse_type_inner();
+        self.type_depth -= 1;
+        r
+    }
+
+    fn parse_type_inner(&mut self) -> Result<Type, ParseError> {
         match self.peek() {
             Token::LBrace => {
                 // Record type: {x: Int, y: Int}
@@ -1374,6 +1405,30 @@ impl Parser {
     /// 解析模式
     /// Pattern := Literal | _ | Binder | Variant '(' Patterns ')'
     fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+        // R60（九审）：模式递归深度守卫（变体模式嵌套无界）；包裹法同 parse_type
+        self.pattern_depth += 1;
+        if self.pattern_depth > self.max_expr_depth {
+            self.pattern_depth -= 1;
+            let (line, col) = {
+                let tok = self.current();
+                (tok.line, tok.col)
+            };
+            self.pos = self.tokens.len().saturating_sub(1);
+            return Err(ParseError {
+                message: format!(
+                    "模式嵌套超过 {} 层（256MB 栈的安全上限）：检查变体模式括号是否配对",
+                    self.max_expr_depth
+                ),
+                line,
+                col,
+            });
+        }
+        let r = self.parse_pattern_inner();
+        self.pattern_depth -= 1;
+        r
+    }
+
+    fn parse_pattern_inner(&mut self) -> Result<Pattern, ParseError> {
         let tok = self.current().clone();
         // 字面量模式的 span = 单 token 位置
         let tok_span = Span::at(tok.line, tok.col);
@@ -1468,6 +1523,76 @@ end
         let mut p = Parser::new(tokens);
         p.max_expr_depth = 100;
         assert!(p.parse_program().is_ok(), "50 层嵌套在 max=100 内应正常");
+    }
+
+    // ===== R60（九审）：parse_type / parse_pattern 深度守卫 =====
+
+    /// 深嵌套泛型类型（List<List<...>>，v1.2.1 无守卫直接栈溢出）
+    #[test]
+    fn r60_deep_type_nesting_reports_parse_error() {
+        use crate::lexer::Lexer;
+        let src = format!(
+            "fn main() -> {}\n    1\nend\n",
+            format!("{}Int{}", "List<".repeat(300), ">".repeat(300))
+        );
+        let (tokens, lex_errors) = Lexer::new(&src).tokenize_recover();
+        assert!(lex_errors.is_empty());
+        let mut p = Parser::new(tokens);
+        p.recover = true;
+        p.max_expr_depth = 100;
+        let _program = p.parse_program().expect("容错模式应返回");
+        let errors = p.errors;
+        assert!(
+            errors.iter().any(|e| e.message.contains("类型嵌套超过 100 层")),
+            "应报类型嵌套超限: {:?}",
+            errors
+        );
+        assert!(
+            errors.len() <= 3,
+            "不得有错误风暴: {}",
+            errors.len()
+        );
+    }
+
+    /// 深嵌套变体模式（A(A(...(x)))，v1.2.1 无守卫直接栈溢出）
+    #[test]
+    fn r60_deep_pattern_nesting_reports_parse_error() {
+        use crate::lexer::Lexer;
+        let src = format!(
+            "fn main() -> Unit\n    match Ok(1)\n        {}x{} => println(1)\n    end\nend\n",
+            "A(".repeat(300),
+            ")".repeat(300)
+        );
+        let (tokens, lex_errors) = Lexer::new(&src).tokenize_recover();
+        assert!(lex_errors.is_empty());
+        let mut p = Parser::new(tokens);
+        p.recover = true;
+        p.max_expr_depth = 100;
+        let _program = p.parse_program().expect("容错模式应返回");
+        let errors = p.errors;
+        assert!(
+            errors.iter().any(|e| e.message.contains("模式嵌套超过 100 层")),
+            "应报模式嵌套超限: {:?}",
+            errors
+        );
+        assert!(errors.len() <= 3, "不得有错误风暴: {}", errors.len());
+    }
+
+    /// 合法深度的类型/模式不受守卫影响
+    #[test]
+    fn r60_moderate_type_and_pattern_nesting_ok() {
+        use crate::lexer::Lexer;
+        let src = format!(
+            "fn f(x: {}) -> Unit\n    match Ok(1)\n        {}y{} => ()\n        _ => ()\n    end\nend\nfn main() -> Unit\n    f(Ok(1))\nend\n",
+            format!("{}Int{}", "List<".repeat(50), ">".repeat(50)),
+            "A(".repeat(50),
+            ")".repeat(50)
+        );
+        let (tokens, lex_errors) = Lexer::new(&src).tokenize_recover();
+        assert!(lex_errors.is_empty(), "词法应干净");
+        let mut p = Parser::new(tokens);
+        p.max_expr_depth = 100;
+        assert!(p.parse_program().is_ok(), "50 层类型/模式在 max=100 内应正常");
     }
 
     /// Q3：容错模式下超限 = 深度错误后终止（pos 跳 Eof，不产生错误风暴）。

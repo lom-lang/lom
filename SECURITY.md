@@ -24,7 +24,7 @@ end` as `deep.lom`; `./target/release/lom deep.lom` prints the diagnostic and ex
 
 ## Known limitations (accepted risks)
 
-1. **Depth guards are partial**: Q3 guards expression nesting at 30,000 levels and runtime `json_parse` nesting at 100,000. `parse_type` and `parse_pattern` are independently recursive and currently have no depth counter. The old statement “all recursion entry points fail structurally” was too broad; R60 tracks the correction and missing tests.
+1. **Depth guards cover expression, JSON, type, and pattern parsing** (R60, 2026-09-21): expression nesting is bounded at 30,000 levels, runtime `json_parse` nesting at 100,000, and `parse_type`/`parse_pattern` recursion now shares the same software depth counter pattern (previously unbounded — a hand-crafted `List<List<…×300>>` or `A(A(…(x)))` input could overflow the stack; now a structured `PARSE001 类型嵌套超过…层` / `模式嵌套超过…层` error). Verify: the regression tests `r60_deep_type_nesting_reports_parse_error` / `r60_deep_pattern_nesting_reports_parse_error`.
 2. **`file` module performs no path validation** — it reads/writes whatever the OS user can access (trusted-program threat model).
 3. **`RefCell` reentrancy**: a builtin that borrows a Map while a user closure mutates the same Map would panic. No such reentrancy path is currently reachable (higher-order builtins operate on List, not Map), but it is a documented invariant to preserve when adding builtins.
 4. **Int arithmetic is not generally checked**. Add/sub/mul overflow wraps (now explicit `wrapping_*` in both debug and release, 2026-09-21 R56 — the documented semantics). Division/modulo by zero and the `i64::MIN / -1` / `i64::MIN % -1` overflow edges are structured RUNTIME000 diagnostics with exit 1 (R56 fix; process-level regression in `tests/r56_process.rs`). Verify: write `fn main() -> Unit\n    let min = 9223372036854775807 + 1\n    println(min / -1)\nend` as `ovf.lom`; `./target/release/lom ovf.lom` prints `[RUNTIME000] 整数除法溢出…` to stderr and exits 1. This is a bug fix for two panic edges, not evidence that all arithmetic is checked.
@@ -39,7 +39,7 @@ Open a [GitHub issue](https://github.com/lom-lang/lom/issues) for non-sensitive 
 
 For any change touching `src/` (this repository pushes directly to `main`, without a PR gate):
 
-1. No new Rust crate dependencies without an RFC. Current CI catches ordinary dependency tables but does not cover every valid target-specific/workspace TOML form; review `cargo metadata` as the factual check until R60 strengthens the gate.
+1. No new Rust crate dependencies without an RFC. The CI gate (R60-hardened 2026-09-21) blocks all dependency-table TOML forms (`[dependencies]`/`[dev-]`/`[build-]`/`[dependencies.foo]`/`[target.'cfg(…)'.dependencies]`/`[workspace.dependencies]`) **and** asserts an empty resolved-dependency set from `cargo metadata` — the factual check no longer depends on the awk text scan alone.
 2. No `unsafe` (grep-enforced in review: `grep -rn "unsafe" src/` must stay empty).
 3. New builtins must not hold a `RefCell` borrow across a user-closure callback.
 4. New parsing paths must stay bounded and reject missing required delimiters; cover expression, type, and pattern recursion separately.

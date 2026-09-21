@@ -66,7 +66,7 @@
     "id": "093",
     "category": "error_repair",
     "difficulty": "medium",
-    "prompt": "以下 .lom 代码有错误。请修复使其正确输出 Monday / Tuesday / Other。\n\n错误代码：\nfn day_name(n: Int) -> String\n    match n\n        1 => \"Monday\"\n        2 => \"Tuesday\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(1))\n    println(day_name(2))\n    println(day_name(5))\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"stage\":\"type\",\"code\":\"MAT001\",\"message\":\"match 不穷尽：缺少 _ 通配符或所有分支\",\"line\":2,\"col\":5,\"hint\":\"添加 _ => ... 分支处理剩余情况\"}]}\n\n请输出修复后的完整代码。",
+    "prompt": "以下 .lom 代码对 Int 的 match 缺少其余取值分支（Int match 不做穷尽性检查，--check 零警告——这是真实诊断状态）。请添加 _ 分支使其正确输出 Monday / Tuesday / Other。\n\n错误代码：\nfn day_name(n: Int) -> String\n    match n\n        1 => \"Monday\"\n        2 => \"Tuesday\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(1))\n    println(day_name(2))\n    println(day_name(5))\nend\n\n诊断 JSON（--check 模式）：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t093.lom\",\"ok\":true,\"summary\":{\"total\":0,\"errors\":0,\"warnings\":0,\"holes\":0},\"diagnostics\":[]}\n\n请输出修复后的完整代码。",
     "solution": "fn day_name(n: Int) -> String\n    match n\n        1 => \"Monday\"\n        2 => \"Tuesday\"\n        _ => \"Other\"\n    end\nend\n\nfn main() -> Unit\n    println(day_name(1))\n    println(day_name(2))\n    println(day_name(5))\nend\n",
     "expected": "Monday\nTuesday\nOther\n",
     "notes": "MAT001: match 不穷尽。修复：添加 _ => \"Other\" 分支。"
@@ -84,7 +84,7 @@
     "id": "095",
     "category": "error_repair",
     "difficulty": "medium",
-    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfrom string import { len }\n\nfn main() -> Unit\n    println(lenght(\"hello\"))\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n运行时错误（实际运行时）：\n未定义变量: 'lenght'（拼写错误，应为 len）\n\n请输出修复后的完整代码。",
+    "prompt": "以下 .lom 代码有错误。请修复使其输出 5。\n\n错误代码：\nfrom string import { len }\n\nfn main() -> Unit\n    println(lenght(\"hello\"))\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t095.lom\",\"ok\":false,\"summary\":{\"total\":1,\"errors\":1,\"warnings\":0,\"holes\":0},\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"type\",\"code\":\"NAM003\",\"message\":\"调用未定义函数 'lenght'\",\"file\":\"t095.lom\",\"line\":4,\"col\":13,\"source_line\":null,\"is_hole\":false,\"hint\":null}]}\n\n（静态检查即报 NAM003；运行时同样未定义——拼写错误，应为 len）\n\n请输出修复后的完整代码。",
     "solution": "from string import { len }\n\nfn main() -> Unit\n    println(len(\"hello\"))\nend\n",
     "expected": "5\n",
     "notes": "NAM003/RUNTIME002: 变量名拼写错误 lenght -> len。"
@@ -129,7 +129,7 @@
     "id": "100",
     "category": "error_repair",
     "difficulty": "hard",
-    "prompt": "以下 .lom 代码有错误。请修复使其正确输出结果。\n\n错误代码：\nfrom string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_tostring(n)\n    println(s)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":true,\"diagnostics\":[]}\n\n运行时错误（实际运行时）：\n未定义变量: 'int_tostring'（应为 int_to_string，下划线缺失）\n\n请输出修复后的完整代码。期望输出 42。",
+    "prompt": "以下 .lom 代码有错误。请修复使其正确输出结果。\n\n错误代码：\nfrom string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_tostring(n)\n    println(s)\nend\n\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t100.lom\",\"ok\":false,\"summary\":{\"total\":1,\"errors\":1,\"warnings\":0,\"holes\":0},\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"type\",\"code\":\"NAM003\",\"message\":\"调用未定义函数 'int_tostring'\",\"file\":\"t100.lom\",\"line\":9,\"col\":13,\"source_line\":null,\"is_hole\":false,\"hint\":null}]}\n\n（静态检查即报 NAM003；运行时同样未定义——应为 int_to_string，下划线缺失）\n\n请输出修复后的完整代码。期望输出 42。",
     "solution": "from string import { int_to_string }\n\nfn double(x: Int) -> Int\n    x * 2\nend\n\nfn main() -> Unit\n    let n = double(21)\n    let s = int_to_string(n)\n    println(s)\nend\n",
     "expected": "42\n",
     "notes": "NAM003/RUNTIME002: 函数名拼写错误 int_tostring -> int_to_string。考察 LLM 对标识符精确性的把握。"
@@ -174,7 +174,7 @@
     "id": "113",
     "category": "error_repair",
     "difficulty": "hard",
-    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 x。\n\n错误代码：\nfn main() -> Unit\n    let x = 1\n    match x\n        _ => println(\"x\")\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"ok\":false,\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 闭合 match\",\"line\":5,\"col\":1,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
+    "prompt": "以下 .lom 代码有错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行并输出 x。\n\n错误代码：\nfn main() -> Unit\n    let x = 1\n    match x\n        _ => println(\"x\")\n诊断 JSON：\n{\"schema\":\"lom-diag/v1\",\"file\":\"t113.lom\",\"ok\":false,\"summary\":{\"total\":2,\"errors\":2,\"warnings\":0,\"holes\":0},\"diagnostics\":[{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' 闭合 match\",\"file\":\"t113.lom\",\"line\":5,\"col\":1,\"source_line\":null,\"is_hole\":false,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"},{\"severity\":\"error\",\"stage\":\"parse\",\"code\":\"PARSE001\",\"message\":\"期望 'end' (块闭合)，得到 文件结束\",\"file\":\"t113.lom\",\"line\":5,\"col\":1,\"source_line\":null,\"is_hole\":false,\"hint\":\"检查语法结构是否完整，关键字/分隔符是否匹配\"}]}\n\n请输出修复后的完整代码。",
     "solution": "fn main() -> Unit\n    let x = 1\n    match x\n        _ => println(\"x\")\n    end\nend\n",
     "expected": "x\n",
     "notes": "match 未闭合（期望 'end' 闭合 match）——M3 实测确认这是唯一的 end 类报错形态"
