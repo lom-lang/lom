@@ -137,5 +137,24 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   - 语言面事实登记（spike 踩到）：无科学计数法浮点字面量（1e2 是
     PARSE001）；尾部裸 return 使函数块值为 Unit（TYPE010 warning，
     函数值统一尾表达式风格）；无 List 字面量（§4.5b 再应验）。
-  下一步：L2.2 最小子集编译器（fn/let/算术/println → .wasm，与宿主
-  Rust 后端同程序双产物行为级对拍）。
+- **修订 3（2026-09-21）：L2.2 最小子集编译器完成——双产物行为级
+  对拍 5/5。** 交付件：`examples/selfhost/self_comp.lom`（2895 行 =
+  self_interp 前端 A-C4 物理复用 ~2179 行 + 新增 codegen/驱动 ~700 行）、
+  `tools/selfcomp/run_selfcomp.mjs`（L2 专用 harness，fmtFloat 口径与
+  宿主 run_wasm.mjs 一致）、`tools/selfcomp/cases/`（5 用例）、
+  `tools/verify_selfcomp.py`（验收器）。子集：fn（Int/Float/Unit 参数与
+  返回）/ let / let mut / 赋值（扁平作用域，遮蔽=新槽）/ Int 与 Float
+  算术（混合提升 Float 对齐宿主）/ 一元负 / 括号 / 调用（含前向引用）/
+  println(Int|Float)；块值=尾表达式。值表示（实现自由度）：**untagged
+  原生 i64/f64** + env.print_i64/print_f64 宿主导入——case1 宿主产物
+  9746 字节 vs L2 产物 121 字节，stdout 逐字一致。验收：**5/5 用例
+  双产物（stdout+rc）一致**；self_comp 自身 --check 零诊断、lom fmt
+  gate 过；六模式/523+5 测试/doc_audit 65/65 全绿复验。已知边界
+  （如实登记）：① Float 字面量解析为从右往左除法近似，测试集限定
+  二进制精确可表示值，任意字面量正确舍入留 L2.3 精度专项；② 对拍
+  避开宿主 tagged-i64 值域 ±2^59（§11f-7 既有分歧，用例界内取值）；
+  ③ Float % / 控制流 / String 留 L2.3。开发踩坑登记（HANDOVER §11.6）：
+  前端复用的块尾裸表达式归 Tail 不归 stmts（void 尾有副作用必须编译
+  执行——首版静默丢弃）；Form B 臂 end 计数（§4.1 再应验，5 处漏补）；
+  ExBinary 的 op 是 token 判别名（"Add"）非符号（"+"）。下一步 L2.3
+  全语言面（控制流/闭包/enum/match/字符串/list/map/json/包）。
