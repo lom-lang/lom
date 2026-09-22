@@ -1,0 +1,15 @@
+# R82：分支局部闭包的完整签名也应从该块按序取到。
+fn main() -> Unit ! [IO]
+    let f = if True
+        let inner = fn(x: Int) -> Int
+            x + 4
+        end
+        inner
+    else
+        let inner = fn(x: Int) -> Int
+            x + 1
+        end
+        inner
+    end
+    println(f(5))
+end

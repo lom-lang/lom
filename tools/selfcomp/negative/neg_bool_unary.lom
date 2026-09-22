@@ -1,0 +1,5 @@
+# R81 同根防线：一元负也不得把 i32 Bool 送进 f64.neg。
+fn main() -> Unit ! [IO]
+    let x = -True
+    println(x)
+end

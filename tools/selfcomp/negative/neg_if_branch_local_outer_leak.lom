@@ -1,0 +1,11 @@
+# R82：类型预扫可看到本分支 let，但不得向外泄漏该绑定。
+fn main() -> Unit ! [IO]
+    let y = if True
+        let x = 7
+        x
+    else
+        2
+    end
+    println(y)
+    println(x)
+end

@@ -22,30 +22,30 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.7（v1.2.6 tag 于 CI #156 六 job 全绿后切；
-  v1.2.7 tag 仍须遵守 CI 绿后切，首回合须实查最新 main CI 与 annotations）；
+- 仓库版本 v1.2.8（v1.2.7 tag 于 CI #158 六 job 全绿后切；
+  v1.2.8 tag 仍须遵守 CI 绿后切，首回合须实查最新 main CI 与 annotations）；
   语言面与外部发布线冻结。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
-  复核，非外部同行审计。**R1-R80 已关闭；R81/R82 仍开放（P2×2）**。
-  R79 控制流子块 let 泄漏、R80 闭包捕获被同名全局符号抢先，已按
-  用户裁决先行修复；R81 Bool 二元运算 COMPILED 后产不可实例化
-  WASM，R82 值位 if 分支合法 let 尾值误拒，继续按既定顺序整改。
-  维护会话已对四项原始主形态亲手复现。十三审 B+ 只属其旧基线
+  复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
+  用户裁决先 R79/R80、后 R81/R82：前批修控制流子块 let 泄漏与
+  闭包同名局部捕获，后批修 Bool 运算产坏 WASM 与值位 if 合法尾值
+  误拒；新增正反向测试锁定。维护会话已对四项原始主形态亲手复现。
+  十三审 B+ 只属其旧基线
   1418536/v1.2.5；十四审 B 不外推整改后。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1 已实现）。L2 自举
-  编译器（RFC-0004 方案 A，accepted，修订 1-10）：L2.1 spike + L2.2
+  编译器（RFC-0004 方案 A，accepted，修订 1-11）：L2.1 spike + L2.2
   子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**（if/while/for(Int)/
   Bool/比较/逻辑短路/块尾 if）+ **L2.3-b 闭包与捕获批**均完成（设计方案
   docs/designs/0001 四裁决点全按建议项：untagged+闭包 i64 指针 / B1+B2 /
   mut 捕获放行 / 8 字节统一槽；b 批 17 对拍 + 23 负例，存量 10 用例
   hex 逐字节不变实证）+ **L2.3-c1 非泛型用户枚举与标量/枚举 match**
   （递归载荷、嵌套模式、guard、Form A/B、无匹配 trap；
-  self_comp.lom 5059 行，verify_selfcomp 81/81 = 30 对拍 + 51 负例，新增负例锁具体
+  self_comp.lom 5094 行，verify_selfcomp 92/92 = 35 对拍 + 57 负例，新增负例锁具体
   拒绝原因）。闭包批堆分配器/funcref 表/闭包值通道为复合值地基；c1
-  使无 table 的 enum 程序也可分配。**R79/R80 已按
-  docs/designs/0002 块作用域方案整改；c2 代码推进暂缓，先收口
-  R81/R82**：内建 Result/Option
+  使无 table 的 enum 程序也可分配。**R79-R82 两批整改已按
+  docs/designs/0002 块作用域方案与 RFC 修订 10/11 收官；c2
+  代码推进待下一步用户裁决**：内建 Result/Option
   与泛型用户 enum 的类型参数表示；再后是 String / List / Map / json /
   包 / return 语句（块深度跟踪）。不可把 c1 称为 enum/match 全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
@@ -68,9 +68,8 @@
   必须吐出；闭包重赋还须比较 sig；Windows 子 Python 输出固定 UTF-8。
   **十四审新教训**：match 臂复制 Map 不等于 if/while/for 块作用域；
   类型预扫既要看到块内 let 又不能泄漏它；闭包先查局部再查全局；
-  i32 Bool 不可落到 f64 opcode。R79/R80 已锁定，R81/R82 仍需负例。
-- 用户已裁决先 R79/R80、后 R81/R82；前一批完成，当前按既定顺序
-  继续后一批，之后才恢复 c2。另有 typechecker
+  i32 Bool 不可落到 f64 opcode。四项现已按 92/92 正反向验收锁定。
+- 下一步由用户裁决 L2.3-c2 或发起独立复审；另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
   迁移观察 2026-10-19。
@@ -82,7 +81,7 @@
    docs/reviews/review-2026-09-23.html（十四审——最新轮）及
    docs/reviews/review-2026-09-22-2.html（十三审旧基线），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
-   修订 1-10），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
+   修订 1-11），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
    含值表示/捕获语义决策记录）和 docs/designs/0002-l2.3-block-scopes.md
    （R79/R82 共用作用域设计）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
@@ -94,14 +93,13 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 81/81 = 30 用例双产物行为一致 + 51 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 92/92 = 35 用例双产物行为一致 + 57 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线。用户已授权 R79-R82 按两批整改，R79/R80 首批已完成；
-   接着完成 R81/R82，提交前跑 §2.2、推送后看 CI，CI 绿后切 tag。
-   R79-R82 收口后再就 L2.3-c2（Result/Option 与泛型 enum 类型参数表示）
-   给方向菜单等用户裁决；其后 String / List / Map / json / 包 / return
+3. 如实报告基线，只给用户方向菜单等裁决。R79-R82 已按两批整改
+   收官；可选 L2.3-c2（Result/Option 与泛型 enum 类型参数表示）或
+   下一轮独立复审。其后 String / List / Map / json / 包 / return
    逐批交付。外部发布线继续冻结。
 
 【状态锚点（当前行为，供复核）】
@@ -131,8 +129,8 @@
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主
   `9`、L2 `0` 或 `1`；R81：Bool 相等比较 COMPILED 后实例化
   类型错；R82：分支内 `let x; x` 合法尾值被误拒。报告含全部源码
-  与可复现命令；现行 R79/R80 已按 30 对拍 + 51 负例锁定，R81/R82
-  仍是 TODO 未关闭事实源。不得把十四审 B 外推整改后。
+  与可复现命令；现行 R79-R82 已按 35 对拍 + 57 负例锁定，
+  整改事实源为 TODO。不得把十四审 B 外推整改后。
 - 写 self_comp 代码的坑：宿主 dangling-else 贪婪归内（then 块首元素
   嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
   改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）；多返回值调用点

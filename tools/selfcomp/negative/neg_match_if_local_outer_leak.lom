@@ -1,0 +1,21 @@
+# R82：Form B 臂内嵌套 if 的 z 不得在该 if 外可见。
+enum E = Z | V(Int)
+
+fn choose(e: E) -> Int
+    match e
+        V(n) =>
+            if True
+                let z = n + 1
+                z
+            else
+                0
+            end
+            z
+        end
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(V(6)))
+end

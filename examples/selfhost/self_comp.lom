@@ -2535,16 +2535,7 @@ end
 fn closure_rv(reto: Option<Ty>, body: Blk, env2: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match reto
         Some(t) => ty_vt(t, fns)
-        None =>
-            match body
-                BlkOf(_, tail) =>
-                    match tail
-                        None => Ok("void")
-                        Some(te) => ex_rv(te, env2, fns)
-                    end
-                end
-            end
-        end
+        None => blk_rv(body, env2, fns)
     end
 end
 
@@ -2686,10 +2677,12 @@ end
 # 块的返回段（尾表达式 ex_rv；无尾 = void）
 fn blk_rv(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match b
-        BlkOf(_, tail) =>
+        BlkOf(stmts, tail) =>
+            let block_env = copy_bindings(env)
+            scan_block_lets(stmts, block_env, fns, "")?
             match tail
                 None => Ok("void")
-                Some(te) => ex_rv(te, env, fns)
+                Some(te) => ex_rv(te, block_env, fns)
             end
         end
     end
@@ -2823,6 +2816,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if itn == "cl" or enum_vt(itn)
                 return Err(subset_err("闭包/枚举值参与一元负"))
             end
+            if itn == "i32"
+                return Err(subset_err("Bool 参与一元负"))
+            end
             Ok(itn)
         end
         ExBinary(op, l, r) =>
@@ -2837,6 +2833,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                     return Err(subset_err("闭包/枚举值参与比较（结构相等留后续批次）"))
                 end
+                if (lt == "i32" and rt != "i32") or (rt == "i32" and lt != "i32")
+                    return Err(subset_err("Bool 与非 Bool 比较（L2 子集外）"))
+                end
                 return Ok("i32")
             end
             if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
@@ -2849,6 +2848,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                 return Err(subset_err("闭包/枚举值参与算术"))
+            end
+            if lt == "i32" or rt == "i32"
+                return Err(subset_err("Bool 参与算术"))
             end
             if lt == "i64" and rt == "i64"
                 Ok("i64")
@@ -2908,13 +2910,34 @@ fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String,
     end
 end
 
-# 块的值类型：有尾表达式 → 尾综合；无尾 → void（语句性块）
+# R82：类型预扫只在独立绑定表里按声明序登记 let。编译期槽位由真实
+# 发射路径分配；这里的 slot=0 是只供 infer_ex/ex_sig 使用的占位值。
+fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, prefix: String) -> Result<Unit, String>
+    for s in stmts
+        match s
+            StLet(_, name, tyo, ex) =>
+                let vt = let_vt(tyo, ex, block_env, fns)?
+                if vt == "void"
+                    return Err(subset_err(prefix + "let 绑定 void 值"))
+                end
+                let sig = if vt == "cl" ex_sig(ex, block_env, fns)? else "" end
+                map_set(block_env, name, {slot: 0, vt: vt, sig: sig, cap: False})
+            end
+            _ => ()
+        end
+    end
+    Ok(())
+end
+
+# 块的值类型：临时块作用域先综合本块 let，再综合尾表达式；无尾 → void。
 fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match b
-        BlkOf(_, tail) =>
+        BlkOf(stmts, tail) =>
+            let block_env = copy_bindings(env)
+            scan_block_lets(stmts, block_env, fns, "")?
             match tail
                 None => Ok("void")
-                Some(te) => infer_ex(te, env, fns)
+                Some(te) => infer_ex(te, block_env, fns)
             end
         end
     end
@@ -3004,22 +3027,11 @@ end
 fn match_block_type(b: Blk, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
-            for s in stmts
-                match s
-                    StLet(_, name, tyo, ex) =>
-                        let vt = let_vt(tyo, ex, arm_env, fns)?
-                        if vt == "void"
-                            return Err(subset_err("match 臂内 let 绑定 void 值"))
-                        end
-                        let sig = if vt == "cl" ex_sig(ex, arm_env, fns)? else "" end
-                        map_set(arm_env, name, {slot: 0, vt: vt, sig: sig, cap: False})
-                    end
-                    _ => ()
-                end
-            end
+            let block_env = copy_bindings(arm_env)
+            scan_block_lets(stmts, block_env, fns, "match 臂内 ")?
             match tail
                 None => Ok("void")
-                Some(te) => infer_ex(te, arm_env, fns)
+                Some(te) => infer_ex(te, block_env, fns)
             end
         end
     end
@@ -3131,6 +3143,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
                 return Err(subset_err("一元运算 '" + op + "'"))
             end
             let it = infer_ex(inner, env, fns)?
+            if it == "i32"
+                return Err(subset_err("Bool 参与一元负"))
+            end
             let code = comp_ex(inner, env, fns, cg, locals, localvt)?
             if it == "i64"
                 Ok("4200" + code + "7d")
@@ -3198,6 +3213,25 @@ fn i64_cmp_op(op: String) -> Result<String, String>
     end
 end
 
+# R81：Bool 为 i32 0/1，六种同类型比较均使用 i32 操作码。
+fn i32_cmp_op(op: String) -> Result<String, String>
+    if op == "Eq"
+        Ok("46")
+    elif op == "NotEq"
+        Ok("47")
+    elif op == "Lt"
+        Ok("48")
+    elif op == "Gt"
+        Ok("4a")
+    elif op == "LtEq"
+        Ok("4c")
+    elif op == "GtEq"
+        Ok("4e")
+    else
+        Err(subset_err("比较运算 '" + op + "'"))
+    end
+end
+
 # L2.3-a：f64 比较操作码（eq 61 / ne 62 / lt 63 / gt 64 / le 65 / ge 66）
 fn f64_cmp_op(op: String) -> Result<String, String>
     if op == "Eq"
@@ -3228,6 +3262,8 @@ fn f64_cmp_op(op: String) -> Result<String, String>
 end
 
 fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    # 发射前先走完整类型校验；非法 Bool 组合不得流入 f64 opcode。
+    let _ = infer_ex(ExBinary(op, l, r), env, fns)?
     let left_vt = infer_ex(l, env, fns)?
     let right_vt = infer_ex(r, env, fns)?
     if enum_vt(left_vt) or enum_vt(right_vt)
@@ -3235,17 +3271,18 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     end
     if is_cmp_op(op)
         # L2.3-a：比较——i64 直接比 / f64 直接比 / 混合提升 f64 后比（对齐宿主）
-        let lt = infer_ex(l, env, fns)?
-        let rt = infer_ex(r, env, fns)?
         let lc = comp_ex(l, env, fns, cg, locals, localvt)?
         let rc = comp_ex(r, env, fns, cg, locals, localvt)?
-        if lt == "i64" and rt == "i64"
+        if left_vt == "i32" and right_vt == "i32"
+            return Ok(lc + rc + i32_cmp_op(op)?)
+        end
+        if left_vt == "i64" and right_vt == "i64"
             return Ok(lc + rc + i64_cmp_op(op)?)
         end
-        if lt == "i64" and rt == "f64"
+        if left_vt == "i64" and right_vt == "f64"
             return Ok(lc + "b9" + rc + f64_cmp_op(op)?)
         end
-        if lt == "f64" and rt == "i64"
+        if left_vt == "f64" and right_vt == "i64"
             return Ok(lc + rc + "b9" + f64_cmp_op(op)?)
         end
         return Ok(lc + rc + f64_cmp_op(op)?)
@@ -3253,17 +3290,15 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     if op != "Add" and op != "Sub" and op != "Mul" and op != "Div" and op != "Mod"
         return Err(subset_err("二元运算 '" + op + "'"))
     end
-    let lt = infer_ex(l, env, fns)?
-    let rt = infer_ex(r, env, fns)?
     let lc = comp_ex(l, env, fns, cg, locals, localvt)?
     let rc = comp_ex(r, env, fns, cg, locals, localvt)?
-    if lt == "i64" and rt == "i64"
+    if left_vt == "i64" and right_vt == "i64"
         Ok(lc + rc + i64_op(op))
     else
-        if lt == "i64" and rt == "f64"
+        if left_vt == "i64" and right_vt == "f64"
             return Ok(lc + "b9" + rc + f64_op(op)?)
         end
-        if lt == "f64" and rt == "i64"
+        if left_vt == "f64" and right_vt == "i64"
             return Ok(lc + rc + "b9" + f64_op(op)?)
         end
         Ok(lc + rc + f64_op(op)?)

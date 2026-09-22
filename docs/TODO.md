@@ -1,20 +1,20 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-23 R79/R80 整改后刷新）**：仓库版本 v1.2.7；
+> **交接声明（2026-09-23 R79-R82 整改收官）**：仓库版本 v1.2.8；
 > 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，
 > 基线 `5c92f59`/v1.2.6）评级 **B**，开账 **R79-R82：P1×2 + P2×2**。
-> 用户已裁决按 P1 后 P2 顺序整改：**R79/R80 已按设计收口**（控制流
-> 子块独立绑定表；闭包捕获局部优先于同名全局）；**R81/R82 仍开放**
-> （Bool 二元运算产坏 WASM；值位 if 分支合法 let 尾值误拒）。
+> 用户已裁决按 P1 后 P2 顺序整改，**R79-R82 四项全部关闭**：
+> v1.2.7 收口控制流子块绑定泄漏与闭包同名捕获；v1.2.8 收口
+> Bool 运算产坏 WASM 与值位 if 局部尾值误拒。
 > 十三审 B+ 仅属旧基线 `1418536`/v1.2.5；十四审 B 也只评其
 > `5c92f59` 时点，整改后不自行重评。535 单元 + 8 集成、
-> verify_selfcomp **81/81 = 30 对拍 + 51 负例**、eval 双后端 121/121、
-> 自举六模式、doc_audit 67/67 是现行回归；不能据此抹去 R81/R82。
+> verify_selfcomp **92/92 = 35 对拍 + 57 负例**、eval 双后端 121/121、
+> 自举六模式、doc_audit 67/67 是现行回归；整改后评级待独立复审。
 > L2.3-a/b/c1 已交付；c2（Result/Option 与泛型 enum 类型参数表示）
-> 的代码推进暂缓，先收口 R81/R82。语言面与外部
+> 的代码推进待下一步用户裁决。语言面与外部
 > 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
-> 读 HANDOVER 指定章节与十四审报告，跑 §2.2 全量基线，再按当前
-> 已获裁决的整改顺序执行。
+> 读 HANDOVER 指定章节与十四审报告，跑 §2.2 全量基线，再呈方向
+> 菜单等用户裁决。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
@@ -42,7 +42,7 @@
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
 
-## 第十四轮体系内独立复核 + R79-R82 开账（2026-09-23）⚠️ review done / remediation open
+## 第十四轮体系内独立复核 + R79-R82 整改（2026-09-23）✅ review done / remediation done
 
 **报告**：[review-2026-09-23.html](reviews/review-2026-09-23.html)，基线
 `5c92f59` / v1.2.6；总评 **B**，只针对本轮时点。这是体系内 agent
@@ -95,7 +95,7 @@ Rust 535+8、宿主 eval 双后端 121+121、自举六模式、doc_audit 67/67
   29_shadowed_fn_capture 宿主 `9` / L2 `1`（均 rc0）；修复后均
   输出 `9`。30_unshadowed_globals 仍按全局解析并与宿主对齐。
 
-### R81 — Bool 二元运算编成不可实例化 WASM（P2）🟠 open
+### R81 — Bool 二元运算编成不可实例化 WASM（P2）✅ done（2026-09-23，v1.2.8）
 
 - **实测**：`r14_bool_eq` 的 `True == False`，宿主 WASM stdout `0`、
   rc0；L2 COMPILED 104 bytes，Node 实例化 rc1：`f64.eq expected f64,
@@ -103,11 +103,20 @@ Rust 535+8、宿主 eval 双后端 121+121、自举六模式、doc_audit 67/67
   COMPILED 90 bytes 后实例化报 `f64.add expected f64, found i32`。
 - **读码根因**：`infer_ex` 把 i32 比较放行、算术落到 f64；
   `comp_binary` 只处理 i64/f64，i32 落进 f64 指令分支。
-- **整改验收建议，待用户裁决**：合法 Bool 相等按 i32 编码；不支持
+- **审查时整改建议（现已执行）**：合法 Bool 相等按 i32 编码；不支持
   的 Bool 算术在编译期明确拒绝且不产 hex。锁正常输出与无坏 WASM
   负例，不能仅看 `--check`。
+- **整改与实测**：`infer_ex` 将 Bool 算术、一元负、Bool/数值混合
+  比较明确拒绝；`comp_binary` 发射前强制同一校验。Bool/Bool 的
+  Eq/NotEq/Lt/Gt/LtEq/GtEq 六种比较发 i32 opcode，与宿主 WASM
+  stdout+rc 对齐。修复前 35_bool_binary COMPILED 后 Node 实例化
+  类型错；neg_bool_arith 与 neg_bool_mixed_compare 曾 COMPILED 出
+  坏模块；neg_bool_unary 曾在下游 println 才因 Bool 类型报错，
+  未抓到真正的 i32→f64.neg 风险。修复后三条均按明确原因
+  COMPILE-ERROR 且无 hex。Bool/数值混合比较在宿主可求异型相等，
+  L2 选择编译期严格拒绝，信任边界已登记 RFC-0004 修订 11。
 
-### R82 — 分支内 let 的合法尾值被预扫误拒（P2）🟠 open
+### R82 — 分支内 let 的合法尾值被预扫误拒（P2）✅ done（2026-09-23，v1.2.8）
 
 - **实测**：`r14_if_local_tail` 的 if 真分支 `let x=7` 后以 `x`
   为块尾，宿主 WASM stdout `7\n2`、rc0；L2 `COMPILE-ERROR:
@@ -115,15 +124,26 @@ Rust 535+8、宿主 eval 双后端 121+121、自举六模式、doc_audit 67/67
   臂尾嵌套 if 中 `let z=n+1; z`：宿主 `7\n0`，L2 误拒 z。
 - **读码根因**：`infer_if_expr` 调 `blk_val_ty`，后者只看 tail，
   没有按序建模本块 let；`match_block_type` 只处理 Form B 顶层 let。
-- **整改验收建议，待用户裁决**：类型预扫在临时块作用域按声明序
+- **审查时整改建议（现已执行）**：类型预扫在临时块作用域按声明序
   记录绑定；锁 if 值位、嵌套 if、match Form B 的合法正例，并与
   R79 的“不可向外泄漏”负例一同验收。
+- **整改与实测**：`scan_block_lets` 复制入块绑定后逐条综合 StLet
+  类型/闭包签名；`blk_val_ty`、`blk_rv`、`match_block_type` 共用，
+  无显式返回注解的闭包体经 `blk_rv`。预扫只用占位槽，不改真实
+  local 分配和父 Map；真实发射继续使用 R79 的子块拷贝。新增
+  31_if_local_tail、32_match_if_local_tail、33_nested_if_local_tail、
+  34_if_closure_local_tail 四个正例：修复前均误拒局部名，修复后
+  双 WASM stdout+rc 对齐。三个负例分别锁值位 if 块外、兄弟分支、
+  Form B 嵌套 if 外未定义名：宿主 WASM 均 rc1 无产物，L2 均明确
+  COMPILE-ERROR 无 hex。方案见 docs/designs/0002。
 
-**整改次序（用户已授权执行）**：R79/R80 两项 P1 已完成；接着
-R81/R82 两项 P2。R79 与 R82 的块环境设计共用
+**整改收官**：按用户裁决，R79/R80 两项 P1 先于 R81/R82 两项 P2
+关闭；R79 与 R82 共用
 [0002-l2.3-block-scopes.md](designs/0002-l2.3-block-scopes.md)。
-L2.3-c2 的代码推进在 R81/R82 收口前暂缓；语言面与外部发布线
-冻结不变。下一轮复审前不得自行宣布评级回升。
+verify_selfcomp 92/92 = 35 正例行为对拍 + 57 负例明确拒绝；
+535+8、eval 双后端 121/121、自举六模式保持。L2.3-c2 下一步
+待用户方向裁决；语言面与外部发布线冻结不变。下一轮复审前不得
+自行宣布评级回升。
 
 ## 第九轮维护者独立审查 + R55-R61（2026-09-21）⚠️ review done / remediation open
 

@@ -1,0 +1,5 @@
+# R81：Bool 算术必须在编译期拒绝，不留下不可实例化 WASM。
+fn main() -> Unit ! [IO]
+    let x = True + False
+    println(x)
+end

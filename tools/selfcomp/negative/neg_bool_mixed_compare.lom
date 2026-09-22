@@ -1,0 +1,7 @@
+# R81：Bool 与数字混合比较属于 L2 严格子集外，须编译期拒绝。
+fn main() -> Unit ! [IO]
+    let x = True == 1
+    if x
+        println(1)
+    end
+end

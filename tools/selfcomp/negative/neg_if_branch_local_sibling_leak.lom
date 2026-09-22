@@ -1,0 +1,13 @@
+# R82：then 分支类型预扫登记的 x 不得让 else 分支读取。
+fn choose(b: Bool) -> Int
+    if b
+        let x = 7
+        x
+    else
+        x
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(True))
+end

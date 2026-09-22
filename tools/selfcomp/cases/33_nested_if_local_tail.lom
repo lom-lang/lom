@@ -1,0 +1,20 @@
+# R82：嵌套值位 if 的预扫按每层声明序建模，不向外泄漏。
+fn choose(b: Bool, c: Bool) -> Int
+    if b
+        let base = 5
+        if c
+            let n = base + 2
+            n
+        else
+            base
+        end
+    else
+        1
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(True, True))
+    println(choose(True, False))
+    println(choose(False, True))
+end

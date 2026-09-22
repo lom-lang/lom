@@ -1,0 +1,23 @@
+# R82：分支内 let 的尾值合法，类型预扫只在该分支内可见。
+fn choose(b: Bool) -> Int
+    if b
+        let x = 7
+        x
+    else
+        2
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(True))
+    println(choose(False))
+    let x = 5
+    let y = if True
+        let x = 11
+        x
+    else
+        0
+    end
+    println(y)
+    println(x)
+end

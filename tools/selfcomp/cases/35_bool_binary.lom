@@ -1,0 +1,11 @@
+# R81：Bool 同类型比较六种操作都应产可实例化的 i32 WASM。
+fn main() -> Unit ! [IO]
+    let a = True
+    let b = False
+    println(if a == b 1 else 0 end)
+    println(if a != b 1 else 0 end)
+    println(if b < a 1 else 0 end)
+    println(if a > b 1 else 0 end)
+    println(if b <= a 1 else 0 end)
+    println(if a >= b 1 else 0 end)
+end

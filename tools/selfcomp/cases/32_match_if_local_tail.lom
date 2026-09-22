@@ -1,0 +1,21 @@
+# R82：Form B 臂尾嵌套值位 if 的局部 let 应参与类型综合。
+enum E = Z | V(Int)
+
+fn choose(e: E) -> Int
+    match e
+        V(n) =>
+            if True
+                let z = n + 1
+                z
+            else
+                0
+            end
+        end
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(V(6)))
+    println(choose(Z))
+end

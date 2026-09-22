@@ -26,8 +26,13 @@ NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 
 EXPECTED_NEGATIVE_MESSAGES = {
+    'neg_bool_arith.lom': 'Bool 参与算术',
+    'neg_bool_mixed_compare.lom': 'Bool 与非 Bool 比较',
+    'neg_bool_unary.lom': 'Bool 参与一元负',
     'neg_for_block_let_leak.lom': "未定义变量 'y'",
     'neg_if_block_let_leak.lom': "未定义变量 'y'",
+    'neg_if_branch_local_outer_leak.lom': "未定义变量 'x'",
+    'neg_if_branch_local_sibling_leak.lom': "未定义变量 'x'",
     'neg_if_sibling_let_leak.lom': "未定义变量 'y'",
     'neg_builtin_none_pattern.lom': "内建 Result/Option 模式留后续子批（'None'）",
     'neg_builtin_result_type.lom': '泛型 enum/Result/Option 留后续批次',
@@ -51,6 +56,7 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_match_binder_sibling_leak.lom': "未定义变量 'x'",
     'neg_match_block_let_leak.lom': "未定义变量 'z'",
     'neg_match_guard_type.lom': 'match guard 须为 Bool',
+    'neg_match_if_local_outer_leak.lom': "未定义变量 'z'",
     'neg_match_no_arms.lom': 'match 至少需要一个臂',
     'neg_match_string_pattern.lom': 'String 字面量模式留 String 批',
     'neg_variant_shadow_call.lom': '调用非闭包值',
