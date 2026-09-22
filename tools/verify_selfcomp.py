@@ -26,6 +26,9 @@ NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 
 EXPECTED_NEGATIVE_MESSAGES = {
+    'neg_for_block_let_leak.lom': "未定义变量 'y'",
+    'neg_if_block_let_leak.lom': "未定义变量 'y'",
+    'neg_if_sibling_let_leak.lom': "未定义变量 'y'",
     'neg_builtin_none_pattern.lom': "内建 Result/Option 模式留后续子批（'None'）",
     'neg_builtin_result_type.lom': '泛型 enum/Result/Option 留后续批次',
     'neg_builtin_some.lom': "内建 Result/Option 变体留后续子批（'Some'）",
@@ -51,6 +54,7 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_match_no_arms.lom': 'match 至少需要一个臂',
     'neg_match_string_pattern.lom': 'String 字面量模式留 String 批',
     'neg_variant_shadow_call.lom': '调用非闭包值',
+    'neg_while_block_let_leak.lom': "未定义变量 'y'",
 }
 
 

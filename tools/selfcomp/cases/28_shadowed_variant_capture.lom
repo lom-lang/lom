@@ -1,0 +1,17 @@
+# R80：局部 Z 遮蔽全局零参变体，闭包应捕获局部值。
+enum E = Z | V(Int)
+
+fn score(e: E) -> Int
+    match e
+        V(x) => x
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let Z = V(9)
+    let f = fn() -> E
+        Z
+    end
+    println(score(f()))
+end

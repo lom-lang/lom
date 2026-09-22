@@ -2920,8 +2920,8 @@ fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap:
     end
 end
 
-# L2.3-c：match 臂独立作用域。Lom Map 是引用语义，直接 let arm_env = env
-# 会把 Binder/臂内 let 泄漏给后续臂及外层，故逐项复制绑定记录。
+# match 臂和控制流子块的独立作用域：Map 是引用语义，故逐项复制绑定。
+# 只复制名字到槽的映射；同一函数内的 locals/localvt 仍共享并持续分配新槽。
 fn copy_bindings(env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>) -> Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>
     let out = map_empty()
     for key in map_keys(env)
@@ -3698,21 +3698,21 @@ end
 # 递归闭包（预绑定 + 补丁）由 comp_one_stmt 特判调用本函数后追加补丁。
 fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<(String, Int, List<String>), String>
     let _ = need_heap(cg)?
-    # 1. 自由变量 → 捕获名单（fns 命中不捕获——全局符号；env 命中捕获；
-    #    否则未定义变量错）
+    # 1. 自由变量 → 捕获名单。词法局部先于同名全局函数/变体解析；
+    #    只有父环境没有绑定时才按全局符号放行。
     let frees = free_vars_block(body, params)
     let nf = list_length(frees)
     let mut capnames = list_empty()
     let mut fi2 = 0
     while fi2 < nf
         let nm = list_get(frees, fi2)
-        if map_has(fns, nm) == False and map_has(fns, "@variant:" + nm) == False
-            match map_get(env, nm)
-                None =>
+        match map_get(env, nm)
+            Some(_) =>
+                capnames = list_cons(nm, capnames)
+            end
+            None =>
+                if map_has(fns, nm) == False and map_has(fns, "@variant:" + nm) == False
                     return Err("闭包捕获了未定义变量 '" + nm + "'")
-                end
-                Some(_) =>
-                    capnames = list_cons(nm, capnames)
                 end
             end
         end
@@ -4486,10 +4486,12 @@ end
 fn comp_stmt_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
+            # R79：绑定表为引用语义；每个词法子块独立复制，local 槽表继续共享。
+            let block_env = copy_bindings(env)
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                out = out + comp_one_stmt(list_get(stmts, si), env, fns, cg, locals, localvt, ret_vt)?
+                out = out + comp_one_stmt(list_get(stmts, si), block_env, fns, cg, locals, localvt, ret_vt)?
                 si = si + 1
             end
             match tail
@@ -4499,11 +4501,11 @@ fn comp_stmt_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, c
                         ExIf(ifr) =>
                             # L2.3-a：语句体块尾的 if——按语句执行（分支值
                             # 丢弃），走 comp_if_stmt 的 void 形态
-                            Ok(out + comp_if_stmt(ifr, env, fns, cg, locals, localvt, ret_vt)?)
+                            Ok(out + comp_if_stmt(ifr, block_env, fns, cg, locals, localvt, ret_vt)?)
                         end
                         _ =>
-                            let tt = infer_ex(te, env, fns)?
-                            let code = comp_ex(te, env, fns, cg, locals, localvt)?
+                            let tt = infer_ex(te, block_env, fns)?
+                            let code = comp_ex(te, block_env, fns, cg, locals, localvt)?
                             if tt == "void"
                                 Ok(out + code)
                             else
@@ -4582,15 +4584,16 @@ end
 fn comp_val_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
+            let block_env = copy_bindings(env)
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                out = out + comp_one_stmt(list_get(stmts, si), env, fns, cg, locals, localvt, "void")?
+                out = out + comp_one_stmt(list_get(stmts, si), block_env, fns, cg, locals, localvt, "void")?
                 si = si + 1
             end
             match tail
                 None => Ok(out)
-                Some(te) => Ok(out + comp_ex(te, env, fns, cg, locals, localvt)?)
+                Some(te) => Ok(out + comp_ex(te, block_env, fns, cg, locals, localvt)?)
             end
         end
     end
@@ -4640,15 +4643,10 @@ fn comp_for(var: String, iter: Ex, body: Blk, env: Map<String, {slot: Int, vt: S
     let ic = comp_ex(iter, env, fns, cg, locals, localvt)?
     let n_slot = new_slot(locals, localvt, "i64")
     let x_slot = new_slot(locals, localvt, "i64")
-    # 作用域恢复：for 变量仅在循环内可见（对齐宿主——循环后外层同名绑定
-    # 不变、无外层同名时不可见）。body 编译后恢复旧绑定或移除新绑定。
-    let saved = map_get(env, var)
-    map_set(env, var, {slot: x_slot, vt: "i64", sig: "", cap: False})
-    let bc = comp_stmt_blk(body, env, fns, cg, locals, localvt, ret_vt)?
-    match saved
-        Some(old) => map_set(env, var, old)
-        None => map_remove(env, var)
-    end
+    # 迭代变量只进入循环的临时绑定表；循环体自己再开一层子块。
+    let loop_env = copy_bindings(env)
+    map_set(loop_env, var, {slot: x_slot, vt: "i64", sig: "", cap: False})
+    let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
     let xl = leb128_hex(x_slot)
     Ok(ic + "21" + leb128_hex(n_slot)
         + "4200" + "21" + xl

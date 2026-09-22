@@ -1,0 +1,15 @@
+# R80：同名局部闭包作为值进入内层闭包时须优先捕获。
+fn original() -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    let original = fn() -> Int
+        9
+    end
+    let f = fn() -> Int
+        let g = original
+        g()
+    end
+    println(f())
+end

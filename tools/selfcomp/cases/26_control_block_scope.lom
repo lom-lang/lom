@@ -1,0 +1,32 @@
+# R79：控制流子块的 let 遮蔽不应改变兄弟分支或块外绑定。
+fn main() -> Unit ! [IO]
+    let x = 5
+    if False
+        let x = 9
+    else
+        println(x)
+    end
+    println(x)
+    while False
+        let x = 11
+    end
+    println(x)
+    for i in 0
+        let x = 13
+    end
+    println(x)
+    for i in 1
+        let x = 17
+        println(x)
+    end
+    println(x)
+    let mut n = 1
+    if True
+        n = n + 1
+        if True
+            let n = 99
+        end
+        n = n + 1
+    end
+    println(n)
+end

@@ -1,0 +1,25 @@
+# R80 反向：未遮蔽的全局函数与变体仍可在闭包内按全局解析。
+enum E = Z | V(Int)
+
+fn original() -> Int
+    3
+end
+
+fn score(e: E) -> Int
+    match e
+        V(x) => x
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let f = fn() -> Int
+        let g = original
+        g()
+    end
+    let h = fn() -> E
+        Z
+    end
+    println(f())
+    println(score(h()))
+end

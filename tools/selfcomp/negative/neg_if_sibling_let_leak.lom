@@ -1,0 +1,8 @@
+# R79：then 子块的 y 不可被 else 兄弟分支读取。
+fn main() -> Unit ! [IO]
+    if True
+        let y = 9
+    else
+        println(y)
+    end
+end

@@ -1,0 +1,7 @@
+# R79：只在 while 子块声明的 y 不可在块外读取。
+fn main() -> Unit ! [IO]
+    while False
+        let y = 9
+    end
+    println(y)
+end

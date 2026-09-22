@@ -1,0 +1,18 @@
+# R79：Form B 臂内 if 的 let 不得遮蔽本臂外层绑定。
+fn pick(n: Int) -> Int
+    let x = 5
+    match n
+        0 =>
+            if False
+                let x = 9
+            end
+            x
+        end
+        _ => x
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(pick(0))
+    println(pick(1))
+end

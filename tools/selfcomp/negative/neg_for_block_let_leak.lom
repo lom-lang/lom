@@ -1,0 +1,7 @@
+# R79：for 循环体内 let y 不可在块外读取。
+fn main() -> Unit ! [IO]
+    for i in 0
+        let y = 9
+    end
+    println(y)
+end
