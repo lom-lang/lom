@@ -220,3 +220,21 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   - **剩余批次**：闭包与捕获 / enum 与 match / String / List / Map /
     json / 包 / return 语句（块深度跟踪）——按"编译期校验 + 负例"成对
     交付。
+- **修订 7（2026-09-22）：L2.3-b 闭包与捕获批设计方案产出（动工前置，
+  待用户裁决）。** 交付 docs/designs/0001-l2.3-closures.md——基于
+  self_comp（3342 行）与宿主 wasm_codegen 闭包五件（free_vars /
+  compile_closure / emit_fn_value / emit_closure_call / 递归闭包预绑定
+  补丁）+ rt_alloc + funcref 表的读码对齐设计。四个裁决点待用户：
+  **A 值表示**（甲 untagged+闭包 i64 指针【方案建议】vs 乙 tagged 整体
+  迁移——untagged 是修订 3 已验收决策，乙属方向性变更应回 RFC 重议）；
+  **B 语法范围**（B1 核心 + B2 任意 callee【建议】；B3 `Fn` 类型注解
+  推后——宿主 Fn=Named("Fn") 无参型信息，untagged 的 call_indirect 需
+  精确签名，支持它需语言面变化或放弃编译期校验，负例登记）；**C 捕获
+  mut 绑定**（放行对齐宿主 WASM【建议】——MUT002 是宿主检查器 warning
+  面，宿主 WASM 本身放行且值拷贝行为良定义）；**D env 槽位布局**（8
+  字节统一槽【建议】，对齐宿主偏移公式 4+8i）。信任边界预登记三条
+  （编译期拦非闭包调用/闭包值算术 vs 宿主运行时兜底；Fn 注解子集外；
+  println(闭包) 拒绝 vs 宿主打 "<闭包>"——String 先例同型）。基础设施
+  （bump 分配器 + funcref 表 + 闭包值通道）为 enum/match/String/List/
+  Map/json 全部后续批次复用地基。**代码零改动——纯设计文档交付；
+  动工在裁决后。**
