@@ -1,0 +1,63 @@
+# L2.3-c：单行无参枚举 + 多行多载荷枚举；声明索引与类型绑定。
+enum Color = Red | Green | Blue
+
+enum Shape
+    | Circle(Float)
+    | Square(Float)
+    | Rectangle(Float, Float)
+end
+
+fn color_code(c: Color) -> Int
+    match c
+        Red => 1
+        Green => 2
+        Blue => 3
+    end
+end
+
+fn area(s: Shape) -> Float
+    match s
+        Circle(r) => r * r
+        Square(side) => side * side
+        Rectangle(w, h) => w * h
+    end
+end
+
+fn choose(b: Bool) -> Color
+    match b
+        True => Red
+        False => Blue
+    end
+end
+
+fn circle_marker(s: Shape) -> Int
+    match s
+        Circle(2.0) => 1
+        Circle(_) => 2
+        _ => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(color_code(Red))
+    println(color_code(Green))
+    println(color_code(Blue))
+    println(color_code(Red()))
+    println(color_code(choose(True)))
+    let selected = if False
+        Green
+    else
+        Blue
+    end
+    println(color_code(selected))
+    match Red
+        Red => println(9)
+        _ => println(0)
+    end
+    println(area(Circle(2.0)))
+    println(area(Square(3.0)))
+    println(area(Rectangle(2.0, 4.0)))
+    println(circle_marker(Circle(2.0)))
+    println(circle_marker(Circle(3.0)))
+    println(circle_marker(Square(2.0)))
+end

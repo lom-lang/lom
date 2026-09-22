@@ -1,0 +1,28 @@
+# L2.3-c：递归枚举、嵌套变体模式、前向 enum 类型登记。
+fn evaluate(e: Expr) -> Int
+    match e
+        Num(n) => n
+        Add(a, b) => evaluate(a) + evaluate(b)
+        Mul(a, b) => evaluate(a) * evaluate(b)
+    end
+end
+
+fn pair_sum(e: Expr) -> Int
+    match e
+        Add(Num(a), Num(b)) => a + b
+        _ => 0
+    end
+end
+
+enum Expr
+    | Num(Int)
+    | Add(Expr, Expr)
+    | Mul(Expr, Expr)
+end
+
+fn main() -> Unit ! [IO]
+    let ast = Mul(Add(Num(1), Num(2)), Add(Num(3), Num(4)))
+    println(evaluate(ast))
+    println(pair_sum(Add(Num(5), Num(7))))
+    println(pair_sum(ast))
+end

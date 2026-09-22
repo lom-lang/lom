@@ -1,0 +1,6 @@
+# 负例：枚举槽不得被 Int 覆写（同为 WASM i64 也须静态区分）。
+enum E = Z
+fn main() -> Unit
+    let mut e = Z
+    e = 1
+end

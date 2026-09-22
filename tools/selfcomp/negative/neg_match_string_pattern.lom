@@ -1,0 +1,10 @@
+# 负例：String 字面量模式留 String 批，不能误按数值比较编码。
+fn pick(n: Int) -> Int
+    match n
+        "x" => 1
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

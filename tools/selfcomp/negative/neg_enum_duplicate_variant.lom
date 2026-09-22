@@ -1,0 +1,6 @@
+# 负例：同名变体使全局 idx 不唯一，编译期拒绝。
+enum A = Z
+enum B = Z
+fn main() -> Unit ! [IO]
+    println(1)
+end

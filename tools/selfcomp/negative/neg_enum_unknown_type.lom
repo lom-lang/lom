@@ -1,0 +1,7 @@
+# 负例：不存在的枚举类型不得当成 i64 指针放行。
+fn f(x: Ghost) -> Int
+    1
+end
+fn main() -> Unit ! [IO]
+    println(f(1))
+end

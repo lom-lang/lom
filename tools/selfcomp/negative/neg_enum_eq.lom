@@ -1,0 +1,9 @@
+# 负例：枚举结构相等不能误用裸指针 i64.eq。
+enum E = Z
+fn main() -> Unit ! [IO]
+    let a = Z
+    let b = Z
+    if a == b
+        println(1)
+    end
+end

@@ -1,0 +1,11 @@
+# 负例：不存在的变体名必须在编译期拒绝。
+enum E = V(Int)
+fn extract(e: E) -> Int
+    match e
+        Missing(a) => a
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(extract(V(1)))
+end

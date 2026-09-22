@@ -1,20 +1,18 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-22 深夜六刷新）**：本台账处于**交接就绪**状态。
+> **交接声明（2026-09-22 深夜七刷新）**：本台账记录 v1.2.6 仓库版本。
 > 第十三轮独立复审（[review-2026-09-22-2.html](reviews/review-2026-09-22-2.html)，
-> 总评 **B+**，基线 `1418536`/v1.2.5）确认 R73-R76 整改零失真 + 代码面
-> 零击穿后，用户裁决动工 L2.3——**L2.3-a 控制流批（RFC-0004 修订 6）与
-> L2.3-b 闭包与捕获批（修订 8，设计 docs/designs/0001 四裁决点全按
-> 建议项）均已交付**：self_comp.lom 4665 行，verify_selfcomp 40/40 =
-> 17 对拍 + 23 负例拒绝，存量 10 用例产物 hex 逐字节不变实证；顺带修复
-> 两枚 L2.3-a 存量缺口（bind_params 漏 TyBool / comp_ex 缺 ExIf 分支）。
-> 当前 **R1-R78 全部关闭**（R78 随 L2.3-a 包收口；无新开整改项——本周期
-> 两批均为交付性工作）。活跃工作包：**L2.3 进行中**（剩余批次：
-> enum+match/String/List/Map/json/包/return 语句）。两批在十三审基线
-> 之后交付，待下一轮独立复审重估。
-> 发布线维持冻结。新任维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
-> 再读 HANDOVER §0/§1/§2.2/§9/§11.6/§12，跑 §2.2 全量基线（六模式
-> 逐个），然后向用户呈现方向菜单。
+> 总评 **B+**，基线 `1418536`/v1.2.5）确认 R73-R76 整改零失真与代码面
+> 零击穿；**其评级不外推**到基线后的 L2.3-a/b/c1 三批。L2.3-a 控制流、
+> b 闭包与捕获、**c1 非泛型用户枚举与标量/枚举 match**均已实现；c1 详见
+> RFC-0004 修订 9。self_comp.lom **5061 行**，verify_selfcomp **72/72 =
+> 25 对拍 + 47 负例拒绝**；`lom fmt` guard 缩进修复增加 2 条 Rust 单测，
+> 当前 **535 单元 + 8 集成**。R1-R78 全部关闭，无新开审查整改项。
+> L2.3 仍进行中：内建 Result/Option 与泛型用户 enum 的类型参数表示列为
+> c2；随后 String/List/Map/json/包/return 语句逐批推进，均按“编译期校验
+> + 负例”成对交付。外部发布线维持冻结。新维护者先复制
+> [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，读 HANDOVER 指定章节并跑 §2.2
+> 全量基线（六模式逐个），再呈方向菜单等用户裁决。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
@@ -578,6 +576,33 @@ String/非 Bool 条件/逻辑非 Bool 负例）；self_comp 2950→3342 行。
 再应验。全量回归全绿（六模式/533+8/eval 双后端 121+121/golden/fmt
 gate/doc_audit 67/67）。**后续批次**：闭包/enum+match/String/List/
 Map/json/包/return 语句。
+
+## L2.3-c1 非泛型用户枚举与 match 子批（2026-09-22）✅ implemented
+
+**范围与证据**（RFC-0004 修订 9）：用户 enum 的两遍登记支持递归载荷，
+`en:<name>` 编译期区分类型、运行时为 i64 裸指针；对象布局
+`[variant_idx:i32][arity:i32][payload:i64×n]`。无闭包的 enum 程序仍发
+alloc/memory/global；闭包 table/elem 继续按需发。标量与用户枚举 match
+覆盖字面量/Binder/通配符/嵌套变体、guard、Form A/B、值位与语句位；
+无臂命中 trap 并保留 trap 前 stdout。模式载荷只在 idx 命中后读取；
+页尾零参对象正例固定 8191 次分配。宿主 `match` 字面量 Int/Float
+不做普通二元比较的数值提升（18_match_scalar 双向对拍实证）。
+
+**严格拒绝**：构造器 arity/参数类型、模式类型/子模式数、guard Bool、
+臂返回 vt、赋值 vt/闭包重赋 sig 逐项编译期校验；新负例还锁具体拒绝
+原因，不仅锁 COMPILE-ERROR。verify_selfcomp **72/72 = 25 双产物行为
+对拍 + 47 负例拒绝**；原负例 neg_match_expr 已转为更完整的正例测试，
+其删除可由 Git 历史恢复。正例包括递归枚举、嵌套模式、闭包携枚举、
+无参对象页尾、无匹配 rc=1、同签名闭包重赋；负例包括三种臂绑定
+泄漏、不同闭包签名重赋与泛型/Result/Option 的明确子集边界。
+
+**同包工具修复**：`lom fmt` 把 match guard `if` 误记为开块的既有
+缺陷由 Form A/B 两条 Rust 单测锁定（Rust 533→**535**；集成仍 8）；
+`run_selfcomp.mjs` 在 trap 时输出已积累 stdout；`verify_selfcomp.py`
+给子进程固定 UTF-8，消除 Windows reader thread 解码异常。
+语言面四项冻结均未触碰。**c2 待做**：内建 Result/Option、泛型用户
+enum 的类型参数表示；当前还拒绝 String 模式、枚举结构相等/显示、
+闭包值 match 等，均须继续按“校验 + 负例”解锁，不得称全语言面完成。
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 

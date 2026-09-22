@@ -1,0 +1,7 @@
+# 负例：Result<T,E> 参数类型留泛型值表示子批。
+fn unwrap(x: Result<Int, Int>) -> Int
+    1
+end
+fn main() -> Unit ! [IO]
+    println(unwrap(Ok(1)))
+end

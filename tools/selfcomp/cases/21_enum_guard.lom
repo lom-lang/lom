@@ -1,0 +1,32 @@
+# L2.3-c：载荷 Bool、模式 Binder/通配符、guard 穿透到后续臂。
+enum Packet
+    | Empty
+    | Data(Int, Bool)
+end
+
+fn grade(p: Packet) -> Int
+    match p
+        Data(n, active) if active and n > 5 => 1
+        Data(n, _) if n > 0 => 2
+        Data(0, False) => 3
+        Data(_, _) => 5
+        Empty => 4
+    end
+end
+
+# 宿主约定：带载荷变体名不带括号写在模式位时是 Binder，不是变体测试。
+fn bare_payload_name(p: Packet) -> Int
+    match p
+        Data => 7
+        _ => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(grade(Data(8, True)))
+    println(grade(Data(3, True)))
+    println(grade(Data(0, False)))
+    println(grade(Data(0, True)))
+    println(grade(Empty))
+    println(bare_payload_name(Empty))
+end

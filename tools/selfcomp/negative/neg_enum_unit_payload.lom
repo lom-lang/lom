@@ -1,0 +1,5 @@
+# 负例：Unit 载荷没有 WASM 值槽，不可产 i64.store。
+enum E = V(Unit)
+fn main() -> Unit ! [IO]
+    println(1)
+end

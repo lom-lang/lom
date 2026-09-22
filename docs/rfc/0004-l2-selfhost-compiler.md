@@ -279,3 +279,29 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   - **剩余批次**：enum 与 match / String / List / Map / json / 包 /
     return 语句（块深度跟踪）——闭包批的堆/表/闭包值通道是它们的共同
     地基。
+- **修订 9（2026-09-22）：L2.3-c1 非泛型用户枚举与 match 子批。**
+  用户裁决继续推进 L2.3 后，先交付无需泛型动态值的可验证子集：
+  - **表示与模块布局**：用户枚举声明两遍登记（先类型名，后声明序变体，
+    idx 从宿主保留的 4 起）；编译期 vt 为 `en:<name>`，WASM 值为裸 i64
+    指针，堆对象 `[variant_idx:i32][arity:i32][payload:i64×n]`，Float
+    载荷位重解释、Bool 扩宽；递归枚举可引用自身类型。`needs_heap` 预扫
+    覆盖闭包/枚举/match；无 table 的枚举程序也发 alloc、memory、global，
+    闭包 table/elem 仍按需发射。无这些新形态的存量程序沿用旧布局。
+  - **match**：Int/Float/Bool 与用户枚举被测值；字面量/Binder/通配符/
+    嵌套变体模式、guard、Form A/B、值位与语句位、无臂命中 trap。
+    每臂复制绑定表避免 Map 引用语义泄漏；载荷读取必须在变体 idx
+    命中之后（RFC-0003 修订 25 的页尾 OOB 教训）；Form B 臂内 let
+    纳入尾表达式类型综合。宿主 `match` 字面量走 tagged `rt_eq`：
+    `Int 2` 与 `Float 2.0` **不匹配**，不能套用普通二元比较的数值提升。
+  - **严格拒绝边界**：构造器 arity/逐参 vt、模式类型/子模式数、guard
+    Bool、臂返回 vt、赋值 vt 与闭包重赋签名均在编译期校验，不让坏 WASM
+    落到实例化（延续 R68/R74 信任边界）。非泛型以外的用户 enum、内建
+    Result/Option 及其模式、String 模式、枚举结构相等/显示、闭包值 match
+    均明确留后续子批；宿主的 warning/运行时兜底与 L2 严格拒绝差异已登记。
+  - **验收**：verify_selfcomp **72/72**（25 个双产物 stdout+rc 对拍，
+    含递归枚举、嵌套模式、闭包携枚举、页尾零参对象、无匹配 rc=1；
+    47 个 COMPILE-ERROR 无 hex 负例，新负例同时锁拒绝原因）。L2 专用
+    Node harness 在 trap 时保留已输出 stdout；Windows 子 Python 的
+    `hex2wasm.py` 输出统一 UTF-8，消除验收器 reader thread 解码异常。
+    `lom fmt` 的现存 guard 缩进误判一并修复（`if` 不再被误计开块，
+    2 条 Rust 单测），语言语法/20 关键字/诊断码/43 内建均未变化。

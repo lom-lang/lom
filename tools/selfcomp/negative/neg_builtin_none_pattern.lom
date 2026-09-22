@@ -1,0 +1,10 @@
+# 负例：None 在 c1 不可被当成普通 Binder 全匹配。
+fn pick(n: Int) -> Int
+    match n
+        None => 1
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(1))
+end

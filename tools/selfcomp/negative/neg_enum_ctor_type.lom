@@ -1,0 +1,5 @@
+# 负例：构造器参数 vt 不符不得产出非法 wasm。
+enum E = V(Float)
+fn main() -> Unit
+    let e = V(1)
+end

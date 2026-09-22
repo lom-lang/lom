@@ -1,0 +1,5 @@
+# 负例：内建类型名不能被 c1 当成用户 enum 类型元数据。
+enum Int = Wrapped(Int)
+fn main() -> Unit ! [IO]
+    println(1)
+end

@@ -1,0 +1,12 @@
+# 负例：跨枚举变体模式被 L2 子集编译期拒绝。
+enum A = A1
+enum B = B1
+fn pick(a: A) -> Int
+    match a
+        B1 => 1
+        A1 => 2
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(A1))
+end

@@ -1,0 +1,11 @@
+# 负例：前一臂的 Binder 不可被后一臂读取。
+fn pick(n: Int) -> Int
+    match n
+        x if x < 0 => x
+        0 => x
+        _ => 1
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

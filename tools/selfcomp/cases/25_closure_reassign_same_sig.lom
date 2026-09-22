@@ -1,0 +1,11 @@
+# L2.3-c1 顺手收口：同签名闭包重赋值仍合法，不能把所有 cl 赋值一刀切拒绝。
+fn main() -> Unit ! [IO]
+    let mut f = fn(x: Int) -> Int
+        x + 1
+    end
+    println(f(1))
+    f = fn(x: Int) -> Int
+        x * 3
+    end
+    println(f(2))
+end

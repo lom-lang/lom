@@ -1,0 +1,20 @@
+# L2.3-c：零参枚举恰贴 64 KiB 页尾；先测带载荷变体再测零参。
+# L2 分配器 hp 初始 8，8191 个 8 字节 Z 的最后一枚起于 65528。
+enum E = Z | V(Int)
+
+fn inspect(e: E) -> Int
+    match e
+        V(x) => x
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let mut e = Z
+    for i in 8190
+        e = Z
+    end
+    println(inspect(e))
+    e = V(5)
+    println(inspect(e))
+end

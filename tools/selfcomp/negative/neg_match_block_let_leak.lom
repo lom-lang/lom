@@ -1,0 +1,11 @@
+# 负例：Form B 臂内部 let 不可泄漏到 match 外。
+fn main() -> Unit ! [IO]
+    match 1
+        1 =>
+            let z = 2
+            println(z)
+        end
+        _ => println(0)
+    end
+    println(z)
+end

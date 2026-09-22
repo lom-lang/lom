@@ -1,0 +1,10 @@
+# 负例：不同臂的 WASM 返回 vt 不可混用。
+fn pick(n: Int) -> Int
+    match n
+        0 => 1
+        _ => 2.0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

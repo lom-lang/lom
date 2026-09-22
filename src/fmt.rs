@@ -35,7 +35,9 @@ pub fn format_source(src: &str) -> Result<String, String> {
         enums: usize,   // enum 关键字数
         ends: usize,    // end
         fat_arrow_last: bool,
-        has_assign: bool, // 单行枚举 `enum X = A | B` 无 end，靠此排除块开
+        saw_fat_arrow: bool,
+        if_before_arrow: usize, // match guard 的 if 不开块；=> 后的 if 仍是表达式开块
+        has_assign: bool,       // 单行枚举 `enum X = A | B` 无 end，靠此排除块开
         bracket_delta: i32,
     }
 
@@ -50,6 +52,8 @@ pub fn format_source(src: &str) -> Result<String, String> {
             enums: 0,
             ends: 0,
             fat_arrow_last: false,
+            saw_fat_arrow: false,
+            if_before_arrow: 0,
             has_assign: false,
             bracket_delta: 0,
         });
@@ -57,7 +61,14 @@ pub fn format_source(src: &str) -> Result<String, String> {
             entry.first = Some(st.token.clone());
         }
         match st.token {
-            Token::Fn | Token::If | Token::While | Token::For | Token::Match => entry.openers += 1,
+            Token::Fn | Token::While | Token::For | Token::Match => entry.openers += 1,
+            Token::If => {
+                entry.openers += 1;
+                if !entry.saw_fat_arrow {
+                    entry.if_before_arrow += 1;
+                }
+            }
+            Token::FatArrow => entry.saw_fat_arrow = true,
             Token::Enum => entry.enums += 1,
             Token::End => entry.ends += 1,
             Token::Assign => entry.has_assign = true,
@@ -72,6 +83,11 @@ pub fn format_source(src: &str) -> Result<String, String> {
     // 单行形态 `enum X = A | B` 无 end 配平，不计入。
     // （fn/if/while/for/match 与 = 共存的单行形态如 let x = if c 1 else 2 end 有 end 配平，无需特判）
     for s in stats.values_mut() {
+        if s.saw_fat_arrow && s.if_before_arrow > 0 && !matches!(s.first, Some(Token::If)) {
+            // `pattern if guard => body` 的第一个 if 是 guard 分隔符，不开块。
+            // 只减一：guard 条件里若有真正的 if 表达式，其 end 仍需配平。
+            s.openers -= 1;
+        }
         if !s.has_assign {
             s.openers += s.enums;
         }
@@ -170,6 +186,18 @@ mod tests {
         let src = "fn f(x: Int) -> Unit\nif x > 0\nprintln(1)\nelif x > 1\nprintln(2)\nelse\nprintln(3)\nend\nend\n";
         let expected = "fn f(x: Int) -> Unit\n    if x > 0\n        println(1)\n    elif x > 1\n        println(2)\n    else\n        println(3)\n    end\nend\n";
         assert_eq!(format_source(src).unwrap(), expected);
+    }
+
+    #[test]
+    fn fmt_match_guard_does_not_indent_following_arms() {
+        let src = "fn f(n: Int) -> Int\n    match n\n        x if x > 0 => 1\n        0 => 0\n        _ => -1\n    end\nend\n";
+        assert_eq!(format_source(src).unwrap(), src);
+    }
+
+    #[test]
+    fn fmt_match_guard_form_b_keeps_arm_end_balanced() {
+        let src = "fn f(n: Int) -> Int\n    match n\n        x if x > 0 =>\n            let y = x\n            y\n        end\n        _ => 0\n    end\nend\n";
+        assert_eq!(format_source(src).unwrap(), src);
     }
 
     #[test]

@@ -1,0 +1,5 @@
+# 负例：构造器 arity 不符必须在编译期拒绝。
+enum Pair = Both(Int, Int)
+fn main() -> Unit
+    let p = Both(1)
+end

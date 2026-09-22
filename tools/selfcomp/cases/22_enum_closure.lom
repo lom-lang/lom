@@ -1,0 +1,31 @@
+# L2.3-c：闭包捕获枚举指针、闭包体内 match 与构造器名全局可见。
+enum Box
+    | Full(Int)
+    | Empty
+end
+
+fn main() -> Unit ! [IO]
+    let b = Full(4)
+    let read = fn(n: Int) -> Int
+        match b
+            Full(v) => v + n
+            Empty => n
+        end
+    end
+    println(read(3))
+    let make = fn(n: Int) -> Int
+        match Full(n)
+            Full(v) => v * 2
+            Empty => 0
+        end
+    end
+    println(make(6))
+    let identity = fn(x: Box) -> Box
+        x
+    end
+    let b2 = identity(Full(9))
+    match b2
+        Full(v) => println(v)
+        Empty => println(0)
+    end
+end

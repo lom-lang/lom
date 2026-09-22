@@ -1,0 +1,63 @@
+# L2.3-c：标量 match、字面量/Binder/guard、Form A/B 块值；
+# 模式字面量 Int/Float 不做普通二元比较的数值提升。
+fn classify(x: Int) -> Int
+    match x
+        n if n < 0 => -1
+        0 => 0
+        1 => 10
+        _ => 20
+    end
+end
+
+fn bool_case(b: Bool) -> Int
+    match b
+        True => 1
+        False => 0
+    end
+end
+
+fn float_case(f: Float) -> Int
+    match f
+        1.5 => 15
+        2 => 20
+        _ => -1
+    end
+end
+
+fn int_case(n: Int) -> Int
+    match n
+        2.0 => 200
+        2 => 20
+        _ => -1
+    end
+end
+
+fn block_case(n: Int) -> Int
+    match n
+        0 =>
+            let x = 2
+            x + 3
+        end
+        _ => n * 2
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(classify(-3))
+    println(classify(0))
+    println(classify(1))
+    println(classify(8))
+    println(bool_case(True))
+    println(bool_case(False))
+    println(float_case(1.5))
+    println(float_case(2.0))
+    println(int_case(2))
+    println(int_case(3))
+    println(block_case(0))
+    println(block_case(3))
+    let picked = match 3
+        3 => 30
+        _ => 0
+    end
+    println(picked)
+end

@@ -1,4 +1,4 @@
-// L2 自举编译器产物的运行 harness（self_comp 专用，L2.2）
+// L2 自举编译器产物的运行 harness（self_comp 专用，L2.2/L2.3）
 // 契约（self_comp.lom Part X 头注释）：
 //   import env.print_i64(i64) / env.print_f64(f64)——untagged 原生值，
 //   每次调用输出一行（println 语义：换行隐式）。
@@ -28,5 +28,12 @@ const { instance } = await WebAssembly.instantiate(bytes, {
     print_f64: (v) => { out += fmtFloat(v) + '\n'; },
   },
 });
-instance.exports.main();
-process.stdout.write(out);
+try {
+  instance.exports.main();
+  process.stdout.write(out);
+} catch (e) {
+  // 对齐宿主 run_wasm.mjs：trap 前已执行的 println 不得丢失。
+  process.stdout.write(out);
+  console.error('wasm trap: ' + (e && e.message ? e.message : String(e)));
+  process.exit(1);
+}

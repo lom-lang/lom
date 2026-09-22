@@ -1,0 +1,10 @@
+# 负例：同为 cl/i64 的不同签名闭包重赋值必须编译期拒绝。
+fn main() -> Unit ! [IO]
+    let mut f = fn(x: Int) -> Int
+        x + 1
+    end
+    f = fn(x: Float) -> Float
+        x + 1.0
+    end
+    println(f(1))
+end

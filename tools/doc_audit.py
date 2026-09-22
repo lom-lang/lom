@@ -163,9 +163,9 @@ def main():
                r'self_interp\.lom（(\d+) 行', [self_lines])
     # R76（十二审）：self_comp 行数宣称位（README/HANDOFF_PROMPT）——
     # L2.3 行数再变时钉住，R69 同族漂移点根治
-    # L2.3-b 起 README 措辞带批次字母（L2.3-a/L2.3-b/…）——正则可成长
+    # L2.3-c1 起 README 批次可含一位子批号（c1/c2），仍钉住唯一行数位。
     expect_all('README self_comp 行数', 'README.md',
-               r'(\d+)-line L2\.3-[a-z] subset compiler', [comp_lines])
+               r'(\d+)-line L2\.3-[a-z][0-9]? subset compiler', [comp_lines])
     expect_all('HANDOFF_PROMPT self_comp 行数', 'docs/HANDOFF_PROMPT.md',
                r'self_comp\.lom (\d+)', [comp_lines])
 
@@ -183,7 +183,7 @@ def main():
                r'Current release: v([\d.]+)', [cargo_ver])
     # Ⓒ 一页纸（2026-09-15；日期位随九审交接校准 2026-09-21）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
     expect_all('positioning 版本位', 'docs/positioning.html',
-               r'截至 <strong>2026-09-21（v([\d.]+)）</strong>', [cargo_ver])
+               r'截至 <strong>20\d{2}-\d{2}-\d{2}（v([\d.]+)）</strong>', [cargo_ver])
 
     # ---- F. changelog 对账（N3）----
     print('F. changelog 对账（LANGUAGE_SPEC §13）')

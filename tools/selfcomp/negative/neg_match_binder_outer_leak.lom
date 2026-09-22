@@ -1,0 +1,7 @@
+# 负例：match 臂模式绑定不可泄漏到 match 之后。
+fn main() -> Unit ! [IO]
+    match 1
+        x => println(1)
+    end
+    println(x)
+end

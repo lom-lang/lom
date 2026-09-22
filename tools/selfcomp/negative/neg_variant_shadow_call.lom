@@ -1,0 +1,6 @@
+# 负例：局部同名值遮蔽变体构造器，不可误调用全局变体。
+enum E = V(Int)
+fn main() -> Unit
+    let V = 7
+    let x = V(1)
+end

@@ -1,0 +1,10 @@
+# 负例：guard 必须为 Bool，不能把 Int 压成 if 条件。
+fn pick(n: Int) -> Int
+    match n
+        x if x + 1 => 1
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

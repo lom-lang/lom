@@ -22,24 +22,28 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 版本 v1.2.5（tag 已切，CI 绿）；语言面与发布线冻结。
+- 仓库版本 v1.2.6（tag 仅在 CI 绿后切，首回合须实查）；语言面与外部发布线冻结。
 - 审查状态：十三轮审查，R1-R78 全部关闭（R78 README 存量算术残留已随
   L2.3-a 包顺手收口）。第十三轮复审
   （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
   1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
   22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
-  L2.3-a/L2.3-b 两批在其基线之后交付（待下一轮独立复审重估）。
-- 活跃工作包：**L2.3 进行中**（按批交付——a/b 两批已收官）。L2 自举
-  编译器（RFC-0004 方案 A，accepted，修订 1-8）：L2.1 spike + L2.2
+  L2.3-a/L2.3-b/L2.3-c1 三批在其基线之后交付（待下一轮独立复审重估，
+  不得把十三审 B+ 外推为三批的新评级）。
+- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1 已实现）。L2 自举
+  编译器（RFC-0004 方案 A，accepted，修订 1-9）：L2.1 spike + L2.2
   子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**（if/while/for(Int)/
   Bool/比较/逻辑短路/块尾 if）+ **L2.3-b 闭包与捕获批**均完成（设计方案
   docs/designs/0001 四裁决点全按建议项：untagged+闭包 i64 指针 / B1+B2 /
-  mut 捕获放行 / 8 字节统一槽；self_comp.lom 4665 行，verify_selfcomp
-  40/40 = 17 对拍 + 23 负例拒绝；存量 10 用例产物 hex 逐字节不变实证）。
-  堆分配器/funcref 表/闭包值通道三件基础设施是后续批次共同地基。后续
-  批次：enum 与 match / String / List / Map / json / 包 / return 语句
-  （块深度跟踪）。
-- 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
+  mut 捕获放行 / 8 字节统一槽；b 批 17 对拍 + 23 负例，存量 10 用例
+  hex 逐字节不变实证）+ **L2.3-c1 非泛型用户枚举与标量/枚举 match**
+  （递归载荷、嵌套模式、guard、Form A/B、无匹配 trap；
+  self_comp.lom 5061 行，verify_selfcomp 72/72 = 25 对拍 + 47 负例，新增负例锁具体
+  拒绝原因）。闭包批堆分配器/funcref 表/闭包值通道为复合值地基；c1
+  使无 table 的 enum 程序也可分配。**c2 待做**：内建 Result/Option
+  与泛型用户 enum 的类型参数表示；再后是 String / List / Map / json /
+  包 / return 语句（块深度跟踪）。不可把 c1 称为 enum/match 全覆盖。
+- 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
 - 最新教训（HANDOVER §11.6）：块尾裸表达式归 Tail 不归 stmts；Lom 语句
@@ -52,8 +56,12 @@
   （L2.3-b fv 家族元组误传实录）；WASM table limits flags=0x01 必须带
   max、elem(9) 必须排 export(7) 之后（section id 升序）；**selfcomp
   用例编写三连误写 Fn 注解**（Fn 推后的负例形态是 HOF 自然写法——
-  写完用例全文 grep "Fn" 自查）。
-- 待用户裁决：L2.3 剩余批次推进节奏（闭包批已交付）；typechecker
+  写完用例全文 grep "Fn" 自查）。**c1 新教训**：match 字面量的
+  Int/Float 不做普通二元比较的数值提升；无闭包的 enum 仍需
+  memory/global；模式载荷只在变体测试成功后读；match 臂 Map 环境要
+  复制；`lom fmt` 不得把 guard 的 if 计作开块；WASM trap 前 stdout
+  必须吐出；闭包重赋还须比较 sig；Windows 子 Python 输出固定 UTF-8。
+- 待用户裁决：L2.3 后续子批推进节奏（c2 类型参数表示优先）；typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
   迁移观察 2026-10-19。
@@ -64,25 +72,25 @@
 1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部，
    docs/reviews/review-2026-09-22-2.html（十三审——最新轮），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
-   修订 1-8），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
+   修订 1-9），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
    含值表示/捕获语义决策记录）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
    - cargo build --release
-   - cargo test --release（期望 533/533；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
+   - cargo test --release（期望 535/535；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（零 diff）
    - python tools/doc_audit.py（期望 67/67）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 40/40 = 17 用例双产物行为一致 + 23 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 72/72 = 25 用例双产物行为一致 + 47 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   L2.3 剩余批次（enum 与 match / String / List / Map / json / 包 /
-   return 语句，按"编译期校验 + 负例"成对交付；enum 与 match 是堆对象
-   后首枚复合值批次，闭包批地基已就绪）；发布不应出现在任何菜单项内
+   L2.3-c2（内建 Result/Option 与泛型用户 enum 的类型参数表示），之后
+   String / List / Map / json / 包 / return 语句按"编译期校验 + 负例"逐批
+   交付；十三审后 a/b/c1 增量也可先选独立复审。发布不应出现在菜单项内
    （冻结未解）。
 
 【状态锚点（当前行为，供复核）】
@@ -101,6 +109,12 @@
   闭包值算术比较/闭包体内赋值捕获变量/调用非闭包值 → COMPILE-ERROR
   （10 条编译期校验 + 23 负例锁定）；无闭包程序产物与 L2.3-a 逐字节
   相同（has_closure 预扫定布局）。
+- L2.3-c1 后：非泛型用户 enum 构造/递归载荷 + 标量/枚举 match
+  （嵌套变体、guard、Form A/B、无匹配 trap）可编译；枚举指针 vt 为
+  `en:<name>`，无闭包也发 memory/global。内建 Result/Option、泛型
+  enum、String 模式、枚举结构相等/显示等仍明确 COMPILE-ERROR 无 hex；
+  错参、错误模式/guard/臂类型、不同闭包签名重赋也在编译期拒绝。
+  verify_selfcomp 72/72（25 对拍 + 47 负例；新负例锁拒绝原因）。
 - 写 self_comp 代码的坑：宿主 dangling-else 贪婪归内（then 块首元素
   嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
   改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）；多返回值调用点

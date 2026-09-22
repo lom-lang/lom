@@ -1,0 +1,5 @@
+# 负例：枚举打印需 String/显示运行时，不可送入 print_i64。
+enum E = Z
+fn main() -> Unit ! [IO]
+    println(Z)
+end

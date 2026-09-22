@@ -1,0 +1,4 @@
+# 负例：内建 Option 变体需类型参数表示，c1 不假装支持。
+fn main() -> Unit
+    let x = Some(1)
+end

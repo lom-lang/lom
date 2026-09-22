@@ -1,0 +1,13 @@
+# L2.3-c：非穷尽 match 在运行时无匹配须 trap，不能静默造默认值。
+# 宿主和 L2 的 stderr 文案不同；验收口径是 stdout 与退出码一致。
+fn pick(n: Int) -> Int
+    match n
+        0 => 10
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(3)
+    println(pick(1))
+    println(4)
+end

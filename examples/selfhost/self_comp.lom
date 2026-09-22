@@ -1,5 +1,5 @@
 # ============================================================================
-# self_comp.lom — L2 自举编译器（RFC-0004 方案 A，L2.2 最小子集）
+# self_comp.lom — L2 自举编译器（RFC-0004 方案 A，L2.3-c1 子集）
 #
 # 用途：把 Lom 子集程序编译为 .wasm（经纯 ASCII hex 文本落盘，宿主桩
 #       tools/hex2wasm.py 转二进制——方案 A 通道，RFC-0004）。
@@ -7,16 +7,15 @@
 #   lom self_comp.lom -- <input.lom> <output.hex>
 #   成功打印 "COMPILED <n> bytes -> <path>"；失败打印诊断 + "COMPILE-ERROR"
 #
-# L2.2 子集范围（超出即报错，留给 L2.3+）：
-#   - fn 声明（参数/返回类型限 Int/Float/Unit；显式效应注解允许但忽略）
-#   - let（含 let mut）/ 赋值（扁平作用域，遮蔽 = 新槽）
-#   - 整数与浮点算术（+ - * / %；Int+Float 混合提升 Float——对齐宿主语义；
-#     Float % 不支持——f64 无 rem 指令的合成留给 L2.3）
-#   - 一元负、括号、函数调用（含递归/前向引用）、println(Int|Float)
-#   - 块值 = 尾表达式（return/if/while/for/match/闭包/字符串等全部不支持）
+# 当前子集：L2.2 算术/调用/println + L2.3-a 控制流/Bool + L2.3-b 闭包
+# + L2.3-c1 非泛型用户枚举、标量及枚举 match（字面量/Binder/通配符、
+# 嵌套变体、guard、Form A/B、无匹配 trap）。子集外均编译期明确拒绝：
+# Result/Option 与泛型用户枚举、String/List/Map/json/包、return 语句、
+# 枚举结构相等/显示、闭包值 match 等留 L2.3 后续批次。
 #
 # 值表示（编译器实现自由度，RFC-0004：不做字节级一致，行为级对拍）：
-#   Int = 原生 i64（untagged）；Float = 原生 f64。宿主导入（env 模块）：
+#   Int=i64、Float=f64、Bool=i32；闭包/枚举=i64 裸指针（untagged，
+#   编译期 vt 区分）。宿主导入（env 模块）：
 #   print_i64(i64) / print_f64(f64)——换行由 harness 隐式处理（每调用一行）。
 #   专用 harness：tools/selfcomp/run_selfcomp.mjs（与宿主 run_wasm.mjs 的
 #   fmtFloat 口径一致：整数值补 .0、inf/-inf/NaN 字面）。
@@ -2377,9 +2376,17 @@ fn subset_err(msg: String) -> String
     "L2.2 子集不支持: " + msg
 end
 
-# Ty → 值类型（"i64"|"f64"|"i32"|"cl"|"void"；L2.3-a 起 Bool → i32；L2.3-b 起
-# 闭包值 → "cl"——Fn 类型注解推后（负例登记，designs/0001 §4-B3））
-fn ty_vt(t: Ty) -> Result<String, String>
+# Ty → 值类型（"i64"|"f64"|"i32"|"cl"|"en:<name>"|"void"）。
+# Fn 类型注解推后（designs/0001 §4-B3）；非泛型用户 enum 有名区分。
+fn enum_vt(vt: String) -> Bool
+    starts_with(vt, "en:")
+end
+
+fn builtin_variant(name: String) -> Bool
+    name == "Ok" or name == "Err" or name == "Some" or name == "None"
+end
+
+fn ty_vt(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match t
         TyInt => Ok("i64")
         TyFloat => Ok("f64")
@@ -2388,30 +2395,32 @@ fn ty_vt(t: Ty) -> Result<String, String>
         TyNamed(s) =>
             if s == "Fn"
                 Err(subset_err("Fn 类型注解留后续批次（untagged call_indirect 需精确签名）"))
+            elif map_has(fns, "@enum:" + s)
+                Ok("en:" + s)
             else
-                Err(subset_err("参数/返回类型只支持 Int/Float/Bool/Unit"))
+                Err(subset_err("未知或子集外枚举类型 '" + s + "'"))
             end
         end
-        _ => Err(subset_err("参数/返回类型只支持 Int/Float/Bool/Unit"))
+        _ => Err(subset_err("该参数/返回类型（泛型 enum/Result/Option 留后续批次）"))
     end
 end
 
 # Option<Ty> → 值类型（None = 无返回 = void）
-fn tyopt_vt(t: Option<Ty>) -> Result<String, String>
+fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match t
         None => Ok("void")
-        Some(tt) => ty_vt(tt)
+        Some(tt) => ty_vt(tt, fns)
     end
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64"
+    if vt == "i64" or enum_vt(vt)
         "7e"
     else
         if vt == "i32"
             "7f"
         else
-            # f64 = 7c；cl = 闭包值（i64 裸指针，编译期 vt 跟踪）= 7e
+            # f64 = 7c；cl/enum = i64 裸指针（编译期 vt 跟踪）= 7e
             if vt == "cl"
                 "7e"
             else
@@ -2525,7 +2534,7 @@ end
 # 的 caps 或外层上下文）。
 fn closure_rv(reto: Option<Ty>, body: Blk, env2: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match reto
-        Some(t) => ty_vt(t)
+        Some(t) => ty_vt(t, fns)
         None =>
             match body
                 BlkOf(_, tail) =>
@@ -2549,13 +2558,38 @@ fn closure_sig(params: List<Prm>, reto: Option<Ty>, body: Blk, env2: Map<String,
                 if k > 0
                     ps = ps + ","
                 end
-                ps = ps + ty_vt(pt)?
+                ps = ps + ty_vt(pt, fns)?
             end
         end
         k = k + 1
     end
     let rv = closure_rv(reto, body, env2, fns)?
     Ok(mk_sig(ps, rv))
+end
+
+# 构造器签名校验；与调用点 R74 同为编译期拒绝，不把坏类型留到 wasm 实例化。
+fn variant_call_type(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match map_get(fns, "@variant:" + name)
+        None => Err(subset_err("未知枚举变体 '" + name + "'"))
+        Some(v) =>
+            if list_length(args) != v.nprm
+                return Err(subset_err("变体 '" + name + "' 实参数不符（期望 " + v.nprm + " 得 " + list_length(args) + "）"))
+            end
+            if v.nprm > 0
+                let wants = split(v.prms, ",")
+                let mut i = 0
+                while i < v.nprm
+                    let got = infer_ex(list_get(args, i), env, fns)?
+                    let want = list_get(wants, i)
+                    if got != want
+                        return Err(subset_err("变体 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + want + " 得 " + got + "）"))
+                    end
+                    i = i + 1
+                end
+            end
+            Ok(v.ret)
+        end
+    end
 end
 
 # 表达式的"返回段"综合（作为函数返回值时）：闭包值 → "cl"+sig（嵌套递归）；
@@ -2576,18 +2610,28 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                     end
                 end
                 None =>
-                    match map_get(fns, x)
-                        Some(fi) => Ok("cl" + mk_sig(fi.prms, fi.ret))
-                        None => Err("未定义变量 '" + x + "'")
+                    if map_has(fns, "@variant:" + x)
+                        variant_call_type(x, list_empty(), env, fns)
+                    elif builtin_variant(x)
+                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
+                    else
+                        match map_get(fns, x)
+                            Some(fi) => Ok("cl" + mk_sig(fi.prms, fi.ret))
+                            None => Err("未定义变量 '" + x + "'")
+                        end
                     end
                 end
             end
         end
-        ExCall(callee, _) =>
+        ExCall(callee, args) =>
             # 直调（println/fns）→ ret；闭包调用 → 被调 rv 段原样
             match callee
                 ExIdent(name, _, _) =>
-                    if name == "println"
+                    if map_has(env, name) == False and map_has(fns, "@variant:" + name)
+                        variant_call_type(name, args, env, fns)
+                    elif map_has(env, name) == False and builtin_variant(name)
+                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + name + "'）"))
+                    elif name == "println"
                         Ok("void")
                     else
                         match map_get(fns, name)
@@ -2748,10 +2792,16 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             match map_get(env, x)
                 Some(b) => Ok(b.vt)
                 None =>
-                    # L2.3-b：具名函数当值（v0.4.2 宿主语义——值位引用合法）
-                    match map_get(fns, x)
-                        Some(_) => Ok("cl")
-                        None => Err("未定义变量 '" + x + "'")
+                    if map_has(fns, "@variant:" + x)
+                        variant_call_type(x, list_empty(), env, fns)
+                    elif builtin_variant(x)
+                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
+                    else
+                        # L2.3-b：具名函数当值（v0.4.2 宿主语义）
+                        match map_get(fns, x)
+                            Some(_) => Ok("cl")
+                            None => Err("未定义变量 '" + x + "'")
+                        end
                     end
                 end
             end
@@ -2768,10 +2818,10 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if op != "Neg"
                 return Err(subset_err("一元运算 '" + op + "'"))
             end
-            # L2.3-b：闭包值不参与一元负
+            # 闭包与枚举裸指针不参与一元负。
             let itn = infer_ex(inner, env, fns)?
-            if itn == "cl"
-                return Err(subset_err("闭包值参与一元负"))
+            if itn == "cl" or enum_vt(itn)
+                return Err(subset_err("闭包/枚举值参与一元负"))
             end
             Ok(itn)
         end
@@ -2784,8 +2834,8 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if lt == "void" or rt == "void"
                     return Err(subset_err("void 参与比较"))
                 end
-                if lt == "cl" or rt == "cl"
-                    return Err(subset_err("闭包值参与比较"))
+                if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
+                    return Err(subset_err("闭包/枚举值参与比较（结构相等留后续批次）"))
                 end
                 return Ok("i32")
             end
@@ -2797,8 +2847,8 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if lt == "void" or rt == "void"
                 return Err(subset_err("void 参与算术"))
             end
-            if lt == "cl" or rt == "cl"
-                return Err(subset_err("闭包值参与算术"))
+            if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
+                return Err(subset_err("闭包/枚举值参与算术"))
             end
             if lt == "i64" and rt == "i64"
                 Ok("i64")
@@ -2816,6 +2866,7 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             Ok("i32")
         end
         ExIf(ifr) => infer_if_expr(ifr, env, fns)
+        ExMatch(scrut, arms, _) => infer_match_expr(scrut, arms, env, fns)
         ExCall(callee, _) =>
             # L2.3-b：统一走 ex_rv（直调 println/fns → ret；闭包调用 → 被调
             # rv 段；任意 callee 同口径）——返回段 → vt
@@ -2869,6 +2920,158 @@ fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap:
     end
 end
 
+# L2.3-c：match 臂独立作用域。Lom Map 是引用语义，直接 let arm_env = env
+# 会把 Binder/臂内 let 泄漏给后续臂及外层，故逐项复制绑定记录。
+fn copy_bindings(env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>) -> Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>
+    let out = map_empty()
+    for key in map_keys(env)
+        match map_get(env, key)
+            Some(b) => map_set(out, key, b)
+            None => ()
+        end
+    end
+    out
+end
+
+fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Unit, String>
+    match p
+        PatWildcard => Ok(())
+        PatBinder(name) =>
+            if builtin_variant(name)
+                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
+            end
+            match map_get(fns, "@variant:" + name)
+                Some(v) =>
+                    if v.nprm == 0
+                        if scrut_vt != v.ret
+                            return Err(subset_err("无参变体模式 '" + name + "' 与被测类型 '" + scrut_vt + "' 不符"))
+                        end
+                        return Ok(())
+                    end
+                end
+                None => ()
+            end
+            map_set(arm_env, name, {slot: 0, vt: scrut_vt, sig: "", cap: False})
+            Ok(())
+        end
+        PatLit(lit) =>
+            let string_lit = match lit
+                ExStr(_) => True
+                _ => False
+            end
+            if string_lit
+                return Err(subset_err("String 字面量模式留 String 批"))
+            end
+            let lt = infer_ex(lit, arm_env, fns)?
+            if scrut_vt == lt or (scrut_vt == "i64" and lt == "f64") or (scrut_vt == "f64" and lt == "i64")
+                Ok(())
+            else
+                Err(subset_err("字面量模式类型不符（被测 " + scrut_vt + " 模式 " + lt + "）"))
+            end
+        end
+        PatVariant(name, subs) =>
+            if builtin_variant(name)
+                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
+            end
+            let v = match map_get(fns, "@variant:" + name)
+                Some(meta) => meta
+                None => {idx: -1, ret: "", nprm: -1, prms: ""}
+            end
+            if v.idx < 0
+                return Err(subset_err("未知变体模式 '" + name + "'"))
+            end
+            if scrut_vt != v.ret
+                return Err(subset_err("变体模式 '" + name + "' 与被测类型 '" + scrut_vt + "' 不符"))
+            end
+            if list_length(subs) != v.nprm
+                return Err(subset_err("变体模式 '" + name + "' 子模式数不符（期望 " + v.nprm + " 得 " + list_length(subs) + "）"))
+            end
+            if v.nprm > 0
+                let ps = split(v.prms, ",")
+                let mut i = 0
+                while i < v.nprm
+                    pattern_types(list_get(subs, i), list_get(ps, i), arm_env, fns)?
+                    i = i + 1
+                end
+            end
+            Ok(())
+        end
+    end
+end
+
+# Form B 臂的尾表达式可读取臂内 let；先在拷贝作用域上做类型走查，
+# 再由 comp_val_blk 真正发射语句，不让类型预扫改变外层 env。
+fn match_block_type(b: Blk, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match b
+        BlkOf(stmts, tail) =>
+            for s in stmts
+                match s
+                    StLet(_, name, tyo, ex) =>
+                        let vt = let_vt(tyo, ex, arm_env, fns)?
+                        if vt == "void"
+                            return Err(subset_err("match 臂内 let 绑定 void 值"))
+                        end
+                        let sig = if vt == "cl" ex_sig(ex, arm_env, fns)? else "" end
+                        map_set(arm_env, name, {slot: 0, vt: vt, sig: sig, cap: False})
+                    end
+                    _ => ()
+                end
+            end
+            match tail
+                None => Ok("void")
+                Some(te) => infer_ex(te, arm_env, fns)
+            end
+        end
+    end
+end
+
+fn match_arm_type(body: ArmB, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match body
+        ABExpr(e) => infer_ex(e, arm_env, fns)
+        ABBlock(b) => match_block_type(b, arm_env, fns)
+    end
+end
+
+fn infer_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let svt = infer_ex(scrut, env, fns)?
+    if svt == "void" or svt == "cl"
+        return Err(subset_err("match 被测值类型不支持（'" + svt + "'）"))
+    end
+    let mut out = ""
+    let mut first = True
+    for arm in arms
+        match arm
+            ArmR(pat, guard, body) =>
+                let arm_env = copy_bindings(env)
+                pattern_types(pat, svt, arm_env, fns)?
+                match guard
+                    None => ()
+                    Some(g) =>
+                        let gt = infer_ex(g, arm_env, fns)?
+                        if gt != "i32"
+                            return Err(subset_err("match guard 须为 Bool（得到 '" + gt + "'）"))
+                        end
+                    end
+                end
+                let bt = match_arm_type(body, arm_env, fns)?
+                if first
+                    out = bt
+                    first = False
+                elif bt != out
+                    return Err(subset_err("match 臂值类型不一致（'" + out + "' vs '" + bt + "'）"))
+                end
+            end
+        end
+    end
+    if first
+        return Err(subset_err("match 至少需要一个臂"))
+    end
+    if out == "cl"
+        return Err(subset_err("返回闭包值的 match 留后续批次（缺精确签名）"))
+    end
+    Ok(out)
+end
+
 # ---- X2：表达式编译（产物 hex；值留栈上；void 不产值） ----
 
 fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
@@ -2893,10 +3096,16 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
                     end
                 end
                 None =>
-                    # L2.3-b：具名函数当值（v0.4.2 宿主语义——零捕获 shim）
-                    match map_get(fns, x)
-                        Some(fi) => emit_fn_value(x, fi, fns, cg, locals, localvt)
-                        None => Err("未定义变量 '" + x + "'")
+                    if map_has(fns, "@variant:" + x)
+                        emit_variant_construct(x, list_empty(), env, fns, cg, locals, localvt)
+                    elif builtin_variant(x)
+                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
+                    else
+                        # L2.3-b：具名函数当值（零捕获 shim）
+                        match map_get(fns, x)
+                            Some(fi) => emit_fn_value(x, fi, fns, cg, locals, localvt)
+                            None => Err("未定义变量 '" + x + "'")
+                        end
                     end
                 end
             end
@@ -2937,6 +3146,7 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             # 块尾/值位嵌套 if（else 内嵌 if、let y = if ... end）落兜底被拒
             comp_if_expr(ifr, env, fns, cg, locals, localvt)
         end
+        ExMatch(scrut, arms, _) => comp_match_expr(scrut, arms, env, fns, cg, locals, localvt)
         ExCall(callee, args) => comp_call(callee, args, env, fns, cg, locals, localvt)
         _ => Err(subset_err("该表达式形态"))
     end
@@ -3018,6 +3228,11 @@ fn f64_cmp_op(op: String) -> Result<String, String>
 end
 
 fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let left_vt = infer_ex(l, env, fns)?
+    let right_vt = infer_ex(r, env, fns)?
+    if enum_vt(left_vt) or enum_vt(right_vt)
+        return Err(subset_err("枚举值参与算术/比较（结构相等留后续批次）"))
+    end
     if is_cmp_op(op)
         # L2.3-a：比较——i64 直接比 / f64 直接比 / 混合提升 f64 后比（对齐宿主）
         let lt = infer_ex(l, env, fns)?
@@ -3055,9 +3270,185 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     end
 end
 
+# L2.3-c 用户枚举构造：参数先按源序求值到 scratch local，再分配
+# [variant_idx:i32][arity:i32][payload:i64×n]。Float 用位重解释、Bool
+# 扩为 i64，枚举指针直接存 i64；编译期 vt 与声明逐位校验。
+fn emit_variant_construct(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let _ = need_heap(cg)?
+    let rv = variant_call_type(name, args, env, fns)?
+    let meta = match map_get(fns, "@variant:" + name)
+        Some(v) => v
+        None => {idx: -1, ret: "", nprm: -1, prms: ""}
+    end
+    if meta.idx < 0
+        return Err(subset_err("未知枚举变体 '" + name + "'"))
+    end
+    let mut out = ""
+    let mut slots = list_empty()
+    let mut i = 0
+    while i < meta.nprm
+        let arg = list_get(args, i)
+        let vt = infer_ex(arg, env, fns)?
+        out = out + comp_ex(arg, env, fns, cg, locals, localvt)?
+        let slot = new_slot(locals, localvt, vt)
+        out = out + "21" + leb128_hex(slot)
+        slots = list_cons((slot, vt), slots)
+        i = i + 1
+    end
+    let p = new_slot(locals, localvt, rv)
+    let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+    out = out + "41" + sleb128_hex(8 + 8 * meta.nprm) + "10" + leb128_hex(alloc_idx) + "ac" + "21" + leb128_hex(p)
+    out = out + "20" + leb128_hex(p) + "a7" + "41" + sleb128_hex(meta.idx) + "3600" + "00"
+    out = out + "20" + leb128_hex(p) + "a7" + "41" + sleb128_hex(meta.nprm) + "3600" + "04"
+    let mut j = 0
+    for pr in rev_slots_vt(slots)
+        let mut payload = "20" + leb128_hex(pr.0)
+        if pr.1 == "f64"
+            payload = payload + "bd"
+        elif pr.1 == "i32"
+            payload = payload + "ac"
+        end
+        out = out + "20" + leb128_hex(p) + "a7" + payload + "3700" + leb128_hex(8 + 8 * j)
+        j = j + 1
+    end
+    Ok(out + "20" + leb128_hex(p))
+end
+
+# 模式测试在栈上留下 i32 条件；载荷只在 idx 命中后的 if(result i32)
+# 内读取，防止 0 参对象贴页尾时盲读越界（RFC-0003 修订 25）。
+fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    match p
+        PatWildcard => Ok("4101")
+        PatBinder(name) =>
+            if builtin_variant(name)
+                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
+            end
+            match map_get(fns, "@variant:" + name)
+                Some(v) =>
+                    if v.nprm == 0
+                        if svt != v.ret
+                            return Err(subset_err("无参变体模式 '" + name + "' 类型不符"))
+                        end
+                        return Ok("20" + leb128_hex(s) + "a7" + "2800" + "00" + "41" + sleb128_hex(v.idx) + "46")
+                    end
+                end
+                None => ()
+            end
+            let slot = new_slot(locals, localvt, svt)
+            map_set(arm_env, name, {slot: slot, vt: svt, sig: "", cap: False})
+            Ok("20" + leb128_hex(s) + "21" + leb128_hex(slot) + "4101")
+        end
+        PatLit(lit) =>
+            let lv = infer_ex(lit, arm_env, fns)?
+            let lc = comp_ex(lit, arm_env, fns, cg, locals, localvt)?
+            let sc = "20" + leb128_hex(s)
+            if svt == "i64" and lv == "i64"
+                Ok(sc + lc + "51")
+            elif svt == "f64" and lv == "f64"
+                Ok(sc + lc + "61")
+            elif svt == "i32" and lv == "i32"
+                Ok(sc + lc + "46")
+            elif svt == "i64" and lv == "f64"
+                # 宿主 match 字面量走 tagged rt_eq：Int 2 与 Float 2.0
+                # 不相等（普通二元比较的数值提升不适用于模式）。
+                Ok("4100")
+            elif svt == "f64" and lv == "i64"
+                Ok("4100")
+            else
+                Err(subset_err("字面量模式类型不符（被测 " + svt + " 模式 " + lv + "）"))
+            end
+        end
+        PatVariant(name, subs) =>
+            if builtin_variant(name)
+                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
+            end
+            let v = match map_get(fns, "@variant:" + name)
+                Some(meta) => meta
+                None => {idx: -1, ret: "", nprm: -1, prms: ""}
+            end
+            if v.idx < 0
+                return Err(subset_err("未知变体模式 '" + name + "'"))
+            end
+            if svt != v.ret or list_length(subs) != v.nprm
+                return Err(subset_err("变体模式 '" + name + "' 的类型或子模式数不符"))
+            end
+            let mut out = "20" + leb128_hex(s) + "a7" + "2800" + "00" + "41" + sleb128_hex(v.idx) + "46"
+            if v.nprm > 0
+                out = out + "047f"
+                let ps = split(v.prms, ",")
+                let mut i = 0
+                while i < v.nprm
+                    let vt = list_get(ps, i)
+                    let arg_slot = new_slot(locals, localvt, vt)
+                    out = out + "20" + leb128_hex(s) + "a7" + "2900" + leb128_hex(8 + 8 * i)
+                    if vt == "f64"
+                        out = out + "bf"
+                    elif vt == "i32"
+                        out = out + "a7"
+                    end
+                    out = out + "21" + leb128_hex(arg_slot)
+                    out = out + comp_pattern_test(list_get(subs, i), arg_slot, vt, arm_env, fns, cg, locals, localvt)?
+                    if i > 0
+                        out = out + "71"
+                    end
+                    i = i + 1
+                end
+                out = out + "05" + "4100" + "0b"
+            end
+            Ok(out)
+        end
+    end
+end
+
+fn comp_match_arm_body(body: ArmB, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    match body
+        ABExpr(e) => comp_ex(e, arm_env, fns, cg, locals, localvt)
+        ABBlock(b) => comp_val_blk(b, arm_env, fns, cg, locals, localvt)
+    end
+end
+
+fn comp_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let result_vt = infer_match_expr(scrut, arms, env, fns)?
+    let svt = infer_ex(scrut, env, fns)?
+    let scrut_code = comp_ex(scrut, env, fns, cg, locals, localvt)?
+    let s = new_slot(locals, localvt, svt)
+    let mut out = scrut_code + "21" + leb128_hex(s) + "02" + vt_bt(result_vt)
+    for arm in arms
+        match arm
+            ArmR(pat, guard, body) =>
+                let arm_env = copy_bindings(env)
+                let pc = comp_pattern_test(pat, s, svt, arm_env, fns, cg, locals, localvt)?
+                out = out + pc + "0440"
+                match guard
+                    None =>
+                        out = out + comp_match_arm_body(body, arm_env, fns, cg, locals, localvt)? + "0c01"
+                    end
+                    Some(g) =>
+                        let gt = infer_ex(g, arm_env, fns)?
+                        if gt != "i32"
+                            return Err(subset_err("match guard 须为 Bool"))
+                        end
+                        out = out + comp_ex(g, arm_env, fns, cg, locals, localvt)? + "0440"
+                        out = out + comp_match_arm_body(body, arm_env, fns, cg, locals, localvt)? + "0c02" + "0b"
+                    end
+                end
+                out = out + "0b"
+            end
+        end
+    end
+    # 宿主无匹配臂时运行时错误；L2 对齐为 trap，不默默造默认值。
+    Ok(out + "00" + "0b")
+end
+
 fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     match callee
         ExIdent(name, _, _) =>
+            if map_has(env, name) == False and map_has(fns, "@variant:" + name)
+                return emit_variant_construct(name, args, env, fns, cg, locals, localvt)
+            end
+            if map_has(env, name) == False and builtin_variant(name)
+                return Err(subset_err("内建 Result/Option 变体留后续子批（'" + name + "'）"))
+            end
             if name == "println"
                 return comp_println(args, env, fns, cg, locals, localvt)
             end
@@ -3127,7 +3518,7 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
         if at == "f64"
             Ok(ac + "1001")
         else
-            Err(subset_err("println 只接受 Int/Float（String/Bool 留 L2.3）"))
+            Err(subset_err("println 只接受 Int/Float（String/Bool/Enum 留后续批次）"))
         end
     end
 end
@@ -3296,7 +3687,7 @@ end
 # heap_on 防御（预扫漏判时 fail-safe：宁可编译错误不可产引用缺失 alloc 的 wasm）
 fn need_heap(cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Unit, String>
     if cg_int(cg.cgs, "heap_on") == 0
-        Err("内部错误：闭包预扫漏判（heap 未启用）——请报维护者")
+        Err("内部错误：堆预扫漏判（heap 未启用）——请报维护者")
     else
         Ok(())
     end
@@ -3315,7 +3706,7 @@ fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<Stri
     let mut fi2 = 0
     while fi2 < nf
         let nm = list_get(frees, fi2)
-        if map_has(fns, nm) == False
+        if map_has(fns, nm) == False and map_has(fns, "@variant:" + nm) == False
             match map_get(env, nm)
                 None =>
                     return Err("闭包捕获了未定义变量 '" + nm + "'")
@@ -3337,7 +3728,7 @@ fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<Stri
     while k < np
         match list_get(params, k)
             Prm(pn, pt) =>
-                let vt = ty_vt(pt)?
+                let vt = ty_vt(pt, fns)?
                 map_set(env2, pn, {slot: k + 1, vt: vt, sig: "", cap: False})
                 map_set(localvt2, int_to_string(k + 1), vt)
             end
@@ -3758,9 +4149,8 @@ fn free_vars_block(body: Blk, params: List<Prm>) -> List<String>
 end
 
 # ============================================================================
-# L2.3-b：闭包存在性预扫（designs/0001 §7.2）——保守口径决定模块布局：
-# 任一 ExClosure 或"值位具名函数引用"（fn_value 需要 shim+堆）命中即真；
-# 宁可多发（多出 memory/table）不可漏发（漏发时创建序列引用不存在的 alloc）。
+# L2.3-c1：堆设施预扫——闭包/具名函数值/用户 enum/match 命中即真；
+# 宁可多发 memory/global，不可漏发 alloc。table/elem 仍只在闭包存在时发。
 # 防线：comp 层遇 heap_on=false 却要创建闭包 → 内部一致性 Err（理论不可达）。
 # ============================================================================
 
@@ -3783,7 +4173,7 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
                 end
             end
         end
-        ExIdent(name, _, _) => map_has(fns, name)
+        ExIdent(name, _, _) => map_has(fns, name) or map_has(fns, "@variant:" + name)
         ExBinary(_, l, r) =>
             if scan_ex(l, fns)
                 True
@@ -3809,43 +4199,9 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
         ExField(inner, _) => scan_ex(inner, fns)
         ExGroup(inner) => scan_ex(inner, fns)
         ExIf(ifr) => scan_if(ifr, fns)
-        ExMatch(scrut, arms, _) =>
-            if scan_ex(scrut, fns)
-                True
-            else
-                let mut hit = False
-                for arm in arms
-                    match arm
-                        ArmR(pat, guard, ab) =>
-                            if scan_pattern(pat, fns)
-                                hit = True
-                            end
-                            match guard
-                                None => ()
-                                Some(g) =>
-                                    if scan_ex(g, fns)
-                                        hit = True
-                                    end
-                                end
-                            end
-                            match ab
-                                ABExpr(be) =>
-                                    if scan_ex(be, fns)
-                                        hit = True
-                                    end
-                                end
-                                ABBlock(bb) =>
-                                    if scan_block(bb, fns)
-                                        hit = True
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                hit
-            end
-        end
+        # L2.3-c：match 预扫保守启用堆（标量 match 多发堆设施无害）；
+        # 臂内闭包同样有堆，因此命中即真无需继续递归扫描。
+        ExMatch(_, _, _) => True
         ExTry(inner) => scan_ex(inner, fns)
         ExRange(a, b) =>
             if scan_ex(a, fns)
@@ -3884,21 +4240,6 @@ fn scan_args(args: List<Ex>, fns: Map<String, {idx: Int, ret: String, nprm: Int,
         end
     end
     hit
-end
-
-fn scan_pattern(p: Pat, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Bool
-    match p
-        PatVariant(_, subs) =>
-            let mut hit = False
-            for sp in subs
-                if scan_pattern(sp, fns)
-                    hit = True
-                end
-            end
-            hit
-        end
-        _ => False
-    end
 end
 
 fn scan_if(ifr: IfR, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Bool
@@ -3980,7 +4321,7 @@ fn scan_block(b: Blk, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: 
     end
 end
 
-fn has_closure(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Bool
+fn needs_heap(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Bool
     match prg
         Prg(items) =>
             let mut hit = False
@@ -3990,6 +4331,9 @@ fn has_closure(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prm
                         if scan_block(body, fns)
                             hit = True
                         end
+                    end
+                    ItEnum(_, _, _) =>
+                        hit = True
                     end
                     _ => ()
                 end
@@ -4022,7 +4366,7 @@ fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String, sig:
     match tyo
         None => infer_ex(ex, env, fns)
         Some(tt) =>
-            let av = ty_vt(tt)?
+            let av = ty_vt(tt, fns)?
             let iv = infer_ex(ex, env, fns)?
             if iv != av
                 return Err(subset_err("let 注解类型 '" + av + "' 与值类型 '" + iv + "' 不符（编译期拒绝；宿主侧仅 warning）"))
@@ -4090,6 +4434,16 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
                     if bnd.cap
                         Err("赋值给未定义变量 '" + name + "'（闭包捕获为值拷贝，不能赋值）")
                     else
+                        let assigned_vt = infer_ex(ex, env, fns)?
+                        if assigned_vt != bnd.vt
+                            return Err(subset_err("赋值 '" + name + "' 类型不符（期望 " + bnd.vt + " 得 " + assigned_vt + "）"))
+                        end
+                        if bnd.vt == "cl"
+                            let assigned_sig = ex_sig(ex, env, fns)?
+                            if assigned_sig != bnd.sig
+                                return Err(subset_err("赋值 '" + name + "' 闭包签名不符（call_indirect 需精确签名）"))
+                            end
+                        end
                         Ok(comp_ex(ex, env, fns, cg, locals, localvt)? + "21" + leb128_hex(bnd.slot))
                     end
                 end
@@ -4245,7 +4599,7 @@ end
 # L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f；
 # L2.3-b：cl（闭包值 = i64）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64"
+    if vt == "i64" or enum_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -4350,9 +4704,9 @@ fn comp_one_fn(params: List<Prm>, ret: Option<Ty>, body: Blk, fns: Map<String, {
     let env = map_empty()
     let locals = map_empty()
     let localvt = map_empty()
-    let k = bind_params(params, env)
+    let k = bind_params(params, env, fns)?
     map_set(locals, "n", k)
-    let rv = tyopt_vt(ret)?
+    let rv = tyopt_vt(ret, fns)?
     let code = comp_blk(body, env, fns, cg, locals, localvt, rv)?
     # local 声明段：只声明 let 槽（绝对槽 k..n），每组 count=1
     let total = match map_get(locals, "n")
@@ -4378,29 +4732,21 @@ fn slot_vt(localvt: Map<String, String>, i: Int) -> String
     end
 end
 
-fn bind_params(params: List<Prm>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>) -> Int
+fn bind_params(params: List<Prm>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Int, String>
     let mut k = 0
     for p in params
         match p
-            Prm(pn, TyInt) =>
-                map_set(env, pn, {slot: k, vt: "i64", sig: "", cap: False})
+            Prm(pn, pt) =>
+                let vt = ty_vt(pt, fns)?
+                if vt == "void"
+                    return Err(subset_err("void/子集外参数类型"))
+                end
+                map_set(env, pn, {slot: k, vt: vt, sig: "", cap: False})
                 k = k + 1
             end
-            Prm(pn, TyFloat) =>
-                map_set(env, pn, {slot: k, vt: "f64", sig: "", cap: False})
-                k = k + 1
-            end
-            Prm(pn, TyBool) =>
-                # L2.3-b 顺带修复：L2.3-a 的 bind_params 漏了 TyBool 分支
-                # （签名层 collect_sigs/fn_type_entry 已支持，绑定层漏绑——
-                # 带 Bool 参数的顶层 fn 体内引用该参数会误报未定义变量）
-                map_set(env, pn, {slot: k, vt: "i32", sig: "", cap: False})
-                k = k + 1
-            end
-            Prm(_, _) => ()
         end
     end
-    k
+    Ok(k)
 end
 
 # ---- X4：模块组装 ----
@@ -4409,8 +4755,72 @@ fn sect(id: String, content: String) -> String
     id + leb128_hex(len(content) / 2) + content
 end
 
+# 用户枚举两遍登记：先登记类型名（支持递归载荷），再按声明序登记变体。
+# @ 前缀不是 Lom 标识符字符，故与用户函数名不碰撞；宿主预留的
+# Ok/Err/Some/None 索引 0..3 保留，用户变体从 4 起。
+fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match prg
+        Prg(items) =>
+            for it in items
+                match it
+                    ItEnum(name, tparams, _) =>
+                        if list_is_empty(tparams) == False
+                            return Err(subset_err("泛型 enum 留后续批次（'" + name + "'）"))
+                        end
+                        if name == "Int" or name == "Float" or name == "Bool" or name == "String" or name == "Unit" or name == "Fn" or name == "Result" or name == "Option"
+                            return Err(subset_err("枚举名与内建类型冲突（'" + name + "'）"))
+                        end
+                        if map_has(fns, "@enum:" + name)
+                            return Err(subset_err("重复枚举声明 '" + name + "'"))
+                        end
+                        map_set(fns, "@enum:" + name, {idx: 0, ret: "en:" + name, nprm: 0, prms: ""})
+                    end
+                    _ => ()
+                end
+            end
+            let mut vidx = 4
+            for it in items
+                match it
+                    ItEnum(name, _, variants) =>
+                        for vr in variants
+                            match vr
+                                VarR(vname, fields) =>
+                                    if vname == "Ok" or vname == "Err" or vname == "Some" or vname == "None"
+                                        return Err(subset_err("用户变体名与内建变体冲突（'" + vname + "'）"))
+                                    end
+                                    if map_has(fns, "@variant:" + vname)
+                                        return Err(subset_err("重复变体名 '" + vname + "'"))
+                                    end
+                                    let mut ps = ""
+                                    let mut n = 0
+                                    for ft in fields
+                                        let vt = ty_vt(ft, fns)?
+                                        if vt == "void"
+                                            return Err(subset_err("变体载荷不能为 Unit（'" + vname + "'）"))
+                                        end
+                                        if n > 0
+                                            ps = ps + ","
+                                        end
+                                        ps = ps + vt
+                                        n = n + 1
+                                    end
+                                    map_set(fns, "@variant:" + vname, {idx: vidx, ret: "en:" + name, nprm: n, prms: ps})
+                                    vidx = vidx + 1
+                                end
+                            end
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            Ok("")
+        end
+    end
+end
+
 # 收集签名：fns: Map<name, {idx, ret, nprm, prms}>（idx = 2+序，前两个是 print 导入；prms = 形参 vt 逗号串——R74 调用点校验用）
 fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    register_enums(prg, fns)?
     match prg
         Prg(items) =>
             let mut idx = 2
@@ -4420,34 +4830,23 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                         if name == "println"
                             return Err("用户函数不得命名 'println'")
                         end
-                        let rv = tyopt_vt(ret)?
+                        let rv = tyopt_vt(ret, fns)?
                         # R74（十二审）：摘要携带形参 vt 逗号串——调用点
-                        # 类型/arity 校验的事实源（Int→i64 / Float→f64，
+                        # 类型/arity 校验的事实源（Int/Float/Bool/用户 enum；
                         # 其余在签名层即拒，与 fn_type_entry 同文案）
                         let mut pv = ""
                         let mut k = 0
                         for p in params
                             match p
-                                Prm(_, TyInt) =>
+                                Prm(_, pt) =>
+                                    let vt = ty_vt(pt, fns)?
+                                    if vt == "void"
+                                        return Err(subset_err("void/子集外参数类型"))
+                                    end
                                     if k > 0
                                         pv = pv + ","
                                     end
-                                    pv = pv + "i64"
-                                end
-                                Prm(_, TyFloat) =>
-                                    if k > 0
-                                        pv = pv + ","
-                                    end
-                                    pv = pv + "f64"
-                                end
-                                Prm(_, TyBool) =>
-                                    if k > 0
-                                        pv = pv + ","
-                                    end
-                                    pv = pv + "i32"
-                                end
-                                Prm(_, _) =>
-                                    return Err(subset_err("void/子集外参数类型"))
+                                    pv = pv + vt
                                 end
                             end
                             k = k + 1
@@ -4464,21 +4863,16 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
 end
 
 # 函数类型条目：60 <nprm> <vt...> <0|1> <ret>
-fn fn_type_entry(params: List<Prm>, ret_vt: String) -> Result<String, String>
+fn fn_type_entry(params: List<Prm>, ret_vt: String, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     let mut ps = leb128_hex(list_length(params))
     for p in params
         match p
-            Prm(_, TyInt) =>
-                ps = ps + "7e"
-            end
-            Prm(_, TyFloat) =>
-                ps = ps + "7c"
-            end
-            Prm(_, TyBool) =>
-                ps = ps + "7f"
-            end
-            Prm(_, _) =>
-                return Err(subset_err("void/子集外参数类型"))
+            Prm(_, pt) =>
+                let vt = ty_vt(pt, fns)?
+                if vt == "void"
+                    return Err(subset_err("void/子集外参数类型"))
+                end
+                ps = ps + vt_hex(vt)
             end
         end
     end
@@ -4490,9 +4884,9 @@ fn fn_type_entry(params: List<Prm>, ret_vt: String) -> Result<String, String>
 end
 
 # 从 Itm 提取该函数的返回值类型
-fn sig_ret(it: Itm) -> Result<String, String>
+fn sig_ret(it: Itm, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match it
-        ItFn(_, _, ret, _, _, _, _) => tyopt_vt(ret)
+        ItFn(_, _, ret, _, _, _, _) => tyopt_vt(ret, fns)
         _ => Err("内部错误：sig_ret 只接受 ItFn")
     end
 end
@@ -4517,9 +4911,9 @@ fn build_module(prg: Prg) -> Result<String, String>
                     _ => ()
                 end
             end
-            # L2.3-b：闭包存在性预扫（保守）→ 按需启用堆设施。
-            # 无闭包路径与 L2.3-a 布局逐字节相同（存量对拍用例产物不变）。
-            let heap_on = has_closure(prg, fns)
+            # L2.3-c：闭包、枚举或 match 预扫（保守）→ 按需启用堆设施。
+            # 无闭包/枚举/match 的旧路径布局不变；新枚举路径按需发堆。
+            let heap_on = needs_heap(prg, fns)
             # 模块级编译状态（Map 引用语义跨函数共享）
             let cgs = map_empty()
             let cgh = map_empty()
@@ -4552,8 +4946,8 @@ fn build_module(prg: Prg) -> Result<String, String>
             for it in items
                 match it
                     ItFn(_, params, ret, _, body, _, _) =>
-                        let rv = sig_ret(it)?
-                        tentries = tentries + fn_type_entry(params, rv)?
+                        let rv = sig_ret(it, fns)?
+                        tentries = tentries + fn_type_entry(params, rv, fns)?
                         fidxs = fidxs + leb128_hex(2 + nfun2)
                         bodies = bodies + comp_one_fn(params, ret, body, fns, cg)?
                         nfun2 = nfun2 + 1
@@ -4577,13 +4971,15 @@ fn build_module(prg: Prg) -> Result<String, String>
             let mut mid = ""
             let mut elem_c = ""
             if ntab > 0
-                # table（funcref，min=max=n）+ memory（1 页起，alloc 自动 grow）
-                # + global（hp i32 mutable init 8——地址 0 保留哨兵，对齐宿主
-                # List Nil=空指针惯例）+ elem（active table 0 offset 0）
+                # table（funcref，min=max=n）仅闭包路径需要。
                 mid = sect("04", "01" + "70" + "01" + leb128_hex(ntab) + leb128_hex(ntab))
-                + sect("05", "01" + "00" + "01")
-                + sect("06", "01" + "7f" + "01" + "4108" + "0b")
                 elem_c = sect("09", "01" + "00" + "41000b" + leb128_hex(ntab) + cg_str(cgh, "table"))
+            end
+            if heap_on
+                # 枚举无闭包时 table/elem 为零，但仍需要 alloc 的 memory/global。
+                # hp init 8：地址 0 留哨兵，bump 自动 memory.grow。
+                mid = mid + sect("05", "01" + "00" + "01")
+                + sect("06", "01" + "7f" + "01" + "4108" + "0b")
             end
             # export section：main
             let mi = match map_get(fns, "main")

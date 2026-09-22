@@ -1,0 +1,8 @@
+# 负例：空 match 无法综合 blocktype。
+fn pick(n: Int) -> Int
+    match n
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(1))
+end

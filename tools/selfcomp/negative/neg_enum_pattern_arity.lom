@@ -1,0 +1,11 @@
+# 负例：模式子项数量必须对齐变体声明。
+enum E = V(Int)
+fn extract(e: E) -> Int
+    match e
+        V(a, b) => a + b
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(extract(V(1)))
+end
