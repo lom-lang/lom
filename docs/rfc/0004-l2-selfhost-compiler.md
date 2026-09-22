@@ -238,3 +238,44 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   （bump 分配器 + funcref 表 + 闭包值通道）为 enum/match/String/List/
   Map/json 全部后续批次复用地基。**代码零改动——纯设计文档交付；
   动工在裁决后。**
+- **修订 8（2026-09-22）：L2.3-b 闭包与捕获批交付——用户裁决"按建议动工"
+  （A甲/B1+B2/C放行/D统一槽 全按设计建议项）。** self_comp 3342→**4665 行**，
+  verify_selfcomp 25→**40 项**（17 对拍 + 23 负例；neg_closure 转正删除 +
+  9 新负例）。交付面：
+  - **值类型层**：vt 扩 "cl"（闭包值 = i64 裸指针，编译期 vt 跟踪 +
+    call_indirect 运行时签名检查双保险）；env 绑定 {slot,vt} →
+    {slot,vt,sig,cap}；sig 嵌套编码（prms "@" ret_seg；ret_seg = base |
+    "cl"+内层sig 递归；解析手写扫描避开 split 歧义）；闭包无返回注解时
+    返回段从体尾综合（ex_rv/blk_rv/closure_sig 互递归族）。
+  - **闭包编译主体**：fv 自由变量家族（宿主 fv_* 平移；Lom Map 无 clone →
+    added 名单 add/remove 配对实现块级作用域与遮蔽）；compile_closure
+    （签名 (i64 env, p:vt...)→rvt、local 0 = env、捕获按宽 load/store、
+    嵌套捕获链经父 env local 0 中转）；闭包调用（args 先 callee 后求值序
+    对齐解释器 + 编译期 arity/逐参签名校验——R74 模式）；具名函数当值
+    shim（零捕获 [tslot][env=0]，按名去重复用）；递归闭包（预绑定占位 +
+    创建后 env 槽位补丁，对齐宿主）。
+  - **模块布局按需扩展**：预扫 has_closure（保守口径：任一 ExClosure 或
+    值位具名引用）定布局——**无闭包路径与 L2.3-a 逐字节相同**（存量 10
+    用例产物 hex 对比实证不变，存量路径零改动）；有闭包加 alloc 内部函数
+    （宿主 build_alloc 平移：bump + memory.grow 失败 trap）、memory、
+    global（hp init 8，地址 0 保留哨兵）、table+elem（funcref 表）。
+    两遍式签名收集使顶层 fn idx 先定——天然免疫宿主 §7.3"闭包函数挤占
+    索引空间"坑。
+  - **顺带修复两枚 L2.3-a 存量缺口**：① bind_params 漏 TyBool 分支
+    （collect_sigs/fn_type_entry 支持 Bool 参数但绑定层漏绑——带 Bool
+    参数的顶层 fn 体内引用该参数会误报未定义变量；17 用例覆盖）；②
+    comp_ex 缺 ExIf 分支（块尾 if 表达式此前只在函数体最外层尾被
+    comp_tail 特判支持，else 块尾/值位嵌套 if——elif 链之外的形态——
+    落兜底被拒；修复后 `let y = if ... end` 值位 if 同批打通）。
+  - **信任边界登记（修订 7 预登记三条落地）**：编译期拦非闭包调用/闭包
+    值算术比较（宿主 tagged rt 运行时兜底）；Fn 注解推后（untagged
+    call_indirect 需精确签名 vs 宿主 Fn 无参型信息）；println(闭包)
+    拒（宿主打 "<闭包>"——String 先例同型，对拍用例避开）。
+  - **开发踩坑**（HANDOVER §11.6 同步）：fv_expr ExIf 臂误传 fv_if 的
+    (out,added) 元组——--check 查不出此类动态类型错，rev_str 运行时才
+    炸 list_is_empty（DBG 链定位）；table limits flags=01 漏 max 字节；
+    elem(9) 必须排 export(7) 之后（section id 升序）；**用例编写三连
+    误写 Fn 注解**（肌肉记忆陷阱——Fn 推后的负例形态极易顺手写进正例）。
+  - **剩余批次**：enum 与 match / String / List / Map / json / 包 /
+    return 语句（块深度跟踪）——闭包批的堆/表/闭包值通道是它们的共同
+    地基。

@@ -1,0 +1,7 @@
+# 负例：调用闭包 arity 不符（编译期签名校验——R74 模式）
+fn main() -> Unit ! [IO]
+    let g = fn(a: Int, b: Int) -> Int
+        a + b
+    end
+    println(g(1))
+end

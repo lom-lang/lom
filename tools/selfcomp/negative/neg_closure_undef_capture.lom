@@ -1,6 +1,7 @@
+# 负例：闭包捕获未定义变量
 fn main() -> Unit ! [IO]
     let g = fn(x: Int) -> Int
-        x + 1
+        x + undefined_thing
     end
     println(g(1))
 end

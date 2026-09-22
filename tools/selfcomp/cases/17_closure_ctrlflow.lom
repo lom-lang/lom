@@ -1,0 +1,70 @@
+# L2.3-b：闭包与控制流组合——循环内创建/捕获循环变量 + Bool 参数顶层 fn
+# （bind_params TyBool 修复的覆盖：L2.3-a 签名层支持但绑定层曾漏绑）
+fn flag_to_int(b: Bool) -> Int
+    if b
+        1
+    else
+        0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(flag_to_int(True))
+    println(flag_to_int(False))
+    # for 体内创建闭包：每轮捕获当轮循环变量（独立快照）
+    let mut total = 0
+    for i in 5
+        let get = fn() -> Int
+            i
+        end
+        total = total + get()
+    end
+    println(total)
+    # while 体内创建闭包（条件边界 + 捕获计数器）
+    let mut k = 0
+    let mut acc = 0
+    while k < 4
+        let step = fn() -> Int
+            k * 10
+        end
+        acc = acc + step()
+        k = k + 1
+    end
+    println(acc)
+    # 闭包体内控制流：while 累加
+    let sum_fn = fn(n: Int) -> Int
+        let mut i = 0
+        let mut s = 0
+        while i < n
+            s = s + i
+            i = i + 1
+        end
+        s
+    end
+    println(sum_fn(10))
+    # 闭包体内 for + 捕获外层变量
+    let base = 100
+    let loop_cap = fn(n: Int) -> Int
+        let mut s = 0
+        for j in n
+            s = s + j
+        end
+        base + s
+    end
+    println(loop_cap(5))
+    # 闭包体内 Bool 逻辑短路
+    let classify = fn(x: Int) -> Int
+        if x > 0 and x < 100
+            1
+        else
+            if x >= 100 or x < -100
+                2
+            else
+                3
+            end
+        end
+    end
+    println(classify(50))
+    println(classify(200))
+    println(classify(-5))
+end

@@ -31,7 +31,7 @@
 - 活跃工作包：**L2.3 进行中**（用户已裁决"执行"动工；按批交付——a 批
   已收官，后续批次排队）。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
   spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**均完成
-  （self_comp.lom 3342 行，verify_selfcomp 25/25 = 10 对拍 + 15 负例拒绝）。
+  （self_comp.lom 4665 行，verify_selfcomp 40/40 = 17 对拍 + 23 负例拒绝）。
   后续批次：闭包与捕获（需堆/env 值表示，先出设计方案再动工）/ enum 与
   match / String / List / Map / json / 包 / return 语句（块深度跟踪）。
 - 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval

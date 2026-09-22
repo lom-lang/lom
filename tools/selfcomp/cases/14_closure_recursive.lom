@@ -1,0 +1,52 @@
+# L2.3-b：递归闭包（预绑定 + env 槽位补丁——对齐宿主共享作用域语义）
+fn main() -> Unit ! [IO]
+    let fact = fn(k: Int) -> Int
+        if k <= 1
+            1
+        else
+            k * fact(k - 1)
+        end
+    end
+    println(fact(5))
+    println(fact(10))
+    let fib = fn(k: Int) -> Int
+        if k < 2
+            k
+        else
+            fib(k - 1) + fib(k - 2)
+        end
+    end
+    println(fib(10))
+    # 递归闭包 + 捕获外层变量（捕获与自身引用共存）
+    let offset = 100
+    let rec_add = fn(k: Int) -> Int
+        if k == 0
+            offset
+        else
+            rec_add(k - 1) + 1
+        end
+    end
+    println(rec_add(5))
+    # Float 递归（混合类型递归闭包）
+    let half = fn(k: Int) -> Float
+        if k <= 0
+            0.0
+        else
+            half(k - 1) + 0.5
+        end
+    end
+    println(half(6))
+    # 递归闭包体内调用另一个具名函数（fns 表在闭包体内可见）
+    let sum_to = fn(k: Int) -> Int
+        if k <= 0
+            0
+        else
+            triple(k) + sum_to(k - 1)
+        end
+    end
+    println(sum_to(4))
+end
+
+fn triple(x: Int) -> Int
+    x * 3
+end

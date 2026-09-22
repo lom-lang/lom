@@ -163,8 +163,9 @@ def main():
                r'self_interp\.lom（(\d+) 行', [self_lines])
     # R76（十二审）：self_comp 行数宣称位（README/HANDOFF_PROMPT）——
     # L2.3 行数再变时钉住，R69 同族漂移点根治
+    # L2.3-b 起 README 措辞带批次字母（L2.3-a/L2.3-b/…）——正则可成长
     expect_all('README self_comp 行数', 'README.md',
-               r'(\d+)-line L2\.3-a subset compiler', [comp_lines])
+               r'(\d+)-line L2\.3-[a-z] subset compiler', [comp_lines])
     expect_all('HANDOFF_PROMPT self_comp 行数', 'docs/HANDOFF_PROMPT.md',
                r'self_comp\.lom (\d+)', [comp_lines])
 

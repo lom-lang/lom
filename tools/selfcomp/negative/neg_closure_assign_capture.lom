@@ -1,0 +1,10 @@
+# 负例：闭包体内赋值捕获变量（宿主 WASM 同拒——"赋值给未定义变量"；
+# 值拷贝语义下改拷贝无意义）
+fn main() -> Unit ! [IO]
+    let n = 10
+    let g = fn(x: Int) -> Int
+        n = n + x
+        n
+    end
+    println(g(1))
+end

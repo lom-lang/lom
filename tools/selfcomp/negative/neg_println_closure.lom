@@ -1,0 +1,8 @@
+# 负例：println(闭包值)（宿主打 "<闭包>"——L2 拒，String 先例同型：宿主
+# 合法 L2 拒的子集外形态，负例登记，对拍用例避开）
+fn main() -> Unit ! [IO]
+    let g = fn(x: Int) -> Int
+        x + 1
+    end
+    println(g)
+end

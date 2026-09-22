@@ -1,0 +1,32 @@
+# L2.3-b：闭包基础——字面量 + 局部调用（Int/Float/Bool 参数与返回）
+fn main() -> Unit ! [IO]
+    let inc = fn(x: Int) -> Int
+        x + 1
+    end
+    println(inc(1))
+    let halve = fn(x: Float) -> Float
+        x / 2.0
+    end
+    println(halve(5.0))
+    let is_big = fn(x: Int) -> Bool
+        x > 100
+    end
+    if is_big(500)
+        println(1)
+    else
+        println(0)
+    end
+    if is_big(50)
+        println(1)
+    else
+        println(0)
+    end
+    let both = fn(a: Int, b: Float) -> Float
+        a * 1.0 + b
+    end
+    println(both(3, 0.5))
+    let zero_arg = fn() -> Int
+        7
+    end
+    println(zero_arg())
+end

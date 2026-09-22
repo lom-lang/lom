@@ -1,0 +1,7 @@
+# 负例：闭包值参与算术与比较（L2 编译期拦；宿主 tagged rt 运行时兜底）
+fn main() -> Unit ! [IO]
+    let g = fn(x: Int) -> Int
+        x + 1
+    end
+    println(g + 1)
+end

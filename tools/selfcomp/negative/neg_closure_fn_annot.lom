@@ -1,0 +1,14 @@
+# 负例：Fn 类型注解（B3 推后——untagged call_indirect 需精确签名，宿主
+# Fn=Named("Fn") 不携带参数/返回类型信息；支持它需语言面变化或放弃编译
+# 期校验，负例登记留后续批次裁决）
+fn apply(f: Fn, v: Int) -> Int
+    f(v)
+end
+
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn main() -> Unit ! [IO]
+    println(apply(double, 5))
+end

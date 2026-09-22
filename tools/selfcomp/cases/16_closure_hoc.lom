@@ -1,0 +1,37 @@
+# L2.3-b：任意 callee 的 HOC 形态（make(5)(10) 链式调用）
+fn main() -> Unit ! [IO]
+    # 任意 callee：make_adder(5)(10)
+    let make_adder = fn(a: Int)
+        fn(b: Int) -> Int
+            a + b
+        end
+    end
+    println(make_adder(5)(10))
+    println(make_adder(40)(2))
+    # 三层链式（外层返回中层的调用结果直接再调用）
+    let pipeline = fn(x: Int)
+        fn(y: Int)
+            fn(z: Int) -> Int
+                x * 100 + y * 10 + z
+            end
+        end
+    end
+    println(pipeline(1)(2)(3))
+    # 链式 + 每层捕获快照
+    let mk_scale = fn(s: Int)
+        fn(v: Int) -> Int
+            s * v
+        end
+    end
+    println(mk_scale(3)(7))
+    println(mk_scale(10)(10))
+    # 链式结果参与算术
+    println(make_adder(1)(2) * mk_scale(5)(3))
+    # Float 链式
+    let mkf = fn(a: Float)
+        fn(b: Float) -> Float
+            a * b
+        end
+    end
+    println(mkf(2.5)(4.0))
+end

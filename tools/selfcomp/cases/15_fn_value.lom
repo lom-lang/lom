@@ -1,0 +1,29 @@
+# L2.3-b：具名函数当值（零捕获 shim；按名去重复用）+ 与闭包混用
+fn double(x: Int) -> Int
+    x * 2
+end
+
+fn addf(a: Float, b: Float) -> Float
+    a + b
+end
+
+fn main() -> Unit ! [IO]
+    let f = double
+    println(f(21))
+    # 同名二次绑定（shim 去重复用）
+    let g = double
+    println(g(50))
+    # 直接调用不受影响（具名直调与值位引用并存）
+    println(double(5))
+    # Float 多参具名函数当值
+    let h = addf
+    println(h(1.25, 2.5))
+    # 函数值链式调用（f 的返回值再作 callee）
+    println(f(f(3)))
+    # 具名函数值与闭包值混用：闭包捕获函数值（env 槽位传递闭包值）
+    let base = 10
+    let wrap = fn() -> Int
+        base
+    end
+    println(wrap() + f(1))
+end

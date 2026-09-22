@@ -1,0 +1,39 @@
+# L2.3-b：捕获与值拷贝语义（创建时快照——对齐宿主 WASM 后端）+ mut 捕获
+fn main() -> Unit ! [IO]
+    # 基础捕获：多变量、Int/Float 混合
+    let n = 10
+    let m = 2.5
+    let add_all = fn(x: Int) -> Float
+        x * 1.0 + n * 1.0 + m
+    end
+    println(add_all(5))
+    # 值拷贝语义：创建后修改源变量，闭包内仍是创建时的值
+    let base = 100
+    let snap = fn() -> Int
+        base
+    end
+    let mut base2 = base
+    base2 = base2 + 999
+    println(snap())
+    println(base2)
+    # mut 变量被捕获（裁决 C：放行——值拷贝此刻值）
+    let mut count = 0
+    let read_count = fn() -> Int
+        count
+    end
+    count = count + 5
+    println(read_count())
+    count = count + 5
+    println(read_count())
+    # 捕获后经过计算再捕获（新闭包新快照）
+    let step = 3
+    let mk1 = fn() -> Int
+        step
+    end
+    let step2 = step * 10
+    let mk2 = fn() -> Int
+        step2
+    end
+    println(mk1())
+    println(mk2())
+end

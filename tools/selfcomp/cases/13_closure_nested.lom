@@ -1,0 +1,39 @@
+# L2.3-b：嵌套捕获链——三层（内层捕获中层捕获值：env 对象中转路径）
+fn main() -> Unit ! [IO]
+    # 三层：outer(a) 返回捕获 a 的中层；中层(b) 返回捕获 a/b 的内层
+    let outer = fn(a: Int)
+        fn(b: Int)
+            fn(c: Int) -> Int
+                a + b * 10 + c * 100
+            end
+        end
+    end
+    println(outer(1)(2)(3))
+    println(outer(4)(5)(6))
+    # 中层同时捕获外层变量与自身参数（混合来源）
+    let k = 1000
+    let mix = fn(a: Int)
+        fn(b: Int) -> Int
+            k + a * 10 + b
+        end
+    end
+    println(mix(7)(8))
+    # 每层创建各自 env 快照
+    let mk = fn(x: Int)
+        fn() -> Int
+            x
+        end
+    end
+    let f1 = mk(11)
+    let f2 = mk(22)
+    println(f1())
+    println(f2())
+    # 内层经外层捕获中转（中层体引用外层捕获值参与内层捕获源）
+    let w = 5
+    let mid = fn(b: Int)
+        fn(c: Int) -> Int
+            w * 100 + b * 10 + c
+        end
+    end
+    println(mid(2)(3))
+end

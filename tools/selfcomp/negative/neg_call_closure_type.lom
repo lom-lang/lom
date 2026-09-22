@@ -1,0 +1,7 @@
+# 负例：调用闭包实参类型不符（期望 Float 得 Int——编译期签名校验）
+fn main() -> Unit ! [IO]
+    let g = fn(a: Float) -> Float
+        a * 2.0
+    end
+    println(g(1))
+end

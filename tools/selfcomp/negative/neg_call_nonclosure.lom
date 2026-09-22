@@ -1,0 +1,5 @@
+# 负例：调用非闭包值（Int 值上的调用——L2 编译期拦；宿主 wasm 运行时 trap）
+fn main() -> Unit ! [IO]
+    let x = 42
+    println(x(1))
+end
