@@ -28,12 +28,17 @@
   （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
   1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
   22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
-- 活跃工作包：**L2.3 进行中**（用户已裁决"执行"动工；按批交付——a 批
-  已收官，后续批次排队）。L2 自举编译器（RFC-0004 方案 A，accepted）：L2.1
-  spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**均完成
-  （self_comp.lom 4665 行，verify_selfcomp 40/40 = 17 对拍 + 23 负例拒绝）。
-  后续批次：闭包与捕获（需堆/env 值表示，先出设计方案再动工）/ enum 与
-  match / String / List / Map / json / 包 / return 语句（块深度跟踪）。
+  L2.3-a/L2.3-b 两批在其基线之后交付（待下一轮独立复审重估）。
+- 活跃工作包：**L2.3 进行中**（按批交付——a/b 两批已收官）。L2 自举
+  编译器（RFC-0004 方案 A，accepted，修订 1-8）：L2.1 spike + L2.2
+  子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**（if/while/for(Int)/
+  Bool/比较/逻辑短路/块尾 if）+ **L2.3-b 闭包与捕获批**均完成（设计方案
+  docs/designs/0001 四裁决点全按建议项：untagged+闭包 i64 指针 / B1+B2 /
+  mut 捕获放行 / 8 字节统一槽；self_comp.lom 4665 行，verify_selfcomp
+  40/40 = 17 对拍 + 23 负例拒绝；存量 10 用例产物 hex 逐字节不变实证）。
+  堆分配器/funcref 表/闭包值通道三件基础设施是后续批次共同地基。后续
+  批次：enum 与 match / String / List / Map / json / 包 / return 语句
+  （块深度跟踪）。
 - 测试基线 533 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -42,12 +47,16 @@
   match ... end + frag?）；Lom 侧 Result 消费必带 ? 解包；Form B 臂 end
   计数再应验；新增 .lom 文件提交前必过 lom fmt --check；fix 防护设计
   要以"apply 全轮次"为界（R73——同轮多诊断同坐标不去重）；含反斜杠
-  转义的批量文本替换禁用 heredoc（本轮 doc_audit 修改再应验一次，改用
-  Edit 落盘解决）。
-- 待用户裁决：L2.3 后续批次推进节奏（控制流批已交付）；typechecker
-  for 变量 define 覆盖同名外层可变性标记不恢复的
-  既有 quirk 是否立项（TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底
-  窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+  转义的批量文本替换禁用 heredoc；**Lom 多返回值函数调用点必须显式取
+  .0/.1——元组/List 混传是动态类型错，--check 查不出、运行时才炸**
+  （L2.3-b fv 家族元组误传实录）；WASM table limits flags=0x01 必须带
+  max、elem(9) 必须排 export(7) 之后（section id 升序）；**selfcomp
+  用例编写三连误写 Fn 注解**（Fn 推后的负例形态是 HOF 自然写法——
+  写完用例全文 grep "Fn" 自查）。
+- 待用户裁决：L2.3 剩余批次推进节奏（闭包批已交付）；typechecker
+  for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
+  （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
+  迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
@@ -55,7 +64,8 @@
 1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部，
    docs/reviews/review-2026-09-22-2.html（十三审——最新轮），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
-   修订 1-6）；涉及架构时再读 RFC-0003。
+   修订 1-8），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
+   含值表示/捕获语义决策记录）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
    - cargo build --release
    - cargo test --release（期望 533/533；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
@@ -65,14 +75,15 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 25/25 = 10 用例双产物行为一致 + 15 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 40/40 = 17 用例双产物行为一致 + 23 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   L2.3 后续批次（闭包与捕获 / enum 与 match / String / List / Map /
-   json / 包，按"编译期校验 + 负例"成对交付）；发布不应出现在任何菜单
-   项内（冻结未解）。
+   L2.3 剩余批次（enum 与 match / String / List / Map / json / 包 /
+   return 语句，按"编译期校验 + 负例"成对交付；enum 与 match 是堆对象
+   后首枚复合值批次，闭包批地基已就绪）；发布不应出现在任何菜单项内
+   （冻结未解）。
 
 【状态锚点（当前行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价
@@ -82,12 +93,18 @@
   （f(1) 传 Float 形参 → 第 1 参类型不符；add(1,2,3) → 实参数不符）。
 - R75 修复后：解构遮蔽的重赋值 → hint 不动源码；解构在赋值之后的
   正例仍 High Replace。
-- L2.3-a 后：if/while/for(Int)/Bool/比较/逻辑短路/块尾 if 表达式可编译
-  （verify_selfcomp 25/25）；return 语句/match/解构/闭包/String/List 仍
-  COMPILE-ERROR（后续批次）；for 迭代仅 Int。
-- 写 self_comp 代码的两大坑：宿主 dangling-else 贪婪归内（then 块首
-  元素嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
-  改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）。
+- L2.3-a 后：if/while/for(Int)/Bool/比较/逻辑短路/块尾 if 表达式可编译；
+  for 迭代仅 Int。
+- L2.3-b 后：闭包字面量/值拷贝捕获（含 mut 放行）/嵌套捕获链/递归闭包
+  （预绑定+env 补丁）/具名函数当值（shim 去重）/任意 callee 链式
+  （make(5)(10)）/let 值位 if 均可编译；Fn 类型注解/println(闭包)/
+  闭包值算术比较/闭包体内赋值捕获变量/调用非闭包值 → COMPILE-ERROR
+  （10 条编译期校验 + 23 负例锁定）；无闭包程序产物与 L2.3-a 逐字节
+  相同（has_closure 预扫定布局）。
+- 写 self_comp 代码的坑：宿主 dangling-else 贪婪归内（then 块首元素
+  嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
+  改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）；多返回值调用点
+  显式取 .0/.1；用例全文 grep "Fn" 自查。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
