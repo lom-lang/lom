@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lom 第十四轮体系内独立敌手复核 — 2026-09-23</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, "Microsoft YaHei", sans-serif; line-height: 1.55; }
+  body { max-width: 1120px; margin: 0 auto; padding: 32px 22px 80px; color: #202734; background: #fff; }
+  h1, h2, h3 { line-height: 1.3; color: #17283b; }
+  h1 { border-bottom: 3px solid #274e76; padding-bottom: 12px; }
+  h2 { border-bottom: 1px solid #c6d1dc; padding-bottom: 6px; margin-top: 34px; }
+  .lead { padding: 18px 22px; border-left: 5px solid #a04539; background: #fff4f1; }
+  .good { color: #176341; } .bad { color: #9a2d22; } .muted { color: #5a6470; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .94rem; }
+  th, td { border: 1px solid #cbd3dc; padding: 9px 11px; vertical-align: top; }
+  th { background: #eef3f8; text-align: left; }
+  tr:nth-child(even) { background: #f8fafc; }
+  code, pre { font-family: Consolas, "Cascadia Code", monospace; }
+  code { background: #f1f4f7; padding: 1px 4px; overflow-wrap: anywhere; }
+  pre { background: #172130; color: #e8eef6; padding: 13px 16px; overflow-x: auto; border-radius: 5px; line-height: 1.42; }
+  pre code { background: none; padding: 0; color: inherit; }
+  details { margin: 12px 0; padding: 8px 12px; border: 1px solid #cbd3dc; border-radius: 5px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .tag { display: inline-block; background: #81372d; color: white; font-weight: 700; padding: 1px 8px; border-radius: 4px; }
+  .note { border-left: 4px solid #607b97; padding: 8px 14px; background: #f2f6fa; }
+  a { color: #19558b; }
+</style>
+</head>
+<body>
+<h1>Lom 第十四轮体系内独立敌手复核</h1>
+<p class="muted">2026-09-23（Asia/Shanghai） · 基线 <code>5c92f595a509534a51307b36c6dcfe71e4185a5f</code> / <code>v1.2.6</code> · 对照十三审基线 <code>141853670d840d75c8abdfa4cfe906151a3a434f</code> / <code>v1.2.5</code></p>
+<div class="lead">
+  <p><strong>本轮评级：B（仅评本轮时点及本轮检验面，不外推到整改后或整个 Lom 语言）。</strong>新开建议 <strong>2×P1、2×P2</strong>，无 P0。L2.3-a/b/c1 的官方 72/72 与全仓门禁均通过，但独立反例中有两类合法输入被 L2 静默错编译（块作用域、闭包同名符号捕获），一类合法 Bool 比较输出不可实例化 WASM，另有一类合法分支局部绑定被错误拒绝。宿主 WASM 对这些正例的行为已逐一作为对照实跑。</p>
+  <p><strong>边界：</strong>这是项目体系内 agent 分工进行的独立敌手复核，<strong>不是外部同行审计</strong>。审查阶段未改产品源码、测试、工具或治理文档；本报告只建议开账与回归形态，不修码、不提交、不推送、不切 tag、不发版。十三审 B+ 只覆盖其旧基线，不能作为此增量的等级。</p>
+</div>
+
+<h2>1. 方法、范围与可复现入口</h2>
+<p>先独立阅读交接指定章节、十三审报告、LANGUAGE_SPEC §14、RFC-0004 修订 1–9、闭包设计与 RFC-0003（尤其页尾 OOB 修订 25–29），再读宿主 <code>src/wasm_codegen.rs</code> 与 L2 <code>examples/selfhost/self_comp.lom</code> 的相关分支。正例均穿过真实 <code>lom build</code> / <code>lom self_comp.lom --</code> CLI、hex 解码、WASM、Node；负例直接检查 <code>COMPILE-ERROR</code>、原因和 hex 不存在。单独的 <code>--check</code> 或 WASM verifier 均不作为行为正确性证明。</p>
+<p>下述自构探针的源码完整附在 §4，复制到 <code>target/probes/&lt;名&gt;.lom</code> 后，在仓库根目录的 PowerShell 执行：</p>
+<pre><code>$case = 'r14_if_scope'   # 换成 §4 中任一探针名
+./target/release/lom.exe build "target/probes/$case.lom" --target wasm -o "target/probes/$case.host.wasm"
+./target/release/lom.exe examples/selfhost/self_comp.lom -- "target/probes/$case.lom" "target/probes/$case.hex"
+python tools/hex2wasm.py "target/probes/$case.hex" "target/probes/$case.l2.wasm"
+node eval/runner/run_wasm.mjs "target/probes/$case.host.wasm"
+node tools/selfcomp/run_selfcomp.mjs "target/probes/$case.l2.wasm"</code></pre>
+<p>对被拒绝的探针，前两条即可对照；L2 驱动在 <code>COMPILE-ERROR</code> 时进程本身仍可返回 0，这是现有 CLI 约定，本报告不把该退出码单独定性为缺陷。以下“rc”指 Node 运行产物的退出码，或明确写出的宿主 build 退出码。</p>
+
+<h2>2. 新发现：声明、反例、证据与建议</h2>
+<table>
+  <thead><tr><th>编号 / 严重性</th><th>现行声明与受影响范围</th><th>独立证据（stdout、rc、产物）</th><th>读码根因及只开账建议</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag">F1 · P1</span><br>块级 let 泄漏，静默错值</td>
+      <td>RFC-0004 修订 6 声称 if/while/for(Int) 与块尾 if 可用；修订 9 声称 Form B 臂内 let 纳入类型综合且每臂独立作用域。它们不能推出 if/while/for 子块可覆盖外层绑定。</td>
+      <td><code>r14_if_scope</code>：宿主 <code>5\n5</code>、rc0；L2 <code>0\n0</code>、rc0（COMPILED 103 bytes）。<code>r14_match_formb_scope</code>：宿主 <code>5\n5</code>、L2 <code>0\n5</code>，均 rc0（L2 227 bytes）。<code>r14_loop_scope</code>：宿主 <code>5\n5</code>、L2 <code>0\n0</code>。更强负向 <code>r14_phantom_let</code>：宿主 build rc1“未定义变量 y”；L2 却 COMPILED 93 bytes，Node 打印 <code>0</code>、rc0。</td>
+      <td><code>self_comp.lom:4486,4530,4551,4582,4622,4635</code> 把同一个引用语义 Map <code>env</code> 传给各子块；<code>comp_one_stmt</code> 的 let 直接 <code>map_set</code>，后续分支/外层因而看到未执行分支所分配的零初始化 local。宿主 <code>wasm_codegen.rs:1260,1281</code> 在每个块 push/pop scope。建议按块复制或分层管理绑定并做出口恢复；回归要同时锁 if/while/for、Form B 与“块外未定义名绝不能通过”。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">F2 · P1</span><br>闭包捕获被同名全局符号夺走</td>
+      <td>RFC-0004 修订 8 声称闭包捕获对齐宿主 WASM；修订 9 声称闭包携枚举组合可用。词法局部绑定应优先于同名变体或函数在值位的全局解析。</td>
+      <td><code>r14_shadowed_variant_capture</code>：局部 <code>Z=V(9)</code> 被闭包引用，宿主 WASM 打印 <code>9</code>、L2 打印 <code>0</code>，均 rc0（L2 COMPILED 404 bytes）。同根因 b 路径 <code>r14_shadowed_fn_capture</code>：宿主 <code>9</code>、L2 <code>1</code>，均 rc0（L2 381 bytes）。</td>
+      <td><code>self_comp.lom:3703-3718</code> 先判断 <code>fns</code> 或 <code>@variant:</code> 命中才决定是否查父 <code>env</code>，故跳过同名局部捕获；闭包体退化为全局构造器/函数。宿主 <code>wasm_codegen.rs:5922-5941</code> 先 <code>ctx.lookup</code>/<code>capture_slot</code> 再判全局。建议逆转优先级，并以同名变体与同名具名函数两条独立对拍锁定。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">F3 · P2</span><br>Bool 二元运算产坏 WASM</td>
+      <td>RFC-0004 修订 6 的 Bool/比较与修订 9 的“编译期校验不把坏 WASM 留到实例化”边界；即使某 Bool 算术在宿主运行期不合法，L2 也不应声称 COMPILED 后输出不可实例化模块。</td>
+      <td><code>r14_bool_eq</code>：宿主 WASM stdout <code>0</code>、rc0；L2 COMPILED 104 bytes，Node 实例化 rc1，<code>f64.eq expected type f64, found ... i32</code>。<code>r14_bool_arith</code>：宿主 WASM 运行期 trap rc1；L2 COMPILED 90 bytes，Node 实例化 rc1，<code>f64.add expected type f64, found i32.const</code>。</td>
+      <td><code>self_comp.lom:2814-2849</code> 的 <code>infer_ex</code> 对比较放行 i32，对算术落到 f64；<code>comp_binary:3230-3274</code> 只专门处理 i64/f64，i32 落到 f64 opcode，未做转型。建议 Bool 的合法相等比较发 i32 操作码；其余未支持运算编译期明确拒绝，正反向均断言无坏 WASM。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">F4 · P2</span><br>分支局部 let 的合法尾值被拒绝</td>
+      <td>RFC-0004 修订 6 声称带 else 的值位 if 可用；修订 8 明言 <code>let y = if ... end</code>、值位嵌套 if 已打通；修订 9 的 Form B 臂尾表达式范围包含此组合。此发现与 F1 的编译期绑定泄漏是不同故障方向。</td>
+      <td><code>r14_if_local_tail</code>：宿主 WASM <code>7\n2</code>、rc0；L2 <code>COMPILE-ERROR: 未定义变量 'x'</code>、无 hex。<code>r14_match_if_local_tail</code>（用户枚举 + Form B + 尾 if）：宿主 <code>7\n0</code>、rc0；L2 <code>COMPILE-ERROR: 未定义变量 'z'</code>、无 hex。</td>
+      <td><code>self_comp.lom:2883-2921</code> 中 <code>infer_if_expr</code> 询问 <code>blk_val_ty</code>，后者只看尾表达式、不走本块的 let 声明；<code>match_block_type:3004-3034</code> 只模拟 Form B 顶层 let，深入尾 if 时仍走同一盲区。建议值类型预扫在临时块作用域按声明序建绑定，既不能漏当前块 let，也不能像 F1 那样泄漏到兄弟或外层。</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">这些编号是本报告内部发现号；若维护者采纳，可从现行台账的下一号 <code>R79+</code> 开账。P1/P2 仅评本轮 L2 实际受影响行为，不声称已证明宿主解释器、宿主 WASM 或所有 L2 产物存在同缺陷。</p>
+
+<h2>3. 独立复验矩阵及未击穿面</h2>
+<table>
+  <thead><tr><th>检查</th><th>本轮亲手运行结果</th><th>边界</th></tr></thead>
+  <tbody>
+    <tr><td>代码 / 文档基线</td><td><code>cargo test --release</code>：535 单测 + 8 集成全过；<code>cargo clippy --release -- -D warnings</code>、<code>cargo fmt --all -- --check</code> 均 rc0；<code>lom --version</code> = 1.2.6；物理行数 <code>self_comp.lom</code> 5061。<code>python tools/doc_audit.py</code> 67/67，<code>spec_examples_check.py</code> PASS，<code>eval_prompt_check.py</code> 24/24。示例 fmt gate 37 个有效文件零失败。</td><td>绿门禁与本报告反例并存，不能视为 L2 对所有合法输入的证明。</td></tr>
+    <tr><td>官方 L2 对拍及独立正例</td><td><code>python tools/verify_selfcomp.py</code> 72/72 = 25 双产物 stdout+rc 对拍 + 47 拒绝。另自构 <code>r14_enum_positive</code>：递归 enum、两层嵌套模式、guard、Form B let，宿主/L2 均 <code>14\n11</code>、rc0。</td><td>官方用例有枚举/模式覆盖，但缺四项发现的交叉形态。</td></tr>
+    <tr><td>页尾、trap 输出</td><td>单独按 §1 链路复跑仓库 <code>tools/selfcomp/cases/23_enum_page_edge.lom</code>：8191 个零参对象后，双方 <code>0\n5</code>、rc0；<code>24_match_unmatched_trap.lom</code>：双方先输出 <code>3</code>，随后 unreachable trap、rc1。</td><td>仅覆盖已有 64 KiB 页尾形态，未覆盖所有内存增长/嵌套深度组合。</td></tr>
+    <tr><td>逐例负向</td><td>未借 verifier 判定，直接用真实 L2 CLI 跑 12 个仓库负例：构造 arity/类型、模式 arity/类型、guard Bool、臂返回型、Some/None、泛型 enum、Result 类型、闭包重赋签名、兄弟臂绑定泄漏；全部给出对应明确原因的 <code>COMPILE-ERROR</code> 且无 hex。命令见下。</td><td>“显式拒绝”在所测样本上成立；不等于完整穷举。</td></tr>
+    <tr><td>自举与全仓回归</td><td><code>verify_selfhost.py</code> dump 154/154、tokens 154/154、diags 12/12、static 坏集 22/22 且 clean 154/154、run 31/31、wasm layer2 151/151 + layer3 golden + selfapply 全 PASS。eval 解释器和宿主 WASM 各 121/121；fuzz 80、差分已知分歧 6/6、普通 20/20、包 10/10 全 PASS。</td><td>这些验证宿主和既有资产，不覆盖本次新造的全部 L2 组合。</td></tr>
+    <tr><td>版本 / GitHub CI</td><td>本地 HEAD 精确对应 tag v1.2.6；GitHub Tags API 的 v1.2.6 指向同 SHA。查询时最新 <a href="https://github.com/lom-lang/lom/actions/runs/35749931440">Actions run 35749931440</a> 也是该 SHA：ubuntu、windows、macos、doc gates、selfhost、clippy 六 job 均 success。逐 job 查 check-run annotations：四条 Ubuntu 26 迁移 notice，零 warning/error；windows 与 macos 无 annotation。</td><td>CI 结论为查询时点快照；notice 非本轮代码失败。</td></tr>
+  </tbody>
+</table>
+<p>直接拒绝复验命令（逐个将 <code>$name</code> 换为下列名称）：</p>
+<pre><code>$name = 'neg_enum_ctor_arity'
+./target/release/lom.exe examples/selfhost/self_comp.lom -- "tools/selfcomp/negative/$name.lom" "target/probes/r14_$name.hex"
+Test-Path "target/probes/r14_$name.hex"   # 必须 False
+
+# 实跑名称：neg_enum_ctor_arity, neg_enum_ctor_type,
+# neg_enum_pattern_arity, neg_enum_pattern_wrong_type,
+# neg_match_guard_type, neg_match_arm_type,
+# neg_builtin_some, neg_builtin_none_pattern,
+# neg_enum_generic, neg_builtin_result_type,
+# neg_closure_assign_signature, neg_match_binder_sibling_leak</code></pre>
+
+<h2>4. 自构反例原文（复制即复现）</h2>
+<p>以下是本轮实际运行的输入原文；文件名均属于临时 <code>target/probes/</code>，报告保留全文以免清理临时文件后失去复现能力。</p>
+<details><summary>F1：r14_if_scope.lom</summary><pre><code>fn main() -> Unit ! [IO]
+    let x = 5
+    if False
+        let x = 9
+    else
+        println(x)
+    end
+    println(x)
+end</code></pre></details>
+<details><summary>F1 c1 交叉：r14_match_formb_scope.lom</summary><pre><code>fn pick(n: Int) -> Int
+    let x = 5
+    match n
+        0 =>
+            if False
+                let x = 9
+            end
+            x
+        end
+        _ => x
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(pick(0))
+    println(pick(1))
+end</code></pre></details>
+<details><summary>F1 其他控制流：r14_loop_scope.lom</summary><pre><code>fn main() -> Unit ! [IO]
+    let x = 5
+    while False
+        let x = 9
+    end
+    println(x)
+    for i in 0
+        let x = 11
+    end
+    println(x)
+end</code></pre></details>
+<details><summary>F1 块外未定义名：r14_phantom_let.lom</summary><pre><code>fn main() -> Unit ! [IO]
+    if False
+        let y = 9
+    end
+    println(y)
+end</code></pre></details>
+<details><summary>F2 c1：r14_shadowed_variant_capture.lom</summary><pre><code>enum E = Z | V(Int)
+
+fn score(e: E) -> Int
+    match e
+        V(x) => x
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let Z = V(9)
+    let f = fn() -> E
+        Z
+    end
+    println(score(f()))
+end</code></pre></details>
+<details><summary>F2 b 路径：r14_shadowed_fn_capture.lom</summary><pre><code>fn original() -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    let original = fn() -> Int
+        9
+    end
+    let f = fn() -> Int
+        let g = original
+        g()
+    end
+    println(f())
+end</code></pre></details>
+<details><summary>F3 合法相等比较：r14_bool_eq.lom</summary><pre><code>fn main() -> Unit ! [IO]
+    let a = True
+    let b = False
+    println(if a == b 1 else 0 end)
+end</code></pre></details>
+<details><summary>F3 非法算术也不应产坏模块：r14_bool_arith.lom</summary><pre><code>fn main() -> Unit ! [IO]
+    let x = True + False
+    println(x)
+end</code></pre></details>
+<details><summary>F4：r14_if_local_tail.lom</summary><pre><code>fn choose(b: Bool) -> Int
+    if b
+        let x = 7
+        x
+    else
+        2
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(True))
+    println(choose(False))
+end</code></pre></details>
+<details><summary>F4 c1 交叉：r14_match_if_local_tail.lom</summary><pre><code>enum E = Z | V(Int)
+
+fn choose(e: E) -> Int
+    match e
+        V(n) =>
+            if True
+                let z = n + 1
+                z
+            else
+                0
+            end
+        end
+        Z => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose(V(6)))
+    println(choose(Z))
+end</code></pre></details>
+<details><summary>新增正向交叉：r14_enum_positive.lom</summary><pre><code>enum Tree
+    | Leaf(Int)
+    | Node(Tree, Tree)
+end
+
+fn score(t: Tree) -> Int
+    match t
+        Node(Leaf(a), Leaf(b)) if a &lt; b =>
+            let k = a + b
+            k * 2
+        end
+        Node(left, right) => score(left) + score(right)
+        Leaf(v) => v
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let t = Node(Leaf(2), Leaf(5))
+    println(score(t))
+    println(score(Node(Leaf(8), Leaf(3))))
+end</code></pre></details>
+
+<h2>5. 结论、整改建议及未测面</h2>
+<p>本轮可确认：c1 枚举构造、递归载荷、嵌套模式、guard、Form A/B、页尾零参对象、无匹配 trap 的已测正例运行对齐；明确的 Result/Option/泛型等拒绝在抽样中真实生效；版本、tag、CI 与文档登记数字未见漂移。但 L2 的编译期严格校验承诺被 F3 的坏 WASM 击穿，行为对拍被 F1/F2 的静默错值击穿，子集覆盖被 F4 的错误拒绝收窄。绿矩阵不能覆盖这些未纳入的词法作用域与类型流组合。</p>
+<p>建议开账时把 F1/F2 两类静默错值优先于 F3/F4；每项均加入“应正确运行”及“绝不能静默错编译/产坏 WASM/接受块外未定义名”的反向锁定。F1 与 F4 的块环境改动要联动设计：只修漏入不修漏出，或反之，容易产生新回归。报告仅提出建议，整改次序与实施授权仍归用户。</p>
+<p><strong>未测范围：</strong>未做 L2 随机程序 500 轮或穷举生成、任意小数正确舍入专项、超过现有 64 KiB 页尾探针的大规模堆增长、深递归/深嵌套极限、L2 编译器自身由其产物自举的 L2.4 闭环；String/List/Map/json/包/return 语句及内建 Result/Option、泛型用户 enum 按现行计划仍属未实现子集，不将其“尚未支持”误报为本轮缺陷。没有安装或运行竞品。未改源代码或既有门禁；临时探针只置于 <code>target/probes/</code>，清理不影响上述内嵌复现文本。</p>
+</body>
+</html>

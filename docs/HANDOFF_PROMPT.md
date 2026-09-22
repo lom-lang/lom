@@ -22,14 +22,16 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.6（tag 仅在 CI 绿后切，首回合须实查）；语言面与外部发布线冻结。
-- 审查状态：十三轮审查，R1-R78 全部关闭（R78 README 存量算术残留已随
-  L2.3-a 包顺手收口）。第十三轮复审
-  （docs/reviews/review-2026-09-22-2.html，总评 **B+ 回升**，基线
-  1418536/v1.2.5）确认 R73-R76 整改零失真（✓×4）+ 代码面敌手探针
-  22 形态零击穿（九审以来五轮首次）。事实源 docs/TODO.md 顶部。
-  L2.3-a/L2.3-b/L2.3-c1 三批在其基线之后交付（待下一轮独立复审重估，
-  不得把十三审 B+ 外推为三批的新评级）。
+- 仓库版本 v1.2.6（tag 于 CI #156 六 job 全绿后切；首回合仍须实查
+  最新 main CI 与 annotations）；语言面与外部发布线冻结。
+- 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
+  最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
+  复核，非外部同行审计。R1-R78 全部关闭，**R79-R82 新开未修：
+  2×P1 + 2×P2**。R79 控制流子块 let 泄漏/块外未定义名放行；
+  R80 闭包捕获被同名全局函数或枚举变体抢先；R81 Bool 二元运算
+  COMPILED 后产不可实例化 WASM；R82 值位 if 分支内合法 let 尾值
+  误拒。维护会话已对四项主形态亲手复现。十三审 B+ 只属其旧基线
+  1418536/v1.2.5；十四审 B 不外推整改后。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1 已实现）。L2 自举
   编译器（RFC-0004 方案 A，accepted，修订 1-9）：L2.1 spike + L2.2
   子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**（if/while/for(Int)/
@@ -40,7 +42,8 @@
   （递归载荷、嵌套模式、guard、Form A/B、无匹配 trap；
   self_comp.lom 5061 行，verify_selfcomp 72/72 = 25 对拍 + 47 负例，新增负例锁具体
   拒绝原因）。闭包批堆分配器/funcref 表/闭包值通道为复合值地基；c1
-  使无 table 的 enum 程序也可分配。**c2 待做**：内建 Result/Option
+  使无 table 的 enum 程序也可分配。**c2 代码推进暂缓，先裁决
+  R79-R82 整改顺序**：内建 Result/Option
   与泛型用户 enum 的类型参数表示；再后是 String / List / Map / json /
   包 / return 语句（块深度跟踪）。不可把 c1 称为 enum/match 全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
@@ -61,7 +64,11 @@
   memory/global；模式载荷只在变体测试成功后读；match 臂 Map 环境要
   复制；`lom fmt` 不得把 guard 的 if 计作开块；WASM trap 前 stdout
   必须吐出；闭包重赋还须比较 sig；Windows 子 Python 输出固定 UTF-8。
-- 待用户裁决：L2.3 后续子批推进节奏（c2 类型参数表示优先）；typechecker
+  **十四审新教训**：match 臂复制 Map 不等于 if/while/for 块作用域；
+  类型预扫既要看到块内 let 又不能泄漏它；闭包先查局部再查全局；
+  i32 Bool 不可落到 f64 opcode。72/72 与 CI 绿不证明这些交叉形态正确。
+- 待用户裁决：R79-R82 整改顺序（审查建议先两项 P1，R79/R82
+  联动设计）；之后才恢复 c2。另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
   迁移观察 2026-10-19。
@@ -70,7 +77,8 @@
 
 【第一回合必须完成】
 1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部，
-   docs/reviews/review-2026-09-22-2.html（十三审——最新轮），
+   docs/reviews/review-2026-09-23.html（十四审——最新轮）及
+   docs/reviews/review-2026-09-22-2.html（十三审旧基线），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
    修订 1-9），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
    含值表示/捕获语义决策记录）；涉及架构时再读 RFC-0003。
@@ -88,9 +96,10 @@
    - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，然后只给用户方向菜单，不自行修码。当前推荐菜单首项是
-   L2.3-c2（内建 Result/Option 与泛型用户 enum 的类型参数表示），之后
-   String / List / Map / json / 包 / return 语句按"编译期校验 + 负例"逐批
-   交付；十三审后 a/b/c1 增量也可先选独立复审。发布不应出现在菜单项内
+   **R79-R82 整改裁决**（审查建议先 R79/R80 两项 P1，再 R81/R82；
+   R79 与 R82 联动设计）；未获裁决前不擅自修码。R79-R82 收口后再
+   推进 L2.3-c2（Result/Option 与泛型 enum 类型参数表示），之后
+   String / List / Map / json / 包 / return 语句逐批交付。发布不应出现在菜单项内
    （冻结未解）。
 
 【状态锚点（当前行为，供复核）】
@@ -115,6 +124,13 @@
   enum、String 模式、枚举结构相等/显示等仍明确 COMPILE-ERROR 无 hex；
   错参、错误模式/guard/臂类型、不同闭包签名重赋也在编译期拒绝。
   verify_selfcomp 72/72（25 对拍 + 47 负例；新负例锁拒绝原因）。
+- 十四审后：**上述 a/b/c1 宣称受 R79-R82 四条未修反例限定**。
+  R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
+  未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主
+  `9`、L2 `0` 或 `1`；R81：Bool 相等比较 COMPILED 后实例化
+  类型错；R82：分支内 `let x; x` 合法尾值被误拒。报告含全部源码
+  与可复现命令，TODO R79-R82 为未关闭事实源。现有 72/72 不覆盖
+  这些形态，不能视为复审零击穿。
 - 写 self_comp 代码的坑：宿主 dangling-else 贪婪归内（then 块首元素
   嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
   改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）；多返回值调用点

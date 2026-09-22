@@ -1,22 +1,26 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-22 深夜七刷新）**：本台账记录 v1.2.6 仓库版本。
-> 第十三轮独立复审（[review-2026-09-22-2.html](reviews/review-2026-09-22-2.html)，
-> 总评 **B+**，基线 `1418536`/v1.2.5）确认 R73-R76 整改零失真与代码面
-> 零击穿；**其评级不外推**到基线后的 L2.3-a/b/c1 三批。L2.3-a 控制流、
-> b 闭包与捕获、**c1 非泛型用户枚举与标量/枚举 match**均已实现；c1 详见
-> RFC-0004 修订 9。self_comp.lom **5061 行**，verify_selfcomp **72/72 =
-> 25 对拍 + 47 负例拒绝**；`lom fmt` guard 缩进修复增加 2 条 Rust 单测，
-> 当前 **535 单元 + 8 集成**。R1-R78 全部关闭，无新开审查整改项。
-> L2.3 仍进行中：内建 Result/Option 与泛型用户 enum 的类型参数表示列为
-> c2；随后 String/List/Map/json/包/return 语句逐批推进，均按“编译期校验
-> + 负例”成对交付。外部发布线维持冻结。新维护者先复制
-> [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，读 HANDOVER 指定章节并跑 §2.2
-> 全量基线（六模式逐个），再呈方向菜单等用户裁决。
+> **交接声明（2026-09-23 十四审后刷新）**：仓库版本 v1.2.6；
+> 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，
+> 基线 `5c92f59`/v1.2.6）评级 **B**，新开 **R79-R82：P1×2 + P2×2**。
+> R79 控制流子块 let 泄漏导致静默错值/块外未定义名被放行；R80 闭包
+> 捕获时同名全局函数或枚举变体抢先，静默错指向；R81 Bool 二元运算
+> COMPILED 后产不可实例化 WASM；R82 值位 if 分支内合法 let 尾值被误拒。
+> 维护会话已对四项代表形态穿真实 CLI→hex→WASM→Node 复现；**尚未整改**，
+> 严重性与修法由用户裁决。十三审 B+ 仅属旧基线 `1418536`/v1.2.5；
+> 本轮 B 也只评本轮时点。535 单元 + 8 集成、verify_selfcomp
+> **72/72 = 25 对拍 + 47 负例**、eval 双后端 121/121、自举六模式、
+> doc_audit 67/67 与 CI 六 job 均绿，不能据此抹去上述反例。
+> L2.3-a/b/c1 已交付；c2（Result/Option 与泛型 enum 类型参数表示）
+> 的代码推进建议暂缓，先裁决 R79-R82 的整改次序。语言面与外部
+> 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
+> 读 HANDOVER 指定章节、最新十四审报告，跑 §2.2 全量基线，再呈
+> 方向菜单等用户裁决。
 >
 > **职责**：跨会话的可执行待办唯一事实源。任何会话领任务/交付任务以本文件为准；
 > 完成一项就把状态改为 `done` 并附一行证据（命令输出/测试名），由维护会话复核后提交。
-> **来源**：十三轮审查报告（最新 [review-2026-09-22-2.html](reviews/review-2026-09-22-2.html)，
+> **来源**：十四轮审查报告（最新 [review-2026-09-23.html](reviews/review-2026-09-23.html)，
+> 基线 `5c92f59`；十三审 [review-2026-09-22-2.html](reviews/review-2026-09-22-2.html)，
 > 基线 `1418536`；十二审 [review-2026-09-22.html](reviews/review-2026-09-22.html)，
 > 基线 `aab6f95`；十一审 [review-2026-09-21-3.html](reviews/review-2026-09-21-3.html)，
 > 基线 `65e51dc`；十审 [review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)，
@@ -38,6 +42,73 @@
 > 报告 [review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)）确认
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
+
+## 第十四轮体系内独立复核 + R79-R82 开账（2026-09-23）⚠️ review done / remediation open
+
+**报告**：[review-2026-09-23.html](reviews/review-2026-09-23.html)，基线
+`5c92f59` / v1.2.6；总评 **B**，只针对本轮时点。这是体系内 agent
+分工的独立复核，**不是外部同行审计**。审查阶段未改产品源码；
+报告内嵌全部临时输入原文及 CLI→hex→WASM→Node 复现命令。维护会话
+又用独立临时文件亲手复核 R79-R82 各一组，结果与报告一致；临时
+源码及派生产物已清理，原文仍在报告，可重建。官方 L2 验收 72/72、
+Rust 535+8、宿主 eval 双后端 121+121、自举六模式、doc_audit 67/67
+与 CI #156 六 job 全绿，但这些门禁没有覆盖本轮四类反例。
+
+### R79 — if/while/for 子块 let 泄漏到兄弟分支及外层（P1）🔴 open
+
+- **实测**：`r14_if_scope` 外层 `let x=5`，`if False` 内 `let x=9`，
+  `else` 与块后读取 x：宿主 WASM stdout `5\n5`、rc0；L2 COMPILED
+  103 bytes 后 stdout `0\n0`、rc0。`r14_phantom_let` 的 `y` 仅声明于
+  未执行的 if 内，宿主 build rc1 报“未定义变量 y”；L2 却 COMPILED
+  93 bytes 并输出 `0`、rc0。报告另实测 while False / for 0 与 c1
+  Form B 臂尾同根形态。
+- **读码根因**：`comp_if_from` / `comp_stmt_blk` 等把引用语义 Map
+  `env` 直接传入子块，`comp_one_stmt` 的 let `map_set` 随后泄漏。
+- **整改验收建议，待用户裁决**：子块作用域按宿主 push/pop 语义复制
+  或出口恢复；同时锁“外层同名仍读旧值”正例、“块外未定义名绝不能
+  COMPILED”负例，覆盖 if/while/for/Form B 与嵌套组合。与 R82 联动设计。
+
+### R80 — 闭包捕获时同名全局符号抢先（P1）🔴 open
+
+- **实测**：`r14_shadowed_variant_capture` 中局部 `let Z=V(9)` 遮蔽
+  全局零参变体 Z，闭包返回 Z；宿主 stdout `9`、L2 stdout `0`，
+  均 rc0（L2 COMPILED 404 bytes）。报告还实测局部闭包
+  `original` 遮蔽同名具名函数：宿主 `9`、L2 `1`，均 rc0。
+- **读码根因**：`compile_closure` 自由变量筛选先看 `fns` / `@variant:`
+  再看父 `env`，跳过应捕获的局部。宿主 WASM 先查 local/capture。
+- **整改验收建议，待用户裁决**：捕获来源先按局部环境解析，后判
+  全局；同名零参变体与具名函数两条独立行为对拍，加不遮蔽的全局
+  正例防误伤。
+
+### R81 — Bool 二元运算编成不可实例化 WASM（P2）🟠 open
+
+- **实测**：`r14_bool_eq` 的 `True == False`，宿主 WASM stdout `0`、
+  rc0；L2 COMPILED 104 bytes，Node 实例化 rc1：`f64.eq expected f64,
+  found i32`。报告另实测 `True + False`：宿主运行期 trap，L2
+  COMPILED 90 bytes 后实例化报 `f64.add expected f64, found i32`。
+- **读码根因**：`infer_ex` 把 i32 比较放行、算术落到 f64；
+  `comp_binary` 只处理 i64/f64，i32 落进 f64 指令分支。
+- **整改验收建议，待用户裁决**：合法 Bool 相等按 i32 编码；不支持
+  的 Bool 算术在编译期明确拒绝且不产 hex。锁正常输出与无坏 WASM
+  负例，不能仅看 `--check`。
+
+### R82 — 分支内 let 的合法尾值被预扫误拒（P2）🟠 open
+
+- **实测**：`r14_if_local_tail` 的 if 真分支 `let x=7` 后以 `x`
+  为块尾，宿主 WASM stdout `7\n2`、rc0；L2 `COMPILE-ERROR:
+  未定义变量 'x'`，无 hex。报告的 c1 交叉形态在枚举 match Form B
+  臂尾嵌套 if 中 `let z=n+1; z`：宿主 `7\n0`，L2 误拒 z。
+- **读码根因**：`infer_if_expr` 调 `blk_val_ty`，后者只看 tail，
+  没有按序建模本块 let；`match_block_type` 只处理 Form B 顶层 let。
+- **整改验收建议，待用户裁决**：类型预扫在临时块作用域按声明序
+  记录绑定；锁 if 值位、嵌套 if、match Form B 的合法正例，并与
+  R79 的“不可向外泄漏”负例一同验收。
+
+**审查建议的次序（非整改授权）**：先 R79/R80 两项静默错编译，再
+R81/R82；R79 与 R82 共享块环境设计问题，应同一方案审视，避免只修
+漏入或只修漏出。L2.3-c2 的代码推进在这四项被用户裁决并收口前
+暂缓；语言面与外部发布线冻结不变。下一轮复审前不得自行宣布
+评级回升。
 
 ## 第九轮维护者独立审查 + R55-R61（2026-09-21）⚠️ review done / remediation open
 
