@@ -10,6 +10,8 @@
 > `5c92f59` 时点，整改后不自行重评。535 单元 + 8 集成、
 > verify_selfcomp **92/92 = 35 对拍 + 57 负例**、eval 双后端 121/121、
 > 自举六模式、doc_audit 67/67 是现行回归；整改后评级待独立复审。
+> v1.2.7/v1.2.8 对应 CI #158/#159 各六 job 全绿后已切 tag；
+> 两次 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。
 > L2.3-a/b/c1 已交付；c2（Result/Option 与泛型 enum 类型参数表示）
 > 的代码推进待下一步用户裁决。语言面与外部
 > 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
