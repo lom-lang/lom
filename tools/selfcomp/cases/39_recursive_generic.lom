@@ -1,0 +1,18 @@
+# L2.3-c2：递归泛型载荷与嵌套变体模式。
+enum Tree<T>
+    | Leaf(T)
+    | Node(Tree<T>, Tree<T>)
+end
+
+fn sum(t: Tree<Int>) -> Int
+    match t
+        Leaf(v) => v
+        Node(Leaf(a), Leaf(b)) => a + b
+        Node(left, right) => sum(left) + sum(right)
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(sum(Node(Leaf(2), Leaf(5))))
+    println(sum(Node(Node(Leaf(1), Leaf(3)), Leaf(4))))
+end

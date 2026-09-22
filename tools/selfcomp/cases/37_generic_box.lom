@@ -1,0 +1,25 @@
+# L2.3-c2：用户泛型枚举的 Int/Float 实例及零参变体上下文补全。
+enum Box<T> = Full(T) | Empty
+
+fn score_int(v: Box<Int>) -> Int
+    match v
+        Full(x) => x
+        Empty => 0
+    end
+end
+
+fn score_float(v: Box<Float>) -> Int
+    match v
+        Full(x) => if x > 1.0 1 else 0 end
+        Empty => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score_int(Full(7)))
+    let empty: Box<Int> = Empty
+    println(score_int(empty))
+    println(score_int(Empty))
+    println(score_float(Full(1.5)))
+    println(score_float(Full(0.5)))
+end

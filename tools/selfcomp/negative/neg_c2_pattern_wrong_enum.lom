@@ -1,0 +1,13 @@
+# Option<Int> 的模式不可使用用户 Box 变体。
+enum Box<T> = Full(T)
+
+fn take(v: Option<Int>) -> Int
+    match v
+        Full(x) => x
+        None => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Some(1)))
+end

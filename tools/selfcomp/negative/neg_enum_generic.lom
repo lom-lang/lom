@@ -1,5 +1,0 @@
-# 负例：泛型用户 enum 仍需单独的类型参数表示设计。
-enum Box<T> = Full(T)
-fn main() -> Unit
-    let b = Full(1)
-end

@@ -1,0 +1,10 @@
+# Box<Bool> 不得传给 Box<Int> 形参。
+enum Box<T> = Full(T)
+
+fn take(v: Box<Int>) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Full(True)))
+end

@@ -1,6 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-23 R79-R82 整改收官）**：仓库版本 v1.2.8；
+> **交接声明（2026-09-23 L2.3-c2 交付）**：仓库版本 v1.2.9；
 > 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，
 > 基线 `5c92f59`/v1.2.6）评级 **B**，开账 **R79-R82：P1×2 + P2×2**。
 > 用户已裁决按 P1 后 P2 顺序整改，**R79-R82 四项全部关闭**：
@@ -8,12 +8,13 @@
 > Bool 运算产坏 WASM 与值位 if 局部尾值误拒。
 > 十三审 B+ 仅属旧基线 `1418536`/v1.2.5；十四审 B 也只评其
 > `5c92f59` 时点，整改后不自行重评。535 单元 + 8 集成、
-> verify_selfcomp **92/92 = 35 对拍 + 57 负例**、eval 双后端 121/121、
+> verify_selfcomp **128/128 = 52 对拍 + 76 负例**、eval 双后端 121/121、
 > 自举六模式、doc_audit 67/67 是现行回归；整改后评级待独立复审。
 > v1.2.7/v1.2.8 对应 CI #158/#159 各六 job 全绿后已切 tag；
 > 两次 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。
-> L2.3-a/b/c1 已交付；c2（Result/Option 与泛型 enum 类型参数表示）
-> 的代码推进待下一步用户裁决。语言面与外部
+> L2.3-a/b/c1/c2 已交付；c2 支持内建 Result/Option 和泛型用户 enum
+> 的构造/类型流/match（String/List/Map 载荷与 ?/return 仍留后续）。
+> 下一步工作包或独立复审待用户裁决。语言面与外部
 > 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
 > 读 HANDOVER 指定章节与十四审报告，跑 §2.2 全量基线，再呈方向
 > 菜单等用户裁决。
@@ -708,9 +709,40 @@ alloc/memory/global；闭包 table/elem 继续按需发。标量与用户枚举 
 缺陷由 Form A/B 两条 Rust 单测锁定（Rust 533→**535**；集成仍 8）；
 `run_selfcomp.mjs` 在 trap 时输出已积累 stdout；`verify_selfcomp.py`
 给子进程固定 UTF-8，消除 Windows reader thread 解码异常。
-语言面四项冻结均未触碰。**c2 待做**：内建 Result/Option、泛型用户
+语言面四项冻结均未触碰。**c1 交付时点 c2 待做**：内建 Result/Option、泛型用户
 enum 的类型参数表示；当前还拒绝 String 模式、枚举结构相等/显示、
 闭包值 match 等，均须继续按“校验 + 负例”解锁，不得称全语言面完成。
+
+## L2.3-c2 内建 Result/Option 与泛型用户 enum（2026-09-23）✅ implemented
+
+**范围与表示**（RFC-0004 修订 12；设计
+[0003-l2.3-generic-enums.md](designs/0003-l2.3-generic-enums.md)）：
+不动 c1 的 WASM 对象布局和 untagged i64 指针。宿主预留的
+Ok/Err/Some/None 索引 0..3 进入同一变体元数据路径，用户变体
+仍从 4 起。编译期 vt 用 `en:Name{arg1;arg2}` 记录实例，
+`tv:T` 为声明模板，`?` 为构造器无法从载荷推出的参数；
+花括号深度解析支持嵌套/递归类型且不冲突于形参逗号和闭包签名
+`@`。声明两遍登记，构造按实参递归统一同名参数；函数/let/
+赋值/if/match 的类型流可由注解或另一分支补全部分实例，
+值位块的赋值预扫也按序细化绑定。模式由被测实例代入载荷模板，
+先验证变体与 arity、后读取匹配成功的载荷，沿用页尾防护。
+
+**验收证据**：verify_selfcomp **128/128 = 52 双产物 stdout+rc
+行为对拍 + 76 条 COMPILE-ERROR 无 hex 负例**；c2 新增
+17 个正例（36-52，含内建四变体、泛型单/双参数、递归与嵌套
+实例、Float/Bool 载荷、闭包和具名函数当值、guard/Form B、
+零参 None 页尾、块内 None→Some 类型细化）与 22 个新负例
+（参数数、重复参数、构造/赋值/调用/模式类型不符、未知载荷、
+String/Unit 与 ? 边界），新负例均锁具体原因。三个 c1 时点
+“尚不支持”负例转为正例覆盖后删除，Git 历史可恢复。Rust
+535 单元 + 8 集成、宿主 eval 双后端 121/121、自举六模式、
+golden、fmt、doc_audit 67/67、fuzz/diff 冒烟交付前全量复验。
+
+**仍明确未覆盖**：String/List/Map 值载荷、Unit/Fn 类型参数、
+无上下文且需读取裸未知载荷的泛型模式、枚举结构相等/显示、闭包值
+match、`?` 与 return 语句（后者需块深度跟踪）、json 与包。
+不把 c2 称为 enum/match 或 Result/Option 全语言面覆盖。十四审
+B 仍只评 5c92f59/v1.2.6；c2 待下一轮独立复审。
 
 ## ④ 文档工程小包（2026-09-16，四连包第四项）✅ done
 

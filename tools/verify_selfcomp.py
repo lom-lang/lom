@@ -10,7 +10,7 @@
   断言：两侧 stdout 逐字一致 + 退出码一致 + L2 编译输出 COMPILED 行。
 
 负例集：tools/selfcomp/negative/ 下的子集外构造必须 COMPILE-ERROR
-且不产 hex。L2.3-c 新增枚举/match 负例另断言拒绝原因片段，防止错误
+且不产 hex。L2.3-c 枚举/match/泛型负例另断言拒绝原因片段，防止错误
 路径偶然产出同一个 COMPILE-ERROR 也被误判为校验已覆盖。
 
 用法：python tools/verify_selfcomp.py [--lom-bin PATH]
@@ -34,9 +34,29 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_if_branch_local_outer_leak.lom': "未定义变量 'x'",
     'neg_if_branch_local_sibling_leak.lom': "未定义变量 'x'",
     'neg_if_sibling_let_leak.lom': "未定义变量 'y'",
-    'neg_builtin_none_pattern.lom': "内建 Result/Option 模式留后续子批（'None'）",
-    'neg_builtin_result_type.lom': '泛型 enum/Result/Option 留后续批次',
-    'neg_builtin_some.lom': "内建 Result/Option 变体留后续子批（'Some'）",
+    'neg_builtin_none_pattern.lom': "无参变体模式 'None' 与被测类型 'i64' 不符",
+    'neg_c2_assign_wrong_instance.lom': "赋值 'x' 类型不符",
+    'neg_c2_duplicate_param.lom': "重复类型参数 'T'",
+    'neg_c2_generic_arity.lom': "类型参数数不符",
+    'neg_c2_generic_conflict.lom': "变体 'Pair' 第 2 参类型不符",
+    'neg_c2_generic_naked.lom': "泛型枚举类型 'Box' 期望 1 个类型参数",
+    'neg_c2_generic_wrong_arg.lom': "调用 'take' 第 1 参类型不符",
+    'neg_c2_nested_wrong_payload.lom': "调用 'take' 第 1 参类型不符",
+    'neg_c2_nested_typevar_conflict.lom': "变体 'Both' 第 2 参类型不符",
+    'neg_c2_none_arity.lom': "变体 'None' 实参数不符",
+    'neg_c2_pattern_arity.lom': "子模式数不符",
+    'neg_c2_pattern_wrong_enum.lom': "变体模式所属枚举 'Box' 与被测类型",
+    'neg_c2_result_string.lom': "该参数/返回类型（String/List/Map/记录/元组留后续批次）",
+    'neg_c2_result_wrong_payload.lom': "调用 'take' 第 1 参类型不符",
+    'neg_c2_recursive_wrong_payload.lom': "变体 'Node' 第 1 参类型不符",
+    'neg_c2_print_generic.lom': 'println 只接受 Int/Float',
+    'neg_c2_some_arity.lom': "变体 'Some' 实参数不符",
+    'neg_c2_type_param_builtin.lom': "类型参数名与内建类型冲突（'Int'）",
+    'neg_c2_try_deferred.lom': "? 提前返回留 return 批",
+    'neg_c2_unbound_field_type.lom': "未知或子集外枚举类型 'U'",
+    'neg_c2_unit_type_arg.lom': "Option 类型参数暂不支持 Unit/Fn",
+    'neg_c2_unknown_payload_pattern.lom': "模式载荷类型不可推断",
+    'neg_c2_unknown_type_arg.lom': "未知或子集外枚举类型 'Ghost'",
     'neg_closure_assign_signature.lom': '闭包签名不符',
     'neg_enum_assign_type.lom': "赋值 'e' 类型不符",
     'neg_enum_builtin_type_name.lom': '枚举名与内建类型冲突',
@@ -44,7 +64,6 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_enum_ctor_type.lom': "变体 'V' 第 1 参类型不符",
     'neg_enum_duplicate_variant.lom': '重复变体名',
     'neg_enum_eq.lom': '闭包/枚举值参与比较',
-    'neg_enum_generic.lom': '泛型 enum 留后续批次',
     'neg_enum_pattern_arity.lom': '子模式数不符',
     'neg_enum_pattern_unknown.lom': "未知变体模式 'Missing'",
     'neg_enum_pattern_wrong_type.lom': "无参变体模式 'B1' 与被测类型",

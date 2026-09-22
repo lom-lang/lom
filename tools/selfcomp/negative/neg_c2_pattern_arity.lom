@@ -1,0 +1,11 @@
+# Some 只有一个子模式，两个子模式必须编译期拒绝。
+fn take(v: Option<Int>) -> Int
+    match v
+        Some(a, b) => a
+        None => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Some(1)))
+end

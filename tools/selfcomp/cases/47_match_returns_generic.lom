@@ -1,0 +1,21 @@
+# L2.3-c2：match 臂的部分类型合流后返回嵌套泛型实例。
+enum Box<T> = Full(T)
+
+fn choose(b: Bool) -> Option<Box<Int>>
+    match b
+        True => Some(Full(3))
+        False => None
+    end
+end
+
+fn unwrap(v: Option<Box<Int>>) -> Int
+    match v
+        Some(Full(n)) => n
+        None => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(unwrap(choose(True)))
+    println(unwrap(choose(False)))
+end

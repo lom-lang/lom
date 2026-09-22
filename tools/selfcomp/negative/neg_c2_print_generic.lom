@@ -1,0 +1,6 @@
+# 枚举显示值仍留后续批次，不能送到 Int/Float println 导入。
+enum Box<T> = Full(T)
+
+fn main() -> Unit ! [IO]
+    println(Full(1))
+end

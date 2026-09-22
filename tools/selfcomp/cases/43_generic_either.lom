@@ -1,0 +1,25 @@
+# L2.3-c2：双参数用户 enum 的分支合流与赋值后类型参数细化。
+enum Either<A, B> = Left(A) | Right(B)
+
+fn make(b: Bool) -> Either<Int, Bool>
+    if b
+        Left(4)
+    else
+        Right(True)
+    end
+end
+
+fn score(v: Either<Int, Bool>) -> Int
+    match v
+        Left(x) => x
+        Right(flag) => if flag 10 else 0 end
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score(make(True)))
+    println(score(make(False)))
+    let mut last = Left(1)
+    last = Right(True)
+    println(score(last))
+end

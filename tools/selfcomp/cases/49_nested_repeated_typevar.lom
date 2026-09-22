@@ -1,0 +1,17 @@
+# L2.3-c2：同一 T 藏在两层 Option 内，None 可由另一载荷补全。
+enum Twin<T> = Both(Option<T>, Option<T>)
+
+fn score(v: Twin<Int>) -> Int
+    match v
+        Both(Some(a), Some(b)) => a + b
+        Both(None, Some(b)) => b
+        Both(Some(a), None) => a
+        Both(None, None) => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score(Both(None, Some(3))))
+    println(score(Both(Some(2), Some(5))))
+    println(score(Both(None, None)))
+end

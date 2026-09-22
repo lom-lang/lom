@@ -1,0 +1,19 @@
+# L2.3-c2：泛型载荷 binder 在 guard 和 Form B 尾值中保留具体类型。
+enum Maybe<T> = N | Y(T)
+
+fn score(v: Maybe<Int>) -> Int
+    match v
+        Y(x) if x > 5 =>
+            let y = x + 1
+            y
+        end
+        Y(x) => x
+        N => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score(Y(7)))
+    println(score(Y(2)))
+    println(score(N))
+end

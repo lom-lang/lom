@@ -1,5 +1,5 @@
 # ============================================================================
-# self_comp.lom — L2 自举编译器（RFC-0004 方案 A，L2.3-c1 子集）
+# self_comp.lom — L2 自举编译器（RFC-0004 方案 A，L2.3-c2 子集）
 #
 # 用途：把 Lom 子集程序编译为 .wasm（经纯 ASCII hex 文本落盘，宿主桩
 #       tools/hex2wasm.py 转二进制——方案 A 通道，RFC-0004）。
@@ -8,10 +8,10 @@
 #   成功打印 "COMPILED <n> bytes -> <path>"；失败打印诊断 + "COMPILE-ERROR"
 #
 # 当前子集：L2.2 算术/调用/println + L2.3-a 控制流/Bool + L2.3-b 闭包
-# + L2.3-c1 非泛型用户枚举、标量及枚举 match（字面量/Binder/通配符、
-# 嵌套变体、guard、Form A/B、无匹配 trap）。子集外均编译期明确拒绝：
-# Result/Option 与泛型用户枚举、String/List/Map/json/包、return 语句、
-# 枚举结构相等/显示、闭包值 match 等留 L2.3 后续批次。
+# + L2.3-c1 非泛型用户枚举与 match + c2 内建 Result/Option、泛型
+# 用户枚举类型实例（构造、match、递归/嵌套载荷）。子集外编译期拒绝：
+# String/List/Map/json/包、? 与 return 语句、枚举结构相等/显示、
+# 闭包值 match 等留 L2.3 后续批次。
 #
 # 值表示（编译器实现自由度，RFC-0004：不做字节级一致，行为级对拍）：
 #   Int=i64、Float=f64、Bool=i32；闭包/枚举=i64 裸指针（untagged，
@@ -2377,32 +2377,272 @@ fn subset_err(msg: String) -> String
 end
 
 # Ty → 值类型（"i64"|"f64"|"i32"|"cl"|"en:<name>"|"void"）。
-# Fn 类型注解推后（designs/0001 §4-B3）；非泛型用户 enum 有名区分。
+# 泛型实例延伸为 en:Name{arg1;arg2}，其中类型参数模板为 tv:T，
+# 构造时未知参数为 ?；实例编码不含逗号/@，可嵌入现有 prms/sig 字符串。
 fn enum_vt(vt: String) -> Bool
     starts_with(vt, "en:")
 end
 
-fn builtin_variant(name: String) -> Bool
-    name == "Ok" or name == "Err" or name == "Some" or name == "None"
+# 从内部枚举 vt 拆出基名与最外层类型参数；嵌套花括号按深度配对。
+fn enum_vt_parts(vt: String) -> Result<{name: String, args: List<String>}, String>
+    if !enum_vt(vt)
+        return Err("内部错误：非枚举 vt 进入 enum_vt_parts（" + vt + "）")
+    end
+    let chars = split(vt, "")
+    let n = list_length(chars)
+    let mut i = 3
+    let mut name = ""
+    while i < n and list_get(chars, i) != "{"
+        name = name + list_get(chars, i)
+        i = i + 1
+    end
+    if name == ""
+        return Err("内部错误：枚举 vt 缺类型名")
+    end
+    if i == n
+        return Ok({name: name, args: list_empty()})
+    end
+    i = i + 1
+    let mut depth = 1
+    let mut arg = ""
+    let mut args = list_empty()
+    while i < n
+        let c = list_get(chars, i)
+        if c == "{"
+            depth = depth + 1
+            arg = arg + c
+        elif c == "}"
+            depth = depth - 1
+            if depth == 0
+                if arg == "" or i != n - 1
+                    return Err("内部错误：枚举 vt 参数编码损坏（" + vt + "）")
+                end
+                args = list_cons(arg, args)
+            else
+                arg = arg + c
+            end
+        elif c == ";" and depth == 1
+            if arg == ""
+                return Err("内部错误：枚举 vt 含空参数（" + vt + "）")
+            end
+            args = list_cons(arg, args)
+            arg = ""
+        else
+            arg = arg + c
+        end
+        i = i + 1
+    end
+    if depth != 0
+        return Err("内部错误：枚举 vt 花括号未闭合（" + vt + "）")
+    end
+    Ok({name: name, args: rev_str(args)})
 end
 
-fn ty_vt(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+fn enum_vt_make(name: String, args: List<String>) -> String
+    if list_is_empty(args)
+        return "en:" + name
+    end
+    let mut out = "en:" + name + "{"
+    let mut first = True
+    for arg in args
+        if !first
+            out = out + ";"
+        end
+        out = out + arg
+        first = False
+    end
+    out + "}"
+end
+
+# ? 仅代表构造器未提供的信息，不代表任意动态值；已知参数必须逐层相等。
+fn vt_merge(a: String, b: String) -> Result<String, String>
+    if a == b
+        return Ok(a)
+    end
+    if a == "?"
+        return Ok(b)
+    end
+    if b == "?"
+        return Ok(a)
+    end
+    if enum_vt(a) and enum_vt(b)
+        let aa = enum_vt_parts(a)?
+        let bb = enum_vt_parts(b)?
+        if aa.name != bb.name or list_length(aa.args) != list_length(bb.args)
+            return Err(subset_err("泛型实例类型不符（'" + a + "' vs '" + b + "'）"))
+        end
+        let mut merged = list_empty()
+        let mut i = 0
+        while i < list_length(aa.args)
+            merged = list_cons(vt_merge(list_get(aa.args, i), list_get(bb.args, i))?, merged)
+            i = i + 1
+        end
+        return Ok(enum_vt_make(aa.name, rev_str(merged)))
+    end
+    Err(subset_err("类型不符（'" + a + "' vs '" + b + "'）"))
+end
+
+fn vt_compatible(a: String, b: String) -> Bool
+    match vt_merge(a, b)
+        Ok(_) => True
+        Err(_) => False
+    end
+end
+
+fn type_var_name(vt: String) -> String
+    let chars = split(vt, "")
+    let mut out = ""
+    let mut i = 3
+    while i < list_length(chars)
+        out = out + list_get(chars, i)
+        i = i + 1
+    end
+    out
+end
+
+# 枚举实例参数 → 模板参数环境；非泛型 enum 的环境为空。
+fn enum_inst_env(inst_vt: String, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Map<String, String>, String>
+    let parts = enum_vt_parts(inst_vt)?
+    let meta = match map_get(fns, "@enum:" + parts.name)
+        Some(m) => m
+        None => {idx: -1, ret: "", nprm: -1, prms: ""}
+    end
+    if meta.nprm < 0 or list_length(parts.args) != meta.nprm
+        return Err(subset_err("枚举实例类型参数数不符（'" + inst_vt + "'）"))
+    end
+    let out = map_empty()
+    if meta.nprm > 0
+        let names = split(meta.prms, ",")
+        let mut i = 0
+        while i < meta.nprm
+            map_set(out, list_get(names, i), list_get(parts.args, i))
+            i = i + 1
+        end
+    end
+    Ok(out)
+end
+
+# 模板载荷类型按具体实例替换；嵌套 enum/Result/Option 递归处理。
+fn template_resolve(tpl: String, subs: Map<String, String>) -> Result<String, String>
+    if starts_with(tpl, "tv:")
+        let key = type_var_name(tpl)
+        match map_get(subs, key)
+            Some(v) => Ok(v)
+            None => Err(subset_err("未声明的枚举类型参数 '" + key + "'"))
+        end
+    elif enum_vt(tpl)
+        let parts = enum_vt_parts(tpl)?
+        let mut args = list_empty()
+        for arg in parts.args
+            args = list_cons(template_resolve(arg, subs)?, args)
+        end
+        Ok(enum_vt_make(parts.name, rev_str(args)))
+    else
+        Ok(tpl)
+    end
+end
+
+# 构造器载荷对模板做结构统一；重复出现的同一参数必须一致。
+fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result<Unit, String>
+    if starts_with(tpl, "tv:")
+        let key = type_var_name(tpl)
+        match map_get(subs, key)
+            Some(old) =>
+                map_set(subs, key, vt_merge(old, got)?)
+                Ok(())
+            end
+            None => Err(subset_err("未声明的枚举类型参数 '" + key + "'"))
+        end
+    elif enum_vt(tpl)
+        if !enum_vt(got)
+            return Err(subset_err("枚举载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let a = enum_vt_parts(tpl)?
+        let b = enum_vt_parts(got)?
+        if a.name != b.name or list_length(a.args) != list_length(b.args)
+            return Err(subset_err("枚举载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let mut i = 0
+        while i < list_length(a.args)
+            template_unify(list_get(a.args, i), list_get(b.args, i), subs)?
+            i = i + 1
+        end
+        Ok(())
+    else
+        if vt_compatible(tpl, got)
+            Ok(())
+        else
+            Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+    end
+end
+
+fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, tparams: List<String>) -> Result<String, String>
     match t
         TyInt => Ok("i64")
         TyFloat => Ok("f64")
         TyBool => Ok("i32")
         TyUnit => Ok("void")
         TyNamed(s) =>
-            if s == "Fn"
+            if name_in(tparams, s)
+                Ok("tv:" + s)
+            elif s == "Fn"
                 Err(subset_err("Fn 类型注解留后续批次（untagged call_indirect 需精确签名）"))
-            elif map_has(fns, "@enum:" + s)
-                Ok("en:" + s)
             else
-                Err(subset_err("未知或子集外枚举类型 '" + s + "'"))
+                match map_get(fns, "@enum:" + s)
+                    Some(meta) =>
+                        if meta.nprm != 0
+                            Err(subset_err("泛型枚举类型 '" + s + "' 期望 " + meta.nprm + " 个类型参数"))
+                        else
+                            Ok("en:" + s)
+                        end
+                    end
+                    None => Err(subset_err("未知或子集外枚举类型 '" + s + "'"))
+                end
             end
         end
-        _ => Err(subset_err("该参数/返回类型（泛型 enum/Result/Option 留后续批次）"))
+        TyGeneric(name, args) =>
+            let meta = match map_get(fns, "@enum:" + name)
+                Some(m) => m
+                None => {idx: -1, ret: "", nprm: -1, prms: ""}
+            end
+            if meta.nprm < 0
+                return Err(subset_err("未知泛型枚举类型 '" + name + "'"))
+            end
+            if list_length(args) != meta.nprm or meta.nprm == 0
+                return Err(subset_err("泛型枚举类型 '" + name + "' 类型参数数不符（期望 " + meta.nprm + " 得 " + list_length(args) + "）"))
+            end
+            let mut out = list_empty()
+            for arg in args
+                let vt = ty_vt_with_params(arg, fns, tparams)?
+                if vt == "void" or vt == "cl"
+                    return Err(subset_err("泛型类型参数暂不支持 Unit/Fn（'" + name + "'）"))
+                end
+                out = list_cons(vt, out)
+            end
+            Ok(enum_vt_make(name, rev_str(out)))
+        end
+        TyOption(inner) =>
+            let vt = ty_vt_with_params(inner, fns, tparams)?
+            if vt == "void" or vt == "cl"
+                return Err(subset_err("Option 类型参数暂不支持 Unit/Fn"))
+            end
+            Ok(enum_vt_make("Option", list_cons(vt, list_empty())))
+        end
+        TResult(ok_ty, err_ty) =>
+            let ok_vt = ty_vt_with_params(ok_ty, fns, tparams)?
+            let err_vt = ty_vt_with_params(err_ty, fns, tparams)?
+            if ok_vt == "void" or err_vt == "void" or ok_vt == "cl" or err_vt == "cl"
+                return Err(subset_err("Result 类型参数暂不支持 Unit/Fn"))
+            end
+            Ok(enum_vt_make("Result", list_cons(ok_vt, list_cons(err_vt, list_empty()))))
+        end
+        _ => Err(subset_err("该参数/返回类型（String/List/Map/记录/元组留后续批次）"))
     end
+end
+
+fn ty_vt(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    ty_vt_with_params(t, fns, list_empty())
 end
 
 # Option<Ty> → 值类型（None = 无返回 = void）
@@ -2566,19 +2806,52 @@ fn variant_call_type(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
             if list_length(args) != v.nprm
                 return Err(subset_err("变体 '" + name + "' 实参数不符（期望 " + v.nprm + " 得 " + list_length(args) + "）"))
             end
+            let owner_parts = enum_vt_parts(v.ret)?
+            let owner = owner_parts.name
+            let enum_meta = match map_get(fns, "@enum:" + owner)
+                Some(m) => m
+                None => {idx: -1, ret: "", nprm: -1, prms: ""}
+            end
+            if enum_meta.nprm < 0
+                return Err("内部错误：变体 '" + name + "' 缺所属枚举")
+            end
+            let subs = map_empty()
+            if enum_meta.nprm > 0
+                for tp in split(enum_meta.prms, ",")
+                    map_set(subs, tp, "?")
+                end
+            end
             if v.nprm > 0
                 let wants = split(v.prms, ",")
                 let mut i = 0
                 while i < v.nprm
                     let got = infer_ex(list_get(args, i), env, fns)?
                     let want = list_get(wants, i)
-                    if got != want
+                    if got == "void" or got == "cl"
+                        return Err(subset_err("变体 '" + name + "' 第 " + (i + 1) + " 参类型不支持（" + got + "）"))
+                    end
+                    let unified = template_unify(want, got, subs)
+                    let valid = match unified
+                        Ok(_) => True
+                        Err(_) => False
+                    end
+                    if !valid
                         return Err(subset_err("变体 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + want + " 得 " + got + "）"))
                     end
                     i = i + 1
                 end
             end
-            Ok(v.ret)
+            let mut inst_args = list_empty()
+            if enum_meta.nprm > 0
+                for tp in split(enum_meta.prms, ",")
+                    let bound = match map_get(subs, tp)
+                        Some(vt) => vt
+                        None => "?"
+                    end
+                    inst_args = list_cons(bound, inst_args)
+                end
+            end
+            Ok(enum_vt_make(owner, rev_str(inst_args)))
         end
     end
 end
@@ -2603,8 +2876,6 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                 None =>
                     if map_has(fns, "@variant:" + x)
                         variant_call_type(x, list_empty(), env, fns)
-                    elif builtin_variant(x)
-                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
                     else
                         match map_get(fns, x)
                             Some(fi) => Ok("cl" + mk_sig(fi.prms, fi.ret))
@@ -2620,8 +2891,6 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                 ExIdent(name, _, _) =>
                     if map_has(env, name) == False and map_has(fns, "@variant:" + name)
                         variant_call_type(name, args, env, fns)
-                    elif map_has(env, name) == False and builtin_variant(name)
-                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + name + "'）"))
                     elif name == "println"
                         Ok("void")
                     else
@@ -2657,12 +2926,17 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                             Ok("void")
                         end
                         Some(eb) =>
-                            let out = blk_rv(eb, env, fns)?
+                            let mut out = blk_rv(eb, env, fns)?
                             for pair in branches
                                 let br = blk_rv(pair.1, env, fns)?
-                                if br != out
+                                let merged = match vt_merge(out, br)
+                                    Ok(vt) => vt
+                                    Err(_) => ""
+                                end
+                                if merged == ""
                                     return Err(subset_err("if 表达式分支返回类型不一致（'" + out + "' vs '" + br + "'）"))
                                 end
+                                out = merged
                             end
                             Ok(out)
                         end
@@ -2787,8 +3061,6 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 None =>
                     if map_has(fns, "@variant:" + x)
                         variant_call_type(x, list_empty(), env, fns)
-                    elif builtin_variant(x)
-                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
                     else
                         # L2.3-b：具名函数当值（v0.4.2 宿主语义）
                         match map_get(fns, x)
@@ -2869,6 +3141,7 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
         end
         ExIf(ifr) => infer_if_expr(ifr, env, fns)
         ExMatch(scrut, arms, _) => infer_match_expr(scrut, arms, env, fns)
+        ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
         ExCall(callee, _) =>
             # L2.3-b：统一走 ex_rv（直调 println/fns → ret；闭包调用 → 被调
             # rv 段；任意 callee 同口径）——返回段 → vt
@@ -2899,9 +3172,14 @@ fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String,
                     let mut t = blk_val_ty(eb, env, fns)?
                     for pair in branches
                         let bt = blk_val_ty(pair.1, env, fns)?
-                        if bt != t
+                        let merged = match vt_merge(t, bt)
+                            Ok(vt) => vt
+                            Err(_) => ""
+                        end
+                        if merged == ""
                             return Err(subset_err("if 表达式各分支值类型不一致（'" + t + "' vs '" + bt + "'）"))
                         end
+                        t = merged
                     end
                     Ok(t)
                 end
@@ -2910,8 +3188,9 @@ fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String,
     end
 end
 
-# R82：类型预扫只在独立绑定表里按声明序登记 let。编译期槽位由真实
-# 发射路径分配；这里的 slot=0 是只供 infer_ex/ex_sig 使用的占位值。
+# R82/c2：类型预扫只在独立绑定表里按序登记 let，并在赋值时细化
+# 尚未知的泛型参数。编译期槽位由真实发射路径分配；临时 let 的
+# slot=0 只供 infer_ex/ex_sig 使用。
 fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, prefix: String) -> Result<Unit, String>
     for s in stmts
         match s
@@ -2922,6 +3201,30 @@ fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: Strin
                 end
                 let sig = if vt == "cl" ex_sig(ex, block_env, fns)? else "" end
                 map_set(block_env, name, {slot: 0, vt: vt, sig: sig, cap: False})
+            end
+            StAssign(name, _, _, ex) =>
+                let bnd = match map_get(block_env, name)
+                    Some(b) => b
+                    None => {slot: -1, vt: "", sig: "", cap: False}
+                end
+                if bnd.slot < 0
+                    return Err("赋值给未定义变量 '" + name + "'")
+                end
+                if bnd.cap
+                    return Err("赋值给未定义变量 '" + name + "'（闭包捕获为值拷贝，不能赋值）")
+                end
+                let got = infer_ex(ex, block_env, fns)?
+                if !vt_compatible(bnd.vt, got)
+                    return Err(subset_err("赋值 '" + name + "' 类型不符（期望 " + bnd.vt + " 得 " + got + "）"))
+                end
+                if bnd.vt == "cl"
+                    let assigned_sig = ex_sig(ex, block_env, fns)?
+                    if assigned_sig != bnd.sig
+                        return Err(subset_err("赋值 '" + name + "' 闭包签名不符"))
+                    end
+                end
+                let merged = vt_merge(bnd.vt, got)?
+                map_set(block_env, name, {slot: bnd.slot, vt: merged, sig: bnd.sig, cap: False})
             end
             _ => ()
         end
@@ -2956,17 +3259,45 @@ fn copy_bindings(env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool
     out
 end
 
+# 根据被测枚举实例替换变体载荷模板；模式与真实发射共用这一结果。
+fn variant_field_vts(v: {idx: Int, ret: String, nprm: Int, prms: String}, scrut_vt: String, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<List<String>, String>
+    if !enum_vt(scrut_vt)
+        return Err(subset_err("变体模式与非枚举被测类型 '" + scrut_vt + "' 不符"))
+    end
+    let owner = enum_vt_parts(v.ret)?
+    let actual = enum_vt_parts(scrut_vt)?
+    if owner.name != actual.name
+        return Err(subset_err("变体模式所属枚举 '" + owner.name + "' 与被测类型 '" + scrut_vt + "' 不符"))
+    end
+    let subs = enum_inst_env(scrut_vt, fns)?
+    let mut out = list_empty()
+    if v.nprm > 0
+        for tpl in split(v.prms, ",")
+            let field_vt = template_resolve(tpl, subs)?
+            # en:Tree{?} 自身仍是 i64 指针；只有载荷 vt 本身未知时
+            # 才无法选择 load/local 宽度。更深层模式会再次独立校验。
+            if field_vt == "?" or starts_with(field_vt, "tv:")
+                return Err(subset_err("模式载荷类型不可推断（需枚举实例类型注解）"))
+            end
+            out = list_cons(field_vt, out)
+        end
+    end
+    Ok(rev_str(out))
+end
+
 fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Unit, String>
     match p
         PatWildcard => Ok(())
         PatBinder(name) =>
-            if builtin_variant(name)
-                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
-            end
             match map_get(fns, "@variant:" + name)
                 Some(v) =>
                     if v.nprm == 0
-                        if scrut_vt != v.ret
+                        let checked = variant_field_vts(v, scrut_vt, fns)
+                        let valid = match checked
+                            Ok(_) => True
+                            Err(_) => False
+                        end
+                        if !valid
                             return Err(subset_err("无参变体模式 '" + name + "' 与被测类型 '" + scrut_vt + "' 不符"))
                         end
                         return Ok(())
@@ -2993,9 +3324,6 @@ fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: 
             end
         end
         PatVariant(name, subs) =>
-            if builtin_variant(name)
-                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
-            end
             let v = match map_get(fns, "@variant:" + name)
                 Some(meta) => meta
                 None => {idx: -1, ret: "", nprm: -1, prms: ""}
@@ -3003,17 +3331,14 @@ fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: 
             if v.idx < 0
                 return Err(subset_err("未知变体模式 '" + name + "'"))
             end
-            if scrut_vt != v.ret
-                return Err(subset_err("变体模式 '" + name + "' 与被测类型 '" + scrut_vt + "' 不符"))
-            end
             if list_length(subs) != v.nprm
                 return Err(subset_err("变体模式 '" + name + "' 子模式数不符（期望 " + v.nprm + " 得 " + list_length(subs) + "）"))
             end
+            let fields = variant_field_vts(v, scrut_vt, fns)?
             if v.nprm > 0
-                let ps = split(v.prms, ",")
                 let mut i = 0
                 while i < v.nprm
-                    pattern_types(list_get(subs, i), list_get(ps, i), arm_env, fns)?
+                    pattern_types(list_get(subs, i), list_get(fields, i), arm_env, fns)?
                     i = i + 1
                 end
             end
@@ -3069,8 +3394,15 @@ fn infer_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt
                 if first
                     out = bt
                     first = False
-                elif bt != out
-                    return Err(subset_err("match 臂值类型不一致（'" + out + "' vs '" + bt + "'）"))
+                else
+                    let merged = match vt_merge(out, bt)
+                        Ok(vt) => vt
+                        Err(_) => ""
+                    end
+                    if merged == ""
+                        return Err(subset_err("match 臂值类型不一致（'" + out + "' vs '" + bt + "'）"))
+                    end
+                    out = merged
                 end
             end
         end
@@ -3110,8 +3442,6 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
                 None =>
                     if map_has(fns, "@variant:" + x)
                         emit_variant_construct(x, list_empty(), env, fns, cg, locals, localvt)
-                    elif builtin_variant(x)
-                        Err(subset_err("内建 Result/Option 变体留后续子批（'" + x + "'）"))
                     else
                         # L2.3-b：具名函数当值（零捕获 shim）
                         match map_get(fns, x)
@@ -3162,6 +3492,7 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             comp_if_expr(ifr, env, fns, cg, locals, localvt)
         end
         ExMatch(scrut, arms, _) => comp_match_expr(scrut, arms, env, fns, cg, locals, localvt)
+        ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
         ExCall(callee, args) => comp_call(callee, args, env, fns, cg, locals, localvt)
         _ => Err(subset_err("该表达式形态"))
     end
@@ -3355,15 +3686,10 @@ fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: In
     match p
         PatWildcard => Ok("4101")
         PatBinder(name) =>
-            if builtin_variant(name)
-                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
-            end
             match map_get(fns, "@variant:" + name)
                 Some(v) =>
                     if v.nprm == 0
-                        if svt != v.ret
-                            return Err(subset_err("无参变体模式 '" + name + "' 类型不符"))
-                        end
+                        let _ = variant_field_vts(v, svt, fns)?
                         return Ok("20" + leb128_hex(s) + "a7" + "2800" + "00" + "41" + sleb128_hex(v.idx) + "46")
                     end
                 end
@@ -3394,9 +3720,6 @@ fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: In
             end
         end
         PatVariant(name, subs) =>
-            if builtin_variant(name)
-                return Err(subset_err("内建 Result/Option 模式留后续子批（'" + name + "'）"))
-            end
             let v = match map_get(fns, "@variant:" + name)
                 Some(meta) => meta
                 None => {idx: -1, ret: "", nprm: -1, prms: ""}
@@ -3404,16 +3727,16 @@ fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: In
             if v.idx < 0
                 return Err(subset_err("未知变体模式 '" + name + "'"))
             end
-            if svt != v.ret or list_length(subs) != v.nprm
-                return Err(subset_err("变体模式 '" + name + "' 的类型或子模式数不符"))
+            if list_length(subs) != v.nprm
+                return Err(subset_err("变体模式 '" + name + "' 的子模式数不符"))
             end
+            let fields = variant_field_vts(v, svt, fns)?
             let mut out = "20" + leb128_hex(s) + "a7" + "2800" + "00" + "41" + sleb128_hex(v.idx) + "46"
             if v.nprm > 0
                 out = out + "047f"
-                let ps = split(v.prms, ",")
                 let mut i = 0
                 while i < v.nprm
-                    let vt = list_get(ps, i)
+                    let vt = list_get(fields, i)
                     let arg_slot = new_slot(locals, localvt, vt)
                     out = out + "20" + leb128_hex(s) + "a7" + "2900" + leb128_hex(8 + 8 * i)
                     if vt == "f64"
@@ -3481,9 +3804,6 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
             if map_has(env, name) == False and map_has(fns, "@variant:" + name)
                 return emit_variant_construct(name, args, env, fns, cg, locals, localvt)
             end
-            if map_has(env, name) == False and builtin_variant(name)
-                return Err(subset_err("内建 Result/Option 变体留后续子批（'" + name + "'）"))
-            end
             if name == "println"
                 return comp_println(args, env, fns, cg, locals, localvt)
             end
@@ -3519,7 +3839,7 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                         let at = infer_ex(a, env, fns)?
                         if fi.nprm > 0
                             let w = list_get(want, i)
-                            if at != w
+                            if !vt_compatible(at, w)
                                 return Err(subset_err("调用 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
                             end
                         end
@@ -3879,7 +4199,7 @@ fn emit_closure_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt
         let a = list_get(args, i)
         let at = infer_ex(a, env, fns)?
         let w = sig_prm_at(sig, i)
-        if at != w
+        if !vt_compatible(at, w)
             return Err(subset_err("调用闭包第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
         end
         out = out + comp_ex(a, env, fns, cg, locals, localvt)?
@@ -4403,7 +4723,7 @@ fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String, sig:
         Some(tt) =>
             let av = ty_vt(tt, fns)?
             let iv = infer_ex(ex, env, fns)?
-            if iv != av
+            if !vt_compatible(iv, av)
                 return Err(subset_err("let 注解类型 '" + av + "' 与值类型 '" + iv + "' 不符（编译期拒绝；宿主侧仅 warning）"))
             end
             Ok(av)
@@ -4470,7 +4790,7 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
                         Err("赋值给未定义变量 '" + name + "'（闭包捕获为值拷贝，不能赋值）")
                     else
                         let assigned_vt = infer_ex(ex, env, fns)?
-                        if assigned_vt != bnd.vt
+                        if !vt_compatible(assigned_vt, bnd.vt)
                             return Err(subset_err("赋值 '" + name + "' 类型不符（期望 " + bnd.vt + " 得 " + assigned_vt + "）"))
                         end
                         if bnd.vt == "cl"
@@ -4479,7 +4799,12 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
                                 return Err(subset_err("赋值 '" + name + "' 闭包签名不符（call_indirect 需精确签名）"))
                             end
                         end
-                        Ok(comp_ex(ex, env, fns, cg, locals, localvt)? + "21" + leb128_hex(bnd.slot))
+                        let code = comp_ex(ex, env, fns, cg, locals, localvt)?
+                        let merged = vt_merge(bnd.vt, assigned_vt)?
+                        if merged != bnd.vt
+                            map_set(env, name, {slot: bnd.slot, vt: merged, sig: bnd.sig, cap: False})
+                        end
+                        Ok(code + "21" + leb128_hex(bnd.slot))
                     end
                 end
             end
@@ -4707,7 +5032,7 @@ fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String, sig: Str
                     if ret_vt == "void" and t != "void"
                         return Err(subset_err("void 函数的尾表达式产值"))
                     end
-                    if ret_vt != "void" and t != ret_vt
+                    if ret_vt != "void" and !vt_compatible(t, ret_vt)
                         return Err("尾表达式类型与返回类型不符")
                     end
                     Ok(out + comp_if_expr(ifr, env, fns, cg, locals, localvt)?)
@@ -4722,7 +5047,7 @@ fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String, sig: Str
                         end
                         return Err(subset_err("void 函数的尾表达式产值"))
                     end
-                    if tt != ret_vt
+                    if !vt_compatible(tt, ret_vt)
                         return Err("尾表达式类型与返回类型不符")
                     end
                     Ok(out + comp_ex(te, env, fns, cg, locals, localvt)?)
@@ -4788,25 +5113,43 @@ fn sect(id: String, content: String) -> String
     id + leb128_hex(len(content) / 2) + content
 end
 
-# 用户枚举两遍登记：先登记类型名（支持递归载荷），再按声明序登记变体。
-# @ 前缀不是 Lom 标识符字符，故与用户函数名不碰撞；宿主预留的
-# Ok/Err/Some/None 索引 0..3 保留，用户变体从 4 起。
+# 枚举两遍登记：先登记类型名/参数（支持递归载荷），再登记变体模板。
+# 内建 Result/Option 沿用宿主预留的变体索引 0..3；用户变体从 4 起。
+# @ 前缀不是 Lom 标识符字符，故与用户函数名不碰撞。
 fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    map_set(fns, "@enum:Result", {idx: 0, ret: "en:Result", nprm: 2, prms: "T,E"})
+    map_set(fns, "@enum:Option", {idx: 0, ret: "en:Option", nprm: 1, prms: "T"})
+    map_set(fns, "@variant:Ok", {idx: 0, ret: "en:Result", nprm: 1, prms: "tv:T"})
+    map_set(fns, "@variant:Err", {idx: 1, ret: "en:Result", nprm: 1, prms: "tv:E"})
+    map_set(fns, "@variant:Some", {idx: 2, ret: "en:Option", nprm: 1, prms: "tv:T"})
+    map_set(fns, "@variant:None", {idx: 3, ret: "en:Option", nprm: 0, prms: ""})
     match prg
         Prg(items) =>
             for it in items
                 match it
                     ItEnum(name, tparams, _) =>
-                        if list_is_empty(tparams) == False
-                            return Err(subset_err("泛型 enum 留后续批次（'" + name + "'）"))
-                        end
                         if name == "Int" or name == "Float" or name == "Bool" or name == "String" or name == "Unit" or name == "Fn" or name == "Result" or name == "Option"
                             return Err(subset_err("枚举名与内建类型冲突（'" + name + "'）"))
                         end
                         if map_has(fns, "@enum:" + name)
                             return Err(subset_err("重复枚举声明 '" + name + "'"))
                         end
-                        map_set(fns, "@enum:" + name, {idx: 0, ret: "en:" + name, nprm: 0, prms: ""})
+                        let mut ps = ""
+                        let mut seen = map_empty()
+                        for tp in tparams
+                            if tp == "Int" or tp == "Float" or tp == "Bool" or tp == "String" or tp == "Unit" or tp == "Fn" or tp == "Result" or tp == "Option"
+                                return Err(subset_err("类型参数名与内建类型冲突（'" + tp + "'）"))
+                            end
+                            if map_has(seen, tp)
+                                return Err(subset_err("枚举 '" + name + "' 重复类型参数 '" + tp + "'"))
+                            end
+                            map_set(seen, tp, True)
+                            if ps != ""
+                                ps = ps + ","
+                            end
+                            ps = ps + tp
+                        end
+                        map_set(fns, "@enum:" + name, {idx: 0, ret: "en:" + name, nprm: list_length(tparams), prms: ps})
                     end
                     _ => ()
                 end
@@ -4814,7 +5157,7 @@ fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
             let mut vidx = 4
             for it in items
                 match it
-                    ItEnum(name, _, variants) =>
+                    ItEnum(name, tparams, variants) =>
                         for vr in variants
                             match vr
                                 VarR(vname, fields) =>
@@ -4827,7 +5170,7 @@ fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
                                     let mut ps = ""
                                     let mut n = 0
                                     for ft in fields
-                                        let vt = ty_vt(ft, fns)?
+                                        let vt = ty_vt_with_params(ft, fns, tparams)?
                                         if vt == "void"
                                             return Err(subset_err("变体载荷不能为 Unit（'" + vname + "'）"))
                                         end

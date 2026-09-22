@@ -1,0 +1,10 @@
+# 泛型 enum 名不能不带类型实参作函数参数类型。
+enum Box<T> = Full(T)
+
+fn take(v: Box) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Full(1)))
+end

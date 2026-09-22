@@ -1,0 +1,6 @@
+# 同一 enum 类型参数名重复时拒绝，不能静默覆盖映射。
+enum Bad<T, T> = Pair(T, T)
+
+fn main() -> Unit
+    let x = Pair(1, 2)
+end

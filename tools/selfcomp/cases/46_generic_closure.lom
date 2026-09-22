@@ -1,0 +1,22 @@
+# L2.3-c2：泛型 enum 穿闭包捕获、形参与返回签名。
+enum Box<T> = Full(T)
+
+fn unbox(v: Box<Int>) -> Int
+    match v
+        Full(x) => x
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let b = Full(5)
+    let f = fn() -> Box<Int>
+        b
+    end
+    let g = fn(x: Box<Int>) -> Int
+        match x
+            Full(n) => n + 1
+        end
+    end
+    println(unbox(f()))
+    println(g(Full(6)))
+end

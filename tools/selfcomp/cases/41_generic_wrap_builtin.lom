@@ -1,0 +1,14 @@
+# L2.3-c2：用户泛型实例中嵌入内建 Result 类型模板。
+enum Envelope<T> = Hold(Result<T, Int>)
+
+fn score(v: Envelope<Int>) -> Int
+    match v
+        Hold(Ok(x)) => x
+        Hold(Err(e)) => 0 - e
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score(Hold(Ok(8))))
+    println(score(Hold(Err(2))))
+end

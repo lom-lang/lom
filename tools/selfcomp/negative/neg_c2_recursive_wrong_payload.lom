@@ -1,0 +1,6 @@
+# Tree<T> 递归载荷须仍为 Tree<T>，不能直接放 Int。
+enum Tree<T> = Leaf(T) | Node(Tree<T>)
+
+fn main() -> Unit
+    let x = Node(1)
+end

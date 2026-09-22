@@ -1,0 +1,6 @@
+# 同一模板参数 T 两次载荷不一致，必须在构造处拒绝。
+enum Duo<T> = Pair(T, T)
+
+fn main() -> Unit
+    let x = Pair(1, True)
+end

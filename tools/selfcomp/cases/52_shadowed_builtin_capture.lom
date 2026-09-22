@@ -1,0 +1,15 @@
+# L2.3-c2 × R80：局部 None 遮蔽同名内建零参变体时仍须捕获局部。
+fn score(v: Option<Int>) -> Int
+    match v
+        Some(n) => n
+        None => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let None = Some(9)
+    let f = fn() -> Option<Int>
+        None
+    end
+    println(score(f()))
+end

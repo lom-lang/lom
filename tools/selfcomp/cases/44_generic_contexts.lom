@@ -1,0 +1,27 @@
+# L2.3-c2：幻影参数由上下文补全；无上下文 None 仅测无载荷模式。
+enum Phantom<T> = Marker(Int)
+
+fn marker_score(v: Phantom<Int>) -> Int
+    match v
+        Marker(n) => n
+    end
+end
+
+fn float_score(v: Result<Float, Int>) -> Int
+    match v
+        Ok(x) => if x > 1.0 1 else 0 end
+        Err(e) => e
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let p: Phantom<Int> = Marker(7)
+    println(marker_score(p))
+    println(marker_score(Marker(8)))
+    println(float_score(Ok(1.5)))
+    let none = None
+    match none
+        None => println(0)
+        _ => println(1)
+    end
+end

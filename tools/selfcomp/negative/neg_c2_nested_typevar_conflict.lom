@@ -1,0 +1,6 @@
+# 嵌套模板的同一 T 被推成 Int 与 Bool，构造处必须拒绝。
+enum Twin<T> = Both(Option<T>, Option<T>)
+
+fn main() -> Unit
+    let x = Both(Some(1), Some(True))
+end

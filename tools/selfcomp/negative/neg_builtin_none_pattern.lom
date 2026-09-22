@@ -1,4 +1,4 @@
-# 负例：None 在 c1 不可被当成普通 Binder 全匹配。
+# 负例：None 是 Option 的无参变体，不可匹配 Int 被测值。
 fn pick(n: Int) -> Int
     match n
         None => 1

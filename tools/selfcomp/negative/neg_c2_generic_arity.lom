@@ -1,0 +1,10 @@
+# 泛型实例实参个数不符，不应在 WASM 实例化阶段才失败。
+enum Box<T> = Full(T)
+
+fn take(v: Box<Int, Float>) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Full(1)))
+end

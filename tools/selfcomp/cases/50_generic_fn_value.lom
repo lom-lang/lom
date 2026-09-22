@@ -1,0 +1,13 @@
+# L2.3-c2：具名函数当值的 shim 传递泛型 enum 形参类型。
+enum Box<T> = Full(T)
+
+fn score(v: Box<Int>) -> Int
+    match v
+        Full(n) => n + 2
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let g = score
+    println(g(Full(5)))
+end

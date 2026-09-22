@@ -1,0 +1,4 @@
+# 内建 None 零参，不能带实参。
+fn main() -> Unit
+    let x = None(1)
+end

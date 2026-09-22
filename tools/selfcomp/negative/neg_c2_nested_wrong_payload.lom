@@ -1,0 +1,8 @@
+# Result<Option<Bool>, ?> 不得传给 Result<Option<Int>, Int>。
+fn take(v: Result<Option<Int>, Int>) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Ok(Some(True))))
+end

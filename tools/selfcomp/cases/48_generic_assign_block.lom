@@ -1,0 +1,17 @@
+# L2.3-c2：值位块内赋值补全泛型参数后，尾 match 可读取具体载荷。
+fn choose() -> Int
+    if True
+        let mut x = None
+        x = Some(5)
+        match x
+            Some(v) => v
+            None => 0
+        end
+    else
+        0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(choose())
+end

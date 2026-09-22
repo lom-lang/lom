@@ -1,0 +1,6 @@
+# 载荷 U 未在 enum 类型参数中声明，不能误当用户类型。
+enum Box<T> = Full(U)
+
+fn main() -> Unit
+    let x = Full(1)
+end

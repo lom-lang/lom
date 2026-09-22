@@ -1,0 +1,4 @@
+# 内建 Some 仅一参，不能以空调用绕过校验。
+fn main() -> Unit
+    let x = Some()
+end

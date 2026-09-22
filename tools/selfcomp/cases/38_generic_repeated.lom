@@ -1,0 +1,20 @@
+# L2.3-c2：同一类型参数出现两次，Int 与 Bool 载荷分别选宽。
+enum Duo<T> = Pair(T, T)
+
+fn sum(v: Duo<Int>) -> Int
+    match v
+        Pair(a, b) => a + b
+    end
+end
+
+fn both(v: Duo<Bool>) -> Int
+    match v
+        Pair(a, b) => if a and b 1 else 0 end
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(sum(Pair(3, 4)))
+    println(both(Pair(True, False)))
+    println(both(Pair(True, True)))
+end

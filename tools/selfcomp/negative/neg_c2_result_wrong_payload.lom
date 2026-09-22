@@ -1,0 +1,8 @@
+# Result<Bool, ?> 不得传给 Result<Int, Int> 形参。
+fn take(v: Result<Int, Int>) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Ok(True)))
+end

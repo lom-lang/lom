@@ -1,0 +1,7 @@
+# Box<Bool> 不得赋给已标注 Box<Int> 的绑定。
+enum Box<T> = Full(T)
+
+fn main() -> Unit
+    let mut x: Box<Int> = Full(1)
+    x = Full(True)
+end

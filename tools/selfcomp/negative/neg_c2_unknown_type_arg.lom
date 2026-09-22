@@ -1,0 +1,10 @@
+# 未注册的泛型实参类型不能落为占位符。
+enum Box<T> = Full(T)
+
+fn take(v: Box<Ghost>) -> Int
+    1
+end
+
+fn main() -> Unit ! [IO]
+    println(take(Full(1)))
+end

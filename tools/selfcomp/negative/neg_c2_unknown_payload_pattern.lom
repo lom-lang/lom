@@ -1,0 +1,7 @@
+# 无上下文的 None 不知道 Some 载荷宽度，不能猜一个 WASM local 类型。
+fn main() -> Unit ! [IO]
+    match None
+        Some(v) => println(1)
+        None => println(0)
+    end
+end

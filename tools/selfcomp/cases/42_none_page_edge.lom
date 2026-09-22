@@ -1,0 +1,16 @@
+# L2.3-c2：零参 None 贴页尾时，Some 载荷仅在变体命中后读取。
+fn score(v: Option<Int>) -> Int
+    match v
+        Some(x) => x
+        None => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let mut last: Option<Int> = None
+    for i in 8190
+        last = None
+    end
+    println(score(last))
+    println(score(Some(5)))
+end

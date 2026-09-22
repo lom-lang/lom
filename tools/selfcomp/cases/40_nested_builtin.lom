@@ -1,0 +1,14 @@
+# L2.3-c2：Result<Option<Int>, Int> 嵌套实例与内建变体嵌套模式。
+fn score(v: Result<Option<Int>, Int>) -> Int
+    match v
+        Ok(Some(n)) => n
+        Ok(None) => 0
+        Err(e) => 0 - e
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(score(Ok(Some(5))))
+    println(score(Ok(None)))
+    println(score(Err(3)))
+end

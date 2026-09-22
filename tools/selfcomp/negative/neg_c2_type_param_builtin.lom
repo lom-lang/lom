@@ -1,0 +1,6 @@
+# 类型参数名 Int 会被 parser 归为内建 TyInt，必须显式拒绝声明。
+enum Bad<Int> = Wrap(Int)
+
+fn main() -> Unit
+    let x = Wrap(1)
+end

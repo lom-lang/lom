@@ -1,0 +1,9 @@
+# ? 的提前返回降低留 return 批，不得静默丢弃。
+fn take() -> Option<Int>
+    let x = Some(1)?
+    Some(x)
+end
+
+fn main() -> Unit ! [IO]
+    println(1)
+end

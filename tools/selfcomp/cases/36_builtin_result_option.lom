@@ -1,0 +1,41 @@
+# L2.3-c2：内建四变体的构造、注解补全和 match。
+fn maybe(b: Bool) -> Option<Int>
+    if b
+        Some(7)
+    else
+        None
+    end
+end
+
+fn checked(n: Int) -> Result<Int, Int>
+    if n > 0
+        Ok(n * 2)
+    else
+        Err(9)
+    end
+end
+
+fn opt_score(v: Option<Int>) -> Int
+    match v
+        Some(x) => x + 1
+        None => 0
+    end
+end
+
+fn result_score(v: Result<Int, Int>) -> Int
+    match v
+        Ok(x) => x
+        Err(e) => 0 - e
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(opt_score(maybe(True)))
+    println(opt_score(maybe(False)))
+    println(result_score(checked(3)))
+    println(result_score(checked(0)))
+    let nothing: Option<Int> = None
+    let okay: Result<Int, Int> = Ok(3)
+    println(opt_score(nothing))
+    println(result_score(okay))
+end

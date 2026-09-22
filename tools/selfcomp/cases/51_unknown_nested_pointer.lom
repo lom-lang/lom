@@ -1,0 +1,10 @@
+# L2.3-c2：未知内层参数不影响枚举指针宽度；只测无载荷变体安全。
+enum Tree<T> = Empty | Node(Tree<T>)
+
+fn main() -> Unit ! [IO]
+    let t = Node(Empty)
+    match t
+        Node(Empty) => println(1)
+        _ => println(0)
+    end
+end
