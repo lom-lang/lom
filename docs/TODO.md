@@ -14,6 +14,8 @@
 > 两次 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。
 > L2.3-a/b/c1/c2 已交付；c2 支持内建 Result/Option 和泛型用户 enum
 > 的构造/类型流/match（String/List/Map 载荷与 ?/return 仍留后续）。
+> v1.2.9 功能提交 e778b65 对应 CI #161 六 job 全绿后已切 tag；
+> annotations 四条 Ubuntu 26 迁移 notice，零 warning/error。
 > 下一步工作包或独立复审待用户裁决。语言面与外部
 > 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
 > 读 HANDOVER 指定章节与十四审报告，跑 §2.2 全量基线，再呈方向

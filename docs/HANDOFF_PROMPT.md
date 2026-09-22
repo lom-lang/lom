@@ -22,9 +22,8 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.9（v1.2.8 tag 于 CI #159 六 job 全绿后切；
-  v1.2.9 tag 只在本次 CI 绿后切；首回合仍须实查最新 main CI 与
-  annotations）；
+- 仓库版本 v1.2.9（v1.2.8/v1.2.9 tag 分别于 CI #159/#161 六 job
+  全绿后切；首回合仍须实查最新 main CI 与 annotations）；
   语言面与外部发布线冻结。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
