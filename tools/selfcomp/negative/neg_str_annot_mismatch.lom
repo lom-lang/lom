@@ -1,0 +1,5 @@
+# 负例：let 注解与 String 值不符（R68 注解一致性延伸）
+fn main() -> Unit ! [IO]
+    let s: Int = "x"
+    println(s)
+end

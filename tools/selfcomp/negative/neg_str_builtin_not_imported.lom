@@ -1,0 +1,4 @@
+# 负例：未导入的 string 内建调用（对齐宿主 NAM005 精神——L2 编译期拒）
+fn main() -> Unit ! [IO]
+    println(len("abc"))
+end

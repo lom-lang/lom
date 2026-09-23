@@ -1,0 +1,5 @@
+# 负例：String 参与非 Add 算术（拼接只支持 +）
+fn main() -> Unit ! [IO]
+    let x = "ab" - "a"
+    println(x)
+end

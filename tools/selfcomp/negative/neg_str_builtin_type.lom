@@ -1,0 +1,5 @@
+# 负例：string 内建参数类型不符（len 期望 String 得 Int）
+from string import {len}
+fn main() -> Unit ! [IO]
+    println(len(42))
+end

@@ -1,0 +1,6 @@
+# 负例：String 赋给 Int 绑定（赋值 vt 校验延伸）
+fn main() -> Unit ! [IO]
+    let mut n = 1
+    n = "x"
+    println(n)
+end

@@ -1,6 +1,17 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-23 L2.3-c2 交付）**：仓库版本 v1.2.9；
+> **交接声明（2026-09-24 L2.3 String 批交付）**：仓库版本 v1.2.10；
+> String 批 B1+B2+B3 按用户裁决"按建议动工"交付（designs/0004
+> 三裁决点全按建议项；RFC-0004 修订 14）：vt "st"=i64 裸指针、
+> data(11) 段与 print_str/ftoa 按需导入、10 个 string 内建剥 tag
+> 平移、拼接提升与 println(Bool) 顺带解禁；string_to_int（Int|Unit
+> 联合 untagged 下运行时不可区分）与 split（返回 List）明确编译期
+> 拒绝、for-over-String 推后。verify_selfcomp 148/148 = 62 对拍 +
+> 86 负例（转正 4 + 改锁 1 + 新增 14）；self_comp 6578 行；存量
+> 52 用例产物 hex 逐字节不变（HEAD 版编译器对拍实证）。v1.2.10
+> tag 待 CI 绿后切。
+>
+> **前次交接声明（2026-09-23 L2.3-c2 交付）**：仓库版本 v1.2.9；
 > 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，
 > 基线 `5c92f59`/v1.2.6）评级 **B**，开账 **R79-R82：P1×2 + P2×2**。
 > 用户已裁决按 P1 后 P2 顺序整改，**R79-R82 四项全部关闭**：
@@ -8,8 +19,9 @@
 > Bool 运算产坏 WASM 与值位 if 局部尾值误拒。
 > 十三审 B+ 仅属旧基线 `1418536`/v1.2.5；十四审 B 也只评其
 > `5c92f59` 时点，整改后不自行重评。535 单元 + 8 集成、
-> verify_selfcomp **128/128 = 52 对拍 + 76 负例**、eval 双后端 121/121、
-> 自举六模式、doc_audit 67/67 是现行回归；整改后评级待独立复审。
+> verify_selfcomp 现行 **148/148 = 62 对拍 + 86 负例**、eval 双后端
+> 121/121、自举六模式、doc_audit 67/67 是现行回归；整改与 String 批
+> 后评级待独立复审。
 > v1.2.7/v1.2.8 对应 CI #158/#159 各六 job 全绿后已切 tag；
 > 两次 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。
 > L2.3-a/b/c1/c2 已交付；c2 支持内建 Result/Option 和泛型用户 enum

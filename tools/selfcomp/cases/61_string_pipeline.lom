@@ -1,0 +1,25 @@
+from string import {trim, replace, int_to_string}
+fn normalize(s: String) -> String
+    replace(trim(s), " ", "_")
+end
+
+fn main() -> Unit ! [IO]
+    println(normalize("  hello world  "))
+    let a = "ab"
+    let b = a + "cd"
+    let c = b + a
+    println(c)
+    println(("x" + "y") == "xy")
+    if "abc" < "abd"
+        println("lt ok")
+    else
+        println("lt bad")
+    end
+    let mut acc = ""
+    let mut i = 0
+    while i < 3
+        acc = acc + int_to_string(i)
+        i = i + 1
+    end
+    println(acc)
+end

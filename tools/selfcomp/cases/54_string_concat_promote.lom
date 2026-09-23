@@ -1,0 +1,12 @@
+fn main() -> Unit ! [IO]
+    println("n = " + 42)
+    println("f = " + 1.5)
+    println("b = " + True)
+    println("u = " + ())
+    println(0 - 7 + " neg")
+    println("x" == "x")
+    println("x" != "y")
+    println("ab" < "b")
+    println("b" >= "ab")
+    println("abc" <= "abc")
+end

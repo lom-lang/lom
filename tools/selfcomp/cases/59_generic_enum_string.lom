@@ -1,0 +1,16 @@
+enum Box
+    | Full(String)
+    | Empty
+end
+
+fn unbox(b: Box) -> String
+    match b
+        Full(s) => s
+        Empty => "none"
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(unbox(Full("gold")))
+    println(unbox(Empty))
+end

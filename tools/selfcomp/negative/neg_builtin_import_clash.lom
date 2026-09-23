@@ -1,0 +1,8 @@
+# 负例：内建导入名与用户函数同名
+fn len(x: Int) -> Int
+    x
+end
+from string import {len}
+fn main() -> Unit ! [IO]
+    println(len("ab"))
+end

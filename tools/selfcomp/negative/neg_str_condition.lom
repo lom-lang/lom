@@ -1,0 +1,6 @@
+# 负例：String 作 if 条件（须 Bool）
+fn main() -> Unit ! [IO]
+    if "x"
+        println(1)
+    end
+end

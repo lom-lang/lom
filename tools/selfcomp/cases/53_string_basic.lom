@@ -1,0 +1,7 @@
+fn main() -> Unit ! [IO]
+    println("hello")
+    let s = "world"
+    println(s)
+    let t = "a" + "b" + "c"
+    println(t)
+end

@@ -1,0 +1,5 @@
+# 负例：string_to_int 返回 Int|Unit 联合——untagged 表示下运行时不可区分
+from string import {string_to_int}
+fn main() -> Unit ! [IO]
+    println(string_to_int("42"))
+end

@@ -1,0 +1,21 @@
+fn take(v: Result<Int, String>) -> Int
+    match v
+        Ok(n) => n
+        Err(m) => 0 - 1
+    end
+end
+
+fn first(v: Option<String>) -> Int
+    match v
+        Some(s) => len(s)
+        None => 0
+    end
+end
+
+from string import {len}
+fn main() -> Unit ! [IO]
+    println(take(Ok(5)))
+    println(take(Err("bad")))
+    println(first(Some("abcd")))
+    println(first(None))
+end

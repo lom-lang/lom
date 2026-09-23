@@ -1,0 +1,10 @@
+# 负例：被测 Int 配 String 字面量模式（反向类型不符）
+fn pick(n: Int) -> Int
+    match n
+        "x" => 1
+        _ => 0
+    end
+end
+fn main() -> Unit ! [IO]
+    println(pick(0))
+end

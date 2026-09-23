@@ -1,7 +1,0 @@
-# 负例：闭包参数类型 String（子集外——String 批次未交付）
-fn main() -> Unit ! [IO]
-    let g = fn(s: String) -> Int
-        1
-    end
-    println(g("x"))
-end

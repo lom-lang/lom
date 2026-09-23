@@ -2583,6 +2583,7 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
         TyFloat => Ok("f64")
         TyBool => Ok("i32")
         TyUnit => Ok("void")
+        TyString => Ok("st")
         TyNamed(s) =>
             if name_in(tparams, s)
                 Ok("tv:" + s)
@@ -2654,7 +2655,7 @@ fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, p
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64" or enum_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st"
         "7e"
     else
         if vt == "i32"
@@ -3049,6 +3050,7 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
         ExInt(_) => Ok("i64")
         ExFloat(_) => Ok("f64")
         ExBool(_) => Ok("i32")
+        ExStr(_) => Ok("st")
         ExUnit => Ok("void")
         ExGroup(inner) => infer_ex(inner, env, fns)
         ExClosure(_, _, _) =>
@@ -3085,8 +3087,8 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             # 闭包与枚举裸指针不参与一元负。
             let itn = infer_ex(inner, env, fns)?
-            if itn == "cl" or enum_vt(itn)
-                return Err(subset_err("闭包/枚举值参与一元负"))
+            if itn == "cl" or enum_vt(itn) or itn == "st"
+                return Err(subset_err("闭包/枚举/String 值参与一元负"))
             end
             if itn == "i32"
                 return Err(subset_err("Bool 参与一元负"))
@@ -3102,6 +3104,12 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if lt == "void" or rt == "void"
                     return Err(subset_err("void 参与比较"))
                 end
+                if lt == "st" or rt == "st"
+                    if lt == "st" and rt == "st"
+                        return Ok("i32")
+                    end
+                    return Err(subset_err("String 与非 String 比较（L2 子集外；宿主跨类型比较是运行时行为）"))
+                end
                 if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                     return Err(subset_err("闭包/枚举值参与比较（结构相等留后续批次）"))
                 end
@@ -3115,11 +3123,22 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             let lt = infer_ex(l, env, fns)?
             let rt = infer_ex(r, env, fns)?
+            if op == "Add" and (lt == "st" or rt == "st")
+                # 拼接提升（v0.4.1 宿主语义）：任一侧 String → 两侧 to_display 后拼接。
+                # Bool/Unit 侧经显示串；枚举/闭包显示留后续。
+                if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
+                    return Err(subset_err("闭包/枚举值的显示留后续批次（拼接提升）"))
+                end
+                return Ok("st")
+            end
             if lt == "void" or rt == "void"
                 return Err(subset_err("void 参与算术"))
             end
             if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                 return Err(subset_err("闭包/枚举值参与算术"))
+            end
+            if lt == "st" or rt == "st"
+                return Err(subset_err("String 只参与 + 拼接"))
             end
             if lt == "i32" or rt == "i32"
                 return Err(subset_err("Bool 参与算术"))
@@ -3309,13 +3328,7 @@ fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: 
             Ok(())
         end
         PatLit(lit) =>
-            let string_lit = match lit
-                ExStr(_) => True
-                _ => False
-            end
-            if string_lit
-                return Err(subset_err("String 字面量模式留 String 批"))
-            end
+            # L2.3 String 批：ExStr 综合 "st"，走通用类型校验（scrut 类型不符即拒）
             let lt = infer_ex(lit, arm_env, fns)?
             if scrut_vt == lt or (scrut_vt == "i64" and lt == "f64") or (scrut_vt == "f64" and lt == "i64")
                 Ok(())
@@ -3460,6 +3473,11 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
                 Ok("4100")
             end
         end
+        ExStr(s) =>
+            # L2.3 String 批：字面量 intern 进 data 段 → i64 裸指针（偏移零扩展）
+            let off = intern_str_lit(s, cg)
+            Ok("41" + sleb128_hex(off) + "ad")
+        end
         ExUnary(op, inner) =>
             if op == "Not"
                 # L2.3-a：! = i32.eqz（操作数须 Bool）
@@ -3563,6 +3581,40 @@ fn i32_cmp_op(op: String) -> Result<String, String>
     end
 end
 
+# i32 有符号比较操作码（st_cmp 的 -1/0/1 与 0 比较：lt_s=48 gt_s=4a le_s=4c ge_s=4e）
+fn i32_ord_op(op: String) -> Result<String, String>
+    if op == "Lt"
+        Ok("48")
+    elif op == "Gt"
+        Ok("4a")
+    elif op == "LtEq"
+        Ok("4c")
+    else
+        Ok("4e")
+    end
+end
+
+# 拼接提升的显示化：code（栈上值）→ String 值（宿主 to_display 子集——
+# Int/Float 走 helper，Bool/Unit 编译期静态串；st 原样；cl/en 已在上游拒）
+fn disp_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
+    if vt == "st"
+        Ok(code)
+    elif vt == "i64"
+        let idx = ensure_str_helper("st_itoa", cg)?
+        Ok(code + "10" + leb128_hex(idx))
+    elif vt == "f64"
+        let idx = ensure_str_helper("st_ftoa", cg)?
+        Ok(code + "10" + leb128_hex(idx))
+    elif vt == "i32"
+        let t_off = intern_str_lit("true", cg)
+        let f_off = intern_str_lit("false", cg)
+        Ok(code + "047e" + "41" + sleb128_hex(t_off) + "ad" + "05" + "41" + sleb128_hex(f_off) + "ad" + "0b")
+    else
+        let u_off = intern_str_lit("()", cg)
+        Ok(code + "41" + sleb128_hex(u_off) + "ad")
+    end
+end
+
 # L2.3-a：f64 比较操作码（eq 61 / ne 62 / lt 63 / gt 64 / le 65 / ge 66）
 fn f64_cmp_op(op: String) -> Result<String, String>
     if op == "Eq"
@@ -3604,6 +3656,19 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
         # L2.3-a：比较——i64 直接比 / f64 直接比 / 混合提升 f64 后比（对齐宿主）
         let lc = comp_ex(l, env, fns, cg, locals, localvt)?
         let rc = comp_ex(r, env, fns, cg, locals, localvt)?
+        if left_vt == "st" and right_vt == "st"
+            # L2.3 String 批：Eq/NotEq 走 st_eq；序比较走 st_cmp(-1/0/1) 与 0 比
+            if op == "Eq"
+                let idx = ensure_str_helper("st_eq", cg)?
+                return Ok(lc + rc + "10" + leb128_hex(idx))
+            end
+            if op == "NotEq"
+                let idx = ensure_str_helper("st_eq", cg)?
+                return Ok(lc + rc + "10" + leb128_hex(idx) + "45")
+            end
+            let idx = ensure_str_helper("st_cmp", cg)?
+            return Ok(lc + rc + "10" + leb128_hex(idx) + "4100" + i32_ord_op(op)?)
+        end
         if left_vt == "i32" and right_vt == "i32"
             return Ok(lc + rc + i32_cmp_op(op)?)
         end
@@ -3623,6 +3688,14 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     end
     let lc = comp_ex(l, env, fns, cg, locals, localvt)?
     let rc = comp_ex(r, env, fns, cg, locals, localvt)?
+    if op == "Add" and (left_vt == "st" or right_vt == "st")
+        # L2.3 String 批：拼接提升（v0.4.1 宿主语义）——非 String 侧
+        # to_display 后拼接（Bool/Unit 静态串、Int/Float 走 helper）
+        let ld = disp_code(lc, left_vt, cg)?
+        let rd = disp_code(rc, right_vt, cg)?
+        let idx = ensure_str_helper("st_concat", cg)?
+        return Ok(ld + rd + "10" + leb128_hex(idx))
+    end
     if left_vt == "i64" and right_vt == "i64"
         Ok(lc + rc + i64_op(op))
     else
@@ -3709,6 +3782,10 @@ fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: In
                 Ok(sc + lc + "61")
             elif svt == "i32" and lv == "i32"
                 Ok(sc + lc + "46")
+            elif svt == "st" and lv == "st"
+                # L2.3 String 批：String 字面量模式走 st_eq（字节相等，对齐宿主 rt_eq）
+                let idx = ensure_str_helper("st_eq", cg)?
+                Ok(sc + lc + "10" + leb128_hex(idx))
             elif svt == "i64" and lv == "f64"
                 # 宿主 match 字面量走 tagged rt_eq：Int 2 与 Float 2.0
                 # 不相等（普通二元比较的数值提升不适用于模式）。
@@ -3823,6 +3900,10 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                     end
                 end
                 Some(fi) =>
+                    # L2.3 String 批：内建摘要哨兵（idx=-2）→ helper 分派
+                    if fi.idx == -2
+                        return comp_builtin_call(name, fi, args, env, fns, cg, locals, localvt)
+                    end
                     # R74（十二审）：调用点校验 arity 与逐实参类型——不符即
                     # 拒绝，不产坏 wasm（此前 f(1) 传 Float 形参/多传参均
                     # COMPILED，失败面推迟到实例化）。与 R68 同为编译期
@@ -3861,6 +3942,42 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
     end
 end
 
+# L2.3 String 批：string 内建调用编译（R74 模式——arity/逐参校验后 call helper）
+fn comp_builtin_call(name: String, fi: {idx: Int, ret: String, nprm: Int, prms: String}, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let ent = st_builtin_entry(name)?
+    if list_length(args) != fi.nprm
+        return Err(subset_err("调用 '" + name + "' 实数量不符（期望 " + fi.nprm + " 得 " + list_length(args) + "）"))
+    end
+    let want = split(fi.prms, ",")
+    let mut out = ""
+    let mut i = 0
+    while i < list_length(args)
+        let a = list_get(args, i)
+        let at = infer_ex(a, env, fns)?
+        if fi.nprm > 0
+            let w = list_get(want, i)
+            if !vt_compatible(at, w)
+                return Err(subset_err("调用 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
+            end
+        end
+        out = out + comp_ex(a, env, fns, cg, locals, localvt)?
+        i = i + 1
+    end
+    let hidx = ensure_str_helper(ent.helper, cg)?
+    Ok(out + "10" + leb128_hex(hidx))
+end
+
+# println(String) 的打印序列：ptr_code（栈上 i64）→ 存 local →
+# print_str(p+4, len) + print_str(0,1)（'\n' 在 data offset 0）
+fn print_st_hex(ptr_code: String, locals: Map<String, Int>, localvt: Map<String, String>) -> String
+    let t = new_slot(locals, localvt, "st")
+    ptr_code + "21" + leb128_hex(t)
+    + "20" + leb128_hex(t) + "a7" + "4104" + "6a"
+    + "20" + leb128_hex(t) + "a7" + "2800" + "00"
+    + "10" + "02"
+    + "4100" + "4101" + "10" + "02"
+end
+
 fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     if list_length(args) != 1
         return Err("println 期望 1 个参数")
@@ -3873,7 +3990,17 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
         if at == "f64"
             Ok(ac + "1001")
         else
-            Err(subset_err("println 只接受 Int/Float（String/Bool/Enum 留后续批次）"))
+            if at == "st"
+                Ok(print_st_hex(ac, locals, localvt))
+            else
+                if at == "i32"
+                    # L2.3 String 批顺带解禁（裁决 2）：Bool → "true"/"false" 静态串
+                    let pc = disp_code(ac, "i32", cg)?
+                    Ok(print_st_hex(pc, locals, localvt))
+                else
+                    Err(subset_err("println 只接受 Int/Float/String/Bool（枚举显示留后续批次）"))
+                end
+            end
         end
     end
 end
@@ -3993,7 +4120,7 @@ fn sig_typeidx(sig: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>
     match map_get(cg.sigty, sig)
         Some(t) => t
         None =>
-            let idx = 2 + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+            let idx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
             map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + sig_type_hex(sig))
             map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
             map_set(cg.sigty, sig, idx)
@@ -4003,8 +4130,9 @@ fn sig_typeidx(sig: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>
 end
 
 # 注册 extra 函数（追加 typeidx 索引 + code 条目），返回 funcidx
+# （String 批起 import 面按需扩展：ibase=2（无 String）/4（有 String），从 cgs 读）
 fn reg_extra_fn(tidx: Int, bodyhex: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Int
-    let fidx = 2 + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_fns")
+    let fidx = cg_int(cg.cgs, "ibase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_fns")
     map_set(cg.cgh, "extra_fidxs", cg_str(cg.cgh, "extra_fidxs") + leb128_hex(tidx))
     map_set(cg.cgh, "extra_bodies", cg_str(cg.cgh, "extra_bodies") + leb128_hex(len(bodyhex) / 2) + bodyhex)
     map_set(cg.cgs, "n_extra_fns", cg_int(cg.cgs, "n_extra_fns") + 1)
@@ -4047,6 +4175,623 @@ fn need_heap(cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<St
         Ok(())
     end
 end
+
+# ============================================================================
+# L2.3 String 批：编译期编码器 + data 段 intern（designs/0004 §7.1-§7.2）
+#
+# 值表示：vt "st"，WASM 值 = i64 裸指针（静态字面量 = data 段偏移零扩展，
+# 动态串 = 堆地址）；对象布局对齐宿主 [len: i32][utf8 bytes]（len 为字节数）。
+# data 段 offset 0 = '\n'（println 换行，对齐宿主惯例）；末尾 64 字节 scratch
+# （itoa/ftoa 共用，global 1 指向）。
+#
+# 字面量 → UTF-8 字节 hex：Lom 无 char_to_code 内建，码点用两段二分求取
+# （UTF-8 字节序 = 码点序；代理区 D800-DFFF 的 char_from_code 会 trap，
+# 故以 U+E000 为界分 [0,0xD7FF] / [0xE000,0x10FFFF] 两段，段内 mid 安全）。
+# ============================================================================
+
+# 二分求单字符码点（c 必为合法单字符；lo/hi 界内不含代理区）
+fn bin_search_cp(c: String, lo: Int, hi: Int) -> Int
+    let mut l = lo
+    let mut h = hi
+    while l <= h
+        let mid = (l + h) / 2
+        let mc = char_from_code(mid)
+        if c == mc
+            return mid
+        elif c < mc
+            h = mid - 1
+        else
+            l = mid + 1
+        end
+    end
+    lo
+end
+
+# 单字符 → 码点（两段二分；每字符 ≤ ~21 次 char_from_code）
+fn cp_of_char(c: String) -> Int
+    if char_from_code(57344) <= c
+        bin_search_cp(c, 57344, 1114111)
+    else
+        bin_search_cp(c, 0, 55295)
+    end
+end
+
+# 码点 → UTF-8 字节 hex（1-4 字节；编码逻辑 = 宿主 char_from_code 蓝本）
+fn utf8_hex(cp: Int) -> String
+    if cp < 128
+        byte_hex(cp)
+    elif cp < 2048
+        byte_hex((cp / 64) + 192) + byte_hex((cp % 64) + 128)
+    elif cp < 65536
+        byte_hex((cp / 4096) + 224) + byte_hex(((cp / 64) % 64) + 128) + byte_hex((cp % 64) + 128)
+    else
+        byte_hex((cp / 262144) + 240) + byte_hex(((cp / 4096) % 64) + 128) + byte_hex(((cp / 64) % 64) + 128) + byte_hex((cp % 64) + 128)
+    end
+end
+
+# 4 字节小端 hex（data 段串长度头）
+fn le32_hex(n: Int) -> String
+    byte_hex(n % 256) + byte_hex((n / 256) % 256) + byte_hex((n / 65536) % 256) + byte_hex((n / 16777216) % 256)
+end
+
+# 字面量 intern 进 data 段（去重）；返回字节偏移。
+# data 布局（has_str 时）：offset 0 = '\n'；随后 intern 字面量；
+# 编译完成后追加 64 字节 scratch（global 1 指向；hp 从 scratch 之后起）。
+fn intern_str_lit(s: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Int
+    match map_get(cg.cgh, "stroff:" + s)
+        Some(off_s) =>
+            match string_to_int(off_s)
+                n => n
+            end
+        end
+        None =>
+            let off = cg_int(cg.cgs, "data_len")
+            let mut bytes_hex = ""
+            for ch in split(s, "")
+                bytes_hex = bytes_hex + utf8_hex(cp_of_char(ch))
+            end
+            # n 是字节数（多字节字符按 UTF-8 实际宽度——len 头语义与宿主一致）
+            let n = len(bytes_hex) / 2
+            map_set(cg.cgh, "data_hex", cg_str(cg.cgh, "data_hex") + le32_hex(n) + bytes_hex)
+            map_set(cg.cgs, "data_len", off + 4 + n)
+            map_set(cg.cgh, "stroff:" + s, int_to_string(off))
+            off
+        end
+    end
+end
+
+# ============================================================================
+# L2.3 String 批：运行时 helper 家族（宿主 build_str_* 蓝本剥 tag 平移——
+# 参数/返回为裸指针/裸值，无 tag 装拆；alloc/ftoa 依赖经参数注入 idx）。
+# helper 注册进 extra 区（alloc 之后的 extra_fns 机制），cgh "hidx:<name>" 去重。
+# ============================================================================
+
+# st_eq: (i64 a, i64 b) -> i32；逐字节相等（宿主 build_str_eq 平移）
+# locals: 2=pa,3=pb,4=la,5=i（4×i32）
+fn st_eq_body() -> String
+    "01047f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2103"
+    + "2002" + "280000" + "2104"
+    + "2004" + "2003" + "280000" + "47"
+    + "0440" + "4100" + "0f" + "0b"
+    + "4100" + "2105"
+    + "0240" + "0340"
+    + "2005" + "2004" + "4f" + "0d01"
+    + "2002" + "4104" + "6a" + "2005" + "6a" + "2d0000"
+    + "2003" + "4104" + "6a" + "2005" + "6a" + "2d0000"
+    + "47" + "0440" + "4100" + "0f" + "0b"
+    + "2005" + "4101" + "6a" + "2105"
+    + "0c00"
+    + "0b" + "0b"
+    + "4101"
+    + "0b"
+end
+
+# st_cmp: (i64 a, i64 b) -> i32（-1/0/1 字节序，对齐 Rust str Ord；宿主平移）
+# locals: 2=pa,3=la,4=pb,5=lb,6=i,7=min（6×i32）
+fn st_cmp_body() -> String
+    "01067f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2104"
+    + "2002" + "280000" + "2103"
+    + "2004" + "280000" + "2105"
+    # min = la < lb ? la : lb（select：[la, lb, cond]）
+    + "2003" + "2005" + "2003" + "2005" + "48" + "1b" + "2107"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2007" + "4f" + "0d01"
+    + "2002" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    + "2004" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    + "6b" + "4100" + "48"
+    + "0440" + "41" + sleb128_hex(-1) + "0f" + "0b"
+    + "2002" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    + "2004" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    + "6b" + "4100" + "4a"
+    + "0440" + "4101" + "0f" + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "2003" + "2005" + "48" + "0440" + "41" + sleb128_hex(-1) + "0f" + "0b"
+    + "2003" + "2005" + "4a" + "0440" + "4101" + "0f" + "0b"
+    + "4100"
+    + "0b"
+end
+
+# st_concat: (i64 a, i64 b) -> i64；新堆对象（宿主 build_str_concat 平移）
+# locals: 2=pa,3=pb,4=la,5=lb,6=pout,7=i（6×i32）
+fn st_concat_body(alloc_idx: Int) -> String
+    "01067f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2103"
+    + "2002" + "280000" + "2104"
+    + "2003" + "280000" + "2105"
+    + "2004" + "2005" + "6a" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2106"
+    + "2006" + "2004" + "2005" + "6a" + "360000"
+    + "4100" + "2107"
+    + "0240" + "0340"
+    + "2007" + "2004" + "4f" + "0d01"
+    + "2006" + "4104" + "6a" + "2007" + "6a"
+    + "2002" + "4104" + "6a" + "2007" + "6a" + "2d0000"
+    + "3a0000"
+    + "2007" + "4101" + "6a" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "4100" + "2107"
+    + "0240" + "0340"
+    + "2007" + "2005" + "4f" + "0d01"
+    + "2006" + "4104" + "6a" + "2004" + "6a" + "2007" + "6a"
+    + "2003" + "4104" + "6a" + "2007" + "6a" + "2d0000"
+    + "3a0000"
+    + "2007" + "4101" + "6a" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "2006" + "ac"
+    + "0b"
+end
+
+# st_len: (i64 a) -> i64；字符数 = 非 UTF-8 续字节计数（宿主平移）
+# locals: 1=ptr,2=len,3=i,4=count（4×i32）
+fn st_len_body() -> String
+    "01047f"
+    + "2000" + "a7" + "2101"
+    + "2001" + "280000" + "2102"
+    + "4100" + "2103" + "4100" + "2104"
+    + "0240" + "0340"
+    + "2003" + "2002" + "4f" + "0d01"
+    + "2001" + "4104" + "6a" + "2003" + "6a" + "2d0000"
+    + "41" + sleb128_hex(192) + "71" + "41" + sleb128_hex(128) + "47"
+    + "0440" + "2004" + "4101" + "6a" + "2104" + "0b"
+    + "2003" + "4101" + "6a" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2004" + "ac"
+    + "0b"
+end
+
+# st_itoa: (i64 v) -> i64；十进制格式化（宿主 build_itoa 平移——数字倒序写
+# global 1 scratch 尾部再正向拷贝；i64::MIN 走 0-n 回绕路径）
+# locals: 1=mag(i64), 2=pos,3=neg,4=len,5=p,6=i（1×i64 + 5×i32）
+fn st_itoa_body(alloc_idx: Int) -> String
+    "02017e057f"
+    + "2000" + "2101"
+    + "2001" + "4200" + "53" + "2103"
+    + "2003" + "047e"
+    + "4200" + "2001" + "7d"
+    + "05"
+    + "2001"
+    + "0b" + "2101"
+    + "2301" + "41" + sleb128_hex(64) + "6a" + "2102"
+    + "0340"
+    + "2002" + "4101" + "6b" + "2102"
+    + "2002" + "2001" + "420a" + "82" + "4230" + "7c" + "a7" + "3a0000"
+    + "2001" + "420a" + "80" + "2101"
+    + "2001" + "4200" + "56" + "0d00"
+    + "0b"
+    + "2003" + "0440"
+    + "2002" + "4101" + "6b" + "2102"
+    + "2002" + "412d" + "3a0000"
+    + "0b"
+    + "2301" + "41" + sleb128_hex(64) + "6a" + "2002" + "6b" + "2104"
+    + "2004" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2004" + "360000"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2004" + "4f" + "0d01"
+    + "2005" + "4104" + "6a" + "2006" + "6a" + "2002" + "2006" + "6a" + "2d0000" + "3a0000"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "2005" + "ac"
+    + "0b"
+end
+
+# st_ftoa: (f64 v) -> i64；经 env.ftoa 导入（idx 3）写 global 1 scratch
+# 再拷贝到堆对象（宿主 build_ftoa_str 平移；与宿主同源——JS String(v) 口径）
+# locals: 1=len,2=p,3=i（3×i32）
+fn st_ftoa_body(alloc_idx: Int) -> String
+    "01037f"
+    + "2000" + "2301" + "1003" + "2101"
+    + "2001" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2102"
+    + "2002" + "2001" + "360000"
+    + "4100" + "2103"
+    + "0240" + "0340"
+    + "2003" + "2001" + "4f" + "0d01"
+    + "2002" + "4104" + "6a" + "2003" + "6a" + "2301" + "2003" + "6a" + "2d0000" + "3a0000"
+    + "2003" + "4101" + "6a" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2002" + "ac"
+    + "0b"
+end
+
+# st_starts/st_ends: (i64 s, i64 sub) -> i32（宿主 build_starts_ends 平移）
+# locals: 2=ps,3=ls,4=psub,5=lsub,6=i（5×i32）
+fn st_starts_ends_body(is_starts: Bool) -> String
+    let head =
+    "01057f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2104"
+    + "2002" + "280000" + "2103"
+    + "2004" + "280000" + "2105"
+    + "2005" + "2003" + "4a" + "0440" + "4100" + "0f" + "0b"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2005" + "4f" + "0d01"
+    let s_addr =
+    if is_starts
+        "2002" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    else
+        "2002" + "4104" + "6a" + "2003" + "2005" + "6b" + "6a" + "2006" + "6a" + "2d0000"
+    end
+    head + s_addr
+    + "2004" + "4104" + "6a" + "2006" + "6a" + "2d0000"
+    + "47" + "0440" + "4100" + "0f" + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "4101"
+    + "0b"
+end
+
+# st_contains: (i64 s, i64 sub) -> i32；朴素子串查找（宿主平移）
+# locals: 2=ps,3=ls,4=psub,5=lsub,6=i,7=j（6×i32）
+fn st_contains_body() -> String
+    "01067f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2104"
+    + "2002" + "280000" + "2103"
+    + "2004" + "280000" + "2105"
+    + "2005" + "45" + "0440" + "4101" + "0f" + "0b"
+    + "2005" + "2003" + "4a" + "0440" + "4100" + "0f" + "0b"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2005" + "6a" + "2003" + "4a" + "0d01"
+    + "4100" + "2107"
+    + "0240" + "0340"
+    + "2007" + "2005" + "4f" + "0440" + "4101" + "0f" + "0b"
+    + "2002" + "4104" + "6a" + "2006" + "6a" + "2007" + "6a" + "2d0000"
+    + "2004" + "4104" + "6a" + "2007" + "6a" + "2d0000"
+    + "47" + "0d01"
+    + "2007" + "4101" + "6a" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "4100"
+    + "0b"
+end
+
+# ASCII 空白判定（b==32 or 9 or 10 or 13）——local 号参数化
+fn is_ws_hex(l: Int) -> String
+    "20" + leb128_hex(l) + "4120" + "46"
+    + "20" + leb128_hex(l) + "4109" + "46" + "72"
+    + "20" + leb128_hex(l) + "410a" + "46" + "72"
+    + "20" + leb128_hex(l) + "410d" + "46" + "72"
+end
+
+# st_trim: (i64 s) -> i64；ASCII 空白（宿主平移；Unicode 差异为宿主既有登记）
+# locals: 1=ptr,2=len,3=start,4=end,5=b,6=pout,7=i（7×i32）
+fn st_trim_body(alloc_idx: Int) -> String
+    "01077f"
+    + "2000" + "a7" + "2101"
+    + "2001" + "280000" + "2102"
+    + "4100" + "2103"
+    + "2002" + "2104"
+    + "0240" + "0340"
+    + "2003" + "2004" + "4f" + "0d01"
+    + "2001" + "4104" + "6a" + "2003" + "6a" + "2d0000" + "2105"
+    + is_ws_hex(5) + "45" + "0d01"
+    + "2003" + "4101" + "6a" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "0240" + "0340"
+    + "2004" + "2003" + "4c" + "0d01"
+    + "2001" + "4104" + "6a" + "2004" + "6a" + "4101" + "6b" + "2d0000" + "2105"
+    + is_ws_hex(5) + "45" + "0d01"
+    + "2004" + "4101" + "6b" + "2104"
+    + "0c00"
+    + "0b" + "0b"
+    + "2004" + "2003" + "6b" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2106"
+    + "2006" + "2004" + "2003" + "6b" + "360000"
+    + "4100" + "2107"
+    + "0240" + "0340"
+    + "2007" + "2004" + "2003" + "6b" + "4f" + "0d01"
+    + "2006" + "4104" + "6a" + "2007" + "6a" + "2001" + "4104" + "6a" + "2003" + "6a" + "2007" + "6a" + "2d0000" + "3a0000"
+    + "2007" + "4101" + "6a" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "2006" + "ac"
+    + "0b"
+end
+
+# st_upper/st_lower: (i64 s) -> i64；ASCII-only（宿主 build_case 平移）
+# locals: 1=ptr,2=len,3=i,4=pout,5=b（5×i32）
+fn st_case_body(upper: Bool, alloc_idx: Int) -> String
+    let lo =
+    if upper
+        97
+    else
+        65
+    end
+    let hi =
+    if upper
+        122
+    else
+        90
+    end
+    let delta =
+    if upper
+        -32
+    else
+        32
+    end
+    "01057f"
+    + "2000" + "a7" + "2101"
+    + "2001" + "280000" + "2102"
+    + "2002" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2104"
+    + "2004" + "2002" + "360000"
+    + "4100" + "2103"
+    + "0240" + "0340"
+    + "2003" + "2002" + "4f" + "0d01"
+    + "2001" + "4104" + "6a" + "2003" + "6a" + "2d0000" + "2105"
+    + "2004" + "4104" + "6a" + "2003" + "6a"
+    + "2005" + "41" + sleb128_hex(lo) + "4e" + "2005" + "41" + sleb128_hex(hi) + "4c" + "71"
+    + "047f"
+    + "2005" + "41" + sleb128_hex(delta) + "6a"
+    + "05"
+    + "2005"
+    + "0b"
+    + "3a0000"
+    + "2003" + "4101" + "6a" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2004" + "ac"
+    + "0b"
+end
+
+# match_at(i)：local 3=ps 从偏移 i 起 与 local 5=pf 逐字节比（lf=local 6），
+# 结果(1/0)写 local 15（宿主 emit_match_at 平移；local 号对齐 replace 布局）
+fn match_at_hex() -> String
+    "4101" + "210f"
+    + "4100" + "210a"
+    + "0240" + "0340"
+    + "200a" + "2006" + "4f" + "0d01"
+    + "2003" + "4104" + "6a" + "2009" + "6a" + "200a" + "6a" + "2d0000"
+    + "2005" + "4104" + "6a" + "200a" + "6a" + "2d0000"
+    + "47" + "0440" + "4100" + "210f" + "0c02" + "0b"
+    + "200a" + "4101" + "6a" + "210a"
+    + "0c00"
+    + "0b" + "0b"
+end
+
+# st_replace: (i64 s, i64 from, i64 to) -> i64；两遍扫描全量替换
+# （宿主 build_replace 平移；from 空 = 每间隙插入含两端，Rust 语义）
+# locals: 3=ps,4=ls,5=pf,6=lf,7=pt,8=lt,9=i,10=j,11=cnt,12=olen,13=pout,14=o,15=mf（13×i32）
+fn st_replace_body(alloc_idx: Int) -> String
+    let head =
+    "010d7f"
+    + "2000" + "a7" + "2103"
+    + "2001" + "a7" + "2105"
+    + "2002" + "a7" + "2107"
+    + "2003" + "280000" + "2104"
+    + "2005" + "280000" + "2106"
+    + "2007" + "280000" + "2108"
+    # from 为空特例：olen = ls + lt*(ls+1)；i in 0..=ls 每步先写 to 再写 s[i]
+    let empty_case =
+    "2006" + "45" + "0440"
+    + "2004" + "2008" + "2004" + "4101" + "6a" + "6c" + "6a" + "210c"
+    + "200c" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "210d"
+    + "200d" + "200c" + "360000"
+    + "4100" + "2109" + "4100" + "210e"
+    + "0240" + "0340"
+    + "2009" + "2004" + "4a" + "0d01"
+    + "4100" + "210a"
+    + "0240" + "0340"
+    + "200a" + "2008" + "4f" + "0d01"
+    + "200d" + "4104" + "6a" + "200e" + "6a" + "2007" + "4104" + "6a" + "200a" + "6a" + "2d0000" + "3a0000"
+    + "200e" + "4101" + "6a" + "210e"
+    + "200a" + "4101" + "6a" + "210a"
+    + "0c00"
+    + "0b" + "0b"
+    + "2009" + "2004" + "48" + "0440"
+    + "200d" + "4104" + "6a" + "200e" + "6a" + "2003" + "4104" + "6a" + "2009" + "6a" + "2d0000" + "3a0000"
+    + "200e" + "4101" + "6a" + "210e"
+    + "0b"
+    + "2009" + "4101" + "6a" + "2109"
+    + "0c00"
+    + "0b" + "0b"
+    + "200d" + "ac" + "0f"
+    + "0b"
+    # pass 1：数非重叠匹配
+    let pass1 =
+    "4100" + "2109" + "4100" + "210b"
+    + "0240" + "0340"
+    + "2009" + "2006" + "6a" + "2004" + "4a" + "0d01"
+    + match_at_hex()
+    + "200f" + "0440"
+    + "200b" + "4101" + "6a" + "210b"
+    + "2009" + "2006" + "6a" + "2109"
+    + "05"
+    + "2009" + "4101" + "6a" + "2109"
+    + "0b"
+    + "0c00"
+    + "0b" + "0b"
+    # olen = ls - cnt*lf + cnt*lt；pout 分配
+    + "2004" + "200b" + "2006" + "6c" + "6b" + "200b" + "2008" + "6c" + "6a" + "210c"
+    + "200c" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "210d"
+    + "200d" + "200c" + "360000"
+    # pass 2：填充
+    + "4100" + "2109" + "4100" + "210e"
+    + "0240" + "0340"
+    + "2009" + "2004" + "4f" + "0d01"
+    + "2009" + "2006" + "6a" + "2004" + "4c" + "0440"
+    + match_at_hex()
+    + "05"
+    + "4100" + "210f"
+    + "0b"
+    + "200f" + "0440"
+    + "4100" + "210a"
+    + "0240" + "0340"
+    + "200a" + "2008" + "4f" + "0d01"
+    + "200d" + "4104" + "6a" + "200e" + "6a" + "2007" + "4104" + "6a" + "200a" + "6a" + "2d0000" + "3a0000"
+    + "200e" + "4101" + "6a" + "210e"
+    + "200a" + "4101" + "6a" + "210a"
+    + "0c00"
+    + "0b" + "0b"
+    + "2009" + "2006" + "6a" + "2109"
+    + "05"
+    + "200d" + "4104" + "6a" + "200e" + "6a" + "2003" + "4104" + "6a" + "2009" + "6a" + "2d0000" + "3a0000"
+    + "200e" + "4101" + "6a" + "210e"
+    + "2009" + "4101" + "6a" + "2109"
+    + "0b"
+    + "0c00"
+    + "0b" + "0b"
+    + "200d" + "ac"
+    + "0b"
+    head + empty_case + pass1
+end
+
+# st_cfc: (i64 cp) -> i64；码点→UTF-8 单字符 Str（宿主 build_char_from_code
+# 平移；无效码点/代理区 trap 对齐宿主）
+# locals: 1=cp(i64), 2=cp32, 3=n, 4=p（1×i64 + 3×i32）
+fn st_cfc_body(alloc_idx: Int) -> String
+    "02017e037f"
+    + "2000" + "2101"
+    + "2001" + "4200" + "53" + "0440" + "00" + "0b"
+    + "2001" + "42" + sleb128_hex(1114111) + "55" + "0440" + "00" + "0b"
+    + "2001" + "42" + sleb128_hex(55296) + "59" + "2001" + "42" + sleb128_hex(57343) + "57" + "71" + "0440" + "00" + "0b"
+    + "2001" + "a7" + "2102"
+    + "4101" + "2103"
+    + "2002" + "41" + sleb128_hex(128) + "4f" + "0440"
+    + "4102" + "2103"
+    + "2002" + "41" + sleb128_hex(2048) + "4f" + "0440"
+    + "4103" + "2103"
+    + "2002" + "41" + sleb128_hex(65536) + "4f" + "0440"
+    + "4104" + "2103"
+    + "0b"
+    + "0b"
+    + "0b"
+    + "2003" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2104"
+    + "2004" + "2003" + "360000"
+    # 写字节：if n==1 {1B} else { if n==2 {2B} else { if n==3 {3B} else {4B} } }
+    + "2003" + "4101" + "46" + "0440"
+    + "2004" + "4104" + "6a" + "2002" + "3a0000"
+    + "05"
+    + "2003" + "4102" + "46" + "0440"
+    + "2004" + "4104" + "6a" + "2002" + "4106" + "76" + "41" + sleb128_hex(192) + "72" + "3a0000"
+    + "2004" + "4105" + "6a" + "2002" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "05"
+    + "2003" + "4103" + "46" + "0440"
+    + "2004" + "4104" + "6a" + "2002" + "410c" + "76" + "41" + sleb128_hex(224) + "72" + "3a0000"
+    + "2004" + "4105" + "6a" + "2002" + "4106" + "76" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "2004" + "4106" + "6a" + "2002" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "05"
+    + "2004" + "4104" + "6a" + "2002" + "41" + sleb128_hex(18) + "76" + "41" + sleb128_hex(240) + "72" + "3a0000"
+    + "2004" + "4105" + "6a" + "2002" + "410c" + "76" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "2004" + "4106" + "6a" + "2002" + "4106" + "76" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "2004" + "4107" + "6a" + "2002" + "413f" + "71" + "41" + sleb128_hex(128) + "72" + "3a0000"
+    + "0b"
+    + "0b"
+    + "0b"
+    + "2004" + "ac"
+    + "0b"
+end
+
+# String helper 注册（cgh "hidx:<name>" 去重；type/body 追加 extra 区）。
+# heap 依赖 helper 在注册前调用 need_heap 防御（预扫漏判 fail-safe）。
+# ftoa 导入 idx 恒为 3（has_str 布局：0/1=print_i64/f64、2=print_str、3=ftoa）。
+fn ensure_str_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
+    match map_get(cg.cgh, "hidx:" + name)
+        Some(idx_s) =>
+            match string_to_int(idx_s)
+                n => Ok(n)
+            end
+        end
+        None =>
+            let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+            let tyhex =
+            if name == "st_eq" or name == "st_cmp" or name == "st_starts" or name == "st_ends" or name == "st_contains"
+                "60027e7e017f"
+            else
+                if name == "st_concat"
+                    "60027e7e017e"
+                else
+                    if name == "st_ftoa"
+                        "60017c017e"
+                    else
+                        if name == "st_replace"
+                            "60037e7e7e017e"
+                        else
+                            "60017e017e"
+                        end
+                    end
+                end
+            end
+            let body =
+            if name == "st_eq"
+                st_eq_body()
+            elif name == "st_cmp"
+                st_cmp_body()
+            elif name == "st_concat"
+                st_concat_body(alloc_idx)
+            elif name == "st_len"
+                st_len_body()
+            elif name == "st_itoa"
+                st_itoa_body(alloc_idx)
+            elif name == "st_ftoa"
+                st_ftoa_body(alloc_idx)
+            elif name == "st_starts"
+                st_starts_ends_body(True)
+            elif name == "st_ends"
+                st_starts_ends_body(False)
+            elif name == "st_contains"
+                st_contains_body()
+            elif name == "st_trim"
+                st_trim_body(alloc_idx)
+            elif name == "st_upper"
+                st_case_body(True, alloc_idx)
+            elif name == "st_lower"
+                st_case_body(False, alloc_idx)
+            elif name == "st_replace"
+                st_replace_body(alloc_idx)
+            else
+                st_cfc_body(alloc_idx)
+            end
+            if name != "st_eq" and name != "st_cmp" and name != "st_len" and name != "st_starts" and name != "st_ends" and name != "st_contains"
+                let _ = need_heap(cg)?
+            end
+            let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex)
+            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+            let fidx = reg_extra_fn(tidx, body, cg)
+            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+            Ok(fidx)
+        end
+    end
+end
+
 
 # 闭包创建点编译（宿主 compile_closure 平移）。返回 (code, e 槽, caps 名单)：
 # code 在父函数里执行——分配 env 对象 + 闭包对象，栈上留闭包值。
@@ -4962,7 +5707,7 @@ end
 # L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f；
 # L2.3-b：cl（闭包值 = i64）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64" or enum_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st"
         "7e"
     else
         if vt == "i32"
@@ -5195,11 +5940,321 @@ fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
 end
 
 # 收集签名：fns: Map<name, {idx, ret, nprm, prms}>（idx = 2+序，前两个是 print 导入；prms = 形参 vt 逗号串——R74 调用点校验用）
-fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+# Ty 是否含 String（递归；String 批 has_str 预扫的签名路）
+fn ty_has_string(t: Ty) -> Bool
+    match t
+        TyString => True
+        TyOption(i) => ty_has_string(i)
+        TResult(a, b) => ty_has_string(a) or ty_has_string(b)
+        TyGeneric(_, args) =>
+            let mut hit = False
+            for a in args
+                if ty_has_string(a)
+                    hit = True
+                end
+            end
+            hit
+        end
+        TyRecord(flds) =>
+            let mut hit = False
+            for f in flds
+                if ty_has_string(f.1)
+                    hit = True
+                end
+            end
+            hit
+        end
+        TyTuple(args) =>
+            let mut hit = False
+            for a in args
+                if ty_has_string(a)
+                    hit = True
+                end
+            end
+            hit
+        end
+        _ => False
+    end
+end
+
+# Option<Ty> 是否含 String（None = 无返回注解 = 不含）
+fn tyopt_has_string(t: Option<Ty>) -> Bool
+    match t
+        Some(tt) => ty_has_string(tt)
+        None => False
+    end
+end
+
+# string 模块内建表（B3 子集；string_to_int 返回 Int|Unit 联合在 untagged 下
+# 不可表达、split 返回 List——两者明确拒绝并锁负例）
+fn st_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "len"
+        return Ok({helper: "st_len", nprm: 1, prms: "st", ret: "i64"})
+    end
+    if name == "int_to_string"
+        return Ok({helper: "st_itoa", nprm: 1, prms: "i64", ret: "st"})
+    end
+    if name == "starts_with"
+        return Ok({helper: "st_starts", nprm: 2, prms: "st,st", ret: "i32"})
+    end
+    if name == "ends_with"
+        return Ok({helper: "st_ends", nprm: 2, prms: "st,st", ret: "i32"})
+    end
+    if name == "contains"
+        return Ok({helper: "st_contains", nprm: 2, prms: "st,st", ret: "i32"})
+    end
+    if name == "trim"
+        return Ok({helper: "st_trim", nprm: 1, prms: "st", ret: "st"})
+    end
+    if name == "upper"
+        return Ok({helper: "st_upper", nprm: 1, prms: "st", ret: "st"})
+    end
+    if name == "lower"
+        return Ok({helper: "st_lower", nprm: 1, prms: "st", ret: "st"})
+    end
+    if name == "replace"
+        return Ok({helper: "st_replace", nprm: 3, prms: "st,st,st", ret: "st"})
+    end
+    if name == "char_from_code"
+        return Ok({helper: "st_cfc", nprm: 1, prms: "i64", ret: "st"})
+    end
+    if name == "string_to_int"
+        return Err(subset_err("string_to_int 返回 Int|Unit 联合（成功 Int 失败 Unit），untagged 表示下运行时不可区分——留后续批次"))
+    end
+    if name == "split"
+        return Err(subset_err("split 返回 List——随 List 批交付"))
+    end
+    Err(subset_err("string 模块内建 '" + name + "' 超出 L2 String 批子集"))
+end
+
+# n 字节零的 hex（scratch 区填充）
+fn zeros_hex(n: Int) -> String
+    let mut out = ""
+    let mut i = 0
+    while i < n
+        out = out + "00"
+        i = i + 1
+    end
+    out
+end
+
+# ---- String 预扫（表达式路：AST 含 ExStr 即真——独立于 heap 预扫，语义不混）----
+
+fn str_pattern(p: Pat) -> Bool
+    match p
+        PatLit(lit) => str_ex(lit)
+        PatVariant(_, subs) =>
+            let mut hit = False
+            for s in subs
+                if str_pattern(s)
+                    hit = True
+                end
+            end
+            hit
+        end
+        _ => False
+    end
+end
+
+fn str_ex(e: Ex) -> Bool
+    match e
+        ExStr(_) => True
+        ExBinary(_, l, r) => str_ex(l) or str_ex(r)
+        ExLogical(_, l, r) => str_ex(l) or str_ex(r)
+        ExUnary(_, i) => str_ex(i)
+        ExGroup(i) => str_ex(i)
+        ExCall(c, args) =>
+            let mut hit = str_ex(c)
+            for a in args
+                if str_ex(a)
+                    hit = True
+                end
+            end
+            hit
+        end
+        ExIndex(a, b) => str_ex(a) or str_ex(b)
+        ExField(i, _) => str_ex(i)
+        ExIf(ifr) => str_if(ifr)
+        ExMatch(scrut, arms, _) =>
+            let mut hit = str_ex(scrut)
+            for arm in arms
+                match arm
+                    ArmR(pat, guard, ab) =>
+                        if str_pattern(pat)
+                            hit = True
+                        end
+                        match guard
+                            Some(g) =>
+                                if str_ex(g)
+                                    hit = True
+                                end
+                            end
+                            None => ()
+                        end
+                        match ab
+                            ABExpr(ae) =>
+                                if str_ex(ae)
+                                    hit = True
+                                end
+                            end
+                            ABBlock(bb) =>
+                                if str_block(bb)
+                                    hit = True
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            hit
+        end
+        ExClosure(_, _, body) => str_block(body)
+        ExTry(i) => str_ex(i)
+        ExPipe(a, b) => str_ex(a) or str_ex(b)
+        ExRange(a, b) => str_ex(a) or str_ex(b)
+        ExRecord(flds) =>
+            let mut hit = False
+            for f in flds
+                if str_ex(f.1)
+                    hit = True
+                end
+            end
+            hit
+        end
+        ExTuple(args) =>
+            let mut hit = False
+            for a in args
+                if str_ex(a)
+                    hit = True
+                end
+            end
+            hit
+        end
+        _ => False
+    end
+end
+
+fn str_if(ifr: IfR) -> Bool
+    match ifr
+        IfR(branches, else_b) =>
+            let mut hit = False
+            for pair in branches
+                if str_ex(pair.0) or str_block(pair.1)
+                    hit = True
+                end
+            end
+            match else_b
+                Some(eb) =>
+                    if str_block(eb)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+fn str_block(b: Blk) -> Bool
+    match b
+        BlkOf(stmts, tail) =>
+            let mut hit = False
+            for s in stmts
+                if str_stmt(s)
+                    hit = True
+                end
+            end
+            match tail
+                Some(t) =>
+                    if str_ex(t)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+fn str_stmt(s: St) -> Bool
+    match s
+        StLet(_, _, _, e) => str_ex(e)
+        StDestruct(_, e) => str_ex(e)
+        StAssign(_, _, _, e) => str_ex(e)
+        StIf(ifr) => str_if(ifr)
+        StWhile(c, b) => str_ex(c) or str_block(b)
+        StFor(_, i, b) => str_ex(i) or str_block(b)
+        StReturn(oe) =>
+            match oe
+                Some(e) => str_ex(e)
+                None => False
+            end
+        end
+        StExpr(e) => str_ex(e)
+        StHole(_, _) => False
+    end
+end
+
+fn scan_has_string(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            let mut hit = False
+            for it in items
+                match it
+                    ItFn(_, _, _, _, body, _, _) =>
+                        if str_block(body)
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
+# 签名/import 路的 String 预探测（不注册 fns——ibase 判定先行）
+fn probe_str_sigs(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            let mut hit = False
+            for it in items
+                match it
+                    ItFn(_, params, ret, _, _, _, _) =>
+                        if tyopt_has_string(ret)
+                            hit = True
+                        end
+                        for p in params
+                            match p
+                                Prm(_, pt) =>
+                                    if ty_has_string(pt)
+                                        hit = True
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    ItImport(module, _) =>
+                        if module == "string"
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
+fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, ibase: Int) -> Result<String, String>
     register_enums(prg, fns)?
     match prg
         Prg(items) =>
-            let mut idx = 2
+            let mut idx = ibase
             for it in items
                 match it
                     ItFn(name, params, ret, _, _, _, _) =>
@@ -5208,7 +6263,7 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                         end
                         let rv = tyopt_vt(ret, fns)?
                         # R74（十二审）：摘要携带形参 vt 逗号串——调用点
-                        # 类型/arity 校验的事实源（Int/Float/Bool/用户 enum；
+                        # 类型/arity 校验的事实源（Int/Float/Bool/String/用户 enum；
                         # 其余在签名层即拒，与 fn_type_entry 同文案）
                         let mut pv = ""
                         let mut k = 0
@@ -5229,6 +6284,23 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                         end
                         map_set(fns, name, {idx: idx, ret: rv, nprm: list_length(params), prms: pv})
                         idx = idx + 1
+                    end
+                    ItImport(module, im_items) =>
+                        # L2.3 String 批：from string import {...} 逐名注册
+                        # 内建摘要（idx=-2 哨兵 → comp_call 走 helper 分派）
+                        if module == "string"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = st_builtin_entry(iname)?
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
                     end
                     _ => ()
                 end
@@ -5270,13 +6342,23 @@ end
 # Prg → 模块 hex
 fn build_module(prg: Prg) -> Result<String, String>
     let fns = map_empty()
-    collect_sigs(prg, fns)?
+    # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
+    # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
+    # 含 ExStr——st 值的三个来源全覆盖；模式内 ExStr 必伴随其一。
+    let has_str = probe_str_sigs(prg) or scan_has_string(prg)
+    let ibase =
+    if has_str
+        4
+    else
+        2
+    end
+    collect_sigs(prg, fns, ibase)?
     if map_has(fns, "main") == False
         return Err("程序缺少 main 函数")
     end
     match prg
         Prg(items) =>
-            # L2.3-b：nfun 预计数（闭包 funcidx = 2+nfun+extra 序依赖它——
+            # L2.3-b：nfun 预计数（闭包 funcidx = base+nfun+extra 序依赖它——
             # 两遍式天然免疫宿主 §7.3"闭包挤占索引空间"坑）
             let mut nfun = 0
             for it in items
@@ -5287,27 +6369,50 @@ fn build_module(prg: Prg) -> Result<String, String>
                     _ => ()
                 end
             end
+            # L2.3 String 批：has_str → import 扩 4（+print_str/ftoa），全部
+            # funcidx/typeidx 基址随抬（ibase/tbase）；data 段 offset 0 起
+            # '\n'。无 String 程序布局与旧版逐字节一致（存量 hex 不变）。
+            let ibase =
+            if has_str
+                4
+            else
+                2
+            end
             # L2.3-c：闭包、枚举或 match 预扫（保守）→ 按需启用堆设施。
-            # 无闭包/枚举/match 的旧路径布局不变；新枚举路径按需发堆。
-            let heap_on = needs_heap(prg, fns)
+            # String 批保守化：任一 String 形态也开堆（静态/动态判定易漏，
+            # 宁可多发；行为对拍不受 section 多寡影响）。
+            let heap_on = needs_heap(prg, fns) or has_str
             # 模块级编译状态（Map 引用语义跨函数共享）
             let cgs = map_empty()
             let cgh = map_empty()
             map_set(cgs, "nfun", nfun)
+            map_set(cgs, "ibase", ibase)
+            map_set(cgs, "tbase", ibase)
+            map_set(cgs, "has_str",
+            if has_str
+                1
+            else
+                0
+            end)
             map_set(cgs, "n_extra_types", 0)
             map_set(cgs, "n_extra_fns", 0)
             map_set(cgs, "n_table", 0)
             map_set(cgs, "alloc_idx", 0)
+            if has_str
+                # data 段初始化：offset 0 = '\n'（println 换行 + 静态串基址）
+                map_set(cgh, "data_hex", "0a")
+                map_set(cgs, "data_len", 1)
+            end
             if heap_on
                 map_set(cgs, "heap_on", 1)
                 # alloc 注册为 extra 区第一个（type (i32)->(i32) + bump 体）
                 let abody = alloc_body_hex()
                 map_set(cgh, "extra_types", "60017f017f")
                 map_set(cgs, "n_extra_types", 1)
-                map_set(cgh, "extra_fidxs", leb128_hex(2 + nfun))
+                map_set(cgh, "extra_fidxs", leb128_hex(ibase + nfun))
                 map_set(cgh, "extra_bodies", leb128_hex(len(abody) / 2) + abody)
                 map_set(cgs, "n_extra_fns", 1)
-                map_set(cgs, "alloc_idx", 2 + nfun)
+                map_set(cgs, "alloc_idx", ibase + nfun)
             else
                 map_set(cgs, "heap_on", 0)
             end
@@ -5324,25 +6429,40 @@ fn build_module(prg: Prg) -> Result<String, String>
                     ItFn(_, params, ret, _, body, _, _) =>
                         let rv = sig_ret(it, fns)?
                         tentries = tentries + fn_type_entry(params, rv, fns)?
-                        fidxs = fidxs + leb128_hex(2 + nfun2)
+                        fidxs = fidxs + leb128_hex(ibase + nfun2)
                         bodies = bodies + comp_one_fn(params, ret, body, fns, cg)?
                         nfun2 = nfun2 + 1
                     end
                     _ => ()
                 end
             end
-            # type section：t0=(i64)->()、t1=(f64)->() 供 print 导入；用户 t2+；
-            # L2.3-b 起按需追加 extra types（alloc/闭包体/shim 签名）
-            let types_c = leb128_hex(2 + nfun2 + cg_int(cgs, "n_extra_types")) + "60" + "01" + "7e" + "00" + "60" + "01" + "7c" + "00" + tentries + cg_str(cgh, "extra_types")
-            # import section：env.print_i64(t0) / env.print_f64(t1)
-            let imp_c = leb128_hex(2)
+            # type section：t0=(i64)->()、t1=(f64)->() 供 print 导入；用户
+            # base+；has_str 再加 t2=(i32,i32)->()（print_str）与
+            # t3=(f64,i32)->i32（ftoa）；L2.3-b 起按需追加 extra types
+            let mut types_head = "60" + "01" + "7e" + "00" + "60" + "01" + "7c" + "00"
+            let mut ntypes = 2 + nfun2
+            if has_str
+                types_head = types_head + "60" + "02" + "7f" + "7f" + "00" + "60" + "02" + "7c" + "7f" + "01" + "7f"
+                ntypes = ntypes + 2
+            end
+            let types_c = leb128_hex(ntypes + cg_int(cgs, "n_extra_types")) + types_head + tentries + cg_str(cgh, "extra_types")
+            # import section：env.print_i64(t0) / env.print_f64(t1)；
+            # has_str 加 env.print_str(t2) / env.ftoa(t3)（count=4）
+            let mut imp_c = leb128_hex(2)
             + "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
             + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
-            # function section（用户 + extra：alloc/闭包体/shim）
+            if has_str
+                imp_c = leb128_hex(4)
+                + "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
+                + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
+                + "03" + "656e76" + "09" + "7072696e745f737472" + "00" + "02"
+                + "03" + "656e76" + "04" + "66746f61" + "00" + "03"
+            end
+            # function section（用户 + extra：alloc/闭包体/shim/helper）
             let nfn_total = nfun2 + cg_int(cgs, "n_extra_fns")
             let func_c = leb128_hex(nfn_total) + fidxs + cg_str(cgh, "extra_fidxs")
             # L2.3-b 按需 section（table/memory/global 在 export 前、elem 在
-            # export 后——WASM section id 升序：4/5/6 < 7 < 9 < 10）
+            # export 后——WASM section id 升序：4/5/6 < 7 < 9 < 10 < 11）
             let ntab = cg_int(cgs, "n_table")
             let mut mid = ""
             let mut elem_c = ""
@@ -5352,19 +6472,39 @@ fn build_module(prg: Prg) -> Result<String, String>
                 elem_c = sect("09", "01" + "00" + "41000b" + leb128_hex(ntab) + cg_str(cgh, "table"))
             end
             if heap_on
-                # 枚举无闭包时 table/elem 为零，但仍需要 alloc 的 memory/global。
-                # hp init 8：地址 0 留哨兵，bump 自动 memory.grow。
                 mid = mid + sect("05", "01" + "00" + "01")
-                + sect("06", "01" + "7f" + "01" + "4108" + "0b")
+                if has_str
+                    # data 尾追加 64 字节 scratch（itoa/ftoa 共用，global 1 指向）；
+                    # hp 从 scratch 之后起（无 data 冲突）
+                    let lit_end = cg_int(cgs, "data_len")
+                    let data_hex = cg_str(cgh, "data_hex") + zeros_hex(64)
+                    mid = mid + sect("06", "02"
+                    + "7f" + "01" + "41" + sleb128_hex(lit_end + 64) + "0b"
+                    + "7f" + "01" + "41" + sleb128_hex(lit_end) + "0b")
+                    map_set(cgh, "data_bytes", data_hex)
+                else
+                    # hp init 8：地址 0 留哨兵，bump 自动 memory.grow。
+                    mid = mid + sect("06", "01" + "7f" + "01" + "4108" + "0b")
+                end
             end
-            # export section：main
+            # export section：main（has_str 加导出 memory——harness 打印需要）
             let mi = match map_get(fns, "main")
                 Some(f) => f
                 None => {idx: 2, ret: "void", nprm: 0, prms: ""}
             end
-            let exp_c = "01" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            let exp_c =
+            if has_str
+                "02" + "06" + "6d656d6f7279" + "02" + "00" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            else
+                "01" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            end
             # code section
             let code_c = leb128_hex(nfn_total) + bodies + cg_str(cgh, "extra_bodies")
+            # data section(11)：排 code(10) 之后（section id 升序）；active 全量装载
+            let mut data_c = ""
+            if has_str
+                data_c = sect("0b", "01" + "00" + "4100" + "0b" + leb128_hex(len(cg_str(cgh, "data_bytes")) / 2) + cg_str(cgh, "data_bytes"))
+            end
             Ok("0061736d01000000"
                 + sect("01", types_c)
                 + sect("02", imp_c)
@@ -5372,7 +6512,8 @@ fn build_module(prg: Prg) -> Result<String, String>
                 + mid
                 + sect("07", exp_c)
                 + elem_c
-                + sect("0a", code_c))
+                + sect("0a", code_c)
+                + data_c)
         end
     end
 end

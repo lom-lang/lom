@@ -1,0 +1,6 @@
+from string import {char_from_code, len}
+fn main() -> Unit ! [IO]
+    println(char_from_code(20013))
+    println(len(char_from_code(233)))
+    println("中: " + char_from_code(22269))
+end

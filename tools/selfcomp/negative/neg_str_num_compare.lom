@@ -1,0 +1,4 @@
+# 负例：String 与数值比较（宿主跨类型比较是运行时行为；L2 编译期拒）
+fn main() -> Unit ! [IO]
+    println("x" == 1)
+end

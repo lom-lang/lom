@@ -1,0 +1,14 @@
+from string import {len, starts_with, ends_with, contains, trim, upper, lower, replace, int_to_string}
+fn main() -> Unit ! [IO]
+    println(len("héllo"))
+    println(len("你好"))
+    println(starts_with("hello", "he"))
+    println(ends_with("hello", "lo"))
+    println(contains("hello", "ll"))
+    println(contains("hello", "xy"))
+    println(trim("  hi  ") + "|")
+    println(upper("aBc"))
+    println(lower("aBc"))
+    println(replace("banana", "na", "x"))
+    println(int_to_string(-7))
+end

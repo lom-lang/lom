@@ -368,3 +368,28 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   print_str/ftoa；has_string 预扫与 heap_on 保守化；负例转正 4 个 +
   保留改锁 1 个 + 新增负例 10-14 个。**代码零改动——纯设计文档
   交付；动工在裁决后。**
+- **修订 14（2026-09-24）：L2.3 String 批交付（用户裁决"按建议动工"——
+  B1+B2+B3 同批、println(Bool) 顺带解禁、Float display 平移宿主 ftoa
+  导入）。** vt "st" = i64 裸指针（静态 data 串与堆串同布局
+  [len][bytes]）；模块组装新增 data(11) 段（排 code 后）、按需导入
+  print_str/ftoa（ibase 2→4，全部 funcidx/typeidx 参数化）、第二
+  global（data 尾 64 字节 scratch）与 memory 导出。字面量经编译期
+  UTF-8 编码器 intern（码点两段二分求取——Lom 无 char_to_code，
+  代理区外分段保证 char_from_code 不 trap）。B1：字面量/类型流/
+  println(String)/六比较（字节序对齐 Rust str Ord）/Str+Str 拼接/
+  match String 字面量模式/闭包与泛型载荷（Result<Int,String> 等）。
+  B2：拼接提升（v0.4.1 宿主语义）——非 String 侧 to_display（Int/Float
+  走 helper，Float 与宿主同源经 env.ftoa；Bool/Unit 编译期静态串）；
+  println(Bool) 顺带解禁（neg_println_bool 转正）。B3：内建 10 个
+  剥 tag 平移（len/int_to_string/starts_with/ends_with/contains/
+  trim/upper/lower/replace/char_from_code）+ import 逐名注册摘要
+  （idx=-2 哨兵分派）+ R74 式调用校验。**string_to_int（Int|Unit
+  联合在 untagged 下运行时不可区分——设计实施中发现并改拒，负例
+  锁原因）与 split（返回 List 随 List 批）明确编译期拒绝；for-over-
+  String 推后**。信任边界新增：String/数值混合比较编译期拒（宿主
+  跨类型比较是运行时行为）；trim/upper/lower 的 ASCII 语义平移继承
+  宿主既有登记差异。验收：verify_selfcomp **148/148 = 62 对拍 + 86
+  负例**（转正 4 + 改锁 1 + 新增 14）；**存量 52 用例产物 hex 逐字节
+  不变**（HEAD 版编译器同用例对拍实证）；self_comp 6578 行。Rust
+  535+8/自举六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。
+  开发踩坑六枚入档 HANDOVER §11.6。语言面零变化。

@@ -1,0 +1,18 @@
+fn pick(s: String) -> Int
+    match s
+        "x" => 1
+        "yz" => 2
+        _ => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(pick("x"))
+    println(pick("yz"))
+    println(pick("other"))
+    let m = match "ab"
+        "ab" => 10
+        _ => 20
+    end
+    println(m)
+end

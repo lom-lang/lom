@@ -1,4 +1,4 @@
-# Lom 新任维护者交接提示词（2026-09-23）
+# Lom 新任维护者交接提示词（2026-09-24）
 
 > **文档定位（2026-09-21 用户裁决）**：本文件是 Lom 的**持续维护文档**与交接
 > 必要流程——每个维护周期收官/交接时必须刷新【当前真实状态】段与基线数字，
@@ -22,12 +22,13 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.9（v1.2.8/v1.2.9 tag 分别于 CI #159/#161 六 job
-  全绿后切；首回合仍须实查最新 main CI 与 annotations）；
-  语言面与外部发布线冻结。
-- 交接前主线提交 2ac6962 的 CI #162 六 job 全绿；annotations 四条
-  Ubuntu 26 迁移 notice、零 warning/error。Lom fmt 递归覆盖 37 个
-  有效示例（apply_test 豁免）；Rust cargo fmt 本地零 diff，未进 CI。
+- 仓库版本 v1.2.10（v1.2.9 tag 于 CI #161 六 job 全绿后切；v1.2.10
+  tag 待本次 String 批提交 CI 绿后切——首回合仍须实查最新 main CI
+  与 annotations）；语言面与外部发布线冻结。
+- String 批前主线提交 3cfd3e9 的 CI #163 六 job 全绿（交接文档记录
+  到 #162，实测 #163 同形态）；annotations 四条 Ubuntu 26 迁移
+  notice、零 warning/error。Lom fmt 递归覆盖 37 个有效示例
+  （apply_test 豁免）；Rust cargo fmt 本地零 diff，未进 CI。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
   复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
@@ -36,22 +37,23 @@
   误拒；新增正反向测试锁定。维护会话已对四项原始主形态亲手复现。
   十三审 B+ 只属其旧基线 1418536/v1.2.5；十四审 B 不外推整改
   或 c2 后。事实源 docs/TODO.md 顶部。
-- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2 已实现）。L2 自举
-  编译器（RFC-0004 方案 A，accepted，修订 1-12）：L2.1 spike + L2.2
-  子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批**（if/while/for(Int)/
-  Bool/比较/逻辑短路/块尾 if）+ **L2.3-b 闭包与捕获批**均完成（设计方案
-  docs/designs/0001 四裁决点全按建议项：untagged+闭包 i64 指针 / B1+B2 /
-  mut 捕获放行 / 8 字节统一槽；b 批 17 对拍 + 23 负例，存量 10 用例
-  hex 逐字节不变实证）+ **L2.3-c1 非泛型用户枚举与标量/枚举 match**
-  （递归载荷、嵌套模式、guard、Form A/B、无匹配 trap）与
-  **L2.3-c2 内建 Result/Option + 泛型用户 enum**（实例 vt、部分
-  参数上下文补全、构造/函数/赋值/闭包/match；设计 docs/designs/0003）；
-  self_comp.lom 5437 行，verify_selfcomp 128/128 = 52 对拍 + 76
-  负例，新负例锁具体拒绝原因。闭包批堆分配器/funcref 表/闭包值
-  通道为复合值地基；c1 使无 table 的 enum 程序也可分配。
-  **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12 交付**。
-  String/List/Map 载荷、Unit/Fn 类型参数、?/return 语句及
-  json/包等留后续批次，不可称 enum/match 全覆盖。
+- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String 已实现）。
+  L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-14）：L2.1 spike +
+  L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批** +
+  **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
+  **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
+  与泛型用户 enum**（designs/0003）+ **L2.3 String 批 B1+B2+B3**
+  （designs/0004 三裁决点全按建议项：B1 值通道/B2 拼接提升/
+  B3 内建 10 个 + println(Bool) 顺带解禁 + Float display 平移宿主
+  ftoa 导入；vt "st"=i64 裸指针、data(11) 段 + print_str/ftoa 按需
+  导入 + scratch global；string_to_int（Int|Unit 联合 untagged 下
+  不可表达）与 split（返回 List）明确编译期拒绝、for-over-String
+  推后）。self_comp.lom 6578 行，verify_selfcomp **148/148 =
+  62 对拍 + 86 负例**（转正 4 + 改锁 1 + 新增 14）；**存量 52 用例
+  产物 hex 逐字节不变**（HEAD 版编译器对拍实证）。
+  **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
+  修订 14 交付**。List/Map/json/包/return 语句及 string_to_int/
+  split/for-String 等留后续批次，不可称 String 全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -102,7 +104,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 128/128 = 52 用例双产物行为一致 + 76 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 148/148 = 62 用例双产物行为一致 + 86 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -137,9 +139,18 @@
 - L2.3-c2 后：内建 Ok/Err/Some/None 与泛型用户 enum 构造、类型
   参数上下文补全、嵌套/递归模式可编译；实例 vt 为
   `en:Name{arg;arg}`，WASM 仍为 i64 指针。无上下文未知载荷、
-  String/List/Map 载荷、Unit/Fn 参数、枚举相等/显示与 ?/return
-  均明确 COMPILE-ERROR 无 hex。verify_selfcomp 128/128 =
-  52 对拍 + 76 负例；十四审 B 不评此新增范围。
+  Unit/Fn 参数、枚举相等/显示与 ?/return 均明确 COMPILE-ERROR
+  无 hex。
+- L2.3 String 批后：字面量/类型流/println(String|Bool)/六比较/
+  Str+Str 与拼接提升（Int/Float/Bool/Unit 侧 to_display）/match
+  String 字面量模式/闭包与泛型 String 载荷/10 个 string 内建
+  （import 逐名注册）可编译；vt "st"=i64 裸指针（静态 data 串与
+  堆串同布局），模块按需发 data(11)+print_str/ftoa+scratch
+  global+memory 导出。string_to_int（Int|Unit 联合）、split
+  （List）、for-over-String、String 与数值比较、String 算术
+  （非 +）、枚举/闭包显示均明确 COMPILE-ERROR 无 hex。
+  verify_selfcomp 148/148 = 62 对拍 + 86 负例；存量 52 用例
+  hex 逐字节不变；十四审 B 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主

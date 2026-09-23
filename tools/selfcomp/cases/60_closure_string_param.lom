@@ -1,0 +1,21 @@
+from string import {len, upper, int_to_string}
+fn apply_len(s: String) -> Int
+    len(s)
+end
+
+fn main() -> Unit ! [IO]
+    let f = fn(s: String) -> Int
+        len(s) + 1
+    end
+    println(f("abcd"))
+    let g = fn(n: Int) -> String
+        "n" + upper("x") + int_to_string(n)
+    end
+    println(g(3))
+    let base = "id-"
+    let h = fn(k: Int) -> String
+        base + int_to_string(k)
+    end
+    println(h(42))
+    println(apply_len("héllo"))
+end

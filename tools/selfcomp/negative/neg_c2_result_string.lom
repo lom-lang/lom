@@ -1,8 +1,0 @@
-# String 值表示留后续批次；Result<Int, String> 暂明确拒绝。
-fn take(v: Result<Int, String>) -> Int
-    1
-end
-
-fn main() -> Unit ! [IO]
-    println(take(Ok(1)))
-end

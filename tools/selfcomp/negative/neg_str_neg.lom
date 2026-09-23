@@ -1,0 +1,4 @@
+# 负例：String 一元负
+fn main() -> Unit ! [IO]
+    println(-"x")
+end

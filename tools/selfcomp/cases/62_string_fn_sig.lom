@@ -1,0 +1,16 @@
+from string import {starts_with, len}
+fn greet(name: String) -> String
+    "hello, " + name + "!"
+end
+
+fn main() -> Unit ! [IO]
+    println(greet("lom"))
+    let s = greet("wor" + "ld")
+    println(s)
+    println(s == "hello, world!")
+    if starts_with(s, "hello")
+        println(len(s))
+    else
+        println(0)
+    end
+end

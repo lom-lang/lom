@@ -1,0 +1,5 @@
+# 负例：string 内建 arity 不符
+from string import {contains}
+fn main() -> Unit ! [IO]
+    println(contains("abc"))
+end

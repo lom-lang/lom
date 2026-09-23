@@ -1,0 +1,5 @@
+# 负例：对 String 值调用
+fn main() -> Unit ! [IO]
+    let s = "x"
+    println(s(1))
+end
