@@ -25,6 +25,9 @@
 - 仓库版本 v1.2.9（v1.2.8/v1.2.9 tag 分别于 CI #159/#161 六 job
   全绿后切；首回合仍须实查最新 main CI 与 annotations）；
   语言面与外部发布线冻结。
+- 交接前主线提交 2ac6962 的 CI #162 六 job 全绿；annotations 四条
+  Ubuntu 26 迁移 notice、零 warning/error。Lom fmt 递归覆盖 37 个
+  有效示例（apply_test 豁免）；Rust cargo fmt 本地零 diff，未进 CI。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
   复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
@@ -94,14 +97,16 @@
    - cargo build --release
    - cargo test --release（期望 535/535；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
    - cargo clippy --release -- -D warnings（零 warning）
-   - cargo fmt --all -- --check（零 diff）
+   - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 67/67）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（期望 128/128 = 52 用例双产物行为一致 + 76 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
-   - for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done（apply_test 豁免）
+   - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
+     $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
+     foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
 3. 如实报告基线，只给用户方向菜单等裁决。R79-R82 与 L2.3-c2
    已交付；可选下一轮独立复审，或继续 String / List / Map / json /

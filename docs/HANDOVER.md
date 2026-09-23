@@ -1,3 +1,4 @@
+> 最后更新：2026-09-23（**交接准备复核**：工作区基线 v1.2.9；§2.2 的 Lom fmt 命令改为可执行的 PowerShell 递归检查，实跑 37 个有效示例全过、apply_test 豁免；Rust cargo fmt 本地零 diff，但现行 CI 未设置该 gate，R70 历史登记已校准。doc_audit 67/67；交接前主线 CI #162 六 job success、annotations 四条 Ubuntu 26 迁移 notice 且零 warning/error。语言面和外部发布线继续冻结；下一方向待用户裁决。）
 > 最后更新：2026-09-23（**L2.3-c2 交接五件套刷新**：v1.2.9 功能提交 e778b65 的 CI #161 六 job 全绿，annotations 四条 Ubuntu 26 迁移 notice、零 warning/error 后切 tag；HANDOFF_PROMPT 当前状态/首回合基线、本文 §1/§9、TODO 顶部、doc_audit 67/67 同步。外部发布线继续冻结；c2 评级待独立复审。）
 > 最后更新：2026-09-23（**L2.3-c2 内建 Result/Option 与泛型用户 enum 子批交付，仓库版本 v1.2.9**。实例 vt en:Name{args} + tv:T 模板 + ? 未知参数，内建四变体沿用宿主编号 0..3；构造/函数/赋值/分支/match/闭包的类型流与载荷宽度按实例校验。verify_selfcomp 128/128 = 52 双产物行为对拍 + 76 负例；self_comp 5437 行。String/List/Map 载荷、Unit/Fn 参数与 ?/return 等仍明确拒绝。语言面/外部发布线冻结，十四审 B 仍只评 v1.2.6；c2 待独立复审。**）
 > 最后更新：2026-09-23（**R79-R82 两批整改交接五件套刷新**：v1.2.7 提交 e5e3e3d 的 CI #158 六 job 全绿后切 tag，v1.2.8 提交 cd70e8a 的 CI #159 六 job 全绿后切 tag；两次首跑 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。HANDOFF_PROMPT 当前状态与首回合基线、本文 §1/§9、TODO 顶部及 doc_audit 67/67 已同步；外部发布线继续冻结。）
@@ -75,7 +76,7 @@
 | 版本 | **v1.2.9**（Cargo.toml/lock 一致；2026-09-23 L2.3-c2 Result/Option 与泛型用户 enum 子批，宿主及冻结语言面未动；v1.2.8 tag 在 CI #159 六 job 全绿后已切。v1.2.9 tag 已在 CI #161 六 job 全绿后切；外部发布线继续冻结；历次变更见 LANGUAGE_SPEC §13） |
 | Rust 测试 | **535/535 通过 + 8 集成**（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **121/121**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
-| CI | **#161 六 job 全绿**（main 功能提交 e778b65；含三平台、selfhost、clippy、doc gates；annotations 四条 Ubuntu 26 迁移 notice，零 warning/error） |
+| CI | **交接前主线 #162 六 job 全绿**（提交 2ac6962；三平台、selfhost、clippy、doc gates 均 success；annotations 四条 Ubuntu 26 迁移 notice，零 warning/error；新交接提交推送后仍须重查首跑） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |
@@ -135,7 +136,8 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 
 ```powershell
 cargo test --release                                    # 期望 535/535（v1.2.6：v1.2.5 的 533 + fmt guard 两条单测；另有 tests/ 集成 ×8——r56 ×1 + r58 套件 ×7，合计 543）
-for f in examples/*.lom examples/bootstrap/*.lom examples/selfhost/*.lom; do ./target/release/lom.exe fmt "$f" --check; done   # CI fmt gate 同款（apply_test 豁免）——**新增/修改 .lom 文件提交前必查**（L2.1 会话只跑 cargo fmt 漏了 Lom 自己的 fmt gate，CI 三平台红一次）
+$lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
+foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }  # CI 同覆盖：37 个有效文件，apply_test 豁免；新增/修改 .lom 提交前必查
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
@@ -154,8 +156,9 @@ python tools/doc_audit.py                               # 对账：文档数字 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。
 
 九审补充（R70 陈旧句已于交接刷新时修正）：`cargo fmt --all -- --check` 自 R61
-机械包起零 diff 且是 CI gate；若 rustfmt 版本更替出现新 diff，仍应另开纯机械包
-处理、不混语义修复。Windows 文档脚本自九审交接起统一 UTF-8 输出，默认
+机械包起零 diff；现行 CI 工作流没有 cargo fmt 步骤，本地提交前须单独检查。
+若 rustfmt 版本更替出现新 diff，仍应另开纯机械包处理、不混语义修复。
+Windows 文档脚本自九审交接起统一 UTF-8 输出，默认
 `python tools\spec_examples_check.py` 应可直接运行。
 
 ### 2.3 git 提交与推送（不依赖任何 GitHub 插件）
@@ -593,8 +596,9 @@ end
   逐文件循环；apply_test.lom 是故意坏文件有豁免）。
 - `spec_examples_check.py` 的 `✓` 在 Windows GBK 会抛 UnicodeEncodeError，本交接已在脚本入口
   强制 stdout/stderr UTF-8；默认命令必须在提交前实跑。
-- `cargo fmt --check` 当前大量失败且不在 CI。格式化应另开机械提交，绝不混入 R55-R60
-  语义修复，否则审查 diff 被淹没。
+- **九审开账时点**：`cargo fmt --check` 当时大量失败且不在 CI；R61
+  机械包后现行检查零 diff，CI 至今未设置该 gate。格式化变更应另开
+  机械提交，不混语义修复，否则审查 diff 被淹没。
 - **宿主 dangling-else 贪婪归内（2026-09-22 L2.3-a 实证）**：then 块
   首元素是嵌套 if 时，**外层 else 被内层 if 吞掉**（缩进不敏感、AST 实证
   Hole 错位到下一个顶层项）——宿主既定语法行为非 bug；嵌套 if 需自带

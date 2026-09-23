@@ -16,6 +16,11 @@
 > 的构造/类型流/match（String/List/Map 载荷与 ?/return 仍留后续）。
 > v1.2.9 功能提交 e778b65 对应 CI #161 六 job 全绿后已切 tag；
 > annotations 四条 Ubuntu 26 迁移 notice，零 warning/error。
+> **交接准备复核**：主线交接提交 2ac6962 对应 CI #162 六 job 全绿、
+> annotations 同为四条迁移 notice 且零 warning/error；递归 Lom fmt
+> 37 个有效示例全过、apply_test 豁免。§2.2 与提示词的旧三层 glob
+> 漏 `pkg_demo` 两文件且是 Bash 句式，已改 PowerShell 递归命令；
+> `cargo fmt` 本地零 diff，但不在现行 CI（R70 登记失实已校准）。
 > 下一步工作包或独立复审待用户裁决。语言面与外部
 > 发布线继续冻结。新维护者先复制 [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md)，
 > 读 HANDOVER 指定章节与十四审报告，跑 §2.2 全量基线，再呈方向
@@ -502,6 +507,10 @@ elease` 的 `	`/`
 - **验收（2026-09-22）**：交接刷新（3bedab5/5ef6575）时已替换为如实句
   （"自 R61 机械包起零 diff 且是 CI gate"）；本轮 `cargo fmt --all --
   --check` 实跑退出 0 复核收口。
+- **交接复核更正（2026-09-23）**：上句历史替换文本的“且是 CI gate”
+  与现行 `.github/workflows/ci.yml` 不符：工作流只有递归的 `lom fmt`
+  gate，没有 `cargo fmt` 步骤。Rust fmt 本地检查仍零 diff；本次只校准
+  登记措辞与可复制命令，不改变 R70 已关闭的产品问题状态。
 
 ### R71 — LSP 非 UTF-8 payload 静默丢弃（P3）✅ done（2026-09-22，v1.2.4）
 
