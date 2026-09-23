@@ -351,3 +351,20 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   无上下文裸未知载荷的模式读取、枚举相等/显示及 `?`/return
   （后者需块深度跟踪）。这是 L2 严格子集边界，不改变宿主或冻结
   语言面；十四审 B 不外推到本次代码。
+- **修订 13（2026-09-24）：String 批设计方案产出（动工前置，待用户
+  裁决）。** 交付 docs/designs/0004-l2.3-strings.md——基于 self_comp
+  （5437 行，String 编译侧六处拒绝点：ty_vt 签名层/infer_ex/comp_ex/
+  comp_println/comp_call 内建/match 模式层）与宿主 String 面
+  （tagged 布局、静态 data 段与动态堆对象同构、rt_add 拼接提升、
+  字节序比较、13 导入面）的读码对齐设计。值表示沿 0001 裁决 A甲
+  untagged 路线自然延伸（vt "st" = i64 裸指针，静态/动态同布局），
+  不设裁决点；三个裁决点待用户：**1 批次范围**（B1 值通道核心 /
+  +B2 拼接提升含 display 家族 / +B3 string 内建 11 个剥 tag 平移
+  （split 随 List 批推后）/ +B4 for-over-String——建议 B1+B2+B3
+  同批、B4 推后）；**2 println(Bool) 顺带解禁**（建议顺带，宿主支持
+  且 disp_bool 反正要写）；**3 Float display 通道**（甲 平移宿主
+  ftoa 导入与宿主同源【建议】/ 乙 L2 自写有精度风险 / 丙 B2 降档）。
+  L2 模块组装需新增 data(11) section（排 code(10) 后）与按需导入
+  print_str/ftoa；has_string 预扫与 heap_on 保守化；负例转正 4 个 +
+  保留改锁 1 个 + 新增负例 10-14 个。**代码零改动——纯设计文档
+  交付；动工在裁决后。**
