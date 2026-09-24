@@ -23,7 +23,7 @@
 
 【当前真实状态】
 - 仓库版本 v1.2.11（v1.2.9/v1.2.10/v1.2.11 tag 分别于 CI
-  #161/#165/#TBD 六 job 全绿后切；首回合仍须实查最新 main CI 与
+  #161/#165/#36004908755 六 job 全绿后切；首回合仍须实查最新 main CI 与
   annotations）；语言面与外部发布线冻结。
 - List 批功能提交的 CI 首跑六 job 全绿；annotations 预期仍为四条
   Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。Lom fmt
