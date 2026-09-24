@@ -22,13 +22,13 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.10（v1.2.9 tag 于 CI #161 六 job 全绿后切；v1.2.10
-  tag 待本次 String 批提交 CI 绿后切——首回合仍须实查最新 main CI
-  与 annotations）；语言面与外部发布线冻结。
-- String 批前主线提交 3cfd3e9 的 CI #163 六 job 全绿（交接文档记录
-  到 #162，实测 #163 同形态）；annotations 四条 Ubuntu 26 迁移
-  notice、零 warning/error。Lom fmt 递归覆盖 37 个有效示例
-  （apply_test 豁免）；Rust cargo fmt 本地零 diff，未进 CI。
+- 仓库版本 v1.2.10（v1.2.9/v1.2.10 tag 分别于 CI #161/#165 六 job
+  全绿后切；首回合仍须实查最新 main CI 与 annotations）；
+  语言面与外部发布线冻结。
+- String 批功能提交 20a29a3 的 CI #165 六 job 全绿；annotations
+  四条 Ubuntu 26 迁移 notice、零 warning/error。Lom fmt 递归覆盖
+  37 个有效示例（apply_test 豁免）；Rust cargo fmt 本地零 diff，
+  未进 CI。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
   复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
@@ -77,9 +77,19 @@
   i32 Bool 不可落到 f64 opcode。**c2 新教训**：泛型 vt 分隔符不得
   撞形参逗号/闭包签名 @；裸未知载荷 ? 不可猜读取宽度，嵌套枚举
   指针 `en:Tree{?}` 则仍为 i64；值位块赋值细化须进入预扫；
-  None 页尾仍先测变体后读载荷。
-- 下一步由用户裁决后续 String/List/Map/json/包/return 子批或
-  发起独立复审；另有 typechecker
+  None 页尾仍先测变体后读载荷。**String 批新教训**：load8 地址
+  显式 +4 又给 memarg offset=4 会双加（地址/offset 二选一带 4）；
+  sleb128 单字节界 [-64,63]——const ≥64 必须 "41"+sleb128_hex
+  动态生成（硬编码 "41 40" 解码为 -64）；宿主 pos-- 平移时 i32.sub
+  (6b) 勿抄成 i32.add (6a)；多 local helper 的局部号笔误（concat 的
+  lb 读了 la 所在 local）静态对拍可能碰巧掩盖——静态+动态组合用例
+  必测；i64 比较区段 0x51-0x5A（ge_s=0x59/le_s=0x57），验证器报
+  f32.gt 一类错先查操作数宽度；intern 的 data_len 推进必须按
+  UTF-8 字节数（len 头语义=字节）不是字符数；**改 README 行数锚
+  措辞前先查 doc_audit 正则**（本轮一次砸锚实录）。
+- 下一步由用户裁决后续 List/Map/json/包/return 子批或
+  发起独立复审（R79-R82 整改 + c2 + String 批后评级均待复审）；
+  另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
   迁移观察 2026-10-19。
@@ -91,10 +101,11 @@
    docs/reviews/review-2026-09-23.html（十四审——最新轮）及
    docs/reviews/review-2026-09-22-2.html（十三审旧基线），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
-   修订 1-12），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
-   含值表示/捕获语义决策记录）和 docs/designs/0002-l2.3-block-scopes.md
-   （R79/R82 共用作用域设计）与 docs/designs/0003-l2.3-generic-enums.md
-   （c2 泛型表示与边界）；涉及架构时再读 RFC-0003。
+   修订 1-14），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
+   含值表示/捕获语义决策记录）、docs/designs/0002-l2.3-block-scopes.md
+   （R79/R82 共用作用域设计）、docs/designs/0003-l2.3-generic-enums.md
+   （c2 泛型表示与边界）与 docs/designs/0004-l2.3-strings.md（String 批
+   设计与实施修正记录）；涉及架构时再读 RFC-0003。
 2. 顺序跑基线：
    - cargo build --release
    - cargo test --release（期望 535/535；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
@@ -110,9 +121,10 @@
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R79-R82 与 L2.3-c2
-   已交付；可选下一轮独立复审，或继续 String / List / Map / json /
-   包 / return 逐批交付。外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。R79-R82、L2.3-c2 与
+   String 批（B1+B2+B3）已交付；可选下一轮独立复审，或继续
+   List / Map / json / 包 / return 逐批交付（string_to_int/split/
+   for-String 留各自后续批）。外部发布线继续冻结。
 
 【状态锚点（当前行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价

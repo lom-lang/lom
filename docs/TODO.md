@@ -9,7 +9,12 @@
 > 拒绝、for-over-String 推后。verify_selfcomp 148/148 = 62 对拍 +
 > 86 负例（转正 4 + 改锁 1 + 新增 14）；self_comp 6578 行；存量
 > 52 用例产物 hex 逐字节不变（HEAD 版编译器对拍实证）。v1.2.10
-> tag 待 CI 绿后切。
+> 功能提交 20a29a3 的 CI #165 六 job 全绿后已切 tag；annotations
+> 四条 Ubuntu 26 迁移 notice、零 warning/error。**交接就绪**：
+> 下一步工作包（List/Map/json/包/return 逐批）或独立复审待用户
+> 裁决；语言面与外部发布线继续冻结。新维护者先复制
+> HANDOFF_PROMPT.md，读 HANDOVER 指定章节与十四审报告，跑 §2.2
+> 全量基线，再呈方向菜单等裁决。
 >
 > **前次交接声明（2026-09-23 L2.3-c2 交付）**：仓库版本 v1.2.9；
 > 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，
