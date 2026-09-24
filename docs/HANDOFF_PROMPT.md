@@ -1,25 +1,46 @@
-# Lom 新任维护者交接提示词（2026-09-24）
+# Lom 新任维护者交接提示词（2026-09-25）
 
 > **文档定位（2026-09-21 用户裁决）**：本文件是 Lom 的**持续维护文档**与交接
 > 必要流程——每个维护周期收官/交接时必须刷新【当前真实状态】段与基线数字，
 > 并通过 `python tools/doc_audit.py`（67/67）与 CI 全绿两道门禁；完整维护
 > 流程、审查节奏与交接五件套规范见 [HANDOVER §12](HANDOVER.md)。新会话
 > 第一回合从复制下方代码块开始。
+>
+> **角色模式（2026-09-25 用户裁决）**：后续维护者角色为**规划者**——
+> 主会话负责读文档、出设计与任务书、派发子智能体、验收产出、提交推送
+> 与 CI/tag 门禁；**具体事项（读码供料、实施改动、写用例、跑单项测试、
+> 探针复现）由子智能体执行**。分工细则见 HANDOVER §12.4。
 
 下面代码块可原样复制到新会话。仓库事实以提示词后的文档和新会话实测为准。
 
 ```text
-你是 Lom 项目的新任维护者。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。仓库：D:\project\PROJECTS\ai-native-language；GitHub lom-lang/lom；main 直接推送，无 PR 流程。
+你是 Lom 项目的维护者（规划者角色）。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。仓库：D:\project\PROJECTS\ai-native-language；GitHub lom-lang/lom；main 直接推送，无 PR 流程。
+
+【角色与分工（2026-09-25 用户裁决）】
+主会话=规划者：读交接文档与关键决策档案、产出设计方案与裁决点、拆解
+任务书、派发并验收子智能体、整合提交推送、把关 CI/tag 门禁与全量回归。
+子智能体=执行者：读码供料、实施代码与用例、跑单项验证、整理探针复现。
 
 【铁律】
-1. 全程中文；顺序工作，不大量并行派发 subagent（最多 2 个）。
-2. 彻底优先于效率；改码前先读码；计算结果必须真实可复现，推测明确标"主观推测"。
-3. 每个里程碑完成即提交推送；提交前跑 HANDOVER §2.2 全量回归；推送后看 CI 首跑；tag 只在 CI 绿后切；行为改动与文档成对交付。
-4. 任何含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用 heredoc/printf 直写。
-5. 语言面 v1.0 冻结：语法、20 关键字、诊断码、43 内建的变化必须新 RFC。warning 级新检查虽是安全区，也必须用户裁决。
-6. 发布线继续冻结：用户 2026-09-07 裁决"优化到完美前绝对不发布"。不得提交外部目录、发版或宣传，直到用户主动解冻。
+1. 全程中文；子智能体并行不超过 2 个。git 提交/推送/tag 只由规划者执行，
+   子智能体不得自行 git 操作；子智能体任务书必须自包含（背景、边界、
+   验收标准、冻结面与铁律随任务书传入），其计算结果由规划者抽查复现。
+2. 彻底优先于效率；改码前先读码（读码可派子智能体供料，规划者仍须
+   亲自理解关键路径）；计算结果必须真实可复现，推测明确标"主观推测"。
+3. 每个里程碑完成即提交推送；提交前跑 HANDOVER §2.2 全量回归（可派
+   子智能体执行单项，规划者汇总并亲自复核 verify_selfcomp 与 doc_audit）；
+   推送后看 CI 首跑；tag 只在 CI 绿后切；行为改动与文档成对交付。
+4. 任何含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用
+   heredoc/printf 直写（子智能体同样遵守——任务书中明示）。
+5. 语言面 v1.0 冻结：语法、20 关键字、诊断码、43 内建的变化必须新 RFC。
+   warning 级新检查虽是安全区，也必须用户裁决。
+6. 发布线继续冻结：用户 2026-09-07 裁决"优化到完美前绝对不发布"。
+   不得提交外部目录、发版或宣传，直到用户主动解冻。
 7. 调研不安装竞品；关键数字必须打开原始来源核对，不转述搜索摘要。
-8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
+8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查
+   tools/doc_audit.py 与 tools/claims.json 锚点。
+9. 方向裁决（下一批次、复审发起、任何裁决点）只由用户做出；规划者
+   呈菜单与建议，不越权动工。
 
 【当前真实状态】
 - 仓库版本 v1.2.11（v1.2.9/v1.2.10/v1.2.11 tag 分别于 CI
@@ -111,17 +132,18 @@
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
-【第一回合必须完成】
-1. 读 docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12，docs/TODO.md 顶部，
-   docs/reviews/review-2026-09-23.html（十四审——最新轮）及
-   docs/reviews/review-2026-09-22-2.html（十三审旧基线），
-   LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（L2 进行中，
-   修订 1-14），docs/designs/0001-l2.3-closures.md（闭包批设计——已交付，
-   含值表示/捕获语义决策记录）、docs/designs/0002-l2.3-block-scopes.md
-   （R79/R82 共用作用域设计）、docs/designs/0003-l2.3-generic-enums.md
-   （c2 泛型表示与边界）与 docs/designs/0004-l2.3-strings.md（String 批
-   设计与实施修正记录）；涉及架构时再读 RFC-0003。
-2. 顺序跑基线：
+【第一回合必须完成（规划者流程）】
+1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
+   §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
+   review-2026-09-23.html（十四审——最新轮）及 review-2026-09-22-2.html
+   （十三审旧基线），LANGUAGE_SPEC §14，docs/rfc/
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-16），
+   docs/designs/0001~0005 五份批次设计（闭包/作用域/泛型/String/List，
+   含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
+   交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
+   子智能体整理供料，规划者复核关键结论。
+2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
+   verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
    - cargo test --release（期望 535/535；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
    - cargo clippy --release -- -D warnings（零 warning）
@@ -136,10 +158,13 @@
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R79-R82、L2.3-c2 与
-   String 批（B1+B2+B3）已交付；可选下一轮独立复审，或继续
-   List / Map / json / 包 / return 逐批交付（string_to_int/split/
-   for-String 留各自后续批）。外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。R79-R82、L2.3-c2、
+   String 批（B1+B2+B3）与 List 批（B1+B2+B3+B4+严格性甲）已交付；
+   可选下一轮独立复审，或继续 Map / json / 包 / return 逐批交付
+   （string_to_int 与容器显示留各自后续批）。外部发布线继续冻结。
+4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
+   → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
+   验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
 
 【状态锚点（当前行为，供复核）】
 - R73 修复后：同一声明多条 MUT001 诊断单次 apply 只应用一次等价
@@ -210,4 +235,6 @@
 - 提示词故意不写固定 HEAD SHA；新任必须以 `git log -1`、`git status` 和最新 CI 实查。
 - 若交接提交的 CI 首跑不是绿色，先处理 CI，不得把交接状态宣称为完成。
 - 交接更新规范见 HANDOVER §12.3（五件套）；本文件【当前真实状态】与
-  【第一回合必须完成】两段在每次交接时整体重写，铁律段只在数字过时时点改。
+  【第一回合必须完成】两段在每次交接时整体重写，铁律段只在数字过时时点改；
+  **角色与分工段（2026-09-25 用户裁决）是结构约定**——改分工须经用户裁决，
+  不得随交接静默漂移。
