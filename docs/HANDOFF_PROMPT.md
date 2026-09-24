@@ -22,13 +22,13 @@
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查 tools/doc_audit.py 与 tools/claims.json 锚点。
 
 【当前真实状态】
-- 仓库版本 v1.2.10（v1.2.9/v1.2.10 tag 分别于 CI #161/#165 六 job
-  全绿后切；首回合仍须实查最新 main CI 与 annotations）；
-  语言面与外部发布线冻结。
-- String 批功能提交 20a29a3 的 CI #165 六 job 全绿；annotations
-  四条 Ubuntu 26 迁移 notice、零 warning/error。Lom fmt 递归覆盖
-  37 个有效示例（apply_test 豁免）；Rust cargo fmt 本地零 diff，
-  未进 CI。
+- 仓库版本 v1.2.11（v1.2.9/v1.2.10/v1.2.11 tag 分别于 CI
+  #161/#165/#TBD 六 job 全绿后切；首回合仍须实查最新 main CI 与
+  annotations）；语言面与外部发布线冻结。
+- List 批功能提交的 CI 首跑六 job 全绿；annotations 预期仍为四条
+  Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。Lom fmt
+  递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp 用例
+  全量；Rust cargo fmt 本地零 diff，未进 CI。
 - 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
   最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
   复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
@@ -37,23 +37,29 @@
   误拒；新增正反向测试锁定。维护会话已对四项原始主形态亲手复现。
   十三审 B+ 只属其旧基线 1418536/v1.2.5；十四审 B 不外推整改
   或 c2 后。事实源 docs/TODO.md 顶部。
-- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String 已实现）。
-  L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-14）：L2.1 spike +
-  L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流批** +
-  **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
+- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List 已
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-16）：
+  L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
+  批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
   与泛型用户 enum**（designs/0003）+ **L2.3 String 批 B1+B2+B3**
-  （designs/0004 三裁决点全按建议项：B1 值通道/B2 拼接提升/
-  B3 内建 10 个 + println(Bool) 顺带解禁 + Float display 平移宿主
-  ftoa 导入；vt "st"=i64 裸指针、data(11) 段 + print_str/ftoa 按需
-  导入 + scratch global；string_to_int（Int|Unit 联合 untagged 下
-  不可表达）与 split（返回 List）明确编译期拒绝、for-over-String
-  推后）。self_comp.lom 6578 行，verify_selfcomp **148/148 =
-  62 对拍 + 86 负例**（转正 4 + 改锁 1 + 新增 14）；**存量 52 用例
-  产物 hex 逐字节不变**（HEAD 版编译器对拍实证）。
+  （designs/0004 三裁决点全按建议项；string_to_int 明确编译期拒绝）
+  + **L2.3 List 批 B1+B2+B3+B4**（designs/0005 两裁决点全按建议项：
+  B1 值通道+7 非 HOF 内建+range+split 解禁+for-in-List / B2 HOF
+  三件按闭包签名与元素 vt 特化+去重 / B3 结构相等 Eq/NotEq 特化
+  递归 / B4 for-over-String（char_at 物化+UTF-8 步进）+ 编译期
+  严格性包（谓词 Bool/签名/元素不相容拒）；vt ls{T}、Nil=0 哨兵
+  （b 批伏笔兑现）、cons 槽 8B 按元素 vt 存取；ls{?} 由 cons/注解
+  补全（c2 ? 机制复用）；顺手收口 String 批存量缺口——无字面量
+  程序的 println(Bool) 产不可实例化 wasm（三层预扫+ibase 防御修复，
+  存量 hex 零影响）；println(List)/拼接提升 List 侧/大小比较/
+  管道语法（L2 从未支持，负例首登）明确拒）。self_comp.lom 7724
+  行，verify_selfcomp **174/174 = 74 对拍 + 100 负例**（转正
+  2 + 新增对拍 12 + 新负例 16）；**存量 62 用例产物 hex 逐字节
+  不变**（HEAD 版编译器 stash 对拍实证，fmt 归一后复验仍恒等）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
-  修订 14 交付**。List/Map/json/包/return 语句及 string_to_int/
-  split/for-String 等留后续批次，不可称 String 全覆盖。
+  修订 14、List 批按修订 16 交付**。Map/json/包/return 语句留后续
+  批次，不可称 List/容器全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -87,8 +93,17 @@
   f32.gt 一类错先查操作数宽度；intern 的 data_len 推进必须按
   UTF-8 字节数（len 头语义=字节）不是字符数；**改 README 行数锚
   措辞前先查 doc_audit 正则**（本轮一次砸锚实录）。
-- 下一步由用户裁决后续 List/Map/json/包/return 子批或
-  发起独立复审（R79-R82 整改 + c2 + String 批后评级均待复审）；
+- **List 批新教训（HANDOVER §11.6 详档）**：eqz 是**单字节无操作数
+  指令**（i64.eqz=0x50、i32.eqz=0x45）——"5000"/"4500" 带出的
+  0x00 是 unreachable 恒 trap（两枚实录）；**3 参 helper 的声明
+  local 从 local3 起**（参数占 0-2）——fold 沿用 2 参基址致 acc
+  覆盖 xs 参数静默错值；local 组数必须与组列表数一致（声明 5 组
+  只列 4 组 → 0x01 被读作 valtype）；预扫要消费**块尾 Tail**（
+  println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
+  map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
+  名不副实（string_pipeline 无管道语法）——查先例先验内容。
+- 下一步由用户裁决后续 Map/json/包/return 子批或
+  发起独立复审（R79-R82 整改 + c2 + String/List 批后评级均待复审）；
   另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
@@ -115,7 +130,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 148/148 = 62 用例双产物行为一致 + 86 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 174/174 = 74 用例双产物行为一致 + 100 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -161,7 +176,18 @@
   global+memory 导出。string_to_int（Int|Unit 联合）、split
   （List）、for-over-String、String 与数值比较、String 算术
   （非 +）、枚举/闭包显示均明确 COMPILE-ERROR 无 hex。
-  verify_selfcomp 148/148 = 62 对拍 + 86 负例；存量 52 用例
+- L2.3 List 批后：7 非 HOF 内建 + range a..b + split 解禁 +
+  for-in-List + HOF map/filter/fold（按闭包签名与元素 vt 特化
+  去重）+ 结构相等 Eq/NotEq（含嵌套表与 String 元素）+
+  for-over-String（char_at 物化 + UTF-8 步进）+ List 泛型载荷
+  （List<T>/en:Box{ls{i64}}/Result<Int,List<String>>）可编译；
+  vt ls{T}（list_empty 返回 ls{?} 由 cons/注解补全）、Nil=0、
+  cons 槽 8B 按元素 vt 存取。谓词 Bool/签名/元素不相容赋值/
+  range 非 Int/裸 ls{?} 读宽度、println(List)/拼接提升 List 侧/
+  大小比较/管道语法（L2 从未支持）均明确 COMPILE-ERROR 无 hex。
+  顺手收口 String 批存量缺口：无字面量程序的 println(Bool) 曾产
+  不可实例化 wasm（三层预扫 + ibase 防御修复，存量 hex 零影响）。
+  verify_selfcomp 174/174 = 74 对拍 + 100 负例；存量 62 用例
   hex 逐字节不变；十四审 B 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外

@@ -1,0 +1,21 @@
+# L2.3 List 批 B1：cons 构造与查询族（Int/Float/Bool/String 四元素表）。
+from list import { list_empty, list_cons, list_length, list_get, list_head, list_tail, list_is_empty }
+from string import { len }
+
+fn main() -> Unit ! [IO]
+    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    println(list_length(xs))
+    println(list_get(xs, 0))
+    println(list_get(xs, 2))
+    println(list_head(list_tail(xs)))
+    println(list_is_empty(list_empty()))
+    println(list_is_empty(xs))
+    let fs = list_cons(1.5, list_cons(2.5, list_empty()))
+    println(list_get(fs, 1))
+    let bs = list_cons(True, list_cons(False, list_empty()))
+    println(list_get(bs, 0))
+    println(list_get(bs, 1))
+    let ss = list_cons("lom", list_cons("list", list_empty()))
+    println(list_get(ss, 0))
+    println(len(list_get(ss, 1)))
+end

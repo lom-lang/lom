@@ -1,5 +1,0 @@
-# 负例：split 返回 List——随 List 批交付
-from string import {split}
-fn main() -> Unit ! [IO]
-    println(len(split("a,b", ",")))
-end

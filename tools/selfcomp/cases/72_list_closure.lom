@@ -1,0 +1,25 @@
+# L2.3 List 批：闭包与 List 组合（闭包捕获 List 值/List 作闭包参数与
+# 返回——ls vt 流经 sig 串与 8 字节捕获槽）。
+from list import { list_cons, list_empty, list_get, list_length }
+
+fn main() -> Unit ! [IO]
+    let xs = list_cons(4, list_cons(5, list_empty()))
+    let tail_of = fn(ys: List<Int>) -> List<Int>
+        ys
+    end
+    println(list_get(tail_of(xs), 0))
+    let counter = fn(seed: List<Int>) -> Int
+        list_length(seed) + 100
+    end
+    println(counter(xs))
+    let add_head = fn(n: Int) -> List<Int>
+        list_cons(n, xs)
+    end
+    println(list_get(add_head(9), 0))
+    println(list_length(add_head(9)))
+    let wrap = fn(ys: List<Int>) -> List<Int>
+        list_cons(list_get(ys, 0), ys)
+    end
+    println(list_length(wrap(xs)))
+    println(list_get(wrap(xs), 1))
+end

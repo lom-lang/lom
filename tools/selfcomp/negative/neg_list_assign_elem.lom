@@ -1,0 +1,6 @@
+from list import { list_empty, list_cons }
+fn main() -> Unit ! [IO]
+    let mut xs = list_cons(1, list_empty())
+    xs = list_cons(2.5, list_empty())
+    println(xs)
+end

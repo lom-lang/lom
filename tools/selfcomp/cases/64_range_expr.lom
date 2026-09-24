@@ -1,0 +1,18 @@
+# L2.3 List 批 B1：range 表达式（左闭右开；空区间/负区间边界）。
+from list import { list_length, list_get, list_is_empty }
+
+fn main() -> Unit ! [IO]
+    let xs = 2..6
+    println(list_length(xs))
+    println(list_get(xs, 0))
+    println(list_get(xs, 3))
+    let empty = 5..5
+    println(list_is_empty(empty))
+    let neg = -3..1
+    println(list_length(neg))
+    println(list_get(neg, 0))
+    println(list_get(neg, 3))
+    let n = 4
+    let ys = 1..n
+    println(list_length(ys))
+end

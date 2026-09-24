@@ -1,0 +1,20 @@
+# L2.3 List 批 B2：list_fold（acc 类型 ≠ 元素类型的 String 拼接 acc +
+# 空表返 init + 具名 f）。
+from list import { list_fold, list_empty, list_cons }
+from string import { split }
+
+fn add(a: Int, n: Int) -> Int
+    a + n
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..5
+    let total = list_fold(add, 0, xs)
+    println(total)
+    let joined = list_fold(fn(a: String, s: String) -> String a + s end, "<", split("a,b,c", ","))
+    println(joined)
+    let empty = list_fold(fn(a: Int, n: Int) -> Int a + n end, 42, list_empty())
+    println(empty)
+    let single = list_fold(fn(a: Int, n: Int) -> Int a * 10 + n end, 0, list_cons(7, list_empty()))
+    println(single)
+end

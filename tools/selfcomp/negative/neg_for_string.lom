@@ -1,5 +1,0 @@
-fn main() -> Unit ! [IO]
-    for c in "ab"
-        println(1)
-    end
-end

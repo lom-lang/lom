@@ -1,0 +1,5 @@
+from list import { list_empty, list_cons }
+fn main() -> Unit ! [IO]
+    let xs: List<Int> = list_cons(1.5, list_empty())
+    println(xs)
+end

@@ -1,0 +1,25 @@
+# L2.3 List 批 B2：list_map 特化（具名函数当值 f / 闭包字面量 f /
+# 元素类型改变 Int→String——特化键按 (elem, ret) 去重复用）。
+from list import { list_map, list_get, list_length }
+from string import { int_to_string }
+
+fn double(n: Int) -> Int
+    n * 2
+end
+
+fn show(n: Int) -> String
+    int_to_string(n)
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..5
+    let ys = list_map(double, xs)
+    println(list_get(ys, 3))
+    let ws = list_map(fn(n: Int) -> Int n + 10 end, xs)
+    println(list_get(ws, 0))
+    let ss = list_map(show, xs)
+    println(list_get(ss, 2))
+    let again = list_map(double, ys)
+    println(list_get(again, 3))
+    println(list_length(xs))
+end

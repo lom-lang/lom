@@ -1,0 +1,21 @@
+# L2.3 List 批 B4：for-in-String（neg_for_string 转正）——ASCII +
+# 多字节 UTF-8 步进（迭代变量是物化单字符 String，println(String)
+# 直接可用）。
+from string import { len }
+
+fn main() -> Unit ! [IO]
+    for c in "ab"
+        println(c)
+    end
+    for c in "你好"
+        println(c)
+    end
+    let s = "lom语言"
+    let mut n = 0
+    for c in s
+        if len(c) == 3
+            n = n + 1
+        end
+    end
+    println(n)
+end

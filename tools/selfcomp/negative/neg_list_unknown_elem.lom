@@ -1,0 +1,4 @@
+from list import { list_empty, list_head }
+fn main() -> Unit ! [IO]
+    println(list_head(list_empty()))
+end

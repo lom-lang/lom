@@ -1,0 +1,17 @@
+# L2.3 List 批 B1：split 解禁（neg_split_list 转正）——非空分隔符/空串/
+# 无匹配分隔符边界。
+from string import { split }
+from list import { list_length, list_get, list_is_empty }
+
+fn main() -> Unit ! [IO]
+    let parts = split("a,b,c", ",")
+    println(list_length(parts))
+    println(list_get(parts, 0))
+    println(list_get(parts, 2))
+    let chars = split("abc", "")
+    println(list_length(chars))
+    println(list_get(chars, 1))
+    let none = split("abc", "|")
+    println(list_length(none))
+    println(list_get(none, 0))
+end

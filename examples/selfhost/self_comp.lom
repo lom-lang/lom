@@ -2455,6 +2455,25 @@ fn enum_vt_make(name: String, args: List<String>) -> String
 end
 
 # ? 仅代表构造器未提供的信息，不代表任意动态值；已知参数必须逐层相等。
+# L2.3 List 批：ls{T} 判定与内层提取（designs/0005 §3）。单参数类型，
+# 首尾定界即可——嵌套内层（如 ls{ls{i64}} 的内层 "ls{i64}"）完整保留
+# 花括号，与 en:Name 多参数的深度拆分需求不同。
+fn ls_vt(vt: String) -> Bool
+    starts_with(vt, "ls{") and ends_with(vt, "}")
+end
+
+fn ls_inner(vt: String) -> String
+    let n = len(vt)
+    let chars = split(vt, "")
+    let mut out = ""
+    let mut i = 3
+    while i < n - 1
+        out = out + list_get(chars, i)
+        i = i + 1
+    end
+    out
+end
+
 fn vt_merge(a: String, b: String) -> Result<String, String>
     if a == b
         return Ok(a)
@@ -2464,6 +2483,11 @@ fn vt_merge(a: String, b: String) -> Result<String, String>
     end
     if b == "?"
         return Ok(a)
+    end
+    if ls_vt(a) and ls_vt(b)
+        # List 元素类型按结构合流（ls{?} 与 ls{i64} 合流为 ls{i64}——
+        # list_empty 的未知元素由 cons/注解补全，c2 ? 机制同族）
+        return Ok("ls{" + vt_merge(ls_inner(a), ls_inner(b))? + "}")
     end
     if enum_vt(a) and enum_vt(b)
         let aa = enum_vt_parts(a)?
@@ -2603,6 +2627,14 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
             end
         end
         TyGeneric(name, args) =>
+            # L2.3 List 批：List<T> → ls{T}（泛型枚举之外的唯一内建泛型；
+            # Map 等其余泛型仍留后续批次）
+            if name == "List"
+                if list_length(args) != 1
+                    return Err(subset_err("List 类型参数数不符（期望 1 得 " + list_length(args) + "）"))
+                end
+                return Ok("ls{" + ty_vt_with_params(list_get(args, 0), fns, tparams)? + "}")
+            end
             let meta = match map_get(fns, "@enum:" + name)
                 Some(m) => m
                 None => {idx: -1, ret: "", nprm: -1, prms: ""}
@@ -2655,7 +2687,7 @@ fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, p
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st"
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -2859,6 +2891,111 @@ end
 
 # 表达式的"返回段"综合（作为函数返回值时）：闭包值 → "cl"+sig（嵌套递归）；
 # 闭包调用的结果 = 被调 rv 段原样；其余 = infer_ex 的 base vt
+# L2.3 List 批：内建调用的动态返回类型综合（ex_rv 的 idx=-2 哨兵分派）。
+# string 内建（除 split）ret 静态；list 内建与 split 的返回依赖实参——
+# HOF 的 f 签名校验（裁决 2 甲：谓词 Bool / map、fold 签名）在此完成，
+# prms 摘要表达不了元素级约束。
+fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if name == "split"
+        return Ok("ls{st}")
+    end
+    if name == "list_empty"
+        return Ok("ls{?}")
+    end
+    if name == "list_length"
+        return Ok("i64")
+    end
+    if name == "list_is_empty"
+        return Ok("i32")
+    end
+    if name == "list_cons"
+        if list_length(args) != 2
+            return Err(subset_err("调用 'list_cons' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let hv = infer_ex(list_get(args, 0), env, fns)?
+        let xv = infer_ex(list_get(args, 1), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 'list_cons' 第 2 参类型不符（期望 List 得 " + xv + "）"))
+        end
+        return Ok("ls{" + vt_merge(hv, ls_inner(xv))? + "}")
+    end
+    if name == "list_head" or name == "list_get"
+        let xv = infer_ex(list_get(args, 0), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 '" + name + "' 期望 List 得 " + xv))
+        end
+        let inner = ls_inner(xv)
+        if inner == "?"
+            return Err(subset_err("未知 List 元素类型——需注解或构造上下文（" + name + "）"))
+        end
+        return Ok(inner)
+    end
+    if name == "list_tail"
+        let xv = infer_ex(list_get(args, 0), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 'list_tail' 期望 List 得 " + xv))
+        end
+        return Ok(xv)
+    end
+    if name == "list_map"
+        if list_length(args) != 2
+            return Err(subset_err("调用 'list_map' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        if sig_nprm(sig) != 1
+            return Err(subset_err("list_map 的 f 期望单参数闭包（得到 " + sig_nprm(sig) + " 参数）"))
+        end
+        let xv = infer_ex(list_get(args, 1), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 'list_map' 第 2 参类型不符（期望 List 得 " + xv + "）"))
+        end
+        # 元素类型 = f 形参与 xs 内层合流（ls{?} 由 f 签名补全）
+        let _ = vt_merge(sig_prm_at(sig, 0), ls_inner(xv))?
+        return Ok("ls{" + sig_rv(sig) + "}")
+    end
+    if name == "list_filter"
+        if list_length(args) != 2
+            return Err(subset_err("调用 'list_filter' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        if sig_nprm(sig) != 1
+            return Err(subset_err("list_filter 的 f 期望单参数闭包（得到 " + sig_nprm(sig) + " 参数）"))
+        end
+        if sig_rv(sig) != "i32"
+            return Err(subset_err("list_filter 谓词须返回 Bool（得到 " + sig_rv(sig) + "）"))
+        end
+        let xv = infer_ex(list_get(args, 1), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 'list_filter' 第 2 参类型不符（期望 List 得 " + xv + "）"))
+        end
+        let _ = vt_merge(sig_prm_at(sig, 0), ls_inner(xv))?
+        return Ok(xv)
+    end
+    if name == "list_fold"
+        if list_length(args) != 3
+            return Err(subset_err("调用 'list_fold' 实数量不符（期望 3 得 " + list_length(args) + "）"))
+        end
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        if sig_nprm(sig) != 2
+            return Err(subset_err("list_fold 的 f 期望双参数闭包（acc, elem）（得到 " + sig_nprm(sig) + " 参数）"))
+        end
+        let iv = infer_ex(list_get(args, 1), env, fns)?
+        let xv = infer_ex(list_get(args, 2), env, fns)?
+        if !ls_vt(xv)
+            return Err(subset_err("调用 'list_fold' 第 3 参类型不符（期望 List 得 " + xv + "）"))
+        end
+        let _ = vt_merge(sig_prm_at(sig, 0), iv)?
+        let _ = vt_merge(sig_prm_at(sig, 1), ls_inner(xv))?
+        let _ = vt_merge(sig_rv(sig), iv)?
+        return Ok(iv)
+    end
+    # string 内建（split 之外）：ret 静态，取注册摘要
+    match map_get(fns, name)
+        Some(fi) => Ok(fi.ret)
+        None => Err("调用未知函数 '" + name + "'")
+    end
+end
+
 fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match e
         ExClosure(params, reto, body) =>
@@ -2896,7 +3033,15 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                         Ok("void")
                     else
                         match map_get(fns, name)
-                            Some(fi) => Ok(fi.ret)
+                            Some(fi) =>
+                                # L2.3 List 批：内建哨兵（idx=-2）返回类型动态综合
+                                # （string 静态 / list 与 split 依赖实参元素类型）
+                                if fi.idx == -2
+                                    builtin_rv(name, args, env, fns)
+                                else
+                                    Ok(fi.ret)
+                                end
+                            end
                             None =>
                                 let s = ex_sig(callee, env, fns)?
                                 Ok(sig_rv(s))
@@ -3110,6 +3255,17 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                     end
                     return Err(subset_err("String 与非 String 比较（L2 子集外；宿主跨类型比较是运行时行为）"))
                 end
+                if ls_vt(lt) or ls_vt(rt)
+                    # L2.3 List 批（B3）：结构相等 Eq/NotEq 放行（特化递归 eq）；
+                    # 大小比较与跨类型比较明确拒（宿主跨类型 trap——L2 编译期拦）
+                    if ls_vt(lt) and ls_vt(rt) and (op == "Eq" or op == "NotEq")
+                        return Ok("i32")
+                    end
+                    if ls_vt(lt) and ls_vt(rt)
+                        return Err(subset_err("List 大小比较（L2 子集外；仅支持 ==/!=）"))
+                    end
+                    return Err(subset_err("List 与非 List 比较（L2 子集外）"))
+                end
                 if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                     return Err(subset_err("闭包/枚举值参与比较（结构相等留后续批次）"))
                 end
@@ -3129,6 +3285,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                     return Err(subset_err("闭包/枚举值的显示留后续批次（拼接提升）"))
                 end
+                if ls_vt(lt) or ls_vt(rt)
+                    return Err(subset_err("List 值的显示留后续批次（拼接提升；与 println(List) 同边界）"))
+                end
                 return Ok("st")
             end
             if lt == "void" or rt == "void"
@@ -3136,6 +3295,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                 return Err(subset_err("闭包/枚举值参与算术"))
+            end
+            if ls_vt(lt) or ls_vt(rt)
+                return Err(subset_err("List 参与算术（L2 子集外；仅支持 ==/!= 比较）"))
             end
             if lt == "st" or rt == "st"
                 return Err(subset_err("String 只参与 + 拼接"))
@@ -3161,6 +3323,16 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
         ExIf(ifr) => infer_if_expr(ifr, env, fns)
         ExMatch(scrut, arms, _) => infer_match_expr(scrut, arms, env, fns)
         ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
+        ExRange(a, b) =>
+            # L2.3 List 批：a..b → ls{i64}（左闭右开）；两端须 Int
+            # （宿主 TYPE001 warning 的编译期严格化——R68 同族）
+            let lt = infer_ex(a, env, fns)?
+            let rt = infer_ex(b, env, fns)?
+            if lt != "i64" or rt != "i64"
+                return Err(subset_err("range 两端须为 Int（得到 '" + lt + "' 与 '" + rt + "'）"))
+            end
+            Ok("ls{i64}")
+        end
         ExCall(callee, _) =>
             # L2.3-b：统一走 ex_rv（直调 println/fns → ret；闭包调用 → 被调
             # rv 段；任意 callee 同口径）——返回段 → vt
@@ -3511,6 +3683,14 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
         end
         ExMatch(scrut, arms, _) => comp_match_expr(scrut, arms, env, fns, cg, locals, localvt)
         ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
+        ExRange(a, b) =>
+            # L2.3 List 批：call rt_ls_range（infer 已保证两端 i64）
+            let _ = need_heap(cg)?
+            let idx = ensure_ls_helper("ls_range", cg)?
+            let ac = comp_ex(a, env, fns, cg, locals, localvt)?
+            let bc = comp_ex(b, env, fns, cg, locals, localvt)?
+            Ok(ac + bc + "10" + leb128_hex(idx))
+        end
         ExCall(callee, args) => comp_call(callee, args, env, fns, cg, locals, localvt)
         _ => Err(subset_err("该表达式形态"))
     end
@@ -3668,6 +3848,19 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
             end
             let idx = ensure_str_helper("st_cmp", cg)?
             return Ok(lc + rc + "10" + leb128_hex(idx) + "4100" + i32_ord_op(op)?)
+        end
+        # L2.3 List 批（B3）：结构相等 Eq/NotEq 走特化递归 eq（元素按
+        # vt 分派——infer 已放行 Eq/NotEq、拒大小比较与跨类型）
+        if ls_vt(left_vt) and ls_vt(right_vt)
+            let elem = vt_merge(ls_inner(left_vt), ls_inner(right_vt))?
+            if elem == "?"
+                return Err(subset_err("未知 List 元素类型——需注解或构造上下文（== 比较）"))
+            end
+            let idx = ensure_ls_helper("ls_eq|" + elem, cg)?
+            if op == "Eq"
+                return Ok(lc + rc + "10" + leb128_hex(idx))
+            end
+            return Ok(lc + rc + "10" + leb128_hex(idx) + "45")
         end
         if left_vt == "i32" and right_vt == "i32"
             return Ok(lc + rc + i32_cmp_op(op)?)
@@ -3902,6 +4095,10 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                 Some(fi) =>
                     # L2.3 String 批：内建摘要哨兵（idx=-2）→ helper 分派
                     if fi.idx == -2
+                        # L2.3 List 批：list 内建与 split 走 list 编译路径
+                        if starts_with(name, "list_") or name == "split"
+                            return comp_list_builtin(name, args, env, fns, cg, locals, localvt)
+                        end
                         return comp_builtin_call(name, fi, args, env, fns, cg, locals, localvt)
                     end
                     # R74（十二审）：调用点校验 arity 与逐实参类型——不符即
@@ -3967,6 +4164,125 @@ fn comp_builtin_call(name: String, fi: {idx: Int, ret: String, nprm: Int, prms: 
     Ok(out + "10" + leb128_hex(hidx))
 end
 
+# L2.3 List 批：list 内建调用编译（designs/0005 §6）。empty/is_empty/
+# head/tail/cons 调用点内联（对齐宿主形态）；length/get 走 helper；
+# HOF 三件按 f 签名与元素 vt 特化分派（特化键 "|" 分隔）。
+fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let ent =
+    if name == "split"
+        st_builtin_entry(name)?
+    else
+        li_builtin_entry(name)?
+    end
+    if list_length(args) != ent.nprm
+        return Err(subset_err("调用 '" + name + "' 实数量不符（期望 " + ent.nprm + " 得 " + list_length(args) + "）"))
+    end
+    # 逐参校验（prms 摘要——ls{?} 万能列表型经 vt_merge 合流）+ 编译
+    let want = split(ent.prms, ",")
+    let mut out = ""
+    let mut i = 0
+    while i < list_length(args)
+        let a = list_get(args, i)
+        let at = infer_ex(a, env, fns)?
+        if ent.nprm > 0
+            let w = list_get(want, i)
+            if !vt_compatible(at, w)
+                return Err(subset_err("调用 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
+            end
+        end
+        out = out + comp_ex(a, env, fns, cg, locals, localvt)?
+        i = i + 1
+    end
+    if name == "list_empty"
+        return Ok(out + "4200")
+    end
+    if name == "list_is_empty"
+        return Ok(out + "50")
+    end
+    if name == "list_head" or name == "list_tail"
+        # 暂存 xs → 空表 trap（unreachable，双侧 rc1 一致）→ 按 vt 读槽
+        let xv = infer_ex(list_get(args, 0), env, fns)?
+        let t = new_slot(locals, localvt, xv)
+        let base = out + "21" + leb128_hex(t)
+        + "20" + leb128_hex(t) + "50" + "0440" + "00" + "0b"
+        if name == "list_tail"
+            return Ok(base + "20" + leb128_hex(t) + "a7" + "2900" + "08")
+        end
+        let elem = ls_inner(xv)
+        if elem == "f64"
+            return Ok(base + "20" + leb128_hex(t) + "a7" + "2b00" + "00")
+        end
+        if elem == "i32"
+            return Ok(base + "20" + leb128_hex(t) + "a7" + "2900" + "00" + "a7")
+        end
+        return Ok(base + "20" + leb128_hex(t) + "a7" + "2900" + "00")
+    end
+    if name == "list_length"
+        let idx = ensure_ls_helper("ls_len", cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "list_get"
+        let xv = infer_ex(list_get(args, 0), env, fns)?
+        let elem = ls_inner(xv)
+        let idx = ensure_ls_helper("ls_get|" + elem, cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "list_cons"
+        # 内联 alloc 16 + store head（按元素 vt）/ tail
+        let _ = need_heap(cg)?
+        let hv = infer_ex(list_get(args, 0), env, fns)?
+        let xsv = infer_ex(list_get(args, 1), env, fns)?
+        let h_l = new_slot(locals, localvt, hv)
+        let xs_l = new_slot(locals, localvt, xsv)
+        let cell = new_slot(locals, localvt, "i32")
+        let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+        let st_h =
+        if hv == "f64"
+            "20" + leb128_hex(cell) + "20" + leb128_hex(h_l) + "3900" + "00"
+        else
+            if hv == "i32"
+                "20" + leb128_hex(cell) + "20" + leb128_hex(h_l) + "ac" + "3700" + "00"
+            else
+                "20" + leb128_hex(cell) + "20" + leb128_hex(h_l) + "3700" + "00"
+            end
+        end
+        return Ok(out
+            + "21" + leb128_hex(xs_l) + "21" + leb128_hex(h_l)
+            + "4110" + "10" + leb128_hex(alloc_idx) + "21" + leb128_hex(cell)
+            + st_h
+            + "20" + leb128_hex(cell) + "20" + leb128_hex(xs_l) + "3700" + "08"
+            + "20" + leb128_hex(cell) + "ad")
+    end
+    if name == "list_map"
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        let xv = infer_ex(list_get(args, 1), env, fns)?
+        let elem = vt_merge(sig_prm_at(sig, 0), ls_inner(xv))?
+        let ret = sig_rv(sig)
+        let idx = ensure_ls_helper("ls_map|" + elem + "|" + ret, cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "list_filter"
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        let xv = infer_ex(list_get(args, 1), env, fns)?
+        let elem = vt_merge(sig_prm_at(sig, 0), ls_inner(xv))?
+        let idx = ensure_ls_helper("ls_filter|" + elem, cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "list_fold"
+        let sig = ex_sig(list_get(args, 0), env, fns)?
+        let av = infer_ex(list_get(args, 1), env, fns)?
+        let xv = infer_ex(list_get(args, 2), env, fns)?
+        let elem = vt_merge(sig_prm_at(sig, 1), ls_inner(xv))?
+        let idx = ensure_ls_helper("ls_fold|" + av + "|" + elem, cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "split"
+        let idx = ensure_ls_helper("ls_split", cg)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    Err(subset_err("内部错误：list 内建分派遗漏 '" + name + "'"))
+end
+
 # println(String) 的打印序列：ptr_code（栈上 i64）→ 存 local →
 # print_str(p+4, len) + print_str(0,1)（'\n' 在 data offset 0）
 fn print_st_hex(ptr_code: String, locals: Map<String, Int>, localvt: Map<String, String>) -> String
@@ -3994,11 +4310,17 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                 Ok(print_st_hex(ac, locals, localvt))
             else
                 if at == "i32"
-                    # L2.3 String 批顺带解禁（裁决 2）：Bool → "true"/"false" 静态串
+                    # L2.3 String 批顺带解禁（裁决 2）：Bool → "true"/"false" 静态串。
+                    # List 批实施中发现：无 String 程序里 has_string 预扫不识
+                    # Bool 显示——三层预扫（scan_has_bool_display）覆盖自然
+                    # 写法；深层 Bool 流到此防御兜底拒绝（不产坏 wasm）
+                    if cg_int(cg.cgs, "ibase") < 4
+                        return Err(subset_err("println(Bool) 需要 String 设施（data/print_str）——深层 Bool 流未被预扫覆盖（如跨函数参数传递）；用局部比较或含 String 字面量/签名的形态"))
+                    end
                     let pc = disp_code(ac, "i32", cg)?
                     Ok(print_st_hex(pc, locals, localvt))
                 else
-                    Err(subset_err("println 只接受 Int/Float/String/Bool（枚举显示留后续批次）"))
+                    Err(subset_err("println 只接受 Int/Float/String/Bool（List/枚举显示留后续批次）"))
                 end
             end
         end
@@ -4722,6 +5044,369 @@ end
 # String helper 注册（cgh "hidx:<name>" 去重；type/body 追加 extra 区）。
 # heap 依赖 helper 在注册前调用 need_heap 防御（预扫漏判 fail-safe）。
 # ftoa 导入 idx 恒为 3（has_str 布局：0/1=print_i64/f64、2=print_str、3=ftoa）。
+# ============================================================================
+# L2.3 List 批（designs/0005）：helper 本体生成（宿主 wasm_codegen 平移，
+# 剥 tag——值通道全裸 i64；Nil=0 哨兵，cons 单元 [head:8B][tail:8B]，
+# 偏移 0/8 与宿主一致）。特化族（map/filter/fold/eq）按 vt 参数化。
+# ============================================================================
+
+# rt_ls_len: (i64 xs) -> i64；locals 2=cur,3=n（i64）——参数占 local 0，
+# 声明 3 个（1..3）
+fn ls_len_body() -> String
+    "01037e"
+    + "2000" + "2102"
+    + "4200" + "2103"
+    + "0240" + "0340"
+    + "2002" + "50" + "0d01"
+    + "2003" + "4201" + "7c" + "2103"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "0c00"
+    + "0b" + "0b"
+    + "2003"
+    + "0b"
+end
+
+# rt_ls_get<elem>: (i64 xs, i64 i) -> i64/elem；越界 trap（Nil 到达即
+# unreachable——对齐宿主 rt_list_get/解释器越界错误的双侧一致 rc1）。
+# head 读出按元素 vt（f64 → f64.load / i32 → wrap）——B1 实施修正：
+# 首版恒 i64 读出，Float 元素表经 get 后流入 print_f64 产类型错
+# locals 2=cur,3=k（i64）
+fn ls_get_body(elem_vt: String) -> Result<String, String>
+    let head_ld = ls_load_head(2, elem_vt)?
+    Ok("01027e"
+    + "2000" + "2102"
+    + "2001" + "2103"
+    + "0240" + "0340"
+    + "2002" + "50" + "0440" + "00" + "0b"
+    + "2003" + "4200" + "57" + "0d01"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "2003" + "4201" + "7d" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + head_ld
+    + "0b")
+end
+
+# rt_ls_range: (i64 a, i64 b) -> i64；左闭右开（宿主 build_range 平移：
+# v 从 b 递减，先减后 cons）
+# locals 2=v,3=list（i64）、4=cell（i32）
+fn ls_range_body(alloc_idx: Int) -> String
+    "02" + "027e" + "017f"
+    + "2001" + "2102"
+    + "4200" + "2103"
+    + "0240" + "0340"
+    + "2002" + "2000" + "57" + "0d01"
+    + "2002" + "4201" + "7d" + "2102"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2104"
+    + "2004" + "2002" + "3700" + "00"
+    + "2004" + "2003" + "3700" + "08"
+    + "2004" + "ad" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2003"
+    + "0b"
+end
+
+# rt_ls_substr: (i64 s, i64 start, i64 end) -> i64 Str（字节切片；调用方
+# 保证 0<=start<=end<=len——宿主 build_substr 平移）
+# locals 3=ps,4=st,5=p,6=len,7=i（i32）
+fn ls_substr_body(alloc_idx: Int) -> String
+    "01057f"
+    + "2000" + "a7" + "2103"
+    + "2001" + "a7" + "2104"
+    + "2002" + "a7" + "2004" + "6b" + "2106"
+    + "2006" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2006" + "3600" + "00"
+    + "4100" + "2107"
+    + "0240" + "0340"
+    + "2007" + "2006" + "4f" + "0d01"
+    + "2005" + "4104" + "6a" + "2007" + "6a"
+    + "2003" + "4104" + "6a" + "2004" + "6a" + "2007" + "6a" + "2d00" + "00"
+    + "3a00" + "00"
+    + "2007" + "4101" + "6a" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "2005" + "ad"
+    + "0b"
+end
+
+# rt_char_at: (i64 s, i64 off) -> i64 单字符 Str（物化；宿主
+# build_str_char_at 平移——首字节前缀判长度 + alloc + 拷贝）
+# locals 2=ps,3=off,4=clen,5=p,6=i（i32）
+fn ls_char_at_body(alloc_idx: Int) -> String
+    "01067f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2103"
+    + "4101" + "2104"
+    + "2002" + "4104" + "6a" + "2003" + "6a" + "2d00" + "00" + "41" + sleb128_hex(240) + "4f"
+    + "0440" + "4104" + "2104" + "05"
+    + "2002" + "4104" + "6a" + "2003" + "6a" + "2d00" + "00" + "41" + sleb128_hex(224) + "4f"
+    + "0440" + "4103" + "2104" + "05"
+    + "2002" + "4104" + "6a" + "2003" + "6a" + "2d00" + "00" + "41" + sleb128_hex(192) + "4f"
+    + "0440" + "4102" + "2104"
+    + "0b"
+    + "0b"
+    + "0b"
+    + "2004" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2004" + "3600" + "00"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2004" + "4f" + "0d01"
+    + "2005" + "4104" + "6a" + "2006" + "6a"
+    + "2002" + "4104" + "6a" + "2003" + "6a" + "2006" + "6a" + "2d00" + "00"
+    + "3a00" + "00"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "2005" + "ad"
+    + "0b"
+end
+
+# rt_ls_split: (i64 s, i64 sep) -> i64 ls{st}；空 sep 逐字符（UTF-8）、
+# 非空按子串（含尾段——宿主 build_split 平移）。
+# locals 2=ps,3=ls,4=pf,5=lf,6=i,7=start,8=j,9=mf（i32）、10=out,11=tmp（i64）、12=cell（i32）
+fn ls_split_body(alloc_idx: Int, charat_idx: Int, substr_idx: Int) -> String
+    "03" + "08" + "7f" + "02" + "7e" + "01" + "7f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2104"
+    + "2002" + "2800" + "00" + "2103"
+    + "2004" + "2800" + "00" + "2105"
+    + "4200" + "210a"
+    + "2005" + "45" + "0440"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2003" + "4f" + "0d01"
+    + "2000" + "2006" + "ad" + "10" + leb128_hex(charat_idx) + "210b"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "210c"
+    + "200c" + "200b" + "3700" + "00"
+    + "200c" + "200a" + "3700" + "08"
+    + "200c" + "ad" + "210a"
+    + "200b" + "a7" + "2800" + "00" + "2006" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "05"
+    + "4100" + "2106" + "4100" + "2107"
+    + "0240" + "0340"
+    + "2006" + "2005" + "6a" + "2003" + "4a" + "0d01"
+    + "4101" + "2109"
+    + "4100" + "2108"
+    + "0240" + "0340"
+    + "2008" + "2005" + "4f" + "0d01"
+    + "2002" + "4104" + "6a" + "2006" + "6a" + "2008" + "6a" + "2d00" + "00"
+    + "2004" + "4104" + "6a" + "2008" + "6a" + "2d00" + "00"
+    + "47"
+    + "0440" + "4100" + "2109" + "0c02" + "0b"
+    + "2008" + "4101" + "6a" + "2108"
+    + "0c00"
+    + "0b" + "0b"
+    + "2009" + "0440"
+    + "2000" + "2007" + "ad" + "2006" + "ad" + "10" + leb128_hex(substr_idx) + "210b"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "210c"
+    + "200c" + "200b" + "3700" + "00"
+    + "200c" + "200a" + "3700" + "08"
+    + "200c" + "ad" + "210a"
+    + "2006" + "2005" + "6a" + "2106"
+    + "2006" + "2107"
+    + "05"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0b"
+    + "0c00"
+    + "0b" + "0b"
+    + "2000" + "2007" + "ad" + "2003" + "ad" + "10" + leb128_hex(substr_idx) + "210b"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "210c"
+    + "200c" + "200b" + "3700" + "00"
+    + "200c" + "200a" + "3700" + "08"
+    + "200c" + "ad" + "210a"
+    + "0b"
+    + "4200" + "210b"
+    + "0240" + "0340"
+    + "200a" + "50" + "0d01"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "210c"
+    + "200c" + "200a" + "a7" + "2900" + "00" + "3700" + "00"
+    + "200c" + "200b" + "3700" + "08"
+    + "200c" + "ad" + "210b"
+    + "200a" + "a7" + "2900" + "08" + "210a"
+    + "0c00"
+    + "0b" + "0b"
+    + "200b"
+    + "0b"
+end
+
+# 元素读取发射（栈上留 i32 cons 指针 → 按元素 vt 读 head 槽）
+fn ls_load_head(cur_l: Int, vt: String) -> Result<String, String>
+    let base = "20" + leb128_hex(cur_l) + "a7"
+    if vt == "f64"
+        Ok(base + "2b00" + "00")
+    elif vt == "i32"
+        Ok(base + "2900" + "00" + "a7")
+    else
+        Ok(base + "2900" + "00")
+    end
+end
+
+# 槽值写入发射（栈上 [cell i32][值]——i32 值先 extend）
+fn ls_store_val(cell_l: Int, val_l: Int, vt: String) -> Result<String, String>
+    let base = "20" + leb128_hex(cell_l) + "20" + leb128_hex(val_l)
+    if vt == "f64"
+        Ok(base + "3900" + "00")
+    elif vt == "i32"
+        Ok(base + "ac" + "3700" + "00")
+    else
+        Ok(base + "3700" + "00")
+    end
+end
+
+# vt → WASM local 类型字节
+fn ls_vt_bt(vt: String) -> Result<String, String>
+    if vt == "f64"
+        Ok("7c")
+    elif vt == "i32"
+        Ok("7f")
+    else
+        if vt == "i64" or vt == "st" or ls_vt(vt) or enum_vt(vt) or vt == "cl"
+            Ok("7e")
+        else
+            Err(subset_err("List 元素类型子集外（'" + vt + "'）"))
+        end
+    end
+end
+
+# rt_ls_map<elem,ret>: (i64 f, i64 xs) -> i64；保序（反构再反转）。
+# locals 2=cur,3=out（i64）、4=head(elem)、5=frv(ret)、6=cell(i32)、7=res(i64)
+fn ls_map_body(elem_vt: String, ret_vt: String, alloc_idx: Int, tidx: Int) -> Result<String, String>
+    let eb = ls_vt_bt(elem_vt)?
+    let rb = ls_vt_bt(ret_vt)?
+    let head_ld = ls_load_head(2, elem_vt)?
+    let rv_st = ls_store_val(6, 5, ret_vt)?
+    # 反转段：遍历指针是 local 3（out），读头/存头都按它——主循环的
+    # local 2（cur）在反转段是旧值。String 批 concat 局部号笔误同款（§11.6）
+    let rev_ld = ls_load_head(3, elem_vt)?
+    let hd_st = ls_store_val(6, 4, elem_vt)?
+    Ok("05" + "02" + "7e" + "01" + eb + "01" + rb + "01" + "7f" + "01" + "7e"
+    + "2001" + "2102"
+    + "4200" + "2103"
+    + "0240" + "0340"
+    + "2002" + "50" + "0d01"
+    + head_ld + "2104"
+    + "2000" + "a7" + "2800" + "04" + "ad"
+    + "2004"
+    + "2000" + "a7" + "2800" + "00"
+    + "11" + leb128_hex(tidx) + "00"
+    + "2105"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2106"
+    + rv_st
+    + "2006" + "2003" + "3700" + "08"
+    + "2006" + "ad" + "2103"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "0c00"
+    + "0b" + "0b"
+    + "4200" + "2107"
+    + "0240" + "0340"
+    + "2003" + "50" + "0d01"
+    + rev_ld + "2104"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2106"
+    + hd_st
+    + "2006" + "2007" + "3700" + "08"
+    + "2006" + "ad" + "2107"
+    + "2003" + "a7" + "2900" + "08" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2007"
+    + "0b")
+end
+
+# rt_ls_filter<elem>: (i64 f, i64 xs) -> i64；谓词结果 i32 直接 if
+# （Bool 已在编译期校验——builtin_rv 校验 #5，无 truthy 运行时面）。
+# locals 2=cur,3=out（i64）、4=head(elem)、5=cell(i32)、6=res(i64)
+fn ls_filter_body(elem_vt: String, alloc_idx: Int, tidx: Int) -> Result<String, String>
+    let eb = ls_vt_bt(elem_vt)?
+    let head_ld = ls_load_head(2, elem_vt)?
+    let rev_ld = ls_load_head(3, elem_vt)?
+    let head_st = ls_store_val(5, 4, elem_vt)?
+    Ok("04" + "02" + "7e" + "01" + eb + "01" + "7f" + "01" + "7e"
+    + "2001" + "2102"
+    + "4200" + "2103"
+    + "0240" + "0340"
+    + "2002" + "50" + "0d01"
+    + head_ld + "2104"
+    + "2000" + "a7" + "2800" + "04" + "ad"
+    + "2004"
+    + "2000" + "a7" + "2800" + "00"
+    + "11" + leb128_hex(tidx) + "00"
+    + "0440"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + head_st
+    + "2005" + "2003" + "3700" + "08"
+    + "2005" + "ad" + "2103"
+    + "0b"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "0c00"
+    + "0b" + "0b"
+    + "4200" + "2106"
+    + "0240" + "0340"
+    + "2003" + "50" + "0d01"
+    + rev_ld + "2104"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + head_st
+    + "2005" + "2006" + "3700" + "08"
+    + "2005" + "ad" + "2106"
+    + "2003" + "a7" + "2900" + "08" + "2103"
+    + "0c00"
+    + "0b" + "0b"
+    + "2006"
+    + "0b")
+end
+
+# rt_ls_fold<acc,elem>: (i64 f, i64 init, i64 xs) -> i64 acc（正向，无新表）
+# locals 2=acc(rvt)、3=cur(i64)、4=head(elem)
+fn ls_fold_body(acc_vt: String, elem_vt: String, tidx: Int) -> Result<String, String>
+    let ab = ls_vt_bt(acc_vt)?
+    let eb = ls_vt_bt(elem_vt)?
+    # 参数占 local 0-2（f/init/xs），声明 local 从 3 起：
+    # 3=acc、4=cur、5=head（3 参 helper 的基址偏移——map/filter 是 2 参
+    # 从 2 起，本函数曾沿用 2 起导致 acc 覆盖 xs 参数）
+    let head_ld = ls_load_head(4, elem_vt)?
+    Ok("03" + "01" + ab + "01" + "7e" + "01" + eb
+    + "2001" + "2103"
+    + "2002" + "2104"
+    + "0240" + "0340"
+    + "2004" + "50" + "0d01"
+    + head_ld + "2105"
+    + "2000" + "a7" + "2800" + "04" + "ad"
+    + "2003"
+    + "2005"
+    + "2000" + "a7" + "2800" + "00"
+    + "11" + leb128_hex(tidx) + "00"
+    + "2103"
+    + "2004" + "a7" + "2900" + "08" + "2104"
+    + "0c00"
+    + "0b" + "0b"
+    + "2003"
+    + "0b")
+end
+
+# rt_ls_eq<elem>: (i64 a, i64 b) -> i32；双指针齐步、head 按元素 vt 特化
+# 比较（宿主 build_list_eq 平移）。eq_op 是 head 比较发射段（i64/i32 直
+# opcode、st/嵌套 ls 为 call 序列）。
+# locals 2=ca,3=cb（i64）
+fn ls_eq_body(eq_op: String) -> String
+    "01027e"
+    + "2000" + "2102"
+    + "2001" + "2103"
+    + "0340"
+    + "2002" + "50" + "0440" + "2003" + "50" + "0f" + "0b"
+    + "2003" + "50" + "0440" + "4100" + "0f" + "0b"
+    + eq_op
+    + "45" + "0440" + "4100" + "0f" + "0b"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "2003" + "a7" + "2900" + "08" + "2103"
+    + "0c00"
+    + "0b"
+    + "00"
+    + "0b"
+end
+
+
 fn ensure_str_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
     match map_get(cg.cgh, "hidx:" + name)
         Some(idx_s) =>
@@ -4788,6 +5473,194 @@ fn ensure_str_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, 
             let fidx = reg_extra_fn(tidx, body, cg)
             map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
             Ok(fidx)
+        end
+    end
+end
+
+
+# L2.3 List 批：helper 注册（hidx 与 String 批共享空间去重）。特化键用
+# "|" 分隔参数（vt 字符集不含 "|"——"ls_map|<elem>|<ret>"、
+# "ls_filter|<elem>"、"ls_fold|<acc>|<elem>"、"ls_eq|<elem>"）。
+# 依赖序：range/substr/char_at 仅 alloc；split 先确保 char_at/substr；
+# map/filter 需 alloc + f 闭包签名 typeidx；eq 的 st/嵌套 ls 元素先
+# 确保内层比较（递归特化）。
+fn ensure_ls_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
+    match map_get(cg.cgh, "hidx:" + name)
+        Some(idx_s) =>
+            match string_to_int(idx_s)
+                n => Ok(n)
+            end
+        end
+        None =>
+            let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+            let parts = split(name, "|")
+            let head = list_get(parts, 0)
+            let tyhex =
+            if head == "ls_len"
+                "60017e017e"
+            else
+                if head == "ls_get" or head == "ls_range"
+                    "60027e7e017e"
+                else
+                    if head == "ls_substr" or head == "ls_char_at" or head == "ls_split"
+                        "60037e7e7e017e"
+                    else
+                        if head == "ls_eq"
+                            "60027e7e017f"
+                        else
+                            "60027e7e017e"
+                        end
+                    end
+                end
+            end
+            if head == "ls_substr" or head == "ls_char_at"
+                # alloc 类（堆分配对象）——预扫覆盖的调用点 heap_on 已开
+                let _ = need_heap(cg)?
+                # (i64, i64, i64) 修正：substr/char_at 是三参/两参区分
+                let tyhex2 =
+                if head == "ls_substr"
+                    "60037e7e7e017e"
+                else
+                    "60027e7e017e"
+                end
+                let body =
+                if head == "ls_substr"
+                    ls_substr_body(alloc_idx)
+                else
+                    ls_char_at_body(alloc_idx)
+                end
+                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex2)
+                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                let fidx = reg_extra_fn(tidx, body, cg)
+                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                Ok(fidx)
+            else
+                if head == "ls_len"
+                    let body = ls_len_body()
+                    let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex)
+                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                    let fidx = reg_extra_fn(tidx, body, cg)
+                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                    Ok(fidx)
+                else
+                    if head == "ls_get"
+                        let elem = list_get(parts, 1)
+                        let body = ls_get_body(elem)?
+                        let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                        map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e" + "01" + vt_hex(elem))
+                        map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                        let fidx = reg_extra_fn(tt, body, cg)
+                        map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                        Ok(fidx)
+                    else
+                        if head == "ls_range"
+                            let _ = need_heap(cg)?
+                            let body = ls_range_body(alloc_idx)
+                            let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex)
+                            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                            let fidx = reg_extra_fn(tidx, body, cg)
+                            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                            Ok(fidx)
+                        else
+                            if head == "ls_split"
+                                let _ = need_heap(cg)?
+                                let ca = ensure_ls_helper("ls_char_at", cg)?
+                                let su = ensure_ls_helper("ls_substr", cg)?
+                                let body = ls_split_body(alloc_idx, ca, su)
+                                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017e")
+                                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                let fidx = reg_extra_fn(tidx, body, cg)
+                                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                Ok(fidx)
+                            else
+                                if head == "ls_map"
+                                    let _ = need_heap(cg)?
+                                    let elem = list_get(parts, 1)
+                                    let ret = list_get(parts, 2)
+                                    let tidx = sig_typeidx(mk_sig(elem, ret), cg)
+                                    let body = ls_map_body(elem, ret, alloc_idx, tidx)?
+                                    let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017e")
+                                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                    let fidx = reg_extra_fn(tt, body, cg)
+                                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                    Ok(fidx)
+                                else
+                                    if head == "ls_filter"
+                                        let _ = need_heap(cg)?
+                                        let elem = list_get(parts, 1)
+                                        let tidx = sig_typeidx(mk_sig(elem, "i32"), cg)
+                                        let body = ls_filter_body(elem, alloc_idx, tidx)?
+                                        let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                        map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017e")
+                                        map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                        let fidx = reg_extra_fn(tt, body, cg)
+                                        map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                        Ok(fidx)
+                                    else
+                                        if head == "ls_fold"
+                                            let acc = list_get(parts, 1)
+                                            let elem = list_get(parts, 2)
+                                            let tidx = sig_typeidx(mk_sig(acc + "," + elem, acc), cg)
+                                            let body = ls_fold_body(acc, elem, tidx)?
+                                            let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60037e7e7e017e")
+                                            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                            let fidx = reg_extra_fn(tt, body, cg)
+                                            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                            Ok(fidx)
+                                        else
+                                            if head == "ls_eq"
+                                                let elem = list_get(parts, 1)
+                                                let op = ls_eq_op(elem, cg)?
+                                                let body = ls_eq_body(op)
+                                                let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017f")
+                                                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                                let fidx = reg_extra_fn(tt, body, cg)
+                                                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                                Ok(fidx)
+                                            else
+                                                Err(subset_err("内部错误：未知 list helper '" + name + "'"))
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# ls_eq 的 head 比较发射段：[load(ca)] [load(cb)] <比较>（栈序 a 先 b 后）
+fn ls_eq_op(elem: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
+    let la = "20" + leb128_hex(2) + "a7"
+    let lb = "20" + leb128_hex(3) + "a7"
+    if elem == "i64" or elem == "i32"
+        # i32 值以 extend 后的 i64 存槽——i64.eq 与 i32.eq 等价（Bool 0/1）
+        Ok(la + "2900" + "00" + lb + "2900" + "00" + "51")
+    else
+        if elem == "f64"
+            Ok(la + "2b00" + "00" + lb + "2b00" + "00" + "61")
+        else
+            if elem == "st"
+                let idx = ensure_str_helper("st_eq", cg)?
+                Ok(la + "2900" + "00" + lb + "2900" + "00" + "10" + leb128_hex(idx))
+            else
+                if ls_vt(elem)
+                    let idx = ensure_ls_helper("ls_eq|" + ls_inner(elem), cg)?
+                    Ok(la + "2900" + "00" + lb + "2900" + "00" + "10" + leb128_hex(idx))
+                else
+                    Err(subset_err("List 元素相等比较暂不支持 枚举/闭包 元素（'" + elem + "'）"))
+                end
+            end
         end
     end
 end
@@ -5263,13 +6136,25 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
                 ExIdent(name, _, _) => map_has(fns, name)
                 _ => False
             end
-            if callee_is_direct
-                scan_args(args, fns)
+            # L2.3 List 批：alloc 类内建（产新表——cons/map/filter/split）
+            # 命中即开堆；读类（head/tail/length/get/is_empty/fold/empty）
+            # 不触发（纯读程序无需堆设施）
+            let alloc_builtin =
+            match callee
+                ExIdent(name, _, _) => (name == "list_cons" or name == "list_map" or name == "list_filter" or name == "split")
+                _ => False
+            end
+            if alloc_builtin
+                True
             else
-                if scan_ex(callee, fns)
-                    True
-                else
+                if callee_is_direct
                     scan_args(args, fns)
+                else
+                    if scan_ex(callee, fns)
+                        True
+                    else
+                        scan_args(args, fns)
+                    end
                 end
             end
         end
@@ -5303,13 +6188,7 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
         # 臂内闭包同样有堆，因此命中即真无需继续递归扫描。
         ExMatch(_, _, _) => True
         ExTry(inner) => scan_ex(inner, fns)
-        ExRange(a, b) =>
-            if scan_ex(a, fns)
-                True
-            else
-                scan_ex(b, fns)
-            end
-        end
+        ExRange(_, _) => True
         ExRecord(fields) =>
             let mut hit = False
             for pair in fields
@@ -5381,7 +6260,9 @@ fn scan_stmt(s: St, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: St
             end
         end
         StFor(_, iter, body) =>
-            if scan_ex(iter, fns)
+            # L2.3 List 批：iter 含 String 字面量也开堆（for-in-String 的
+            # char_at 物化需要 alloc——参数透传形态由 comp_for 防御明确拒）
+            if scan_ex(iter, fns) or str_ex(iter)
                 True
             else
                 scan_block(body, fns)
@@ -5707,7 +6588,7 @@ end
 # L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f；
 # L2.3-b：cl（闭包值 = i64）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st"
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -5742,25 +6623,83 @@ end
 # 留后续批次。iter 表达式循环前求值一次存槽。
 fn comp_for(var: String, iter: Ex, body: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     let it = infer_ex(iter, env, fns)?
-    if it != "i64"
-        return Err(subset_err("for 迭代仅支持 Int（String/List 留后续批次，得到 '" + it + "'）"))
+    # ---- Int 迭代（L2.3-a 原路径，0..n）----
+    if it == "i64"
+        let ic = comp_ex(iter, env, fns, cg, locals, localvt)?
+        let n_slot = new_slot(locals, localvt, "i64")
+        let x_slot = new_slot(locals, localvt, "i64")
+        # 迭代变量只进入循环的临时绑定表；循环体自己再开一层子块。
+        let loop_env = copy_bindings(env)
+        map_set(loop_env, var, {slot: x_slot, vt: "i64", sig: "", cap: False})
+        let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
+        let xl = leb128_hex(x_slot)
+        return Ok(ic + "21" + leb128_hex(n_slot)
+            + "4200" + "21" + xl
+            + "0240" + "0340"
+            + "20" + xl + "20" + leb128_hex(n_slot) + "53"
+            + "45" + "0d01"
+            + bc
+            + "20" + xl + "4201" + "7c" + "21" + xl
+            + "0c00" + "0b" + "0b")
     end
-    let ic = comp_ex(iter, env, fns, cg, locals, localvt)?
-    let n_slot = new_slot(locals, localvt, "i64")
-    let x_slot = new_slot(locals, localvt, "i64")
-    # 迭代变量只进入循环的临时绑定表；循环体自己再开一层子块。
-    let loop_env = copy_bindings(env)
-    map_set(loop_env, var, {slot: x_slot, vt: "i64", sig: "", cap: False})
-    let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
-    let xl = leb128_hex(x_slot)
-    Ok(ic + "21" + leb128_hex(n_slot)
-        + "4200" + "21" + xl
-        + "0240" + "0340"
-        + "20" + xl + "20" + leb128_hex(n_slot) + "53"
-        + "45" + "0d01"
-        + bc
-        + "20" + xl + "4201" + "7c" + "21" + xl
-        + "0c00" + "0b" + "0b")
+    # ---- List 迭代（L2.3 List 批 B1：宿主 cons 指针步进，Nil=0 终止）----
+    if ls_vt(it)
+        let ic = comp_ex(iter, env, fns, cg, locals, localvt)?
+        let elem = ls_inner(it)
+        let c_slot = new_slot(locals, localvt, it)
+        let x_slot = new_slot(locals, localvt, elem)
+        let loop_env = copy_bindings(env)
+        map_set(loop_env, var, {slot: x_slot, vt: elem, sig: "", cap: False})
+        let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
+        let cl = leb128_hex(c_slot)
+        let xl = leb128_hex(x_slot)
+        let head_ld =
+        if elem == "f64"
+            "20" + cl + "a7" + "2b00" + "00"
+        else
+            if elem == "i32"
+                "20" + cl + "a7" + "2900" + "00" + "a7"
+            else
+                "20" + cl + "a7" + "2900" + "00"
+            end
+        end
+        return Ok(ic + "21" + cl
+            + "0240" + "0340"
+            + "20" + cl + "50" + "0d01"
+            + head_ld + "21" + xl
+            + bc
+            + "20" + cl + "a7" + "2900" + "08" + "21" + cl
+            + "0c00" + "0b" + "0b")
+    end
+    # ---- String 迭代（L2.3 List 批 B4：char_at 物化 + UTF-8 步进）----
+    if it == "st"
+        if cg_int(cg.cgs, "heap_on") == 0
+            return Err(subset_err("for-in-String 需堆设施（char_at 物化）——迭代源含 String 字面量/String 内建调用即可启用；参数透传形态留后续批次"))
+        end
+        let ic = comp_ex(iter, env, fns, cg, locals, localvt)?
+        let ca_idx = ensure_ls_helper("ls_char_at", cg)?
+        let s_slot = new_slot(locals, localvt, "st")
+        let m_slot = new_slot(locals, localvt, "i64")
+        let n_slot = new_slot(locals, localvt, "i64")
+        let x_slot = new_slot(locals, localvt, "st")
+        let loop_env = copy_bindings(env)
+        map_set(loop_env, var, {slot: x_slot, vt: "st", sig: "", cap: False})
+        let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
+        let sl = leb128_hex(s_slot)
+        let ml = leb128_hex(m_slot)
+        let nl = leb128_hex(n_slot)
+        let xl = leb128_hex(x_slot)
+        return Ok(ic + "21" + sl
+            + "20" + sl + "a7" + "2800" + "00" + "ad" + "21" + ml
+            + "4200" + "21" + nl
+            + "0240" + "0340"
+            + "20" + nl + "20" + ml + "59" + "0d01"
+            + "20" + sl + "20" + nl + "10" + leb128_hex(ca_idx) + "21" + xl
+            + bc
+            + "20" + xl + "a7" + "2800" + "00" + "ad" + "20" + nl + "7c" + "21" + nl
+            + "0c00" + "0b" + "0b")
+    end
+    Err(subset_err("for 迭代仅支持 Int/String/List（得到 '" + it + "'）"))
 end
 
 fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, out: String, ret_vt: String, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
@@ -6022,9 +6961,48 @@ fn st_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: St
         return Err(subset_err("string_to_int 返回 Int|Unit 联合（成功 Int 失败 Unit），untagged 表示下运行时不可区分——留后续批次"))
     end
     if name == "split"
-        return Err(subset_err("split 返回 List——随 List 批交付"))
+        # L2.3 List 批解禁（designs/0005 §4 B1）：返回 ls{st}
+        return Ok({helper: "ls_split", nprm: 2, prms: "st,st", ret: "ls{st}"})
     end
     Err(subset_err("string 模块内建 '" + name + "' 超出 L2 String 批子集"))
+end
+
+# L2.3 List 批：list 模块内建摘要（designs/0005 §6）。
+# helper "-" 表示调用点内联发射（empty/is_empty/head/tail）或专用
+# 编译路径（cons 内联 alloc；HOF 特化分派）；ret 里的 ls{?} 是
+# 无上下文未知元素——实际返回类型由 builtin_rv 按实参动态综合。
+fn li_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "list_empty"
+        return Ok({helper: "-", nprm: 0, prms: "", ret: "ls{?}"})
+    end
+    if name == "list_is_empty"
+        return Ok({helper: "-", nprm: 1, prms: "ls{?}", ret: "i32"})
+    end
+    if name == "list_head"
+        return Ok({helper: "-", nprm: 1, prms: "ls{?}", ret: "?"})
+    end
+    if name == "list_tail"
+        return Ok({helper: "-", nprm: 1, prms: "ls{?}", ret: "ls{?}"})
+    end
+    if name == "list_cons"
+        return Ok({helper: "-", nprm: 2, prms: "?,ls{?}", ret: "ls{?}"})
+    end
+    if name == "list_length"
+        return Ok({helper: "ls_len", nprm: 1, prms: "ls{?}", ret: "i64"})
+    end
+    if name == "list_get"
+        return Ok({helper: "ls_get", nprm: 2, prms: "ls{?},i64", ret: "?"})
+    end
+    if name == "list_map"
+        return Ok({helper: "-", nprm: 2, prms: "cl,ls{?}", ret: "ls{?}"})
+    end
+    if name == "list_filter"
+        return Ok({helper: "-", nprm: 2, prms: "cl,ls{?}", ret: "ls{?}"})
+    end
+    if name == "list_fold"
+        return Ok({helper: "-", nprm: 3, prms: "cl,?,ls{?}", ret: "?"})
+    end
+    Err(subset_err("list 模块内建 '" + name + "' 超出 L2 List 批子集"))
 end
 
 # n 字节零的 hex（scratch 区填充）
@@ -6216,6 +7194,158 @@ fn scan_has_string(prg: Prg) -> Bool
     end
 end
 
+# L2.3 List 批实施中发现并收口（String 批存量缺口）：println(Bool) 需要
+# data 静态串与 print_str 导入（ibase 4），但 has_string 预扫不识"无字面量
+# 的 Bool 显示"——按三层保守判定（println 直接 Bool 产参数/一层 let 绑定
+# 追踪/Bool 返回函数直调）；深层 Bool 流由 comp_println 的 ibase 防御兜底
+# 拒绝（不产坏 wasm）。存量用例零影响（唯一 println(Bool) 的 62 已含
+# String 签名）。
+fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+    match e
+        ExBool(_) => True
+        ExBinary(op, _, _) => op == "Eq" or op == "NotEq" or op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
+        ExLogical(_, _, _) => True
+        ExUnary(op, _) => op == "Not"
+        ExGroup(i) => bool_disp_expr(i, bool_names, ret_bool_fns)
+        ExIdent(x, _, _) => map_has(bool_names, x)
+        ExCall(callee, _) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if n == "println"
+                        False
+                    else
+                        map_has(ret_bool_fns, n) or n == "list_is_empty" or n == "starts_with" or n == "ends_with" or n == "contains"
+                    end
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+    match b
+        BlkOf(stmts, tail) =>
+            let mut hit = False
+            for s in stmts
+                match s
+                    StLet(_, n, _, ex) =>
+                        if bool_disp_expr(ex, bool_names, ret_bool_fns)
+                            map_set(bool_names, n, True)
+                        end
+                    end
+                    StExpr(e) =>
+                        if println_bool_ex(e, bool_names, ret_bool_fns)
+                            hit = True
+                        end
+                    end
+                    StIf(ifr) =>
+                        if bool_disp_if(ifr, bool_names, ret_bool_fns)
+                            hit = True
+                        end
+                    end
+                    StWhile(_, body) =>
+                        if bool_disp_block(body, bool_names, ret_bool_fns)
+                            hit = True
+                        end
+                    end
+                    StFor(_, _, body) =>
+                        if bool_disp_block(body, bool_names, ret_bool_fns)
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            # 块尾裸表达式归 Tail 不归 stmts（println(...) 常见于此——
+            # L2.2 首版教训同族）
+            match tail
+                Some(t) =>
+                    if println_bool_ex(t, bool_names, ret_bool_fns)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+# println(单个 Bool 产实参) 形态判定（bool_disp_block 的 tail/stmts 共用）
+fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+    match e
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if n == "println" and list_length(args) == 1
+                        bool_disp_expr(list_get(args, 0), bool_names, ret_bool_fns)
+                    else
+                        False
+                    end
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+    match ifr
+        IfR(branches, else_b) =>
+            let mut hit = False
+            for pair in branches
+                if bool_disp_block(pair.1, bool_names, ret_bool_fns)
+                    hit = True
+                end
+            end
+            match else_b
+                Some(eb) =>
+                    if bool_disp_block(eb, bool_names, ret_bool_fns)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+fn scan_has_bool_display(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            let mut rf = map_empty()
+            for it in items
+                match it
+                    ItFn(name, _, ret, _, _, _, _) =>
+                        match ret
+                            Some(TyBool) => map_set(rf, name, True)
+                            _ => ()
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            let mut hit = False
+            for it in items
+                match it
+                    ItFn(_, _, _, _, body, _, _) =>
+                        let names = map_empty()
+                        if bool_disp_block(body, names, rf)
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
 # 签名/import 路的 String 预探测（不注册 fns——ibase 判定先行）
 fn probe_str_sigs(prg: Prg) -> Bool
     match prg
@@ -6301,6 +7431,22 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                 end
                             end
                         end
+                        # L2.3 List 批：from list import {...} 同一注册路径
+                        # （ret/prms 里的 ls{?} 由 builtin_rv/comp_list_builtin
+                        # 按实参动态综合与校验）
+                        if module == "list"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = li_builtin_entry(iname)?
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
                     end
                     _ => ()
                 end
@@ -6345,7 +7491,7 @@ fn build_module(prg: Prg) -> Result<String, String>
     # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
     # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
     # 含 ExStr——st 值的三个来源全覆盖；模式内 ExStr 必伴随其一。
-    let has_str = probe_str_sigs(prg) or scan_has_string(prg)
+    let has_str = probe_str_sigs(prg) or scan_has_string(prg) or scan_has_bool_display(prg)
     let ibase =
     if has_str
         4

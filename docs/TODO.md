@@ -1,20 +1,35 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-24 L2.3 String 批交付）**：仓库版本 v1.2.10；
-> String 批 B1+B2+B3 按用户裁决"按建议动工"交付（designs/0004
-> 三裁决点全按建议项；RFC-0004 修订 14）：vt "st"=i64 裸指针、
-> data(11) 段与 print_str/ftoa 按需导入、10 个 string 内建剥 tag
-> 平移、拼接提升与 println(Bool) 顺带解禁；string_to_int（Int|Unit
-> 联合 untagged 下运行时不可区分）与 split（返回 List）明确编译期
-> 拒绝、for-over-String 推后。verify_selfcomp 148/148 = 62 对拍 +
-> 86 负例（转正 4 + 改锁 1 + 新增 14）；self_comp 6578 行；存量
-> 52 用例产物 hex 逐字节不变（HEAD 版编译器对拍实证）。v1.2.10
-> 功能提交 20a29a3 的 CI #165 六 job 全绿后已切 tag；annotations
-> 四条 Ubuntu 26 迁移 notice、零 warning/error。**交接就绪**：
-> 下一步工作包（List/Map/json/包/return 逐批）或独立复审待用户
-> 裁决；语言面与外部发布线继续冻结。新维护者先复制
+> **交接声明（2026-09-24 L2.3 List 批交付）**：仓库版本 v1.2.11；
+> List 批 B1+B2+B3+B4 + 编译期严格性甲按用户裁决"按建议动工"交付
+> （designs/0005 两裁决点全按建议项；RFC-0004 修订 16）：vt ls{T}
+> （ls{?} 由 cons/注解补全）、Nil=0 哨兵、cons 槽 8B 按元素 vt
+> 存取；7 非 HOF 内建 + range + split 解禁 + for-in-List + HOF
+> 三件按签名特化去重 + 结构相等 + for-over-String + List 泛型
+> 载荷；谓词 Bool/签名/元素不相容/range 非 Int/裸 ls{?} 编译期
+> 拒。实施修正四处（f64 槽直写、ls_get 按元素特化、B4 防御实测
+> 不可达、管道语法 L2 从未支持——负例首登）；**顺手收口 String
+> 批存量缺口**：无字面量程序的 println(Bool) 产不可实例化 wasm
+> （三层预扫 + ibase 防御修复，存量 hex 零影响）。verify_selfcomp
+> **174/174 = 74 对拍 + 100 负例**（转正 2 + 新对拍 12 + 新负例
+> 16 锁原因）；self_comp 7724 行；**存量 62 用例 hex 逐字节不变**
+> （HEAD 编译器 stash 对拍 + fmt 归一后复验双实证）。v1.2.11
+> 功能提交的 CI 首跑六 job 全绿后已切 tag；annotations 预期四条
+> Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。**交接
+> 就绪**：下一步工作包（Map/json/包/return 逐批）或独立复审待
+> 用户裁决；语言面与外部发布线继续冻结。新维护者先复制
 > HANDOFF_PROMPT.md，读 HANDOVER 指定章节与十四审报告，跑 §2.2
 > 全量基线，再呈方向菜单等裁决。
+>
+> **前次交接声明（2026-09-24 L2.3 String 批交付）**：仓库版本
+> v1.2.10；String 批 B1+B2+B3 交付（designs/0004 三裁决点全按
+> 建议项；RFC-0004 修订 14）——vt "st"=i64 裸指针、data(11) 段
+> 与 print_str/ftoa 按需导入、10 个 string 内建剥 tag 平移、拼接
+> 提升与 println(Bool) 顺带解禁；string_to_int（Int|Unit 联合
+> untagged 下运行时不可区分）明确编译期拒绝。verify_selfcomp
+> 148/148 = 62 对拍 + 86 负例；self_comp 6578 行；存量 52 用例
+> 产物 hex 逐字节不变。v1.2.10 功能提交 20a29a3 的 CI #165 六
+> job 全绿后已切 tag。
 >
 > **前次交接声明（2026-09-23 L2.3-c2 交付）**：仓库版本 v1.2.9；
 > 第十四轮体系内独立复核（[review-2026-09-23.html](reviews/review-2026-09-23.html)，

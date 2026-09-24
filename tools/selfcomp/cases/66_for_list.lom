@@ -1,0 +1,23 @@
+# L2.3 List 批 B1：for-in-List（嵌套双层迭代 + 迭代变量遮蔽外层 +
+# Float 元素表走 f64 槽通道）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let xs = list_cons(1, list_cons(2, list_empty()))
+    let total_outer = 0
+    for x in xs
+        let total_outer = x * 10
+        println(total_outer)
+    end
+    println(total_outer)
+    let grid = list_cons(list_cons(1, list_cons(2, list_empty())), list_cons(list_cons(3, list_empty()), list_empty()))
+    for row in grid
+        for cell in row
+            println(cell)
+        end
+    end
+    let fs = list_cons(0.5, list_cons(1.25, list_empty()))
+    for f in fs
+        println(f)
+    end
+end

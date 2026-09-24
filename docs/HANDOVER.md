@@ -1,3 +1,4 @@
+> 最后更新：2026-09-24（**L2.3 List 批交付（B1+B2+B3+B4 + 编译期严格性甲），仓库版本 v1.2.11**。用户裁决"按建议动工"（designs/0005 两裁决点全按建议项）：vt ls{T}（ls{?} 由 cons/注解补全——c2 ? 机制复用）、Nil=0（b 批地址 0 哨兵伏笔兑现）、cons 槽 8B 按元素 vt 存取；B1 七非 HOF 内建 + range + split 解禁 + for-in-List + 泛型载荷；B2 HOF 三件按闭包签名与元素 vt 特化去重（"|" 键）；B3 结构相等特化递归；B4 for-over-String（char_at 物化 + UTF-8 步进）；严格性包（谓词 Bool/签名/元素不相容/range 两端 Int/裸 ls{?} 拒）。**实施修正四处**（f64 槽直写弃 reinterpret、ls_get 按元素特化、B4 堆预扫经 has_str 联动防御不可达、管道语法经查 L2 从未支持——负例首登）。**顺手收口 String 批存量缺口**：无字面量程序的 println(Bool) 产不可实例化 wasm（三层预扫 scan_has_bool_display + comp_println ibase 防御修复；62 存量用例恰未踩到、hex 零影响）。verify_selfcomp **174/174 = 74 对拍 + 100 负例**（转正 2 + 新对拍 12 + 新负例 16 锁原因）；self_comp **7724 行**；**存量 62 用例 hex 逐字节不变**（HEAD 编译器 stash 对拍 + fmt 归一后复验双实证）。Rust 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿。开发踩坑入档 §11.6（eqz 单字节族 "5000"/"4500" 两枚、3 参 helper 声明 local 从 3 起、local 组数=组列表数、预扫消费块尾 Tail、map/filter 反转段局部号、61 名不副实）。语言面零变化；十四审 B 不评此批。**）
 > 最后更新：2026-09-24（**交接就绪——§12.3 五件套刷新（L2.3 String 批交付后状态）**。本维护周期全链：新会话首回合基线 14 项全绿复验 → 用户裁决"L2.3 后续子批"→ 按闭包批先例产出 String 批设计方案 designs/0004（三裁决点）→ 用户裁决"按建议动工"（B1+B2+B3/println(Bool) 顺带/Float display 甲）→ 交付 RFC-0004 修订 14 + 升版 v1.2.10（20a29a3，CI #165 六 job 全绿后已切 tag）。刷新面：HANDOFF_PROMPT【当前真实状态】/【第一回合必须完成】/【状态锚点】三段（148/148、6578 行、String 六坑入档、菜单首项改 List/Map 等后续批）、本文 §1 快照行 + §2.2 基线 + §9 检查单 + §11.6 六坑、TODO 顶部交接声明、README/SPEC §13/positioning 成对、doc_audit 67/67。**待用户裁决：L2.3 后续批次（List/Map/json/包/return）或发起独立复审。发布线维持冻结。**）
 > 最后更新：2026-09-24（**L2.3 String 批交付（B1+B2+B3，用户裁决"按建议动工"），仓库版本 v1.2.10**。设计 docs/designs/0004 三裁决点全按建议项：B1 值通道（字面量/类型流/println(String)/六比较/Str+Str 拼接/match String 模式/闭包与泛型载荷）+ B2 拼接提升（Int/Float/Bool/Unit 侧 to_display——Float 经平移的 env.ftoa 导入与宿主同源）+ B3 内建 10 个剥 tag 平移（len/int_to_string/starts_with/ends_with/contains/trim/upper/lower/replace/char_from_code）；println(Bool) 顺带解禁（负例转正）。string_to_int（Int|Unit 联合在 untagged 下运行时不可区分）与 split（返回 List）明确编译期拒绝。模块组装新增 data(11) 段（排 code 后）+ 按需 import（print_str/ftoa，ibase 2→4 全 idx 参数化）+ 第二 global（scratch，itoa/ftoa 共用 data 尾 64 字节）+ export memory。vt "st"=i64 裸指针，静态/动态串同布局 [len][bytes]。verify_selfcomp **148/148 = 62 对拍 + 86 负例**（负例转正 4 + 改锁 1 + 新增 14）；self_comp **6578 行**；**存量 52 用例产物 hex 逐字节不变**（HEAD 版编译器对拍实证）。Rust 535+8/六模式/eval 双后端 121/121/doc_audit 全绿复验。开发踩坑六枚入档 §11.6（load8 地址显式 +4 又给 offset=4 的双加、sleb 单字节界 64 需两字节、itoa pos 移动抄成加、concat lb 读 local4 笔误、i64 比较 opcode 区段 0x57/0x59、intern 长度按字符数推进致 data 错位）。语言面/43 内建/诊断码零变化；十四审 B 仍只评 v1.2.6，String 批后评级待独立复审。**）
 > 最后更新：2026-09-23（**交接准备复核**：工作区基线 v1.2.9；§2.2 的 Lom fmt 命令改为可执行的 PowerShell 递归检查，实跑 37 个有效示例全过、apply_test 豁免；Rust cargo fmt 本地零 diff，但现行 CI 未设置该 gate，R70 历史登记已校准。doc_audit 67/67；交接前主线 CI #162 六 job success、annotations 四条 Ubuntu 26 迁移 notice 且零 warning/error。语言面和外部发布线继续冻结；下一方向待用户裁决。）
@@ -75,10 +76,10 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.2.10**（Cargo.toml/lock 一致；2026-09-24 L2.3 String 批 B1+B2+B3，宿主及冻结语言面未动；v1.2.9/v1.2.10 tag 分别在 CI #161/#165 六 job 全绿后已切；外部发布线继续冻结；历次变更见 LANGUAGE_SPEC §13） |
+| 版本 | **v1.2.11**（Cargo.toml/lock 一致；2026-09-24 L2.3 List 批 B1+B2+B3+B4 + 编译期严格性甲 + String 批 println(Bool) 存量缺口顺手收口，宿主及冻结语言面未动；v1.2.9/v1.2.10/v1.2.11 tag 分别在 CI 六 job 全绿后已切；外部发布线继续冻结；历次变更见 LANGUAGE_SPEC §13） |
 | Rust 测试 | **535/535 通过 + 8 集成**（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **121/121**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
-| CI | **String 批提交 #165 六 job 全绿**（提交 20a29a3；三平台、selfhost、clippy、doc gates 均 success；annotations 四条 Ubuntu 26 迁移 notice，零 warning/error；新交接提交推送后仍须重查首跑） |
+| CI | **List 批提交首跑六 job 全绿**（三平台、selfhost、clippy、doc gates 均 success；annotations 预期四条 Ubuntu 26 迁移 notice，零 warning/error；新交接提交推送后仍须重查首跑） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |
@@ -99,7 +100,7 @@
 | **第十三轮审查** | **复审完成（2026-09-22，总评 B+；报告 review-2026-09-22-2.html，基线 1418536/v1.2.5）**：R73-R76 整改零失真（✓×4）；基线 14 项全绿；**代码面敌手探针 22 形态零击穿（九审以来五轮首次；MUT001 定位面四轮击穿链断）**；仅 2×P3 文档对账（R77 漏改 4 处开账即修、R78 README 存量算术残留 open）。**裁定：B+ 回升；L2.3 建议放行（R74 收口达成，动工授权待用户）；发布冻结维持；v1.2.5 tag 无需撤回。** |
 | **第十二轮审查** | **复审完成（2026-09-22，总评 B；报告 review-2026-09-22.html，基线 aab6f95/v1.2.4）**：R65-R72 八项整改在自列验收面上**零失真（✓×8）**（含扩展探针：elif/嵌套 for/未定义赋值目标语句拒绝、闭包捕获+外层重赋混合、注解一致正例）；基线复验全绿；敌手探针新开 R73（P1，同轮多 MUT001 双 Replace 产 `let mut mut`——证伪"永不可能"宣称）/R74（P2，self_comp call 路径无实参类型/arity 校验产非法 wasm）/R75-R76（P3）。头条 P1 维护会话已亲手复现确认。**裁定：B 针对本轮时点（问题面较十一审 2×P1+3×P2 收窄至 1×P1+1×P2）；R73/R74 入 v1.2.5；L2.3 暂缓条件推进为 R74 收口；发布冻结维持。** |
 | **第十一轮审查** | **复审完成（2026-09-21，总评 B；报告 review-2026-09-21-3.html，基线 65e51dc）**：R62/R63 整改在自列验收面上**零失真**（三探针真实 apply 复现：applied=0/源码逐字不变/ok:false；边界扩展与基线九件套全绿；L2.1 双载体 24 向量 + L2.2 验收 5/5 复证）。敌手探针新开 R65-R72：R65（P1，MUT001 嵌套作用域错目标+非幂等改坏源码——证伪"闭包/match 臂内降级 hint"宣称）、R66（P1，self_comp 语句级子集拒绝死臂——Err 值在语句位置被丢弃，if/while/for/return 静默蒸发产错行为 wasm）、R67/R68（P2，return 死臂/let 注解信任边界）、R69（P2，case1 字节锚陈旧）、R70-R72（P3）。头条两 P1 维护会话已亲手复现确认。**裁定：B 针对本轮时点；L2.3 暂缓先收口 R65-R72；发布冻结维持。** |
-| 下一步 | **L2.3 String 批（B1+B2+B3）已按用户裁决交付**：verify_selfcomp 148/148；第十四轮体系内复核 B 仅评 5c92f59/v1.2.6，不评整改、c2 或 String 批后。下一步由用户裁决后续 List/Map/json/包/return 分批推进或发起独立复审；string_to_int/split/for-over-String 与枚举显示仍属明确子集边界。MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。外部发布线继续冻结，推送后须实查 CI 首跑。 |
+| 下一步 | **L2.3 List 批（B1+B2+B3+B4 + 严格性甲）已按用户裁决交付**：verify_selfcomp 174/174 = 74 对拍 + 100 负例，存量 62 用例 hex 逐字节不变；第十四轮体系内复核 B 仅评 5c92f59/v1.2.6，不评整改、c2、String 或 List 批后。下一步由用户裁决后续 Map/json/包/return 分批推进或发起独立复审；string_to_int（联合不可表达）与枚举/List 显示仍属明确子集边界。MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。外部发布线继续冻结，推送后须实查 CI 首跑。 |
 | 遗留挂账 | **R1-R82 全部关闭；十四审整改和 L2.3-c2 后评级待独立复审**。长期项仍有：typechecker for 变量 define 覆盖同名外层可变性标记不恢复（v1.2.3 既有 quirk）；WASM Int 安全值域 ±2^59 的结构根治（RFC 级）；L2 自举编译器后续 String/List/Map/json/包/return 与 L2.4 闭环；Float 字面量正确舍入精度专项；包注册中心/调试器/概率类型；CLI 粘合层覆盖；V8 默认栈深限制；doc_audit 命令行完整性锚（R64 根治方向）。历史已关闭项不得因评级回退而重开。 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
@@ -374,10 +375,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6/§12、TODO 顶部、最新十四审报告（review-2026-09-23.html）；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
-2. `cargo build --release && cargo test --release` 确认 535/535（另有 tests/ 集成 ×8）、零 warning、`./target/release/lom.exe --version` 显示 1.2.10
-3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 148/148）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
+2. `cargo build --release && cargo test --release` 确认 535/535（另有 tests/ 集成 ×8）、零 warning、`./target/release/lom.exe --version` 显示 1.2.11
+3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 174/174）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
-5. **当前状态：v1.2.10、语言面/外部发布线冻结；十四轮审查的 B 只评 5c92f59/v1.2.6，R1-R82 全关闭，整改与 c2 后评级待独立复审。活跃工作包 L2.3：a 控制流、b 闭包、c1 非泛型 enum/match、c2 内建 Result/Option 与泛型用户 enum、String 批（B1+B2+B3）已实现（RFC-0004 修订 14；self_comp 6578 行，verify_selfcomp 148/148 = 62 对拍 + 86 负例，存量 52 用例 hex 逐字节不变）。String 批仍拒 string_to_int/split/for-over-String 与枚举/闭包显示；后续 List/Map/json/包/return 按批交付，下一方向待用户裁决。** 历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行）、selfhost 六模式；doc_audit 现为 67 项。维护流程见 §12；CI 与 tag 状态须实查。
+5. **当前状态：v1.2.11、语言面/外部发布线冻结；十四轮审查的 B 只评 5c92f59/v1.2.6，R1-R82 全关闭，整改与 c2/String/List 批后评级待独立复审。活跃工作包 L2.3：a 控制流、b 闭包、c1 非泛型 enum/match、c2 内建 Result/Option 与泛型用户 enum、String 批（B1+B2+B3）、List 批（B1+B2+B3+B4 + 严格性甲）已实现（RFC-0004 修订 16；self_comp 7724 行，verify_selfcomp 174/174 = 74 对拍 + 100 负例，存量 62 用例 hex 逐字节不变）。List 批顺手收口 String 批 println(Bool) 无字面量程序产坏 wasm 的存量缺口；仍拒 string_to_int/println(List)/拼接提升 List 侧/管道语法与枚举显示；后续 Map/json/包/return 按批交付，下一方向待用户裁决。** 历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行）、selfhost 六模式；doc_audit 现为 67 项。维护流程见 §12；CI 与 tag 状态须实查。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -693,6 +694,27 @@ end
   实证）；无参 None 页尾仍要先测变体再读载荷。旧的三个“子集外”
   负例转正后从 negative 删除，Git 历史可恢复；新负例同时锁具体
   拒绝原因与无 hex。范围/边界见 designs/0003 与 RFC-0004 修订 12。
+
+- **L2.3 List 批踩坑六枚（2026-09-24）**：① **eqz 是单字节无操作数
+  指令**——i64.eqz=0x50、i32.eqz=0x45；写成 "5000"/"4500" 带出的
+  0x00 是 **unreachable 恒 trap**（is_empty 全灭、split 恒炸两枚
+  实录——与 String 批 sleb 单字节界教训同族，无立即数指令别多拼
+  字节）；② **3 参 helper 的声明 local 从 local3 起**（参数占
+  0-2）——fold 沿用 map 的 2 参基址（local2 起）导致 acc 槽覆盖
+  xs 参数、静默错值（调试法：循环内死返回 local 值看实值）；
+  ③ **local 组数必须等于组列表数**——声明 "05"（5 组）只列 4 组
+  时指令流的 0x20/0x01 被读作第 5 组的 (count=32, type=0x01) →
+  "invalid value type 0x1"（Node 报错定位到模块偏移而非函数内，
+  别被误导）；④ **预扫要消费块尾 Tail**——`println(list_get(...))`
+  常是函数体尾表达式（BlkOf 的 tail）不在 stmts 里，只扫 stmts 的
+  预扫恒 False（str_block 先例有 match tail，照抄）；⑤ **map/
+  filter 的反转段遍历指针是 out 槽**（local3/4）非主循环 cur 槽
+  ——local 号跨段复用时逐段核对读/写槽（String 批 concat lb
+  笔误同族再应验）；⑥ **用例名不等于语法覆盖**——61_string_
+  pipeline 实无管道语法（语义命名），据用例名推断"管道已支持"
+  会踩空（ExPipe 在 L2 从未实现，本批负例首登）。另：探针里
+  `1..5` 长 4——range 对拍 get 索引别写 4（本轮两次越界乌龙，
+  宿主 trap 是正确行为）。
 
 ---
 

@@ -1,0 +1,4 @@
+fn main() -> Unit ! [IO]
+    let xs = "a"..3
+    println(xs)
+end

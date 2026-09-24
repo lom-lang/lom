@@ -1,0 +1,26 @@
+# L2.3 List 批 B3：结构相等 Eq/NotEq（同构/长短不等/元素不等/嵌套
+# ls{ls{i64}}/String 元素表/空表）。
+from list import { list_empty, list_cons }
+
+fn main() -> Unit ! [IO]
+    let a = list_cons(1, list_cons(2, list_empty()))
+    let b = list_cons(1, list_cons(2, list_empty()))
+    let c = list_cons(1, list_empty())
+    let d = list_cons(1, list_cons(3, list_empty()))
+    println(a == b)
+    println(a == c)
+    println(a == d)
+    println(a != d)
+    let e: List<Int> = list_empty()
+    println(e == list_empty())
+    let nest1 = list_cons(a, list_empty())
+    let nest2 = list_cons(b, list_empty())
+    let nest3 = list_cons(c, list_empty())
+    println(nest1 == nest2)
+    println(nest1 == nest3)
+    let s1 = list_cons("x", list_cons("y", list_empty()))
+    let s2 = list_cons("x", list_cons("y", list_empty()))
+    let s3 = list_cons("x", list_cons("z", list_empty()))
+    println(s1 == s2)
+    println(s1 == s3)
+end

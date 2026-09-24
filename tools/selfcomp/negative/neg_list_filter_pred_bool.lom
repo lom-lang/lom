@@ -1,0 +1,5 @@
+from list import { list_filter }
+fn main() -> Unit ! [IO]
+    let ys = list_filter(fn(n: Int) -> Int n end, 1..3)
+    println(ys)
+end

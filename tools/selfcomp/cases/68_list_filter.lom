@@ -1,0 +1,22 @@
+# L2.3 List 批 B2：list_filter（谓词闭包；全滤空/全保留边界——
+# Bool 谓词编译期校验后的运行时形态）。
+from list import { list_filter, list_length, list_get, list_is_empty }
+
+fn even(n: Int) -> Bool
+    n % 2 == 0
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..6
+    let evens = list_filter(even, xs)
+    println(list_length(evens))
+    println(list_get(evens, 0))
+    println(list_get(evens, 1))
+    let odds = list_filter(fn(n: Int) -> Bool n % 2 == 1 end, xs)
+    println(list_length(odds))
+    println(list_get(odds, 2))
+    let none = list_filter(fn(n: Int) -> Bool n > 100 end, xs)
+    println(list_is_empty(none))
+    let all = list_filter(fn(n: Int) -> Bool n > 0 end, xs)
+    println(list_length(all))
+end

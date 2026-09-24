@@ -26,6 +26,24 @@ NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 
 EXPECTED_NEGATIVE_MESSAGES = {
+    # ---- L2.3 List 批（designs/0005 校验表 #1-#12 + 管道子集外登记）----
+    'neg_list_cons_elem_type.lom': "类型不符（'f64' vs 'i64'）",
+    'neg_list_head_nonlist.lom': "调用 'list_head' 期望 List 得 i64",
+    'neg_list_get_idx_type.lom': "调用 'list_get' 第 2 参类型不符",
+    'neg_list_map_sig.lom': 'list_map 的 f 期望单参数闭包',
+    'neg_list_fold_sig.lom': 'list_fold 的 f 期望双参数闭包',
+    'neg_list_filter_pred_bool.lom': 'list_filter 谓词须返回 Bool',
+    'neg_list_assign_elem.lom': "赋值 'xs' 类型不符（期望 ls{i64} 得 ls{f64}）",
+    'neg_list_annot_mismatch.lom': "let 注解类型 'ls{i64}' 与值类型 'ls{f64}' 不符",
+    'neg_list_arith.lom': 'List 参与算术',
+    'neg_list_compare.lom': 'List 大小比较',
+    'neg_list_concat_promote.lom': 'List 值的显示留后续批次',
+    'neg_println_list.lom': 'println 只接受 Int/Float/String/Bool（List/枚举显示留后续批次）',
+    'neg_list_unknown_elem.lom': '未知 List 元素类型——需注解或构造上下文（list_head）',
+    'neg_range_not_int.lom': 'range 两端须为 Int',
+    'neg_list_eq_enum_elem.lom': 'List 元素相等比较暂不支持 枚举/闭包 元素',
+    'neg_pipe_syntax.lom': '该表达式形态',
+    # ---- 此前批次 ----
     'neg_bool_arith.lom': 'Bool 参与算术',
     'neg_bool_mixed_compare.lom': 'Bool 与非 Bool 比较',
     'neg_bool_unary.lom': 'Bool 参与一元负',
@@ -35,7 +53,6 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_str_annot_mismatch.lom': "let 注解类型 'i64' 与值类型 'st' 不符",
     'neg_str_call_value.lom': "调用非闭包值（得到 vt 'st'）",
     'neg_stoi_union.lom': 'untagged 表示下运行时不可区分',
-    'neg_split_list.lom': '随 List 批交付',
     'neg_str_builtin_arity.lom': "调用 'contains' 实数量不符",
     'neg_str_builtin_type.lom': "调用 'len' 第 1 参类型不符（期望 st 得 i64）",
     'neg_str_builtin_not_imported.lom': "未定义变量 'len'",

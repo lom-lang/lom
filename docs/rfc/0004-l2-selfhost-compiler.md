@@ -417,6 +417,54 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   不变**（HEAD 版编译器同用例对拍实证）；self_comp 6578 行。Rust
   535+8/自举六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。
   开发踩坑六枚入档 HANDOVER §11.6。语言面零变化。
+- **修订 16（2026-09-24）：L2.3 List 批交付（用户裁决"按建议动工"——
+  B1+B2+B3+B4 同批 + 编译期严格性甲；designs/0005 两裁决点全按
+  建议项）。** vt `ls{T}`（嵌套花括号与 en:Name{args} 同族；list_empty
+  无上下文返回 `ls{?}`，由 cons/注解结构补全——c2 ? 机制复用）；
+  **Nil=0**（b 批 hp init 8 的地址 0 哨兵伏笔兑现）；cons 单元
+  [head:8B][tail:8B]，元素存取按 vt（f64 → f64.load/store 槽直写、
+  i32 → extend/wrap、其余 i64 直存——闭包 env 槽裁决 D 同型，
+  **实施修正**：设计稿的 reinterpret 路线改为槽直写，更简）。
+  B1：10 内建中 7 个非 HOF（empty/is_empty/head/tail 内联对齐宿主、
+  length/get 走 helper，**get 按元素 vt 特化**——实施修正：首版恒
+  i64 读出，Float 表经 get 后流入 print_f64 产类型错）；range 表达式
+  a..b（左闭右开）；**split 解禁**（返回 ls{st}，string 注册表补第
+  11 名）；for-in-List（迭代变量 vt=元素）；泛型载荷解禁
+  （List<T> 签名、en:Box{ls{i64}}、Result<Int, List<String>>）。
+  B2：map/filter/fold helper 按 f 闭包签名与元素 vt **特化+去重**
+  （"|" 分隔键——vt 字符集不含 |，en: 冒号不冲突）；具名函数当值经
+  shim 天然支持；fold 的 acc=local 基址在 3 参 helper 上从 3 起
+  （**实施踩坑**：首版沿用 2 参基址致 acc 覆盖 xs 参数）。B3：
+  ==/!= 特化递归 eq（i64/i32 直 opcode、f64、st 走 st_eq、嵌套 ls
+  递归特化；en/cl 元素明确拒——负例锁）。B4：for-in-String
+  （char_at 物化 + UTF-8 步进；iter 的 String 值来源三层
+  字面量/签名/内建必居其一，heap 预扫由 has_str 联动覆盖——
+  comp_for 防御实测不可达，保留为 fail-safe）。
+  **信任边界新增**：编译期严格包（filter 谓词 Bool、map/fold 签名、
+  ls 元素不相容赋值/注解、range 两端 Int、裸 ls{?} 进 head/get/
+  比较——宿主运行期或 deferred，L2 编译期拒）；println(List) 与
+  拼接提升 List 侧拒（容器显示批）；List 大小比较与跨类型比较拒；
+  **管道语法（ExPipe）L2 历史上从未支持**（61_string_pipeline 名不
+  副实——纯语义命名），本批以 neg_pipe_syntax 负例首次登记该子集
+  边界。
+  **顺手收口（String 批存量缺口，实施中发现）**：println(Bool) 在
+  无 String 字面量程序里 has_string 预扫不识——发射 call 2
+  （print_str）而 import 仅 2 个，产不可实例化 wasm（`fn main()
+  { println(1 == 2) }` 可复现；62 存量用例恰未踩到）。修复：
+  scan_has_bool_display 三层预扫（println 直接 Bool 产参数/一层
+  let 绑定追踪/Bool 返回函数直调——含 list_is_empty 与
+  starts_with/ends_with/contains 内建）+ comp_println 的 ibase
+  防御兜底（深层 Bool 流明确拒绝不产坏 wasm）；存量 hex 零影响
+  （唯一 println(Bool) 的 62_string_fn_sig 已含 String 签名）。
+  验收：verify_selfcomp **174/174 = 74 对拍 + 100 负例**（转正
+  neg_split_list/neg_for_string + 新对拍 12 + 新负例 16，全部
+  锁具体拒绝原因）；**存量 62 用例产物 hex 逐字节不变**（HEAD
+  版编译器 stash 对拍实证，fmt 归一后复验仍恒等）；self_comp
+  7724 行。Rust 535+8/自举六模式/eval 双后端 121/121/doc_audit
+  67/67 全绿复验。开发踩坑入档 HANDOVER §11.6（eqz 单字节族
+  两枚 "5000"/"4500"、3 参 helper 的声明 local 基址、local 组数
+  与组列表数不一致、块尾 Tail 归预扫、map/filter 反转段的
+  局部号、61 用例名不副实）。语言面零变化。
 - **修订 15（2026-09-24）：List 批设计方案产出（动工前置，待用户
   裁决）。** 交付 docs/designs/0005-l2.3-lists.md——基于 self_comp
   （6578 行，List 编译侧拒绝点五处：ty_vt 的 TyGeneric("List") 落

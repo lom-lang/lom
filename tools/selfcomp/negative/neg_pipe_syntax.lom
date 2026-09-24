@@ -1,0 +1,5 @@
+from list import { list_length }
+fn main() -> Unit ! [IO]
+    let xs = 1..3
+    println(xs |> list_length)
+end

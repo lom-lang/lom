@@ -1,0 +1,35 @@
+# L2.3 List 批：泛型载荷解禁——List<T> 载荷流经用户泛型 enum 与内建
+# Result（en:Box{ls{i64}} 构造/match；Result<Int, List<String>> err 载荷）。
+from list import { list_cons, list_empty, list_get, list_length }
+from string import { split }
+
+enum Box
+    | Items(List<Int>)
+    | Empty
+end
+
+fn first_of(b: Box) -> Int
+    match b
+        Items(xs) =>
+            let head = list_get(xs, 0)
+            head
+        end
+        Empty => 0
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let b = Items(list_cons(7, list_cons(8, list_empty())))
+    println(first_of(b))
+    println(first_of(Empty))
+    let r: Result<Int, List<String>> = Err(split("x,y", ","))
+    match r
+        Ok(n) => println(n)
+        Err(words) => println(list_get(words, 1))
+    end
+    let ok: Result<Int, List<String>> = Ok(5)
+    match ok
+        Ok(n) => println(n)
+        Err(words) => println(list_length(words))
+    end
+end

@@ -1,0 +1,20 @@
+# L2.3 List 批：List 内建链式组合（具名函数 + 内建接力——管道语法
+# 本身仍属 L2 子集外，见 neg_pipe_syntax 负例）。
+from list import { list_cons, list_empty, list_length, list_get, list_map, list_filter }
+
+fn double(n: Int) -> Int
+    n * 2
+end
+
+fn evens_len(xs: List<Int>) -> Int
+    list_length(list_filter(fn(n: Int) -> Bool n % 2 == 0 end, xs))
+end
+
+fn main() -> Unit ! [IO]
+    let xs = list_cons(3, list_cons(4, list_empty()))
+    println(list_length(xs))
+    let ys = 1..4
+    println(evens_len(ys))
+    println(list_get(list_map(double, ys), 3))
+    println(list_length(list_filter(fn(n: Int) -> Bool n > 2 end, ys)))
+end

@@ -1,0 +1,5 @@
+from list import { list_fold }
+fn main() -> Unit ! [IO]
+    let r = list_fold(fn(a: Int) -> Int a end, 0, 1..3)
+    println(r)
+end
