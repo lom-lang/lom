@@ -43,10 +43,9 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.2.12（v1.2.11/v1.2.12 tag 分别于 CI
-  #36004908755 与其 bump 提交首跑六 job 全绿后切；首回合仍须实查
-  最新 main CI 与 annotations）；语言面与外部发布线冻结。
-- List 批功能提交的 CI 首跑六 job 全绿；annotations 预期仍为四条
+- 仓库版本 v1.2.13（v1.2.12/v1.2.13 tag 分别于 CI 六 job 全绿后切；
+  首回合仍须实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
+- Map 批功能提交的 CI 首跑六 job 全绿后切 tag；annotations 预期四条
   Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。Lom fmt
   递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp 用例
   全量；Rust cargo fmt 本地零 diff，未进 CI。
@@ -59,8 +58,8 @@
   均已修于 v1.2.12（R85 选甲）**——R1-R85 全部关闭，整改后评级
   待下一轮复审。十四审 B 只评 5c92f59/v1.2.6；十三审 B+ 只属
   1418536/v1.2.5——历史评级不外推。事实源 docs/TODO.md 顶部。
-- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-16）：
+- 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-19）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -78,13 +77,22 @@
   管道语法（L2 从未支持，负例首登）明确拒）。**v1.2.12 十五审整改**：
   R84 ls_fold 按 acc_vt 特化（Float/Bool acc 不再产不可实例化 wasm，
   白名单外 acc 编译期拒）、R85 预扫补值位 if/match/局部闭包产 Bool
-  识别（跨函数 Bool 参数流转留边界负例锁定）。self_comp.lom 7813
-  行，verify_selfcomp **181/181 = 79 对拍 + 102 负例**（十五审探针
-  转正 5 + 新负例 2）；**存量 74 对拍用例产物 hex 逐字节不变**
+  识别（跨函数 Bool 参数流转留边界负例锁定）。**v1.2.13 Map 批**
+  （designs/0006 三裁决点全按建议项：B1+B2 同批/裁决 2 甲/严格性甲）：
+  vt **mp{V}** 单参数（键恒 String 不进 vt）、mp{?} 由 set/注解补全、
+  桶布局照宿主平移（头 12B + 桶 16B [state][key_off][val 8B 按值 vt
+  装载]）；8 内建全量（map_get→en:Option{V} 与 c2 变体表 idx 2/3
+  逐值对齐、map_keys/values 键排序字节序、rehash 翻倍仅搬 state==1、
+  map_size 内联、map_remove 返回 void 对齐宿主 WASM——宿主解释器/TC
+  返回 Bool 的双后端分叉挂账待裁）+ 结构相等 mp_eq|V 特化递归
+  （en/cl 值拒）；import 注册堵"静默忽略"缺口（未知内建报错）。
+  self_comp.lom 8627
+  行，verify_selfcomp **205/205 = 90 对拍 + 115 负例**（新对拍 11 +
+  新负例 13）；**存量 79 对拍用例产物 hex 逐字节不变**
   （执行者全量对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
-  修订 14、List 批按修订 16、十五审整改按修订 17 交付**。Map/json/
-  包/return 语句留后续批次，不可称 List/容器全覆盖。
+  修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19
+  交付**。json/包/return 语句留后续批次，不可称容器全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -127,8 +135,8 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决后续 Map/json/包/return 子批或
-  发起下一轮独立复审（R84/R85 整改后评级待复审）；
+- 下一步由用户裁决后续 json/包/return 子批或
+  发起下一轮独立复审（R84/R85 整改与 Map 批后评级待复审）；
   另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
@@ -141,8 +149,8 @@
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
    review-2026-09-26.html（十五审——最新轮）及 review-2026-09-23.html
    （十四审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-17），
-   docs/designs/0001~0005 五份批次设计（闭包/作用域/泛型/String/List，
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-19），
+   docs/designs/0001~0006 六份批次设计（闭包/作用域/泛型/String/List/Map，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
    子智能体整理供料，规划者复核关键结论。
@@ -156,7 +164,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 181/181 = 79 用例双产物行为一致 + 102 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 205/205 = 90 用例双产物行为一致 + 115 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -225,6 +233,18 @@
   跨函数 Bool 参数流转仍明确拒绝（文案不变、无 hex——负例锁定）。
   verify_selfcomp 181/181 = 79 对拍 + 102 负例；存量 74 对拍用例
   hex 逐字节不变；十五审 B+ 不评本次整改。
+- L2.3 Map 批后（v1.2.13）：8 个 map 内建宿主/L2 双侧行为一致
+  （set/get（match 消费 Option）/has/size/keys（字节序排序含多字节
+  UTF-8 键）/values（值序=键序）/remove（墓碑+复用）/empty）；
+  map_get 返回 en:Option{V} 与 c2 变体表 idx 2/3 逐值对齐；引用语义
+  （let 别名 set 后双读一致——Map 区别于 List 的核心语义，86 用例
+  锁定）；rehash >16 键翻倍仅搬 state==1；mp{?} 由 set/注解补全、
+  裸 mp{?} 读拒；结构相等 mp_eq 嵌套递归（en/cl 值拒）；map_remove
+  返回 void 对齐宿主 WASM（let 绑定其返回值在 L2 拒——宿主解释器
+  合法，信任边界；宿主双后端分叉挂账）。println(Map)/拼接提升
+  Map 侧/大小比较/for 迭代 Map 均明确 COMPILE-ERROR 无 hex。
+  verify_selfcomp 205/205 = 90 对拍 + 115 负例；存量 79 对拍用例
+  hex 逐字节不变；十五审 B+ 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主

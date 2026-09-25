@@ -1,6 +1,23 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-26 十五审整改收官）**：仓库版本 v1.2.12；
+> **交接声明（2026-09-26 L2.3 Map 批交付）**：仓库版本 v1.2.13；Map 批
+> B1+B2 + 裁决 2 甲 + 严格性甲按用户裁决"执行"交付（designs/0006 三裁决
+> 点全按建议项；RFC-0004 修订 19）：vt mp{V} 单参数（键恒 String）、
+> mp{?} 由 set/注解补全、桶布局照宿主平移（val 槽 8B 按值 vt 装载）；
+> 8 内建全量（map_get→en:Option{V} 与 c2 变体表 idx 2/3 逐值对齐、
+> map_keys/values 键排序字节序、rehash 翻倍仅搬 state==1、map_remove
+> 返回 void 对齐宿主 WASM）+ 结构相等 mp_eq|V 特化递归（en/cl 值拒）；
+> import 注册堵"from map import 静默忽略"缺口。verify_selfcomp
+> **205/205 = 90 对拍 + 115 负例**（新对拍 11 + 新负例 13 锁原因）；
+> self_comp 8627 行；**存量 79 对拍用例 hex 逐字节不变**（执行者全量
+> 对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。v1.2.13 功能提交
+> CI 首跑六 job 全绿后已切 tag。**宿主挂账（设计期实证）**：map_remove
+> 返回值宿主双后端分叉（解释器/TC=Bool vs WASM=Unit——`println` 形态
+> true/false vs ()/()），按裁决 2 甲 L2 对齐 WASM，宿主修否待用户另裁。
+> 下一步 json/包/return 批次或独立复审待用户裁决；语言面与外部发布线
+> 继续冻结。
+>
+> **前次交接声明（2026-09-26 十五审整改收官）**：仓库版本 v1.2.12；
 > 第十五轮体系内独立审查（[review-2026-09-26.html](reviews/review-2026-09-26.html)，
 > 基线 44954e2/v1.2.11-3）总评 **B+**——R79-R82 整改与 c2/String/List 批
 > 核心宣称零失真（存量 62 用例 hex 恒等独立对拍 62/62 全等）、基线 14 项

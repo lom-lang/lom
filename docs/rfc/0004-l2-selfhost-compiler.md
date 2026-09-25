@@ -508,3 +508,36 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   不相容/裸 mp{?} 编译期拒【建议】/ 乙 对齐宿主运行时）。预计 verify_selfcomp
   ≈ 199-203 项（新对拍 8-10 + 新负例 10-12）、存量 79 对拍 hex 恒等、
   self_comp ~8600-8900 行。**代码零改动——纯设计文档交付；动工在裁决后。**
+- **修订 19（2026-09-26）：L2.3 Map 批交付（用户裁决"执行"——B1+B2
+  同批、裁决 2 甲、严格性甲；designs/0006 三裁决点全按建议项）。**
+  vt **mp{V}** 单参数（键恒 String 不进 vt）、**mp{?}** 由 set/注解补全
+  （c2 ? 机制复用，refine_map_set 进 scan_block_lets 与 comp_one_stmt
+  双路同步）；对象/桶布局照宿主平移（头 [buckets][cap][size] 12B、
+  桶 [state][key_off][val 8B] 步长 16——val 槽按值 vt 装载，cons 槽
+  同型；probe/rehash 搬运与 vt 无关 8B 盲拷）。**B1**：8 内建全量——
+  map_get 构造 Some[idx=2]/None[idx=3] 对象与 L2 变体表逐值对齐
+  （c2 match 零新增消费）、map_keys/values 键排序字节序（st_cmp
+  复用，多字节 UTF-8 键对拍）、map_size 内联、**map_remove 返回
+  void 对齐宿主 WASM（裁决 2 甲；`let b = map_remove(..)` 在 L2
+  拒——宿主解释器合法，信任边界）**、rehash size*2>cap 翻倍仅搬
+  state==1、引用语义（let 别名共享，86 用例锁定——Map 区别 List
+  的核心语义）。**B2**：结构相等 mp_eq|V 特化递归（i64/i32/f64/st/
+  嵌套 ls/mp；en/cl 值编译期拒——List B3 同族）。**顺手堵缺口**：
+  `from map import` 此前被静默忽略（误导性"调用未知函数"），未知
+  内建名现报"未知内建 'map.<name>'"。信任边界新增：编译期严格包
+  （期望 Map/键 String/值不相容/裸 mp{?} 拒——既定路线延续）；
+  println(Map) 与拼接提升 Map 侧拒（容器显示批统一裁决）；**宿主
+  双后端分叉挂账**（map_remove 返回值解释器/TC=Bool vs WASM=Unit，
+  设计期规划者双后端实验实证 true/false vs ()/()——修否待用户另裁）。
+  验收：verify_selfcomp **205/205 = 90 对拍 + 115 负例**（新对拍
+  11：80_map_basic~90_map_eq 含引用语义/墓碑复用/rehash/嵌套值；
+  新负例 13 锁原因）；**存量 79 对拍用例产物 hex 逐字节不变**
+  （执行者全量对拍 + 规划者 git show 导出旧编译器独立抽验恒等）；
+  self_comp 7813→8627 行；Rust 535+8/六模式/eval 双后端 121/121/
+  doc_audit 67/67 全绿复验。开发对拍修掉 4 枚发射 bug（mp_new 类型
+  hex 漏 01 字节、无参 helper 声明 local 从 0 起、空 local 向量需
+  显式计数字节 00、size++ 误发 6c(i32.mul) 应为 6a(i32.add)——
+  §11.6 坑族再应验）；另登记一条复现未遂的疑似坑（self_comp 上下文
+  裸语句 `f(...)?` 运行时错位——最小复现未遂，规避形态 let 绑定
+  已用并注释，**主观推测**与块尾表达式/语句分组边角相关）。语言面
+  与宿主零变化；十五审 B+ 不评此新增范围。
