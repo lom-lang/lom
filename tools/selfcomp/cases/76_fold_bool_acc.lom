@@ -1,0 +1,11 @@
+from list import { list_cons, list_empty, list_fold }
+
+fn main() -> Unit ! [IO]
+    let xs = list_cons(1, list_cons(2, list_empty()))
+    let all = list_fold(fn(a: Bool, n: Int) -> Bool a and n > 0 end, True, xs)
+    if all
+        println(1)
+    else
+        println(0)
+    end
+end

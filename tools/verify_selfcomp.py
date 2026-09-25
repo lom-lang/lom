@@ -43,6 +43,9 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_range_not_int.lom': 'range 两端须为 Int',
     'neg_list_eq_enum_elem.lom': 'List 元素相等比较暂不支持 枚举/闭包 元素',
     'neg_pipe_syntax.lom': '该表达式形态',
+    # ---- 第十五轮整改（R84/R85）----
+    'neg_fold_unsupported_acc.lom': 'list_fold 累加器类型子集外',
+    'neg_bool_param_flow.lom': '深层 Bool 流未被预扫覆盖',
     # ---- 此前批次 ----
     'neg_bool_arith.lom': 'Bool 参与算术',
     'neg_bool_mixed_compare.lom': 'Bool 与非 Bool 比较',

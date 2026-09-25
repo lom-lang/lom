@@ -1,0 +1,6 @@
+fn main() -> Unit ! [IO]
+    let f = fn() -> Bool
+        True
+    end
+    println(f())
+end

@@ -1,0 +1,4 @@
+fn main() -> Unit ! [IO]
+    let flag = if 1 == 1 True else False end
+    println(flag)
+end

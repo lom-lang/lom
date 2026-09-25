@@ -5357,7 +5357,9 @@ fn ls_filter_body(elem_vt: String, alloc_idx: Int, tidx: Int) -> Result<String, 
     + "0b")
 end
 
-# rt_ls_fold<acc,elem>: (i64 f, i64 init, i64 xs) -> i64 acc（正向，无新表）
+# rt_ls_fold<acc,elem>: (i64 f, acc_vt init, i64 xs) -> acc_vt（正向，无新表）
+# R84：init 位/返回位按 acc_vt 特化——acc 只经 local 3 流转（无槽存取），
+# local 组类型 ab 已按 acc_vt 选宽（f64/i32/其余 i64 指针载体），故体不变
 # locals 2=acc(rvt)、3=cur(i64)、4=head(elem)
 fn ls_fold_body(acc_vt: String, elem_vt: String, tidx: Int) -> Result<String, String>
     let ab = ls_vt_bt(acc_vt)?
@@ -5605,10 +5607,20 @@ fn ensure_ls_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, S
                                         if head == "ls_fold"
                                             let acc = list_get(parts, 1)
                                             let elem = list_get(parts, 2)
+                                            # R84：acc 载体先于类型注册校验——f64/i32 槽型与
+                                            # i64 指针载体（st/en/cl/ls）由签名特化覆盖；其余
+                                            # （如 Unit）编译期明确拒绝，绝不产可实例化失败的
+                                            # 模块（e5b/e9b 教训：init 位与返回位硬编码 i64）
+                                            let acc_ok = acc == "i64" or acc == "f64" or acc == "i32" or acc == "st" or acc == "cl" or ls_vt(acc) or enum_vt(acc)
+                                            if !acc_ok
+                                                return Err(subset_err("list_fold 累加器类型子集外（'" + acc + "'）——支持 Int/Float/Bool/String/List/枚举/闭包载体"))
+                                            end
                                             let tidx = sig_typeidx(mk_sig(acc + "," + elem, acc), cg)
                                             let body = ls_fold_body(acc, elem, tidx)?
                                             let tt = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
-                                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60037e7e7e017e")
+                                            # R84：init 参数位与返回位按 acc_vt 特化（f 恒为
+                                            # 闭包指针 i64、xs 恒为 i64；i64 载体字节不变）
+                                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60037e" + vt_hex(acc) + "7e" + "01" + vt_hex(acc))
                                             map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
                                             let fidx = reg_extra_fn(tt, body, cg)
                                             map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
@@ -7200,23 +7212,47 @@ end
 # 追踪/Bool 返回函数直调）；深层 Bool 流由 comp_println 的 ibase 防御兜底
 # 拒绝（不产坏 wasm）。存量用例零影响（唯一 println(Bool) 的 62 已含
 # String 签名）。
-fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
     match e
         ExBool(_) => True
         ExBinary(op, _, _) => op == "Eq" or op == "NotEq" or op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
         ExLogical(_, _, _) => True
         ExUnary(op, _) => op == "Not"
-        ExGroup(i) => bool_disp_expr(i, bool_names, ret_bool_fns)
+        ExGroup(i) => bool_disp_expr(i, bool_names, ret_bool_fns, cl_bools)
         ExIdent(x, _, _) => map_has(bool_names, x)
+        ExIf(ifr) => bool_disp_if_val(ifr, bool_names, ret_bool_fns, cl_bools)
+        ExMatch(_, arms, _) =>
+            let mut hit = False
+            for arm in arms
+                match arm
+                    ArmR(_, _, body) =>
+                        match body
+                            ABExpr(ae) =>
+                                if bool_disp_expr(ae, bool_names, ret_bool_fns, cl_bools)
+                                    hit = True
+                                end
+                            end
+                            ABBlock(ab) =>
+                                if blk_tail_bool(ab, bool_names, ret_bool_fns, cl_bools)
+                                    hit = True
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            hit
+        end
         ExCall(callee, _) =>
             match callee
                 ExIdent(n, _, _) =>
                     if n == "println"
                         False
                     else
-                        map_has(ret_bool_fns, n) or n == "list_is_empty" or n == "starts_with" or n == "ends_with" or n == "contains"
+                        map_has(ret_bool_fns, n) or n == "list_is_empty" or n == "starts_with" or n == "ends_with" or n == "contains" or map_has(cl_bools, n)
                     end
                 end
+                ExClosure(_, creto, cbody) => closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools)
                 _ => False
             end
         end
@@ -7224,34 +7260,86 @@ fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String
     end
 end
 
-fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+# 块值位置的 Bool 判定：块值 = tail（blk_val_ty 同口径——None 即 void）
+fn blk_tail_bool(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+    match b
+        BlkOf(_, tail) =>
+            match tail
+                Some(te) => bool_disp_expr(te, bool_names, ret_bool_fns, cl_bools)
+                None => False
+            end
+        end
+    end
+end
+
+# 值位 if 产 Bool：任一分支/else 的块尾产 Bool 即命中（R85 pb3）
+fn bool_disp_if_val(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+    match ifr
+        IfR(branches, else_b) =>
+            let mut hit = False
+            for pair in branches
+                if blk_tail_bool(pair.1, bool_names, ret_bool_fns, cl_bools)
+                    hit = True
+                end
+            end
+            match else_b
+                Some(eb) =>
+                    if blk_tail_bool(eb, bool_names, ret_bool_fns, cl_bools)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+# 局部闭包返回 Bool 判定：reto 显式 Bool 直判；未注解时保守查体尾
+# （单层启发——深层形态由 comp_println 的 ibase 防御兜底）
+fn closure_ret_bool(reto: Option<Ty>, body: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+    match reto
+        Some(TyBool) => True
+        _ => blk_tail_bool(body, bool_names, ret_bool_fns, cl_bools)
+    end
+end
+
+fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
     match b
         BlkOf(stmts, tail) =>
             let mut hit = False
             for s in stmts
                 match s
                     StLet(_, n, _, ex) =>
-                        if bool_disp_expr(ex, bool_names, ret_bool_fns)
+                        if bool_disp_expr(ex, bool_names, ret_bool_fns, cl_bools)
                             map_set(bool_names, n, True)
+                        end
+                        match ex
+                            ExClosure(_, creto, cbody) =>
+                                if closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools)
+                                    map_set(cl_bools, n, True)
+                                end
+                            end
+                            _ => ()
                         end
                     end
                     StExpr(e) =>
-                        if println_bool_ex(e, bool_names, ret_bool_fns)
+                        if println_bool_ex(e, bool_names, ret_bool_fns, cl_bools)
                             hit = True
                         end
                     end
                     StIf(ifr) =>
-                        if bool_disp_if(ifr, bool_names, ret_bool_fns)
+                        if bool_disp_if(ifr, bool_names, ret_bool_fns, cl_bools)
                             hit = True
                         end
                     end
                     StWhile(_, body) =>
-                        if bool_disp_block(body, bool_names, ret_bool_fns)
+                        if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools)
                             hit = True
                         end
                     end
                     StFor(_, _, body) =>
-                        if bool_disp_block(body, bool_names, ret_bool_fns)
+                        if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools)
                             hit = True
                         end
                     end
@@ -7262,7 +7350,7 @@ fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<Stri
             # L2.2 首版教训同族）
             match tail
                 Some(t) =>
-                    if println_bool_ex(t, bool_names, ret_bool_fns)
+                    if println_bool_ex(t, bool_names, ret_bool_fns, cl_bools)
                         hit = True
                     end
                 end
@@ -7274,13 +7362,13 @@ fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<Stri
 end
 
 # println(单个 Bool 产实参) 形态判定（bool_disp_block 的 tail/stmts 共用）
-fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
     match e
         ExCall(callee, args) =>
             match callee
                 ExIdent(n, _, _) =>
                     if n == "println" and list_length(args) == 1
-                        bool_disp_expr(list_get(args, 0), bool_names, ret_bool_fns)
+                        bool_disp_expr(list_get(args, 0), bool_names, ret_bool_fns, cl_bools)
                     else
                         False
                     end
@@ -7292,18 +7380,18 @@ fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<Strin
     end
 end
 
-fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>) -> Bool
+fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
     match ifr
         IfR(branches, else_b) =>
             let mut hit = False
             for pair in branches
-                if bool_disp_block(pair.1, bool_names, ret_bool_fns)
+                if bool_disp_block(pair.1, bool_names, ret_bool_fns, cl_bools)
                     hit = True
                 end
             end
             match else_b
                 Some(eb) =>
-                    if bool_disp_block(eb, bool_names, ret_bool_fns)
+                    if bool_disp_block(eb, bool_names, ret_bool_fns, cl_bools)
                         hit = True
                     end
                 end
@@ -7334,7 +7422,8 @@ fn scan_has_bool_display(prg: Prg) -> Bool
                 match it
                     ItFn(_, _, _, _, body, _, _) =>
                         let names = map_empty()
-                        if bool_disp_block(body, names, rf)
+                        let cls = map_empty()
+                        if bool_disp_block(body, names, rf, cls)
                             hit = True
                         end
                     end

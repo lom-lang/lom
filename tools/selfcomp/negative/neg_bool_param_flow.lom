@@ -1,0 +1,7 @@
+fn show(b: Bool) -> Unit ! [IO]
+    println(b)
+end
+
+fn main() -> Unit ! [IO]
+    show(1 == 1)
+end
