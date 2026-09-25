@@ -1,0 +1,41 @@
+# L2.3 Map 批 B1：泛型载荷——en:Box{mp{i64}} 构造/match 与
+# Result<Int, Map<String, Int>> 的 err 载荷（mp vt 流经泛型实例替换）。
+from map import { map_empty, map_set, map_get, map_size }
+
+enum Box<T> = Wrap(T)
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 2)
+    let b = Wrap(m)
+    match b
+        Wrap(inner) =>
+            match map_get(inner, "a")
+                Some(v) => println(v)
+                None => println(0)
+            end
+        end
+    end
+    let ok: Result<Int, Map<String, Int>> = Ok(7)
+    match ok
+        Ok(v) => println(v)
+        Err(em) =>
+            match map_get(em, "x")
+                Some(v) => println(v)
+                None => println(-1)
+            end
+        end
+    end
+    let err: Result<Int, Map<String, Int>> = Err(m)
+    match err
+        Ok(v) => println(v)
+        Err(em) =>
+            println(map_size(em))
+            match map_get(em, "b")
+                Some(v) => println(v)
+                None => println(0)
+            end
+        end
+    end
+end

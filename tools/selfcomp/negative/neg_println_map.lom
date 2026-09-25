@@ -1,0 +1,8 @@
+# 校验 #7：println(Map)——宿主打 {k: v}，L2 容器显示留后续批次
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    println(m)
+end

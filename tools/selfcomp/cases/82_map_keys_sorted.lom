@@ -1,0 +1,24 @@
+# L2.3 Map 批 B1：map_keys 键排序确定性（字节序，与宿主 Rust str Ord
+# 同语义）——乱序插入 + 多字节 UTF-8 键（FNV-1a 哈希输入面钉住）。
+from map import { map_empty, map_set, map_keys }
+from list import { list_length, list_get }
+from string import { len }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "zebra", 1)
+    map_set(m, "apple", 2)
+    map_set(m, "mango", 3)
+    map_set(m, "banana", 4)
+    map_set(m, "banana2", 5)
+    map_set(m, "Apple", 6)
+    map_set(m, "苹果", 7)
+    let ks = map_keys(m)
+    println(list_length(ks))
+    let i = 0
+    while i < list_length(ks)
+        println(list_get(ks, i))
+        println(len(list_get(ks, i)))
+        i = i + 1
+    end
+end

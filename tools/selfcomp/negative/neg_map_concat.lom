@@ -1,0 +1,9 @@
+# 校验 #6：拼接提升的 Map 侧（宿主 rt_add 合法——信任边界，L2 拒）
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    let s = "m: " + m
+    println(s)
+end

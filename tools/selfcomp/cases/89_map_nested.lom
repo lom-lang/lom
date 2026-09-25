@@ -1,0 +1,37 @@
+# L2.3 Map 批 B1：嵌套 Map——mp{mp{i64}}（外层值是内层 Map 裸指针，
+# set 细化链 outer: mp{?} → mp{mp{i64}}；get 逐层 Option 剥离）。
+from map import { map_empty, map_set, map_get, map_size }
+
+fn main() -> Unit ! [IO]
+    let outer = map_empty()
+    let inner1 = map_empty()
+    map_set(inner1, "x", 10)
+    map_set(inner1, "y", 20)
+    let inner2 = map_empty()
+    map_set(inner2, "x", 30)
+    map_set(outer, "one", inner1)
+    map_set(outer, "two", inner2)
+    println(map_size(outer))
+    match map_get(outer, "one")
+        Some(im) =>
+            match map_get(im, "y")
+                Some(v) => println(v)
+                None => println(0)
+            end
+        end
+        None => println(-1)
+    end
+    match map_get(outer, "two")
+        Some(im) =>
+            match map_get(im, "x")
+                Some(v) => println(v)
+                None => println(0)
+            end
+        end
+        None => println(-1)
+    end
+    match map_get(outer, "zz")
+        Some(_) => println(1)
+        None => println(2)
+    end
+end

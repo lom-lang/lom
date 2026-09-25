@@ -1,0 +1,16 @@
+# 校验 #9（B2 边界）：mp_eq 遇枚举值——List B3 同族拒绝
+from map import { map_empty, map_set }
+
+enum Color = Red | Green
+
+fn main() -> Unit
+    let m1 = map_empty()
+    map_set(m1, "k", Red)
+    let m2 = map_empty()
+    map_set(m2, "k", Green)
+    if m1 == m2
+        println(1)
+    else
+        println(0)
+    end
+end

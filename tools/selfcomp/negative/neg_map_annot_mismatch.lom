@@ -1,0 +1,7 @@
+# 校验 #3（let 注解形态）：Map 注解与非 Map 值不符（R68 同族）
+from map import { map_empty }
+
+fn main() -> Unit
+    let m: Map<String, Int> = 5
+    println(0)
+end

@@ -9,9 +9,10 @@
 #
 # 当前子集：L2.2 算术/调用/println + L2.3-a 控制流/Bool + L2.3-b 闭包
 # + L2.3-c1 非泛型用户枚举与 match + c2 内建 Result/Option、泛型
-# 用户枚举类型实例（构造、match、递归/嵌套载荷）。子集外编译期拒绝：
-# String/List/Map/json/包、? 与 return 语句、枚举结构相等/显示、
-# 闭包值 match 等留 L2.3 后续批次。
+# 用户枚举类型实例（构造、match、递归/嵌套载荷）+ String 批 + List 批
+# + Map 批（mp{V} 类型流、8 内建、结构相等 eq）。子集外编译期拒绝：
+# json/包、? 与 return 语句、List/Map/枚举显示、闭包值 match
+# 等留 L2.3 后续批次。
 #
 # 值表示（编译器实现自由度，RFC-0004：不做字节级一致，行为级对拍）：
 #   Int=i64、Float=f64、Bool=i32；闭包/枚举=i64 裸指针（untagged，
@@ -2474,6 +2475,25 @@ fn ls_inner(vt: String) -> String
     out
 end
 
+# L2.3 Map 批（designs/0006 §3）：mp{V} 判定与内层提取。单参数（键恒
+# String 不进 vt——与宿主 typechecker Generic("Map",[_Any]) 一致），嵌套
+# 内层（mp{mp{i64}}）完整保留花括号，与 ls{T} 同族。
+fn mp_vt(vt: String) -> Bool
+    starts_with(vt, "mp{") and ends_with(vt, "}")
+end
+
+fn mp_inner(vt: String) -> String
+    let n = len(vt)
+    let chars = split(vt, "")
+    let mut out = ""
+    let mut i = 3
+    while i < n - 1
+        out = out + list_get(chars, i)
+        i = i + 1
+    end
+    out
+end
+
 fn vt_merge(a: String, b: String) -> Result<String, String>
     if a == b
         return Ok(a)
@@ -2488,6 +2508,10 @@ fn vt_merge(a: String, b: String) -> Result<String, String>
         # List 元素类型按结构合流（ls{?} 与 ls{i64} 合流为 ls{i64}——
         # list_empty 的未知元素由 cons/注解补全，c2 ? 机制同族）
         return Ok("ls{" + vt_merge(ls_inner(a), ls_inner(b))? + "}")
+    end
+    if mp_vt(a) and mp_vt(b)
+        # L2.3 Map 批：Map 值类型按结构合流（mp{?} 由 set/注解补全）
+        return Ok("mp{" + vt_merge(mp_inner(a), mp_inner(b))? + "}")
     end
     if enum_vt(a) and enum_vt(b)
         let aa = enum_vt_parts(a)?
@@ -2627,13 +2651,29 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
             end
         end
         TyGeneric(name, args) =>
-            # L2.3 List 批：List<T> → ls{T}（泛型枚举之外的唯一内建泛型；
-            # Map 等其余泛型仍留后续批次）
+            # L2.3 List 批：List<T> → ls{T}；L2.3 Map 批（designs/0006 §7.2）：
+            # Map<K, V> → mp{V}（键恒 String——宿主 8 内建第 2 参全为 String，
+            # 键通道不进 vt；参数数校验 1）；其余泛型仍留后续批次
             if name == "List"
                 if list_length(args) != 1
                     return Err(subset_err("List 类型参数数不符（期望 1 得 " + list_length(args) + "）"))
                 end
                 return Ok("ls{" + ty_vt_with_params(list_get(args, 0), fns, tparams)? + "}")
+            end
+            if name == "Map"
+                if list_length(args) != 2
+                    return Err(subset_err("Map 类型参数数不符（期望 2 得 " + list_length(args) + "）"))
+                end
+                # 键参数编译期校验恒 String（宿主 map_* 第 2 参 Type::String）
+                let kvt = ty_vt_with_params(list_get(args, 0), fns, tparams)?
+                if kvt != "st"
+                    return Err(subset_err("Map 键类型恒为 String（得到 '" + kvt + "'）"))
+                end
+                let vvt = ty_vt_with_params(list_get(args, 1), fns, tparams)?
+                if vvt == "void" or vvt == "cl"
+                    return Err(subset_err("Map 值类型暂不支持 Unit/Fn"))
+                end
+                return Ok("mp{" + vvt + "}")
             end
             let meta = match map_get(fns, "@enum:" + name)
                 Some(m) => m
@@ -2687,7 +2727,7 @@ fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, p
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -2989,6 +3029,79 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
         let _ = vt_merge(sig_rv(sig), iv)?
         return Ok(iv)
     end
+    # L2.3 Map 批（designs/0006 §7.2 / §7.3 裁决 3 甲）：map_* 返回类型
+    # 按实参综合 + 编译期严格校验（第 1 参须 Map、键须 String、值与
+    # mp{X} 内层相容——宿主运行期 tag trap / deferred，L2 编译期拦）
+    if name == "map_empty"
+        return Ok("mp{?}")
+    end
+    if name == "map_set"
+        if list_length(args) != 3
+            return Err(subset_err("调用 'map_set' 实数量不符（期望 3 得 " + list_length(args) + "）"))
+        end
+        let mv = infer_ex(list_get(args, 0), env, fns)?
+        if !mp_vt(mv)
+            return Err(subset_err("调用 'map_set' 期望 Map 得 " + mv))
+        end
+        let kv = infer_ex(list_get(args, 1), env, fns)?
+        if !vt_compatible(kv, "st")
+            return Err(subset_err("调用 'map_set' 第 2 参期望 String 键（得 " + kv + "）"))
+        end
+        let vv = infer_ex(list_get(args, 2), env, fns)?
+        if vv == "void"
+            return Err(subset_err("map_set 值不能为 Unit"))
+        end
+        let inner = mp_inner(mv)
+        if inner != "?" and !vt_compatible(vv, inner)
+            return Err(subset_err("Map 值类型不符（期望 mp{" + inner + "} 得 " + vv + "）"))
+        end
+        return Ok("void")
+    end
+    if name == "map_get" or name == "map_has" or name == "map_remove"
+        if list_length(args) != 2
+            return Err(subset_err("调用 '" + name + "' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let mv = infer_ex(list_get(args, 0), env, fns)?
+        if !mp_vt(mv)
+            return Err(subset_err("调用 '" + name + "' 期望 Map 得 " + mv))
+        end
+        let kv = infer_ex(list_get(args, 1), env, fns)?
+        if !vt_compatible(kv, "st")
+            return Err(subset_err("调用 '" + name + "' 第 2 参期望 String 键（得 " + kv + "）"))
+        end
+        if name == "map_has"
+            return Ok("i32")
+        end
+        if name == "map_remove"
+            # 裁决 2 甲：对齐宿主 WASM（RT_MAP_REMOVE 返回 Unit）
+            return Ok("void")
+        end
+        let inner = mp_inner(mv)
+        if inner == "?"
+            return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（map_get）"))
+        end
+        return Ok(enum_vt_make("Option", list_cons(inner, list_empty())))
+    end
+    if name == "map_keys" or name == "map_values" or name == "map_size"
+        if list_length(args) != 1
+            return Err(subset_err("调用 '" + name + "' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let mv = infer_ex(list_get(args, 0), env, fns)?
+        if !mp_vt(mv)
+            return Err(subset_err("调用 '" + name + "' 期望 Map 得 " + mv))
+        end
+        if name == "map_keys"
+            return Ok("ls{st}")
+        end
+        if name == "map_size"
+            return Ok("i64")
+        end
+        let inner = mp_inner(mv)
+        if inner == "?"
+            return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（map_values）"))
+        end
+        return Ok("ls{" + inner + "}")
+    end
     # string 内建（split 之外）：ret 静态，取注册摘要
     match map_get(fns, name)
         Some(fi) => Ok(fi.ret)
@@ -3232,8 +3345,8 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             # 闭包与枚举裸指针不参与一元负。
             let itn = infer_ex(inner, env, fns)?
-            if itn == "cl" or enum_vt(itn) or itn == "st"
-                return Err(subset_err("闭包/枚举/String 值参与一元负"))
+            if itn == "cl" or enum_vt(itn) or itn == "st" or mp_vt(itn)
+                return Err(subset_err("闭包/枚举/String/Map 值参与一元负"))
             end
             if itn == "i32"
                 return Err(subset_err("Bool 参与一元负"))
@@ -3266,6 +3379,17 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                     end
                     return Err(subset_err("List 与非 List 比较（L2 子集外）"))
                 end
+                if mp_vt(lt) or mp_vt(rt)
+                    # L2.3 Map 批（B2）：结构相等 Eq/NotEq 放行（特化递归 eq）；
+                    # 大小/跨类型拒（List B3 同族）
+                    if mp_vt(lt) and mp_vt(rt) and (op == "Eq" or op == "NotEq")
+                        return Ok("i32")
+                    end
+                    if mp_vt(lt) and mp_vt(rt)
+                        return Err(subset_err("Map 大小比较（L2 子集外；仅支持 ==/!=）"))
+                    end
+                    return Err(subset_err("Map 与非 Map 比较（L2 子集外）"))
+                end
                 if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                     return Err(subset_err("闭包/枚举值参与比较（结构相等留后续批次）"))
                 end
@@ -3288,6 +3412,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if ls_vt(lt) or ls_vt(rt)
                     return Err(subset_err("List 值的显示留后续批次（拼接提升；与 println(List) 同边界）"))
                 end
+                if mp_vt(lt) or mp_vt(rt)
+                    return Err(subset_err("Map 值的显示留后续批次（拼接提升；与 println(Map) 同边界）"))
+                end
                 return Ok("st")
             end
             if lt == "void" or rt == "void"
@@ -3298,6 +3425,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             if ls_vt(lt) or ls_vt(rt)
                 return Err(subset_err("List 参与算术（L2 子集外；仅支持 ==/!= 比较）"))
+            end
+            if mp_vt(lt) or mp_vt(rt)
+                return Err(subset_err("Map 参与算术（L2 子集外；仅支持 ==/!= 比较）"))
             end
             if lt == "st" or rt == "st"
                 return Err(subset_err("String 只参与 + 拼接"))
@@ -3382,6 +3512,43 @@ end
 # R82/c2：类型预扫只在独立绑定表里按序登记 let，并在赋值时细化
 # 尚未知的泛型参数。编译期槽位由真实发射路径分配；临时 let 的
 # slot=0 只供 infer_ex/ex_sig 使用。
+# L2.3 Map 批（designs/0006 §7.2）：map_set 语句的 mp{?} 绑定细化——
+# 第 1 参为裸标识符且绑定 vt 是 mp{?} 时按值 vt 回写（ls{?} 经 cons/赋值
+# 补全的 c2 ? 机制同族）。仅语句位置生效（值位置 set 无从回写绑定）；
+# scan_block_lets（预扫）与 comp_one_stmt（真实发射）两处同步调用，
+# 防预扫/发射类型分叉（R82 教训）。
+fn refine_map_set(ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Unit, String>
+    match ex
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(name, _, _) =>
+                    if name == "map_set" and list_length(args) == 3
+                        match list_get(args, 0)
+                            ExIdent(mn, _, _) =>
+                                match map_get(env, mn)
+                                    Some(b) =>
+                                        if b.vt == "mp{?}"
+                                            let vv = infer_ex(list_get(args, 2), env, fns)?
+                                            if vv != "void"
+                                                map_set(env, mn, {slot: b.slot, vt: "mp{" + vv + "}", sig: "", cap: b.cap})
+                                            end
+                                        end
+                                    end
+                                    None => ()
+                                end
+                            end
+                            _ => ()
+                        end
+                    end
+                end
+                _ => ()
+            end
+        end
+        _ => ()
+    end
+    Ok(())
+end
+
 fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, prefix: String) -> Result<Unit, String>
     for s in stmts
         match s
@@ -3416,6 +3583,13 @@ fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: Strin
                 end
                 let merged = vt_merge(bnd.vt, got)?
                 map_set(block_env, name, {slot: bnd.slot, vt: merged, sig: bnd.sig, cap: False})
+            end
+            StExpr(ex) =>
+                # L2.3 Map 批：map_set 语句的 mp{?} 绑定细化（预扫路——
+                # 与 comp_one_stmt 的真实发射路同步）。let 绑定而非裸
+                # 语句调用：宿主解析器对裸 f(...)? 语句在本上下文有
+                # 分组边角（§11.6 族），let 形态稳定
+                let rms_r = refine_map_set(ex, block_env, fns)?
             end
             _ => ()
         end
@@ -3862,6 +4036,19 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
             end
             return Ok(lc + rc + "10" + leb128_hex(idx) + "45")
         end
+        # L2.3 Map 批（B2）：mp{V} 结构相等走特化递归 eq（List B3 同族；
+        # 值按 V 分派——嵌套 ls/mp 递归特化，en/cl 值编译期拒）
+        if mp_vt(left_vt) and mp_vt(right_vt)
+            let inner = vt_merge(mp_inner(left_vt), mp_inner(right_vt))?
+            if inner == "?"
+                return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（== 比较）"))
+            end
+            let idx = ensure_mp_helper("mp_eq|" + inner, cg)?
+            if op == "Eq"
+                return Ok(lc + rc + "10" + leb128_hex(idx))
+            end
+            return Ok(lc + rc + "10" + leb128_hex(idx) + "45")
+        end
         if left_vt == "i32" and right_vt == "i32"
             return Ok(lc + rc + i32_cmp_op(op)?)
         end
@@ -3960,6 +4147,11 @@ fn comp_pattern_test(p: Pat, s: Int, svt: String, arm_env: Map<String, {slot: In
                     end
                 end
                 None => ()
+            end
+            # L2.3 Map 批（校验 #4）：裸 mp{?} 进 binder 拒（ls{?} 需值
+            # 宽度的位置同族——绑定后无从选 load 宽度）
+            if mp_vt(svt) and mp_inner(svt) == "?"
+                return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（match binder）"))
             end
             let slot = new_slot(locals, localvt, svt)
             map_set(arm_env, name, {slot: slot, vt: svt, sig: "", cap: False})
@@ -4098,6 +4290,10 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                         # L2.3 List 批：list 内建与 split 走 list 编译路径
                         if starts_with(name, "list_") or name == "split"
                             return comp_list_builtin(name, args, env, fns, cg, locals, localvt)
+                        end
+                        # L2.3 Map 批：map 内建走 map 编译路径
+                        if starts_with(name, "map_")
+                            return comp_map_builtin(name, args, env, fns, cg, locals, localvt)
                         end
                         return comp_builtin_call(name, fi, args, env, fns, cg, locals, localvt)
                     end
@@ -4283,6 +4479,95 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
     Err(subset_err("内部错误：list 内建分派遗漏 '" + name + "'"))
 end
 
+# L2.3 Map 批（designs/0006 §7.1-§7.2）：map 内建调用编译。empty 走
+# mp_new helper；size 内联 load size@8（宿主 WC 调用点对齐）；其余
+# eval 参数 + call helper（set/get/values 按值 vt 特化键）。参数求值序
+# 与宿主一致（先参数后分派）；校验与 builtin_rv 同口径（裁决 3 甲）。
+fn comp_map_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if name == "map_empty"
+        if list_length(args) != 0
+            return Err(subset_err("调用 'map_empty' 实数量不符（期望 0 得 " + list_length(args) + "）"))
+        end
+        let idx = ensure_mp_helper("mp_new", cg)?
+        return Ok("10" + leb128_hex(idx))
+    end
+    let nprm =
+    if name == "map_set"
+        3
+    else
+        if name == "map_get" or name == "map_has" or name == "map_remove"
+            2
+        else
+            1
+        end
+    end
+    if list_length(args) != nprm
+        return Err(subset_err("调用 '" + name + "' 实数量不符（期望 " + nprm + " 得 " + list_length(args) + "）"))
+    end
+    # 第 1 参须 Map（mp{?} 可——set/get/values 按值上下文分流）
+    let mv = infer_ex(list_get(args, 0), env, fns)?
+    if !mp_vt(mv)
+        return Err(subset_err("调用 '" + name + "' 期望 Map 得 " + mv))
+    end
+    # 键参（set/get/has/remove 第 2 参）须 String
+    if nprm == 2
+        let kv = infer_ex(list_get(args, 1), env, fns)?
+        if !vt_compatible(kv, "st")
+            return Err(subset_err("调用 '" + name + "' 第 2 参期望 String 键（得 " + kv + "）"))
+        end
+    end
+    let inner = mp_inner(mv)
+    if name == "map_size"
+        # 内联：wrap → i32.load size@8 → extend（宿主 WC map_size 同构）
+        let mc = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        return Ok(mc + "a7" + "2800" + "08" + "ac")
+    end
+    if name == "map_keys"
+        let idx = ensure_mp_helper("mp_keys", cg)?
+        let out = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "map_has" or name == "map_remove"
+        let hname =
+        if name == "map_has"
+            "mp_has"
+        else
+            "mp_remove"
+        end
+        let idx = ensure_mp_helper(hname, cg)?
+        let out = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)? + comp_ex(list_get(args, 1), env, fns, cg, locals, localvt)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "map_get"
+        if inner == "?"
+            return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（map_get）"))
+        end
+        let idx = ensure_mp_helper("mp_get|" + inner, cg)?
+        let out = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)? + comp_ex(list_get(args, 1), env, fns, cg, locals, localvt)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    if name == "map_values"
+        if inner == "?"
+            return Err(subset_err("未知 Map 值类型——需注解或 set 上下文（map_values）"))
+        end
+        let idx = ensure_mp_helper("mp_values|" + inner, cg)?
+        let out = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        return Ok(out + "10" + leb128_hex(idx))
+    end
+    # map_set：值与 mp{X} 内层相容（校验 #3）→ 特化键 mp_set|V
+    let vv = infer_ex(list_get(args, 2), env, fns)?
+    if vv == "void"
+        return Err(subset_err("map_set 值不能为 Unit"))
+    end
+    if inner != "?" and !vt_compatible(vv, inner)
+        return Err(subset_err("Map 值类型不符（期望 mp{" + inner + "} 得 " + vv + "）"))
+    end
+    let vvt = vt_merge(inner, vv)?
+    let idx = ensure_mp_helper("mp_set|" + vvt, cg)?
+    let out = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)? + comp_ex(list_get(args, 1), env, fns, cg, locals, localvt)? + comp_ex(list_get(args, 2), env, fns, cg, locals, localvt)?
+    Ok(out + "10" + leb128_hex(idx))
+end
+
 # println(String) 的打印序列：ptr_code（栈上 i64）→ 存 local →
 # print_str(p+4, len) + print_str(0,1)（'\n' 在 data offset 0）
 fn print_st_hex(ptr_code: String, locals: Map<String, Int>, localvt: Map<String, String>) -> String
@@ -4320,7 +4605,7 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                     let pc = disp_code(ac, "i32", cg)?
                     Ok(print_st_hex(pc, locals, localvt))
                 else
-                    Err(subset_err("println 只接受 Int/Float/String/Bool（List/枚举显示留后续批次）"))
+                    Err(subset_err("println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"))
                 end
             end
         end
@@ -5263,7 +5548,7 @@ fn ls_vt_bt(vt: String) -> Result<String, String>
     elif vt == "i32"
         Ok("7f")
     else
-        if vt == "i64" or vt == "st" or ls_vt(vt) or enum_vt(vt) or vt == "cl"
+        if vt == "i64" or vt == "st" or ls_vt(vt) or mp_vt(vt) or enum_vt(vt) or vt == "cl"
             Ok("7e")
         else
             Err(subset_err("List 元素类型子集外（'" + vt + "'）"))
@@ -5671,6 +5956,466 @@ fn ls_eq_op(elem: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, 
                     Ok(la + "2900" + "00" + lb + "2900" + "00" + "10" + leb128_hex(idx))
                 else
                     Err(subset_err("List 元素相等比较暂不支持 枚举/闭包 元素（'" + elem + "'）"))
+                end
+            end
+        end
+    end
+end
+
+# ============================================================================
+# L2.3 Map 批（designs/0006 §7.1）：helper 本体生成（宿主 wasm_codegen
+# build_map_* L4249-4967 平移，剥 tag——Map 值 = i64 裸指针，头
+# [buckets:i32][cap:i32][size:i32] 12B，桶 [state][key_off][val:8B] 16B
+# 步长；键恒 String（[len][bytes] 布局与 L2 st 逐字节一致——key_off 存
+# i32，st 指针 wrap/extend 往返）。FNV-1a 哈希 h=2166136261（i32 位型
+# -2128831035）、(h^b)*16777619 i32 回绕、线性探测、墓碑 first_free、
+# 负值编码插入槽、rehash size*2>cap 翻倍仅搬 state==1（宿主同构——
+# helper body 是 hex 发射，i32.mul 回绕语义与宿主逐指令一致，无 Lom
+# 层算术）。桶 val 槽物理 8B：probe/rehash 搬运与值 vt 无关（8B 盲拷），
+# 值 vt 只影响 set 写入装载（f64 直写/i32 extend/其余 i64——cons 槽
+# 同型规则）与 eq 的值比较分派。
+# ============================================================================
+
+# FNV-1a 哈希段（kp/h/j 为调用方给定的 local 号；j 是循环暂存）
+fn mp_fnv_hex(kp: Int, h: Int, j: Int) -> String
+    "41" + sleb128_hex(-2128831035) + "21" + leb128_hex(h)
+    + "4100" + "21" + leb128_hex(j)
+    + "0240" + "0340"
+    + "20" + leb128_hex(j) + "20" + leb128_hex(kp) + "2800" + "00" + "4f" + "0d01"
+    + "20" + leb128_hex(h)
+    + "20" + leb128_hex(kp) + "4104" + "6a" + "20" + leb128_hex(j) + "6a" + "2d00" + "00"
+    + "73" + "41" + sleb128_hex(16777619) + "6c" + "21" + leb128_hex(h)
+    + "20" + leb128_hex(j) + "4101" + "6a" + "21" + leb128_hex(j)
+    + "0c00"
+    + "0b" + "0b"
+end
+
+# 桶 val 槽写入段（值在 local 2——mp_set 的第 3 参；地址已在栈上）。
+# 白名单与 ls cons 槽同族：i64/i32/f64/st/cl/ls/en/mp 载体
+fn mp_val_store_hex(v_vt: String) -> Result<String, String>
+    let ok = v_vt == "f64" or v_vt == "i32" or v_vt == "i64" or v_vt == "st" or v_vt == "cl" or ls_vt(v_vt) or enum_vt(v_vt) or mp_vt(v_vt)
+    if !ok
+        return Err(subset_err("Map 值类型子集外（'" + v_vt + "'）"))
+    end
+    if v_vt == "f64"
+        Ok("2002" + "3900" + "08")
+    elif v_vt == "i32"
+        Ok("2002" + "ac" + "3700" + "08")
+    else
+        Ok("2002" + "3700" + "08")
+    end
+end
+
+# rt_mp_new: () -> i64；alloc 头 12B + 桶区 16*16=256B（cap=16 零初始化）
+# local 0=p（i32）——无参数，声明从 0 起（宿主 build_map_new 同注）
+fn mp_new_body(alloc_idx: Int) -> String
+    "01017f"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2100"
+    + "2000" + "41" + sleb128_hex(256) + "10" + leb128_hex(alloc_idx) + "3600" + "00"
+    + "2000" + "4110" + "3600" + "04"
+    + "2000" + "4100" + "3600" + "08"
+    + "2000" + "ac"
+    + "0b"
+end
+
+# rt_mp_probe: (i64 m, i64 k) -> i32；命中→桶下标(≥0)，未命中→-(插入槽+1)
+# locals 2=mp,3=kp,4=buckets,5=cap,6=h,7=i,8=j,9=ff,10=addr（9×i32）
+fn mp_probe_body(st_eq_idx: Int) -> String
+    "01097f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2103"
+    + "2002" + "2800" + "00" + "2104"
+    + "2002" + "2800" + "04" + "2105"
+    + mp_fnv_hex(3, 6, 8)
+    + "2006" + "2005" + "4101" + "6b" + "71" + "2107"
+    + "41" + "7f" + "2109"
+    + "0240" + "0340"
+    + "2004" + "2007" + "4110" + "6c" + "6a" + "210a"
+    + "200a" + "2800" + "00" + "45" + "0440"
+    + "2009" + "2007" + "2009" + "4100" + "4e" + "1b"
+    + "41" + "7f" + "6c" + "4101" + "6b" + "0f"
+    + "0b"
+    + "200a" + "2800" + "00" + "4102" + "46" + "0440"
+    + "2009" + "4100" + "4e" + "0440" + "05" + "2007" + "2109" + "0b"
+    + "0b"
+    + "200a" + "2800" + "00" + "4101" + "46" + "0440"
+    + "200a" + "2800" + "04" + "ac"
+    + "2001"
+    + "10" + leb128_hex(st_eq_idx)
+    + "0440" + "2007" + "0f" + "0b"
+    + "0b"
+    + "2007" + "4101" + "6a" + "2005" + "4101" + "6b" + "71" + "2107"
+    + "0c00"
+    + "0b" + "0b"
+    + "00"
+    + "0b"
+end
+
+# rt_mp_set<V>: (i64 m, i64 k, V v) -> void；命中覆盖，未命中插入，
+# size*2>cap 翻倍 rehash（仅搬 state==1，8B 盲拷）。返回 void——裁决 2 甲
+# （对齐宿主 WASM RT_MAP_SET 的 Unit）。
+# locals 3=r,4=mp,5=addr,6=kp,7=nb,8=ncap,9=j,10=h,11=bi,12=oldb,
+# 13=oldcap（11×i32）——参数占 0-2，声明从 3 起（fold 批 §11.6 坑同族）
+fn mp_set_body(v_vt: String, probe_idx: Int, alloc_idx: Int) -> Result<String, String>
+    let vs = mp_val_store_hex(v_vt)?
+    Ok("010b7f"
+    + "2000" + "2001" + "10" + leb128_hex(probe_idx) + "2103"
+    + "2000" + "a7" + "2104"
+    + "2001" + "a7" + "2106"
+    + "2003" + "4100" + "4e" + "0440"
+    + "2004" + "2800" + "00" + "2003" + "4110" + "6c" + "6a"
+    + vs
+    + "0f"
+    + "0b"
+    + "2003" + "41" + "7f" + "6c" + "4101" + "6b" + "2103"
+    + "2004" + "2800" + "00" + "2003" + "4110" + "6c" + "6a" + "2105"
+    + "2005" + "4101" + "3600" + "00"
+    + "2005" + "2006" + "3600" + "04"
+    + "2005" + vs
+    + "2004" + "2004" + "2800" + "08" + "4101" + "6a" + "3600" + "08"
+    + "2004" + "2800" + "08" + "4102" + "6c" + "2004" + "2800" + "04" + "4a" + "0440"
+    + "2004" + "2800" + "04" + "4102" + "6c" + "2108"
+    + "2008" + "4110" + "6c" + "10" + leb128_hex(alloc_idx) + "2107"
+    + "2004" + "2800" + "00" + "210c"
+    + "2004" + "2800" + "04" + "210d"
+    + "4100" + "2109"
+    + "0240" + "0340"
+    + "2009" + "200d" + "4f" + "0d01"
+    + "200c" + "2009" + "4110" + "6c" + "6a" + "2800" + "00" + "4101" + "46" + "0440"
+    + "200c" + "2009" + "4110" + "6c" + "6a" + "2800" + "04" + "2106"
+    + mp_fnv_hex(6, 10, 11)
+    + "200a" + "2008" + "4101" + "6b" + "71" + "210b"
+    + "0240" + "0340"
+    + "2007" + "200b" + "4110" + "6c" + "6a" + "2800" + "00" + "45" + "0d01"
+    + "200b" + "4101" + "6a" + "2008" + "4101" + "6b" + "71" + "210b"
+    + "0c00"
+    + "0b" + "0b"
+    + "2007" + "200b" + "4110" + "6c" + "6a" + "4101" + "3600" + "00"
+    + "2007" + "200b" + "4110" + "6c" + "6a" + "2006" + "3600" + "04"
+    + "2007" + "200b" + "4110" + "6c" + "6a" + "200c" + "2009" + "4110" + "6c" + "6a" + "2900" + "08" + "3700" + "08"
+    + "0b"
+    + "2009" + "4101" + "6a" + "2109"
+    + "0c00"
+    + "0b" + "0b"
+    + "2004" + "2007" + "3600" + "00"
+    + "2004" + "2008" + "3600" + "04"
+    + "0b"
+    + "0b")
+end
+
+# rt_mp_get: (i64 m, i64 k) -> i64 Option；Some=[idx=2][n=1][v]（16B）、
+# None=[idx=3][n=0]（8B）——与 L2 变体表 Some/None idx 2/3 逐值对齐。
+# 载荷 8B 盲拷：桶槽物理字节即枚举载荷槽字节（f64 位型经
+# store/load/reinterpret 逐位相同——设计稿 mp_get|V 特化经推演为单型
+# 本体，键仍按 V 登记）；match 读侧按 V 选宽（bf/a7）与写侧互补。
+# locals 2=r(i32),3=v(i64),4=p(i64)
+fn mp_get_body(probe_idx: Int, alloc_idx: Int) -> String
+    "02017f027e"
+    + "2000" + "2001" + "10" + leb128_hex(probe_idx) + "2102"
+    + "2002" + "4100" + "4e" + "047e"
+    + "2000" + "a7" + "2800" + "00" + "2002" + "4110" + "6c" + "6a" + "2900" + "08" + "2103"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "ac" + "2104"
+    + "2004" + "a7" + "4102" + "3600" + "00"
+    + "2004" + "a7" + "4101" + "3600" + "04"
+    + "2004" + "a7" + "2003" + "3700" + "08"
+    + "2004"
+    + "05"
+    + "4108" + "10" + leb128_hex(alloc_idx) + "ac" + "2104"
+    + "2004" + "a7" + "4103" + "3600" + "00"
+    + "2004" + "a7" + "4100" + "3600" + "04"
+    + "2004"
+    + "0b"
+    + "0b"
+end
+
+# rt_mp_has: (i64 m, i64 k) -> i32；probe ≥ 0（无声明 local——空 local
+# 向量仍须显式计数字节 00）
+fn mp_has_body(probe_idx: Int) -> String
+    "00"
+    + "2000" + "2001" + "10" + leb128_hex(probe_idx) + "4100" + "4e"
+    + "0b"
+end
+
+# rt_mp_remove: (i64 m, i64 k) -> void；命中→墓碑 state=2 + size--
+# （返回 void——裁决 2 甲）。local 2=r（i32）
+fn mp_remove_body(probe_idx: Int) -> String
+    "01017f"
+    + "2000" + "2001" + "10" + leb128_hex(probe_idx) + "2102"
+    + "2002" + "4100" + "4e" + "0440"
+    + "2000" + "a7" + "2800" + "00" + "2002" + "4110" + "6c" + "6a" + "4102" + "3600" + "00"
+    + "2000" + "a7" + "2000" + "a7" + "2800" + "08" + "4101" + "6b" + "3600" + "08"
+    + "0b"
+    + "0b"
+end
+
+# rt_mp_keys: (i64 m) -> i64 ls{st}；key_off 收集 + st_cmp 插入排序
+# （字节序确定性，与宿主 Rust str Ord 同语义）+ 尾起 cons 正序（Nil=0）。
+# locals 1=mp/j,2=cap,3=buckets,4=sz,5=arr,6=i,7=key,8=n（i32）、
+# 9=out（i64）、10=cell（i32）；排序内层 j 复用 mp 槽（收集期后不再用）
+fn mp_keys_body(st_cmp_idx: Int, alloc_idx: Int) -> String
+    "03087f017e017f"
+    + "2000" + "a7" + "2101"
+    + "2001" + "2800" + "04" + "2102"
+    + "2001" + "2800" + "00" + "2103"
+    + "2001" + "2800" + "08" + "2104"
+    + "2004" + "4104" + "6c" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "4100" + "2106"
+    + "4100" + "2108"
+    + "0240" + "0340"
+    + "2006" + "2002" + "4f" + "0d01"
+    + "2003" + "2006" + "4110" + "6c" + "6a" + "2800" + "00" + "4101" + "46" + "0440"
+    + "2005" + "2008" + "4104" + "6c" + "6a" + "2003" + "2006" + "4110" + "6c" + "6a" + "2800" + "04" + "3600" + "00"
+    + "2008" + "4101" + "6a" + "2108"
+    + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "4101" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2008" + "4f" + "0d01"
+    + "2005" + "2006" + "4104" + "6c" + "6a" + "2800" + "00" + "2107"
+    + "2006" + "4101" + "6b" + "2101"
+    + "0240" + "0340"
+    + "2001" + "4100" + "48" + "0d01"
+    + "2005" + "2001" + "4104" + "6c" + "6a" + "2800" + "00" + "ac" + "2007" + "ac" + "10" + leb128_hex(st_cmp_idx) + "4100" + "4c" + "0d01"
+    + "2005" + "2001" + "4101" + "6a" + "4104" + "6c" + "6a" + "2005" + "2001" + "4104" + "6c" + "6a" + "2800" + "00" + "3600" + "00"
+    + "2001" + "4101" + "6b" + "2101"
+    + "0c00"
+    + "0b" + "0b"
+    + "2005" + "2001" + "4101" + "6a" + "4104" + "6c" + "6a" + "2007" + "3600" + "00"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "4200" + "2109"
+    + "0240" + "0340"
+    + "2008" + "45" + "0d01"
+    + "2008" + "4101" + "6b" + "2108"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "210a"
+    + "200a" + "2005" + "2008" + "4104" + "6c" + "6a" + "2800" + "00" + "ac" + "3700" + "00"
+    + "200a" + "2009" + "3700" + "08"
+    + "200a" + "ad" + "2109"
+    + "0c00"
+    + "0b" + "0b"
+    + "2009"
+    + "0b"
+end
+
+# rt_mp_values: (i64 m) -> i64 ls{V}；复用 keys 序逐键 probe 取 val +
+# cons 反转（宿主 build_map_values 平移；值经 8B 盲拷进 cons 头槽——
+# 读侧 list_head/get 按元素 vt 选宽，字节不变；键按 V 登记）。
+# locals 1=keys,2=out,3=val/res（i64）、4=r,5=cell（i32）
+fn mp_values_body(keys_idx: Int, probe_idx: Int, alloc_idx: Int) -> String
+    "02037e027f"
+    + "2000" + "10" + leb128_hex(keys_idx) + "2101"
+    + "4200" + "2102"
+    + "0240" + "0340"
+    + "2001" + "4200" + "51" + "0d01"
+    + "2000" + "2001" + "a7" + "2900" + "00" + "10" + leb128_hex(probe_idx) + "2104"
+    + "2000" + "a7" + "2800" + "00" + "2004" + "4110" + "6c" + "6a" + "2900" + "08" + "2103"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2003" + "3700" + "00"
+    + "2005" + "2002" + "3700" + "08"
+    + "2005" + "ad" + "2102"
+    + "2001" + "a7" + "2900" + "08" + "2101"
+    + "0c00"
+    + "0b" + "0b"
+    + "4200" + "2103"
+    + "0240" + "0340"
+    + "2002" + "4200" + "51" + "0d01"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2002" + "a7" + "2900" + "00" + "3700" + "00"
+    + "2005" + "2003" + "3700" + "08"
+    + "2005" + "ad" + "2103"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "0c00"
+    + "0b" + "0b"
+    + "2003"
+    + "0b"
+end
+
+# rt_mp_eq<V>: (i64 a, i64 b) -> i32；size 等 + 逐键 probe 对方 + 值按
+# V 递归（宿主 build_map_eq 平移；List B3 特化族同根）。
+# locals 2=ma,3=mb,4=cap,5=buckets,6=i,7=r（6×i32）
+fn mp_eq_body(v_vt: String, probe_idx: Int, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
+    let la = "2005" + "2006" + "4110" + "6c" + "6a"
+    let lb = "2003" + "2800" + "00" + "2007" + "4110" + "6c" + "6a"
+    let cmp =
+    if v_vt == "i64" or v_vt == "i32"
+        la + "2900" + "08" + lb + "2900" + "08" + "51"
+    else
+        if v_vt == "f64"
+            la + "2b00" + "08" + lb + "2b00" + "08" + "61"
+        else
+            if v_vt == "st"
+                let idx = ensure_str_helper("st_eq", cg)?
+                la + "2900" + "08" + lb + "2900" + "08" + "10" + leb128_hex(idx)
+            else
+                if ls_vt(v_vt)
+                    let idx = ensure_ls_helper("ls_eq|" + ls_inner(v_vt), cg)?
+                    la + "2900" + "08" + lb + "2900" + "08" + "10" + leb128_hex(idx)
+                else
+                    if mp_vt(v_vt)
+                        let idx = ensure_mp_helper("mp_eq|" + mp_inner(v_vt), cg)?
+                        la + "2900" + "08" + lb + "2900" + "08" + "10" + leb128_hex(idx)
+                    else
+                        return Err(subset_err("Map 值相等比较暂不支持 枚举/闭包 值（'" + v_vt + "'）"))
+                    end
+                end
+            end
+        end
+    end
+    Ok("01067f"
+    + "2000" + "a7" + "2102"
+    + "2001" + "a7" + "2103"
+    + "2002" + "2800" + "08" + "2003" + "2800" + "08" + "47" + "0440" + "4100" + "0f" + "0b"
+    + "2002" + "2800" + "04" + "2104"
+    + "2002" + "2800" + "00" + "2105"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2004" + "4f" + "0d01"
+    + "2005" + "2006" + "4110" + "6c" + "6a" + "2800" + "00" + "4101" + "46" + "0440"
+    + "2001" + "2005" + "2006" + "4110" + "6c" + "6a" + "2800" + "04" + "ac" + "10" + leb128_hex(probe_idx) + "2107"
+    + "2007" + "4100" + "48" + "0440" + "4100" + "0f" + "0b"
+    + cmp
+    + "45" + "0440" + "4100" + "0f" + "0b"
+    + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "4101"
+    + "0b")
+end
+
+# L2.3 Map 批：helper 注册（与 string/list helper 共享 extra 区，"|"
+# 特化键同族——vt 字符集不含 "|"）。依赖序：probe 先确保 st_eq；set/
+# get 先确保 probe；values 先确保 keys+probe；eq 的值依赖（st/嵌套 ls/
+# 嵌套 mp 递归特化）先确保。tidx 一律在依赖确保之后计算（依赖会推进
+# n_extra_types——ls_split 先例）。
+fn ensure_mp_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
+    match map_get(cg.cgh, "hidx:" + name)
+        Some(idx_s) =>
+            match string_to_int(idx_s)
+                n => Ok(n)
+            end
+        end
+        None =>
+            let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+            let parts = split(name, "|")
+            let head = list_get(parts, 0)
+            if head == "mp_new"
+                let _ = need_heap(cg)?
+                let body = mp_new_body(alloc_idx)
+                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "6000017e")
+                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                let fidx = reg_extra_fn(tidx, body, cg)
+                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                Ok(fidx)
+            else
+                if head == "mp_probe"
+                    let se = ensure_str_helper("st_eq", cg)?
+                    let body = mp_probe_body(se)
+                    let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017f")
+                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                    let fidx = reg_extra_fn(tidx, body, cg)
+                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                    Ok(fidx)
+                else
+                    if head == "mp_set"
+                        let _ = need_heap(cg)?
+                        let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                        let vvt = list_get(parts, 1)
+                        let body = mp_set_body(vvt, probe_idx, alloc_idx)?
+                        let tyhex =
+                        if vvt == "f64"
+                            "60037e7e7c00"
+                        else
+                            if vvt == "i32"
+                                "60037e7e7f00"
+                            else
+                                "60037e7e7e00"
+                            end
+                        end
+                        let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                        map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex)
+                        map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                        let fidx = reg_extra_fn(tidx, body, cg)
+                        map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                        Ok(fidx)
+                    else
+                        if head == "mp_get"
+                            let _ = need_heap(cg)?
+                            let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                            let body = mp_get_body(probe_idx, alloc_idx)
+                            let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017e")
+                            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                            let fidx = reg_extra_fn(tidx, body, cg)
+                            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                            Ok(fidx)
+                        else
+                            if head == "mp_has"
+                                let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                                let body = mp_has_body(probe_idx)
+                                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017f")
+                                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                let fidx = reg_extra_fn(tidx, body, cg)
+                                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                Ok(fidx)
+                            else
+                                if head == "mp_remove"
+                                    let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                                    let body = mp_remove_body(probe_idx)
+                                    let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e00")
+                                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                    let fidx = reg_extra_fn(tidx, body, cg)
+                                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                    Ok(fidx)
+                                else
+                                    if head == "mp_keys"
+                                        let _ = need_heap(cg)?
+                                        let sc = ensure_str_helper("st_cmp", cg)?
+                                        let body = mp_keys_body(sc, alloc_idx)
+                                        let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                        map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e017e")
+                                        map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                        let fidx = reg_extra_fn(tidx, body, cg)
+                                        map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                        Ok(fidx)
+                                    else
+                                        if head == "mp_values"
+                                            let _ = need_heap(cg)?
+                                            let keys_idx = ensure_mp_helper("mp_keys", cg)?
+                                            let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                                            let body = mp_values_body(keys_idx, probe_idx, alloc_idx)
+                                            let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e017e")
+                                            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                            let fidx = reg_extra_fn(tidx, body, cg)
+                                            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                            Ok(fidx)
+                                        else
+                                            if head == "mp_eq"
+                                                let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                                                let body = mp_eq_body(list_get(parts, 1), probe_idx, cg)?
+                                                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017f")
+                                                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                                let fidx = reg_extra_fn(tidx, body, cg)
+                                                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                                Ok(fidx)
+                                            else
+                                                Err(subset_err("内部错误：未知 map helper '" + name + "'"))
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -6150,10 +6895,11 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
             end
             # L2.3 List 批：alloc 类内建（产新表——cons/map/filter/split）
             # 命中即开堆；读类（head/tail/length/get/is_empty/fold/empty）
-            # 不触发（纯读程序无需堆设施）
+            # 不触发（纯读程序无需堆设施）。L2.3 Map 批：map_empty 同入
+            # alloc 类（Map 值的唯一来源——set/get 等不另触发）
             let alloc_builtin =
             match callee
-                ExIdent(name, _, _) => (name == "list_cons" or name == "list_map" or name == "list_filter" or name == "split")
+                ExIdent(name, _, _) => (name == "list_cons" or name == "list_map" or name == "list_filter" or name == "split" or name == "map_empty")
                 _ => False
             end
             if alloc_builtin
@@ -6331,6 +7077,20 @@ fn needs_heap(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms
                     _ => ()
                 end
             end
+            # L2.3 Map 批：mp vt 注解保守入 needs_heap（Map 值本身源自
+            # map_empty 的 alloc 白名单——此处为签名携带 mp 的防御性冗余）
+            if hit == False
+                for key in map_keys(fns)
+                    match map_get(fns, key)
+                        Some(fi) =>
+                            if contains(fi.prms, "mp{") or contains(fi.ret, "mp{")
+                                hit = True
+                            end
+                        end
+                        None => ()
+                    end
+                end
+            end
             hit
         end
     end
@@ -6449,6 +7209,10 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
         end
         StExpr(ex) =>
             let t = infer_ex(ex, env, fns)?
+            # L2.3 Map 批：map_set 语句的 mp{?} 绑定细化（真实发射路——
+            # 与 scan_block_lets 预扫路同步，防类型分叉）；let 绑定形态
+            # （裸 f(...)? 语句的解析边角规避，scan 侧同）
+            let rms_r = refine_map_set(ex, env, fns)?
             let code = comp_ex(ex, env, fns, cg, locals, localvt)?
             if t == "void"
                 Ok(code)
@@ -6598,9 +7362,9 @@ fn comp_val_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, ca
 end
 
 # L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f；
-# L2.3-b：cl（闭包值 = i64）→ 7e）
+# L2.3-b：cl（闭包值 = i64）→ 7e；L2.3 Map 批：mp{V}（裸指针）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -7015,6 +7779,39 @@ fn li_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: St
         return Ok({helper: "-", nprm: 3, prms: "cl,?,ls{?}", ret: "?"})
     end
     Err(subset_err("list 模块内建 '" + name + "' 超出 L2 List 批子集"))
+end
+
+# L2.3 Map 批（designs/0006 §7.2）：map 模块内建摘要（8 内建）。
+# helper "-" 表示调用点内联/专用编译路径（empty 走 mp_new、size 内联
+# load、set/get/values 按 vt 特化分派）；prms 的 mp{?} 是无上下文未知
+# 值类型——实际类型由 builtin_rv/comp_map_builtin 按实参综合与校验
+# （裁决 3 甲）。未知内建名明确报错——堵 from map import 静默忽略缺口。
+fn mp_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "map_empty"
+        return Ok({helper: "-", nprm: 0, prms: "", ret: "mp{?}"})
+    end
+    if name == "map_set"
+        return Ok({helper: "-", nprm: 3, prms: "mp{?},st,?", ret: "void"})
+    end
+    if name == "map_get"
+        return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "en:Option{?}"})
+    end
+    if name == "map_has"
+        return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "i32"})
+    end
+    if name == "map_remove"
+        return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "void"})
+    end
+    if name == "map_keys"
+        return Ok({helper: "mp_keys", nprm: 1, prms: "mp{?}", ret: "ls{st}"})
+    end
+    if name == "map_values"
+        return Ok({helper: "-", nprm: 1, prms: "mp{?}", ret: "ls{?}"})
+    end
+    if name == "map_size"
+        return Ok({helper: "-", nprm: 1, prms: "mp{?}", ret: "i64"})
+    end
+    Err(subset_err("未知内建 'map." + name + "'"))
 end
 
 # n 字节零的 hex（scratch 区填充）
@@ -7528,6 +8325,23 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                 match imp
                                     ImpI(iname, alias) =>
                                         let ent = li_builtin_entry(iname)?
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
+                        # L2.3 Map 批：from map import {...} 同一注册路径
+                        # （mp{?} 由 builtin_rv/comp_map_builtin 按实参综合；
+                        # 未知内建名在 mp_builtin_entry 明确拒绝——堵旧版
+                        # "from map import 被静默忽略"缺口）
+                        if module == "map"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = mp_builtin_entry(iname)?
                                         if map_has(fns, alias)
                                             return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
                                         end

@@ -1,0 +1,25 @@
+# L2.3 Map 批 B1：引用语义——let 别名共享底层 Map 对象（map_set 就地
+# 改，双读一致；Map 与 List 不可变语义的关键区别，L2 裸指针天然同构）。
+from map import { map_empty, map_set, map_get, map_has, map_size }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    let m2 = m
+    map_set(m2, "b", 2)
+    println(map_size(m))
+    if map_has(m, "b")
+        println(1)
+    else
+        println(0)
+    end
+    match map_get(m, "b")
+        Some(v) => println(v)
+        None => println(0)
+    end
+    map_set(m, "a", 9)
+    match map_get(m2, "a")
+        Some(v) => println(v)
+        None => println(0)
+    end
+end

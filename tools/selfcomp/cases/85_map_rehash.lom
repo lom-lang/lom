@@ -1,0 +1,40 @@
+# L2.3 Map 批 B1：rehash——20 键触发 cap 16→32 翻倍（size*2>cap，仅搬
+# state==1 桶），rehash 后全量 get 对拍（宿主 WC 测试形态复刻，键量 20
+# 防超时——一次翻倍足够覆盖）。注解补全形态（mp{?} 由 let 注解补全——
+# 循环体内 set 的绑定层细化不回写外层作用域，与 ls{?} 同边界）。
+from map import { map_empty, map_set, map_get, map_size }
+from string import { int_to_string }
+
+fn main() -> Unit ! [IO]
+    let m: Map<String, Int> = map_empty()
+    let i = 0
+    while i < 20
+        map_set(m, "k" + int_to_string(i), i * i)
+        i = i + 1
+    end
+    println(map_size(m))
+    match map_get(m, "k0")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    match map_get(m, "k7")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    match map_get(m, "k9")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    match map_get(m, "k16")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    match map_get(m, "k19")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    match map_get(m, "kx")
+        Some(v) => println(v)
+        None => println(-2)
+    end
+end

@@ -26,7 +26,23 @@ NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 
 EXPECTED_NEGATIVE_MESSAGES = {
+    # ---- L2.3 Map 批（designs/0006 §7.3 校验表 #1-#10 + 裁决 2/3 甲）----
+    'neg_map_set_nonmap.lom': "调用 'map_set' 期望 Map 得 i64",
+    'neg_map_key_type.lom': "第 2 参期望 String 键（得 i64）",
+    'neg_map_val_mismatch.lom': "Map 值类型不符（期望 mp{i64} 得 f64）",
+    'neg_map_annot_mismatch.lom': "let 注解类型 'mp{i64}' 与值类型 'i64' 不符",
+    'neg_map_unknown_val.lom': '未知 Map 值类型——需注解或 set 上下文（map_get）',
+    'neg_map_call_arity.lom': "调用 'map_set' 实数量不符",
+    'neg_map_arith.lom': 'Map 参与算术',
+    'neg_map_compare.lom': 'Map 大小比较',
+    'neg_map_concat.lom': 'Map 值的显示留后续批次',
+    'neg_println_map.lom': 'println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）',
+    'neg_for_map.lom': 'for 迭代仅支持 Int/String/List',
+    'neg_map_eq_enum_val.lom': 'Map 值相等比较暂不支持 枚举/闭包 值',
+    'neg_map_remove_unit_bind.lom': 'let 绑定 void 值',
     # ---- L2.3 List 批（designs/0005 校验表 #1-#12 + 管道子集外登记）----
+    # Map 批将 println/拼接提升的容器显示文案扩为 List/Map（neg_println_list
+    # /neg_list_concat_promote 的锁定串随批更新）
     'neg_list_cons_elem_type.lom': "类型不符（'f64' vs 'i64'）",
     'neg_list_head_nonlist.lom': "调用 'list_head' 期望 List 得 i64",
     'neg_list_get_idx_type.lom': "调用 'list_get' 第 2 参类型不符",
@@ -38,7 +54,7 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_list_arith.lom': 'List 参与算术',
     'neg_list_compare.lom': 'List 大小比较',
     'neg_list_concat_promote.lom': 'List 值的显示留后续批次',
-    'neg_println_list.lom': 'println 只接受 Int/Float/String/Bool（List/枚举显示留后续批次）',
+    'neg_println_list.lom': 'println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）',
     'neg_list_unknown_elem.lom': '未知 List 元素类型——需注解或构造上下文（list_head）',
     'neg_range_not_int.lom': 'range 两端须为 Int',
     'neg_list_eq_enum_elem.lom': 'List 元素相等比较暂不支持 枚举/闭包 元素',
@@ -52,7 +68,7 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_bool_unary.lom': 'Bool 参与一元负',
     'neg_str_num_compare.lom': 'String 与非 String 比较',
     'neg_str_arith.lom': 'String 只参与 + 拼接',
-    'neg_str_neg.lom': 'String 值参与一元负',
+    'neg_str_neg.lom': '闭包/枚举/String/Map 值参与一元负',
     'neg_str_annot_mismatch.lom': "let 注解类型 'i64' 与值类型 'st' 不符",
     'neg_str_call_value.lom': "调用非闭包值（得到 vt 'st'）",
     'neg_stoi_union.lom': 'untagged 表示下运行时不可区分',

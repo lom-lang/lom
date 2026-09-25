@@ -1,0 +1,9 @@
+# 校验 #6：Map 参与算术（仅支持 ==/!= 比较）
+from map import { map_empty, map_set }
+
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "a", 1)
+    let n = m + 1
+    println(0)
+end

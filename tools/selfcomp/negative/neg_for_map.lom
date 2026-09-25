@@ -1,0 +1,10 @@
+# 校验 #8：for 迭代 Map（三向文案：仅 Int/String/List）
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    for k in m
+        println(0)
+    end
+end

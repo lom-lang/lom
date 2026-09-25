@@ -1,0 +1,7 @@
+# 校验 #1：map_* 第 1 参非 Map（宿主运行期 tag trap；L2 编译期拦）
+from map import { map_empty, map_set }
+
+fn main() -> Unit
+    let m = 5
+    map_set(m, "a", 1)
+end

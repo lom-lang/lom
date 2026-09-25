@@ -1,0 +1,35 @@
+# L2.3 Map 批 B1：Int 值表——set/覆盖、get（match 消费 Some/None）、
+# has、size（内联 load size@8）。
+from map import { map_empty, map_set, map_get, map_has, map_size }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 2)
+    map_set(m, "c", 3)
+    match map_get(m, "b")
+        Some(v) => println(v)
+        None => println(0)
+    end
+    match map_get(m, "zz")
+        Some(v) => println(v)
+        None => println(-1)
+    end
+    if map_has(m, "a")
+        println(1)
+    else
+        println(0)
+    end
+    if map_has(m, "x")
+        println(1)
+    else
+        println(0)
+    end
+    println(map_size(m))
+    map_set(m, "a", 10)
+    match map_get(m, "a")
+        Some(v) => println(v)
+        None => println(0)
+    end
+    println(map_size(m))
+end

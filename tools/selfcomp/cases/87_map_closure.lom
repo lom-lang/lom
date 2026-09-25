@@ -1,0 +1,55 @@
+# L2.3 Map 批 B1：闭包与 Map 组合——闭包捕获 Map 值、Map 作闭包参数与
+# 返回（mp{..} 流经 sig 串与 8 字节 i64 捕获槽）；具名函数的 Map 参数/
+# 返回签名。
+from map import { map_empty, map_set, map_get, map_size }
+
+fn bump(m: Map<String, Int>, k: String, by: Int) -> Unit
+    match map_get(m, k)
+        Some(v) =>
+            map_set(m, k, v + by)
+        end
+        None =>
+            map_set(m, k, by)
+        end
+    end
+end
+
+fn make_seeded(seed: Int) -> Map<String, Int>
+    let m = map_empty()
+    map_set(m, "v", seed * 2)
+    m
+end
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "n", 5)
+    bump(m, "n", 10)
+    bump(m, "hits", 1)
+    println(map_size(m))
+    match map_get(m, "n")
+        Some(v) => println(v)
+        None => println(0)
+    end
+    let get_n = fn(mm: Map<String, Int>) -> Int
+        match map_get(mm, "n")
+            Some(v) => v
+            None => 0
+        end
+    end
+    println(get_n(m))
+    let adder = fn(a: Int) -> Map<String, Int>
+        let mm = map_empty()
+        map_set(mm, "v", a * 2)
+        mm
+    end
+    let m3 = adder(21)
+    match map_get(m3, "v")
+        Some(v) => println(v)
+        None => println(0)
+    end
+    let m4 = make_seeded(50)
+    match map_get(m4, "v")
+        Some(v) => println(v)
+        None => println(0)
+    end
+end

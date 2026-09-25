@@ -1,0 +1,7 @@
+# 校验 #5：map_* arity 不符（R74 式）
+from map import { map_empty, map_set }
+
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "a")
+end

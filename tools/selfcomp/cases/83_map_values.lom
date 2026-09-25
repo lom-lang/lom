@@ -1,0 +1,27 @@
+# L2.3 Map 批 B1：map_values——值序 = 键序（复用 keys 序逐键 probe）。
+# Float 值表（f64 槽直写通道）+ Bool 值表（i32 extend 通道）+ 注解补全
+# 形态（mp{?} 由 let 注解补全，与 set 补全两形态并存）。
+from map import { map_empty, map_set, map_get, map_values }
+from list import { list_length, list_get }
+
+fn main() -> Unit ! [IO]
+    let fs: Map<String, Float> = map_empty()
+    map_set(fs, "a", 1.5)
+    map_set(fs, "b", 0.25)
+    map_set(fs, "c", 2.0)
+    let vs = map_values(fs)
+    println(list_length(vs))
+    println(list_get(vs, 0))
+    println(list_get(vs, 1))
+    println(list_get(vs, 2))
+    match map_get(fs, "b")
+        Some(v) => println(v)
+        None => println(0.0)
+    end
+    let bs: Map<String, Bool> = map_empty()
+    map_set(bs, "x", True)
+    map_set(bs, "y", False)
+    let vs2 = map_values(bs)
+    println(list_get(vs2, 0))
+    println(list_get(vs2, 1))
+end

@@ -1,0 +1,26 @@
+# L2.3 Map 批 B1：map_get → en:Option{V} 经 c2 match 消费——Some(v)
+# 解构绑值、guard、None 分支；map_remove 返回值不消费（裁决 2 甲，
+# 语句调用形态）。
+from map import { map_empty, map_set, map_get, map_remove, map_size }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "k1", 100)
+    map_set(m, "k2", 200)
+    let hit = match map_get(m, "k1")
+        Some(v) if v > 50 => v + 1
+        Some(v) => v
+        None => 0
+    end
+    println(hit)
+    match map_get(m, "none")
+        Some(_) => println(1)
+        None => println(2)
+    end
+    map_remove(m, "k1")
+    match map_get(m, "k1")
+        Some(_) => println(1)
+        None => println(3)
+    end
+    println(map_size(m))
+end

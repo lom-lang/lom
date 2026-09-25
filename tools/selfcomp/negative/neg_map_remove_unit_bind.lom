@@ -1,0 +1,11 @@
+# 校验 #10（裁决 2 甲信任边界）：let 绑定 map_remove 的 void 返回
+# ——L2 对齐宿主 WASM（Unit），既有 void 值绑定检查拒绝；宿主解释器
+# 该写法合法（Bool）——用例避开
+from map import { map_empty, map_set, map_remove }
+
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, "a", 1)
+    let b = map_remove(m, "a")
+    println(0)
+end

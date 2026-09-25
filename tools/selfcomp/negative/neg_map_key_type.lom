@@ -1,0 +1,7 @@
+# 校验 #2：键非 String（宿主 tag trap；L2 编译期拦）
+from map import { map_empty, map_set, map_get }
+
+fn main() -> Unit
+    let m = map_empty()
+    map_set(m, 5, 1)
+end

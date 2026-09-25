@@ -1,0 +1,10 @@
+# 校验 #4：裸 mp{?} 进 get——无 set/注解上下文，值类型不可知
+from map import { map_empty, map_get }
+
+fn main() -> Unit
+    let m = map_empty()
+    match map_get(m, "a")
+        Some(v) => println(v)
+        None => println(0)
+    end
+end

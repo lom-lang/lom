@@ -1,0 +1,14 @@
+# 校验 #6：Map 大小比较（仅支持 ==/≠ 的结构相等）
+from map import { map_empty, map_set }
+
+fn main() -> Unit
+    let a = map_empty()
+    map_set(a, "x", 1)
+    let b = map_empty()
+    map_set(b, "x", 2)
+    if a < b
+        println(1)
+    else
+        println(0)
+    end
+end

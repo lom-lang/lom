@@ -1,0 +1,58 @@
+# L2.3 Map 批 B2：Map 结构相等 ==/!=——特化递归 eq 六形态：乱序同集
+# 相等 / size 不等 / 值不等 / != 值不等 / 同集副本相等 / 嵌套 Map 递归。
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    let a = map_empty()
+    map_set(a, "x", 1)
+    map_set(a, "y", 2)
+    let b = map_empty()
+    map_set(b, "y", 2)
+    map_set(b, "x", 1)
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+    let c = map_empty()
+    map_set(c, "x", 1)
+    if a == c
+        println(1)
+    else
+        println(0)
+    end
+    let d = map_empty()
+    map_set(d, "x", 1)
+    map_set(d, "y", 3)
+    if a == d
+        println(1)
+    else
+        println(0)
+    end
+    if a != d
+        println(1)
+    else
+        println(0)
+    end
+    let e = map_empty()
+    map_set(e, "x", 1)
+    map_set(e, "y", 2)
+    if a == e
+        println(1)
+    else
+        println(0)
+    end
+    let nested1 = map_empty()
+    let n1 = map_empty()
+    map_set(n1, "k", 7)
+    map_set(nested1, "m", n1)
+    let nested2 = map_empty()
+    let n2 = map_empty()
+    map_set(n2, "k", 7)
+    map_set(nested2, "m", n2)
+    if nested1 == nested2
+        println(1)
+    else
+        println(0)
+    end
+end
