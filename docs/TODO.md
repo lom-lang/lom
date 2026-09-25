@@ -87,6 +87,41 @@
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
 
+## 第十五轮体系内独立审查（2026-09-26）✅ review done — R84/R85 开账，整改顺序待用户裁决
+
+**报告**：[review-2026-09-26.html](reviews/review-2026-09-26.html)，基线 `44954e2`
+（v1.2.11-3，含同日 R83 修复）；总评 **B+**（仅评本轮时点与检验面；整改后只能
+由下一轮重估）。R79-R82 四项整改宣称与 c2/String/List 批核心宣称
+（verify_selfcomp 174/174、"存量 62 用例 hex 逐字节不变"——本轮用 git show
+只读导出 v1.2.10 编译器独立对拍 **62/62 全等**）零失真；基线复验 14 项全绿。
+规划者验收：已亲手复现 R84 主形态 + String acc 对照 + R85 一枚，stdout 与
+错误文案与报告逐字一致。
+
+### R84 — list_fold 的 Float/Bool acc 产不可实例化 WASM（P2）⏳ open
+
+- **实测**：Float acc（`fn(a: Float, n: Int) -> Float a + n * 0.5 end`，init
+  0.0）宿主 wasm `3.0`、rc0；L2 COMPILED 456 bytes，Node 实例化失败
+  `call[1] expected type i64, found f64.const of type f64 @+287`。Bool acc
+  同族（expected i64 found i32）。String acc（i64 载体）对照双侧一致正常
+  ——69_list_fold 用例恰只测 String acc，是盲区。R81 同族（不支持的形态
+  不得留下坏模块），且击穿 List 批"fold 按闭包签名特化"宣称。
+- **读码根因（审查）**：`self_comp.lom` L5611 的 ls_fold helper 签名硬编码
+  `(i64,i64,i64)->i64`——init 参数与返回位未按 acc_vt 特化（ls_get L5552
+  按元素 vt 特化是同批先例）。
+- **建议修法**：fold helper 的参数/返回位按 acc_vt 特化（与 map/filter 特化
+  键合流）；成对交付"Float acc fold / Bool acc fold 行为对拍"+"非 i64 载体
+  acc 绝不产可实例化失败模块"的负向锁定。
+
+### R85 — println(Bool) 三层预扫覆盖缺口：自然写法被编译期拒绝（P3）⏳ open
+
+- **实测**：值位 if 产 Bool（`let flag = if 1 == 1 True else False end;
+  println(flag)`）宿主 `true`、rc0；L2 COMPILE-ERROR（ibase 防御生效、无
+  hex、不产坏 wasm）。match 产 Bool、局部闭包产 Bool、跨函数参数流转
+  同族；同一写法是否被拒取决于程序其余部分是否触发预扫（混合形态全对）。
+  根因：`bool_disp_expr` 预扫无 ExIf/ExMatch 分支、ExCall 只查顶层函数名。
+- **建议修法（二选一，裁决点）**：甲 补预扫识别（ExIf/ExMatch/闭包签名）；
+  乙 在 RFC-0004 信任边界明确登记该拒绝面为 L2 严格子集边界。
+
 ## 规划者读档发现：R83 — RFC-0004 修订记录重复与倒序（P3）✅ done（2026-09-26，同轮修复）
 
 - **发现**：2026-09-26 规划者第一回合读档发现，python/git 字节级核实——
