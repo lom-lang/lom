@@ -555,6 +555,7 @@ end
 **CI/提交流程**：
 - **`git add <目录>` 不 stage 兄弟文件的删除**——Q2-b 拆分只 add 了 `src/typechecker/`，旧 `src/typechecker.rs` 的删除漏 stage，checkout 新旧并存编译失败（CI #90/#91 双红，下个提交才顺带恢复）。**含删除/移动的提交必须 `git status` 复核 staged 列表**。
 - **推送后看 CI 首跑没有豁免情形**——同一次事故里连续三个提交没看首跑，三连红。查法：GitHub API `actions/runs?per_page=1` + `/runs/{id}/jobs` 看 failed step。
+- **显式清单 `git add` 后必须 `git status` 复核 staged 与工作区差集（2026-09-26 v1.2.13 实录）**——feat 提交的 add 清单漏了 Cargo.toml/Cargo.lock 两件 bump 文件：提交树版本仍 1.2.12 而文档全宣称 v1.2.13，CI doc gates 五项 FAIL（4 版本位 + 防虚构）。**本地提交前门禁（doc_audit 等）跑在工作区——验的是工作区状态不是提交树**，add 漏项时本地全绿是假象。升版提交前 `git show --stat HEAD` 核对 bump 文件真的进提交（#90/#91 "git add 目录不 stage 兄弟文件"的姐妹形态：显式清单照样会漏）。
 - **doc-gates 的 changelog 对账需要 git tag**——`actions/checkout` 默认 `fetch-depth:1` 不带 tag，"防虚构"检查把 v1.x 条目全判虚构（CI #82/#83）；doc-gates job 已加 `fetch-depth: 0`。
 - **防虚构规则 ③ 与 tag 后置纪律的时序死锁（#96/#97）**——"v1.x 条目全有 tag"在升版提交推送时必然红（tag 要等 CI 绿、CI 绿要 gate 过，死循环）：修复 c4e960a 对账豁免当前发布版本。升版窗口该规则的红是预期行为，不是事故。
 - **§2.2 命令清单会被控制字符咬（2026-09-14 R15 实例）**——820fa63 交接提交把 `tools\fuzz_smoke.py` 的 `\f` 写成真实换页符（0x0C，全仓唯一），Read 显示为"吞字符"极具迷惑性（初判显示 bug、实为文件真字节）；教训条与被咬行同文档并存。复制粘贴用的命令清单落盘后用字节扫描/实际执行验证一遍。
