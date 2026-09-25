@@ -43,21 +43,22 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.2.11（v1.2.9/v1.2.10/v1.2.11 tag 分别于 CI
-  #161/#165/#36004908755 六 job 全绿后切；首回合仍须实查最新 main CI 与
-  annotations）；语言面与外部发布线冻结。
+- 仓库版本 v1.2.12（v1.2.11/v1.2.12 tag 分别于 CI
+  #36004908755 与其 bump 提交首跑六 job 全绿后切；首回合仍须实查
+  最新 main CI 与 annotations）；语言面与外部发布线冻结。
 - List 批功能提交的 CI 首跑六 job 全绿；annotations 预期仍为四条
   Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。Lom fmt
   递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp 用例
   全量；Rust cargo fmt 本地零 diff，未进 CI。
-- 审查状态：**十四轮审查，总评 B（仅评 5c92f59/v1.2.6 时点）**。
-  最新 docs/reviews/review-2026-09-23.html 为体系内 agent 分工独立
-  复核，非外部同行审计。**R1-R82 已关闭，十四审整改后评级待复审**。
-  用户裁决先 R79/R80、后 R81/R82：前批修控制流子块 let 泄漏与
-  闭包同名局部捕获，后批修 Bool 运算产坏 WASM 与值位 if 合法尾值
-  误拒；新增正反向测试锁定。维护会话已对四项原始主形态亲手复现。
-  十三审 B+ 只属其旧基线 1418536/v1.2.5；十四审 B 不外推整改
-  或 c2 后。事实源 docs/TODO.md 顶部。
+- 审查状态：**十五轮审查，总评 B+（仅评 44954e2/v1.2.11-3 时点）**。
+  最新 docs/reviews/review-2026-09-26.html 为体系内 agent 分工独立
+  复核，非外部同行审计。十五审确认：R79-R82 四项整改宣称与
+  c2/String/List 批核心宣称（174/174、存量 62 用例 hex 恒等独立
+  对拍 62/62 全等）零失真；新开 **R84（P2：list_fold Float/Bool acc
+  产不可实例化 wasm）与 R85（P3：println(Bool) 预扫覆盖缺口），
+  均已修于 v1.2.12（R85 选甲）**——R1-R85 全部关闭，整改后评级
+  待下一轮复审。十四审 B 只评 5c92f59/v1.2.6；十三审 B+ 只属
+  1418536/v1.2.5——历史评级不外推。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List 已
   实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-16）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
@@ -74,13 +75,16 @@
   补全（c2 ? 机制复用）；顺手收口 String 批存量缺口——无字面量
   程序的 println(Bool) 产不可实例化 wasm（三层预扫+ibase 防御修复，
   存量 hex 零影响）；println(List)/拼接提升 List 侧/大小比较/
-  管道语法（L2 从未支持，负例首登）明确拒）。self_comp.lom 7724
-  行，verify_selfcomp **174/174 = 74 对拍 + 100 负例**（转正
-  2 + 新增对拍 12 + 新负例 16）；**存量 62 用例产物 hex 逐字节
-  不变**（HEAD 版编译器 stash 对拍实证，fmt 归一后复验仍恒等）。
+  管道语法（L2 从未支持，负例首登）明确拒）。**v1.2.12 十五审整改**：
+  R84 ls_fold 按 acc_vt 特化（Float/Bool acc 不再产不可实例化 wasm，
+  白名单外 acc 编译期拒）、R85 预扫补值位 if/match/局部闭包产 Bool
+  识别（跨函数 Bool 参数流转留边界负例锁定）。self_comp.lom 7813
+  行，verify_selfcomp **181/181 = 79 对拍 + 102 负例**（十五审探针
+  转正 5 + 新负例 2）；**存量 74 对拍用例产物 hex 逐字节不变**
+  （执行者全量对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
-  修订 14、List 批按修订 16 交付**。Map/json/包/return 语句留后续
-  批次，不可称 List/容器全覆盖。
+  修订 14、List 批按修订 16、十五审整改按修订 17 交付**。Map/json/
+  包/return 语句留后续批次，不可称 List/容器全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -124,7 +128,7 @@
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
 - 下一步由用户裁决后续 Map/json/包/return 子批或
-  发起独立复审（R79-R82 整改 + c2 + String/List 批后评级均待复审）；
+  发起下一轮独立复审（R84/R85 整改后评级待复审）；
   另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
@@ -135,9 +139,9 @@
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
-   review-2026-09-23.html（十四审——最新轮）及 review-2026-09-22-2.html
-   （十三审旧基线），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-16），
+   review-2026-09-26.html（十五审——最新轮）及 review-2026-09-23.html
+   （十四审），LANGUAGE_SPEC §14，docs/rfc/
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-17），
    docs/designs/0001~0005 五份批次设计（闭包/作用域/泛型/String/List，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
@@ -152,7 +156,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 174/174 = 74 用例双产物行为一致 + 100 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 181/181 = 79 用例双产物行为一致 + 102 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -214,6 +218,13 @@
   不可实例化 wasm（三层预扫 + ibase 防御修复，存量 hex 零影响）。
   verify_selfcomp 174/174 = 74 对拍 + 100 负例；存量 62 用例
   hex 逐字节不变；十四审 B 不评此新增范围。
+- L2.3 十五审整改后（v1.2.12）：list_fold 的 Float/Bool acc 宿主/L2
+  双侧行为一致（Float acc 0.0 起步求和 3.0、Bool acc 经 if 消费打 1）；
+  acc 白名单外（如 Unit）编译期拒绝且无 hex；println(Bool) 预扫识别
+  值位 if/match 产 Bool 与局部闭包返回 Bool（宿主合法形态双侧一致）；
+  跨函数 Bool 参数流转仍明确拒绝（文案不变、无 hex——负例锁定）。
+  verify_selfcomp 181/181 = 79 对拍 + 102 负例；存量 74 对拍用例
+  hex 逐字节不变；十五审 B+ 不评本次整改。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主

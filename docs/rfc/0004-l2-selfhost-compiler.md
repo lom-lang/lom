@@ -464,3 +464,25 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   两枚 "5000"/"4500"、3 参 helper 的声明 local 基址、local 组数
   与组列表数不一致、块尾 Tail 归预扫、map/filter 反转段的
   局部号、61 用例名不副实）。语言面零变化。
+- **修订 17（2026-09-26）：第十五轮 R84/R85 整改。** 用户裁决同包
+  修（R85 选甲）。**R84（P2）**：ls_fold helper 的类型条目按 acc_vt
+  特化（f 恒为闭包指针 i64、xs 恒 i64，init 参数位与返回位随 acc；
+  body 零改动——acc 只经 local 3 流转，local 组类型本已按 acc 选宽）
+  ——修复 Float/Bool acc 编译产出不可实例化 wasm（宿主正常求值），
+  击穿 List 批"fold 按闭包签名特化"宣称的十五审发现；acc 载体白名单
+  （i64/f64/i32/st/cl/ls/en）外（如 Unit）编译期拒绝无 hex
+  （neg_fold_unsupported_acc 锁定）。**R85（P3，选甲）**：
+  scan_has_bool_display 预扫补三类识别——值位 if（bool_disp_if_val
+  各分支块尾递归）、match 臂尾产 Bool（blk_tail_bool，块值=tail 与
+  blk_val_ty 同口径）、局部闭包调用产 Bool（cl_bools 表 +
+  closure_ret_bool；闭包字面量直调同判）——pb2/pb3/pb4 自然写法
+  转正（77/78/79 用例）。**残余边界登记**：跨函数 Bool 参数流转
+  （pb5）保持 ibase 防御拒绝（neg_bool_param_flow 锁文案不变）——
+  函数间追踪扩大放行面，留后续批次评估。验收：verify_selfcomp
+  **181/181 = 79 对拍 + 102 负例**（十五审探针转正 75_fold_f64_acc/
+  76_fold_bool_acc/77_bool_disp_if/78_bool_disp_closure/
+  79_bool_disp_match + 新负例 2）；**存量 74 对拍用例产物 hex 逐字节
+  不变**（执行者全量对拍 + 规划者 git show 导出旧编译器独立抽验
+  恒等）；self_comp 7724→7813 行；Rust 535+8/六模式/eval 双后端
+  121/121/doc_audit 67/67 全绿复验。十五审 B+ 不外推本批；整改后
+  评级待下一轮独立复审。语言面零变化。

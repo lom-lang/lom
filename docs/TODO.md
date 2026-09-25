@@ -1,6 +1,21 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-24 L2.3 List 批交付）**：仓库版本 v1.2.11；
+> **交接声明（2026-09-26 十五审整改收官）**：仓库版本 v1.2.12；
+> 第十五轮体系内独立审查（[review-2026-09-26.html](reviews/review-2026-09-26.html)，
+> 基线 44954e2/v1.2.11-3）总评 **B+**——R79-R82 整改与 c2/String/List 批
+> 核心宣称零失真（存量 62 用例 hex 恒等独立对拍 62/62 全等）、基线 14 项
+> 全绿；开账 R84（P2）/R85（P3），用户裁决**同包整改（R85 选甲）**已于
+> v1.2.12 交付：ls_fold 按 acc_vt 特化（白名单外编译期拒）+ println(Bool)
+> 预扫补值位 if/match/局部闭包产 Bool 识别（跨函数 Bool 参数流转留边界、
+> 负例锁定）。verify_selfcomp **181/181 = 79 对拍 + 102 负例**；存量 74
+> 对拍用例 hex 逐字节不变（执行者全量对拍 + 规划者 git show 导出旧编译器
+> 独立抽验恒等）；self_comp 7813 行。另 R83（RFC-0004 修订记录重复与
+> 倒序）由规划者读档发现并同日修复。**R1-R85 全部关闭；整改后评级待
+> 下一轮复审**。下一步 Map/json/包/return 批次或复审由用户裁决；语言面
+> 与外部发布线继续冻结。新会话先复制 HANDOFF_PROMPT.md 按规划者第一回
+> 合流程读档、派发基线验证并验收，再呈方向菜单等裁决。
+>
+> **前次交接声明（2026-09-24 L2.3 List 批交付）**：仓库版本 v1.2.11；
 > List 批 B1+B2+B3+B4 + 编译期严格性甲按用户裁决"按建议动工"交付
 > （designs/0005 两裁决点全按建议项；RFC-0004 修订 16）：vt ls{T}
 > （ls{?} 由 cons/注解补全）、Nil=0 哨兵、cons 槽 8B 按元素 vt
@@ -87,7 +102,7 @@
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
 
-## 第十五轮体系内独立审查（2026-09-26）✅ review done — R84/R85 开账，整改顺序待用户裁决
+## 第十五轮体系内独立审查 + R84/R85 整改（2026-09-26）✅ review done / remediation done
 
 **报告**：[review-2026-09-26.html](reviews/review-2026-09-26.html)，基线 `44954e2`
 （v1.2.11-3，含同日 R83 修复）；总评 **B+**（仅评本轮时点与检验面；整改后只能
@@ -97,7 +112,7 @@
 规划者验收：已亲手复现 R84 主形态 + String acc 对照 + R85 一枚，stdout 与
 错误文案与报告逐字一致。
 
-### R84 — list_fold 的 Float/Bool acc 产不可实例化 WASM（P2）⏳ open
+### R84 — list_fold 的 Float/Bool acc 产不可实例化 WASM（P2）✅ done（2026-09-26，v1.2.12）
 
 - **实测**：Float acc（`fn(a: Float, n: Int) -> Float a + n * 0.5 end`，init
   0.0）宿主 wasm `3.0`、rc0；L2 COMPILED 456 bytes，Node 实例化失败
@@ -111,8 +126,15 @@
 - **建议修法**：fold helper 的参数/返回位按 acc_vt 特化（与 map/filter 特化
   键合流）；成对交付"Float acc fold / Bool acc fold 行为对拍"+"非 i64 载体
   acc 绝不产可实例化失败模块"的负向锁定。
+- **整改与实测（v1.2.12）**：用户裁决同包修。ls_fold 类型条目按 acc_vt
+  特化（f/xs 恒 i64，init 位与返回位随 acc；body 零改动——acc 只经
+  local 3 流转）；acc 载体白名单（i64/f64/i32/st/cl/ls/en）外编译期
+  拒绝无 hex（neg_fold_unsupported_acc 锁 Unit 形态）。十五审探针
+  e5b/e5c/e9b 全部转正为宿主/L2 双侧行为一致（75/76 用例），String acc
+  对照（69）不回归；执行者全量 74 用例 hex 恒等 + 规划者 git show 导出
+  旧编译器独立抽验 5 用例恒等。
 
-### R85 — println(Bool) 三层预扫覆盖缺口：自然写法被编译期拒绝（P3）⏳ open
+### R85 — println(Bool) 三层预扫覆盖缺口：自然写法被编译期拒绝（P3）✅ done（2026-09-26，v1.2.12，选甲）
 
 - **实测**：值位 if 产 Bool（`let flag = if 1 == 1 True else False end;
   println(flag)`）宿主 `true`、rc0；L2 COMPILE-ERROR（ibase 防御生效、无
@@ -121,6 +143,13 @@
   根因：`bool_disp_expr` 预扫无 ExIf/ExMatch 分支、ExCall 只查顶层函数名。
 - **建议修法（二选一，裁决点）**：甲 补预扫识别（ExIf/ExMatch/闭包签名）；
   乙 在 RFC-0004 信任边界明确登记该拒绝面为 L2 严格子集边界。
+- **整改与实测（v1.2.12，用户裁决选甲）**：bool_disp_expr 家族加
+  cl_bools 表并补三类识别——值位 if（bool_disp_if_val 各分支块尾递归）、
+  match 臂尾（ABExpr/ABBlock，blk_tail_bool 块值=tail 口径）、局部闭包
+  调用产 Bool（closure_ret_bool；闭包字面量直调同判）。pb2/pb3/pb4
+  转正（77/78/79 用例）双侧行为一致；pb6 混合形态不回归；**跨函数 Bool
+  参数流转（pb5）保持 ibase 防御拒绝**——函数间追踪扩大放行面，文案
+  不变并由 neg_bool_param_flow 负例锁定（留后续批次评估）。
 
 ## 规划者读档发现：R83 — RFC-0004 修订记录重复与倒序（P3）✅ done（2026-09-26，同轮修复）
 
