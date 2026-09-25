@@ -486,3 +486,25 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   恒等）；self_comp 7724→7813 行；Rust 535+8/六模式/eval 双后端
   121/121/doc_audit 67/67 全绿复验。十五审 B+ 不外推本批；整改后
   评级待下一轮独立复审。语言面零变化。
+- **修订 18（2026-09-26）：Map 批设计方案产出（动工前置，待用户裁决）。**
+  交付 docs/designs/0006-l2.3-maps.md——基于执行者读码供料（L2 现状拒绝点
+  七处：ty_vt_with_params 的"未知泛型枚举类型 'Map'"/import 静默忽略/
+  comp_call 未知函数误导文案/println/预扫白名单/vt 合流缺口；宿主蓝本：
+  TAG_MAP=10、头 [buckets][cap][size] 12B + 桶 [state][key_off][val] 16B、
+  RT_MAP_* 十个 helper、map_get 构造 Some/None 枚举对象与 L2 变体表
+  idx 2/3 逐值对齐；可复用件：en:Option{vt}/ls{st}/st_cmp/"|" 特化键/
+  cons 槽按 vt 存取规则）与规划者双后端实验。值表示沿 untagged 路线
+  延伸不设裁决点：vt **mp{V} 单参数**（键恒 String 不进 vt，与宿主
+  typechecker Generic("Map",[_Any]) 一致）、**mp{?}** 由 set/注解补全
+  （c2 ? 机制复用）、桶布局照宿主平移、val 槽 8B 按值 vt 装载（cons 槽
+  同型）。**宿主双后端分叉实证（设计期间发现）**：map_remove 返回值
+  宿主三分裂——解释器/TC=Bool vs 宿主 WASM=Unit，`println(map_remove(..))`
+  双后端打 true/false 与 ()/()（规划者亲手复现）；作为裁决点 2 处理。
+  三个裁决点待用户：**1 批次范围**（B1 值通道 + 8 内建全量（values 随批，
+  size 内联）/ +B2 结构相等特化递归（en/cl 值拒——List B3 同族）——建议
+  B1+B2 同批）；**2 map_remove 返回值**（甲 L2 对齐宿主 WASM=Unit、宿主
+  分叉登记挂账【建议】/ 乙 修宿主 WASM 三处归一（升格为宿主行为改动包）/
+  丙 对齐解释器不建议）；**3 编译期严格性**（甲 期望 Map/键 String/值
+  不相容/裸 mp{?} 编译期拒【建议】/ 乙 对齐宿主运行时）。预计 verify_selfcomp
+  ≈ 199-203 项（新对拍 8-10 + 新负例 10-12）、存量 79 对拍 hex 恒等、
+  self_comp ~8600-8900 行。**代码零改动——纯设计文档交付；动工在裁决后。**
