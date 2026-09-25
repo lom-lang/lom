@@ -392,31 +392,30 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   负例**（转正 4 + 改锁 1 + 新增 14）；**存量 52 用例产物 hex 逐字节
   不变**（HEAD 版编译器同用例对拍实证）；self_comp 6578 行。Rust
   535+8/自举六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。
-- **修订 14（2026-09-24）：L2.3 String 批交付（用户裁决"按建议动工"——
-  B1+B2+B3 同批、println(Bool) 顺带解禁、Float display 平移宿主 ftoa
-  导入）。** vt "st" = i64 裸指针（静态 data 串与堆串同布局
-  [len][bytes]）；模块组装新增 data(11) 段（排 code 后）、按需导入
-  print_str/ftoa（ibase 2→4，全部 funcidx/typeidx 参数化）、第二
-  global（data 尾 64 字节 scratch）与 memory 导出。字面量经编译期
-  UTF-8 编码器 intern（码点两段二分求取——Lom 无 char_to_code，
-  代理区外分段保证 char_from_code 不 trap）。B1：字面量/类型流/
-  println(String)/六比较（字节序对齐 Rust str Ord）/Str+Str 拼接/
-  match String 字面量模式/闭包与泛型载荷（Result<Int,String> 等）。
-  B2：拼接提升（v0.4.1 宿主语义）——非 String 侧 to_display（Int/Float
-  走 helper，Float 与宿主同源经 env.ftoa；Bool/Unit 编译期静态串）；
-  println(Bool) 顺带解禁（neg_println_bool 转正）。B3：内建 10 个
-  剥 tag 平移（len/int_to_string/starts_with/ends_with/contains/
-  trim/upper/lower/replace/char_from_code）+ import 逐名注册摘要
-  （idx=-2 哨兵分派）+ R74 式调用校验。**string_to_int（Int|Unit
-  联合在 untagged 下运行时不可区分——设计实施中发现并改拒，负例
-  锁原因）与 split（返回 List 随 List 批）明确编译期拒绝；for-over-
-  String 推后**。信任边界新增：String/数值混合比较编译期拒（宿主
-  跨类型比较是运行时行为）；trim/upper/lower 的 ASCII 语义平移继承
-  宿主既有登记差异。验收：verify_selfcomp **148/148 = 62 对拍 + 86
-  负例**（转正 4 + 改锁 1 + 新增 14）；**存量 52 用例产物 hex 逐字节
-  不变**（HEAD 版编译器同用例对拍实证）；self_comp 6578 行。Rust
-  535+8/自举六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。
   开发踩坑六枚入档 HANDOVER §11.6。语言面零变化。
+- **修订 15（2026-09-24）：List 批设计方案产出（动工前置，待用户
+  裁决）。** 交付 docs/designs/0005-l2.3-lists.md——基于 self_comp
+  （6578 行，List 编译侧拒绝点五处：ty_vt 的 TyGeneric("List") 落
+  枚举查找失败 / infer_ex 与 comp_ex 的 ExRange 兜底拒 / import 只
+  注册 string 模块 / comp_for 仅 Int / println 文案）与宿主 List 面
+  （tag 9、Nil 立即值 9、cons 单元 [head][tail] 16 字节、head/tail/
+  is_empty 内联、map/filter/fold 走 tagged 单型 call_indirect、
+  for 三向分派、rt_list_eq 结构相等、rt_list_str 显示）的读码对齐
+  设计。值表示沿 0001 裁决 A甲 untagged 路线自然延伸不设裁决点：
+  vt `ls{T}`（嵌套花括号，与 en:Name{args} 同族）、**Nil=0**（b 批
+  global hp init 8 预留地址 0 哨兵的既定伏笔）、cons 槽 8 字节统一
+  按元素 vt reinterpret/extend 还原（与闭包 env 槽裁决 D 同型）。
+  两个裁决点待用户：**1 批次范围**（B1 值通道+7 非 HOF 内建+range+
+  split 解禁+for-in-List / +B2 HOF 三件 helper 按闭包签名特化+去重 /
+  +B3 结构相等特化递归 / +B4 for-over-String（0004 既定"随 List 批"）
+  ——建议 B1+B2+B3+B4 同批）；**2 编译期严格性包**（filter 谓词
+  Bool / map、fold 签名 / ls 元素类型不相容赋值——甲 编译期拒【建议】
+  / 乙 对齐宿主运行时——R68/R74 既定路线延续）。println(List) 与
+  拼接提升的 List 侧明确不做（println(闭包)/println(Enum) 同型边界，
+  留容器显示批）；rt_ls_eq 首版限标量/st/嵌套 ls 元素（en/cl 元素
+  负例登记留后续）。负例转正 2（neg_split_list、neg_for_string）+
+  新增 12-14；新对拍 10-12；预计 verify_selfcomp ≈ 168-172 项。
+  **代码零改动——纯设计文档交付；动工在裁决后。**
 - **修订 16（2026-09-24）：L2.3 List 批交付（用户裁决"按建议动工"——
   B1+B2+B3+B4 同批 + 编译期严格性甲；designs/0005 两裁决点全按
   建议项）。** vt `ls{T}`（嵌套花括号与 en:Name{args} 同族；list_empty
@@ -465,26 +464,3 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   两枚 "5000"/"4500"、3 参 helper 的声明 local 基址、local 组数
   与组列表数不一致、块尾 Tail 归预扫、map/filter 反转段的
   局部号、61 用例名不副实）。语言面零变化。
-- **修订 15（2026-09-24）：List 批设计方案产出（动工前置，待用户
-  裁决）。** 交付 docs/designs/0005-l2.3-lists.md——基于 self_comp
-  （6578 行，List 编译侧拒绝点五处：ty_vt 的 TyGeneric("List") 落
-  枚举查找失败 / infer_ex 与 comp_ex 的 ExRange 兜底拒 / import 只
-  注册 string 模块 / comp_for 仅 Int / println 文案）与宿主 List 面
-  （tag 9、Nil 立即值 9、cons 单元 [head][tail] 16 字节、head/tail/
-  is_empty 内联、map/filter/fold 走 tagged 单型 call_indirect、
-  for 三向分派、rt_list_eq 结构相等、rt_list_str 显示）的读码对齐
-  设计。值表示沿 0001 裁决 A甲 untagged 路线自然延伸不设裁决点：
-  vt `ls{T}`（嵌套花括号，与 en:Name{args} 同族）、**Nil=0**（b 批
-  global hp init 8 预留地址 0 哨兵的既定伏笔）、cons 槽 8 字节统一
-  按元素 vt reinterpret/extend 还原（与闭包 env 槽裁决 D 同型）。
-  两个裁决点待用户：**1 批次范围**（B1 值通道+7 非 HOF 内建+range+
-  split 解禁+for-in-List / +B2 HOF 三件 helper 按闭包签名特化+去重 /
-  +B3 结构相等特化递归 / +B4 for-over-String（0004 既定"随 List 批"）
-  ——建议 B1+B2+B3+B4 同批）；**2 编译期严格性包**（filter 谓词
-  Bool / map、fold 签名 / ls 元素类型不相容赋值——甲 编译期拒【建议】
-  / 乙 对齐宿主运行时——R68/R74 既定路线延续）。println(List) 与
-  拼接提升的 List 侧明确不做（println(闭包)/println(Enum) 同型边界，
-  留容器显示批）；rt_ls_eq 首版限标量/st/嵌套 ls 元素（en/cl 元素
-  负例登记留后续）。负例转正 2（neg_split_list、neg_for_string）+
-  新增 12-14；新对拍 10-12；预计 verify_selfcomp ≈ 168-172 项。
-  **代码零改动——纯设计文档交付；动工在裁决后。**
