@@ -178,9 +178,9 @@
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R79-R82、L2.3-c2、
-   String 批（B1+B2+B3）与 List 批（B1+B2+B3+B4+严格性甲）已交付；
-   可选下一轮独立复审，或继续 Map / json / 包 / return 逐批交付
+3. 如实报告基线，只给用户方向菜单等裁决。R79-R85 全部关闭；
+   L2.3-c2、String 批、List 批、十五审整改（R84/R85）与 Map 批均已
+   交付；可选下一轮独立复审，或继续 json / 包 / return 逐批交付
    （string_to_int 与容器显示留各自后续批）。外部发布线继续冻结。
 4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
    → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
