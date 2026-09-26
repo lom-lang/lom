@@ -43,12 +43,19 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.2.13（v1.2.12/v1.2.13 tag 分别于 CI 六 job 全绿后切；
-  首回合仍须实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
-- Map 批功能提交的 CI 首跑六 job 全绿后切 tag；annotations 预期四条
-  Ubuntu 26 迁移 notice、零 warning/error（首回合实查）。Lom fmt
-  递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp 用例
-  全量；Rust cargo fmt 本地零 diff，未进 CI。
+- 仓库版本 v1.2.13（tag 切于补提交 7d8dded；首回合仍须实查最新 main
+  CI 与 annotations）；语言面与外部发布线冻结。
+- Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
+  红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
+  1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
+  （annotations 四条 Ubuntu 26 迁移 notice、零 warning/error），tag
+  v1.2.13 切于 7d8dded。教训入档 HANDOVER §11.3（提交前门禁跑在
+  工作区≠验提交树；升版提交前 `git show --stat HEAD` 核对 bump 文件）。
+  Lom fmt 递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp
+  用例全量；Rust cargo fmt 本地零 diff，未进 CI。
+- 环境遗留告知：`git stash list` 存在一枚 2026-09-03 旧会话 WIP
+  （eval/tasks/03_types.json、04_closures.json，挂 8ea8fd0）——非当前
+  工作流产物，未动；是否清理由用户裁决。
 - 审查状态：**十五轮审查，总评 B+（仅评 44954e2/v1.2.11-3 时点）**。
   最新 docs/reviews/review-2026-09-26.html 为体系内 agent 分工独立
   复核，非外部同行审计。十五审确认：R79-R82 四项整改宣称与
@@ -139,8 +146,9 @@
   发起下一轮独立复审（R84/R85 整改与 Map 批后评级待复审）；
   另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
-  （TODO R65 证据区）；MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像
-  迁移观察 2026-10-19。
+  （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
+  git stash 旧 WIP（2026-09-03 遗留）清理与否；MoonBit 1.0 Q3 复核等
+  月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 

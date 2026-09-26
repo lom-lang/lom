@@ -1,3 +1,16 @@
+> 最后更新：2026-09-26（**交接就绪——五件套刷新（Map 批交付后状态；
+> 维护者角色维持规划者模式）**。本维护周期全链（规划者分工）：
+> 第一回合只读核验（基线 19/19 + CI 实查）→ RFC-0004 修订记录腐坏
+> 修复（R83，规划者读档发现）→ 十五审独立审查（B+，开账 R84/R85）
+> → 同包整改（v1.2.12）→ Map 批设计（designs/0006 三裁决点）→ 用户
+> 裁决"执行" → 实施（v1.2.13）。五件套刷新面：HANDOFF_PROMPT
+> 【当前真实状态】/【第一回合必须完成】/【状态锚点】（CI 轨迹如实、
+> stash 遗留告知、教训引用）、本文（顶部条目 + §1 + §2.2 + §9 +
+> §11.3 新教训条）、TODO 顶部（含待裁决菜单：json/包/return 批次或
+> 十六审；宿主 map_remove 分叉修否；stash 清理与否）；doc_audit
+> 67/67；CI 最新 run 7d8dded 六 job success。**后续维护者角色不变：
+> 规划者（规划分发验收的决策者，§12.4），不具体执行。待用户裁决：
+> json/包/return 后续批次或发起十六审。发布线维持冻结。**）
 > 最后更新：2026-09-26（**L2.3 Map 批交付（B1+B2 + 裁决 2 甲 + 严格性甲）+ v1.2.13**。
 > 用户裁决"执行"（按 designs/0006 建议项）：vt **mp{V}** 单参数（键恒
 > String 不进 vt）、mp{?} 由 set/注解补全、桶布局照宿主平移（头 12B +
@@ -15,8 +28,10 @@
 > 导出旧编译器独立抽验 5 用例恒等）；self_comp 7813→8627 行；Rust
 > 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。开发对拍
 > 修掉 4 枚发射 bug（mp_new 类型 hex 漏 01/无参 local 起点/空 local 向量
-> 计数字节/size++ 误发 6c）；RFC-0004 修订 19。CI 首跑六 job 全绿后切
-> tag v1.2.13。**R1-R85 全关闭；json/包/return 留后续批次。**）
+> 计数字节/size++ 误发 6c）；RFC-0004 修订 19。CI 轨迹（如实）：feat
+> dbbb4c6+docs 28ad799 首跑 doc gates 红（git add 清单漏 Cargo 双件，
+> 提交树 1.2.12 vs 文档 1.2.13）；补提交 7d8dded 后六 job 全绿，
+> **tag v1.2.13 切于 7d8dded**。）
 > 最后更新：2026-09-26（**十五审整改收官 + v1.2.12**。第十五轮体系内
 > 独立敌手复核（review-2026-09-26.html，基线 44954e2/v1.2.11-3）总评
 > **B+**：R79-R82 整改与 c2/String/List 批核心宣称零失真（存量 62 用例
@@ -127,7 +142,7 @@
 | 版本 | **v1.2.13**（Cargo.toml/lock 一致；2026-09-26 L2.3 Map 批 B1+B2（8 内建 + 结构相等 + 编译期严格包，裁决 2 甲），宿主及冻结语言面未动；v1.2.12/v1.2.13 tag 分别在 CI 六 job 全绿后已切；外部发布线继续冻结；历次变更见 LANGUAGE_SPEC §13） |
 | Rust 测试 | **535/535 通过 + 8 集成**（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **121/121**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
-| CI | **v1.2.13 Map 批提交首跑六 job 全绿**（三平台、selfhost、clippy、doc gates 均 success；annotations 四条 Ubuntu 26 迁移 notice、零 warning/error；新交接提交推送后仍须重查首跑） |
+| CI | **v1.2.13 交接树 7d8dded 六 job 全绿**（Map 批 feat 首跑曾红：doc gates 五项 FAIL——git add 清单漏 Cargo 双件，§11.3 教训；补提交后全绿，tag 切于 7d8dded；annotations 四条 Ubuntu 26 迁移 notice、零 warning/error；新交接提交推送后仍须重查首跑） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |

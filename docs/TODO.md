@@ -10,8 +10,11 @@
 > import 注册堵"from map import 静默忽略"缺口。verify_selfcomp
 > **205/205 = 90 对拍 + 115 负例**（新对拍 11 + 新负例 13 锁原因）；
 > self_comp 8627 行；**存量 79 对拍用例 hex 逐字节不变**（执行者全量
-> 对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。v1.2.13 功能提交
-> CI 首跑六 job 全绿后已切 tag。**宿主挂账（设计期实证）**：map_remove
+> 对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。CI 轨迹（如实）：
+> feat dbbb4c6 首跑 doc gates 红（git add 清单漏 Cargo 双件，提交树
+> 1.2.12 vs 文档 1.2.13）；补提交 7d8dded 后六 job 全绿，tag v1.2.13
+> 切于 7d8dded（教训入档 HANDOVER §11.3）。**宿主挂账（设计期实证）**：
+> map_remove
 > 返回值宿主双后端分叉（解释器/TC=Bool vs WASM=Unit——`println` 形态
 > true/false vs ()/()），按裁决 2 甲 L2 对齐 WASM，宿主修否待用户另裁。
 > 下一步 json/包/return 批次或独立复审待用户裁决；语言面与外部发布线
