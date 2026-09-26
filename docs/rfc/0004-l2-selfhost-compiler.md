@@ -576,3 +576,25 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
     升版 v1.2.14（诊断文案修正属行为修复 patch）。语言面与宿主
     src 零改动；十六审 A- 不因本整改改判，后续评级由下一轮
     复审重估。
+- **修订 21（2026-09-26）：json 批设计方案产出（动工前置，待用户
+  裁决）。** 交付 docs/designs/0007-l2.3-json.md——基于执行者读码
+  供料（Lom 无内建 Json 类型：json_parse 返回 `_Any` 即 7 种既有
+  Value 的动态联合、消费靠 `.field` 动态访问与 List 内建、无 match
+  形态；宿主 WASM 蓝本是 Phase 7.7 宿主中介导入（JS 实现 + materialize
+  + 已登记 Int/Float 切分等双后端差异）；L2 现状拒绝点五处（import
+  静默忽略/_Any 拒/未知函数/ExField·ExRecord 无分支/println 容器拒））
+  与规划者三处抽验。核心难题：动态联合在 untagged 下无运行时通道
+  ——string_to_int 拒绝根因的七倍放大。三个裁决点待用户：**1 实现
+  路线**（甲 混合中介——parse/stringify 走 L2 harness 双导入（JS
+  语义=对拍基准零分叉）+ L2 侧 js 节点消费分派【建议】/ 乙 全 L2
+  自实现（Part H ~780 行 helper 化，2-3 倍工作量）/ 丙 窄档往返）；
+  **2 消费与构造面**（B1 `.field`+list 消费+标量 println+`_Any` 注解
+  必含 / +B2 stringify 广参数（产物内 js_of 转换族）【建议随批】/
+  B3 record 字面量留后续负例登记）；**3 数字切分**（甲 对齐宿主
+  WASM（JS 值判定）——harness 物化天然成立【建议】/ 乙 对齐解释器
+  源语法）。vt `js` 不透明节点 `[kind:i32][payload 8B]`（array 复用
+  ls{js} cons 链、object 用保插入序 kv 序列——不用 Map 防键序分叉）；
+  对拍用例规避已登记双后端差异面（"30.0"/极端指数/整数样键/>2^53/
+  超深嵌套）。预计 verify_selfcomp ≈ 226-234 项、存量 90 对拍 hex
+  恒等、self_comp ~9200-9500 行（**主观推测**）。**代码零改动——
+  纯设计文档交付；动工在裁决后。**
