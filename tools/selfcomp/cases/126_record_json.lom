@@ -1,0 +1,20 @@
+# L2.3 record/tuple 批（designs/0010 §8 #126）：rc 与 js 组合消费——
+# record 字段位持 js 值（json_parse 产物）、js object 字段取值喂 record
+# 构造、json_stringify 与 record 流转互不干扰。
+from json import { json_parse, json_stringify }
+
+fn main() -> Unit ! [IO]
+    let node = json_parse("{\"n\": 5, \"name\": \"five\"}")
+    let boxed = {count: 3, payload: node}
+    println(boxed.count)
+    println(json_stringify(boxed.payload))
+    let rebuilt = {a: 1, raw: json_parse("[1, 2, 3]")}
+    println(json_stringify(rebuilt.raw))
+    let t = (json_parse("true"), 9)
+    println(json_stringify(t.0))
+    println(t.1)
+    let s = json_parse("\"str\"")
+    let pair = {k: "key", v: s}
+    println(json_stringify(pair.v))
+    println(pair.k)
+end

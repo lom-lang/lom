@@ -17,6 +17,18 @@
 //     6 object(kv 定长数组指针 [n:i32][key_st:i64][val_js:i64]×n 保插入序)
 //   物化分配经产物导出的 lom_alloc（宿主 lom_alloc 先例）；parse 失败
 //   JS 异常抛出 → wasm trap → rc 1（宿主 WASM 同款）。
+//   L2.3 record/tuple 批按需追加（designs/0010 §5，宿主 run_wasm.mjs 的
+//   file/env 同语义——untagged 化：无 tag 位）：
+//   env.lom_file_read(i32 pp, i32 pl) -> i64（读文件，st 布局 [len][bytes]
+//   物化——两侧一致；失败 JS 异常 → trap）
+//   env.lom_file_write/append(i32 pp, i32 pl, i32 cp, i32 cl)（字节写，
+//   无返回——L2 import 类型为 void 语义）
+//   env.lom_file_exists(i32 pp, i32 pl) -> i32（1/0，JS number 即可）
+//   env.lom_env_args() -> i64（argv 物化：materializeNode array 分支直抄
+//   ——writeStr + 16B cell 裸指针 cons、Nil=0；argv = [wasm 路径, ...用户
+//   参数]——node run_selfcomp.mjs <wasm> [args...] 的剩余参数透传，含
+//   未来 L2.4 自举用的 -- 后参数；第一个裸 "--" 是分隔符，剥掉——对齐
+//   宿主 run_wasm.mjs 的 CLI 惯例）
 // 格式化口径与宿主 eval/runner/run_wasm.mjs 的 fmtFloat 一致：
 //   浮点整数值补 .0；非有限值映射 inf/-inf/NaN。
 // 用法: node tools/selfcomp/run_selfcomp.mjs <file.wasm>
@@ -185,6 +197,45 @@ const { instance: inst } = await WebAssembly.instantiate(bytes, {
       return materializeNode(v);
     },
     lom_json_stringify: (np) => BigInt(writeStr(stringifyNode(np))),
+    // L2.3 record/tuple 批：file/env 四件套（真实文件系统/进程参数）
+    lom_file_read: (pp, pl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      // 失败抛异常 → wasm trap → rc 1（对齐宿主 run_wasm.mjs）
+      return BigInt(writeStr(fs.readFileSync(p, 'utf8')));
+    },
+    lom_file_write: (pp, pl, cp, cl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      const c = Buffer.from(new Uint8Array(memory.buffer, cp, cl)); // 字节写
+      fs.writeFileSync(p, c);
+      return 0n; // L2 import 声明无返回（void 语义）——返回值被忽略
+    },
+    lom_file_append: (pp, pl, cp, cl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      const c = Buffer.from(new Uint8Array(memory.buffer, cp, cl));
+      fs.appendFileSync(p, c);
+      return 0n;
+    },
+    lom_file_exists: (pp, pl) => {
+      const p = Buffer.from(new Uint8Array(memory.buffer, pp, pl)).toString('utf8');
+      return fs.existsSync(p) ? 1 : 0; // i32 导入返回 JS number
+    },
+    lom_env_args: () => {
+      // argv = [wasm 路径, ...用户参数]（对齐宿主 argv[0]=程序路径）；
+      // 第一个裸 "--" 是分隔符，剥掉（宿主 run_wasm.mjs CLI 惯例）
+      let rest = process.argv.slice(3); // [node, script, wasm, ...args]
+      const dd = rest.indexOf('--');
+      if (dd >= 0) rest = [rest[0], ...rest.slice(dd + 1)];
+      const all = [path, ...rest];
+      // materializeNode array 分支直抄：writeStr + 16B cell 裸指针 cons、Nil=0
+      let list = 0n; // Nil
+      for (let i = all.length - 1; i >= 0; i--) {
+        const cell = instance.exports.lom_alloc(16);
+        rd().setBigInt64(cell, BigInt(writeStr(all[i])), true);
+        rd().setBigInt64(cell + 8, list, true);
+        list = BigInt(cell);
+      }
+      return list;
+    },
   },
 });
 instance = inst;

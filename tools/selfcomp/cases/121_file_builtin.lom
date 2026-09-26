@@ -1,0 +1,35 @@
+# L2.3 record/tuple 批（designs/0010 §8 #121）：file 四件套 roundtrip——
+# write → exists → append → read 内容对拍。路径用 target/probes/ 下临时
+# 文件（用例可重复运行：write 覆盖旧内容）。
+from file import { file_read, file_write, file_append, file_exists }
+from string import { split }
+
+fn main() -> Unit ! [IO]
+    let path = "target/probes/121_file_builtin.txt"
+    file_write(path, "hello-")
+    if file_exists(path)
+        println("exists-after-write")
+    else
+        println("missing-after-write")
+    end
+    println(file_read(path))
+    file_append(path, "world")
+    println(file_read(path))
+    file_write(path, "reset")
+    println(file_read(path))
+    if file_exists("target/probes/no_such_file_121.lom")
+        println("ghost")
+    else
+        println("clean")
+    end
+    let len = count(file_read(path))
+    println(len)
+end
+
+fn count(s: String) -> Int
+    let mut n = 0
+    for c in split(s, "")
+        n += 1
+    end
+    n
+end

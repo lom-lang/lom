@@ -1,0 +1,6 @@
+# L2.3 record/tuple 批校验 #5：file 内建 arity 不符（R74 式）
+from file import { file_read }
+
+fn main() -> Unit ! [IO]
+    println(file_read())
+end

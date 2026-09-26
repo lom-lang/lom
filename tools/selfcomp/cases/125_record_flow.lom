@@ -1,0 +1,52 @@
+# L2.3 record/tuple 批（designs/0010 §8 #125）：record/tuple 经 if/match/
+# for/while/HOF 流转——分支值合流、match 臂值、循环内构造。
+from list import { list_length, list_get }
+
+fn pick(n: Int) -> {a: Int, s: String}
+    if n > 0
+        {a: n, s: "pos"}
+    else
+        {a: -n, s: "neg"}
+    end
+end
+
+enum Mode
+    | On
+    | Off
+end
+
+fn main() -> Unit ! [IO]
+    let r1 = pick(5)
+    println(r1.a)
+    println(r1.s)
+    let r2 = pick(-8)
+    println(r2.a)
+    println(r2.s)
+    let m = On
+    let conf = match m
+        On => {speed: 10, up: True}
+        Off => {speed: 0, up: False}
+    end
+    println(conf.speed)
+    println(conf.up)
+    let mut cur = {steps: 0, total: 1}
+    let mut i = 0
+    while i < 4
+        cur = {steps: cur.steps + 1, total: cur.total * (i + 1)}
+        i += 1
+    end
+    println(cur.steps)
+    println(cur.total)
+    let xs = (1, 2, 3)
+    for k in 0..3
+        let pair = (k, xs.0 + k)
+        println(pair.0 + pair.1)
+    end
+    let mk = fn(n: Int) -> {v: Int}
+        {v: n * n}
+    end
+    let a = mk(3)
+    let b = mk(4)
+    println(a.v + b.v)
+    println(list_length(0..2) + 1)
+end

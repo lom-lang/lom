@@ -10,9 +10,12 @@
 # 当前子集：L2.2 算术/调用/println + L2.3-a 控制流/Bool + L2.3-b 闭包
 # + L2.3-c1 非泛型用户枚举与 match + c2 内建 Result/Option、泛型
 # 用户枚举类型实例（构造、match、递归/嵌套载荷）+ String 批 + List 批
-# + Map 批（mp{V} 类型流、8 内建、结构相等 eq）。子集外编译期拒绝：
-# json/包、? 与 return 语句、List/Map/枚举显示、闭包值 match
-# 等留 L2.3 后续批次。
+# + Map 批（mp{V} 类型流、8 内建、结构相等 eq）+ json 批（js 节点树、
+# parse/stringify 宿主中介）+ 包批（pkg-expand 展开单元 + 包清单第三参）
+# + return/? 批 + record/tuple 批（rc{a:vt}/tp{vt} 类型流、构造/字段/
+# 位置访问编译期偏移、file/env 四内建宿主中介、math 四名内联、io 放行）。
+# 子集外编译期拒绝：? 与 return 语句面已开（designs/0009）；List/Map/
+# Record/Tuple/枚举显示与相等比较、let (a,b)= 解构等留 L2.3 后续批次。
 #
 # 值表示（编译器实现自由度，RFC-0004：不做字节级一致，行为级对拍）：
 #   Int=i64、Float=f64、Bool=i32；闭包/枚举=i64 裸指针（untagged，
@@ -2512,6 +2515,206 @@ fn mp_inner(vt: String) -> String
     out
 end
 
+# L2.3 record/tuple 批（designs/0010 §3）：rc{a:vt;b:vt} / tp{vt;vt} 判定。
+# 字段名进 vt（record 是结构类型——字段序与名字都是类型组成部分；字段名
+# 是标识符，':' 在既有 vt 字符集（';'/'{}'/'|'/'@'/'en:' 前缀）未占用）；
+# 嵌套内层完整保留花括号（ls/mp 同族）。
+fn rc_vt(vt: String) -> Bool
+    starts_with(vt, "rc{") and ends_with(vt, "}")
+end
+
+fn tp_vt(vt: String) -> Bool
+    starts_with(vt, "tp{") and ends_with(vt, "}")
+end
+
+# 深度 ';' 分段（ls/mp 的单参内层不同——rc/tp 是多段）：段界只认深度 1 的
+# ';'，'{' 增深度、'}' 减深度（嵌套 rc/tp/ls/mp/en 的内层完整保留）。
+# 输入是去外壳的内层串（rc/tp 主体）；空串 → 空表。
+fn vt_split_semi(body: String) -> Result<List<String>, String>
+    if body == ""
+        return Ok(list_empty())
+    end
+    let chars = split(body, "")
+    let n = list_length(chars)
+    let mut depth = 1
+    let mut seg = ""
+    let mut segs = list_empty()
+    let mut i = 0
+    while i < n
+        let c = list_get(chars, i)
+        if c == "{"
+            depth = depth + 1
+            seg = seg + c
+        elif c == "}"
+            depth = depth - 1
+            if depth == 0
+                return Err("内部错误：vt 分段花括号失衡（" + body + "）")
+            end
+            seg = seg + c
+        elif c == ";" and depth == 1
+            if seg == ""
+                return Err("内部错误：vt 分段含空段（" + body + "）")
+            end
+            segs = list_cons(seg, segs)
+            seg = ""
+        else
+            seg = seg + c
+        end
+        i = i + 1
+    end
+    if depth != 1
+        return Err("内部错误：vt 分段花括号未闭合（" + body + "）")
+    end
+    if seg == ""
+        return Err("内部错误：vt 分段含尾空段（" + body + "）")
+    end
+    segs = list_cons(seg, segs)
+    Ok(rev_str(segs))
+end
+
+# rc 内层串（去 "rc{" 前缀与 "}" 后缀）
+fn rc_body(vt: String) -> String
+    let n = len(vt)
+    let chars = split(vt, "")
+    let mut out = ""
+    let mut i = 3
+    while i < n - 1
+        out = out + list_get(chars, i)
+        i = i + 1
+    end
+    out
+end
+
+# rc{...} → [(name, vt)]（段内第一个 ':' 拆名——嵌套内层的 ':' 在段串
+# 深度 >0 处不会先于段名出现：段名是标识符无花括号，首个 ':' 必是分隔符）
+fn rc_vt_fields(vt: String) -> Result<List<(String, String)>, String>
+    if !rc_vt(vt)
+        return Err("内部错误：非 record vt 进入 rc_vt_fields（" + vt + "）")
+    end
+    let segs = vt_split_semi(rc_body(vt))?
+    let mut out = list_empty()
+    for seg in segs
+        let chars = split(seg, "")
+        let mut name = ""
+        let mut split_at = -1
+        let mut i = 0
+        while i < list_length(chars) and split_at < 0
+            if list_get(chars, i) == ":"
+                split_at = i
+            else
+                name = name + list_get(chars, i)
+            end
+            i = i + 1
+        end
+        if split_at < 0
+            return Err("内部错误：record vt 字段缺 ':'（" + vt + "）")
+        end
+        if name == ""
+            return Err("内部错误：record vt 字段名为空（" + vt + "）")
+        end
+        let mut vtpart = ""
+        let mut j = split_at + 1
+        while j < list_length(chars)
+            vtpart = vtpart + list_get(chars, j)
+            j = j + 1
+        end
+        out = list_cons((name, vtpart), out)
+    end
+    Ok(rev_sfld(out))
+end
+
+# tp 内层串（同 rc_body 的 3 前缀——"tp{" 同长）
+fn tp_body(vt: String) -> String
+    rc_body(vt)
+end
+
+fn tp_vt_elems(vt: String) -> Result<List<String>, String>
+    if !tp_vt(vt)
+        return Err("内部错误：非 tuple vt 进入 tp_vt_elems（" + vt + "）")
+    end
+    vt_split_semi(tp_body(vt))
+end
+
+# 字段表 → rc{...}（空表 → "rc{}"——空 record 合法形态）
+fn rc_vt_make(fields: List<(String, String)>) -> String
+    let mut out = "rc{"
+    let mut first = True
+    for f in fields
+        if !first
+            out = out + ";"
+        end
+        out = out + f.0 + ":" + f.1
+        first = False
+    end
+    out + "}"
+end
+
+fn tp_vt_make(elems: List<String>) -> String
+    let mut out = "tp{"
+    let mut first = True
+    for e in elems
+        if !first
+            out = out + ";"
+        end
+        out = out + e
+        first = False
+    end
+    out + "}"
+end
+
+# rc/tp 字段查找（命中返回序号，未找到 -1）
+fn rc_field_pos(fields: List<(String, String)>, name: String) -> Int
+    let n = list_length(fields)
+    let mut i = 0
+    while i < n
+        if list_get(fields, i).0 == name
+            return i
+        end
+        i = i + 1
+    end
+    -1
+end
+
+# 字段访问的 vt/序号综合（infer 与 comp 单点事实源）：rc → 查字段序
+# （未知字段名编译期拒——校验 #2）；tp → 位置（数字字段名——parser 的
+# ExField(name="N") 形态；越界拒——校验 #3）
+fn record_field_vt(it: String, fname: String) -> Result<String, String>
+    if rc_vt(it)
+        let fields = rc_vt_fields(it)?
+        let pos = rc_field_pos(fields, fname)
+        if pos < 0
+            return Err(subset_err("record 无字段 '" + fname + "'（类型 " + it + "）"))
+        end
+        return Ok(list_get(fields, pos).1)
+    end
+    let elems = tp_vt_elems(it)?
+    match try_sti(fname)
+        Some(i) =>
+            if i < 0 or i >= list_length(elems)
+                Err(subset_err("tuple 索引 " + fname + " 越界（" + it + " 共 " + list_length(elems) + " 元）"))
+            else
+                Ok(list_get(elems, i))
+            end
+        end
+        None => Err(subset_err("tuple 索引须为数字字面量（得到 '" + fname + "'）"))
+    end
+end
+
+fn record_field_idx(it: String, fname: String) -> Result<Int, String>
+    if rc_vt(it)
+        let fields = rc_vt_fields(it)?
+        let pos = rc_field_pos(fields, fname)
+        if pos < 0
+            return Err(subset_err("record 无字段 '" + fname + "'（类型 " + it + "）"))
+        end
+        return Ok(pos)
+    end
+    match try_sti(fname)
+        Some(i) => Ok(i)
+        None => Err(subset_err("tuple 索引须为数字字面量（得到 '" + fname + "'）"))
+    end
+end
+
 fn vt_merge(a: String, b: String) -> Result<String, String>
     if a == b
         return Ok(a)
@@ -2530,6 +2733,42 @@ fn vt_merge(a: String, b: String) -> Result<String, String>
     if mp_vt(a) and mp_vt(b)
         # L2.3 Map 批：Map 值类型按结构合流（mp{?} 由 set/注解补全）
         return Ok("mp{" + vt_merge(mp_inner(a), mp_inner(b))? + "}")
+    end
+    # L2.3 record/tuple 批（designs/0010 §3-§4）：结构类型合流——字段集/
+    # 元素集、名字与序全同才合流（同名异序是不同类型——校验 #1/#7 的
+    # 编译期拒绝由这里的 Err 传导）；字段 vt 递归合流（c2 ? 机制同族）。
+    if rc_vt(a) and rc_vt(b)
+        let fa = rc_vt_fields(a)?
+        let fb = rc_vt_fields(b)?
+        if list_length(fa) != list_length(fb)
+            return Err(subset_err("record 字段集不符（期望 " + a + " 得 " + b + "）"))
+        end
+        let mut merged = list_empty()
+        let mut i = 0
+        while i < list_length(fa)
+            let pa = list_get(fa, i)
+            let pb = list_get(fb, i)
+            if pa.0 != pb.0
+                return Err(subset_err("record 字段集不符（期望 " + a + " 得 " + b + "）"))
+            end
+            merged = list_cons((pa.0, vt_merge(pa.1, pb.1)?), merged)
+            i = i + 1
+        end
+        return Ok(rc_vt_make(rev_sfld(merged)))
+    end
+    if tp_vt(a) and tp_vt(b)
+        let ea = tp_vt_elems(a)?
+        let eb = tp_vt_elems(b)?
+        if list_length(ea) != list_length(eb)
+            return Err(subset_err("tuple 元素数不符（期望 " + a + " 得 " + b + "）"))
+        end
+        let mut merged = list_empty()
+        let mut i = 0
+        while i < list_length(ea)
+            merged = list_cons(vt_merge(list_get(ea, i), list_get(eb, i))?, merged)
+            i = i + 1
+        end
+        return Ok(tp_vt_make(rev_str(merged)))
     end
     if enum_vt(a) and enum_vt(b)
         let aa = enum_vt_parts(a)?
@@ -2603,6 +2842,22 @@ fn template_resolve(tpl: String, subs: Map<String, String>) -> Result<String, St
             args = list_cons(template_resolve(arg, subs)?, args)
         end
         Ok(enum_vt_make(parts.name, rev_str(args)))
+    elif rc_vt(tpl)
+        # L2.3 record/tuple 批：record 字段里的 tv: 模板参数递归替换
+        let fields = rc_vt_fields(tpl)?
+        let mut out = list_empty()
+        for f in fields
+            out = list_cons((f.0, template_resolve(f.1, subs)?), out)
+        end
+        Ok(rc_vt_make(rev_sfld(out)))
+    elif tp_vt(tpl)
+        # tuple 元素里的 tv: 递归替换
+        let elems = tp_vt_elems(tpl)?
+        let mut out = list_empty()
+        for e in elems
+            out = list_cons(template_resolve(e, subs)?, out)
+        end
+        Ok(tp_vt_make(rev_str(out)))
     else
         Ok(tpl)
     end
@@ -2631,6 +2886,42 @@ fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result
         let mut i = 0
         while i < list_length(a.args)
             template_unify(list_get(a.args, i), list_get(b.args, i), subs)?
+            i = i + 1
+        end
+        Ok(())
+    elif rc_vt(tpl)
+        # L2.3 record/tuple 批：record 载荷对模板做结构统一（嵌套 tv:
+        # 参数经 subs 消费；字段集/序不符 → 编译期拒）
+        if !rc_vt(got)
+            return Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let fa = rc_vt_fields(tpl)?
+        let fb = rc_vt_fields(got)?
+        if list_length(fa) != list_length(fb)
+            return Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let mut i = 0
+        while i < list_length(fa)
+            if list_get(fa, i).0 != list_get(fb, i).0
+                return Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+            end
+            template_unify(list_get(fa, i).1, list_get(fb, i).1, subs)?
+            i = i + 1
+        end
+        Ok(())
+    elif tp_vt(tpl)
+        # tuple 载荷逐元统一
+        if !tp_vt(got)
+            return Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let ea = tp_vt_elems(tpl)?
+        let eb = tp_vt_elems(got)?
+        if list_length(ea) != list_length(eb)
+            return Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
+        end
+        let mut i = 0
+        while i < list_length(ea)
+            template_unify(list_get(ea, i), list_get(eb, i), subs)?
             i = i + 1
         end
         Ok(())
@@ -2733,7 +3024,34 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
             end
             Ok(enum_vt_make("Result", list_cons(ok_vt, list_cons(err_vt, list_empty()))))
         end
-        _ => Err(subset_err("该参数/返回类型（String/List/Map/记录/元组留后续批次）"))
+        TyRecord(fields) =>
+            # L2.3 record/tuple 批（designs/0010 §4）：注解序即字段序（结构
+            # 类型的类型组成）——注解与字面量构造序的一致性经 vt_merge 的
+            # 逐位合流校验（R68 注解一致性路线）。字段值 vt 递归（含 tv:
+            # 模板参数——泛型枚举载荷注解面随之解锁）。
+            let mut fvt = list_empty()
+            for f in fields
+                let vt = ty_vt_with_params(f.1, fns, tparams)?
+                if vt == "void"
+                    return Err(subset_err("record 字段 '" + f.0 + "' 不能为 Unit"))
+                end
+                fvt = list_cons((f.0, vt), fvt)
+            end
+            Ok(rc_vt_make(rev_sfld(fvt)))
+        end
+        TyTuple(args) =>
+            # L2.3 record/tuple 批：位置化无字段名；元素 vt 递归
+            let mut evt = list_empty()
+            for a in args
+                let vt = ty_vt_with_params(a, fns, tparams)?
+                if vt == "void"
+                    return Err(subset_err("tuple 元素不能为 Unit"))
+                end
+                evt = list_cons(vt, evt)
+            end
+            Ok(tp_vt_make(rev_str(evt)))
+        end
+        _ => Err(subset_err("该参数/返回类型（Fn 注解等子集外形态）"))
     end
 end
 
@@ -2750,7 +3068,7 @@ fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, p
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js"
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js" or rc_vt(vt) or tp_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -3013,6 +3331,82 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
             return Err(subset_err("stringify 暂不支持 枚举/闭包 值（'" + at + "'）"))
         end
         return Ok("st")
+    end
+    # L2.3 record/tuple 批顺带（designs/0010 §5）：math 四名返回综合——
+    # sqrt 广数值（Int/Float→Float，untagged 按 vt 静态定宽无 promote）；
+    # abs/min/max 同型对（Int→Int / Float→Float；混合与容器拒——宿主
+    # 同型 trap 面的编译期严格化）
+    if name == "sqrt"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'sqrt' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if at != "i64" and at != "f64"
+            return Err(subset_err("调用 'sqrt' 第 1 参类型不符（期望 Int/Float 得 " + at + "）"))
+        end
+        return Ok("f64")
+    end
+    if name == "abs"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'abs' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if at != "i64" and at != "f64"
+            return Err(subset_err("调用 'abs' 第 1 参类型不符（期望 Int/Float 得 " + at + "）"))
+        end
+        return Ok(at)
+    end
+    if name == "min" or name == "max"
+        if list_length(args) != 2
+            return Err(subset_err("调用 '" + name + "' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let a0 = infer_ex(list_get(args, 0), env, fns)?
+        let a1 = infer_ex(list_get(args, 1), env, fns)?
+        if a0 != a1 or (a0 != "i64" and a0 != "f64")
+            return Err(subset_err("调用 '" + name + "' 期望同型 Int/Float 对（得 " + a0 + " 与 " + a1 + "——混合类型 trap 面，L2 编译期拒）"))
+        end
+        return Ok(a0)
+    end
+    # file/env 四内建返回综合（宿主中介导入——json_parse 式校验）
+    if name == "file_read"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'file_read' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if !vt_compatible(at, "st")
+            return Err(subset_err("调用 'file_read' 第 1 参类型不符（期望 st 得 " + at + "）"))
+        end
+        return Ok("st")
+    end
+    if name == "file_write" or name == "file_append"
+        if list_length(args) != 2
+            return Err(subset_err("调用 '" + name + "' 实数量不符（期望 2 得 " + list_length(args) + "）"))
+        end
+        let a0 = infer_ex(list_get(args, 0), env, fns)?
+        let a1 = infer_ex(list_get(args, 1), env, fns)?
+        if !vt_compatible(a0, "st")
+            return Err(subset_err("调用 '" + name + "' 第 1 参类型不符（期望 st 得 " + a0 + "）"))
+        end
+        if !vt_compatible(a1, "st")
+            return Err(subset_err("调用 '" + name + "' 第 2 参类型不符（期望 st 得 " + a1 + "）"))
+        end
+        return Ok("void")
+    end
+    if name == "file_exists"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'file_exists' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if !vt_compatible(at, "st")
+            return Err(subset_err("调用 'file_exists' 第 1 参类型不符（期望 st 得 " + at + "）"))
+        end
+        return Ok("i32")
+    end
+    if name == "args"
+        if list_length(args) != 0
+            return Err(subset_err("调用 'args' 实数量不符（期望 0 得 " + list_length(args) + "）"))
+        end
+        return Ok("ls{st}")
     end
     if name == "list_empty"
         return Ok("ls{?}")
@@ -3432,6 +3826,11 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if itn == "cl" or enum_vt(itn) or itn == "st" or mp_vt(itn)
                 return Err(subset_err("闭包/枚举/String/Map 值参与一元负"))
             end
+            # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：容器值不参与
+            # 一元负（单列文案——与既有锁定串互不干扰）
+            if rc_vt(itn) or tp_vt(itn)
+                return Err(subset_err("Record/Tuple 值参与一元负"))
+            end
             if itn == "js"
                 return Err(subset_err("json 值参与一元负（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
             end
@@ -3472,6 +3871,12 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                     end
                     return Err(subset_err("List 与非 List 比较（L2 子集外）"))
                 end
+                # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：显示与相等
+                # 比较拒（容器显示/相等批边界——self_comp 源码零使用，负例
+                # 登记留后续；List/Map 族同边界）
+                if rc_vt(lt) or rc_vt(rt) or tp_vt(lt) or tp_vt(rt)
+                    return Err(subset_err("Record/Tuple 相等与大小比较（L2 子集外；容器相等批边界）"))
+                end
                 if mp_vt(lt) or mp_vt(rt)
                     # L2.3 Map 批（B2）：结构相等 Eq/NotEq 放行（特化递归 eq）；
                     # 大小/跨类型拒（List B3 同族）
@@ -3508,6 +3913,10 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if mp_vt(lt) or mp_vt(rt)
                     return Err(subset_err("Map 值的显示留后续批次（拼接提升；与 println(Map) 同边界）"))
                 end
+                # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：容器显示拒
+                if rc_vt(lt) or rc_vt(rt) or tp_vt(lt) or tp_vt(rt)
+                    return Err(subset_err("Record/Tuple 值的显示留后续批次（拼接提升；与 println(Record/Tuple) 同边界）"))
+                end
                 if lt == "js" or rt == "js"
                     return Err(subset_err("json 值参与算术/拼接（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
                 end
@@ -3527,6 +3936,10 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             if mp_vt(lt) or mp_vt(rt)
                 return Err(subset_err("Map 参与算术（L2 子集外；仅支持 ==/!= 比较）"))
+            end
+            # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：算术拒
+            if rc_vt(lt) or rc_vt(rt) or tp_vt(lt) or tp_vt(rt)
+                return Err(subset_err("Record/Tuple 参与算术（L2 子集外）"))
             end
             if lt == "st" or rt == "st"
                 return Err(subset_err("String 只参与 + 拼接"))
@@ -3568,15 +3981,23 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             Ok("ls{i64}")
         end
-        ExField(inner, _) =>
+        ExField(inner, fname) =>
             # L2.3 json 批（designs/0007 §6.3）：js 值的动态字段访问 → js
             # （object 节点逐键匹配，miss/非 object 运行时 trap——对齐宿主
-            # `.field` 不存在 trap）；非 js 值的字段访问维持现拒（record 批）
+            # `.field` 不存在 trap）；
+            # L2.3 record/tuple 批（designs/0010 §3-§4）：untagged 静态类型
+            # ——编译期已知字段布局，字段 vt 直接综合：rc{...} 查字段序
+            # （未知字段名编译期拒——校验 #2）；tp{...} 按位置（parser 产
+            # ExField(name="N") 数字串形态；越界拒——校验 #3）
             let it = infer_ex(inner, env, fns)?
             if it == "js"
                 Ok("js")
             else
-                Err(subset_err("该表达式形态"))
+                if rc_vt(it) or tp_vt(it)
+                    record_field_vt(it, fname)
+                else
+                    Err(subset_err("该表达式形态"))
+                end
             end
         end
         ExCall(callee, _) =>
@@ -3584,6 +4005,32 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             # rv 段；任意 callee 同口径）——返回段 → vt
             let rv = ex_rv(e, env, fns)?
             Ok(rv_vt(rv))
+        end
+        ExRecord(fields) =>
+            # L2.3 record/tuple 批（designs/0010 §4）：字面量构造序即字段序
+            # （无注解时首见固化；与注解序的一致性经 vt_merge 逐位合流
+            # 校验）。字段 vt 经 infer_ex 递归；void 字段拒。
+            let mut fvt = list_empty()
+            for pair in fields
+                let vt = infer_ex(pair.1, env, fns)?
+                if vt == "void"
+                    return Err(subset_err("record 字段 '" + pair.0 + "' 不能为 void 值"))
+                end
+                fvt = list_cons((pair.0, vt), fvt)
+            end
+            Ok(rc_vt_make(rev_sfld(fvt)))
+        end
+        ExTuple(elems) =>
+            # 位置化构造；void 元素拒
+            let mut evt = list_empty()
+            for el in elems
+                let vt = infer_ex(el, env, fns)?
+                if vt == "void"
+                    return Err(subset_err("tuple 元素不能为 void 值"))
+                end
+                evt = list_cons(vt, evt)
+            end
+            Ok(tp_vt_make(rev_str(evt)))
         end
         _ => Err(subset_err("该表达式形态"))
     end
@@ -4039,16 +4486,92 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
         ExField(inner, fname) =>
             # L2.3 json 批（designs/0007 §6.3）：js 值的动态字段访问 →
             # js_field helper（object 节点逐键 st_eq 匹配取子节点；miss 或
-            # 非 object → unreachable trap——对齐宿主 `.field` 不存在 trap）；
-            # 非 js 值的 ExField 维持现拒（record 批边界）
+            # 非 object → unreachable trap——对齐宿主 `.field` 不存在 trap）。
+            # L2.3 record/tuple 批（designs/0010 §4）：rc/tp 值 → 编译期偏移
+            # 读取（untagged 静态类型：名字/位置 → 序号 → 4+8*idx 偏移 +
+            # 宽度补码；类型校验在 infer_ex 层完成——此处仅发射）
             let it = infer_ex(inner, env, fns)?
-            if it != "js"
-                return Err(subset_err("该表达式形态"))
+            if it == "js"
+                let base = comp_ex(inner, env, fns, cg, locals, localvt)?
+                let key_off = intern_str_lit(fname, cg)
+                let idx = ensure_js_helper("js_field", cg)?
+                Ok(base + "41" + sleb128_hex(key_off) + "ad" + "10" + leb128_hex(idx))
+            else
+                if rc_vt(it) or tp_vt(it)
+                    # 字段 vt/序号（校验与 infer 同口径——record_field_vt 单点）
+                    let fvt = record_field_vt(it, fname)?
+                    let idx2 = record_field_idx(it, fname)?
+                    let base = comp_ex(inner, env, fns, cg, locals, localvt)?
+                    let s = new_slot(locals, localvt, "i64")
+                    Ok(base + "21" + leb128_hex(s) + fld_load_hex(s, fvt, 4 + 8 * idx2))
+                else
+                    Err(subset_err("该表达式形态"))
+                end
             end
-            let base = comp_ex(inner, env, fns, cg, locals, localvt)?
-            let key_off = intern_str_lit(fname, cg)
-            let idx = ensure_js_helper("js_field", cg)?
-            Ok(base + "41" + sleb128_hex(key_off) + "ad" + "10" + leb128_hex(idx))
+        end
+        ExRecord(fields) =>
+            # L2.3 record/tuple 批（designs/0010 §4）：求值序对齐宿主——
+            # 先逐字段求值入 scratch 槽，再 alloc(4+8n)，写 [n:i32] 头，
+            # 逐字段按宽存槽（偏移 4+8k），返回 i64 裸指针。
+            let _ = need_heap(cg)?
+            let n = list_length(fields)
+            let mut fvts = list_empty()
+            for pair in fields
+                fvts = list_cons(infer_ex(pair.1, env, fns)?, fvts)
+            end
+            let fvtl = rev_str(fvts)
+            let mut out = ""
+            let mut slots = list_empty()
+            let mut i = 0
+            while i < n
+                out = out + comp_ex(list_get(fields, i).1, env, fns, cg, locals, localvt)?
+                let s = new_slot(locals, localvt, list_get(fvtl, i))
+                out = out + "21" + leb128_hex(s)
+                slots = list_cons(int_to_string(s), slots)
+                i = i + 1
+            end
+            let slotl = rev_str(slots)
+            let p = new_slot(locals, localvt, "i32")
+            out = out
+                + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
+                + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
+            let mut k = 0
+            while k < n
+                out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(fvtl, k), 4 + 8 * k)
+                k = k + 1
+            end
+            Ok(out + "20" + leb128_hex(p) + "ad")
+        end
+        ExTuple(elems) =>
+            # 位置化同构（无字段名）
+            let _ = need_heap(cg)?
+            let n = list_length(elems)
+            let mut evts = list_empty()
+            for el in elems
+                evts = list_cons(infer_ex(el, env, fns)?, evts)
+            end
+            let evtl = rev_str(evts)
+            let mut out = ""
+            let mut slots = list_empty()
+            let mut i = 0
+            while i < n
+                out = out + comp_ex(list_get(elems, i), env, fns, cg, locals, localvt)?
+                let s = new_slot(locals, localvt, list_get(evtl, i))
+                out = out + "21" + leb128_hex(s)
+                slots = list_cons(int_to_string(s), slots)
+                i = i + 1
+            end
+            let slotl = rev_str(slots)
+            let p = new_slot(locals, localvt, "i32")
+            out = out
+                + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
+                + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
+            let mut k = 0
+            while k < n
+                out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(evtl, k), 4 + 8 * k)
+                k = k + 1
+            end
+            Ok(out + "20" + leb128_hex(p) + "ad")
         end
         _ => Err(subset_err("该表达式形态"))
     end
@@ -4457,6 +4980,11 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
             if name == "println"
                 return comp_println(args, env, fns, cg, locals, localvt)
             end
+            # L2.3 record/tuple 批顺带：io.print（prelude 语义——无需
+            # import 即可用，显式导入等价 no-op）
+            if name == "print"
+                return comp_print_builtin(args, env, fns, cg, locals, localvt)
+            end
             match map_get(fns, name)
                 None =>
                     # L2.3-b：闭包变量调用（分派次序对齐宿主/解释器：
@@ -4486,6 +5014,14 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                         # L2.3 json 批：json 双内建走 import 调用编译路径
                         if name == "json_parse" or name == "json_stringify"
                             return comp_json_builtin(name, args, env, fns, cg, locals, localvt)
+                        end
+                        # L2.3 record/tuple 批顺带：math 四名内联指令 +
+                        # file/env 四内建宿主中介导入（designs/0010 §5）
+                        if name == "sqrt" or name == "abs" or name == "min" or name == "max"
+                            return comp_math_builtin(name, args, env, fns, cg, locals, localvt)
+                        end
+                        if name == "file_read" or name == "file_write" or name == "file_append" or name == "file_exists" or name == "args"
+                            return comp_fileenv_builtin(name, args, env, fns, cg, locals, localvt)
                         end
                         return comp_builtin_call(name, fi, args, env, fns, cg, locals, localvt)
                     end
@@ -4810,6 +5346,135 @@ fn comp_json_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
     Ok(conv + "10" + leb128_hex(jstr))
 end
 
+# ============================================================================
+# L2.3 record/tuple 批顺带（designs/0010 §5）：math 四名内联指令编译 +
+# file/env 四内建宿主中介调用编译 + io.print。宿主蓝本 wasm_codegen.rs
+# L2142-2185 / L2309-2352（untagged 化：无 promote/box——vt 静态定宽）。
+# 操作码：f64.sqrt=9f、f64.abs=99、f64.min=a4、f64.max=a5、select=1b、
+# i64.lt_s=53、i64.gt_s=55、i64.xor=85、i64.shr_s=87、i64.sub=7d、
+# f64.convert_i64_s=b9（src/wasm.rs 常量表为权威）。
+# ============================================================================
+
+# String 实参拆两路（栈上 st 指针 → (p+4, len) 两值，print_st_hex 同款；
+# 打头的 st 参数先暂存槽——后续参数可复用同形。返回 (pre 前缀, pcode,
+# lcode)：pre 含入槽与首路读取的完整序列）
+fn st_arg_split(ac: String, locals: Map<String, Int>, localvt: Map<String, String>) -> {pre: String, pcode: String, lcode: String}
+    let t = new_slot(locals, localvt, "st")
+    {pre: ac + "21" + leb128_hex(t), pcode: "20" + leb128_hex(t) + "a7" + "4104" + "6a", lcode: "20" + leb128_hex(t) + "a7" + "2800" + "00"}
+end
+
+# math 内联编译（校验已由 builtin_rv 完成——此处按实参 vt 发射）
+fn comp_math_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    # 校验复用 builtin_rv（arity/类型/同型对——单点事实源）
+    let _ = builtin_rv(name, args, env, fns)?
+    if name == "sqrt"
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        if at == "i64"
+            # Int → f64.convert_i64_s + f64.sqrt（宿主 promote 语义的静态化）
+            return Ok(ac + "b9" + "9f")
+        end
+        return Ok(ac + "9f")
+    end
+    if name == "abs"
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        if at == "f64"
+            return Ok(ac + "99")
+        end
+        # Int 无分支绝对值：(v^(v>>63))-(v>>63)（宿主同构；栈序：
+        # [v][t=v>>63] → xor → [v^t][t] → sub）
+        let s = new_slot(locals, localvt, "i64")
+        return Ok(ac + "21" + leb128_hex(s)
+            + "20" + leb128_hex(s) + "20" + leb128_hex(s) + "423f" + "87" + "85"
+            + "20" + leb128_hex(s) + "423f" + "87" + "7d")
+    end
+    # min/max：i64 → select(a,b,a</>b)；f64 → f64.min/max
+    let a0 = infer_ex(list_get(args, 0), env, fns)?
+    let ac0 = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+    let sa = new_slot(locals, localvt, a0)
+    let ac1 = comp_ex(list_get(args, 1), env, fns, cg, locals, localvt)?
+    let sb = new_slot(locals, localvt, a0)
+    let head = ac0 + "21" + leb128_hex(sa) + ac1 + "21" + leb128_hex(sb)
+    if a0 == "f64"
+        let op =
+        if name == "min"
+            "a4"
+        else
+            "a5"
+        end
+        return Ok(head + "20" + leb128_hex(sa) + "20" + leb128_hex(sb) + op)
+    end
+    let cmp =
+    if name == "min"
+        "53"
+    else
+        "55"
+    end
+    Ok(head + "20" + leb128_hex(sa) + "20" + leb128_hex(sb)
+        + "20" + leb128_hex(sa) + "20" + leb128_hex(sb) + cmp + "1b")
+end
+
+# file/env 四内建调用编译（harness 导入——json_parse 式拆参与 call）
+fn comp_fileenv_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if cg_int(cg.cgs, "has_fileenv") == 0
+        return Err("内部错误：file/env 内建未启用预扫（has_fileenv）——请报维护者")
+    end
+    # 校验复用 builtin_rv（单点事实源）
+    let _ = builtin_rv(name, args, env, fns)?
+    let ibase = cg_int(cg.cgs, "ibase")
+    let fread = ibase - 5
+    let fwrite = ibase - 4
+    let fappend = ibase - 3
+    let fexists = ibase - 2
+    let eargs = ibase - 1
+    if name == "file_read"
+        let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        let sp = st_arg_split(ac, locals, localvt)
+        return Ok(sp.pre + sp.pcode + sp.lcode + "10" + leb128_hex(fread))
+    end
+    if name == "file_write" or name == "file_append"
+        let ac0 = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        let sp0 = st_arg_split(ac0, locals, localvt)
+        let ac1 = comp_ex(list_get(args, 1), env, fns, cg, locals, localvt)?
+        let sp1 = st_arg_split(ac1, locals, localvt)
+        let fidx =
+        if name == "file_write"
+            fwrite
+        else
+            fappend
+        end
+        # import 声明为无返回（void 语义——宿主 Unit 的 untagged 化），
+        # 调用后栈上不留值
+        return Ok(sp0.pre + sp0.pcode + sp0.lcode + sp1.pre + sp1.pcode + sp1.lcode + "10" + leb128_hex(fidx))
+    end
+    if name == "file_exists"
+        let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        let sp = st_arg_split(ac, locals, localvt)
+        return Ok(sp.pre + sp.pcode + sp.lcode + "10" + leb128_hex(fexists))
+    end
+    # args
+    Ok("10" + leb128_hex(eargs))
+end
+
+# io.print：不换行显示打印（与 println 同显示面，去尾部 '\n' 路）
+fn comp_print_builtin(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if list_length(args) != 1
+        return Err("print 期望 1 个参数")
+    end
+    if cg_int(cg.cgs, "ibase") < 4
+        return Err(subset_err("print 需要 String 设施（print_str/data）——io import 预扫未覆盖的深层形态；请显式 from io import"))
+    end
+    let at = infer_ex(list_get(args, 0), env, fns)?
+    if at != "i64" and at != "f64" and at != "st" and at != "i32"
+        return Err(subset_err("print 只接受 Int/Float/String/Bool（与 println 同显示面）"))
+    end
+    let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+    let pc = disp_code(ac, at, cg)?
+    let sp = st_arg_split(pc, locals, localvt)
+    Ok(sp.pre + sp.pcode + sp.lcode + "10" + "02")
+end
+
 # println(String) 的打印序列：ptr_code（栈上 i64）→ 存 local →
 # print_str(p+4, len) + print_str(0,1)（'\n' 在 data offset 0）
 fn print_st_hex(ptr_code: String, locals: Map<String, Int>, localvt: Map<String, String>) -> String
@@ -4861,6 +5526,12 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                         let idx = ensure_js_helper("js_print", cg)?
                         Ok(ac + "10" + leb128_hex(idx))
                     else
+                        # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：
+                        # 容器显示拒（单列文案——与既有 List/Map 锁定串互不
+                        # 干扰）
+                        if rc_vt(at) or tp_vt(at)
+                            return Err(subset_err("println 只接受 Int/Float/String/Bool（Record/Tuple 显示留后续批次——容器显示批边界）"))
+                        end
                         Err(subset_err("println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"))
                     end
                 end
@@ -4933,6 +5604,43 @@ fn cap_store_hex(vt: String, off: Int) -> String
             "3600" + leb128_hex(off)
         else
             "3700" + leb128_hex(off)
+        end
+    end
+end
+
+# ============================================================================
+# L2.3 record/tuple 批（designs/0010 §4）：构造/访问发射件
+#
+# 堆布局（untagged，cons 槽 8B 按值的第三应用）：[n:i32][field 8B × n]，
+# 槽偏移 4+8i，alloc 尺寸 4+8n（不 pad——访问偏移即 4+8i，宿主 tagged
+# record [n][12B/字段] 无 pad 同口径）。WASM 值 = i64 裸指针。
+# 求值序对齐宿主：先逐字段求值入 scratch 槽，再 alloc，再写头与槽。
+# ============================================================================
+
+# record/tuple 字段槽写入（8B 槽按宽：f64 直写 / i32 extend 后 i64.store /
+# 其余 i64——cons 槽同型规则）
+fn fld_store_hex(pslot: Int, sslot: Int, vt: String, off: Int) -> String
+    if vt == "f64"
+        "20" + leb128_hex(pslot) + "20" + leb128_hex(sslot) + "3900" + leb128_hex(off)
+    else
+        if vt == "i32"
+            "20" + leb128_hex(pslot) + "20" + leb128_hex(sslot) + "ac" + "3700" + leb128_hex(off)
+        else
+            "20" + leb128_hex(pslot) + "20" + leb128_hex(sslot) + "3700" + leb128_hex(off)
+        end
+    end
+end
+
+# record/tuple 字段槽读取（指针 wrap + 按宽 load + i32 补码 wrap——
+# 写读往返：i32 extend 写 / i64.load + wrap 读）
+fn fld_load_hex(s: Int, vt: String, off: Int) -> String
+    if vt == "f64"
+        "20" + leb128_hex(s) + "a7" + "2b00" + leb128_hex(off)
+    else
+        if vt == "i32"
+            "20" + leb128_hex(s) + "a7" + "2900" + leb128_hex(off) + "a7"
+        else
+            "20" + leb128_hex(s) + "a7" + "2900" + leb128_hex(off)
         end
     end
 end
@@ -5805,7 +6513,7 @@ fn ls_vt_bt(vt: String) -> Result<String, String>
     elif vt == "i32"
         Ok("7f")
     else
-        if vt == "i64" or vt == "st" or ls_vt(vt) or mp_vt(vt) or enum_vt(vt) or vt == "cl" or vt == "js"
+        if vt == "i64" or vt == "st" or ls_vt(vt) or mp_vt(vt) or enum_vt(vt) or vt == "cl" or vt == "js" or rc_vt(vt) or tp_vt(vt)
             Ok("7e")
         else
             Err(subset_err("List 元素类型子集外（'" + vt + "'）"))
@@ -6248,9 +6956,9 @@ fn mp_fnv_hex(kp: Int, h: Int, j: Int) -> String
 end
 
 # 桶 val 槽写入段（值在 local 2——mp_set 的第 3 参；地址已在栈上）。
-# 白名单与 ls cons 槽同族：i64/i32/f64/st/cl/ls/en/mp 载体
+# 白名单与 ls cons 槽同族：i64/i32/f64/st/cl/ls/en/mp/rc/tp 载体
 fn mp_val_store_hex(v_vt: String) -> Result<String, String>
-    let ok = v_vt == "f64" or v_vt == "i32" or v_vt == "i64" or v_vt == "st" or v_vt == "cl" or ls_vt(v_vt) or enum_vt(v_vt) or mp_vt(v_vt)
+    let ok = v_vt == "f64" or v_vt == "i32" or v_vt == "i64" or v_vt == "st" or v_vt == "cl" or ls_vt(v_vt) or enum_vt(v_vt) or mp_vt(v_vt) or rc_vt(v_vt) or tp_vt(v_vt)
     if !ok
         return Err(subset_err("Map 值类型子集外（'" + v_vt + "'）"))
     end
@@ -6834,6 +7542,13 @@ fn js_conv_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<S
     if mp_vt(vt)
         let i = ensure_js_helper("js_of_map|" + mp_inner(vt), cg)?
         return Ok(code + "10" + leb128_hex(i))
+    end
+    # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：stringify 对容器
+    # 值拒（容器显示批边界——宿主 Debug 形态合法是 json 批已登记信任
+    # 边界；record 批起 ExRecord 综合解锁，拒绝点从 ExRecord 兜底迁移
+    # 到此，文案随批精确化）
+    if rc_vt(vt) or tp_vt(vt)
+        return Err(subset_err("stringify 暂不支持 Record/Tuple 值（容器显示批边界；'" + vt + "'）"))
     end
     Err(subset_err("stringify 暂不支持 枚举/闭包 值元素（'" + vt + "'）"))
 end
@@ -7571,7 +8286,9 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
         ExTry(inner) => scan_ex(inner, fns)
         ExRange(_, _) => True
         ExRecord(fields) =>
-            let mut hit = False
+            # L2.3 record/tuple 批：构造即 alloc——needs_heap 保守口径
+            # （宿主 Tuple/Record 构造同走 RT_ALLOC）
+            let mut hit = True
             for pair in fields
                 if scan_ex(pair.1, fns)
                     hit = True
@@ -7580,7 +8297,7 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
             hit
         end
         ExTuple(elems) =>
-            let mut hit = False
+            let mut hit = True
             for el in elems
                 if scan_ex(el, fns)
                     hit = True
@@ -7702,7 +8419,10 @@ fn needs_heap(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms
             end
             # L2.3 Map 批：mp vt 注解保守入 needs_heap（Map 值本身源自
             # map_empty 的 alloc 白名单——此处为签名携带 mp 的防御性冗余）；
-            # L2.3 json 批：js vt 注解同入（"js" 子串不出现于其他 vt 编码）
+            # L2.3 json 批：js vt 注解同入（"js" 子串不出现于其他 vt 编码）；
+            # L2.3 record/tuple 批：rc{/tp{ 注解同入（签名携带防御——
+            # 值来源的构造路径已在 scan_ex 命中；"rc{"/"tp{" 子串偶见于
+            # en:Xxx{...} 的枚举名前缀时为保守方向误报，无害）
             if hit == False
                 for key in map_keys(fns)
                     match map_get(fns, key)
@@ -7711,6 +8431,12 @@ fn needs_heap(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms
                                 hit = True
                             end
                             if contains(fi.prms, "js") or contains(fi.ret, "js")
+                                hit = True
+                            end
+                            if contains(fi.prms, "rc{") or contains(fi.ret, "rc{")
+                                hit = True
+                            end
+                            if contains(fi.prms, "tp{") or contains(fi.ret, "tp{")
                                 hit = True
                             end
                         end
@@ -8024,7 +8750,7 @@ end
 # L2.3-b：cl（闭包值 = i64）→ 7e；L2.3 Map 批：mp{V}（裸指针）→ 7e；
 # L2.3 json 批：js（JSON 节点裸指针）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js"
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js" or rc_vt(vt) or tp_vt(vt)
         "7e"
     else
         if vt == "i32"
@@ -8526,6 +9252,47 @@ fn js_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: St
     Err(subset_err("未知内建 'json." + name + "'"))
 end
 
+# ============================================================================
+# L2.3 record/tuple 批顺带（designs/0010 §5）：file/env/math/io 四模块
+# 内建表（宿主中介——json 批甲路线先例）。
+#   file 四件套 + env.args 走 harness 导入（has_fileenv 预扫发 import 段；
+#   类型布局见 build_module）；math 四名走 f64 内联指令（宿主蓝本
+#   wasm_codegen.rs L2142-2185：sqrt=9f/abs=99（f64）或无分支 i64/min-max
+#   select——L2 untagged 按 vt 静态定宽，无 promote/box）；io 的 println
+#   既有分派、print 为不换行显示打印（io import 出现即开 String 设施，
+#   prelude 语义——显式导入等价 no-op 放行）。四模块均不支持 as 别名
+# （json 批边界同族）。
+# ============================================================================
+
+fn fe_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "file_read"
+        return Ok({helper: "-", nprm: 1, prms: "st", ret: "st"})
+    end
+    if name == "file_write" or name == "file_append"
+        return Ok({helper: "-", nprm: 2, prms: "st,st", ret: "void"})
+    end
+    if name == "file_exists"
+        return Ok({helper: "-", nprm: 1, prms: "st", ret: "i32"})
+    end
+    if name == "args"
+        return Ok({helper: "-", nprm: 0, prms: "", ret: "ls{st}"})
+    end
+    Err(subset_err("未知内建 'file." + name + "' / 'env." + name + "'"))
+end
+
+fn math_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "sqrt"
+        return Ok({helper: "-", nprm: 1, prms: "?", ret: "f64"})
+    end
+    if name == "abs"
+        return Ok({helper: "-", nprm: 1, prms: "?", ret: "?"})
+    end
+    if name == "min" or name == "max"
+        return Ok({helper: "-", nprm: 2, prms: "?,?", ret: "?"})
+    end
+    Err(subset_err("未知内建 'math." + name + "'"))
+end
+
 # n 字节零的 hex（scratch 区填充）
 fn zeros_hex(n: Int) -> String
     let mut out = ""
@@ -8969,6 +9736,12 @@ fn probe_str_sigs(prg: Prg) -> Bool
                         if module == "string"
                             hit = True
                         end
+                        # L2.3 record/tuple 批顺带：io import 出现即开 String
+                        # 设施（print/println 的显示路径依赖 print_str/data
+                        # 段——宿主 prelude 语义，显式导入等价 no-op 放行）
+                        if module == "io"
+                            hit = True
+                        end
                     end
                     _ => ()
                 end
@@ -8989,6 +9762,28 @@ fn probe_json_import(prg: Prg) -> Bool
                 match it
                     ItImport(module, _) =>
                         if module == "json"
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
+# L2.3 record/tuple 批顺带（designs/0010 §5）：has_fileenv 预扫——import
+# file 或 env 出现即发（json 批同款保守口径：四内建与 args 的唯一入口
+# 是这两个 import）。
+fn probe_fileenv_import(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            let mut hit = False
+            for it in items
+                match it
+                    ItImport(module, _) =>
+                        if module == "file" or module == "env"
                             hit = True
                         end
                     end
@@ -9105,14 +9900,74 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                 end
                             end
                         end
+                        # L2.3 record/tuple 批顺带（designs/0010 §5）：file/
+                        # env/math/io 四模块白名单——file 四件套与 env.args
+                        # 走 harness 导入编译（has_fileenv 预扫）、math 四名
+                        # 走内联指令、io 的 println/print 是 prelude 语义
+                        # （no-op 放行——注册哨兵仅为 import 逐名校验与调用
+                        # 点放行；println 的专用分派在前不受影响）。四模块均
+                        # 不支持 as 别名（json 批边界同族）。
+                        if module == "file" or module == "env"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = fe_builtin_entry(iname)?
+                                        if alias != iname
+                                            return Err(subset_err(module + " 内建导入暂不支持 as 别名（'" + iname + "'）"))
+                                        end
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
+                        if module == "math"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = math_builtin_entry(iname)?
+                                        if alias != iname
+                                            return Err(subset_err("math 内建导入暂不支持 as 别名（'" + iname + "'）"))
+                                        end
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
+                        if module == "io"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        if iname != "println" and iname != "print"
+                                            return Err(subset_err("未知内建 'io." + iname + "'"))
+                                        end
+                                        if alias != iname
+                                            return Err(subset_err("io 内建导入暂不支持 as 别名（'" + iname + "'）"))
+                                        end
+                                        # println/print 是 prelude 名（comp_call
+                                        # 专用分派不查 fns）——哨兵注册仅让
+                                        # "内建与用户函数重名"面有守卫
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: "void", nprm: 1, prms: "?"})
+                                    end
+                                end
+                            end
+                        end
                         # L2.3 包批（designs/0008 §6.2，裁决 3 甲）：非内建
-                        # 四模块的 import 分派——包清单成员放行（逐名校验与
+                        # 模块的 import 分派——包清单成员放行（逐名校验与
                         # as 别名注册留待下方 pass 2：items 序中包 fn 可能
                         # 注册在本 import 之后，pass 1 时 fns 表未必齐备）；
                         # 既非内建也非包清单 → 编译错误（堵旧版静默落空：
                         # 此前 math/file/env/任意名整条 import 被静默忽略，
                         # 错误推迟到调用点才报"调用未知函数"，误导定位）。
-                        if module != "string" and module != "list" and module != "map" and module != "json"
+                        if module != "string" and module != "list" and module != "map" and module != "json" and module != "file" and module != "env" and module != "math" and module != "io"
                             if map_has(pkgs, module) == False
                                 return Err(subset_err("未知模块 '" + module + "'（非内建模块且不在包清单——检查 import 拼写或通过第三参声明包名）"))
                             end
@@ -9209,13 +10064,25 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
     # 需要 print_str/data 段（纯 stringify 程序可无任何 String 字面量，
     # 预扫会漏）；行为对拍不受 section 多寡影响。
     let has_json = probe_json_import(prg)
-    let has_str = has_str0 or has_json
+    # L2.3 record/tuple 批顺带（designs/0010 §5）：has_fileenv 预扫
+    # （import file/env 出现即发）——import 段尾部追加 5 个宿主中介导入
+    # （funcidx = ibase-5..ibase-1：file_read/file_write/file_append/
+    # file_exists/env_args）。has_fileenv → has_str 保守置真（file_read
+    # 返回 st，println 该值需要 print_str/data 段——json 批同款保守）
+    # 且 → heap_on（harness file_read 物化 writeStr 与 args 的 cons 物化
+    # 都调 lom_alloc——export memory/alloc 的前提）。
+    let has_fileenv = probe_fileenv_import(prg)
+    let has_str = has_str0 or has_json or has_fileenv
     let ibase = 2 + (if has_str
         2
     else
         0
     end) + (if has_json
         2
+    else
+        0
+    end) + (if has_fileenv
+        5
     else
         0
     end)
@@ -9246,7 +10113,9 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             # String 批保守化：任一 String 形态也开堆（静态/动态判定易漏，
             # 宁可多发；行为对拍不受 section 多寡影响）。json 批：has_json
             # → heap_on（alloc export 与 js_of/parse 物化路径的前提）。
-            let heap_on = needs_heap(prg, fns) or has_str or has_json
+            # record/tuple 批顺带：has_fileenv → heap_on（harness file_read
+            # 的 writeStr 与 args 的 cons 物化调 lom_alloc）。
+            let heap_on = needs_heap(prg, fns) or has_str or has_json or has_fileenv
             # 模块级编译状态（Map 引用语义跨函数共享）
             let cgs = map_empty()
             let cgh = map_empty()
@@ -9255,7 +10124,16 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             map_set(cgh, "cret", "void")
             map_set(cgs, "nfun", nfun)
             map_set(cgs, "ibase", ibase)
-            map_set(cgs, "tbase", ibase)
+            # tbase = 用户类型起始 typeidx = 2 + 2*has_str + 2*has_json +
+            # 4*has_fileenv（fileenv 导入 5 条但类型 4 个——write/append 共
+            # 型，typeidx 与 funcidx 自 fileenv 批起不再数值重合；无
+            # fileenv 时 tbase == ibase，存量布局不变）
+            let tbase0 = ibase - (if has_fileenv
+                1
+            else
+                0
+            end)
+            map_set(cgs, "tbase", tbase0)
             map_set(cgs, "has_str",
             if has_str
                 1
@@ -9264,6 +10142,12 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             end)
             map_set(cgs, "has_json",
             if has_json
+                1
+            else
+                0
+            end)
+            map_set(cgs, "has_fileenv",
+            if has_fileenv
                 1
             else
                 0
@@ -9280,10 +10164,12 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             if heap_on
                 map_set(cgs, "heap_on", 1)
                 # alloc 注册为 extra 区第一个（type (i32)->(i32) + bump 体）
+                # function section 条目是 typeidx（tbase+nfun——fileenv 批起
+                # 与 funcidx 分离；call 用的 alloc_idx 仍是 ibase+nfun）
                 let abody = alloc_body_hex()
                 map_set(cgh, "extra_types", "60017f017f")
                 map_set(cgs, "n_extra_types", 1)
-                map_set(cgh, "extra_fidxs", leb128_hex(ibase + nfun))
+                map_set(cgh, "extra_fidxs", leb128_hex(tbase0 + nfun))
                 map_set(cgh, "extra_bodies", leb128_hex(len(abody) / 2) + abody)
                 map_set(cgs, "n_extra_fns", 1)
                 map_set(cgs, "alloc_idx", ibase + nfun)
@@ -9303,7 +10189,7 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                     ItFn(_, params, ret, _, body, _, _) =>
                         let rv = sig_ret(it, fns)?
                         tentries = tentries + fn_type_entry(params, rv, fns)?
-                        fidxs = fidxs + leb128_hex(ibase + nfun2)
+                        fidxs = fidxs + leb128_hex(tbase0 + nfun2)
                         bodies = bodies + comp_one_fn(params, ret, body, fns, cg)?
                         nfun2 = nfun2 + 1
                     end
@@ -9314,6 +10200,10 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             # base+；has_str 再加 t2=(i32,i32)->()（print_str）与
             # t3=(f64,i32)->i32（ftoa）；has_json 加 (i32,i32)->i64
             # （lom_json_parse）与 (i64)->i64（lom_json_stringify）；
+            # has_fileenv 加 4 型（fileenv 导入用，接在 json 类型之后）：
+            # (i32,i32)->i64（file_read）/ (i32,i32,i32,i32)->()（file_
+            # write/append——void 语义无返回）/ (i32,i32)->i32（file_
+            # exists）/ ()->i64（env_args）；
             # L2.3-b 起按需追加 extra types
             let mut types_head = "60" + "01" + "7e" + "00" + "60" + "01" + "7c" + "00"
             let mut ntypes = 2 + nfun2
@@ -9330,11 +10220,22 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                 types_head = types_head + "60027f7f017e" + "60017e017e"
                 ntypes = ntypes + 2
             end
+            let ftbase = jt0 + (if has_json
+                2
+            else
+                0
+            end)
+            if has_fileenv
+                types_head = types_head + "60027f7f017e" + "60047f7f7f7f00" + "60027f7f017f" + "6000017e"
+                ntypes = ntypes + 4
+            end
             let types_c = leb128_hex(ntypes + cg_int(cgs, "n_extra_types")) + types_head + tentries + cg_str(cgh, "extra_types")
             # import section：env.print_i64(t0) / env.print_f64(t1)；
             # has_str 加 env.print_str(t2) / env.ftoa(t3)；has_json 加
             # env.lom_json_parse / env.lom_json_stringify（import 段尾部，
-            # funcidx = ibase-2 / ibase-1）
+            # funcidx = ibase-2 / ibase-1）；has_fileenv 再加 5 导入（尾部，
+            # funcidx = ibase-5..ibase-1：file_read/write/append/exists/
+            # env_args——JS 实现在 run_selfcomp.mjs）
             let mut n_imp = 2
             let mut imp_body = "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
             + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
@@ -9349,6 +10250,15 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                 imp_body = imp_body
                 + "03" + "656e76" + "0e" + "6c6f6d5f6a736f6e5f7061727365" + "00" + leb128_hex(jt0)
                 + "03" + "656e76" + "12" + "6c6f6d5f6a736f6e5f737472696e67696679" + "00" + leb128_hex(jt0 + 1)
+            end
+            if has_fileenv
+                n_imp = n_imp + 5
+                imp_body = imp_body
+                + "03" + "656e76" + "0d" + "6c6f6d5f66696c655f72656164" + "00" + leb128_hex(ftbase)
+                + "03" + "656e76" + "0e" + "6c6f6d5f66696c655f7772697465" + "00" + leb128_hex(ftbase + 1)
+                + "03" + "656e76" + "0f" + "6c6f6d5f66696c655f617070656e64" + "00" + leb128_hex(ftbase + 1)
+                + "03" + "656e76" + "0f" + "6c6f6d5f66696c655f657869737473" + "00" + leb128_hex(ftbase + 2)
+                + "03" + "656e76" + "0c" + "6c6f6d5f656e765f61726773" + "00" + leb128_hex(ftbase + 3)
             end
             let imp_c = leb128_hex(n_imp) + imp_body
             # function section（用户 + extra：alloc/闭包体/shim/helper）
@@ -9380,20 +10290,21 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                     mid = mid + sect("06", "01" + "7f" + "01" + "4108" + "0b")
                 end
             end
-            # export section：main；has_str/has_json 加导出 memory（打印
-            # 与 json 物化都要读 memory.buffer）；has_json 再加导出 alloc
-            # （funcidx = alloc_idx，harness 物化分配用——宿主 lom_alloc 先例）
+            # export section：main；has_str/has_json/has_fileenv 加导出
+            # memory（打印与 json/fileenv 物化都要读 memory.buffer）；
+            # has_json 或 has_fileenv 再加导出 alloc（funcidx = alloc_idx，
+            # harness 物化分配用——宿主 lom_alloc 先例）
             let mi = match map_get(fns, "main")
                 Some(f) => f
                 None => {idx: 2, ret: "void", nprm: 0, prms: ""}
             end
             let mut exp_n = 1
             let mut exp_body = "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
-            if has_str or has_json
+            if has_str or has_json or has_fileenv
                 exp_n = exp_n + 1
                 exp_body = "06" + "6d656d6f7279" + "02" + "00" + exp_body
             end
-            if has_json
+            if has_json or has_fileenv
                 exp_n = exp_n + 1
                 exp_body = exp_body + "09" + "6c6f6d5f616c6c6f63" + "00" + leb128_hex(cg_int(cgs, "alloc_idx"))
             end

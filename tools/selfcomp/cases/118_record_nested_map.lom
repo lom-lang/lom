@@ -1,0 +1,34 @@
+# L2.3 record/tuple 批（designs/0010 §8 #118）：cg 同构形态——四字段
+# 嵌 Map 的 record（值位 rc）+ 字段访问链 + Map 值位 record 读回。
+from map import { map_empty, map_set, map_get, map_size, map_has }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "one", {v: 1, w: 2})
+    map_set(m, "two", {v: 5, w: 6})
+    match map_get(m, "one")
+        Some(r) => println(r.v + r.w)
+        None => println(0)
+    end
+    match map_get(m, "two")
+        Some(r) => println(r.v * r.w)
+        None => println(0)
+    end
+    match map_get(m, "zz")
+        Some(r) => println(r.v)
+        None => println(-1)
+    end
+    println(map_size(m))
+    if map_has(m, "one")
+        println("has")
+    else
+        println("no")
+    end
+    # 嵌套：record 字段位 Map + Map 值位 record 双向
+    let holder = {name: "cfg", table: m}
+    println(holder.name)
+    match map_get(holder.table, "two")
+        Some(r) => println(r.w)
+        None => println(0)
+    end
+end

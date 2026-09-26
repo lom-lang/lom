@@ -1,0 +1,5 @@
+name = "aliasapp"
+version = "0.1.0"
+
+[dependencies]
+libouter = { path = "libouter" }

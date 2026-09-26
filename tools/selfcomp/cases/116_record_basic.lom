@@ -1,0 +1,25 @@
+# L2.3 record/tuple 批（designs/0010 §8 #116）：record 构造/字段读/
+# 嵌套 rc in rc/四字段混合 vt（i64/f64/st/i32）。
+fn main() -> Unit ! [IO]
+    let p = {a: 1, b: 2.5, c: "hi", d: True}
+    println(p.a)
+    println(p.b)
+    println(p.c)
+    println(p.d)
+    let inner = {x: 7, y: 8}
+    let outer = {m: inner, n: 3}
+    println(outer.m.x + outer.m.y + outer.n)
+    let q = {a: 10, b: 0.25, c: "yo", d: False}
+    println(q.a + p.a)
+    println(q.c + "!")
+    if q.d
+        println(1)
+    else
+        println(0)
+    end
+    if p.d
+        println("T")
+    else
+        println("F")
+    end
+end

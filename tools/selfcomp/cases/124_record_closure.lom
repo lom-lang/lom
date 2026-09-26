@@ -1,0 +1,35 @@
+# L2.3 record/tuple 批（designs/0010 §8 #124）：闭包与 record/tuple——
+# 捕获 record 值、闭包返回 record、闭包参数 record、tuple 捕获。
+fn main() -> Unit ! [IO]
+    let p = {x: 6, y: 7}
+    let get_x = fn(r: {x: Int, y: Int}) -> Int
+        r.x
+    end
+    println(get_x(p))
+    let mk = fn(a: Int) -> {v: Int, tag: String}
+        {v: a * 2, tag: "mk"}
+    end
+    let r = mk(21)
+    println(r.v)
+    println(r.tag)
+    let t = (4, 5)
+    let sum_t = fn(u: (Int, Int)) -> Int
+        u.0 + u.1
+    end
+    println(sum_t(t))
+    let cap = fn(k: Int) -> Int
+        p.x + p.y + k
+    end
+    println(cap(1))
+    let cap_t = fn() -> Int
+        t.0 * t.1
+    end
+    println(cap_t())
+    let deep = fn(a: Int) -> Int
+        let inner = fn(b: Int) -> Int
+            p.y + b
+        end
+        inner(a) + p.x
+    end
+    println(deep(5))
+end

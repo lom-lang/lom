@@ -1,0 +1,28 @@
+# L2.3 record/tuple 批（designs/0010 §8 #119）：tuple 构造/.0/.1/.2 位置
+# 访问/多元素混合 vt/双元素与三元素/函数返回 tuple 消费。
+fn divmod(a: Int, b: Int) -> (Int, Int)
+    (a / b, a % b)
+end
+
+fn main() -> Unit ! [IO]
+    let t = (10, "x", False)
+    println(t.0)
+    println(t.1)
+    println(t.2)
+    let pair = (3, 4)
+    println(pair.0 + pair.1)
+    println(pair.0 * pair.1)
+    let dm = divmod(17, 5)
+    println(dm.0)
+    println(dm.1)
+    let nested = ((1, 2), 9)
+    let inner_t = nested.0
+    println(inner_t.0 + inner_t.1 + nested.1)
+    let mixed = (1.5, "s", 7, True)
+    println(mixed.0)
+    println(mixed.1)
+    println(mixed.2)
+    println(mixed.3)
+    let same = (5, 6, 7, 8)
+    println(same.0 + same.1 + same.2 + same.3)
+end

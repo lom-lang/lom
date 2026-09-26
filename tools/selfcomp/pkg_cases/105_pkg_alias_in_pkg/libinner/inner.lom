@@ -1,0 +1,4 @@
+# 内层包：被别名导入的目标（triple）
+fn triple(x: Int) -> Int
+    x * 3
+end

@@ -1,0 +1,7 @@
+# L2.3 record/tuple 批校验 #6：let (a,b)= 解构维持拒（self_comp 源码零
+# 使用；负例域不变）
+fn main() -> Unit ! [IO]
+    let t = (1, 2)
+    let (a, b) = t
+    println(a + b)
+end

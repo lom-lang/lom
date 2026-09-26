@@ -1,0 +1,5 @@
+# L2.3 record/tuple 批校验 #4：println(record) 容器显示拒
+fn main() -> Unit ! [IO]
+    let p = {a: 1}
+    println(p)
+end

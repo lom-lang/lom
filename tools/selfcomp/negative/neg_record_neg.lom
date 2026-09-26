@@ -1,0 +1,5 @@
+# L2.3 record/tuple 批校验 #4 附：record 参与一元负拒
+fn main() -> Unit ! [IO]
+    let p = {a: 1}
+    println(-p)
+end

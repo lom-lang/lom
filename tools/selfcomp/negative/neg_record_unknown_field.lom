@@ -1,0 +1,5 @@
+# L2.3 record/tuple 批校验 #2：未知字段访问
+fn main() -> Unit ! [IO]
+    let p = {a: 1, b: 2}
+    println(p.y)
+end

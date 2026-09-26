@@ -1,0 +1,8 @@
+# L2.3 record/tuple 批 R90 对拍 105：包源内 as 别名（十七审 c2_aliaschain
+# 形态，输出 18）
+from libouter import { outer_triple, outer_sum }
+
+fn main() -> Unit ! [IO]
+    println(outer_triple(6))
+    println(outer_sum(2, 4))
+end

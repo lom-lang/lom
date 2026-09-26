@@ -1,0 +1,12 @@
+# R90 主形态：包源内的 as 别名 import（t3 -> triple）——pkg-expand 修复
+# 前该行被剥除，展开单元 t3 无定义（L2 拒/宿主解释器 RUNTIME002 的三
+# 声音分叉源）；修复后此行原位保留，别名经展开单元 pass 2 按真名解析。
+from libinner import { triple as t3 }
+
+fn outer_triple(x: Int) -> Int
+    t3(x)
+end
+
+fn outer_sum(a: Int, b: Int) -> Int
+    t3(a) + t3(b)
+end

@@ -1,0 +1,5 @@
+# L2.3 record/tuple 批校验 #1：字面量与注解字段集不符（c 多出/b 缺失）
+fn main() -> Unit ! [IO]
+    let p: {a: Int, b: Int} = {a: 1, c: 2}
+    println(p.a)
+end

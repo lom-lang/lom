@@ -17,6 +17,11 @@ L2 侧先 `lom pkg-expand <main.lom> --list` 取包名清单、`lom pkg-expand`
 且不产 hex。L2.3-c 枚举/match/泛型负例另断言拒绝原因片段，防止错误
 路径偶然产出同一个 COMPILE-ERROR 也被误判为校验已覆盖。
 
+L2.3 record/tuple 批（designs/0010）：cases 116-126（record/tuple 编译、
+file/env/math/io 内建）+ pkg_cases 105_pkg_alias_in_pkg（R90 包源内 as
+别名 pkg-expand 保留）+ 负例 12（校验 #1-#7 与附面）；122_env_args 经
+CASE_ARGS 向两侧 harness 透传 argv。
+
 用法：python tools/verify_selfcomp.py [--lom-bin PATH]
 """
 import os
@@ -35,6 +40,13 @@ SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
 NEG_PKGS = {
     'neg_pkg_missing_symbol.lom': 'mypkg',
     'neg_pkg_alias_arity.lom': 'mypkg',
+}
+
+# L2.3 record/tuple 批（designs/0010 §8）：对拍运行需要向两侧 harness 透传
+# argv 的用例（env.args 消费——双侧同参，用例自身只消费非首元素：首元素
+# 是各自 wasm 路径，打印会分叉）
+CASE_ARGS = {
+    '122_env_args.lom': ['alpha', 'beta'],
 }
 
 EXPECTED_NEGATIVE_MESSAGES = {
@@ -62,7 +74,7 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_json_map_consume.lom': '期望 Map 得 js',
     'neg_json_neg.lom': 'json 值参与一元负',
     'neg_json_parse_nonstr.lom': "第 1 参类型不符（期望 st 得 i64）",
-    'neg_json_record_literal.lom': '该表达式形态',
+    'neg_json_record_literal.lom': 'stringify 暂不支持 Record/Tuple 值',
     'neg_json_stringify_enum_val.lom': 'stringify 暂不支持 枚举/闭包 值',
     'neg_json_stringify_list_enum.lom': '暂不支持 枚举/闭包 值元素',
     'neg_json_stringify_unit.lom': 'json_stringify 实参不能为 Unit',
@@ -172,6 +184,19 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_return_void_with_value.lom': 'void 函数的 return 不能带值',
     'neg_return_value_in_void_fn.lom': 'void 函数的 return 不能带值',
     'neg_return_missing_value.lom': "return 无值但函数返回 'i64'",
+    # ---- L2.3 record/tuple 批（designs/0010 §7 校验 #1-#7 + 附面）----
+    'neg_record_field_mismatch.lom': "let 注解类型 'rc{a:i64;b:i64}' 与值类型 'rc{a:i64;c:i64}' 不符",
+    'neg_record_unknown_field.lom': "record 无字段 'y'（类型 rc{",
+    'neg_tuple_oob.lom': "tuple 索引 2 越界（tp{",
+    'neg_record_println.lom': 'Record/Tuple 显示留后续批次',
+    'neg_record_arith.lom': 'Record/Tuple 参与算术',
+    'neg_record_compare.lom': 'Record/Tuple 相等与大小比较',
+    'neg_record_concat.lom': 'Record/Tuple 值的显示留后续批次（拼接提升',
+    'neg_file_arity.lom': "调用 'file_read' 实数量不符",
+    'neg_tuple_destructure.lom': '该语句形态（match/解构留后续批次）',
+    'neg_record_order.lom': "let 注解类型 'rc{x:i64;y:i64}' 与值类型 'rc{y:i64;x:i64}' 不符",
+    'neg_record_neg.lom': 'Record/Tuple 值参与一元负',
+    'neg_math_mixed.lom': "调用 'min' 期望同型 Int/Float 对",
 }
 
 
@@ -210,7 +235,8 @@ def main():
                 print('FAIL %s: host build rc=%d %s' % (name, r.returncode, r.stderr[:200]))
                 fail += 1
                 continue
-            rh = run(['node', os.path.join(ROOT, 'eval', 'runner', 'run_wasm.mjs'), host_wasm])
+            rh = run(['node', os.path.join(ROOT, 'eval', 'runner', 'run_wasm.mjs'), host_wasm]
+                     + CASE_ARGS.get(name, []))
             # L2 侧：编译
             hex_out = os.path.join(td, name + '.l2.hex')
             rc = run([lom, SELF_COMP, '--', case, hex_out], cwd=ROOT)
@@ -225,7 +251,8 @@ def main():
                 print('FAIL %s: hex2wasm: %s' % (name, rg.stderr[:200]))
                 fail += 1
                 continue
-            rl = run(['node', os.path.join(ROOT, 'tools', 'selfcomp', 'run_selfcomp.mjs'), l2_wasm])
+            rl = run(['node', os.path.join(ROOT, 'tools', 'selfcomp', 'run_selfcomp.mjs'), l2_wasm]
+                     + CASE_ARGS.get(name, []))
             if rh.stdout == rl.stdout and rh.returncode == rl.returncode:
                 ok += 1
                 print('PASS %-22s %d bytes, stdout %d lines, rc=%d' %

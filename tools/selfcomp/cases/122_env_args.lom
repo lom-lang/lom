@@ -1,0 +1,17 @@
+# L2.3 record/tuple 批（designs/0010 §8 #122）：env.args 消费——
+# run_selfcomp.mjs / run_wasm.mjs 的 argv 透传（alpha beta）。
+# 只消费非首元素（首元素是各自的 wasm 路径——双侧不同名，打印会分叉）。
+from env import { args }
+from list import { list_length, list_get }
+
+fn main() -> Unit ! [IO]
+    let a = args()
+    println(list_length(a))
+    println(list_get(a, 1))
+    println(list_get(a, 2))
+    let joined = list_get(a, 1) + "-" + list_get(a, 2)
+    println(joined)
+    let header = {prog: list_length(a), first_user: list_get(a, 1)}
+    println(header.prog)
+    println(header.first_user)
+end

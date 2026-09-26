@@ -1,0 +1,10 @@
+# L2.3 record/tuple 批校验 #4：record 相等比较拒（容器相等批边界）
+fn main() -> Unit ! [IO]
+    let p = {a: 1}
+    let q = {a: 1}
+    if p == q
+        println(1)
+    else
+        println(0)
+    end
+end

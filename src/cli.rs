@@ -321,6 +321,16 @@ pub(crate) fn merge_packages_for_wasm(
 /// 即可容错多行形态（`from x import {` 折行）。主文件的 import 由调用方
 /// 决定保留——它是符号许可与别名的载体（对齐宿主解释器"包内 import 暂
 /// 不传递"语义，interpreter.rs load_packages）。
+///
+/// R90（十七审查/record 批顺带修）：包源内 `from X import {y as z}` 的
+/// 别名映射会随剥除丢失——L2 展开单元拒"未定义变量 'z'"而宿主 wasm 收
+/// （宿主包合并保留包内 import 经 known_packages 放行）。修法（选①）：
+/// 含 " as " 的 import 行**转写保留**（等价别名 import 原位幸存，展开
+/// 单元的 pass 2 按真名解析注册别名——别名调用点语义与宿主 import_
+/// aliases 对齐）。判 " as " 限单行形态：多行折行 import 的起始行不含
+/// " as "（延续行不参与判定），该形态仍剥除——边界登记（存量包源单行
+/// import 为常态）。宿主解释器对该形态自身 RUNTIME002 拒（双后端分叉）
+/// 维持挂账，本修复只覆盖 pkg-expand 转写路径。
 fn strip_toplevel_imports(src: &str) -> String {
     /// 一行内 `{`/`}` 的净增量（import 语句无字符串/字符字面量，直接计数安全）
     fn brace_delta(line: &str) -> i32 {
@@ -343,11 +353,14 @@ fn strip_toplevel_imports(src: &str) -> String {
         }
         let toplevel = !line.starts_with(' ') && !line.starts_with('\t');
         if toplevel && line.trim_start().starts_with("from ") {
-            let d = brace_delta(line);
-            if d > 0 {
-                skip_depth = d; // 花括号未闭合：后续行仍属该 import
+            // R90：含 as 别名的 import 行保留（别名映射的载体）
+            if !line.contains(" as ") {
+                let d = brace_delta(line);
+                if d > 0 {
+                    skip_depth = d; // 花括号未闭合：后续行仍属该 import
+                }
+                continue; // 整行剔除（含行尾注释——注释不进 AST，无语义损失）
             }
-            continue; // 整行剔除（含行尾注释——注释不进 AST，无语义损失）
         }
         kept.push(line);
     }
@@ -808,6 +821,113 @@ end
         assert_eq!(strip_toplevel_imports(indented), indented);
         // 空源码：保持空（无尾换行注入）
         assert_eq!(strip_toplevel_imports(""), "");
+    }
+
+    /// R90（十七审查开账/record 批顺带修）：包源内 `from libinner import
+    /// { triple as t3 }` 的 as 别名 import 行**原位保留**（别名映射的
+    /// 载体——剥除会使 L2 展开单元拒"未定义变量 't3'"，而宿主 wasm 路径
+    /// 经 known_packages 放行包内 import 是收的——三声音分叉见 TODO R90）。
+    /// aliaschain 形态：libouter（含 as 别名 import + 别名调用）经展开后
+    /// import 行幸存、展开单元可解析（别名按真名 triple 解析注册）。
+    #[test]
+    fn pkg_expand_alias_in_pkg_import_kept_and_resolvable() {
+        let tmp = std::env::temp_dir().join(format!("lom_pkgexp_alias_{}", std::process::id()));
+        std::fs::create_dir_all(tmp.join("libinner")).expect("建 libinner 失败");
+        std::fs::create_dir_all(tmp.join("libouter")).expect("建 libouter 失败");
+        std::fs::write(
+            tmp.join("lom.toml"),
+            "name = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nlibouter = { path = \"libouter\" }\n",
+        )
+        .expect("写主清单失败");
+        std::fs::write(
+            tmp.join("libinner").join("lom.toml"),
+            "name = \"libinner\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("写 libinner 清单失败");
+        std::fs::write(
+            tmp.join("libinner").join("inner.lom"),
+            "fn triple(x: Int) -> Int\n    x * 3\nend\n",
+        )
+        .expect("写 libinner 源码失败");
+        std::fs::write(
+            tmp.join("libouter").join("lom.toml"),
+            "name = \"libouter\"\nversion = \"0.1.0\"\n\n[dependencies]\nlibinner = { path = \"../libinner\" }\n",
+        )
+        .expect("写 libouter 清单失败");
+        // R90 主形态：libouter 包源内的 as 别名 import（t3 → triple）
+        std::fs::write(
+            tmp.join("libouter").join("outer.lom"),
+            "from libinner import { triple as t3 }\n\nfn outer_triple(x: Int) -> Int\n    t3(x)\nend\n",
+        )
+        .expect("写 libouter 源码失败");
+        std::fs::write(
+            tmp.join("main.lom"),
+            "from libouter import { outer_triple }\n\nfn main() -> Unit\n    println(outer_triple(6))\nend\n",
+        )
+        .expect("写主文件失败");
+
+        let (unit, names) = expand_package_unit(&tmp.join("main.lom")).expect("展开失败");
+        // 包名集合（顺序按 root 字符串序：传递依赖 libinner 的 root 是
+        // libouter\..\libinner——含 ".." 的长路径字符串序在 libouter 之后，
+        // 与直接依赖并列的 pkg_expand_multi_package_order 不同，不锁序）
+        assert_eq!(names.len(), 2, "两包: {:?}", names);
+        assert!(
+            names.contains(&"libinner".to_string()),
+            "libinner 应在清单: {:?}",
+            names
+        );
+        assert!(
+            names.contains(&"libouter".to_string()),
+            "libouter 应在清单: {:?}",
+            names
+        );
+        // R90 核心：含 as 的包内 import 行幸存（原位——libouter 源段内）
+        assert!(
+            unit.contains("from libinner import { triple as t3 }"),
+            "as 别名 import 应原位保留: {:?}",
+            unit
+        );
+        // 展开单元是合法 Lom（可完整解析——别名 import 幸存且 t3 调用可绑定）
+        assert!(
+            parser::Parser::parse_recover(&unit).is_ok(),
+            "展开单元应可解析: {:?}",
+            unit
+        );
+        // 主文件 import 保留在 libouter 源段之后
+        let outer_pos = unit
+            .find("fn outer_triple")
+            .expect("outer_triple 应在展开单元");
+        let main_import = unit
+            .find("from libouter import")
+            .expect("主文件 import 应保留");
+        assert!(outer_pos < main_import, "包源应在主文件之前");
+        // 确定性：两次展开逐字一致
+        let (unit2, names2) = expand_package_unit(&tmp.join("main.lom")).expect("二次展开失败");
+        assert_eq!(unit, unit2, "同图两次展开必须逐字一致");
+        assert_eq!(names, names2);
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// R90 边界：多行折行 import 的 as 形态不在保留面（起始行不含
+    /// " as "，整段剥除——边界已登记）；单行混排（同名 + 别名并列）整行保留。
+    #[test]
+    fn pkg_expand_alias_edge_cases() {
+        let src = "from libx import {\n    a as b\n}\n\nfn main() -> Unit\n    println(1)\nend\n";
+        let stripped = strip_toplevel_imports(src);
+        assert!(
+            !stripped.contains("a as b"),
+            "多行折行的 as 仍剥除（边界登记）: {:?}",
+            stripped
+        );
+        assert!(stripped.contains("fn main"), "函数保留");
+        // 单行混排：普通名 + 别名并列 → 含 " as " 整行保留
+        let mixed = "from liby import { plain, wrapped as aliased }\n\nfn main() -> Unit\n    println(2)\nend\n";
+        let kept = strip_toplevel_imports(mixed);
+        assert!(
+            kept.contains("from liby import { plain, wrapped as aliased }"),
+            "混排含 as 的单行 import 应保留: {:?}",
+            kept
+        );
     }
 
     #[test]

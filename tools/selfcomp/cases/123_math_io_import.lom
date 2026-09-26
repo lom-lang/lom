@@ -1,0 +1,25 @@
+# L2.3 record/tuple 批（designs/0010 §8 #123）：math 四名内联指令
+# （sqrt/abs/min/max——Int/Float 双路）+ io import no-op（println/print
+# prelude 语义）。
+from math import { sqrt, abs, min, max }
+from io import { println, print }
+
+fn main() -> Unit ! [IO]
+    println(sqrt(16.0))
+    println(sqrt(2.25))
+    println(sqrt(16))
+    println(abs(-7))
+    println(abs(7))
+    println(abs(-2.5))
+    println(min(3, 9))
+    println(max(3, 9))
+    println(min(9, 3))
+    println(max(9, 3))
+    println(min(1.5, 0.25))
+    println(max(1.5, 0.25))
+    print("a")
+    print("b")
+    println("")
+    println(sqrt(min(25.0, 36.0)))
+    println(max(abs(-3), abs(2)))
+end

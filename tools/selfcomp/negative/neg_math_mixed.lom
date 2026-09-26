@@ -1,0 +1,7 @@
+# L2.3 record/tuple 批校验 #5 附：math min 混型对拒（宿主同型 trap 面的
+# 编译期严格化）
+from math import { min }
+
+fn main() -> Unit ! [IO]
+    println(min(1, 2.5))
+end

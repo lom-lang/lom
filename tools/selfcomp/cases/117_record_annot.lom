@@ -1,0 +1,23 @@
+# L2.3 record/tuple 批（designs/0010 §8 #117）：record 注解——签名参数/
+# 返回位、注解序固化、let 注解绑定（注解与构造序一致）、跨函数流转。
+fn get_x(p: {x: Int, y: Int}) -> Int
+    p.x * 10 + p.y
+end
+
+fn mk(x: Int, t: String) -> {n: Int, tag: String}
+    {n: x, tag: t}
+end
+
+fn main() -> Unit ! [IO]
+    let p: {x: Int, y: Int} = {x: 3, y: 4}
+    println(get_x(p))
+    let q: {n: Int, tag: String} = mk(9, "t")
+    println(q.n)
+    println(q.tag)
+    let r = mk(11, "r")
+    println(r.n + q.n)
+    let z: {a: Float, b: Bool, s: String} = {a: 1.5, b: True, s: "z"}
+    println(z.a)
+    println(z.b)
+    println(z.s)
+end

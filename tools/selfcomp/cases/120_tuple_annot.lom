@@ -1,0 +1,39 @@
+# L2.3 record/tuple 批（designs/0010 §8 #120）：tuple 注解（参数/返回位/
+# let 绑定）+ 枚举载荷 tp 注解（供料闸门 1 形态——register_enums 载荷
+# TyTuple 经 ty_vt 解锁）+ 枚举载荷 rc 注解。
+enum Shape
+    | Point
+    | Rect((Int, Int, Int, Int))
+    | Labeled({name: String, rank: Int})
+end
+
+fn area(s: Shape) -> Int
+    match s
+        Point => 0
+        Rect(r) => r.2 * r.3
+        Labeled(l) => l.rank
+    end
+end
+
+fn make_pair(a: Int, b: Int) -> (Int, Int)
+    (b, a)
+end
+
+fn swap_sum(t: (Int, Int)) -> Int
+    t.0 + t.1
+end
+
+fn main() -> Unit ! [IO]
+    let t: (Int, String) = (7, "seven")
+    println(t.0)
+    println(t.1)
+    let p = make_pair(1, 2)
+    println(p.0)
+    println(p.1)
+    println(swap_sum((10, 20)))
+    println(area(Point))
+    println(area(Rect((0, 0, 5, 3))))
+    println(area(Labeled({name: "badge", rank: 42})))
+    let s: Shape = Rect((1, 1, 4, 4))
+    println(area(s))
+end

@@ -1,0 +1,5 @@
+# L2.3 record/tuple 批校验 #7：同名异序 record 互赋（结构类型不符）
+fn main() -> Unit ! [IO]
+    let a: {x: Int, y: Int} = {y: 1, x: 2}
+    println(a.x)
+end
