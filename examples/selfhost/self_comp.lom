@@ -4533,8 +4533,8 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             let slotl = rev_str(slots)
             let p = new_slot(locals, localvt, "i32")
             out = out
-                + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
-                + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
+            + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
+            + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
             let mut k = 0
             while k < n
                 out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(fvtl, k), 4 + 8 * k)
@@ -4564,8 +4564,8 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             let slotl = rev_str(slots)
             let p = new_slot(locals, localvt, "i32")
             out = out
-                + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
-                + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
+            + "41" + leb128_hex(4 + 8 * n) + "10" + leb128_hex(cg_int(cg.cgs, "alloc_idx")) + "21" + leb128_hex(p)
+            + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
             let mut k = 0
             while k < n
                 out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(evtl, k), 4 + 8 * k)
