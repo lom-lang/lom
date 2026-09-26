@@ -1,5 +1,33 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **交接声明（2026-09-26 第十六轮独立审查收官 + git/文件夹整理）**：
+> 仓库版本 v1.2.13（基线 7f71456，工作树干净）。第十六轮体系内
+> agent 分工独立敌手审查（[review-2026-09-26-2.html](reviews/review-2026-09-26-2.html)）
+> 总评 **A-（回升；仅评本轮时点与检验面，历史评级不外推）**：
+> ① R84/R85 整改（v1.2.12）与 Map 批（v1.2.13）全部可复核宣称
+> **零失真**——十五审 11 枚探针原形重建全链路一致、"存量 79 对拍
+> 用例 hex 逐字节不变"由本轮 **git show v1.2.12 导出旧编译器独立
+> 全量对拍 79/79 全等**、205/205 名实相符、self_comp 8627 行、
+> 宿主 map_remove 双后端分叉挂账实证与记载逐字一致；② 基线 14 项
+> 全绿；③ 敌手探针 **36 自构 + 11 重建形态零行为击穿**（35 正例
+> 双侧 stdout+rc 逐字一致 + 1 例宿主侧语法无效；拒绝路径全部干净
+> COMPILE-ERROR 无 hex、零坏 wasm）——连续第二轮无 P2+ 代码发现。
+> 开账 **R86-R89（4×P3，全部登记精度/诊断文案缺口，无行为级修复
+> 需求）**，整改顺序待用户裁决（报告建议：文档登记为先，R89 可
+> 顺手单列文案）。**本轮维护动作（用户指令"整理 git 与文件夹
+> 结构"）**：drop 2026-09-03 旧 WIP stash（eval/tasks 废弃实验
+> 改写，现行任务集已定稿锁定——原"stash 清理与否"待裁决项就此
+> 关闭）；`git gc` 打包 3010 松散对象→2.62 MiB；物理清理 .w0/
+> （W 工作包调试残留 14MB）、.lom/、tools/__pycache__/（均
+> gitignored 本地产物，不触仓库内容）；目录结构经盘点健康
+> （根目录门面 + docs/eval/tools 分类布局为开源惯例，重组只会
+> 砸 doc_audit 67 项锚与 CI 路径，无收益，未动）。eval/
+> candidates_rerun（LLM 复测 raw 证据档案）与 .api_keys.json
+> 按证据价值保留。下一步待用户裁决：R86-R89 整改包（或随下一
+> 批次顺带）/ L2.3 json/包/return 批次 / 宿主 map_remove 双后端
+> 分叉修否 / MoonBit 1.0 Q3 复核（月底窗口）/ ubuntu-26 迁移观察
+> （2026-10-19）。语言面与外部发布线继续冻结。
+>
 > **交接声明（2026-09-26 L2.3 Map 批交付）**：仓库版本 v1.2.13；Map 批
 > B1+B2 + 裁决 2 甲 + 严格性甲按用户裁决"执行"交付（designs/0006 三裁决
 > 点全按建议项；RFC-0004 修订 19）：vt mp{V} 单参数（键恒 String）、
@@ -121,6 +149,28 @@
 > 报告 [review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)）确认
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
+
+## 第十六轮体系内独立审查 + R86-R89 开账（2026-09-26）✅ review done / remediation open（4×P3 待裁决）
+
+- **报告**：[review-2026-09-26-2.html](reviews/review-2026-09-26-2.html)（自包含，探针原文内嵌保复现）；基线 7f71456 / v1.2.13（功能基线 7d8dded）；总评 **A-（回升）**——宣称全对账零失真 + 连续第二轮无 P2+ 代码发现 + 验证面历轮最宽（47 探针执行 + 79 例独立 hex 对拍 + 14 基线）。体系内 agent 分工独立敌手审查，非外部同行审计；评级仅评本轮时点与检验面。
+- **复验面**：基线 14 项全绿（535+8 / 六模式 / 205/205 / 双后端 121+121 / doc_audit 67/67 / CI run 36238830358 六 job success + 四条 Ubuntu 26 迁移 notice）；R84/R85 十五审 11 枚探针原形重建全链路一致（pb5 跨函数仍拒文案逐字不变）；Map 批宣称零失真（存量 79 例 hex **独立全量**对拍 79/79 全等——超出执行者全量+规划者抽 5 的既有证据强度）；敌手 36 自构形态零行为击穿。
+- **规划者验收**：亲读报告关键节 + 亲手复现三枚探针与报告逐字一致——pf1_boolacc_println（R86 主形态：宿主 `true` rc0 / L2 COMPILE-ERROR 文案点名"跨函数"但探针全程单函数）、pm16_remove_retval（R89：宿主 WASM `()/()` 挂账行为 / L2 拒且误中容器显示文案）、pm6_eq_nested3（未击穿正例：三层嵌套 mp eq 双侧 `1/0/1`）；报告落盘后 doc_audit 复跑 67/67。
+
+### R86 — println(Bool) 残余拒绝面比"跨函数"登记宽：同函数 HOF 产 Bool 中转亦拒（P3）open
+
+R85 整改（RFC-0004 修订 17）把残余边界登记为"跨函数 Bool 参数流转（pb5）保持 ibase 防御拒绝"；实测**未跨函数**的 HOF 产 Bool 同样命中同一拒绝——登记面窄于实际拒绝面。证据（报告 §2）：`pf1_boolacc_println`（单函数 `let all = list_fold(fn(a: Bool, n: Int) -> Bool ... end, True, xs); println(all)`）：宿主 `true` rc0；L2 COMPILE-ERROR 无 hex，文案"……深层 Bool 流未被预扫覆盖（如跨函数参数传递）"点名跨函数但本例无跨函数流。`pb8_closure_hof`（list_map Bool 闭包经 list_get → println）同拒。根因：scan_has_bool_display 三路识别不含"HOF 结果绑定"（closure_ret_bool 只登记闭包直调；list_fold/list_map 的 builtin_rv 结果 vt 不参与 ibase 判定）。**建议整改方向（二选一）**：登记面改写为"跨函数参数流转与 HOF 产 Bool 中转"，或预扫补 HOF 结果识别。无行为错误（拒绝非错值、无坏 wasm）。
+
+### R87 — mp{?} 分支内 set 不回写外层绑定的 if 形态未入档（P3）open
+
+RFC-0004 修订 19/designs/0006 登记 `mp{?}` 由 set/注解补全；官方 85 用例注释登记了 **while** 形态（"循环体内 set 的绑定层细化不回写外层作用域"），**if 分支**形态未在任何文档点名。证据：`pm2a_mpq_if_branch`（`let m = map_empty(); if map_size(m) == 0 map_set(m, "k", 5) else ... end; match map_get(m, "k")`）：宿主 `5` rc0；L2 COMPILE-ERROR"未知 Map 值类型——需注解或 set 上下文"无 hex。根因：refine_map_set 在分支体块环境副本（R79 修复族）上细化，不回写外层绑定表——回写反而会重开 R79；行为安全（拒绝而非错值，加注解即过）。**建议**：designs/0006 校验表与 RFC 信任边界把"分支/循环体内 set 不补全外层绑定"从 while 实测点扩为通用句。
+
+### R88 — list_fold 结果 vt 取 init（ls{?}）而非闭包 acc 注解，与 map/filter 免注解细化不对称（P3）open
+
+RFC-0004 修订 17 acc 白名单宣称本身**成立**（ls acc 的 fold 本体编译与行为正确），但 fold 结果绑定需注解才能做元素级访问，而同批 list_map/list_filter 结果按闭包返回型免注解细化（官方 67/74 用例无注解即 list_get）——不对称面未登记，修复 LLM 易误判 fold 不支持 List acc。证据：`pf3_lsacc`（无注解 `let rev = list_fold(fn(acc: List<Int>, n: Int) -> List<Int> ... end, list_empty(), xs)` 后 `list_get(rev, 0)`）：宿主 `3/3/2/1` rc0；L2 COMPILE-ERROR"未知 List 元素类型"无 hex；`pf3b`（加 `: List<Int>` 注解）双侧一致；`pf3c`（无注解仅 list_length）双侧一致。根因：let_vt/builtin_rv 对 fold 结果从 init 推断，闭包 acc 注解未被消费；HOF 特化只作用于 helper 发射（R84 修复面）。**建议**：文档登记不对称（或统一从闭包签名细化）。
+
+### R89 — println(void 实参) 命中容器显示文案，诊断指向错误方向（P3）open
+
+`println(map_remove(...))` 形态的文案把 void 实参归入"容器显示留后续批次"族——实参实为 void/Unit 非 Map，文案指向"等待容器显示批"与本形态无关；对 LLM-repair-native 语言，诊断文案即修复指令。证据：`pm16_remove_retval`：L2 COMPILE-ERROR"println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"无 hex；宿主侧同程序解释器 `true/false` vs 宿主 WASM `()/()`——双后端分叉挂账核实为真（与 designs/0006/RFC 修订 19 记载逐字一致）。let 绑定形态（neg_map_remove_unit_bind）文案准确。**建议**：void 实参单列文案（与"let 绑定 void 值"对齐），可顺手小修。
 
 ## 第十五轮体系内独立审查 + R84/R85 整改（2026-09-26）✅ review done / remediation done
 

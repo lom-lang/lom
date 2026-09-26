@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lom 第十六轮体系内独立敌手审查 — 2026-09-26（第二轮，R84/R85 整改 + Map 批）</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, "Microsoft YaHei", sans-serif; line-height: 1.55; }
+  body { max-width: 1120px; margin: 0 auto; padding: 32px 22px 80px; color: #202734; background: #fff; }
+  h1, h2, h3 { line-height: 1.3; color: #17283b; }
+  h1 { border-bottom: 3px solid #274e76; padding-bottom: 12px; }
+  h2 { border-bottom: 1px solid #c6d1dc; padding-bottom: 6px; margin-top: 34px; }
+  .lead { padding: 18px 22px; border-left: 5px solid #a04539; background: #fff4f1; }
+  .good { color: #176341; } .bad { color: #9a2d22; } .muted { color: #5a6470; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .94rem; }
+  th, td { border: 1px solid #cbd3dc; padding: 9px 11px; vertical-align: top; }
+  th { background: #eef3f8; text-align: left; }
+  tr:nth-child(even) { background: #f8fafc; }
+  code, pre { font-family: Consolas, "Cascadia Code", monospace; }
+  code { background: #f1f4f7; padding: 1px 4px; overflow-wrap: anywhere; }
+  pre { background: #172130; color: #e8eef6; padding: 13px 16px; overflow-x: auto; border-radius: 5px; line-height: 1.42; }
+  pre code { background: none; padding: 0; color: inherit; }
+  details { margin: 12px 0; padding: 8px 12px; border: 1px solid #cbd3dc; border-radius: 5px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .tag { display: inline-block; background: #81372d; color: white; font-weight: 700; padding: 1px 8px; border-radius: 4px; }
+  .note { border-left: 4px solid #607b97; padding: 8px 14px; background: #f2f6fa; }
+  a { color: #19558b; }
+</style>
+</head>
+<body>
+<h1>Lom 第十六轮体系内独立敌手审查（R84/R85 整改 + Map 批）</h1>
+<p class="muted">2026-09-26（Asia/Shanghai） · 基线 <code>7f71456</code>（<code>v1.2.13-2</code>，两笔 docs 提交；功能基线 <code>7d8dded</code> = tag <code>v1.2.13</code>，工作树干净）· 对照十五审报告 <a href="review-2026-09-26.html">review-2026-09-26.html</a>（基线 <code>44954e2</code>/v1.2.11-3，总评 B+，开账 R84/R85）</p>
+<div class="lead">
+  <p><strong>本轮评级：A-（回升；仅评本轮时点与检验面，十五审 B+ 及历史 A/A-/B+/B 轨迹均不外推，本轮结论也不预支后续 json/包/return 批次状态——那些批次尚未交付）。</strong>审查增量（十五审后的两批交付）宣称经本轮全部亲手复核<strong>零失真</strong>：R84/R85 整改（v1.2.12）——十五审 §4.2/§4.3 全部 11 枚探针原形重建穿真实 CLI 全链路，Float acc 双侧 <code>3.0</code>/<code>4.0</code>、Bool acc 经 if 消费打 <code>1</code>、pb2/pb3/pb4 自然写法双侧一致、pb5 跨函数流转仍拒且<strong>文案逐字不变</strong>、Unit acc 编译期拒无 hex；Map 批（v1.2.13）——verify_selfcomp <strong>205/205 = 90 对拍 + 115 负例</strong>名实相符（目录实数 90+115，verify_selfcomp.py 逐例真实双侧执行 stdout+rc 对拍）、<strong>存量 79 对拍用例 hex 逐字节不变</strong>由本轮独立全量复证（<code>git show v1.2.12</code> 导出旧编译器 vs 当前编译器对 79 例全量产 hex 后 cmp，<strong>79/79 全等、0 差异</strong>）、self_comp <strong>8627 行</strong>、13 枚新负例逐一在册、Map 用例 80-90 内容与命名相符、宿主 map_remove 双后端分叉挂账（解释器 <code>true/false</code> vs 宿主 WASM <code>/()/()</code>）实证与记载一致。基线 14 项全绿。本轮自构敌手探针 <strong>36 形态零行为击穿</strong>（35 例双侧 stdout+rc 逐字一致 + 1 例宿主侧语法无效），全部拒绝路径均为干净 COMPILE-ERROR 无 hex。新开建议 <strong>4×P3（R86-R89）</strong>，无 P0/P1/P2——四项均为登记精度/诊断文案缺口，非行为错误。</p>
+  <p><strong>边界：</strong>这是项目体系内 agent 分工的独立敌手审查，<strong>不是外部同行审计</strong>。审查阶段未改任何产品源码、测试、工具或治理文档；唯一写盘物为本报告，自构探针只置于 <code>target/probes/</code>（gitignored）并在报告完成后清理，全部探针原文内嵌于 §4 保复现。本轮只建议开账，不修码、不提交、不推送、不切 tag。</p>
+</div>
+
+<h2>1. 方法、范围与可复现入口</h2>
+<p>先独立阅读 docs/TODO.md 顶部、RFC-0004 修订 17/18/19、designs/0006-l2.3-maps.md、HANDOVER §1/§9/§11.6、十五审报告（方法节与 §4.2/§4.3 探针原文），再读 <code>examples/selfhost/self_comp.lom</code> 的 R84/R85 修复区（<code>ls_fold_body</code> L5645 起、acc 白名单 L5901、<code>closure_ret_bool</code> L8097、<code>scan_has_bool_display</code> L8202）与 Map 批区（<code>mp_builtin_entry</code> L7789、<code>refine_map_set</code> L3520、<code>mp_eq_body</code> L6239），然后构造探针。正例全部穿真实 CLI 全链路：</p>
+<pre><code>$case = 'pm4_rehash_tomb'   # §4 中任一探针名（置于 target/probes/）
+./target/release/lom.exe build "target/probes/$case.lom" --target wasm -o "target/probes/$case.host.wasm"
+./target/release/lom.exe examples/selfhost/self_comp.lom -- "target/probes/$case.lom" "target/probes/$case.hex"
+python tools/hex2wasm.py "target/probes/$case.hex" "target/probes/$case.l2.wasm"
+node eval/runner/run_wasm.mjs "target/probes/$case.host.wasm"
+node tools/selfcomp/run_selfcomp.mjs "target/probes/$case.l2.wasm"      # stdout + rc 逐字对照（cmp）</code></pre>
+<p>负例直接检查真实 L2 CLI 的 <code>COMPILE-ERROR</code> 输出与 hex 文件不存在（L2 驱动在 COMPILE-ERROR 时进程 rc 可为 0，只看输出不看 rc）；"rc"指 Node 运行产物退出码或宿主 build 退出码。单独 <code>--check</code> 或 WASM verifier 不作为行为正确性证明。审查阶段对 git 只用只读命令（show/log/status/describe/tag）；"存量 79 用例 hex 逐字节不变"宣称的复核用 <code>git show v1.2.12:examples/selfhost/self_comp.lom</code> 与 <code>git show v1.2.13:...</code>（工作树即 HEAD 版）两版编译器由同一宿主解释器对拍，未用 worktree/stash（同十五审方法）。边界界定：<code>git show v1.2.12:tools/selfcomp/cases/</code> 正例恰 79 个（01-79），v1.2.13 新增 80-90 共 11 个（79+11=90 对上），负例 102→115（新增 13、删除 0）。</p>
+
+<h2>2. 新发现：声明、反例、证据与建议（R86-R89，全部 P3）</h2>
+<table>
+  <thead><tr><th>编号 / 严重性</th><th>现行声明与受影响范围</th><th>独立证据（stdout、rc、产物）</th><th>读码根因及只开账建议</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag">R86 · P3</span><br>println(Bool) 残余拒绝面比登记的"跨函数"宽：同函数 HOF 产 Bool 亦拒</td>
+      <td>RFC-0004 修订 17、SPEC §13 v1.2.12 条目、TODO 顶部均把 R85 整改后的残余边界登记为"跨函数 Bool 参数流转（pb5）保持 ibase 防御拒绝"。实测防御确实不产坏 wasm，但<strong>未跨函数</strong>的 HOF 产 Bool 同样命中同一拒绝——登记面窄于实际拒绝面。受影响：R85 整改宣称的边界描述、以及修复 LLM 对该文案的解读方向。</td>
+      <td><code>pf1_boolacc_println</code>（<code>let all = list_fold(fn(a: Bool, n: Int) -&gt; Bool a and n &gt; 0 end, True, xs); println(all)</code>，全程单函数）：宿主 <code>true</code> rc0；L2 <code>COMPILE-ERROR: println(Bool) 需要 String 设施（data/print_str）——深层 Bool 流未被预扫覆盖（如跨函数参数传递）</code>，无 hex。文案点名"跨函数"但本例无跨函数流。<code>pb8_closure_hof</code>（<code>list_map</code> Bool 闭包 → <code>list_get</code> → println）：宿主 <code>false/true/2</code> rc0；L2 同文案拒绝。对照组：Bool acc 经 if 消费（e9b/官方 76/本轮 pf4）双侧一致；值位 if/match/闭包直调产 Bool（pb2/3/4/7/9/9b）全部放行且双侧一致——缺口精确圈定为 <strong>HOF 调用结果的 Bool 经 let/索引中转后 println</strong>。</td>
+      <td><code>scan_has_bool_display</code>（self_comp.lom L8202）三路识别不含"HOF 结果绑定"：<code>closure_ret_bool</code>（L8097）只登记 let 绑定闭包签名与直调形态，<code>list_fold/list_map</code> 的结果 vt（builtin_rv 已知为 acc_vt/ret_vt）不参与 ibase 判定。建议：登记面改写为"跨函数参数流转<strong>与 HOF 产 Bool 中转</strong>"，或预扫补 HOF 结果识别——二选一；现状是 R85 收口宣称的边界名单与实际拒绝面不匹配。只开账。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R87 · P3</span><br>mp{?} 分支内 set 不回写外层绑定的 if 形态未入档（while 形态已注明）</td>
+      <td>RFC-0004 修订 19"mp{?} 由 set/注解补全（refine_map_set 进 scan_block_lets 与 comp_one_stmt 双路同步）"；designs/0006 §5 校验表列"裸 mp{?} 进 get/values/binder/eq 拒"；官方 85 用例注释登记了 <strong>while</strong> 形态（"循环体内 set 的绑定层细化不回写外层作用域，与 ls{?} 同边界"）。<strong>if 分支</strong>形态未在任何文档点名。</td>
+      <td><code>pm2a_mpq_if_branch</code>（<code>let m = map_empty(); if map_size(m) == 0 map_set(m, "k", 5) else map_set(m, "j", 6) end; match map_get(m, "k") ...</code>）：宿主 <code>5</code> rc0；L2 <code>COMPILE-ERROR: 未知 Map 值类型——需注解或 set 上下文（map_get）</code>，无 hex。对照：顶层语句 set 补全（官方 80-90 用例）、赋值合流与值位 if 合流（<code>pm2c</code> 双侧 <code>2/3</code> MATCH）、裸 mp{?} 读（<code>pm2b</code> 拒、与 designs/0006 校验 #4 一致）、V 无关内建免补全（<code>pm12</code>：<code>map_keys/map_has/map_size</code> 裸 mp{?} 上双侧 <code>0/0/0</code> MATCH——与校验表"仅 get/values/binder/eq 拒"精确吻合）。</td>
+      <td>块作用域临时环境（R79 修复族）：<code>refine_map_set</code> 在分支体的块环境副本上细化，不回写外层绑定表——回写反而会重开 R79。行为安全（拒绝而非错值），加注解即过。建议：designs/0006 校验表与 RFC 信任边界把"分支/循环体内 set 不补全外层绑定"从 while 实测点扩为通用句。只开账。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R88 · P3</span><br>list_fold 结果 vt 取 init（ls{?}）而非闭包 acc 注解——与 map/filter 免注解细化不对称</td>
+      <td>RFC-0004 修订 17"acc 载体白名单（i64/f64/i32/st/cl/ls/en）"与负例文案"支持 Int/Float/Bool/String/List/枚举/闭包载体"；List 批（修订 16）"ls{?} 由 cons/注解补全"。白名单宣称本身<strong>成立</strong>（见右列 pf3b/pf3c），但 fold 结果绑定需注解才能做元素级访问，而同批的 <code>list_map/list_filter</code> 结果按闭包返回型免注解细化（官方 67/74 用例无注解即 <code>list_get</code>）——不对称面未登记。</td>
+      <td><code>pf3_lsacc</code>（无注解 <code>let rev = list_fold(fn(acc: List&lt;Int&gt;, n: Int) -&gt; List&lt;Int&gt; list_cons(n, acc) end, list_empty(), xs)</code> 后 <code>list_get(rev, 0)</code>）：宿主 <code>3/3/2/1</code> rc0；L2 <code>COMPILE-ERROR: 未知 List 元素类型——需注解或构造上下文（list_get）</code>，无 hex。<code>pf3b</code>（同程序加 <code>: List&lt;Int&gt;</code> 注解）双侧 <code>3/3/2/1</code> MATCH；<code>pf3c</code>（无注解仅 <code>list_length</code>，另含 List 元素作 acc Int 的 fold）双侧 <code>3/3</code> MATCH——ls acc 的 fold 本体编译与行为正确，缺口仅在结果 vt 推断。</td>
+      <td><code>let_vt/builtin_rv</code> 对 fold 结果从 init（<code>list_empty()</code> → <code>ls{?}</code>）推断，闭包 acc 注解（<code>List&lt;Int&gt;</code>）未被消费；fold 的 HOF 特化只作用于 helper 发射（R84 修复面）。属"cons/注解补全"文档规则内的一致行为，但与 map/filter 免注解不对称，修复 LLM 易误判为 fold 不支持 List acc。建议：文档登记不对称（或统一从闭包签名细化）。只开账。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R89 · P3</span><br>println(void 实参) 命中容器显示文案，诊断指向错误方向</td>
+      <td>RFC-0004 修订 19"map_remove 返回 void 对齐宿主 WASM（裁决 2 甲）；<code>let b = map_remove(..)</code> 在 L2 拒"；官方负例 neg_map_remove_unit_bind 锁定 <code>let 绑定 void 值</code>（文案准确）。但 <code>println(map_remove(...))</code> 形态的文案把 void 实参归入"容器显示"族——对一个 LLM-repair-native 语言，诊断文案即修复指令。</td>
+      <td><code>pm16_remove_retval</code>（<code>println(map_remove(m, "a"))</code>）：L2 <code>COMPILE-ERROR: println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）</code>，无 hex——实参实为 void/Unit，非 Map，文案指向"等待容器显示批"是错误方向（该等待与本形态无关）。宿主侧同程序：解释器打 <code>true/false</code>、宿主 WASM 打 <code>/()/()</code>——<strong>双后端分叉挂账实证与 designs/0006/RFC 修订 19 记载逐字一致</strong>（挂账核实为真）。</td>
+      <td><code>comp_println</code> 对 void 参数复用容器显示分支文案（L2.2 子集不支持族）。建议：void 实参单列文案（与 <code>let 绑定 void 值</code> 对齐），不与 List/Map/枚举显示共用。只开账。</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">R86-R89 按台账顺延（R85 已被十五审开账并整改关闭）。P3 沿十五审口径 = 登记精度/覆盖面/诊断文案缺口；P1 = 静默错值/损坏、P2 = 行为级错误但非静默——本轮<strong>未发现任何 P1/P2</strong>：35 例正例探针双侧 stdout+rc 逐字一致，全部拒绝路径干净（COMPILE-ERROR、无 hex、无坏 wasm）。</p>
+
+<h2>3. 独立复验矩阵</h2>
+<h3>3.1 基线复验（14 项全部亲手跑）</h3>
+<table>
+  <thead><tr><th>#</th><th>检查</th><th>结果（真实输出摘录）</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>cargo build --release 零 warning</td><td><span class="good">✓</span> <code>cargo clean --release -p lom</code>（Removed 66 files, 134.7MiB）强制重编后 grep warning/error 零命中</td></tr>
+    <tr><td>2</td><td>cargo test --release</td><td><span class="good">✓</span> 535 passed + 0 failed（单元）+ 1 + 7 = 8 集成全过</td></tr>
+    <tr><td>3</td><td>cargo clippy --release -- -D warnings</td><td><span class="good">✓</span> Finished, 零输出</td></tr>
+    <tr><td>4</td><td>cargo fmt --all -- --check</td><td><span class="good">✓</span> rc0 零 diff</td></tr>
+    <tr><td>5</td><td>python tools/doc_audit.py</td><td><span class="good">✓</span> RESULT: PASS（67/67 项通过）</td></tr>
+    <tr><td>6</td><td>python tools/spec_examples_check.py</td><td><span class="good">✓</span> RESULT: PASS（正例 51 / 反例 5 / skip：json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1）</td></tr>
+    <tr><td>7</td><td>python tools/eval_prompt_check.py</td><td><span class="good">✓</span> RESULT: PASS（校验 24 / 失真 0）</td></tr>
+    <tr><td>8</td><td>verify_selfhost 六模式逐个</td><td><span class="good">✓</span> dump 154/154；tokens 154/154（列坐标已知差异 1）；diags 12/12；static 坏 22 + 干净 ALIGNED 154/DIFF 0；run 31/31；wasm layer2 151/151 + layer3 golden 逐字 + selfapply 逐字——六模式全部 RESULT: PASS</td></tr>
+    <tr><td>9</td><td>python tools/verify_selfcomp.py</td><td><span class="good">✓</span> RESULT: PASS（205/205 项通过：正例对拍 + 负例拒绝）；名实核对：cases/ 正例目录 90 个（01-90）+ negative/ 115 个 = 205 ✓</td></tr>
+    <tr><td>10</td><td>eval runner 双后端</td><td><span class="good">✓</span> <code>run.ps1 -Verify -LomBin ./target/release/lom.exe</code>：Total 121 / Passed 121；<code>-Backend wasm</code> 同 121/121</td></tr>
+    <tr><td>11</td><td>Lom fmt gate（examples 递归，apply_test 豁免）</td><td><span class="good">✓</span> 37 文件全过（含 self_comp.lom/self_interp.lom）</td></tr>
+    <tr><td>12</td><td>golden</td><td><span class="good">✓</span> <code>lom.exe examples/bootstrap/stmt_interp.lom</code> 输出与 expected.txt diff 为空（GOLDEN: identical）</td></tr>
+    <tr><td>13</td><td>git/Cargo 版本</td><td><span class="good">✓</span> 工作树干净；<code>git describe</code> = v1.2.13-2-g7f71456；Cargo.toml version = "1.2.13"；<code>lom --version</code> = lom 1.2.13</td></tr>
+    <tr><td>14</td><td>GitHub API 实查最新 main CI</td><td><span class="good">✓</span> HEAD 7f71456 → run <code>36238830358</code>（2026-09-26T11:26:35Z）六 job（doc gates/clippy/selfhost verify/macos/windows/ubuntu）全 <code>success</code>；check-run annotations：doc gates/clippy/selfhost verify/ubuntu 各 1 条 Ubuntu 26 迁移 notice（共 4 条），macos/windows 0 条；<strong>零 warning/error</strong>。前三 run：c7cdfd3（success）、7d8dded（success，tag v1.2.13 所在）</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 R84/R85 整改宣称复核（v1.2.12，十五审 §4.2/§4.3 探针原形全部重建）</h3>
+<table>
+  <thead><tr><th>探针</th><th>宿主 WASM（stdout, rc）</th><th>L2（stdout, rc）</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td>e5b_fold_f64acc（Float acc + Int 表）</td><td><code>3.0</code>, 0</td><td><code>3.0</code>, 0</td><td><span class="good">MATCH</span> — R84 主形态修复 ✓（十五审时 L2 产不可实例化 wasm rc1）</td></tr>
+    <tr><td>e5c_fold_f64f64（Float acc + Float 表）</td><td><code>4.0</code>, 0</td><td><code>4.0</code>, 0</td><td><span class="good">MATCH</span> ✓</td></tr>
+    <tr><td>e9b_fold_boolacc（Bool acc 经 if 消费）</td><td><code>1</code>, 0</td><td><code>1</code>, 0</td><td><span class="good">MATCH</span> ✓</td></tr>
+    <tr><td>e5a / e5d 对照组（String acc / Int acc+Float 表）</td><td><code>xxx</code> / <code>2</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> ✓（回归未倒）</td></tr>
+    <tr><td>pb1_direct（官方修复形态）</td><td><code>false</code>, 0</td><td><code>false</code>, 0</td><td><span class="good">MATCH</span> ✓</td></tr>
+    <tr><td>pb2_closure / pb3_ifexpr / pb4_matchexpr</td><td><code>true</code> ×3, 0</td><td><code>true</code> ×3, 0</td><td><span class="good">MATCH</span> — R85 三形态转正 ✓（十五审时全拒）</td></tr>
+    <tr><td>pb5_param_flow（跨函数流转）</td><td><code>true</code>, 0</td><td>COMPILE-ERROR，无 hex</td><td><span class="good">✓ 仍拒且文案逐字不变</span>（"…深层 Bool 流未被预扫覆盖（如跨函数参数传递）…"）— 宣称的残余边界成立</td></tr>
+    <tr><td>pb6_mixed（预扫命中后深层流全放行）</td><td><code>false/true/true</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> ✓</td></tr>
+    <tr><td>neg_fold_unsupported_acc（Unit acc，官方负例）</td><td>—</td><td><code>COMPILE-ERROR: list_fold 累加器类型子集外（'void'）——支持 Int/Float/Bool/String/List/枚举/闭包载体</code>，无 hex</td><td><span class="good">✓ 白名单外 acc 编译期拒</span></td></tr>
+    <tr><td colspan="4">v1.2.12 验收宣称（181/181 = 79+102、存量 74 hex 不变、7724→7813 行）本轮经 git 只读核界：v1.2.12 cases 79 正例 + 102 负例（79+11=90、102+13=115 对上 v1.2.13）；v1.2.12 self_comp <code>wc -l</code> = 7813 ✓；存量 74 用例含于本轮 79 例全量 hex 对拍（全等）✓</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 Map 批宣称复核（v1.2.13）</h3>
+<table>
+  <thead><tr><th>宣称</th><th>独立复核方法与结果</th></tr></thead>
+  <tbody>
+    <tr><td>verify_selfcomp 205/205 = 90 对拍 + 115 负例</td><td><span class="good">✓</span> 验收器实跑 RESULT: PASS（205/205）；目录实数正例 90（01-90）/负例 115；读 verify_selfcomp.py 确认逐例真实双侧执行（宿主 build+run_wasm.mjs vs self_comp+hex2wasm+run_selfcomp.mjs，stdout+rc 双查）——非仅 --check</td></tr>
+    <tr><td>新对拍 11（80-90）内容与命名相符</td><td><span class="good">✓</span> 11 个全读：80 basic（set 覆盖/get/has/size）、81 Option 消费含 guard 与 remove 后 None、82 键排序含多字节"苹果"、83 values 值序=键序 + Float/Bool 值表 + 注解补全、84 墓碑（删后 size--/重插复用槽/未命中 remove 无副作用）、85 rehash 20 键 + 注解补全形态、86 引用语义别名、87 闭包捕获/参数/返回、88 Box{mp} 与 Result err 载荷、89 嵌套 mp{mp{i64}}、90 eq 六形态——名实相符，无空壳用例</td></tr>
+    <tr><td>新负例 13 锁原因</td><td><span class="good">✓</span> git 界定 v1.2.12→v1.2.13 新增恰 13、删除 0：neg_for_map / neg_map_{annot_mismatch, arith, call_arity, compare, concat, eq_enum_val, key_type, remove_unit_bind, set_nonmap, unknown_val, val_mismatch} / neg_println_map——全部在 205/205 中实跑通过（COMPILE-ERROR 无 hex）；本轮另独立重触发 neg_map_remove_unit_bind（文案 <code>let 绑定 void 值</code>）与 pm17（<code>未知内建 'map.map_bogus'</code>——"from map import 静默忽略"堵口宣称 ✓）</td></tr>
+    <tr><td><strong>存量 79 对拍用例 hex 逐字节不变</strong></td><td><span class="good">✓ 独立全量复证</span>：<code>git show v1.2.12:examples/selfhost/self_comp.lom</code> → target/probes/old_comp.lom（只读导出）；同一宿主 lom.exe 1.2.13 分别跑旧/新编译器对 cases 01-79 全量 79 例产 hex 后 cmp——<strong>IDENTICAL: 79 / DIFF: 0</strong>（hexold/hexnew 各 79 文件）</td></tr>
+    <tr><td>self_comp 8627 行</td><td><span class="good">✓</span> 工作树 <code>wc -l</code> = 8627；<code>git show v1.2.13:...</code> = 8627；v1.2.12 = 7813（修订 17 的 7724→7813、修订 19 的 7813→8627 两段行数链全部对上）</td></tr>
+    <tr><td>宿主 map_remove 双后端分叉挂账（解释器 Bool vs WASM Unit）</td><td><span class="good">✓</span> pm16 三侧实测：宿主解释器 <code>true/false</code>；宿主 WASM <code>/()/()</code>；L2 对齐 WASM（println 形态拒、语句形态 void）——与 designs/0006 §2.2 / RFC 修订 19 记载逐字一致，挂账登记如实</td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 文档数字对账</h3>
+<table>
+  <thead><tr><th>位置</th><th>宣称</th><th>实测</th></tr></thead>
+  <tbody>
+    <tr><td>README.md L71</td><td>38 .lom（29+4+2+3）、self_comp 8627 行、535+8、双后端 121</td><td><span class="good">✓</span> 实数 29/4/2/3 = 38（fmt gate 37 + apply_test 豁免）；8627 ✓；535+8 ✓；121+121 ✓</td></tr>
+    <tr><td>LANGUAGE_SPEC.md §13 v1.2.13 条目（L1352）</td><td>205/205 = 90+115、11 新对拍、13 新负例、存量 79 hex、535+8、121/121</td><td><span class="good">✓</span> 全部与实测一致（本轮 §3.3）</td></tr>
+    <tr><td>LANGUAGE_SPEC.md §13 v1.2.12 条目（L1353）</td><td>181/181 = 79+102、5 新对拍 75-79、2 新负例、存量 74 hex、535+8</td><td><span class="good">✓</span> 与 git 界定一致（§3.2 末行）</td></tr>
+    <tr><td>docs/HANDOFF_PROMPT.md</td><td>v1.2.13、8627、205/205 = 90+115、存量 79 hex</td><td><span class="good">✓</span> L46/96-98/175/244/254 逐处相符</td></tr>
+    <tr><td>docs/HANDOVER.md §1/§9、docs/TODO.md 顶部</td><td>同上 + CI 轨迹（首跑红→补提交全绿→tag 切 7d8dded）</td><td><span class="good">✓</span> 相符；CI 轨迹经 API 实查 run 36190646051(7d8dded)/36236679591(c7cdfd3)/36238830358(7f71456) 全 success 印证</td></tr>
+    <tr><td>doc_audit 67/67</td><td>报告落盘前后各跑一次</td><td><span class="good">✓</span> 落盘前 PASS；落盘后复验见 §5（review HTML 非锚定对象，预期 PASS）</td></tr>
+  </tbody>
+</table>
+
+<h3>3.5 本轮敌手探针未击穿面（正例均双侧 stdout+rc 逐字一致）</h3>
+<table>
+  <thead><tr><th>族</th><th>探针（→ 结果）</th></tr></thead>
+  <tbody>
+    <tr><td>Map 值通道与 Option</td><td>pm1 深层嵌套 match 消费 Some/None（match 内 match，双侧 <code>10/3</code>）；pm15 <strong>Option 解包引用语义</strong>——经 <code>Some(im)</code> 取出的内层 Map 就地写外部可见（双侧 <code>2/2/1</code>）；pm8 泛型载荷 <code>Box{mp{st}}</code> 与 <code>Result&lt;Int, Map&lt;String,String&gt;&gt;</code> err 载荷（<code>2/hello/world</code>）</td></tr>
+    <tr><td>键序与 String 批交叉</td><td>pm3 多字节键混合 ASCII 不同长度（<code>Apple/a/apple/z/é/中/中国/中国人/日本語</code>——UTF-8 字节序逐键正确，含覆盖写 <code>中</code>）；pm10 动态拼接多字节键（<code>"键"+int_to_string(i)</code> 全运行期生成，5 键 set/get/排序 <code>5/9/-2/5/键0..键4</code>）；pm13 <strong>17 个动态多字节键触发 rehash</strong> 全量平方回读（<code>17/0/1/4/9/…/256/-2</code>）</td></tr>
+    <tr><td>rehash × 墓碑交互</td><td>pm4 <strong>33 键两级翻倍 + 9 墓碑 + 9 重插</strong>（size 33→24→33，k*j%4==0 全 -1、k 其余原值、n0-n8 = 100-108、末 size 33）——双侧逐行一致；pm5 values 值序=键序 × 墓碑/复用（值 <code>1/20/3/5/6</code> 键 <code>a/b/c/e/f</code>）；pm9 <strong>墓碑等价性</strong>——异槽墓碑同内容 eq 为真（<code>1/0</code>）</td></tr>
+    <tr><td>结构相等</td><td>pm6 <strong>三层嵌套 mp{mp{mp{i64}}} eq</strong>（<code>1/0/1</code>）；pm14 ls 值载荷 eq（<code>1/0</code>）；pm11 跨值型 eq（mp{f64} vs mp{i64}）L2 编译期拒"类型不符（'f64' vs 'i64'）"——与 designs/0006"跨类型比较明确不在本批"一致（宿主打 <code>0</code>，属已登记信任边界）</td></tr>
+    <tr><td>闭包 × Map 引用语义</td><td>pm7 闭包捕获 Map 就地写外部可见（<code>2/3/1</code>）；pc3 闭包捕获 Map + match 产 Bool 作 list_filter 谓词 + list_map（<code>2/one!/five!</code>）；87 用例族回归</td></tr>
+    <tr><td>mp{?} 补全边界</td><td>pm2c 赋值合流与值位 if 合流免注解（<code>2/3</code>）；pm12 V 无关内建（keys/has/size）裸 mp{?} 放行（<code>0/0/0</code>，与校验表"仅 get/values/binder/eq 拒"精确吻合）；pm2a/pm2b 拒（见 R87 与校验 #4）</td></tr>
+    <tr><td>R84 acc 族矩阵</td><td>pf2 <strong>fold 内 fold</strong>（嵌套 HOF，<code>10/2</code>）；pf3b/pf3c <strong>ls 元素 acc</strong>（注解/非元素访问两形态，<code>3/3/2/1</code>、<code>3/3</code>）；pf4 Bool acc × Float 元素（<code>0</code>）；pf5 String acc × String 元素（<code>&gt;a-b-</code>）——加十五审五枚（Int/Float/Bool acc × Int/Float 表）矩阵覆盖 8 胞</td></tr>
+    <tr><td>R85 深层流</td><td>pb7 值位 if 产 Bool 三层 let 链（<code>true/no</code>）；pb9 数值 match 深层嵌套产 Bool（<code>true/false</code>）；pb9b <strong>enum match 臂尾产 Bool</strong> 嵌套（<code>true</code>）；pb10 两跳跨函数流转仍拒（文案不变）——R86 之外的自然写法全放行</td></tr>
+    <tr><td>Map × List HOF/迭代</td><td>pc1 map_values → list_filter → list_map 链（<code>2/50/70/4</code>）；pc2 for-in 迭代 map_keys 产物累加 len（<code>14/3</code>）</td></tr>
+    <tr><td>其他</td><td>pt1 裸语句 <code>f(...)?</code>：L2 干净拒绝 <code>? 提前返回留 return 批（块深度跟踪）</code>（宿主正常 <code>1</code>）——RFC 修订 19 登记的"复现未遂疑似坑"本轮<strong>亦未再现</strong>（维持登记）；pt2 带效应注解形态宿主自身 PARSE001（探针语法无效，不计）</td></tr>
+  </tbody>
+</table>
+<p><strong>合计：正例 35 形态双侧逐字一致（含十五审重建 10 + 本轮 25），干净拒绝 10 形态（pm2a/pm2b/pm11/pm16/pf1/pf3/pb8/pb10/pt1/pm17，全部 COMPILE-ERROR 无 hex），零 stdout/rc 失配、零坏 wasm。</strong></p>
+
+<h2>4. 自构探针原文（复制即复现）</h2>
+<h3>4.1 十五审 §4.2/§4.3 探针原形（R84/R85 整改验收，§3.2 表）</h3>
+<p>与十五审报告 §4.2/§4.3 逐字同源（e5a/e5b/e5c/e5d/e9b/pb1-pb6），此处不重复内嵌——以十五审报告为准；本轮重建文件置于 target/probes/ 同名，比对基线为该报告原文。</p>
+<h3>4.2 Map 邻接探针（pm 族）</h3>
+<details><summary>pm1_opt_deep_match.lom — match 内 match 消费 Option（双侧 10/3）</summary><pre><code>from map import { map_empty, map_set, map_get }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 2)
+    match map_get(m, "a")
+        Some(v) =&gt;
+            match map_get(m, "zz")
+                Some(w) =&gt; println(v + w)
+                None =&gt; println(v * 10)
+            end
+        end
+        None =&gt;
+            match map_get(m, "b")
+                Some(w) =&gt; println(w)
+                None =&gt; println(-1)
+            end
+        end
+    end
+    match map_get(m, "b")
+        Some(v) =&gt;
+            match map_get(m, "a")
+                Some(w) =&gt; println(v + w)
+                None =&gt; println(-2)
+            end
+        end
+        None =&gt; println(-3)
+    end
+end</code></pre></details>
+<details><summary>pm2a_mpq_if_branch.lom — if 分支内 set 不补全外层 mp{?}（宿主 5；L2 拒 → R87）</summary><pre><code>from map import { map_empty, map_set, map_get, map_size }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    if map_size(m) == 0
+        map_set(m, "k", 5)
+    else
+        map_set(m, "j", 6)
+    end
+    match map_get(m, "k")
+        Some(v) =&gt; println(v)
+        None =&gt; println(-1)
+    end
+end</code></pre></details>
+<details><summary>pm2b_mpq_bare_use.lom — 裸 mp{?} 读（宿主 0；L2 拒 = designs/0006 校验 #4）</summary><pre><code>from map import { map_empty, map_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    match map_get(m, "k")
+        Some(v) =&gt; println(v)
+        None =&gt; println(0)
+    end
+end</code></pre></details>
+<details><summary>pm2c_mpq_assign_merge.lom — 赋值合流 + 值位 if 合流（双侧 2/3）</summary><pre><code>from map import { map_empty, map_set, map_get }
+
+fn pick(n: Int) -&gt; Map&lt;String, Int&gt;
+    let m = map_empty()
+    map_set(m, "v", n)
+    m
+end
+
+fn main() -&gt; Unit ! [IO]
+    let mut m = pick(1)
+    m = pick(2)
+    match map_get(m, "v")
+        Some(v) =&gt; println(v)
+        None =&gt; println(-1)
+    end
+    let c = if 1 &lt; 2 pick(3) else pick(4) end
+    match map_get(c, "v")
+        Some(v) =&gt; println(v)
+        None =&gt; println(-1)
+    end
+end</code></pre></details>
+<details><summary>pm3_keys_utf8.lom — 多字节键混合 ASCII 排序（双侧 9/Apple/a/apple/z/é/中/中国/中国人/日本語）</summary><pre><code>from map import { map_empty, map_set, map_keys }
+from list import { list_length, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "中", 1)
+    map_set(m, "中国", 2)
+    map_set(m, "z", 3)
+    map_set(m, "a", 4)
+    map_set(m, "中国人", 5)
+    map_set(m, "中", 6)
+    map_set(m, "apple", 7)
+    map_set(m, "Apple", 8)
+    map_set(m, "é", 9)
+    map_set(m, "日本語", 10)
+    let ks = map_keys(m)
+    println(list_length(ks))
+    let i = 0
+    while i &lt; list_length(ks)
+        println(list_get(ks, i))
+        i = i + 1
+    end
+end</code></pre></details>
+<details><summary>pm4_rehash_tomb.lom — 33 键两级 rehash × 9 墓碑 × 9 重插（双侧逐行一致）</summary><pre><code>from map import { map_empty, map_set, map_get, map_remove, map_size }
+from string import { int_to_string }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    let i = 0
+    while i &lt; 33
+        map_set(m, "k" + int_to_string(i), i)
+        i = i + 1
+    end
+    println(map_size(m))
+    let j = 0
+    while j &lt; 33
+        if j % 4 == 0
+            map_remove(m, "k" + int_to_string(j))
+        end
+        j = j + 1
+    end
+    println(map_size(m))
+    let n = 0
+    while n &lt; 9
+        map_set(m, "n" + int_to_string(n), 100 + n)
+        n = n + 1
+    end
+    println(map_size(m))
+    let q = 0
+    while q &lt; 33
+        match map_get(m, "k" + int_to_string(q))
+            Some(v) =&gt; println(v)
+            None =&gt; println(-1)
+        end
+        q = q + 1
+    end
+    let r = 0
+    while r &lt; 9
+        match map_get(m, "n" + int_to_string(r))
+            Some(v) =&gt; println(v)
+            None =&gt; println(-2)
+        end
+        r = r + 1
+    end
+    println(map_size(m))
+end</code></pre></details>
+<details><summary>pm5_values_tomb.lom — values 值序=键序 × 墓碑/复用（双侧 5/1/20/3/5/6/a/b/c/e/f）</summary><pre><code>from map import { map_empty, map_set, map_remove, map_values, map_keys }
+from list import { list_length, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 2)
+    map_set(m, "c", 3)
+    map_set(m, "d", 4)
+    map_set(m, "e", 5)
+    map_remove(m, "b")
+    map_remove(m, "d")
+    map_set(m, "f", 6)
+    map_set(m, "b", 20)
+    let vs = map_values(m)
+    println(list_length(vs))
+    let i = 0
+    while i &lt; list_length(vs)
+        println(list_get(vs, i))
+        i = i + 1
+    end
+    let ks = map_keys(m)
+    let j = 0
+    while j &lt; list_length(ks)
+        println(list_get(ks, j))
+        j = j + 1
+    end
+end</code></pre></details>
+<details><summary>pm6_eq_nested3.lom — 三层嵌套 mp eq 递归（双侧 1/0/1）</summary><pre><code>from map import { map_empty, map_set }
+
+fn main() -&gt; Unit ! [IO]
+    let leaf1 = map_empty()
+    map_set(leaf1, "x", 1)
+    let leaf2 = map_empty()
+    map_set(leaf2, "x", 1)
+    let leaf3 = map_empty()
+    map_set(leaf3, "x", 2)
+    let mid1 = map_empty()
+    map_set(mid1, "l", leaf1)
+    let mid2 = map_empty()
+    map_set(mid2, "l", leaf2)
+    let mid3 = map_empty()
+    map_set(mid3, "l", leaf3)
+    let top1 = map_empty()
+    map_set(top1, "m", mid1)
+    let top2 = map_empty()
+    map_set(top2, "m", mid2)
+    let top3 = map_empty()
+    map_set(top3, "m", mid3)
+    if top1 == top2
+        println(1)
+    else
+        println(0)
+    end
+    if top1 == top3
+        println(1)
+    else
+        println(0)
+    end
+    if top1 != top3
+        println(1)
+    else
+        println(0)
+    end
+end</code></pre></details>
+<details><summary>pm7_closure_ref.lom — 闭包捕获 Map 就地写外部可见（双侧 2/3/1）</summary><pre><code>from map import { map_empty, map_set, map_get, map_size }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "n", 1)
+    let bump = fn(k: String) -&gt; Unit
+        match map_get(m, k)
+            Some(v) =&gt;
+                map_set(m, k, v + 1)
+            end
+            None =&gt;
+                map_set(m, k, 1)
+            end
+        end
+    end
+    bump("n")
+    bump("n")
+    bump("new")
+    println(map_size(m))
+    match map_get(m, "n")
+        Some(v) =&gt; println(v)
+        None =&gt; println(0)
+    end
+    match map_get(m, "new")
+        Some(v) =&gt; println(v)
+        None =&gt; println(0)
+    end
+end</code></pre></details>
+<details><summary>pm8_box_map_st.lom — Box{mp{st}} + Result err 载荷（双侧 2/hello/world）</summary><pre><code>from map import { map_empty, map_set, map_get, map_size }
+
+enum Box&lt;T&gt; = Wrap(T)
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "greet", "hello")
+    map_set(m, "bye", "world")
+    let b = Wrap(m)
+    match b
+        Wrap(inner) =&gt;
+            println(map_size(inner))
+            match map_get(inner, "greet")
+                Some(s) =&gt; println(s)
+                None =&gt; println("?")
+            end
+        end
+    end
+    let r: Result&lt;Int, Map&lt;String, String&gt;&gt; = Err(m)
+    match r
+        Ok(v) =&gt; println(v)
+        Err(em) =&gt;
+            match map_get(em, "bye")
+                Some(s) =&gt; println(s)
+                None =&gt; println("?")
+            end
+        end
+    end
+end</code></pre></details>
+<details><summary>pm9_remove_eq.lom — 墓碑等价性（双侧 1/0）</summary><pre><code>from map import { map_empty, map_set, map_remove }
+
+fn main() -&gt; Unit ! [IO]
+    let a = map_empty()
+    map_set(a, "x", 1)
+    map_set(a, "y", 2)
+    map_set(a, "keep", 9)
+    let b = map_empty()
+    map_set(b, "x", 1)
+    map_set(b, "z", 2)
+    map_set(b, "keep", 9)
+    map_remove(a, "y")
+    map_remove(b, "z")
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+    map_set(b, "w", 5)
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+end</code></pre></details>
+<details><summary>pm10_dyn_utf8_keys.lom — 动态拼接多字节键（双侧 5/9/-2/5/键0..键4）</summary><pre><code>from map import { map_empty, map_set, map_get, map_keys, map_size }
+from string import { int_to_string }
+from list import { list_length, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    let i = 0
+    while i &lt; 5
+        map_set(m, "键" + int_to_string(i), i * 3)
+        i = i + 1
+    end
+    println(map_size(m))
+    match map_get(m, "键" + int_to_string(3))
+        Some(v) =&gt; println(v)
+        None =&gt; println(-1)
+    end
+    match map_get(m, "键" + int_to_string(9))
+        Some(v) =&gt; println(v)
+        None =&gt; println(-2)
+    end
+    let ks = map_keys(m)
+    println(list_length(ks))
+    let j = 0
+    while j &lt; list_length(ks)
+        println(list_get(ks, j))
+        j = j + 1
+    end
+end</code></pre></details>
+<details><summary>pm11_eq_crosstype.lom — 跨值型 eq（宿主 0；L2 拒 = 已登记排除面）</summary><pre><code>from map import { map_empty, map_set }
+
+fn main() -&gt; Unit ! [IO]
+    let a: Map&lt;String, Float&gt; = map_empty()
+    map_set(a, "k", 1.0)
+    let b: Map&lt;String, Int&gt; = map_empty()
+    map_set(b, "k", 1)
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+end</code></pre></details>
+<details><summary>pm12_mpq_agnostic.lom — V 无关内建裸 mp{?} 放行（双侧 0/0/0）</summary><pre><code>from map import { map_empty, map_keys, map_has, map_size }
+from list import { list_length }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    let ks = map_keys(m)
+    println(list_length(ks))
+    if map_has(m, "x")
+        println(1)
+    else
+        println(0)
+    end
+    println(map_size(m))
+end</code></pre></details>
+<details><summary>pm13_rehash_utf8.lom — 17 动态多字节键 rehash 全量回读（双侧 17/0/1/4/9/…/256/-2）</summary><pre><code>from map import { map_empty, map_set, map_get, map_size }
+from string import { int_to_string }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    let i = 0
+    while i &lt; 17
+        map_set(m, "键" + int_to_string(i), i * i)
+        i = i + 1
+    end
+    println(map_size(m))
+    let j = 0
+    while j &lt; 17
+        match map_get(m, "键" + int_to_string(j))
+            Some(v) =&gt; println(v)
+            None =&gt; println(-1)
+        end
+        j = j + 1
+    end
+    match map_get(m, "键" + int_to_string(99))
+        Some(v) =&gt; println(v)
+        None =&gt; println(-2)
+    end
+end</code></pre></details>
+<details><summary>pm14_eq_lsval.lom — ls 值载荷 eq（双侧 1/0）</summary><pre><code>from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+
+fn main() -&gt; Unit ! [IO]
+    let a = map_empty()
+    map_set(a, "row", list_cons(1, list_cons(2, list_empty())))
+    let b = map_empty()
+    map_set(b, "row", list_cons(1, list_cons(2, list_empty())))
+    let c = map_empty()
+    map_set(c, "row", list_cons(1, list_cons(3, list_empty())))
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+    if a == c
+        println(1)
+    else
+        println(0)
+    end
+end</code></pre></details>
+<details><summary>pm15_opt_alias.lom — Option 解包引用语义（双侧 2/2/1）</summary><pre><code>from map import { map_empty, map_set, map_get, map_size }
+
+fn main() -&gt; Unit ! [IO]
+    let outer = map_empty()
+    let inner = map_empty()
+    map_set(inner, "x", 1)
+    map_set(outer, "one", inner)
+    match map_get(outer, "one")
+        Some(im) =&gt;
+            map_set(im, "y", 2)
+        end
+        None =&gt; ()
+    end
+    println(map_size(inner))
+    match map_get(inner, "y")
+        Some(v) =&gt; println(v)
+        None =&gt; println(-1)
+    end
+    println(map_size(outer))
+end</code></pre></details>
+<details><summary>pm16_remove_retval.lom — map_remove 返回值三侧对拍（解释器 true/false；宿主 WASM /()/()；L2 拒 → R89 文案）</summary><pre><code>from map import { map_empty, map_set, map_remove }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    println(map_remove(m, "a"))
+    println(map_remove(m, "zz"))
+end</code></pre></details>
+<details><summary>pm17_bad_import.lom — from map import 未知内建（L2 拒"未知内建 'map.map_bogus'"，堵口宣称 ✓）</summary><pre><code>from map import { map_bogus }
+
+fn main() -&gt; Unit ! [IO]
+    println(1)
+end</code></pre></details>
+
+<h3>4.3 R84 acc 族邻接探针（pf 族）</h3>
+<details><summary>pf1_boolacc_println.lom — Bool acc fold 结果直 println（宿主 true；L2 拒 → R86）</summary><pre><code>from list import { list_cons, list_empty, list_fold }
+
+fn main() -&gt; Unit ! [IO]
+    let xs = list_cons(1, list_cons(2, list_empty()))
+    let all = list_fold(fn(a: Bool, n: Int) -&gt; Bool a and n &gt; 0 end, True, xs)
+    println(all)
+end</code></pre></details>
+<details><summary>pf2_nested_fold.lom — fold 内 fold（双侧 10/2）</summary><pre><code>from list import { list_cons, list_empty, list_fold, list_length }
+
+fn main() -&gt; Unit ! [IO]
+    let outer = list_cons(list_cons(1, list_cons(2, list_empty())), list_cons(list_cons(3, list_cons(4, list_empty())), list_empty()))
+    let total = list_fold(fn(acc: Int, row: List&lt;Int&gt;) -&gt; Int acc + list_fold(fn(s: Int, x: Int) -&gt; Int s + x end, 0, row) end, 0, outer)
+    println(total)
+    println(list_length(outer))
+end</code></pre></details>
+<details><summary>pf3_lsacc.lom / pf3b（注解）/ pf3c（非元素访问）— List acc 结果细化边界（pf3 拒 → R88；pf3b 双侧 3/3/2/1；pf3c 双侧 3/3）</summary><pre><code># pf3（被拒形态）
+from list import { list_cons, list_empty, list_fold, list_length, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    let rev = list_fold(fn(acc: List&lt;Int&gt;, n: Int) -&gt; List&lt;Int&gt; list_cons(n, acc) end, list_empty(), xs)
+    println(list_length(rev))
+    println(list_get(rev, 0))
+    println(list_get(rev, 1))
+    println(list_get(rev, 2))
+end
+
+# pf3b：let rev: List&lt;Int&gt; = ...（加注解，其余同上）→ 双侧 3/3/2/1
+# pf3c：let rev = ...（无注解）但只 list_length(rev)；
+#        另加 Int acc + List 元素的 fold：
+#        let total = list_fold(fn(acc: Int, l: List&lt;Int&gt;) -&gt; Int acc + list_length(l) end,
+#                              0, list_cons(xs, list_empty()))
+#        → 双侧 3/3</code></pre></details>
+<details><summary>pf4_boolacc_f64elem.lom — Bool acc × Float 元素（双侧 0）</summary><pre><code>from list import { list_cons, list_empty, list_fold }
+
+fn main() -&gt; Unit ! [IO]
+    let fs = list_cons(1.5, list_cons(-0.5, list_cons(2.0, list_empty())))
+    let pos = list_fold(fn(a: Bool, v: Float) -&gt; Bool a and v &gt; 0.0 end, True, fs)
+    if pos
+        println(1)
+    else
+        println(0)
+    end
+end</code></pre></details>
+<details><summary>pf5_stracc_strelem.lom — String acc × String 元素（双侧 &gt;a-b-）</summary><pre><code>from list import { list_cons, list_empty, list_fold }
+
+fn main() -&gt; Unit ! [IO]
+    let ws = list_cons("a", list_cons("b", list_empty()))
+    let s = list_fold(fn(acc: String, w: String) -&gt; String acc + w + "-" end, "&gt;", ws)
+    println(s)
+end</code></pre></details>
+
+<h3>4.4 R85 邻接与交叉组合探针（pb7-pb10/pb9b、pc 族、pt 族）</h3>
+<details><summary>pb7_ifval_letchain.lom — 值位 if 产 Bool 三层 let 链（双侧 true/no）</summary><pre><code>fn main() -&gt; Unit ! [IO]
+    let a = if 2 &gt; 1 True else False end
+    let b = a
+    let c = b
+    println(c)
+    println(if 1 &gt; 2 "yes" else "no" end)
+end</code></pre></details>
+<details><summary>pb8_closure_hof.lom — 闭包产 Bool 经 list_map/list_get 再 println（宿主 false/true/2；L2 拒 → R86）</summary><pre><code>from list import { list_cons, list_empty, list_map, list_get, list_length }
+
+fn main() -&gt; Unit ! [IO]
+    let xs = list_cons(1, list_cons(5, list_empty()))
+    let flags = list_map(fn(n: Int) -&gt; Bool n &gt; 2 end, xs)
+    println(list_get(flags, 0))
+    println(list_get(flags, 1))
+    println(list_length(flags))
+end</code></pre></details>
+<details><summary>pb9_match_deep.lom / pb9b_enum_match_bool.lom — 深层嵌套 match 产 Bool（双侧 true/false 与 true）</summary><pre><code># pb9
+fn main() -&gt; Unit ! [IO]
+    let r = match 1
+        1 =&gt; match 2
+            2 =&gt; 3 &lt; 4
+            _ =&gt; False
+        end
+        _ =&gt; False
+    end
+    println(r)
+    let s = match 5
+        5 =&gt; match 6
+            7 =&gt; True
+            _ =&gt; 1 == 2
+        end
+        _ =&gt; True
+    end
+    println(s)
+end
+
+# pb9b（enum 臂尾产 Bool 嵌套）
+enum E = Z | V(Int)
+
+fn main() -&gt; Unit ! [IO]
+    let r = match V(3)
+        V(n) =&gt; match n
+            3 =&gt; n &gt; 2
+            _ =&gt; False
+        end
+        Z =&gt; False
+    end
+    println(r)
+end</code></pre></details>
+<details><summary>pb10_param_flow2.lom — 两跳跨函数 Bool 流转（宿主 true；L2 拒且文案与 pb5 一致）</summary><pre><code>fn down(b: Bool) -&gt; Unit ! [IO]
+    println(b)
+end
+
+fn mid(x: Int) -&gt; Unit ! [IO]
+    down(x &gt; 1)
+end
+
+fn main() -&gt; Unit ! [IO]
+    mid(5)
+end</code></pre></details>
+<details><summary>pc1_values_hof.lom — map_values → list_filter → list_map（双侧 2/50/70/4）</summary><pre><code>from map import { map_empty, map_set, map_values, map_size }
+from list import { list_map, list_filter, list_length, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 5)
+    map_set(m, "c", 2)
+    map_set(m, "d", 7)
+    let vs = map_values(m)
+    let big = list_filter(fn(v: Int) -&gt; Bool v &gt; 2 end, vs)
+    println(list_length(big))
+    let dbl = list_map(fn(v: Int) -&gt; Int v * 10 end, big)
+    println(list_get(dbl, 0))
+    println(list_get(dbl, 1))
+    println(map_size(m))
+end</code></pre></details>
+<details><summary>pc2_forin_keys.lom — for-in 迭代 map_keys（双侧 14/3）</summary><pre><code>from map import { map_empty, map_set, map_keys, map_size }
+from string import { len }
+
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "delta", 1)
+    map_set(m, "alpha", 2)
+    map_set(m, "beta", 3)
+    let mut total = 0
+    for k in map_keys(m)
+        total = total + len(k)
+    end
+    println(total)
+    println(map_size(m))
+end</code></pre></details>
+<details><summary>pc3_closure_mapget_pred.lom — 闭包捕获 Map + match 谓词入 HOF（双侧 2/one!/five!）</summary><pre><code>from map import { map_empty, map_set, map_get }
+from list import { list_cons, list_empty, list_filter, list_length, list_map, list_get }
+
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "one", 1)
+    map_set(m, "five", 5)
+    let ks = list_cons("one", list_cons("two", list_cons("five", list_empty())))
+    let hits = list_filter(fn(k: String) -&gt; Bool
+        match map_get(m, k)
+            Some(_) =&gt; True
+            None =&gt; False
+        end
+    end, ks)
+    println(list_length(hits))
+    let ups = list_map(fn(k: String) -&gt; String k + "!" end, hits)
+    println(list_get(ups, 0))
+    println(list_get(ups, 1))
+end</code></pre></details>
+<details><summary>pt1_bare_try.lom — 裸语句 f(...)?（宿主 1；L2 干净拒"? 提前返回留 return 批"——RFC 修订 19 疑似坑未再现）</summary><pre><code>fn get(n: Int) -&gt; Result&lt;Int, String&gt;
+    if n &gt; 0
+        Ok(n)
+    else
+        Err("neg")
+    end
+end
+
+fn main() -&gt; Unit ! [IO]
+    get(5)?
+    println(1)
+end</code></pre></details>
+
+<h2>5. 结论、整改建议及未测面</h2>
+<p><strong>裁定：</strong></p>
+<ol>
+  <li><strong>两批交付宣称零失真</strong>——R84/R85 整改（v1.2.12）与 Map 批（v1.2.13）的全部可复核宣称（验收计数名实、探针族行为、存量 hex 恒等、行数链、CI 轨迹、双后端分叉挂账）经本轮独立复证全部成立；其中"存量 79 用例 hex 逐字节不变"由本轮<strong>全量 79/79 独立对拍全等</strong>（此前仅执行者全量 + 规划者抽 5）。</li>
+  <li><strong>敌手面零行为击穿</strong>——本轮 36 自构形态 + 11 重建形态覆盖 Map 邻接（Option 深层消费/键序/rehash×墓碑/嵌套 eq/引用语义×闭包/泛型载荷/动态多字节键/交叉 HOF）、R84 acc 族矩阵（含嵌套 fold、ls acc、Bool×Float、String×String）、R85 深层流（多层 let 链、enum match 臂尾、HOF 中转）、裸 <code>?</code> 疑点——stdout+rc 零失配、零坏 wasm；全部拒绝均为干净 COMPILE-ERROR 无 hex。</li>
+  <li><strong>开账 R86-R89（4×P3）</strong>——全部为登记精度/诊断文案缺口（R86 Bool 显示残余面描述偏窄、R87 mp{?} 分支补全边界 if 形态未入档、R88 fold 结果细化与 map/filter 不对称未登记、R89 println(void) 文案误导），建议整改时以文档登记为先（R89 可顺手单列文案）；无行为级修复需求。</li>
+  <li><strong>评级 A-（回升）</strong>——依据：宣称全对账零失真 + 连续第二轮无 P2+ 代码发现 + 本轮验证面为历轮最宽（47 探针执行 + 79 例独立 hex 对拍 + 14 基线）。<strong>该评级仅评本轮时点与检验面</strong>：十五审 B+ 及更早评级不因本轮改判，json/包/return 未交付批次、容器显示批、跨函数 Bool 放行扩面均不在本轮检验面内，亦不外推。</li>
+</ol>
+<p><strong>未测面（如实声明）：</strong>① Map 压力面上限——&gt;33 键三级 rehash、超长键（跨 data 段边界 &gt;256B）、数百键下插入排序仅性能面未测；② mp_eq 递归深度 &gt;3 层与 V8 栈交互未测；③ 宿主侧（解释器/typechecker/WASM 后端）行为本轮仅作参照系未审计——map_remove 双后端分叉修复方向待用户另裁（挂账在册）；④ <code>f(...)?</code> 疑似坑两轮复现未遂，维持 RFC 修订 19 登记不关闭；⑤ "两版编译器对拍"依赖同一宿主解释器载体（与十五审同法）——若宿主解释器自身随版本漂移影响两版输出，属共同模式偏差，本轮未做跨宿主版本交叉；⑥ CI 仅实查至 7f71456，后续推送首跑须重查（§11.3 教训）；⑦ 语言面 v1.0 冻结与 43 内建未动，本轮无语言面检查项。</p>
+<p class="muted">报告落盘后复跑 python tools/doc_audit.py：RESULT: PASS（67/67）——review HTML 非 doc_audit 锚定对象，未受影响。target/probes/ 探针与 hexold/hexnew 对拍产物已清理。</p>
+</body>
+</html>

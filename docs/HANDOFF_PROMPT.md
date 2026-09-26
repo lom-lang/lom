@@ -53,18 +53,21 @@
   工作区≠验提交树；升版提交前 `git show --stat HEAD` 核对 bump 文件）。
   Lom fmt 递归覆盖 37 个有效示例（apply_test 豁免）+ tools/selfcomp
   用例全量；Rust cargo fmt 本地零 diff，未进 CI。
-- 环境遗留告知：`git stash list` 存在一枚 2026-09-03 旧会话 WIP
-  （eval/tasks/03_types.json、04_closures.json，挂 8ea8fd0）——非当前
-  工作流产物，未动；是否清理由用户裁决。
-- 审查状态：**十五轮审查，总评 B+（仅评 44954e2/v1.2.11-3 时点）**。
-  最新 docs/reviews/review-2026-09-26.html 为体系内 agent 分工独立
-  复核，非外部同行审计。十五审确认：R79-R82 四项整改宣称与
-  c2/String/List 批核心宣称（174/174、存量 62 用例 hex 恒等独立
-  对拍 62/62 全等）零失真；新开 **R84（P2：list_fold Float/Bool acc
-  产不可实例化 wasm）与 R85（P3：println(Bool) 预扫覆盖缺口），
-  均已修于 v1.2.12（R85 选甲）**——R1-R85 全部关闭，整改后评级
-  待下一轮复审。十四审 B 只评 5c92f59/v1.2.6；十三审 B+ 只属
-  1418536/v1.2.5——历史评级不外推。事实源 docs/TODO.md 顶部。
+- 环境状态（2026-09-26 已整理）：git stash 已清空（旧 WIP drop）、
+  松散对象已打包、本地调试残留（.w0/.lom/__pycache__）已物理清理；
+  目录结构健康未重组。eval/candidates_rerun（LLM 复测 raw 证据）保留。
+- 审查状态：**十六轮审查，总评 A-（回升；仅评 7f71456/v1.2.13 时点）**。
+  最新 docs/reviews/review-2026-09-26-2.html 为体系内 agent 分工独立
+  复核，非外部同行审计。十六审确认：R84/R85 整改与 Map 批全部可复核
+  宣称零失真——存量 79 对拍用例 hex 由 git show v1.2.12 旧编译器
+  **独立全量对拍 79/79 全等**；敌手 36 自构 + 11 重建形态零行为
+  击穿（连续第二轮无 P2+ 代码发现）。新开 **R86-R89（4×P3：R86
+  println(Bool) 残余面描述偏窄/R87 mp{?} if 分支补全未入档/R88
+  fold 结果细化不对称未登记/R89 println(void) 文案误导）**，全部
+  登记精度/文案类、无行为级修复需求，**open 待裁决**——R1-R85
+  全部关闭。十五审 B+ 只评 44954e2/v1.2.11-3；十四审 B 只评
+  5c92f59/v1.2.6——历史评级不外推，本轮 A- 亦不外推 json/包/return
+  未交付批次。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
   实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-19）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
@@ -142,21 +145,20 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决后续 json/包/return 子批或
-  发起下一轮独立复审（R84/R85 整改与 Map 批后评级待复审）；
-  另有 typechecker
+- 下一步由用户裁决：R86-R89（4×P3，十六审开账——建议文档登记
+  为先、R89 可顺手单列文案）独立整改或随下一批次顺带；后续
+  json/包/return 子批；另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
-  git stash 旧 WIP（2026-09-03 遗留）清理与否；MoonBit 1.0 Q3 复核等
-  月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+  MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
-   review-2026-09-26.html（十五审——最新轮）及 review-2026-09-23.html
-   （十四审），LANGUAGE_SPEC §14，docs/rfc/
+   review-2026-09-26-2.html（十六审——最新轮）及
+   review-2026-09-26.html（十五审），LANGUAGE_SPEC §14，docs/rfc/
    0004-l2-selfhost-compiler.md（L2 进行中，修订 1-19），
    docs/designs/0001~0006 六份批次设计（闭包/作用域/泛型/String/List/Map，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
@@ -178,10 +180,12 @@
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R79-R85 全部关闭；
-   L2.3-c2、String 批、List 批、十五审整改（R84/R85）与 Map 批均已
-   交付；可选下一轮独立复审，或继续 json / 包 / return 逐批交付
-   （string_to_int 与容器显示留各自后续批）。外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。R1-R85 全部关闭、
+   R86-R89 open（4×P3，十六审开账待裁决）；L2.3-c2、String 批、
+   List 批、十五审整改（R84/R85）与 Map 批均已交付并经十六审
+   零失真复证；下一方向可选 R86-R89 整改包（或顺带）、json / 包 /
+   return 逐批交付（string_to_int 与容器显示留各自后续批）。
+   外部发布线继续冻结。
 4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
    → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
