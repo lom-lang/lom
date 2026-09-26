@@ -1,5 +1,19 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **交接声明（2026-09-27 record/tuple 编译子批交付 + v1.3.2 + 十七审
+> R90/R91 收口）**：仓库版本 v1.3.2。record 批按路线甲第一段交付
+> （designs/0010；RFC-0004 修订 28）：vt rc{name:vt}/tp{vt}、
+> [n][8B 槽] 不 pad、编译期偏移访问、file/env 四内建宿主中介
+> （harness argv 透传）、math 内联、io no-op；**R90 随批收口**
+> （pkg-expand 含 as 的包内 import 原位保留——三声音修复为
+> 宿主 wasm ✓/L2 MATCH ✓/解释器 RUNTIME002 挂账维持，Rust 测试
+> ×2 → 541+8）；**R91 登记面扩"if 与 match"**。verify_selfcomp
+> 255→**279/279 = 122 对拍（117 单文件 + 5 包）+ 152 负例**；
+> **存量 115 对拍 hex 逐字节不变**；self_comp 9491→**10402 行**；
+> 宿主 cli.rs +125。规划者升版后亲跑全量回归全绿（clippy "--all-targets
+> 9 错"澄清为存量测试 lint 不在 gate——CI 口径 rc=0）。十七审 A-
+> 不评此新增范围。**L2.4 闭环（第二段）待续——四道闸门已拆三**。
+>
 > **审查登记（2026-09-27 第十七轮独立审查收官）**：总评 **A-（维持；
 > 报告 [review-2026-09-27.html](reviews/review-2026-09-27.html)，基线
 > 8bf1e27/v1.3.1）**——R86-R89 整改与 json/包/return 三批宣称经独立
@@ -241,16 +255,16 @@
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
 
-## 第十七轮体系内独立审查 + R90/R91 开账（2026-09-27）✅ review done / remediation 挂 record 批
+## 第十七轮体系内独立审查 + R90/R91 整改（2026-09-27）✅ review done / remediation done（v1.3.2 随 record 批）
 
 - **报告**：[review-2026-09-27.html](reviews/review-2026-09-27.html)；基线 8bf1e27/v1.3.1；总评 **A-（维持）**——宣称全对账零失真 + 连续第三轮无 P2+ + 三段 hex 恒等 294/294 独立全量。体系内 agent 分工，非外部同行审计。
 - **规划者验收**：亲读报告关键节 + **R90 三声音亲手复现逐字一致**（宿主 wasm `18` rc0 / 宿主解释器 `[RUNTIME002] 未定义函数: 't3'` / L2 `codegen error: 未定义变量 't3'` COMPILE-ERROR 无 hex——libouter 包源 `from libinner import { triple as t3 }` 的别名在 pkg-expand 剥 import 时丢失）；doc_audit 落盘后复跑 67/67。
 
-### R90 — 包源内 as 别名经 pkg-expand 剥除丢失（P3）open（随 record 批修）
+### R90 — 包源内 as 别名经 pkg-expand 剥除丢失（P3）✅ done（2026-09-27，v1.3.2，随 record 批修①）
 
 包源内 `from X import {y as z}` 的别名映射随"剥包内 import"设计丢失：宿主 wasm 路径保留包内 import 经 known_packages 放行（收，18/162/729）；L2 展开单元拒"未定义变量 'z'"；**宿主解释器自身 RUNTIME002 拒（宿主双后端分叉未登记——map_remove 同类新成员）**。主文件别名与真名包调用不受影响（缺口精确圈定包源内 as）。**修法（随 record 批顺带，选审查建议①）**：pkg-expand 对含 as 的包内 import 行**转写保留**（等价别名 import 迁至展开单元主文件段）；宿主解释器分叉并入挂账清单；对拍正例（aliaschain 形态）+ 负例锁定。
 
-### R91 — 值语境 return 臂登记面只点名 if（P3）open（随文档成对扩句）
+### R91 — 值语境 return 臂登记面只点名 if（P3）✅ done（2026-09-27，v1.3.2，登记面扩"if 与 match"）
 
 值语境 **match** return 臂（`match n 5 => return 55 end _ => n*2 end` 作值）与 if 同型：宿主 wasm 收（55/7）、L2 走通用臂值一致性检查拒（文案不指向 return——R86 同型登记面缺口）。随 record 批文档成对扩句（"值语境 if 与 match 的 return 臂"）。
 

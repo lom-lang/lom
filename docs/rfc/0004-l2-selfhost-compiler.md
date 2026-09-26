@@ -753,3 +753,37 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   十七审收官**（A- 维持；R90 包源 as 别名 pkg-expand 丢失随 record
   批修①、R91 登记扩句随文档——docs/reviews/review-2026-09-27.html）。
   **代码零改动——纯设计文档交付；实施在后续。**
+- **修订 28（2026-09-27）：record/tuple 编译子批交付（designs/0010
+  第一段；用户裁决路线甲"继续"）+ 十七审 R90/R91 收口。** vt
+  **rc{name:vt;name:vt}**（字段名进 vt——record 结构类型；`:` 在 vt
+  字符集未占用）与 **tp{vt;vt}**；堆布局 `[n:i32][4+8k 槽]` 不 pad
+  （宿主同口径），槽宽按字段 vt 定发（cons 槽同型第三应用）；
+  **字段访问是编译期偏移**（untagged 静态类型——名字→位置→宽度
+  load；宿主 tagged 的运行时 name_off 比较在此无对应面）；tuple
+  索引 AST 实况 = ExField(name="N") 数字字符串（parser L1980）；
+  字段序注解序为准/字面量首见固化，异序/缺/多经 vt_merge 逐位
+  合流编译期拒。**file/env 四内建宿主中介导入**（json 甲先例：
+  has_fileenv 预扫 5 导入参数化、st 布局两侧一致、env_args 的
+  List 物化直抄 materializeNode array 分支、harness argv 透传）
+  + math 四名内联指令（sqrt=9f/abs=99/min-max select 1b——
+  src/wasm.rs 常量表为权威）+ io println no-op/print 新增；
+  **typeidx/funcidx 重合被打破的 tbase 修正**（fileenv 5 导入
+  4 类型——无 fileenv 程序 tbase==ibase 存量字节不变）。
+  **R90 收口（十七审 P3）**：pkg-expand 对含 as 的包内 import 行
+  原位保留（转写不剥）——三声音修复后 L2 管线 MATCH（宿主 wasm
+  18 ✓/L2 COMPILED+18 ✓/宿主解释器 RUNTIME002 挂账维持）；
+  Rust 测试 +2（alias 幸存可解析 + 折行边界）。**R91 收口**：
+  登记面扩为"值语境 if **与 match** 的 return 臂"（本修订与
+  v1.3.2 文档位）。校验 7 条全落地（字段集/未知字段/越界/容器
+  显示族六处单列文案/arity/解构维持拒/同名异序）。**实施坑
+  入档**：vt_bt/ls_vt_bt/mp_val_store_hex 白名单漏 rc/tp 曾产
+  (result void) 坏 wasm（值语境 if record——修复后编译期拒路径
+  正确）；math abs 的 i64.shr_s 栈序。verify_selfcomp 255→
+  **279/279 = 122 对拍（117 单文件 + 5 pkg 含 R90 用例 105_
+  pkg_alias_in_pkg）+ 152 负例**（新对拍 11：116-126 + 新负例
+  12）；**存量 115 对拍用例产物 hex 逐字节不变**（R90 转写仅对
+  含 as 的包源生效，存量无此形态展开单元字节不变——实测）；
+  self_comp 9491→**10402 行**（+948）；Rust **539→541**（R90 ×2）
+  +8。宿主 src 改动 = cli.rs +125（R90 修复 + 2 测试）。十七审
+  A- 不评此新增范围；升版 v1.3.2（record 批 L2 面 patch + R90
+  宿主工具修复）。**L2.4 闭环（第二段）待续。**

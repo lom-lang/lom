@@ -43,8 +43,9 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.3.1（return 收官批——L2.3 语句面收官；首回合仍须
-  实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
+- 仓库版本 v1.3.2（record/tuple 编译子批 + R90/R91 收口——designs/0010
+  第一段；首回合仍须实查最新 main CI 与 annotations）；语言面与外部
+  发布线冻结。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
   1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
@@ -74,7 +75,7 @@
   5c92f59/v1.2.6——历史评级不外推，十六审 A- 亦不外推 json/包/return
   未交付批次与 R86-R89 整改后状态（后者待下一轮复审）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-26）：
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-28）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -131,18 +132,24 @@
   宽度化读取 + else 原值 0f（校验族+Err 载荷相容严于宿主）；
   cret 经 cg.cgh 线程化（闭包体双 save/restore——闭包内 return 属
   闭包自身）；0x0f Node 验证器全收（else 臂 unreachable 豁免）。
-  json/包批时点：230/238（100/104 对拍）、self_comp 9295/9361 行。
-  return 批现值（v1.3.1）：self_comp.lom 9491
-  行，verify_selfcomp **255/255 = 115 对拍（104 + return 批 11：
-  105-115 含闭包内 return/值位 if 内 ? 含 f64 豁免面/Err 载荷
-  st·ls/递归早退）+ 140 负例**（转正 2 + 新增 8）；**存量 104 对拍
-  用例产物 hex 逐字节不变**（0x0f 零包装的天然结果）；Rust 539+8
-  （宿主零改动）。
+  **v1.3.2 record/tuple 编译子批**（designs/0010 第一段，路线甲）：
+  vt rc{name:vt}/tp{vt}（字段名进 vt）、[n][8B 槽] 不 pad 布局、
+  编译期偏移字段访问、file/env 四内建宿主中介导入（5 导入参数化
+  + harness argv 透传）、math 内联、io no-op；**R90 收口**（pkg-expand
+  含 as 的包内 import 原位保留——三声音修复，Rust 测试 ×2）；
+  **R91 登记面扩"if 与 match"**。
+  json/包/return 批时点：230/238/255（100/104/115 对拍）、self_comp
+  9295/9361/9491 行。record 批现值（v1.3.2）：self_comp.lom 10402
+  行，verify_selfcomp **279/279 = 122 对拍（117 单文件 + 5 包项目
+  含 R90 用例 105_pkg_alias_in_pkg）+ 152 负例**（新对拍 11：116-126
+  record/tuple/file/env/math + 新负例 12）；**存量 115 对拍用例
+  产物 hex 逐字节不变**（R90 转写仅触含 as 包源，存量无此形态）；
+  Rust **541+8**（R90 ×2）；宿主 cli.rs +125（R90 修复+测试）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
   修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19、
   十六审整改按修订 20、json 批按修订 22、包批按修订 24、return
-  收官批按修订 26 交付**——L2.3 语句面收官，仅剩 L2.4 自举闭环；
-  不可称容器全覆盖。
+  收官批按修订 26、record 批按修订 28 交付**——L2.3 全部十一批
+  收官，L2.4 闭环第二段待续；不可称容器全覆盖。
 - 测试基线 539 单元 + 8 集成（v1.3.0 新增 pkg-expand ×4；tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -185,9 +192,9 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：L2.4 自举闭环（self_comp 编译自身产 wasm
-  再编译示例——三层自证对齐 L1 模式）或发起下一轮独立复审
-  （R86-R89 整改与 json/包/return 批后评级待复审）；另有 typechecker
+- 下一步由用户裁决：L2.4 闭环第二段（self_comp 编译自身产 wasm
+  再编译示例——三层自证+自施加，stack-size 60000 起步；四道闸门已拆三）
+  后发起下一轮独立复审（R90/R91 整改后评级待复审）；另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
   MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
@@ -199,22 +206,22 @@
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
    review-2026-09-26-2.html（十六审——最新轮）及
    review-2026-09-26.html（十五审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-26），
-   docs/designs/0001~0009 九份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return，
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-28），
+   docs/designs/0001~0010 十份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return/record+自举，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
    子智能体整理供料，规划者复核关键结论。
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 539/539；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
+   - cargo test --release（期望 541/541；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 67/67）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 255/255 = 115 用例双产物行为一致（含 4 包项目与 11 return 批）+ 140 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 279/279 = 122 用例双产物行为一致（117 单文件 + 5 包项目）+ 152 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -337,6 +344,15 @@
   非 void 无值编译期拒（TYPE010 面信任边界）；值语境 if 的 return
   臂维持既有编译期拒（宿主-L2 分叉面登记）。verify_selfcomp
   255/255；存量 104 对拍 hex 恒等；十六审 A- 不评此新增范围。
+- L2.3 record 批后（v1.3.2）：record（rc{name:vt} 字段名进 vt/
+  字段序注解序优先/异序缺多编译期拒）与 tuple（tp{vt}）构造/访问/
+  注解/签名/枚举载荷/Map 值位嵌套/闭包捕获宿主/L2 双侧一致（含
+  cg 同构四字段嵌 Map 形态）；file 四件套 roundtrip（harness 真实
+  IO + argv 透传 args 消费）；math 四名内联；io import no-op；
+  包源内 as 别名经 pkg-expand 保留后 L2 MATCH（R90 修复——宿主
+  解释器 RUNTIME002 挂账维持）；println/算术/比较/拼接 record·tuple
+  拒（容器显示族）；let (a,b)= 解构维持拒。verify_selfcomp 279/279；
+  存量 115 对拍 hex 恒等；十七审 A- 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主
