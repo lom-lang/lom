@@ -650,3 +650,35 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   v1.3.0**。预计 verify_selfcomp ≈ 237-241 项、存量 100 对拍 hex
   恒等（argv 向后兼容）。**代码零改动——纯设计文档交付；动工在
   裁决后。**
+- **修订 24（2026-09-27）：L2.3 包批交付（用户裁决"执行"——路线
+  丙+丁 / 裁决 2 甲 / 裁决 3 甲；designs/0008 三裁决点全按建议项）。**
+  **首次含宿主工具面改动**：新增 `lom pkg-expand` CLI 子命令
+  （main.rs/cli.rs +297 行含 4 测试——纯工具面不动语言面：复用
+  resolve_dependencies/collect_lom_files 单一事实源，源码文本层展开
+  （包序=宿主 merge 序：包根路径排序+文件名排序）、**剥包内顶层
+  import**（对齐解释器"包内 import 暂不传递"）、`--list` 包名逗号串
+  出口、无 lom.toml 幂等退化、PKG 诊断复用）。L2 侧（self_comp
+  9295→9361 行，+66）：argv 第三参逗号清单进 pkgs 集（缺省空表——
+  单文件路径零变化）；ItImport 分派序对齐宿主 wasm_codegen——
+  内建四模块 → known_pkg（**包符号延迟校验**：collect_sigs 尾部
+  pass2 逐名查 fn/@variant:/@enum: 三表，miss 即"包 'X' 中无公开
+  符号 'y'"——不破坏 pass1 items 序）→ **未知模块编译错误**（
+  "未知模块 'X'（非内建模块且不在包清单……）"——堵静默落空缺口，
+  对齐宿主 PKG005；math/file/env/io import 同步从静默+调用点延迟
+  报错变 import 行即拒，存量 grep 实证零影响）；as 别名=真名摘要
+  整条复制（comp_call 零改动走 R74 校验；别名与既有函数重名不覆盖
+  ——对齐宿主 fn_idx.get(orig) 优先级）；enum/变体重名文案扩注
+  （裁决 2 甲：宿主静默首个赢，L2 明确拒绝+重命名指引——信任边界）。
+  用例 4 包项目（tools/selfcomp/pkg_cases/：101 单包 pkg_demo 同构/
+  102 三包链 C→B→A 跨包 import/103 别名+包内 enum+match/104 enum
+  载荷+双包）+ 负例 4；verify_selfcomp.py 增 PKG_CASES 循环
+  （宿主 build vs pkg-expand 展开单元+第三参，newline='' 防 CRLF）
+  与 NEG_PKGS 机制。验收：verify_selfcomp 230→**238/238 = 104
+  对拍 + 134 负例**；**存量 100 对拍用例产物 hex 逐字节不变**
+  （100/100 identical——argv 向后兼容）；self_comp 9361 行；Rust
+  **535→539**（pkg-expand ×4）+8/六模式/eval 双后端 121/121/
+  doc_audit 67/67 全绿复验（执行者跑全套 + 规划者升版后亲跑全量）；
+  pkg_demo 全链路对拍双侧逐字一致。**升 minor v1.3.0**（宿主 CLI
+  新子命令=用户可见功能，v0.5.x 教训 + NAM005 v1.2.0 先例）。语言面
+  /43 内建/诊断码零变化；十六审 A- 不评此新增范围。**L2.3 剩 return
+  一批。**
