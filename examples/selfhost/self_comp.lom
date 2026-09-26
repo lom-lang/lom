@@ -4584,6 +4584,12 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
         return Err("println 期望 1 个参数")
     end
     let at = infer_ex(list_get(args, 0), env, fns)?
+    # R89（十六审 P3）：void 实参单列诊断——map_remove/map_set 等内建返回
+    # void（宿主 WASM 打 () 为挂账行为），此前落"容器显示留后续批次"兜底
+    # 方向错误（诊断文案即修复指令，会误导修复 LLM）
+    if at == "void"
+        return Err(subset_err("println 实参求值为 void/Unit（map_remove/map_set 等内建返回 void，void 返回函数同理）——void 值不可打印；去掉 println 包裹或改用语句形式调用"))
+    end
     let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
     if at == "i64"
         Ok(ac + "1000")

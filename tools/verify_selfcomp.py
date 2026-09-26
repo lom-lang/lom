@@ -40,6 +40,8 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_for_map.lom': 'for 迭代仅支持 Int/String/List',
     'neg_map_eq_enum_val.lom': 'Map 值相等比较暂不支持 枚举/闭包 值',
     'neg_map_remove_unit_bind.lom': 'let 绑定 void 值',
+    # ---- R89（十六审 P3）：void 实参单列诊断（不再落容器显示兜底）----
+    'neg_println_void.lom': 'println 实参求值为 void',
     # ---- L2.3 List 批（designs/0005 校验表 #1-#12 + 管道子集外登记）----
     # Map 批将 println/拼接提升的容器显示文案扩为 List/Map（neg_println_list
     # /neg_list_concat_promote 的锁定串随批更新）

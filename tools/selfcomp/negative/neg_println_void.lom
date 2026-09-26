@@ -1,0 +1,10 @@
+# R89（十六审 P3）：println 包裹 map_remove——实参综合 vt 为 void（宿主
+# WASM 该形态打 () 为挂账行为）。锁定单列的 void 实参诊断；此前落
+# "容器显示留后续批次"兜底方向错误（诊断即修复指令，会误导修复 LLM）
+from map import { map_empty, map_set, map_remove }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    println(map_remove(m, "a"))
+end
