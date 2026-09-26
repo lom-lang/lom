@@ -735,3 +735,21 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   doc_audit 67/67 全绿复验（升版 v1.3.1 后规划者亲跑）。语言面与
   宿主 src 零改动；十六审 A- 不评此新增范围。**L2.3 语句面收官，
   仅剩 L2.4 自举闭环。**
+- **修订 27（2026-09-27）：L2.4 读码供料 + record/tuple 子批与自举闭环
+  设计产出（动工前置；用户裁决路线甲"继续"）。** 读码供料（执行者
+  实测）证明 **self_comp 源码现无法被 L2 编译**——四道闸门：① 枚举
+  载荷 tuple/record 类型注解（自举实测首错，11.3s 处）；② import
+  file/math/env/io 四行全中"未知模块"；③ 函数签名 record 注解；
+  ④ record 字面量 263 处/字段访问数百/tuple 访问 33 处编译全拒。
+  **修正 RFC 预设：第一序障碍是 record/tuple 语言面缺口（非 Unresolved
+  5 预设的 V8 栈深——栈深降为第二序）**。交付 docs/designs/0010-
+  l2.4-records-bootstrap.md（路线甲两段制：第一段 record/tuple 编译
+  子批——vt rc{name:vt}/tp{vt} 嵌套花括号族、堆 [n][8B 槽] cons 同型
+  布局、编译期偏移字段访问、file/env 四内建宿主中介导入（json 甲
+  先例+materializeNode 同构直抄）+ math 死导入放行与内联指令 + io
+  no-op；第二段 L2.4 三层闭环 + 自施加加分项 + stack-size 60000 起
+  步实测）。沿先例延伸不设裁决点；升版两段制 v1.3.2（record 批
+  patch）/ v1.4.0（自举闭环 minor——本 RFC 收官里程碑）。**同期
+  十七审收官**（A- 维持；R90 包源 as 别名 pkg-expand 丢失随 record
+  批修①、R91 登记扩句随文档——docs/reviews/review-2026-09-27.html）。
+  **代码零改动——纯设计文档交付；实施在后续。**
