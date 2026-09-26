@@ -541,3 +541,38 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   裸语句 `f(...)?` 运行时错位——最小复现未遂，规避形态 let 绑定
   已用并注释，**主观推测**与块尾表达式/语句分组边角相关）。语言面
   与宿主零变化；十五审 B+ 不评此新增范围。
+- **修订 20（2026-09-26）：第十六轮 R86-R89 整改——登记面收口 ×3 +
+  R89 void 实参文案单列。** 用户裁决"执行"（按十六审建议：文档登记
+  为先，R89 顺手小修）。十六审（review-2026-09-26-2.html，基线
+  7f71456/v1.2.13，总评 A-）开账四项 P3 全部关闭：
+  - **R86（登记面扩写）**：println(Bool) 残余拒绝面从"跨函数 Bool
+    参数流转"扩写为"跨函数 Bool 参数流转**与 HOF 产 Bool 中转**
+    （list_fold Bool acc 结果绑定、list_map Bool 闭包经 list_get 后
+    println 同样命中 ibase 防御）"——scan_has_bool_display 不含
+    HOF 结果绑定识别，属登记精度而非行为错误（拒绝干净、无坏
+    wasm）；预扫补 HOF 识别的扩放行面留后续批次评估。
+  - **R87（登记面通用化）**：`mp{?}` 补全边界从 while 实测点扩为
+    通用句——**分支/循环体内 map_set 的绑定层细化均不回写外层
+    绑定**（if/while 同；refine_map_set 在块环境副本上细化，回写
+    反而会重开 R79；加注解即过，行为安全）。
+  - **R88（不对称登记）**：list_fold **结果 vt 从 init 推断**
+    （`list_empty()` 起 → `ls{?}`），闭包 acc 注解不被消费——
+    结果做元素级访问需显式注解，与 list_map/list_filter 按闭包
+    返回型免注解细化**不对称**（ls acc 的 fold 本体编译与行为
+    正确，白名单宣称成立）；修复 LLM 写 fold 时应给结果注解。
+  - **R89（文案小修，代码改动）**：comp_println 对实参综合 vt 为
+    "void" 单列诊断（此前落"容器显示留后续批次"兜底——实参实为
+    void 非 Map/List，方向误导）：`println 实参求值为 void/Unit
+    （map_remove/map_set 等内建返回 void，void 返回函数同理）——
+    void 值不可打印；去掉 println 包裹或改用语句形式调用`；
+    println(List)/println(Map)/println(枚举/闭包) 的既有兜底文案
+    不变（neg_println_map/neg_println_list/neg_enum_print 等
+    负例复验不倒）。
+  - **验收**：verify_selfcomp 205→**206/206 = 90 对拍 + 116 负例**
+    （新负例 neg_println_void 锁新文案关键词 + 无 hex）；
+    **存量 90 对拍用例产物 hex 逐字节不变**（执行者改动前后
+    全量对拍 90/90 identical + 规划者亲跑 206/206 复核）；self_comp
+    8627→**8633 行**（+6：注释 4 行 + void 检查 2 行）；fmt gate 过。
+    升版 v1.2.14（诊断文案修正属行为修复 patch）。语言面与宿主
+    src 零改动；十六审 A- 不因本整改改判，后续评级由下一轮
+    复审重估。

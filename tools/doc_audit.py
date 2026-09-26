@@ -164,8 +164,11 @@ def main():
     # R76（十二审）：self_comp 行数宣称位（README/HANDOFF_PROMPT）——
     # L2.3 行数再变时钉住，R69 同族漂移点根治
     # L2.3-c1 起 README 批次可含一位子批号（c1/c2），仍钉住唯一行数位。
+    # v1.2.14 起 README 称呼去批后缀（"L2.3 subset compiler"），正则
+    # 改为可选后缀——旧措辞（-l/-c1 等）与新措辞均匹配（改措辞前先
+    # 查本正则，§11.6 教训第三次应验后根治）。
     expect_all('README self_comp 行数', 'README.md',
-               r'(\d+)-line L2\.3-[a-z][0-9]? subset compiler', [comp_lines])
+               r'(\d+)-line L2\.3(?:-[a-z][0-9]?)? subset compiler', [comp_lines])
     expect_all('HANDOFF_PROMPT self_comp 行数', 'docs/HANDOFF_PROMPT.md',
                r'self_comp\.lom (\d+)', [comp_lines])
 
