@@ -702,3 +702,36 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   6-8）、存量 104 对拍 hex 恒等、升 **v1.3.1**（纯 L2 面 patch——
   与包批升 minor 的宿主 CLI 面区分）。**代码零改动——纯设计文档
   交付；动工在裁决后。**
+- **修订 26（2026-09-27）：L2.3 return 收官批交付（用户裁决"执行"
+  ——发射 0x0f / B1+B2+B3 全批 / 校验甲；designs/0009 三裁决点全按
+  建议项）。** **L2.3 语句面收官**。self_comp 9361→**9491 行**
+  （+130，设计预估下部）：① cret 线程化——载体 `cg.cgh["cret"]`
+  （cg_str 通道；comp_val_blk 的 ret_vt 硬编码与 comp_ex 无参数通道
+  使 cg 键成为两条路径的单一事实源），comp_one_fn 与
+  **compile_closure 双 save/set/restore**（闭包体独立函数边界——
+  供料点名最易漏点）；② StReturn：有值形 `comp_ex + "0f"`（值与
+  签名同宽无补码）、void 形仅 `"0f"`，三族校验（值不符/void 带值/
+  非 void 无值——宿主 TYPE010 warning 面 L2 编译期拒）；③ ExTry：
+  try_parts 拆族（Result 两参/Option 一参产载荷 vt）+ idx 复合测试
+  （41 00 46 + 41 02 46 + 72 i32.or 对齐宿主 vi==0|vi==2）+ 载荷
+  宽度化读取（2900 08 + f64 补 bf/i32 补 a7）+ else `lget t + 0f`；
+  上下文校验甲（Result 查族 + Err 载荷 vt_compatible；Option 查族）；
+  ex_rv 补 ExTry 臂（闭包尾综合）。**0x0f Node 验证器全收**（关键
+  else 臂 i64+0f 在 if (result f64/i32) 下经 unreachable 豁免通过
+  ——wasm 规范行为，113 用例固化 f64 载荷 Err 直通面）。用例 11
+  （105-115：first_even/for 双形态+嵌套/while 熔断/match Form B 三层/
+  闭包内 return 属闭包自身/try 双路/链式/for 混用/值位 if 内 ? 含
+  f64 豁免面/Err 载荷 st·ls/递归早退）+ 负例 8（#1-#4 全形态）+
+  转正删除 2（neg_return_stmt/neg_c2_try_deferred）。**边界登记**
+  （执行者如实）：值语境 if 的 return 臂（`if c {return x} else {5}`
+  作值使用）是宿主-L2 **既有**分叉面，L2 维持编译期拒（放开需
+  return 臂 unreachable 补丁类新发射决策，超本批最小面）；Fn 参数
+  注解宿主 PARSE001 不支持（109 用例走 let 绑定形态规避）。
+  验收：verify_selfcomp 238→**255/255 = 115 对拍（104 单文件+包 +
+  11 新）+ 140 负例**；**存量 104 对拍用例产物 hex 逐字节不变**
+  （104/104 identical——0x0f 零包装零新键的天然结果）；规划者亲跑
+  255/255 + 0x0f 发射抽查（105 用例 hex 实含 4 处 0f、255 bytes）+
+  113 全链路双侧逐字。Rust 539+8/六模式/eval 双后端 121/121/
+  doc_audit 67/67 全绿复验（升版 v1.3.1 后规划者亲跑）。语言面与
+  宿主 src 零改动；十六审 A- 不评此新增范围。**L2.3 语句面收官，
+  仅剩 L2.4 自举闭环。**

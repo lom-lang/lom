@@ -43,8 +43,8 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.3.0（包批交付，升 minor——宿主 pkg-expand 工具面；
-  首回合仍须实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
+- 仓库版本 v1.3.1（return 收官批——L2.3 语句面收官；首回合仍须
+  实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
   1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
@@ -74,7 +74,7 @@
   5c92f59/v1.2.6——历史评级不外推，十六审 A- 亦不外推 json/包/return
   未交付批次与 R86-R89 整改后状态（后者待下一轮复审）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-24）：
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-26）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -124,17 +124,25 @@
   缺口**——未知模块编译错误对齐宿主 PKG005；math/file/env/io
   从静默+延迟报错变为 import 行即拒，存量零影响）、包符号延迟
   校验、as 别名（R74 零改动）、enum 重名文案扩注（信任边界）。
-  json 批时点（v1.2.15）：230/230 = 100 对拍 + 130 负例、
-  self_comp 9295 行、存量 90 hex 恒等。包批现值（v1.3.0）：
-  self_comp.lom 9361
-  行，verify_selfcomp **238/238 = 104 对拍
-  （含 4 包项目：单包/三包链/别名+enum/enum 载荷+双包）+ 134 负例**；
-  **存量 100 对拍用例产物 hex 逐字节不变**（argv 向后兼容 100/100
-  identical）；Rust **539+8**（pkg-expand ×4）。
+  **v1.3.1 return 收官批**（designs/0009 三裁决点全按建议项：
+  0x0f 直发/B1+B2+B3 全批/校验甲）——**L2.3 语句面收官**：return
+  用 wasm `return` 指令（零深度跟踪/零包装/存量 hex 天然不变/宿主
+  7.2/7.5/W-2 三类深度事故结构性免疫）；`?` = idx 复合测试 + 载荷
+  宽度化读取 + else 原值 0f（校验族+Err 载荷相容严于宿主）；
+  cret 经 cg.cgh 线程化（闭包体双 save/restore——闭包内 return 属
+  闭包自身）；0x0f Node 验证器全收（else 臂 unreachable 豁免）。
+  json/包批时点：230/238（100/104 对拍）、self_comp 9295/9361 行。
+  return 批现值（v1.3.1）：self_comp.lom 9491
+  行，verify_selfcomp **255/255 = 115 对拍（104 + return 批 11：
+  105-115 含闭包内 return/值位 if 内 ? 含 f64 豁免面/Err 载荷
+  st·ls/递归早退）+ 140 负例**（转正 2 + 新增 8）；**存量 104 对拍
+  用例产物 hex 逐字节不变**（0x0f 零包装的天然结果）；Rust 539+8
+  （宿主零改动）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
   修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19、
-  十六审整改按修订 20、json 批按修订 22、包批按修订 24 交付**。
-  return 语句留收官批次，不可称容器全覆盖。
+  十六审整改按修订 20、json 批按修订 22、包批按修订 24、return
+  收官批按修订 26 交付**——L2.3 语句面收官，仅剩 L2.4 自举闭环；
+  不可称容器全覆盖。
 - 测试基线 539 单元 + 8 集成（v1.3.0 新增 pkg-expand ×4；tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -177,8 +185,9 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：L2.3 收官 return 批或发起下一轮独立
-  复审（R86-R89 整改与 json/包批后评级待复审）；另有 typechecker
+- 下一步由用户裁决：L2.4 自举闭环（self_comp 编译自身产 wasm
+  再编译示例——三层自证对齐 L1 模式）或发起下一轮独立复审
+  （R86-R89 整改与 json/包/return 批后评级待复审）；另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
   MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
@@ -190,8 +199,8 @@
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
    review-2026-09-26-2.html（十六审——最新轮）及
    review-2026-09-26.html（十五审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-24），
-   docs/designs/0001~0008 八份批次设计（闭包/作用域/泛型/String/List/Map/json/包，
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-26），
+   docs/designs/0001~0009 九份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
    子智能体整理供料，规划者复核关键结论。
@@ -205,7 +214,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 238/238 = 104 用例双产物行为一致（含 4 包项目）+ 134 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 255/255 = 115 用例双产物行为一致（含 4 包项目与 11 return 批）+ 140 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -319,6 +328,15 @@
   符号 'y'"；enum/变体重名 → 明确拒绝（宿主静默首个赢——信任
   边界，文案含重命名指引）。verify_selfcomp 238/238；存量 100
   对拍 hex 恒等；十六审 A- 不评此新增范围。
+- L2.3 return 收官批后（v1.3.1）：return 语句（有值/无值）与 `?`
+  （Ok/Some 解包、Err/None 原值提前返回）在语句位/循环体/match
+  Form B 臂/闭包体（属闭包自身）/值位 if 内/递归内宿主/L2 双侧
+  stdout+rc 逐字一致（115 对拍锁定）；发射走 wasm return 指令
+  0x0f（零深度——宿主 br $ret 有意偏离登记）；`?` 上下文校验严于
+  宿主（族+Err 载荷相容编译期拒）；return 值与签名不符/void 带值/
+  非 void 无值编译期拒（TYPE010 面信任边界）；值语境 if 的 return
+  臂维持既有编译期拒（宿主-L2 分叉面登记）。verify_selfcomp
+  255/255；存量 104 对拍 hex 恒等；十六审 A- 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主
