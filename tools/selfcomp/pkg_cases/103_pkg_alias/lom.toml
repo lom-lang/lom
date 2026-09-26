@@ -1,0 +1,6 @@
+# L2.3 包批对拍 103：主项目清单——单依赖 libalias
+name = "app103"
+version = "0.1.0"
+
+[dependencies]
+libalias = { path = "libalias" }

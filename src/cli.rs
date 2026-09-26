@@ -44,6 +44,9 @@ pub(crate) struct CliArgs {
     pub(crate) dump_ast: bool,
     /// Phase 8.1（RFC-0003）: --dump-tokens 打印容错词法的 token 流到 stdout（自举 lexer 对账工具）
     pub(crate) dump_tokens: bool,
+    /// L2.3 包批（designs/0008 §6.1）: --list 开关（lom pkg-expand 专用——
+    /// 只输出包名逗号串供脚本消费，stdout 不混入展开产物）
+    pub(crate) list_pkgs: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     pub(crate) program_args: Vec<String>,
 }
@@ -73,6 +76,9 @@ pub(crate) fn print_help(prog: &str) {
         "  {prog} build [--json]             解析 lom.toml 依赖并对包源码类型检查（Phase 4.4）"
     );
     eprintln!("  {prog} build <file> --target wasm [-o out.wasm]  编译为 WASM 二进制（Phase 7.2）");
+    eprintln!(
+        "  {prog} pkg-expand <file.lom> [--list]  展开包项目为单编译单元文本（L2.3 包批；--list 只输出包名逗号串）"
+    );
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
     eprintln!();
@@ -107,6 +113,15 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!(
         "  build       解析 lom.toml 并对依赖包源码做类型检查（Phase 4.4）。--json 输出结构化结果"
     );
+    eprintln!(
+        "  pkg-expand  把 main.lom + 依赖包源码展开为单编译单元文本到 stdout（L2.3 包批，L2 编译器消费）。"
+    );
+    eprintln!(
+        "              包序 = 包根路径排序 + 包内文件名排序（宿主 build 同序）；包内顶层 import 剥除，主文件 import 保留"
+    );
+    eprintln!(
+        "              无 lom.toml 时输出主文件源码原样（单文件项目幂等退化）。--list 只输出包名逗号串"
+    );
     eprintln!();
     eprintln!("选项:");
     eprintln!(
@@ -118,6 +133,9 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  --check    仅做词法/语法/类型检查，不执行；输出带源码上下文的人类可读诊断");
     eprintln!("  --dump-ast 打印 AST 结构树到 stdout（不执行、不类型检查；Phase 8 自举验收工具）");
     eprintln!("  --dump-tokens 打印 token 流到 stdout（Phase 8.1 自举 lexer 对账工具）");
+    eprintln!(
+        "  --list      lom pkg-expand 子命令专用：只输出包名逗号串（供脚本取 L2 第三参），不输出展开产物"
+    );
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
@@ -165,6 +183,10 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 out.subcommand = Some("build".to_string());
                 iter.next();
             }
+            "pkg-expand" => {
+                out.subcommand = Some("pkg-expand".to_string());
+                iter.next();
+            }
             _ => {}
         }
     }
@@ -180,6 +202,7 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
             "--check" => out.check = true,
             "--dump-ast" => out.dump_ast = true,
             "--dump-tokens" => out.dump_tokens = true,
+            "--list" => out.list_pkgs = true,
             "--plan" => out.plan = true,
             "--apply" => out.apply = true,
             "--dry-run" => out.dry_run = true,
@@ -289,6 +312,99 @@ pub(crate) fn merge_packages_for_wasm(
     dep_items.append(&mut program.items);
     let names = graph.packages.keys().cloned().collect();
     (ast::Program { items: dep_items }, names)
+}
+
+/// L2.3 包批（designs/0008 §6.1）：剥除包源码的顶层 import 语句（行级匹配）。
+///
+/// 顶层判定：行未缩进且以 "from " 开头（Lom 顶层 item 只有 fn/enum/import，
+/// 列 0 的 "from" 必为 import）。import 语句不含字符串字面量，花括号配平
+/// 即可容错多行形态（`from x import {` 折行）。主文件的 import 由调用方
+/// 决定保留——它是符号许可与别名的载体（对齐宿主解释器"包内 import 暂
+/// 不传递"语义，interpreter.rs load_packages）。
+fn strip_toplevel_imports(src: &str) -> String {
+    /// 一行内 `{`/`}` 的净增量（import 语句无字符串/字符字面量，直接计数安全）
+    fn brace_delta(line: &str) -> i32 {
+        let mut d = 0i32;
+        for ch in line.chars() {
+            if ch == '{' {
+                d += 1;
+            } else if ch == '}' {
+                d -= 1;
+            }
+        }
+        d
+    }
+    let mut kept: Vec<&str> = Vec::new();
+    let mut skip_depth: i32 = 0; // >0 表示正在跳过多行 import 的延续行
+    for line in src.lines() {
+        if skip_depth > 0 {
+            skip_depth += brace_delta(line);
+            continue;
+        }
+        let toplevel = !line.starts_with(' ') && !line.starts_with('\t');
+        if toplevel && line.trim_start().starts_with("from ") {
+            let d = brace_delta(line);
+            if d > 0 {
+                skip_depth = d; // 花括号未闭合：后续行仍属该 import
+            }
+            continue; // 整行剔除（含行尾注释——注释不进 AST，无语义损失）
+        }
+        kept.push(line);
+    }
+    let mut out = kept.join("\n");
+    if src.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
+
+/// L2.3 包批（designs/0008 §6.1，裁决 1 丙）：包展开——把 main.lom 与依赖
+/// 包源码在文本层合并为单编译单元（L2 编译器 self_comp.lom 的输入；cargo/
+/// rustc 职责分离先例：包管理器展开，编译器吃编译单元）。
+///
+/// 收集与排序完全复用宿主包系统（package.rs resolve_dependencies/
+/// collect_lom_files——单一事实源）：包按根路径排序、包内按文件名排序
+/// （与 merge_packages_for_wasm 同序）。包源码剥顶层 import；主文件源码
+/// 原样保留；各部分之间以空行分隔。
+///
+/// 退化：base_dir 无 lom.toml → (主文件源码原样, [])（单文件项目幂等）。
+/// 失败：清单/依赖解析错误原样上抛（PKG001/002/003 结构化诊断由调用方
+/// 输出 stderr 并以非零码退出）。
+pub(crate) fn expand_package_unit(
+    main_file: &std::path::Path,
+) -> Result<(String, Vec<String>), String> {
+    let src = fs::read_to_string(main_file)
+        .map_err(|e| format!("无法读取文件 '{}': {}", main_file.display(), e))?;
+    let base_dir = main_file.parent().unwrap_or(std::path::Path::new("."));
+    let toml_path = base_dir.join("lom.toml");
+    if !toml_path.exists() {
+        return Ok((src, Vec::new()));
+    }
+    let manifest = package::load_manifest_file(&toml_path).map_err(|e| e.to_string())?;
+    let graph = package::resolve_dependencies(&manifest, base_dir).map_err(|e| e.to_string())?;
+    // 宿主序：包根路径排序（HashMap 遍历序不稳定）；包内 source_files 已由
+    // collect_lom_files 按文件名排序
+    let mut pkgs: Vec<_> = graph.packages.values().collect();
+    pkgs.sort_by(|a, b| a.root.cmp(&b.root));
+    let mut names: Vec<String> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
+    for pkg in pkgs {
+        names.push(pkg.name.clone());
+        for file in &pkg.source_files {
+            let psrc = fs::read_to_string(file)
+                .map_err(|e| format!("无法读取包源码 '{}': {}", file.display(), e))?;
+            parts.push(strip_toplevel_imports(&psrc));
+        }
+    }
+    if parts.is_empty() {
+        // 有清单但零依赖：主文件即编译单元（原样输出，保持幂等）
+        return Ok((src, names));
+    }
+    parts.push(src);
+    // 各部分 trim_end 后以空行分隔、整体单个尾换行——输出确定性（不依赖
+    // 各文件自身的尾随空白形态）
+    let trimmed: Vec<String> = parts.iter().map(|p| p.trim_end().to_string()).collect();
+    Ok((trimmed.join("\n\n") + "\n", names))
 }
 
 /// 修复引擎深化 M2：迭代应用修复直到收敛
@@ -554,6 +670,144 @@ end
         assert!(names2.is_empty());
 
         std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    // ===== L2.3 包批（designs/0008 §6.1）：pkg-expand 展开逻辑回归 =====
+
+    /// pkg_demo 实 fixture：包源码在前（剥 import）、主文件在后（import 保留），
+    /// 展开单元是可解析的合法 Lom。
+    #[test]
+    fn pkg_expand_pkg_demo_strips_imports_and_keeps_main() {
+        let demo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join("pkg_demo")
+            .join("main.lom");
+        let (unit, names) = expand_package_unit(&demo).expect("pkg_demo 展开失败");
+        assert_eq!(names, vec!["mathlib".to_string()], "包名清单应为 [mathlib]");
+        // 包源码在前：主文件 import（保留）之前的文本不得含顶层 from 行（已剥）
+        // （搜 "{ square" 定位主文件真实 import 行——mathlib 源码注释里也提到
+        // "from mathlib import { ... }" 字样，不能用裸前缀匹配）
+        let main_import = unit
+            .find("from mathlib import { square")
+            .expect("主文件 import 必须保留");
+        let pkg_part = &unit[..main_import];
+        assert!(
+            !pkg_part.lines().any(|l| l.starts_with("from ")),
+            "包源码的顶层 import 应被剥除: {:?}",
+            pkg_part
+        );
+        // 宿主序：包 fn（square/cube/factorial）在主文件 items 之前
+        let square_pos = unit.find("fn square").expect("包函数应在展开单元中");
+        assert!(square_pos < main_import, "包源码应在主文件之前");
+        // 展开单元是合法 Lom（可完整解析）
+        assert!(
+            parser::Parser::parse_recover(&unit).is_ok(),
+            "展开单元应可解析"
+        );
+    }
+
+    /// 无 lom.toml 退化：输出主文件源码逐字节原样（幂等——cat 等价）。
+    #[test]
+    fn pkg_expand_single_file_idempotent_without_manifest() {
+        let tmp = std::env::temp_dir().join(format!("lom_pkgexp_idem_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).expect("建目录失败");
+        let src = "fn main() -> Unit\n    println(41 + 1)\nend\n";
+        let main = tmp.join("main.lom");
+        std::fs::write(&main, src).expect("写主文件失败");
+        let (unit, names) = expand_package_unit(&main).expect("退化路径失败");
+        assert_eq!(unit, src, "无清单时主文件源码必须原样输出");
+        assert!(names.is_empty(), "无清单时包名清单为空");
+        // 幂等：对展开产物再次展开（同目录无清单）仍逐字一致
+        let (unit2, names2) = expand_package_unit(&main).expect("二次展开失败");
+        assert_eq!(unit, unit2);
+        assert_eq!(names, names2);
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// 多包排序确定性：同图两次输出逐字一致；包序 = 包根路径排序（liba,libb）；
+    /// 包内跨包 import 剥除而函数体保留。
+    #[test]
+    fn pkg_expand_multi_package_order_and_determinism() {
+        let tmp = std::env::temp_dir().join(format!("lom_pkgexp_multi_{}", std::process::id()));
+        std::fs::create_dir_all(tmp.join("libb")).expect("建 libb 失败");
+        std::fs::create_dir_all(tmp.join("liba")).expect("建 liba 失败");
+        std::fs::write(
+            tmp.join("lom.toml"),
+            "name = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nlibb = { path = \"libb\" }\nliba = { path = \"liba\" }\n",
+        )
+        .expect("写主清单失败");
+        // 声明序故意倒置（libb 在前）——输出序必须按包根路径排序（liba 先）
+        std::fs::write(
+            tmp.join("liba").join("lom.toml"),
+            "name = \"liba\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("写 liba 清单失败");
+        std::fs::write(
+            tmp.join("liba").join("a.lom"),
+            "fn base_a(x: Int) -> Int\n    x + 1\nend\n",
+        )
+        .expect("写 liba 源码失败");
+        std::fs::write(
+            tmp.join("libb").join("lom.toml"),
+            "name = \"libb\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("写 libb 清单失败");
+        std::fs::write(
+            tmp.join("libb").join("b.lom"),
+            "from liba import { base_a }\n\nfn step_b(x: Int) -> Int\n    base_a(x) * 2\nend\n",
+        )
+        .expect("写 libb 源码失败");
+        std::fs::write(
+            tmp.join("main.lom"),
+            "from libb import { step_b }\nfrom liba import { base_a }\n\nfn main() -> Unit\n    println(step_b(base_a(1)))\nend\n",
+        )
+        .expect("写主文件失败");
+
+        let (unit, names) = expand_package_unit(&tmp.join("main.lom")).expect("展开失败");
+        assert_eq!(
+            names,
+            vec!["liba".to_string(), "libb".to_string()],
+            "包序 = 根路径排序"
+        );
+        // liba 的 base_a 在 libb 的 step_b 之前（文件序 + 包序）
+        let a_pos = unit.find("fn base_a").expect("base_a 应在展开单元");
+        let b_pos = unit.find("fn step_b").expect("step_b 应在展开单元");
+        assert!(a_pos < b_pos, "liba 源码应在 libb 之前");
+        // 主文件 import 保留、包内 import 剥除：全文恰好 2 个顶层 from 行（主文件两条）
+        let from_count = unit.lines().filter(|l| l.starts_with("from ")).count();
+        assert_eq!(from_count, 2, "只有主文件的两条 import 保留: {:?}", unit);
+        // 确定性：同图两次输出逐字一致
+        let (unit2, names2) = expand_package_unit(&tmp.join("main.lom")).expect("二次展开失败");
+        assert_eq!(unit, unit2, "同图两次展开必须逐字一致");
+        assert_eq!(names, names2);
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// 剥 import 的行级匹配细节：多行 import 折行形态整段剥除；fn 体内缩进的
+    /// "from" 行不受影响（非顶层）；空产物边界。
+    #[test]
+    fn pkg_expand_strip_matches_multiline_and_skips_indented() {
+        let src = "from libx import {\n    a,\n    b as c\n}\n\nfn main() -> Unit\n    let from = 1\n    println(from)\nend\n";
+        let stripped = strip_toplevel_imports(src);
+        assert!(
+            !stripped.contains("a,"),
+            "多行 import 的延续行应一并剥除: {:?}",
+            stripped
+        );
+        assert!(
+            !stripped.trim_start().starts_with("from libx"),
+            "多行 import 起始行应剥除"
+        );
+        assert!(
+            stripped.contains("fn main"),
+            "import 之后的函数应保留: {:?}",
+            stripped
+        );
+        // 缩进 "from"（非顶层）不受行级匹配影响
+        let indented = "fn main() -> Unit\n    let x = 1\n    println(x)\nend\n";
+        assert_eq!(strip_toplevel_imports(indented), indented);
+        // 空源码：保持空（无尾换行注入）
+        assert_eq!(strip_toplevel_imports(""), "");
     }
 
     #[test]

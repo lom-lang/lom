@@ -1,0 +1,12 @@
+# L2.3 包批负例 #4（designs/0008 §6.4）：别名调用 arity 错——R74 口径
+# 单文件模拟：第三参声明包名 mypkg（verify 脚本经 NEG_PKGS 传入），pf 在
+# 拼接 items 中（此处单文件自含），as 别名注册后按真名摘要做调用点校验
+from mypkg import { pf as aliased_fn }
+
+fn pf(x: Int) -> Int
+    x + 1
+end
+
+fn main() -> Unit ! [IO]
+    println(aliased_fn(1, 2))
+end

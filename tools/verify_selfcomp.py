@@ -9,6 +9,10 @@
           + tools/selfcomp/run_selfcomp.mjs（L2 专用 harness）
   断言：两侧 stdout 逐字一致 + 退出码一致 + L2 编译输出 COMPILED 行。
 
+包项目（L2.3 包批，tools/selfcomp/pkg_cases/）：宿主侧照旧 lom build；
+L2 侧先 `lom pkg-expand <main.lom> --list` 取包名清单、`lom pkg-expand`
+取展开单元，再 `self_comp.lom -- <展开单元> <hex> <包名逗号串>`（裁决 3 甲）。
+
 负例集：tools/selfcomp/negative/ 下的子集外构造必须 COMPILE-ERROR
 且不产 hex。L2.3-c 枚举/match/泛型负例另断言拒绝原因片段，防止错误
 路径偶然产出同一个 COMPILE-ERROR 也被误判为校验已覆盖。
@@ -22,8 +26,16 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, 'tools', 'selfcomp', 'cases')
+PKG_CASES = os.path.join(ROOT, 'tools', 'selfcomp', 'pkg_cases')
 NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
+
+# L2.3 包批（designs/0008 §6.4）：需要向 self_comp 传第三参包名清单的负例
+# （单文件模拟：import 命中包清单成员——否则会先命中"未知模块"拒绝）
+NEG_PKGS = {
+    'neg_pkg_missing_symbol.lom': 'mypkg',
+    'neg_pkg_alias_arity.lom': 'mypkg',
+}
 
 EXPECTED_NEGATIVE_MESSAGES = {
     # ---- L2.3 Map 批（designs/0006 §7.3 校验表 #1-#10 + 裁决 2/3 甲）----
@@ -146,6 +158,11 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_match_string_pattern.lom': '字面量模式类型不符（被测 i64 模式 st）',
     'neg_variant_shadow_call.lom': '调用非闭包值',
     'neg_while_block_let_leak.lom': "未定义变量 'y'",
+    # ---- L2.3 包批（designs/0008 §6.3 校验表 #1/#2/#3 + R74 别名口径）----
+    'neg_pkg_unknown_module.lom': "未知模块 'ghost'",
+    'neg_pkg_missing_symbol.lom': "包 'mypkg' 中无公开符号 'missing_fn'",
+    'neg_pkg_enum_clash.lom': "跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名",
+    'neg_pkg_alias_arity.lom': "调用 'aliased_fn' 实数量不符",
 }
 
 
@@ -209,12 +226,76 @@ def main():
                 print('FAIL %s: 行为不一致\n  host: %r\n  L2:   %r\n  rc host=%d L2=%d' %
                       (name, rh.stdout[:300], rl.stdout[:300], rh.returncode, rl.returncode))
 
+        # L2.3 包批（designs/0008 §6.4，裁决 1 丙+丁 / 裁决 3 甲）：包项目对拍。
+        # 宿主侧照旧 lom build（包合并编译）；L2 侧先 pkg-expand 取包名清单
+        # 与展开单元（两侧编译单元同为宿主包系统的合并产物——等价性由宿主
+        # Rust 代码单点保证），展开单元 + 第三参包名清单喂 self_comp。
+        pkg_dirs = sorted(d for d in glob.glob(os.path.join(PKG_CASES, '*'))
+                          if os.path.isdir(d))
+        for case_dir in pkg_dirs:
+            name = os.path.basename(case_dir)
+            main_lom = os.path.join(case_dir, 'main.lom')
+            # 宿主侧
+            host_wasm = os.path.join(td, name + '.host.wasm')
+            r = run([lom, 'build', main_lom, '--target', 'wasm', '-o', host_wasm])
+            if r.returncode != 0:
+                print('FAIL %s: host build rc=%d %s' % (name, r.returncode, r.stderr[:200]))
+                fail += 1
+                continue
+            rh = run(['node', os.path.join(ROOT, 'eval', 'runner', 'run_wasm.mjs'), host_wasm])
+            # 包名清单（--list 单独出口）+ 展开单元（stdout 纯产物）
+            rl = run([lom, 'pkg-expand', main_lom, '--list'])
+            if rl.returncode != 0:
+                print('FAIL %s: pkg-expand --list rc=%d %s' % (name, rl.returncode, rl.stderr[:200]))
+                fail += 1
+                continue
+            pkgs = rl.stdout.strip()
+            ru = run([lom, 'pkg-expand', main_lom])
+            if ru.returncode != 0:
+                print('FAIL %s: pkg-expand rc=%d %s' % (name, ru.returncode, ru.stderr[:200]))
+                fail += 1
+                continue
+            expanded = os.path.join(td, name + '.expanded.lom')
+            # newline=''：保持 stdout 的 LF 原样落盘（不触发 Windows CRLF 转换）
+            with open(expanded, 'w', encoding='utf-8', newline='') as f:
+                f.write(ru.stdout)
+            # L2 侧：编译（第三参包名逗号清单——缺省不传，保持单文件 argv 形态）
+            hex_out = os.path.join(td, name + '.l2.hex')
+            cmd = [lom, SELF_COMP, '--', expanded, hex_out]
+            if pkgs:
+                cmd.append(pkgs)
+            rc = run(cmd, cwd=ROOT)
+            if 'COMPILED' not in rc.stdout:
+                print('FAIL %s: L2 compile: %s' % (name, rc.stdout.strip()[:300]))
+                fail += 1
+                continue
+            nbytes = int([l for l in rc.stdout.splitlines() if l.startswith('COMPILED')][0].split()[1])
+            l2_wasm = os.path.join(td, name + '.l2.wasm')
+            rg = run(['python', os.path.join(ROOT, 'tools', 'hex2wasm.py'), hex_out, l2_wasm])
+            if rg.returncode != 0:
+                print('FAIL %s: hex2wasm: %s' % (name, rg.stderr[:200]))
+                fail += 1
+                continue
+            rl2 = run(['node', os.path.join(ROOT, 'tools', 'selfcomp', 'run_selfcomp.mjs'), l2_wasm])
+            if rh.stdout == rl2.stdout and rh.returncode == rl2.returncode:
+                ok += 1
+                print('PASS-PKG %-22s pkgs=%s, %d bytes, stdout %d lines, rc=%d' %
+                      (name, pkgs, nbytes, len(rl2.stdout.splitlines()), rl2.returncode))
+            else:
+                fail += 1
+                print('FAIL %s: 行为不一致\n  host: %r\n  L2:   %r\n  rc host=%d L2=%d' %
+                      (name, rh.stdout[:300], rl2.stdout[:300], rh.returncode, rl2.returncode))
+
         # 负例集：子集外构造必须 COMPILE-ERROR 且不产 hex（R66-R68 回归网）
         negatives = sorted(glob.glob(os.path.join(NEGATIVES, '*.lom')))
         for case in negatives:
             name = os.path.basename(case)
             hex_out = os.path.join(td, name + '.neg.hex')
-            rc = run([lom, SELF_COMP, '--', case, hex_out], cwd=ROOT)
+            cmd = [lom, SELF_COMP, '--', case, hex_out]
+            # L2.3 包批：带包名清单的负例（单文件模拟包 import 命中清单）
+            if name in NEG_PKGS:
+                cmd.append(NEG_PKGS[name])
+            rc = run(cmd, cwd=ROOT)
             if 'COMPILE-ERROR' not in rc.stdout:
                 print('FAIL-NEG %s: 期望 COMPILE-ERROR，实际: %s' % (name, rc.stdout.strip()[:200]))
                 fail += 1

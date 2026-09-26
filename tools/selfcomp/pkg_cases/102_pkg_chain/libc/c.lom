@@ -1,0 +1,7 @@
+# L2.3 包批对拍 102：链顶包 libc 源码——跨包 import libb（liba 经传递闭包同图）
+
+from libb import { step_b }
+
+fn step_c(x: Int) -> Int
+    step_b(step_b(x)) + 100
+end

@@ -116,6 +116,19 @@ fn main_inner() {
         return;
     }
 
+    // L2.3 包批（designs/0008 §6.1，裁决 1 丙）：lom pkg-expand <main.lom> [--list]
+    // 把 main.lom + 依赖包源码展开为单编译单元文本到 stdout（L2 编译器
+    // self_comp.lom 的输入）；--list 只输出包名逗号串（脚本取 L2 第三参）。
+    if cli.subcommand.as_deref() == Some("pkg-expand") {
+        match &cli.file {
+            Some(f) => run_pkg_expand(f, cli.list_pkgs),
+            None => {
+                eprintln!("用法：lom pkg-expand <main.lom> [--list]");
+                process::exit(1);
+            }
+        }
+    }
+
     let path = match &cli.file {
         Some(p) => p,
         None => {
@@ -497,6 +510,35 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         }
         Err(e) => {
             eprintln!("无法写入 '{}': {}", out_path, e);
+            process::exit(1);
+        }
+    }
+}
+
+/// L2.3 包批（designs/0008 §6.1，裁决 1 丙）：执行 `lom pkg-expand` 子命令
+///
+/// 把 main.lom 与依赖包源码在文本层展开为单编译单元（包内顶层 import 剥除、
+/// 主文件 import 保留、包序 = 包根路径排序），输出到 stdout 供 L2 编译器
+/// （examples/selfhost/self_comp.lom）消费。`--list` 只输出包名逗号串——
+/// verify 脚本取它作 self_comp 的第三参（裁决 3 甲：argv 包名清单），
+/// 默认模式的 stdout 保持纯展开产物。
+///
+/// 退出码：
+///   0 — 展开成功（含无 lom.toml 的幂等退化：主文件源码原样）
+///   1 — 文件读取失败 / PKG001/002/003（清单缺失字段、路径不存在、循环依赖——
+///       复用宿主结构化诊断原文，stderr 输出）
+fn run_pkg_expand(file: &str, list_only: bool) {
+    match cli::expand_package_unit(std::path::Path::new(file)) {
+        Ok((unit, names)) => {
+            if list_only {
+                println!("{}", names.join(","));
+            } else {
+                print!("{}", unit);
+            }
+            process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("{}", e);
             process::exit(1);
         }
     }

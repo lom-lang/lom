@@ -1,0 +1,9 @@
+# L2.3 包批负例 #2（designs/0008 §6.3 表 #2）：包 import 的符号不在包 items
+# 单文件模拟：第三参声明包名 mypkg（verify 脚本经 NEG_PKGS 传入），源码
+# 中无 missing_fn 定义——pass 2 逐名校验拒绝（对齐宿主 process_import 的
+# public_symbols 检查口径）
+from mypkg import { missing_fn }
+
+fn main() -> Unit ! [IO]
+    println(1)
+end

@@ -1,0 +1,6 @@
+# L2.3 包批对拍 102：主项目清单——直接依赖链顶 libc（libb/liba 经传递闭包入图）
+name = "app102"
+version = "0.1.0"
+
+[dependencies]
+libc = { path = "libc" }

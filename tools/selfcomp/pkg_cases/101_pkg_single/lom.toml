@@ -1,0 +1,6 @@
+# L2.3 包批对拍 101：主项目清单——单依赖 mathlib
+name = "app101"
+version = "0.1.0"
+
+[dependencies]
+mathlib = { path = "mathlib" }

@@ -1,0 +1,6 @@
+# L2.3 包批对拍 102：链中包 libb——依赖 ../liba
+name = "libb"
+version = "0.1.0"
+
+[dependencies]
+liba = { path = "../liba" }

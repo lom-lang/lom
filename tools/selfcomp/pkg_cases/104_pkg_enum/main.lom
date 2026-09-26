@@ -1,0 +1,20 @@
+# L2.3 包批对拍 104：多包符号消费——libshape 枚举载荷 + libutil 跨包桥接
+#
+# main 直接调用两个包的符号；包源码内含跨包 import（libutil→libshape）。
+
+from libshape import { Shape, area }
+from libutil import { label, scaled_area }
+
+fn main() -> Unit ! [IO]
+    println(area(Circle(2.0)))
+    println(area(Rect(2.0, 5.0)))
+    println(label(Circle(9.0)))
+    println(label(Rect(1.0, 1.0)))
+    println(scaled_area(Circle(3.0), 2.0))
+    let s: Shape = Rect(1.5, 4.0)
+    println(area(s) + scaled_area(s, 1.0))
+    match s
+        Circle(r) => println(r)
+        Rect(w, h) => println(w + h)
+    end
+end

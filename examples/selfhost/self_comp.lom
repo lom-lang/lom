@@ -8163,7 +8163,7 @@ fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
                             return Err(subset_err("枚举名与内建类型冲突（'" + name + "'）"))
                         end
                         if map_has(fns, "@enum:" + name)
-                            return Err(subset_err("重复枚举声明 '" + name + "'"))
+                            return Err(subset_err("重复枚举声明 '" + name + "'（跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名）"))
                         end
                         let mut ps = ""
                         let mut seen = map_empty()
@@ -8196,7 +8196,7 @@ fn register_enums(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
                                         return Err(subset_err("用户变体名与内建变体冲突（'" + vname + "'）"))
                                     end
                                     if map_has(fns, "@variant:" + vname)
-                                        return Err(subset_err("重复变体名 '" + vname + "'"))
+                                        return Err(subset_err("重复变体名 '" + vname + "'（跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名）"))
                                     end
                                     let mut ps = ""
                                     let mut n = 0
@@ -8873,7 +8873,7 @@ fn probe_json_import(prg: Prg) -> Bool
     end
 end
 
-fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, ibase: Int) -> Result<String, String>
+fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, ibase: Int, pkgs: Map<String, Bool>) -> Result<String, String>
     register_enums(prg, fns)?
     match prg
         Prg(items) =>
@@ -8978,6 +8978,57 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                 end
                             end
                         end
+                        # L2.3 包批（designs/0008 §6.2，裁决 3 甲）：非内建
+                        # 四模块的 import 分派——包清单成员放行（逐名校验与
+                        # as 别名注册留待下方 pass 2：items 序中包 fn 可能
+                        # 注册在本 import 之后，pass 1 时 fns 表未必齐备）；
+                        # 既非内建也非包清单 → 编译错误（堵旧版静默落空：
+                        # 此前 math/file/env/任意名整条 import 被静默忽略，
+                        # 错误推迟到调用点才报"调用未知函数"，误导定位）。
+                        if module != "string" and module != "list" and module != "map" and module != "json"
+                            if map_has(pkgs, module) == False
+                                return Err(subset_err("未知模块 '" + module + "'（非内建模块且不在包清单——检查 import 拼写或通过第三参声明包名）"))
+                            end
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            # L2.3 包批 pass 2（designs/0008 §6.2）：包 import 的逐名校验与
+            # as 别名注册——一遍注册完全部 items 后再校验（pass 1 时包 fn
+            # 可能尚未进 fns 表：拼接单元里主文件 import 虽在包 fn 之后，
+            # 但单文件程序 import 可先于同名 fn 声明，统一延迟保序不破）。
+            # 校验口径对齐宿主 process_import 的 public_symbols 检查：
+            # fn/枚举类型/变体三者任一命中即通过。
+            for it in items
+                match it
+                    ItImport(module, im_items) =>
+                        if map_has(pkgs, module)
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let known = map_has(fns, iname) or map_has(fns, "@variant:" + iname) or map_has(fns, "@enum:" + iname)
+                                        if known == False
+                                            return Err(subset_err("包 '" + module + "' 中无公开符号 '" + iname + "'"))
+                                        end
+                                        # as 别名注册（宿主 import_aliases 语义——调用点
+                                        # 按真名解析）：用户 fn 的摘要整条复制到别名下，
+                                        # comp_call 零改动即按真名摘要走 R74 arity/类型
+                                        # 校验。别名与既有函数重名时对齐宿主分派优先级
+                                        # （fn_idx.get(orig) 先于 real）——不覆盖，保留既有。
+                                        if alias != iname and map_has(fns, iname)
+                                            if map_has(fns, alias) == False
+                                                let ent = match map_get(fns, iname)
+                                                    Some(e) => e
+                                                    None => {idx: 0, ret: "void", nprm: 0, prms: ""}
+                                                end
+                                                map_set(fns, alias, ent)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     end
                     _ => ()
                 end
@@ -9017,7 +9068,9 @@ fn sig_ret(it: Itm, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: St
 end
 
 # Prg → 模块 hex
-fn build_module(prg: Prg) -> Result<String, String>
+# L2.3 包批（designs/0008 §6.2，裁决 3 甲）：pkgs = 驱动第三参解析出的包名
+# 集（Map<String, Bool> 当集合用）——缺省空表，单文件路径零变化。
+fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
     let fns = map_empty()
     # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
     # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
@@ -9039,7 +9092,7 @@ fn build_module(prg: Prg) -> Result<String, String>
     else
         0
     end)
-    collect_sigs(prg, fns, ibase)?
+    collect_sigs(prg, fns, ibase, pkgs)?
     if map_has(fns, "main") == False
         return Err("程序缺少 main 函数")
     end
@@ -9265,6 +9318,19 @@ fn main() -> Unit ! [IO]
     else
         let input = list_get(argv, 1)
         let outpath = list_get(argv, 2)
+        # L2.3 包批（designs/0008 §6.2，裁决 3 甲）：可选第三参包名逗号
+        # 清单（宿主 pkg-expand --list 供给）——缺省空集，单文件路径
+        # argv 形态零变化。空段/空白段跳过（防御尾逗号形态）。
+        let pkgs = map_empty()
+        if list_length(argv) >= 4
+            let plist = split(list_get(argv, 3), ",")
+            for p in plist
+                let nm = trim(p)
+                if nm != ""
+                    map_set(pkgs, nm, True)
+                end
+            end
+        end
         if file_exists(input) == False
             println("error: file not found: " + input)
             println("COMPILE-ERROR")
@@ -9279,7 +9345,7 @@ fn main() -> Unit ! [IO]
             if bad
                 println("COMPILE-ERROR")
             else
-                match build_module(prg)
+                match build_module(prg, pkgs)
                     Ok(hex) =>
                         file_write(outpath, hex)
                         println("COMPILED " + len(hex) / 2 + " bytes -> " + outpath)

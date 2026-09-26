@@ -1,0 +1,7 @@
+# L2.3 包批对拍 104：主项目清单——双依赖 libshape/libutil
+name = "app104"
+version = "0.1.0"
+
+[dependencies]
+libshape = { path = "libshape" }
+libutil = { path = "libutil" }

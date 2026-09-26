@@ -1,0 +1,12 @@
+# L2.3 包批对拍 102：链中包 libb 源码——跨包 import liba
+# （pkg-expand 剥除该 import；宿主 wasm 路径经 known_packages 放行——两种形态等价）
+
+from liba import { base_a }
+
+fn step_b(x: Int) -> Int
+    base_a(x) * 2
+end
+
+fn wrap_b(y: Int) -> Int
+    step_b(y) + base_a(y)
+end

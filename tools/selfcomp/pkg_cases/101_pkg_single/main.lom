@@ -1,0 +1,15 @@
+# L2.3 包批对拍 101：单包单文件——mathlib 三函数跨包调用（pkg_demo 同构）
+#
+# 宿主侧：lom build main.lom --target wasm（包合并编译）
+# L2 侧：lom pkg-expand 展开 + self_comp 第三参 mathlib
+
+from mathlib import { square, cube, factorial }
+
+fn main() -> Unit ! [IO]
+    println(square(5))
+    println(cube(3))
+    println(factorial(6))
+    let x = 4
+    println(square(x) + cube(2))
+    println(square(factorial(3)))
+end

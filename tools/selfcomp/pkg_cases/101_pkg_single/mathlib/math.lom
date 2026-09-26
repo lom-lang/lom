@@ -1,0 +1,17 @@
+# L2.3 包批对拍 101：mathlib 包源码——square/cube/factorial（递归覆盖尾递归路径）
+
+fn square(x: Int) -> Int
+    x * x
+end
+
+fn cube(x: Int) -> Int
+    x * x * x
+end
+
+fn factorial(n: Int) -> Int
+    if n <= 1
+        1
+    else
+        n * factorial(n - 1)
+    end
+end

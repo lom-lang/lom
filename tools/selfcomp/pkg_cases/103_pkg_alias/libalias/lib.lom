@@ -1,0 +1,15 @@
+# L2.3 包批对拍 103：libalias 包源码——pf 供 as 别名；Color/color_code 供枚举与 match 消费
+
+fn pf(x: Int) -> Int
+    x * 3 + 1
+end
+
+enum Color = Red | Green | Blue
+
+fn color_code(c: Color) -> Int
+    match c
+        Red => 1
+        Green => 2
+        Blue => 3
+    end
+end

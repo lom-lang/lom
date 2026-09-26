@@ -1,0 +1,6 @@
+# L2.3 包批对拍 102：链顶包 libc——依赖 ../libb
+name = "libc"
+version = "0.1.0"
+
+[dependencies]
+libb = { path = "../libb" }

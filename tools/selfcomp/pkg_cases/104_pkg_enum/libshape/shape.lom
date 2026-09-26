@@ -1,0 +1,13 @@
+# L2.3 包批对拍 104：libshape 包源码——带载荷枚举 Shape + area
+
+enum Shape
+    | Circle(Float)
+    | Rect(Float, Float)
+end
+
+fn area(s: Shape) -> Float
+    match s
+        Circle(r) => r * r
+        Rect(w, h) => w * h
+    end
+end

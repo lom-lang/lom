@@ -1,0 +1,6 @@
+# L2.3 包批对拍 104：跨包消费包 libutil 清单——依赖 ../libshape
+name = "libutil"
+version = "0.1.0"
+
+[dependencies]
+libshape = { path = "../libshape" }

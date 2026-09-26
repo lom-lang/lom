@@ -1,0 +1,15 @@
+# L2.3 包批对拍 104：libutil 包源码——跨包 import libshape 的枚举类型
+# （import 是符号许可：area 未 import 也可调——全图注册，宿主/L2 同语义）
+
+from libshape import { Shape }
+
+fn label(s: Shape) -> Int
+    match s
+        Circle(_) => 7
+        Rect(_, _) => 8
+    end
+end
+
+fn scaled_area(s: Shape, k: Float) -> Float
+    area(s) * k
+end

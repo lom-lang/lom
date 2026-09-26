@@ -1,0 +1,10 @@
+# L2.3 包批负例 #3（designs/0008 §4 裁决 2 甲）：enum 重名——L2 明确拒绝
+# 单文件模拟拼接单元中的重复枚举声明（跨包/主文件重名的同一路径）；
+# 宿主静默取首个定义可编译，L2 严格拒绝（R68/R74 严格路线延续）
+enum Color = Red | Green
+
+enum Color = Blue
+
+fn main() -> Unit ! [IO]
+    println(1)
+end

@@ -1,0 +1,15 @@
+# L2.3 包批对拍 102：三包链 C→B→A 桥接（D5 生成器形态）
+#
+# 主文件 import 链顶 libc 与传递依赖 libb（宿主包图按传递闭包放行）；
+# 跨包 import 在包源码内（libb→liba、libc→libb），pkg-expand 剥除后由
+# 合并单元整体解析。
+
+from libc import { step_c }
+from libb import { wrap_b }
+
+fn main() -> Unit ! [IO]
+    println(step_c(1))
+    println(wrap_b(5))
+    println(step_c(step_c(0)))
+    println(step_c(wrap_b(2)))
+end

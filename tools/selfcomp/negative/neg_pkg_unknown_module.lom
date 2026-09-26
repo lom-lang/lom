@@ -1,0 +1,8 @@
+# L2.3 包批负例 #1（designs/0008 §6.3 表 #1）：import 未知模块
+# （非内建 string/list/map/json、也非第三参包清单成员——堵旧版静默落空：
+# 此前该 import 被整条忽略，错误推迟到调用点才报"调用未知函数"）
+from ghost import { anything }
+
+fn main() -> Unit ! [IO]
+    println(1)
+end

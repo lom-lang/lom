@@ -1,0 +1,23 @@
+# L2.3 包批对拍 103：as 别名（pf as aliased_fn）+ 包内 enum 与 match 消费
+#
+# 别名注册走宿主 import_aliases 语义（调用点按真名解析）——L2 侧把真名
+# 摘要复制到别名下（R74 arity/类型校验按真名签名走）。
+
+from libalias import { pf as aliased_fn, Color, color_code }
+
+fn twice_aliased(x: Int) -> Int
+    aliased_fn(aliased_fn(x))
+end
+
+fn main() -> Unit ! [IO]
+    println(aliased_fn(4))
+    println(twice_aliased(2))
+    let c: Color = Green
+    println(color_code(c))
+    println(color_code(Red))
+    println(color_code(Blue))
+    match c
+        Green => println(aliased_fn(10))
+        _ => println(0)
+    end
+end
