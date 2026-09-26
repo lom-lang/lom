@@ -43,7 +43,7 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.2.14（R86-R89 整改包；首回合仍须实查最新 main
+- 仓库版本 v1.2.15（json 批交付；首回合仍须实查最新 main
   CI 与 annotations）；语言面与外部发布线冻结。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
@@ -74,7 +74,7 @@
   5c92f59/v1.2.6——历史评级不外推，十六审 A- 亦不外推 json/包/return
   未交付批次与 R86-R89 整改后状态（后者待下一轮复审）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-20）：
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，修订 1-22）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -105,16 +105,27 @@
   登记收口（println(Bool) 残余拒绝面含 HOF 产 Bool 中转；mp{?}
   分支/循环内 set 不回写外层为通用句；fold 结果 vt 从 init 推断
   的不对称登记）；R89 comp_println 对 void 实参单列诊断（不再误中
-  容器显示文案）。
-  self_comp.lom 8633
-  行，verify_selfcomp **206/206 = 90 对拍 + 116 负例**（Map 批新对拍
-  11 + 新负例 13、R89 新负例 1）；**存量 90 对拍用例产物 hex 逐字节
-  不变**（R89 执行者全量对拍 90/90 identical；Map 批时点存量 79 用例
-  另经十六审 git show 独立全量对拍 79/79 全等）。
+  容器显示文案）。**v1.2.15 json 批**（designs/0007 三裁决点全按
+  建议项：路线甲混合中介 / B1+B2 / 数字切分甲）：vt js 不透明
+  JSON 节点（_Any 归一；object=保插入序 kv 序列不用 Map——键序
+  防分叉；array=ls{js} cons 链）、parse/stringify 走 harness 双导入
+  （JS 语义=对拍基准；产物按 has_json 发双导入+alloc 导出）、
+  B1 消费（.field→js_field trap 对齐宿主 / js 当 ls{js} 归一+
+  js_lguard 守卫 / println(js) 按 kind 分派）、B2 stringify 广参数
+  （js_of 族：标量/ls/mp 产物内转换，en/cl 拒）；import 堵
+  "from json import 静默忽略"缺口；校验 14 形态（as 别名/一元负/
+  js 比较/Unit stringify 拒等）。实施如实登记：执行者子智能体在
+  使用限额耗尽前完成主体，规划者盘点兜底完成验收与全量回归。
+  self_comp.lom 9295
+  行，verify_selfcomp **230/230 = 100 对拍 + 130 负例**（json 批新对拍
+  10：91-100 + 新负例 14 锁原因；用例输入规避已登记双后端差异面）；
+  **存量 90 对拍用例产物 hex 逐字节不变**（规划者全量对拍 90/90
+  identical；Map 批时点存量 79 用例另经十六审 git show 独立全量
+  对拍 79/79 全等）。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
   修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19、
-  十六审整改按修订 20 交付**。json/包/return 语句留后续批次，
-  不可称容器全覆盖。
+  十六审整改按修订 20、json 批按修订 22 交付**。包/return
+  语句留后续批次，不可称容器全覆盖。
 - 测试基线 535 单元 + 8 集成（tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
@@ -157,8 +168,8 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：L2.3 json/包/return 子批逐批推进（json 前置
-  Map 已就绪）；另有 typechecker
+- 下一步由用户裁决：L2.3 剩余 包/return 子批或发起下一轮独立
+  复审（R86-R89 整改与 json 批后评级待复审）；另有 typechecker
   for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
   （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
   MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
@@ -170,8 +181,8 @@
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
    review-2026-09-26-2.html（十六审——最新轮）及
    review-2026-09-26.html（十五审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-20），
-   docs/designs/0001~0006 六份批次设计（闭包/作用域/泛型/String/List/Map，
+   0004-l2-selfhost-compiler.md（L2 进行中，修订 1-22），
+   docs/designs/0001~0007 七份批次设计（闭包/作用域/泛型/String/List/Map/json，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
    子智能体整理供料，规划者复核关键结论。
@@ -185,7 +196,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 206/206 = 90 用例双产物行为一致 + 116 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 230/230 = 100 用例双产物行为一致 + 130 负例拒绝）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -280,6 +291,16 @@
   list_fold 结果 vt 从 init 推断（元素级访问需注解，与 map/filter
   免注解不对称——登记边界）。verify_selfcomp 206/206 = 90 对拍 +
   116 负例；存量 90 对拍用例 hex 逐字节不变；十六审 A- 不评本次整改。
+- L2.3 json 批后（v1.2.15）：json_parse/stringify 宿主/L2 双侧行为
+  一致（roundtrip/转义含中文与 \uXXXX/嵌套深层 .field 链/array 经
+  list 内建消费/标量 println 含 null→"()"；用例规避已登记双后端
+  差异面——"30.0" 切分/极端指数/整数样键/>2^53/超深嵌套）；.field
+  miss 或非 object → 双侧 rc1 trap 对齐；stringify 广参数（标量/
+  ls/mp→js 转换，键序=字节序）；json 值算术/比较/拼接/as 别名/
+  record 字面量/Unit stringify → COMPILE-ERROR 无 hex（14 负例
+  锁原因）；en/cl 值 stringify 拒。verify_selfcomp 230/230 = 100
+  对拍 + 130 负例；存量 90 对拍用例 hex 逐字节不变；十六审 A-
+  不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
   R79：`if False` 内 let 遮蔽外层，宿主 `5/5`、L2 `0/0` 且块外
   未定义名被放行；R80：闭包同名局部与变体/具名函数相撞，宿主

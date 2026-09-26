@@ -598,3 +598,35 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   超深嵌套）。预计 verify_selfcomp ≈ 226-234 项、存量 90 对拍 hex
   恒等、self_comp ~9200-9500 行（**主观推测**）。**代码零改动——
   纯设计文档交付；动工在裁决后。**
+- **修订 22（2026-09-26）：L2.3 json 批交付（用户裁决"按建议执行"
+  ——路线甲混合中介 + B1+B2 + 数字切分甲；designs/0007 三裁决点
+  全按建议项）。** vt **js**（JSON 节点 i64 裸指针，`_Any` 注解位
+  归一）；节点布局 `[kind:i32][payload 8B]`（0 null/1 bool/2 int/
+  3 float/4 str/5 array=ls{js} cons 链/6 object=**保插入序 kv 序列**
+  ——不用 Map 防键序分叉）。**甲路线落地**：parse/stringify 走
+  run_selfcomp.mjs 双导入（`lom_json_parse` JS 解析+物化节点树经
+  产物按需新导出的 alloc；`lom_json_stringify` 读节点序列化，
+  escStr/键序/String(v) 对齐宿主 run_wasm.mjs stringifyVal——
+  数字切分按 JS 值判定天然对齐对拍基准）；产物按 has_json 预扫
+  发双导入 + alloc 导出（**存量程序发射逐字节不变——90/90 全量
+  hex 对拍实证**）。**B1**：ExField 新编译分支（js_field helper：
+  object 逐键 st_eq 匹配，miss/非 object trap 对齐宿主）；js 当
+  ls{js} 消费（js_list_vt 归一 + list 位放行 + js_lguard 拆链守卫
+  kind!=5 trap——is_empty/head/tail/length/get/cons）；println(js)
+  经 js_print 按 kind 分派（标量四通道 + null→"()"；array/object
+  trap 前已打印 stdout 已吐）。**B2**：js_of 标量四枚 + js_of_list|T
+  递归 + js_of_map|V（键序=字节序=宿主 stringify Map 语义）；
+  en/cl 值编译期拒。import 注册堵"from json import 静默忽略"
+  缺口（未知内建报错）；校验 14 形态（含 as 别名拒/一元负拒/
+  js 比较拒/Unit stringify 拒——超设计校验表的实施细化）。
+  验收：verify_selfcomp 206→**230/230 = 100 对拍 + 130 负例**
+  （新对拍 10：91-100 含 roundtrip/field/array list/标量 println/
+  嵌套深层链/_Any 注解+闭包捕获/B2 广参数/stringify 恒等/trap
+  双侧 rc1/bool+null；新负例 14 锁原因——用例输入规避已登记
+  双后端差异面）；**存量 90 对拍用例产物 hex 逐字节不变**；
+  self_comp 8633→**9295 行**（+659）；Rust 535+8/六模式/eval
+  双后端 121/121/doc_audit 67/67 全绿复验。**实施过程说明（如实）**：
+  执行者子智能体在使用限额耗尽前完成编译器/harness/用例/负例
+  主体，规划者盘点遗留后亲自兜底（14 负例文案实跑 + EXPECTED
+  表扩 + 全部验收与全量回归亲跑）。语言面与宿主 src 零改动；
+  十六审 A- 不评此新增范围。
