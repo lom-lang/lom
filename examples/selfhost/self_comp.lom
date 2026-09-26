@@ -2635,6 +2635,11 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
         TyNamed(s) =>
             if name_in(tparams, s)
                 Ok("tv:" + s)
+            elif s == "_Any"
+                # L2.3 json 批（designs/0007 §6.1）：_Any 注解位 → js
+                # （JSON 节点 i64 裸指针，编译期不透明；泛型位 List<_Any>
+                # → ls{js} / Map<String,_Any> → mp{js} 由下方递归自然产生）
+                Ok("js")
             elif s == "Fn"
                 Err(subset_err("Fn 类型注解留后续批次（untagged call_indirect 需精确签名）"))
             else
@@ -2727,7 +2732,7 @@ fn tyopt_vt(t: Option<Ty>, fns: Map<String, {idx: Int, ret: String, nprm: Int, p
 end
 
 fn vt_hex(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js"
         "7e"
     else
         if vt == "i32"
@@ -2935,9 +2940,61 @@ end
 # string 内建（除 split）ret 静态；list 内建与 split 的返回依赖实参——
 # HOF 的 f 签名校验（裁决 2 甲：谓词 Bool / map、fold 签名）在此完成，
 # prms 摘要表达不了元素级约束。
+# L2.3 json 批：js 值当 List 消费时的 vt 归一（js → ls{js}；其余原样）。
+# json array 节点在 list 位实参上视作 ls{js}（元素 = js 节点裸指针，
+# cons 槽 8B 规则复用——harness 物化契约 designs/0007 §6.1）。
+fn js_list_vt(vt: String) -> String
+    if vt == "js"
+        "ls{js}"
+    else
+        vt
+    end
+end
+
+# 该 list 内建的"list 位"实参下标（is_empty/head/tail/length/get=0、
+# cons=1；其余（map/filter/fold/split——list 位不在编译序便利点）返回 -1
+# 不放行 js）。split 是 string 内建共享路径，第 1 参恒 st 不涉及。
+fn list_listpos_index(name: String) -> Int
+    if name == "list_cons"
+        1
+    else
+        if name == "list_is_empty" or name == "list_head" or name == "list_tail" or name == "list_length" or name == "list_get"
+            0
+        else
+            -1
+        end
+    end
+end
+
 fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if name == "split"
         return Ok("ls{st}")
+    end
+    # L2.3 json 批（designs/0007 §6.3）：json 双内建返回类型综合。
+    # parse 实参须 String（校验 #1 R74 式）；stringify 广参数（B2）——
+    # 标量/List/Map/js 经产物内 js_of 转换后序列化，枚举/闭包/Unit 拒
+    if name == "json_parse"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'json_parse' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if !vt_compatible(at, "st")
+            return Err(subset_err("调用 'json_parse' 第 1 参类型不符（期望 st 得 " + at + "）"))
+        end
+        return Ok("js")
+    end
+    if name == "json_stringify"
+        if list_length(args) != 1
+            return Err(subset_err("调用 'json_stringify' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+        end
+        let at = infer_ex(list_get(args, 0), env, fns)?
+        if at == "void"
+            return Err(subset_err("json_stringify 实参不能为 Unit"))
+        end
+        if at == "cl" or enum_vt(at)
+            return Err(subset_err("stringify 暂不支持 枚举/闭包 值（'" + at + "'）"))
+        end
+        return Ok("st")
     end
     if name == "list_empty"
         return Ok("ls{?}")
@@ -2954,17 +3011,20 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
         end
         let hv = infer_ex(list_get(args, 0), env, fns)?
         let xv = infer_ex(list_get(args, 1), env, fns)?
-        if !ls_vt(xv)
+        # L2.3 json 批：第 2 参 js（json array）当 ls{js}（元素须 js）
+        let xl = js_list_vt(xv)
+        if !ls_vt(xl)
             return Err(subset_err("调用 'list_cons' 第 2 参类型不符（期望 List 得 " + xv + "）"))
         end
-        return Ok("ls{" + vt_merge(hv, ls_inner(xv))? + "}")
+        return Ok("ls{" + vt_merge(hv, ls_inner(xl))? + "}")
     end
     if name == "list_head" or name == "list_get"
         let xv = infer_ex(list_get(args, 0), env, fns)?
-        if !ls_vt(xv)
+        let xl = js_list_vt(xv)
+        if !ls_vt(xl)
             return Err(subset_err("调用 '" + name + "' 期望 List 得 " + xv))
         end
-        let inner = ls_inner(xv)
+        let inner = ls_inner(xl)
         if inner == "?"
             return Err(subset_err("未知 List 元素类型——需注解或构造上下文（" + name + "）"))
         end
@@ -2972,10 +3032,11 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
     end
     if name == "list_tail"
         let xv = infer_ex(list_get(args, 0), env, fns)?
-        if !ls_vt(xv)
+        let xl = js_list_vt(xv)
+        if !ls_vt(xl)
             return Err(subset_err("调用 'list_tail' 期望 List 得 " + xv))
         end
-        return Ok(xv)
+        return Ok(xl)
     end
     if name == "list_map"
         if list_length(args) != 2
@@ -3348,6 +3409,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if itn == "cl" or enum_vt(itn) or itn == "st" or mp_vt(itn)
                 return Err(subset_err("闭包/枚举/String/Map 值参与一元负"))
             end
+            if itn == "js"
+                return Err(subset_err("json 值参与一元负（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
+            end
             if itn == "i32"
                 return Err(subset_err("Bool 参与一元负"))
             end
@@ -3361,6 +3425,12 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 let rt = infer_ex(r, env, fns)?
                 if lt == "void" or rt == "void"
                     return Err(subset_err("void 参与比较"))
+                end
+                # L2.3 json 批（designs/0007 §6.5 校验 #7）：js 值不参与任何
+                # 比较（宿主 _Any 运行时动态语义是信任边界——string_to_int
+                # 拒绝先例的系统性登记）
+                if lt == "js" or rt == "js"
+                    return Err(subset_err("json 值参与比较（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
                 end
                 if lt == "st" or rt == "st"
                     if lt == "st" and rt == "st"
@@ -3415,10 +3485,16 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 if mp_vt(lt) or mp_vt(rt)
                     return Err(subset_err("Map 值的显示留后续批次（拼接提升；与 println(Map) 同边界）"))
                 end
+                if lt == "js" or rt == "js"
+                    return Err(subset_err("json 值参与算术/拼接（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
+                end
                 return Ok("st")
             end
             if lt == "void" or rt == "void"
                 return Err(subset_err("void 参与算术"))
+            end
+            if lt == "js" or rt == "js"
+                return Err(subset_err("json 值参与算术/拼接（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
             end
             if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
                 return Err(subset_err("闭包/枚举值参与算术"))
@@ -3462,6 +3538,17 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 return Err(subset_err("range 两端须为 Int（得到 '" + lt + "' 与 '" + rt + "'）"))
             end
             Ok("ls{i64}")
+        end
+        ExField(inner, _) =>
+            # L2.3 json 批（designs/0007 §6.3）：js 值的动态字段访问 → js
+            # （object 节点逐键匹配，miss/非 object 运行时 trap——对齐宿主
+            # `.field` 不存在 trap）；非 js 值的字段访问维持现拒（record 批）
+            let it = infer_ex(inner, env, fns)?
+            if it == "js"
+                Ok("js")
+            else
+                Err(subset_err("该表达式形态"))
+            end
         end
         ExCall(callee, _) =>
             # L2.3-b：统一走 ex_rv（直调 println/fns → ret；闭包调用 → 被调
@@ -3866,6 +3953,20 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             Ok(ac + bc + "10" + leb128_hex(idx))
         end
         ExCall(callee, args) => comp_call(callee, args, env, fns, cg, locals, localvt)
+        ExField(inner, fname) =>
+            # L2.3 json 批（designs/0007 §6.3）：js 值的动态字段访问 →
+            # js_field helper（object 节点逐键 st_eq 匹配取子节点；miss 或
+            # 非 object → unreachable trap——对齐宿主 `.field` 不存在 trap）；
+            # 非 js 值的 ExField 维持现拒（record 批边界）
+            let it = infer_ex(inner, env, fns)?
+            if it != "js"
+                return Err(subset_err("该表达式形态"))
+            end
+            let base = comp_ex(inner, env, fns, cg, locals, localvt)?
+            let key_off = intern_str_lit(fname, cg)
+            let idx = ensure_js_helper("js_field", cg)?
+            Ok(base + "41" + sleb128_hex(key_off) + "ad" + "10" + leb128_hex(idx))
+        end
         _ => Err(subset_err("该表达式形态"))
     end
 end
@@ -4005,6 +4106,10 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     let right_vt = infer_ex(r, env, fns)?
     if enum_vt(left_vt) or enum_vt(right_vt)
         return Err(subset_err("枚举值参与算术/比较（结构相等留后续批次）"))
+    end
+    # L2.3 json 批（校验 #7 防御兜底——infer 侧已拦，不产坏 wasm）
+    if left_vt == "js" or right_vt == "js"
+        return Err(subset_err("json 值参与算术/比较/拼接（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
     end
     if is_cmp_op(op)
         # L2.3-a：比较——i64 直接比 / f64 直接比 / 混合提升 f64 后比（对齐宿主）
@@ -4295,6 +4400,10 @@ fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String
                         if starts_with(name, "map_")
                             return comp_map_builtin(name, args, env, fns, cg, locals, localvt)
                         end
+                        # L2.3 json 批：json 双内建走 import 调用编译路径
+                        if name == "json_parse" or name == "json_stringify"
+                            return comp_json_builtin(name, args, env, fns, cg, locals, localvt)
+                        end
                         return comp_builtin_call(name, fi, args, env, fns, cg, locals, localvt)
                     end
                     # R74（十二审）：调用点校验 arity 与逐实参类型——不符即
@@ -4373,7 +4482,11 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
     if list_length(args) != ent.nprm
         return Err(subset_err("调用 '" + name + "' 实数量不符（期望 " + ent.nprm + " 得 " + list_length(args) + "）"))
     end
-    # 逐参校验（prms 摘要——ls{?} 万能列表型经 vt_merge 合流）+ 编译
+    # 逐参校验（prms 摘要——ls{?} 万能列表型经 vt_merge 合流）+ 编译。
+    # L2.3 json 批：list 位实参 vt js 放行（json array 当 ls{js} 消费——
+    # designs/0007 §4 B1-2），编译段后紧跟 js_lguard 拆链（kind!=5 →
+    # trap，对齐宿主 list_* 对非 List 值的运行时 tag trap）
+    let lpos = list_listpos_index(name)
     let want = split(ent.prms, ",")
     let mut out = ""
     let mut i = 0
@@ -4382,11 +4495,21 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
         let at = infer_ex(a, env, fns)?
         if ent.nprm > 0
             let w = list_get(want, i)
-            if !vt_compatible(at, w)
+            let ok =
+            if at == "js" and i == lpos
+                True
+            else
+                vt_compatible(at, w)
+            end
+            if !ok
                 return Err(subset_err("调用 '" + name + "' 第 " + (i + 1) + " 参类型不符（期望 " + w + " 得 " + at + "）"))
             end
         end
         out = out + comp_ex(a, env, fns, cg, locals, localvt)?
+        if i == lpos and at == "js"
+            let g = ensure_js_helper("js_lguard", cg)?
+            out = out + "10" + leb128_hex(g)
+        end
         i = i + 1
     end
     if name == "list_empty"
@@ -4397,7 +4520,7 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
     end
     if name == "list_head" or name == "list_tail"
         # 暂存 xs → 空表 trap（unreachable，双侧 rc1 一致）→ 按 vt 读槽
-        let xv = infer_ex(list_get(args, 0), env, fns)?
+        let xv = js_list_vt(infer_ex(list_get(args, 0), env, fns)?)
         let t = new_slot(locals, localvt, xv)
         let base = out + "21" + leb128_hex(t)
         + "20" + leb128_hex(t) + "50" + "0440" + "00" + "0b"
@@ -4418,7 +4541,7 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
         return Ok(out + "10" + leb128_hex(idx))
     end
     if name == "list_get"
-        let xv = infer_ex(list_get(args, 0), env, fns)?
+        let xv = js_list_vt(infer_ex(list_get(args, 0), env, fns)?)
         let elem = ls_inner(xv)
         let idx = ensure_ls_helper("ls_get|" + elem, cg)?
         return Ok(out + "10" + leb128_hex(idx))
@@ -4427,7 +4550,7 @@ fn comp_list_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
         # 内联 alloc 16 + store head（按元素 vt）/ tail
         let _ = need_heap(cg)?
         let hv = infer_ex(list_get(args, 0), env, fns)?
-        let xsv = infer_ex(list_get(args, 1), env, fns)?
+        let xsv = js_list_vt(infer_ex(list_get(args, 1), env, fns)?)
         let h_l = new_slot(locals, localvt, hv)
         let xs_l = new_slot(locals, localvt, xsv)
         let cell = new_slot(locals, localvt, "i32")
@@ -4568,6 +4691,42 @@ fn comp_map_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, v
     Ok(out + "10" + leb128_hex(idx))
 end
 
+# L2.3 json 批（designs/0007 §6.3）：json 双内建调用编译。parse 实参
+# vt 须 st（校验 #1 R74 式）→ 拆 (ptr,len) call 导入（funcidx = ibase-2，
+# json 导入面是 import 段最后两条——has_str 恒真下的固定次序 lom_json_
+# parse/lom_json_stringify）；stringify 实参 js 直 call，B2 下非 js 实参
+# 按 vt 先发射 js_of 转换（en/cl/void 编译期拒——校验 #3）。
+fn comp_json_builtin(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if cg_int(cg.cgs, "has_json") == 0
+        return Err("内部错误：json 内建未启用预扫（has_json）——请报维护者")
+    end
+    let ibase = cg_int(cg.cgs, "ibase")
+    let jparse = ibase - 2
+    let jstr = ibase - 1
+    if list_length(args) != 1
+        return Err(subset_err("调用 '" + name + "' 实数量不符（期望 1 得 " + list_length(args) + "）"))
+    end
+    let at = infer_ex(list_get(args, 0), env, fns)?
+    if name == "json_parse"
+        if !vt_compatible(at, "st")
+            return Err(subset_err("调用 'json_parse' 第 1 参类型不符（期望 st 得 " + at + "）"))
+        end
+        let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+        let t = new_slot(locals, localvt, "st")
+        return Ok(ac + "21" + leb128_hex(t)
+            + "20" + leb128_hex(t) + "a7" + "4104" + "6a"
+            + "20" + leb128_hex(t) + "a7" + "2800" + "00"
+            + "10" + leb128_hex(jparse))
+    end
+    # json_stringify：js 直 call；标量/ls/mp 经 js_of 转换（B2）
+    if at == "cl" or enum_vt(at)
+        return Err(subset_err("stringify 暂不支持 枚举/闭包 值（'" + at + "'）"))
+    end
+    let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
+    let conv = js_conv_code(ac, at, cg)?
+    Ok(conv + "10" + leb128_hex(jstr))
+end
+
 # println(String) 的打印序列：ptr_code（栈上 i64）→ 存 local →
 # print_str(p+4, len) + print_str(0,1)（'\n' 在 data offset 0）
 fn print_st_hex(ptr_code: String, locals: Map<String, Int>, localvt: Map<String, String>) -> String
@@ -4611,7 +4770,16 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                     let pc = disp_code(ac, "i32", cg)?
                     Ok(print_st_hex(pc, locals, localvt))
                 else
-                    Err(subset_err("println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"))
+                    if at == "js"
+                        # L2.3 json 批：println(js 标量节点) → js_print helper
+                        # 内聚运行时 kind 分派（int/float/str/bool/null 五路；
+                        # array/object 容器 kind → unreachable trap——容器显示
+                        # 留后续批次，宿主打 display 是已登记信任边界差异）
+                        let idx = ensure_js_helper("js_print", cg)?
+                        Ok(ac + "10" + leb128_hex(idx))
+                    else
+                        Err(subset_err("println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"))
+                    end
                 end
             end
         end
@@ -5554,7 +5722,7 @@ fn ls_vt_bt(vt: String) -> Result<String, String>
     elif vt == "i32"
         Ok("7f")
     else
-        if vt == "i64" or vt == "st" or ls_vt(vt) or mp_vt(vt) or enum_vt(vt) or vt == "cl"
+        if vt == "i64" or vt == "st" or ls_vt(vt) or mp_vt(vt) or enum_vt(vt) or vt == "cl" or vt == "js"
             Ok("7e")
         else
             Err(subset_err("List 元素类型子集外（'" + vt + "'）"))
@@ -6429,6 +6597,366 @@ fn ensure_mp_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, S
 end
 
 
+# ============================================================================
+# L2.3 json 批（designs/0007 §6.1/§6.3）：JSON 节点 helper 家族
+#
+# 节点布局（harness 物化契约，run_selfcomp.mjs 同步）：
+#   [kind:i32][payload 8B]——kind 0 null/1 bool(payload i64 0|1)/2 int(i64)/
+#   3 float(f64 槽)/4 str(st 指针)/5 array(ls{js} cons 链指针，元素=js 节点
+#   裸指针，cons 槽 8B 规则复用)/6 object(kv 定长数组指针：
+#   [n:i32][key_st:i64][val_js:i64]×n 每条 16B——保插入序，不用 Map 承载，
+#   Map 键序重排会与宿主 Record 插入序 stringify 分叉)。
+# helper 注册进 extra 区（alloc 之后的 extra_fns 机制），"|" 特化键同族。
+# ============================================================================
+
+# js_lguard: (i64 node) -> i64；json array 当 List 消费的拆链哨兵——
+# kind != 5（array）→ unreachable（对齐宿主 list_* 对非 List 值的 tag trap）
+# locals: 1=knd（i32）
+fn js_lguard_body() -> String
+    "01017f"
+    + "2000" + "a7" + "2800" + "00" + "2101"
+    + "2001" + "4105" + "47" + "0440" + "00" + "0b"
+    + "2000" + "a7" + "2900" + "04"
+    + "0b"
+end
+
+# js_field: (i64 node, i64 key_st) -> i64；object 节点逐键 st_eq 匹配取子
+# 节点指针；非 object 或键 miss → unreachable（对齐宿主 `.field` 不存在
+# trap）。object 布局：[kind:i32][payload:i64 @4=kvbase]，
+# kvbase → [n:i32][key_st:i64][val_js:i64]×n（条目 16B）。
+# locals: 2=knd,3=base,4=kvbase,5=n,6=i,7=kvaddr（6×i32）
+fn js_field_body(st_eq_idx: Int) -> String
+    "01067f"
+    + "2000" + "a7" + "2800" + "00" + "2102"
+    + "2002" + "4106" + "47" + "0440" + "00" + "0b"
+    + "2000" + "a7" + "2103"
+    + "2003" + "2900" + "04" + "a7" + "2104"
+    + "2004" + "2800" + "00" + "2105"
+    + "4100" + "2106"
+    + "0240" + "0340"
+    + "2006" + "2005" + "4f" + "0d01"
+    + "2004" + "2006" + "4110" + "6c" + "6a" + "4104" + "6a" + "2107"
+    + "2007" + "2900" + "00" + "2001" + "10" + leb128_hex(st_eq_idx)
+    + "0440" + "2007" + "2900" + "08" + "0f" + "0b"
+    + "2006" + "4101" + "6a" + "2106"
+    + "0c00"
+    + "0b" + "0b"
+    + "00"
+    + "0b"
+end
+
+# 静态串打印序列（off 是 data 段 intern 偏移；print_str 恒 idx 2——
+# json 程序 has_str 必真）
+fn js_static_print(off: Int) -> String
+    "41" + sleb128_hex(off + 4)
+    + "41" + sleb128_hex(off) + "ad" + "a7" + "2800" + "00"
+    + "10" + "02"
+    + "4100" + "4101" + "10" + "02"
+end
+
+# js_print: (i64 node) -> ()；println(js) 的运行时 kind 分派——
+# 0 null→"()" / 1 bool→"true"/"false"（静态串）/ 2 int→print_i64 /
+# 3 float→print_f64 / 4 str→print_str；5/6 容器 → unreachable（容器显示
+# 留后续批次——trap 前先前 println 已经 import 即时输出，无缓冲丢失面）。
+# 单参数函数：声明 local 从槽 1 起——1=knd（i32）、2=st 指针（i64）
+fn js_print_body(paren_off: Int, true_off: Int, false_off: Int) -> String
+    "02017f017e"
+    + "2000" + "a7" + "2800" + "00" + "2101"
+    + "2001" + "4100" + "46" + "0440" + js_static_print(paren_off) + "0f" + "0b"
+    + "2001" + "4101" + "46" + "0440"
+    + "2000" + "a7" + "2900" + "04" + "50"
+    + "0440" + js_static_print(false_off) + "05" + js_static_print(true_off) + "0b"
+    + "0f" + "0b"
+    + "2001" + "4102" + "46" + "0440" + "2000" + "a7" + "2900" + "04" + "10" + "00" + "0f" + "0b"
+    + "2001" + "4103" + "46" + "0440" + "2000" + "a7" + "2b00" + "04" + "10" + "01" + "0f" + "0b"
+    + "2001" + "4104" + "46" + "0440"
+    + "2000" + "a7" + "2900" + "04" + "2102"
+    + "2002" + "a7" + "4104" + "6a"
+    + "2002" + "a7" + "2800" + "00"
+    + "10" + "02"
+    + "4100" + "4101" + "10" + "02"
+    + "0f" + "0b"
+    + "00"
+    + "0b"
+end
+
+# js_of_i64: (i64 v) -> i64；构造标量 int 节点 [2][v]
+fn js_of_i64_body(alloc_idx: Int) -> String
+    "01017f"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2101"
+    + "2001" + "4102" + "3600" + "00"
+    + "2001" + "2000" + "3700" + "04"
+    + "2001" + "ad"
+    + "0b"
+end
+
+# js_of_f64: (f64 v) -> i64；构造 float 节点 [3][v]
+fn js_of_f64_body(alloc_idx: Int) -> String
+    "01017f"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2101"
+    + "2001" + "4103" + "3600" + "00"
+    + "2001" + "2000" + "3900" + "04"
+    + "2001" + "ad"
+    + "0b"
+end
+
+# js_of_i32: (i32 v) -> i64；构造 bool 节点 [1][extend(v)]
+fn js_of_i32_body(alloc_idx: Int) -> String
+    "01017f"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2101"
+    + "2001" + "4101" + "3600" + "00"
+    + "2001" + "2000" + "ac" + "3700" + "04"
+    + "2001" + "ad"
+    + "0b"
+end
+
+# js_of_st: (i64 s) -> i64；构造 str 节点 [4][s]
+fn js_of_st_body(alloc_idx: Int) -> String
+    "01017f"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2101"
+    + "2001" + "4104" + "3600" + "00"
+    + "2001" + "2000" + "3700" + "04"
+    + "2001" + "ad"
+    + "0b"
+end
+
+# js 值转换发射（B2）：code（栈上 vt 值）→ 栈上 js 节点。标量四枚 +
+# 递归 ls/mp 特化；en/cl 元素编译期拒（校验 #3——宿主 Debug 形态合法，
+# 信任边界登记）。空 code 形态供 js_of_list/js_of_map 组装元素转换段
+# （同时完成依赖 helper 的 ensure——Map 批先例的依赖序规则）。
+fn js_conv_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
+    if vt == "i64"
+        let i = ensure_js_helper("js_of_i64", cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    if vt == "f64"
+        let i = ensure_js_helper("js_of_f64", cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    if vt == "i32"
+        let i = ensure_js_helper("js_of_i32", cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    if vt == "st"
+        let i = ensure_js_helper("js_of_st", cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    if vt == "js"
+        return Ok(code)
+    end
+    if ls_vt(vt)
+        let i = ensure_js_helper("js_of_list|" + ls_inner(vt), cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    if mp_vt(vt)
+        let i = ensure_js_helper("js_of_map|" + mp_inner(vt), cg)?
+        return Ok(code + "10" + leb128_hex(i))
+    end
+    Err(subset_err("stringify 暂不支持 枚举/闭包 值元素（'" + vt + "'）"))
+end
+
+# js_of_list|T: (i64 xs) -> i64；逐元素按 T 转 js 节点再 cons 成 ls{js}
+# （反构再反转两遍式——ls_map 先例），包 array 节点 [5][链指针]。
+# 单参数函数：声明 local 从槽 1 起——1=cur,2=out（i64）、3=head(elem)、
+# 4=jsv（i64）、5=cell（i32）、6=rev（i64）
+fn js_of_list_body(elem_vt: String, alloc_idx: Int, conv_code: String) -> Result<String, String>
+    let eb = ls_vt_bt(elem_vt)?
+    let head_ld = ls_load_head(1, elem_vt)?
+    Ok("05" + "027e" + "01" + eb + "017e" + "017f" + "017e"
+    + "2000" + "2101"
+    + "4200" + "2102"
+    + "0240" + "0340"
+    + "2001" + "50" + "0d01"
+    + head_ld + "2103"
+    + "2003" + conv_code + "2104"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2004" + "3700" + "00"
+    + "2005" + "2002" + "3700" + "08"
+    + "2005" + "ad" + "2102"
+    + "2001" + "a7" + "2900" + "08" + "2101"
+    + "0c00"
+    + "0b" + "0b"
+    + "4200" + "2106"
+    + "0240" + "0340"
+    + "2002" + "50" + "0d01"
+    + "2002" + "a7" + "2900" + "00" + "2103"
+    + "4110" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "2003" + "3700" + "00"
+    + "2005" + "2006" + "3700" + "08"
+    + "2005" + "ad" + "2106"
+    + "2002" + "a7" + "2900" + "08" + "2102"
+    + "0c00"
+    + "0b" + "0b"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "2105"
+    + "2005" + "4105" + "3600" + "00"
+    + "2005" + "2006" + "3700" + "04"
+    + "2005" + "ad"
+    + "0b")
+end
+
+# js_of_map|V: (i64 m) -> i64；map_keys 键序逐键 probe 取值按 V 转 js，
+# 组 kv 定长数组（一遍式随机写——键序 = map_keys 字节序 = 宿主 stringify
+# Map 键排序语义），包 object 节点 [6][kvbase]。
+# locals: 1=keys(i64)、2=kvbase,3=n,6=slot,9=buckets,10=i,11=node(i32)、
+# 4=kcur,5=kst(i64)、7=val(V)、8=jsv(i64)
+fn js_of_map_body(v_vt: String, alloc_idx: Int, probe_idx: Int, keys_idx: Int, conv_code: String) -> Result<String, String>
+    let vb = ls_vt_bt(v_vt)?
+    let val_ld =
+    if v_vt == "f64"
+        "2009" + "2006" + "4110" + "6c" + "6a" + "2b00" + "08"
+    else
+        if v_vt == "i32"
+            "2009" + "2006" + "4110" + "6c" + "6a" + "2900" + "08" + "a7"
+        else
+            "2009" + "2006" + "4110" + "6c" + "6a" + "2900" + "08"
+        end
+    end
+    Ok("07" + "017e" + "027f" + "027e" + "017f" + "01" + vb + "017e" + "037f"
+    + "2000" + "10" + leb128_hex(keys_idx) + "2101"
+    + "2000" + "a7" + "2800" + "08" + "2103"
+    + "2003" + "4110" + "6c" + "4104" + "6a" + "10" + leb128_hex(alloc_idx) + "2102"
+    + "2002" + "2003" + "3600" + "00"
+    + "2000" + "a7" + "2800" + "00" + "2109"
+    + "2001" + "2104"
+    + "4100" + "210a"
+    + "0240" + "0340"
+    + "2004" + "50" + "0d01"
+    + "2004" + "a7" + "2900" + "00" + "2105"
+    + "2000" + "2005" + "10" + leb128_hex(probe_idx) + "2106"
+    + val_ld + "2107"
+    + "2007" + conv_code + "2108"
+    + "2002" + "200a" + "4110" + "6c" + "6a" + "4104" + "6a" + "2005" + "3700" + "00"
+    + "2002" + "200a" + "4110" + "6c" + "6a" + "410c" + "6a" + "2008" + "3700" + "00"
+    + "200a" + "4101" + "6a" + "210a"
+    + "2004" + "a7" + "2900" + "08" + "2104"
+    + "0c00"
+    + "0b" + "0b"
+    + "410c" + "10" + leb128_hex(alloc_idx) + "210b"
+    + "200b" + "4106" + "3600" + "00"
+    + "200b" + "2002" + "ad" + "3700" + "04"
+    + "200b" + "ad"
+    + "0b")
+end
+
+# L2.3 json 批：json helper 注册（string/list/map helper 共享 extra 区，
+# "|" 特化键同族——vt 字符集不含 "|"）。依赖序（Map 批先例）：依赖先
+# ensure（推进 n_extra_types）→ 组装 body → tidx 依赖之后计算 → 注册。
+# js_field 先确保 st_eq；js_print 先 intern 三静态串（data 段偏移嵌入体）；
+# js_of_list/js_of_map 的元素转换经 js_conv_code 递归 ensure（嵌套 ls/mp
+# 特化键同 ls HOF）。
+fn ensure_js_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
+    match map_get(cg.cgh, "hidx:" + name)
+        Some(idx_s) =>
+            match string_to_int(idx_s)
+                n => Ok(n)
+            end
+        end
+        None =>
+            let alloc_idx = cg_int(cg.cgs, "alloc_idx")
+            let parts = split(name, "|")
+            let head = list_get(parts, 0)
+            if head == "js_field"
+                let se = ensure_str_helper("st_eq", cg)?
+                let body = js_field_body(se)
+                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017e")
+                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                let fidx = reg_extra_fn(tidx, body, cg)
+                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                Ok(fidx)
+            else
+                if head == "js_print"
+                    let paren_off = intern_str_lit("()", cg)
+                    let t_off = intern_str_lit("true", cg)
+                    let f_off = intern_str_lit("false", cg)
+                    let body = js_print_body(paren_off, t_off, f_off)
+                    let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e00")
+                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                    let fidx = reg_extra_fn(tidx, body, cg)
+                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                    Ok(fidx)
+                else
+                    if head == "js_lguard"
+                        let body = js_lguard_body()
+                        let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                        map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e017e")
+                        map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                        let fidx = reg_extra_fn(tidx, body, cg)
+                        map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                        Ok(fidx)
+                    else
+                        if head == "js_of_i64" or head == "js_of_f64" or head == "js_of_i32" or head == "js_of_st"
+                            let _ = need_heap(cg)?
+                            let body =
+                            if head == "js_of_i64"
+                                js_of_i64_body(alloc_idx)
+                            else
+                                if head == "js_of_f64"
+                                    js_of_f64_body(alloc_idx)
+                                else
+                                    if head == "js_of_i32"
+                                        js_of_i32_body(alloc_idx)
+                                    else
+                                        js_of_st_body(alloc_idx)
+                                    end
+                                end
+                            end
+                            let tyhex =
+                            if head == "js_of_f64"
+                                "60017c017e"
+                            else
+                                if head == "js_of_i32"
+                                    "60017f017e"
+                                else
+                                    "60017e017e"
+                                end
+                            end
+                            let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                            map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + tyhex)
+                            map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                            let fidx = reg_extra_fn(tidx, body, cg)
+                            map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                            Ok(fidx)
+                        else
+                            if head == "js_of_list"
+                                let _ = need_heap(cg)?
+                                let elem = list_get(parts, 1)
+                                let conv = js_conv_code("", elem, cg)?
+                                let body = js_of_list_body(elem, alloc_idx, conv)?
+                                let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e017e")
+                                map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                let fidx = reg_extra_fn(tidx, body, cg)
+                                map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                Ok(fidx)
+                            else
+                                if head == "js_of_map"
+                                    let _ = need_heap(cg)?
+                                    let vv = list_get(parts, 1)
+                                    let probe_idx = ensure_mp_helper("mp_probe", cg)?
+                                    let keys_idx = ensure_mp_helper("mp_keys", cg)?
+                                    let conv = js_conv_code("", vv, cg)?
+                                    let body = js_of_map_body(vv, alloc_idx, probe_idx, keys_idx, conv)?
+                                    let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
+                                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60017e017e")
+                                    map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
+                                    let fidx = reg_extra_fn(tidx, body, cg)
+                                    map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
+                                    Ok(fidx)
+                                else
+                                    Err(subset_err("内部错误：未知 json helper '" + name + "'"))
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 # 闭包创建点编译（宿主 compile_closure 平移）。返回 (code, e 槽, caps 名单)：
 # code 在父函数里执行——分配 env 对象 + 闭包对象，栈上留闭包值。
 # 递归闭包（预绑定 + 补丁）由 comp_one_stmt 特判调用本函数后追加补丁。
@@ -7084,12 +7612,16 @@ fn needs_heap(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms
                 end
             end
             # L2.3 Map 批：mp vt 注解保守入 needs_heap（Map 值本身源自
-            # map_empty 的 alloc 白名单——此处为签名携带 mp 的防御性冗余）
+            # map_empty 的 alloc 白名单——此处为签名携带 mp 的防御性冗余）；
+            # L2.3 json 批：js vt 注解同入（"js" 子串不出现于其他 vt 编码）
             if hit == False
                 for key in map_keys(fns)
                     match map_get(fns, key)
                         Some(fi) =>
                             if contains(fi.prms, "mp{") or contains(fi.ret, "mp{")
+                                hit = True
+                            end
+                            if contains(fi.prms, "js") or contains(fi.ret, "js")
                                 hit = True
                             end
                         end
@@ -7368,9 +7900,10 @@ fn comp_val_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, ca
 end
 
 # L2.3-a：值类型 → if 的 blocktype hex（void 40 / i64 7e / f64 7c / i32 7f；
-# L2.3-b：cl（闭包值 = i64）→ 7e；L2.3 Map 批：mp{V}（裸指针）→ 7e）
+# L2.3-b：cl（闭包值 = i64）→ 7e；L2.3 Map 批：mp{V}（裸指针）→ 7e；
+# L2.3 json 批：js（JSON 节点裸指针）→ 7e）
 fn vt_bt(vt: String) -> String
-    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt)
+    if vt == "i64" or enum_vt(vt) or vt == "st" or ls_vt(vt) or mp_vt(vt) or vt == "js"
         "7e"
     else
         if vt == "i32"
@@ -7422,6 +7955,38 @@ fn comp_for(var: String, iter: Ex, body: Blk, env: Map<String, {slot: Int, vt: S
             + "45" + "0d01"
             + bc
             + "20" + xl + "4201" + "7c" + "21" + xl
+            + "0c00" + "0b" + "0b")
+    end
+    # ---- json array 迭代（L2.3 json 批 B1-2）：js 节点经 js_lguard 拆链
+    # （kind!=5 → trap，对齐宿主 for-in 非 List 值的运行时错误）后按
+    # ls{js} cons 指针步进——发射结构与 List 迭代同构 ----
+    if it == "js"
+        let g = ensure_js_helper("js_lguard", cg)?
+        let ic = comp_ex(iter, env, fns, cg, locals, localvt)? + "10" + leb128_hex(g)
+        let elem = "js"
+        let c_slot = new_slot(locals, localvt, "ls{js}")
+        let x_slot = new_slot(locals, localvt, elem)
+        let loop_env = copy_bindings(env)
+        map_set(loop_env, var, {slot: x_slot, vt: elem, sig: "", cap: False})
+        let bc = comp_stmt_blk(body, loop_env, fns, cg, locals, localvt, ret_vt)?
+        let cl = leb128_hex(c_slot)
+        let xl = leb128_hex(x_slot)
+        let head_ld =
+        if elem == "f64"
+            "20" + cl + "a7" + "2b00" + "00"
+        else
+            if elem == "i32"
+                "20" + cl + "a7" + "2900" + "00" + "a7"
+            else
+                "20" + cl + "a7" + "2900" + "00"
+            end
+        end
+        return Ok(ic + "21" + cl
+            + "0240" + "0340"
+            + "20" + cl + "50" + "0d01"
+            + head_ld + "21" + xl
+            + bc
+            + "20" + cl + "a7" + "2900" + "08" + "21" + cl
             + "0c00" + "0b" + "0b")
     end
     # ---- List 迭代（L2.3 List 批 B1：宿主 cons 指针步进，Nil=0 终止）----
@@ -7818,6 +8383,20 @@ fn mp_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: St
         return Ok({helper: "-", nprm: 1, prms: "mp{?}", ret: "i64"})
     end
     Err(subset_err("未知内建 'map." + name + "'"))
+end
+
+# L2.3 json 批（designs/0007 §6.2）：json 模块内建摘要（双内建）。
+# helper "-" 表示走 import 调用编译路径（comp_json_builtin）；parse 返回
+# js（动态联合的节点表示）、stringify 返回 st。未知内建名明确报错——
+# 堵 from json import 静默忽略缺口（Map 批先例）。
+fn js_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
+    if name == "json_parse"
+        return Ok({helper: "-", nprm: 1, prms: "st", ret: "js"})
+    end
+    if name == "json_stringify"
+        return Ok({helper: "-", nprm: 1, prms: "?", ret: "st"})
+    end
+    Err(subset_err("未知内建 'json." + name + "'"))
 end
 
 # n 字节零的 hex（scratch 区填充）
@@ -8272,6 +8851,28 @@ fn probe_str_sigs(prg: Prg) -> Bool
     end
 end
 
+# L2.3 json 批（designs/0007 §6.2 / §12-5）：has_json 预扫——import json
+# 出现即发（保守口径：不扫调用点/注解位——js 值唯一来源是 json_parse，
+# 无 import 的程序不可能产生 js 值；_Any 注解的防御面在 needs_heap）。
+fn probe_json_import(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            let mut hit = False
+            for it in items
+                match it
+                    ItImport(module, _) =>
+                        if module == "json"
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
 fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, ibase: Int) -> Result<String, String>
     register_enums(prg, fns)?
     match prg
@@ -8356,6 +8957,27 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                 end
                             end
                         end
+                        # L2.3 json 批：from json import {...} 同一注册路径
+                        # （parse/stringify 走 comp_json_builtin 的 import
+                        # 调用编译——调用点按注册名分派，json 内建暂不支持
+                        # as 别名导入，别名形态在此明确拒绝——string/list/map
+                        # 同族边界）
+                        if module == "json"
+                            for imp in im_items
+                                match imp
+                                    ImpI(iname, alias) =>
+                                        let ent = js_builtin_entry(iname)?
+                                        if alias != iname
+                                            return Err(subset_err("json 内建导入暂不支持 as 别名（'" + iname + "'）"))
+                                        end
+                                        if map_has(fns, alias)
+                                            return Err(subset_err("内建导入 '" + alias + "' 与用户函数/重复导入同名"))
+                                        end
+                                        map_set(fns, alias, {idx: -2, ret: ent.ret, nprm: ent.nprm, prms: ent.prms})
+                                    end
+                                end
+                            end
+                        end
                     end
                     _ => ()
                 end
@@ -8400,13 +9022,23 @@ fn build_module(prg: Prg) -> Result<String, String>
     # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
     # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
     # 含 ExStr——st 值的三个来源全覆盖；模式内 ExStr 必伴随其一。
-    let has_str = probe_str_sigs(prg) or scan_has_string(prg) or scan_has_bool_display(prg)
-    let ibase =
-    if has_str
-        4
-    else
+    let has_str0 = probe_str_sigs(prg) or scan_has_string(prg) or scan_has_bool_display(prg)
+    # L2.3 json 批（designs/0007 §6.2）：has_json 预扫（import json 出现
+    # 即发）——import 追加 lom_json_parse/stringify、export 追加 alloc。
+    # has_json → has_str 保守置真：json_stringify 返回 st，println(st)
+    # 需要 print_str/data 段（纯 stringify 程序可无任何 String 字面量，
+    # 预扫会漏）；行为对拍不受 section 多寡影响。
+    let has_json = probe_json_import(prg)
+    let has_str = has_str0 or has_json
+    let ibase = 2 + (if has_str
         2
-    end
+    else
+        0
+    end) + (if has_json
+        2
+    else
+        0
+    end)
     collect_sigs(prg, fns, ibase)?
     if map_has(fns, "main") == False
         return Err("程序缺少 main 函数")
@@ -8427,16 +9059,14 @@ fn build_module(prg: Prg) -> Result<String, String>
             # L2.3 String 批：has_str → import 扩 4（+print_str/ftoa），全部
             # funcidx/typeidx 基址随抬（ibase/tbase）；data 段 offset 0 起
             # '\n'。无 String 程序布局与旧版逐字节一致（存量 hex 不变）。
-            let ibase =
-            if has_str
-                4
-            else
-                2
-            end
+            # L2.3 json 批：has_json 再扩 2（json 双导入在 import 段尾部，
+            # funcidx = ibase-2/ibase-1）；json import 的 typeidx 接在
+            # has_str 两类型之后（has_str 恒真时 t4/t5）。
             # L2.3-c：闭包、枚举或 match 预扫（保守）→ 按需启用堆设施。
             # String 批保守化：任一 String 形态也开堆（静态/动态判定易漏，
-            # 宁可多发；行为对拍不受 section 多寡影响）。
-            let heap_on = needs_heap(prg, fns) or has_str
+            # 宁可多发；行为对拍不受 section 多寡影响）。json 批：has_json
+            # → heap_on（alloc export 与 js_of/parse 物化路径的前提）。
+            let heap_on = needs_heap(prg, fns) or has_str or has_json
             # 模块级编译状态（Map 引用语义跨函数共享）
             let cgs = map_empty()
             let cgh = map_empty()
@@ -8445,6 +9075,12 @@ fn build_module(prg: Prg) -> Result<String, String>
             map_set(cgs, "tbase", ibase)
             map_set(cgs, "has_str",
             if has_str
+                1
+            else
+                0
+            end)
+            map_set(cgs, "has_json",
+            if has_json
                 1
             else
                 0
@@ -8493,26 +9129,45 @@ fn build_module(prg: Prg) -> Result<String, String>
             end
             # type section：t0=(i64)->()、t1=(f64)->() 供 print 导入；用户
             # base+；has_str 再加 t2=(i32,i32)->()（print_str）与
-            # t3=(f64,i32)->i32（ftoa）；L2.3-b 起按需追加 extra types
+            # t3=(f64,i32)->i32（ftoa）；has_json 加 (i32,i32)->i64
+            # （lom_json_parse）与 (i64)->i64（lom_json_stringify）；
+            # L2.3-b 起按需追加 extra types
             let mut types_head = "60" + "01" + "7e" + "00" + "60" + "01" + "7c" + "00"
             let mut ntypes = 2 + nfun2
+            let jt0 = 2 + (if has_str
+                2
+            else
+                0
+            end)
             if has_str
                 types_head = types_head + "60" + "02" + "7f" + "7f" + "00" + "60" + "02" + "7c" + "7f" + "01" + "7f"
                 ntypes = ntypes + 2
             end
+            if has_json
+                types_head = types_head + "60027f7f017e" + "60017e017e"
+                ntypes = ntypes + 2
+            end
             let types_c = leb128_hex(ntypes + cg_int(cgs, "n_extra_types")) + types_head + tentries + cg_str(cgh, "extra_types")
             # import section：env.print_i64(t0) / env.print_f64(t1)；
-            # has_str 加 env.print_str(t2) / env.ftoa(t3)（count=4）
-            let mut imp_c = leb128_hex(2)
-            + "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
+            # has_str 加 env.print_str(t2) / env.ftoa(t3)；has_json 加
+            # env.lom_json_parse / env.lom_json_stringify（import 段尾部，
+            # funcidx = ibase-2 / ibase-1）
+            let mut n_imp = 2
+            let mut imp_body = "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
             + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
             if has_str
-                imp_c = leb128_hex(4)
-                + "03" + "656e76" + "09" + "7072696e745f693634" + "00" + "00"
-                + "03" + "656e76" + "09" + "7072696e745f663634" + "00" + "01"
+                n_imp = n_imp + 2
+                imp_body = imp_body
                 + "03" + "656e76" + "09" + "7072696e745f737472" + "00" + "02"
                 + "03" + "656e76" + "04" + "66746f61" + "00" + "03"
             end
+            if has_json
+                n_imp = n_imp + 2
+                imp_body = imp_body
+                + "03" + "656e76" + "0e" + "6c6f6d5f6a736f6e5f7061727365" + "00" + leb128_hex(jt0)
+                + "03" + "656e76" + "12" + "6c6f6d5f6a736f6e5f737472696e67696679" + "00" + leb128_hex(jt0 + 1)
+            end
+            let imp_c = leb128_hex(n_imp) + imp_body
             # function section（用户 + extra：alloc/闭包体/shim/helper）
             let nfn_total = nfun2 + cg_int(cgs, "n_extra_fns")
             let func_c = leb128_hex(nfn_total) + fidxs + cg_str(cgh, "extra_fidxs")
@@ -8542,17 +9197,24 @@ fn build_module(prg: Prg) -> Result<String, String>
                     mid = mid + sect("06", "01" + "7f" + "01" + "4108" + "0b")
                 end
             end
-            # export section：main（has_str 加导出 memory——harness 打印需要）
+            # export section：main；has_str/has_json 加导出 memory（打印
+            # 与 json 物化都要读 memory.buffer）；has_json 再加导出 alloc
+            # （funcidx = alloc_idx，harness 物化分配用——宿主 lom_alloc 先例）
             let mi = match map_get(fns, "main")
                 Some(f) => f
                 None => {idx: 2, ret: "void", nprm: 0, prms: ""}
             end
-            let exp_c =
-            if has_str
-                "02" + "06" + "6d656d6f7279" + "02" + "00" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
-            else
-                "01" + "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            let mut exp_n = 1
+            let mut exp_body = "04" + "6d61696e" + "00" + leb128_hex(mi.idx)
+            if has_str or has_json
+                exp_n = exp_n + 1
+                exp_body = "06" + "6d656d6f7279" + "02" + "00" + exp_body
             end
+            if has_json
+                exp_n = exp_n + 1
+                exp_body = exp_body + "09" + "6c6f6d5f616c6c6f63" + "00" + leb128_hex(cg_int(cgs, "alloc_idx"))
+            end
+            let exp_c = leb128_hex(exp_n) + exp_body
             # code section
             let code_c = leb128_hex(nfn_total) + bodies + cg_str(cgh, "extra_bodies")
             # data section(11)：排 code(10) 之后（section id 升序）；active 全量装载

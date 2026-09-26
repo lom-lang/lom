@@ -1,0 +1,8 @@
+# 校验 #7：json 值参与拼接（非 stringify 语境）
+from json import { json_parse }
+
+fn main() -> Unit
+    let d = json_parse("\"x\"")
+    let s = d + "!"
+    println(s)
+end

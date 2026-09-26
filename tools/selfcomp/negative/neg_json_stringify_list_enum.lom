@@ -1,0 +1,8 @@
+# 校验 #3：stringify 的 List 枚举元素（B2 边界——js_of 特化族拒）
+from json import { json_stringify }
+from list import { list_cons, list_empty }
+
+fn main() -> Unit
+    let xs = list_cons(Some(1), list_empty())
+    println(json_stringify(xs))
+end

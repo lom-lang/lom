@@ -1,0 +1,19 @@
+# L2.3 json 批 B1（designs/0007 §7 93）：json array 经既有 list 内建与
+# for-in 消费（js_lguard 拆链后按 ls{js} 存取——元素 = js 节点）。
+from json import { json_parse }
+from list import { list_length, list_get, list_head, list_tail }
+
+fn main() -> Unit ! [IO]
+    let arr = json_parse("[10,20,30]")
+    println(list_length(arr))
+    println(list_get(arr, 0))
+    println(list_get(arr, 2))
+    println(list_head(arr))
+    println(list_head(list_tail(arr)))
+    for x in arr
+        println(x)
+    end
+    let scores = json_parse("{\"s\":[90,85]}").s
+    println(list_length(scores))
+    println(list_get(scores, 1))
+end

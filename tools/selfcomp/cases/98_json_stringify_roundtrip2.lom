@@ -1,0 +1,13 @@
+# L2.3 json 批（designs/0007 §7 98）：stringify(parse(复杂串)) 恒等——
+# 键保插入序（"b" 先于 "a"）、转义键、中文值、空容器。
+from json import { json_parse, json_stringify }
+
+fn main() -> Unit ! [IO]
+    let s = "{\"b\":2,\"a\":[1,\"两\",true,null]}"
+    println(json_stringify(json_parse(s)))
+    let t = "{\"x\":{\"y\\\"z\":3.5}}"
+    println(json_stringify(json_parse(t)))
+    let u = "[{\"k\":[1,2]},3.5,\"s\"]"
+    println(json_stringify(json_parse(u)))
+    println(json_stringify(json_parse("  [ 1 , 2 ]  ")))
+end

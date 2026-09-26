@@ -1,0 +1,23 @@
+# L2.3 json 批 B2（designs/0007 §7 97）：stringify 广参数——标量四枚
+# 经 js_of 家族转节点 + ls{T}→array + mp{V}→object（键序 = map_keys
+# 字节序 = 宿主 stringify Map 键排序语义）。
+from json import { json_stringify }
+from list import { list_cons, list_empty }
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    println(json_stringify(42))
+    println(json_stringify("x"))
+    println(json_stringify(1.5))
+    println(json_stringify(True))
+    println(json_stringify(False))
+    let xs = list_cons(1, list_cons(2, list_cons(3, list_empty())))
+    println(json_stringify(xs))
+    let ys = list_cons("a", list_cons("b", list_empty()))
+    println(json_stringify(ys))
+    let m = map_empty()
+    map_set(m, "b", 2)
+    map_set(m, "a", 1)
+    map_set(m, "c", 3)
+    println(json_stringify(m))
+end

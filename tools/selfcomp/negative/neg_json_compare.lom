@@ -1,0 +1,12 @@
+# 校验 #7：json 值参与比较
+from json import { json_parse }
+
+fn main() -> Unit
+    let a = json_parse("1")
+    let b = json_parse("2")
+    if a == b
+        println(1)
+    else
+        println(0)
+    end
+end

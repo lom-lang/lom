@@ -1,0 +1,7 @@
+# _Any 注解与非 json 值不符（js 与 i64 不可合流——编译期拒）
+from json import { json_parse }
+
+fn main() -> Unit
+    let x: _Any = 42
+    println(x)
+end

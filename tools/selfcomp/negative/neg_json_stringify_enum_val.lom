@@ -1,0 +1,6 @@
+# 校验 #3：stringify 枚举值（B2 边界——宿主 Debug 形态合法，信任边界）
+from json import { json_stringify }
+
+fn main() -> Unit
+    println(json_stringify(Some(1)))
+end

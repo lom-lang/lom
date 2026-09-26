@@ -1,0 +1,6 @@
+# json_stringify 实参为 Unit（编译期拒）
+from json import { json_stringify }
+
+fn main() -> Unit
+    println(json_stringify(()))
+end

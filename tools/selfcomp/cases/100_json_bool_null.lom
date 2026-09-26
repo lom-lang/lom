@@ -1,0 +1,14 @@
+# L2.3 json 批（designs/0007 §7 100）：true/false/null 的消费形态——
+# bool 节点 println（true/false 通道）+ null 节点（"()"）+ 整体 stringify。
+from json import { json_parse, json_stringify }
+
+fn main() -> Unit ! [IO]
+    let d = json_parse("{\"on\":true,\"off\":false,\"none\":null}")
+    println(d.on)
+    println(d.off)
+    println(d.none)
+    println(json_stringify(d))
+    println(json_parse("true"))
+    println(json_parse("false"))
+    println(json_parse("null"))
+end

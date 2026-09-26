@@ -1,0 +1,16 @@
+# L2.3 json 批 B1（designs/0007 §7 95）：嵌套 object/array 深层 .field
+# 链（ExField 嵌套 + ExField(list_get(...)) 交叉）。
+from json import { json_parse }
+from list import { list_get, list_length }
+
+fn main() -> Unit ! [IO]
+    let d = json_parse("{\"a\":{\"b\":{\"c\":{\"deep\":42}}}}")
+    println(d.a.b.c.deep)
+    let e = json_parse("{\"rows\":[{\"k\":\"v1\"},{\"k\":\"v2\"}],\"meta\":{\"n\":2}}")
+    println(list_get(e.rows, 0).k)
+    println(list_get(e.rows, 1).k)
+    println(e.meta.n)
+    println(list_length(e.rows))
+    let f = json_parse("{\"g\":{\"list\":[{\"val\":1}]}}")
+    println(list_get(f.g.list, 0).val)
+end

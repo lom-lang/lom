@@ -1,0 +1,15 @@
+# L2.3 json 批 B1（designs/0007 §7 91）：parse→stringify 直往返——
+# 标量/嵌套 object/array/bool/null/转义与中文（规避已登记双后端差异面：
+# 无切分歧义数字/极端指数/整数样键/超深嵌套）。
+from json import { json_parse, json_stringify }
+
+fn main() -> Unit ! [IO]
+    println(json_stringify(json_parse("{\"a\":1,\"b\":[1,2,3],\"c\":\"x\"}")))
+    println(json_stringify(json_parse("[true,false,null]")))
+    println(json_stringify(json_parse("\"hello\"")))
+    println(json_stringify(json_parse("42")))
+    println(json_stringify(json_parse("3.25")))
+    println(json_stringify(json_parse("{\"esc\":\"q\\\"w\\\\e\\nr\",\"cn\":\"中文\"}")))
+    println(json_stringify(json_parse("[]")))
+    println(json_stringify(json_parse("{}")))
+end

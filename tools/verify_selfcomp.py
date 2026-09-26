@@ -40,6 +40,21 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_for_map.lom': 'for 迭代仅支持 Int/String/List',
     'neg_map_eq_enum_val.lom': 'Map 值相等比较暂不支持 枚举/闭包 值',
     'neg_map_remove_unit_bind.lom': 'let 绑定 void 值',
+    # ---- L2.3 json 批（designs/0007 裁决 1 甲 + B1+B2 + 数字甲）----
+    'neg_json_alias.lom': '暂不支持 as 别名',
+    'neg_json_arith.lom': 'json 值参与算术/拼接',
+    'neg_json_compare.lom': 'json 值参与比较',
+    'neg_json_concat.lom': 'json 值参与算术/拼接',
+    'neg_json_field_nonjs.lom': '该表达式形态',
+    'neg_json_let_mismatch.lom': "let 注解类型 'js' 与值类型 'i64' 不符",
+    'neg_json_map_consume.lom': '期望 Map 得 js',
+    'neg_json_neg.lom': 'json 值参与一元负',
+    'neg_json_parse_nonstr.lom': "第 1 参类型不符（期望 st 得 i64）",
+    'neg_json_record_literal.lom': '该表达式形态',
+    'neg_json_stringify_enum_val.lom': 'stringify 暂不支持 枚举/闭包 值',
+    'neg_json_stringify_list_enum.lom': '暂不支持 枚举/闭包 值元素',
+    'neg_json_stringify_unit.lom': 'json_stringify 实参不能为 Unit',
+    'neg_json_unknown_builtin.lom': "未知内建 'json.json_dump'",
     # ---- R89（十六审 P3）：void 实参单列诊断（不再落容器显示兜底）----
     'neg_println_void.lom': 'println 实参求值为 void',
     # ---- L2.3 List 批（designs/0005 校验表 #1-#12 + 管道子集外登记）----

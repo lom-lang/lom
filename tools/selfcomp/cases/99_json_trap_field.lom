@@ -1,0 +1,11 @@
+# L2.3 json 批（designs/0007 §7 99）：字段不存在 → 双侧运行时 trap rc1
+# （trap 前已产生的 stdout 必须保留——c1 教训的行为对拍面）。
+from json import { json_parse }
+
+fn main() -> Unit ! [IO]
+    let d = json_parse("{\"a\":1,\"s\":\"ok\"}")
+    println(d.a)
+    println(d.s)
+    println(d.missing)
+    println(0)
+end

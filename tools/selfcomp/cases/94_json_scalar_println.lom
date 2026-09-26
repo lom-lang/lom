@@ -1,0 +1,13 @@
+# L2.3 json 批 B1（designs/0007 §7 94）：五种标量节点 println——
+# int/float/str/bool/null（null → "()" 对齐宿主 println(Unit)）。
+from json import { json_parse }
+
+fn main() -> Unit ! [IO]
+    println(json_parse("7"))
+    println(json_parse("2.5"))
+    println(json_parse("\"str\""))
+    println(json_parse("true"))
+    println(json_parse("false"))
+    println(json_parse("null"))
+    println(json_parse("\"中文\""))
+end

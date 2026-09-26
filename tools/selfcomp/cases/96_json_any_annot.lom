@@ -1,0 +1,25 @@
+# L2.3 json 批 B1（designs/0007 §7 96）：_Any 注解位（let/参数/返回/泛型
+# 载荷 List<_Any>）+ 闭包捕获 js 值（js vt 流经 sig 串与 8 字节捕获槽）。
+from json import { json_parse }
+from list import { list_cons, list_empty, list_length }
+
+fn pick(d: _Any) -> _Any
+    d.n
+end
+
+fn main() -> Unit ! [IO]
+    let d: _Any = json_parse("{\"n\":5,\"s\":\"txt\"}")
+    let xs: List<_Any> = list_cons(d.n, list_cons(d.s, list_empty()))
+    println(list_length(xs))
+    let show = fn(v: _Any) -> _Any
+        v
+    end
+    println(show(d.n))
+    println(show(d.s))
+    let inner = pick(d)
+    println(inner)
+    let grab = fn() -> _Any
+        d.n
+    end
+    println(grab())
+end

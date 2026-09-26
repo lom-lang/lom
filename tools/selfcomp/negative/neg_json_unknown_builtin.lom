@@ -1,0 +1,6 @@
+# 校验 #2：未知 json 内建名（堵 from json import 静默忽略缺口）
+from json import { json_dump }
+
+fn main() -> Unit
+    println(0)
+end

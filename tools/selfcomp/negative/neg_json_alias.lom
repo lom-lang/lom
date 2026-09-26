@@ -1,0 +1,6 @@
+# json 内建 as 别名导入（调用点按注册名分派——别名形态明确拒绝）
+from json import { json_parse as jp }
+
+fn main() -> Unit
+    println(0)
+end

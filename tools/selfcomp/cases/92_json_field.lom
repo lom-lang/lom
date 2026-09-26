@@ -1,0 +1,14 @@
+# L2.3 json 批 B1（designs/0007 §7 92）：data.field 动态字段消费——
+# str/int 两种标量节点 println（js_print 运行时 kind 分派）。
+from json import { json_parse }
+
+fn main() -> Unit ! [IO]
+    let data = json_parse("{\"name\":\"Alice\",\"age\":30}")
+    println(data.name)
+    println(data.age)
+    let todo = json_parse("{\"title\":\"写报告\",\"done\":false,\"id\":7}")
+    println(todo.title)
+    println(todo.done)
+    println(todo.id)
+    println(data.name)
+end

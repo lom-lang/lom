@@ -1,0 +1,7 @@
+# 校验 #4：非 js 值的字段访问（record 批边界——现兜底文案）
+from json import { json_parse }
+
+fn main() -> Unit
+    let n = 5
+    println(n.x)
+end

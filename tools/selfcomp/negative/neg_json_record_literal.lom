@@ -1,0 +1,7 @@
+# 校验 #5：record 字面量构造（ExRecord——record 批边界，B3 不做）
+from json import { json_stringify }
+
+fn main() -> Unit
+    let t = {id: 1, done: True}
+    println(json_stringify(t))
+end
