@@ -1,0 +1,14 @@
+# 校验 #2（void 形）：void main 内用 ?——所在函数返回类型非
+# Result/Option，Err/None 无处返回。
+fn g(n: Int) -> Result<Int, Int>
+    if n > 0
+        Ok(n)
+    else
+        Err(0 - 1)
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let v = g(0 - 5)?
+    println(v)
+end

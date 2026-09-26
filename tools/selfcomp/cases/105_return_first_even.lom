@@ -1,0 +1,35 @@
+# L2.3 return 收官批：eval 020 first_even 原生形态——平铺三 if 语句 +
+# 提前 return + 尾兜底（任意语句深度直达函数边界，0x0f 直发）。
+fn early_return_sum_first_even(a: Int, b: Int, c: Int) -> Int
+    if a % 2 == 0
+        return a
+    end
+    if b % 2 == 0
+        return b
+    end
+    if c % 2 == 0
+        return c
+    end
+    -1
+end
+
+fn nested_depth(a: Int, b: Int) -> Int
+    if a > 0
+        while b < a
+            if b * 2 == a
+                return b
+            end
+            b = b + 1
+        end
+    end
+    0 - 1
+end
+
+fn main() -> Unit ! [IO]
+    println(early_return_sum_first_even(1, 3, 5))
+    println(early_return_sum_first_even(1, 4, 7))
+    println(early_return_sum_first_even(8, 3, 5))
+    println(nested_depth(10, 0))
+    println(nested_depth(9, 0))
+    println(nested_depth(0, 5))
+end

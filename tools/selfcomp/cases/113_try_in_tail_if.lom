@@ -1,0 +1,74 @@
+# L2.3 return 收官批：值位 if 内 ?（块尾尾表达式位置——? 在 if (result)
+# 表达式的 then 臂尾发射，Err 直通的 0f 从 if 表达式内部穿出函数）。
+fn div(a: Int, b: Int) -> Result<Int, Int>
+    if b == 0
+        Err(0 - 1)
+    else
+        Ok(a / b)
+    end
+end
+
+fn gated_div(a: Int, b: Int, use_it: Bool) -> Result<Int, Int>
+    let v =
+    if use_it
+        div(a, b)?
+    else
+        a
+    end
+    if v % 2 == 0
+        Ok(v / 2)
+    else
+        Err(v)
+    end
+end
+
+# f64 载荷形态：? 在 if (result f64) 臂内触发 else 臂 lget(i64)+0f——
+# wasm 规范 return 后 unreachable 豁免臂栈匹配（Node 实测收）。
+fn fdiv(a: Float, b: Float) -> Result<Float, Int>
+    if b == 0.0
+        Err(0 - 1)
+    else
+        Ok(a / b)
+    end
+end
+
+fn gated_fdiv(a: Float, b: Float, use_it: Bool) -> Result<Float, Int>
+    let v =
+    if use_it
+        fdiv(a, b)?
+    else
+        a
+    end
+    Ok(v * 2.0)
+end
+
+fn main() -> Unit ! [IO]
+    match gated_div(100, 5, True)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_div(100, 0, True)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_div(9, 3, False)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_div(8, 3, False)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_fdiv(3.0, 2.0, True)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_fdiv(3.0, 0.0, True)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match gated_fdiv(5.0, 0.0, False)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+end

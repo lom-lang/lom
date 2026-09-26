@@ -1,0 +1,9 @@
+# 校验 #3：return 值与函数返回 vt 不符（期望 i64 得 st）——宿主
+# TYPE010 warning 面，L2 编译期拒。
+fn f() -> Int
+    return "oops"
+end
+
+fn main() -> Unit ! [IO]
+    println(f())
+end

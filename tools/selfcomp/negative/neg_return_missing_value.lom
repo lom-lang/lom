@@ -1,0 +1,11 @@
+# 校验 #3（无值形）：非 void 函数 return 无值。
+fn f(n: Int) -> Int
+    if n > 0
+        return
+    end
+    0
+end
+
+fn main() -> Unit ! [IO]
+    println(f(1))
+end

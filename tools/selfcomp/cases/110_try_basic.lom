@@ -1,0 +1,46 @@
+# L2.3 return 收官批：? 基本面——try_operator.lom 骨架（Result 与 Option
+# 双路 + match 消费；Ok/Some 解包取载荷、Err/None 经 0x0f 提前返回）。
+fn parse_sign(n: Int) -> Result<Int, String>
+    if n < 0
+        Err("negative: " + "x")
+    else
+        Ok(n)
+    end
+end
+
+fn double_pos(n: Int) -> Result<Int, String>
+    let v = parse_sign(n)?
+    Ok(v * 2)
+end
+
+fn opt_half(n: Int) -> Option<Int>
+    if n % 2 == 0
+        Some(n / 2)
+    else
+        None
+    end
+end
+
+fn opt_use(n: Int) -> Option<Int>
+    let v = opt_half(n)?
+    Some(v + 1)
+end
+
+fn main() -> Unit ! [IO]
+    match double_pos(21)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match double_pos(0 - 4)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match opt_use(10)
+        Some(v) => println(v)
+        None => println(0 - 1)
+    end
+    match opt_use(7)
+        Some(v) => println(v)
+        None => println(0 - 1)
+    end
+end

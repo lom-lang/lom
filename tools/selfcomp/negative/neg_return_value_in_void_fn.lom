@@ -1,0 +1,12 @@
+# 校验 #4：无返回注解函数（None 注解 → void 现状维持）内 return 带值。
+fn f(n: Int)
+    if n > 0
+        return n
+    end
+    0
+end
+
+fn main() -> Unit ! [IO]
+    f(1)
+    println(0)
+end

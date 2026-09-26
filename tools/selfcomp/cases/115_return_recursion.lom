@@ -1,0 +1,30 @@
+# L2.3 return 收官批：递归内提前返回——递归栈每层独立 return 语义
+# （基例 return 与中途熔断 return，0x0f 归属当前栈帧）。
+fn sum_to(n: Int) -> Int
+    if n <= 0
+        return 0
+    end
+    if n == 5
+        return 100
+    end
+    n + sum_to(n - 1)
+end
+
+fn fib_memo(n: Int) -> Int
+    if n <= 1
+        return n
+    end
+    if n > 20
+        return 0 - 2
+    end
+    fib_memo(n - 1) + fib_memo(n - 2)
+end
+
+fn main() -> Unit ! [IO]
+    println(sum_to(0))
+    println(sum_to(4))
+    println(sum_to(5))
+    println(sum_to(7))
+    println(fib_memo(10))
+    println(fib_memo(30))
+end

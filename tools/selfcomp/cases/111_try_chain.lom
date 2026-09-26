@@ -1,0 +1,30 @@
+# L2.3 return 收官批：链式双 ?——任一失败整体提前返回（Err 载荷 String
+# 直通出口与函数返回 Err 载荷相容的上下文校验正路）。
+fn div(a: Int, b: Int) -> Result<Int, String>
+    if b == 0
+        Err("div by zero")
+    else
+        Ok(a / b)
+    end
+end
+
+fn chain(a: Int, b: Int, c: Int) -> Result<Int, String>
+    let x = div(a, b)?
+    let y = div(x, c)?
+    Ok(y + 1)
+end
+
+fn main() -> Unit ! [IO]
+    match chain(100, 5, 2)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match chain(100, 0, 2)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match chain(100, 5, 0)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+end

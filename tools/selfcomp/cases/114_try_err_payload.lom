@@ -1,0 +1,52 @@
+# L2.3 return 收官批：Err 载荷 st/ls 形态——String 拼接载荷与 List<Int>
+# 载荷的构造/直通/match 消费（c2 批载荷设施的 ? 复用面）。
+from list import { list_empty, list_cons, list_get, list_length }
+
+fn check_name(s: String) -> Result<Int, String>
+    if s == "lom"
+        Ok(1)
+    else
+        Err("bad: " + s)
+    end
+end
+
+fn use_name(s: String) -> Result<Int, String>
+    let v = check_name(s)?
+    Ok(v * 2)
+end
+
+fn collect_head(a: Int) -> Result<Int, List<Int>>
+    if a > 10
+        Err(list_cons(a, list_cons(a - 1, list_empty())))
+    else
+        Ok(a)
+    end
+end
+
+fn use_collect(a: Int) -> Result<Int, List<Int>>
+    let v = collect_head(a)?
+    Ok(v + 1)
+end
+
+fn main() -> Unit ! [IO]
+    match use_name("lom")
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match use_name("xx")
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match use_collect(5)
+        Ok(v) => println(v)
+        Err(es) => println(list_get(es, 0))
+    end
+    match use_collect(20)
+        Ok(v) => println(v)
+        Err(es) =>
+            println(list_length(es))
+            println(list_get(es, 0))
+            println(list_get(es, 1))
+        end
+    end
+end

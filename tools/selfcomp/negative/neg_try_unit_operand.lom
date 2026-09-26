@@ -1,0 +1,9 @@
+# 校验 #1（Unit 形）：? 作用于 Unit 值——编译期拒。
+fn f() -> Unit
+    ()
+end
+
+fn main() -> Unit ! [IO]
+    let x = f()?
+    println(1)
+end

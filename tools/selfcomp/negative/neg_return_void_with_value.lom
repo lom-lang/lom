@@ -1,0 +1,11 @@
+# 校验 #3（void 形）：void 函数（显式 Unit 注解）内 return 带值。
+fn f(n: Int) -> Unit
+    if n > 0
+        return 1
+    end
+end
+
+fn main() -> Unit ! [IO]
+    f(1)
+    println(0)
+end

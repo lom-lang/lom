@@ -1,0 +1,6 @@
+# 校验 #1：? 操作数非 Result/Option（i64）——宿主运行时错误/TYPE020
+# warning 面，L2 编译期拒（designs/0009 §6.3）。
+fn main() -> Unit ! [IO]
+    let x = 5?
+    println(x)
+end

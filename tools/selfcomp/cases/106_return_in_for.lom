@@ -1,0 +1,37 @@
+# L2.3 return 收官批：for 体内提前 return——List 迭代与 Int(range) 迭代
+# 两形态 + 嵌套双层 for 内 return。
+from list import { list_empty, list_cons, list_length, list_get }
+
+fn find_gt_list(t: Int) -> Int
+    let xs = list_cons(2, list_cons(9, list_cons(4, list_cons(11, list_empty()))))
+    let n = list_length(xs)
+    for i in 0..n
+        let v = list_get(xs, i)
+        if v > t
+            return v
+        end
+    end
+    0 - 1
+end
+
+fn find_gt_nested(t: Int) -> Int
+    for i in 0..6
+        if i > t
+            for j in 0..i
+                if i + j > 2 * t + 2
+                    return i * 10 + j
+                end
+            end
+        end
+    end
+    0 - 1
+end
+
+fn main() -> Unit ! [IO]
+    println(find_gt_list(3))
+    println(find_gt_list(10))
+    println(find_gt_list(99))
+    println(find_gt_nested(1))
+    println(find_gt_nested(4))
+    println(find_gt_nested(90))
+end

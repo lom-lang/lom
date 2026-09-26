@@ -1,0 +1,34 @@
+# L2.3 return 收官批：match Form B 臂块内 if + return 三层嵌套
+# （match → 臂块 → if → 嵌套 if → return；臂块独立 end）。
+fn grade(score: Int) -> Int
+    match score / 10
+        10 =>
+            100
+        end
+        9 =>
+            if score >= 95
+                return 1000
+            end
+            900
+        end
+        _ =>
+            if score > 0
+                if score % 2 == 0
+                    return 0 - score
+                else
+                    return score
+                end
+            end
+            score
+        end
+    end
+end
+
+fn main() -> Unit ! [IO]
+    println(grade(100))
+    println(grade(97))
+    println(grade(90))
+    println(grade(88))
+    println(grade(93))
+    println(grade(0))
+end

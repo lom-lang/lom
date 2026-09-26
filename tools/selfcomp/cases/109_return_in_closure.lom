@@ -1,0 +1,46 @@
+# L2.3 return 收官批：闭包体内 return 属闭包自身边界——断言闭包内
+# return 不影响外层函数（cret 闭包体前后 save/restore 的行为对拍面）。
+fn clamp_add(k: Int, lo: Int) -> Int
+    let g = fn(x: Int) -> Int
+        if x < lo
+            return lo
+        end
+        if x > 1000
+            return 1000
+        end
+        x + k
+    end
+    let direct = g(k * 10)
+    if direct == 1000
+        return 0 - 1
+    end
+    direct + g(0)
+end
+
+fn nested_closure(base: Int) -> Int
+    let outer = fn(x: Int) -> Int
+        let inner = fn(y: Int) -> Int
+            if y > 50
+                return 500
+            end
+            y + 1
+        end
+        inner(x) + inner(x * 2)
+    end
+    outer(base)
+end
+
+fn main() -> Unit ! [IO]
+    let add5 = fn(x: Int) -> Int
+        if x < 0
+            return 0 - 1
+        end
+        x + 5
+    end
+    println(add5(10))
+    println(add5(0 - 3))
+    println(clamp_add(5, 60))
+    println(clamp_add(200, 60))
+    println(nested_closure(10))
+    println(nested_closure(40))
+end

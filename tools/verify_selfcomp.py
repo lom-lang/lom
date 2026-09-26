@@ -130,7 +130,6 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_c2_print_generic.lom': 'println 只接受 Int/Float',
     'neg_c2_some_arity.lom': "变体 'Some' 实参数不符",
     'neg_c2_type_param_builtin.lom': "类型参数名与内建类型冲突（'Int'）",
-    'neg_c2_try_deferred.lom': "? 提前返回留 return 批",
     'neg_c2_unbound_field_type.lom': "未知或子集外枚举类型 'U'",
     'neg_c2_unit_type_arg.lom': "Option 类型参数暂不支持 Unit/Fn",
     'neg_c2_unknown_payload_pattern.lom': "模式载荷类型不可推断",
@@ -163,6 +162,16 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_pkg_missing_symbol.lom': "包 'mypkg' 中无公开符号 'missing_fn'",
     'neg_pkg_enum_clash.lom': "跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名",
     'neg_pkg_alias_arity.lom': "调用 'aliased_fn' 实数量不符",
+    # ---- L2.3 return 收官批（designs/0009 §6.3 校验表 #1-#4 + 裁决 3 甲）----
+    # neg_return_stmt/neg_c2_try_deferred 本批转正删除（Git 历史可恢复）
+    'neg_try_non_result.lom': "? 只能用于 Result/Option（得到 'i64'）",
+    'neg_try_unit_operand.lom': '? 只能用于 Result/Option',
+    'neg_try_ctx_mismatch.lom': '? 的 Err 载荷类型与所在函数返回类型不符',
+    'neg_try_in_void_fn.lom': "? 所在函数返回类型须为 Result/Option（得到 'void'）",
+    'neg_return_type_mismatch.lom': "return 值类型不符（期望 i64 得 st）",
+    'neg_return_void_with_value.lom': 'void 函数的 return 不能带值',
+    'neg_return_value_in_void_fn.lom': 'void 函数的 return 不能带值',
+    'neg_return_missing_value.lom': "return 无值但函数返回 'i64'",
 }
 
 

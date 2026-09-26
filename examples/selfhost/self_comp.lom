@@ -2455,6 +2455,24 @@ fn enum_vt_make(name: String, args: List<String>) -> String
     out + "}"
 end
 
+# L2.3 return 收官批（designs/0009 §6.2，校验 #1）：? 操作数 vt 拆族——
+# en:Result{A;B} → ok=A/err=B；en:Option{A} → ok=A/err=""（None 无载荷）；
+# 其余（含裸 en:Result 模板形态与非枚举 vt）编译期拒——宿主 TYPE020
+# warning/运行时错误面的编译期严格化（R68/R74 路线）。
+fn try_parts(vt: String) -> Result<{fam: String, ok_vt: String, err_vt: String}, String>
+    if !enum_vt(vt)
+        return Err(subset_err("? 只能用于 Result/Option（得到 '" + vt + "'）"))
+    end
+    let parts = enum_vt_parts(vt)?
+    if parts.name == "Result" and list_length(parts.args) == 2
+        return Ok({fam: "Result", ok_vt: list_get(parts.args, 0), err_vt: list_get(parts.args, 1)})
+    end
+    if parts.name == "Option" and list_length(parts.args) == 1
+        return Ok({fam: "Option", ok_vt: list_get(parts.args, 0), err_vt: ""})
+    end
+    Err(subset_err("? 只能用于 Result/Option（得到 '" + vt + "'）"))
+end
+
 # ? 仅代表构造器未提供的信息，不代表任意动态值；已知参数必须逐层相等。
 # L2.3 List 批：ls{T} 判定与内层提取（designs/0005 §3）。单参数类型，
 # 首尾定界即可——嵌套内层（如 ls{ls{i64}} 的内层 "ls{i64}"）完整保留
@@ -3264,6 +3282,11 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                 end
             end
         end
+        ExTry(_) =>
+            # L2.3 return 收官批（designs/0009 §6.2）：闭包尾综合产
+            # Ok/Some 载荷 vt（? 在值位产出载荷，参与返回类型综合）
+            infer_ex(e, env, fns)
+        end
         _ => infer_ex(e, env, fns)
     end
 end
@@ -3528,7 +3551,13 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
         end
         ExIf(ifr) => infer_if_expr(ifr, env, fns)
         ExMatch(scrut, arms, _) => infer_match_expr(scrut, arms, env, fns)
-        ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
+        ExTry(inner) =>
+            # L2.3 return 收官批（designs/0009 §6.2）：操作数须 Result/Option
+            # 族（校验 #1），产出 Ok/Some 载荷 vt
+            let t = infer_ex(inner, env, fns)?
+            let parts = try_parts(t)?
+            Ok(parts.ok_vt)
+        end
         ExRange(a, b) =>
             # L2.3 List 批：a..b → ls{i64}（左闭右开）；两端须 Int
             # （宿主 TYPE001 warning 的编译期严格化——R68 同族）
@@ -3943,7 +3972,61 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             comp_if_expr(ifr, env, fns, cg, locals, localvt)
         end
         ExMatch(scrut, arms, _) => comp_match_expr(scrut, arms, env, fns, cg, locals, localvt)
-        ExTry(_) => Err(subset_err("? 提前返回留 return 批（块深度跟踪）"))
+        ExTry(inner) =>
+            # L2.3 return 收官批（designs/0009 §6.2，裁决 1 乙/3 甲）：
+            # scrut 存 local → idx 复合测试（Ok=0 | Some=2，对齐宿主
+            # vi==0|vi==2 形态——两个 i32.eq + i32.or）→ if (result 载荷
+            # bt)：then 宽度化读载荷（comp_pattern_test :4300 同构件）→
+            # else 原值（枚举指针 i64）+ return（0x0f）从所在函数提前
+            # 返回。return 后 unreachable，else 臂按 wasm 规范豁免
+            # (result bt) 栈匹配（Node 实测见 designs/0009 §11-2）。
+            let t = infer_ex(inner, env, fns)?
+            let parts = try_parts(t)?
+            # 上下文校验（裁决 3 甲，校验 #2）：所在函数返回 vt 须同族且
+            # Err 载荷相容——宿主仅查族（渐进式 warning），L2 严格查载荷
+            # （错配 Err 直通会产签名类型错的坏 wasm——"不留坏 wasm"
+            # 承诺延续）。Option 的 None 无载荷：族匹配即可。
+            let cret = cg_str(cg.cgh, "cret")
+            if !enum_vt(cret)
+                return Err(subset_err("? 所在函数返回类型须为 Result/Option（得到 '" + cret + "'）"))
+            end
+            let cp = enum_vt_parts(cret)?
+            let ctx_ok =
+            if parts.fam == "Result" and cp.name == "Result" and list_length(cp.args) == 2
+                vt_compatible(parts.err_vt, list_get(cp.args, 1))
+            elif parts.fam == "Option" and cp.name == "Option" and list_length(cp.args) == 1
+                True
+            else
+                False
+            end
+            if !ctx_ok
+                return Err(subset_err("? 的 Err 载荷类型与所在函数返回类型不符（函数 '" + cret + "' 操作数 '" + t + "'）"))
+            end
+            let code = comp_ex(inner, env, fns, cg, locals, localvt)?
+            let s = new_slot(locals, localvt, t)
+            let sl = leb128_hex(s)
+            let ld_idx = "20" + sl + "a7" + "2800" + "00"
+            # 载荷读取（offset 8 首字段；宽度补码：f64 → bf、i32 → a7）
+            let pl = "20" + sl + "a7" + "2900" + "08"
+            let plw =
+            if parts.ok_vt == "f64"
+                pl + "bf"
+            else
+                if parts.ok_vt == "i32"
+                    pl + "a7"
+                else
+                    pl
+                end
+            end
+            Ok(code + "21" + sl
+                + ld_idx + "4100" + "46"
+                + ld_idx + "4102" + "46" + "72"
+                + "04" + vt_bt(parts.ok_vt)
+                + plw
+                + "05"
+                + "20" + sl + "0f"
+                + "0b")
+        end
         ExRange(a, b) =>
             # L2.3 List 批：call rt_ls_range（infer 已保证两端 i64）
             let _ = need_heap(cg)?
@@ -7018,7 +7101,13 @@ fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<Stri
     # 4. 闭包体编译（独立 locals：槽从 np+1 起）
     let locals2 = map_empty()
     map_set(locals2, "n", np + 1)
+    # L2.3 return 收官批：闭包体是独立函数边界——cg 是共享引用，"cret"
+    # （当前函数返回 vt）须体前 save/set、体后 restore（宿主 typechecker
+    # current_ret 先例）；闭包体内的 return/? 属闭包自身。
+    let saved_cret = cg_str(cg.cgh, "cret")
+    map_set(cg.cgh, "cret", rvt)
     let code2 = comp_blk(body, env2, fns, cg, locals2, localvt2, rvt)?
+    map_set(cg.cgh, "cret", saved_cret)
     let total2 = cg_int(locals2, "n")
     let mut ldecl2 = leb128_hex(total2 - (np + 1))
     let mut li = np + 1
@@ -7761,7 +7850,39 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
         StIf(ifr) => comp_if_stmt(ifr, env, fns, cg, locals, localvt, ret_vt)
         StWhile(cond, body) => comp_while(cond, body, env, fns, cg, locals, localvt, ret_vt)
         StFor(var, iter, body) => comp_for(var, iter, body, env, fns, cg, locals, localvt, ret_vt)
-        StReturn(_) => Err(subset_err("return 语句（块深度跟踪留后续批次）"))
+        StReturn(opt) =>
+            # L2.3 return 收官批（designs/0009 §6.1，裁决 1 乙）：return =
+            # 值入栈（void 无值）+ wasm return 指令（0x0f）直发——零深度
+            # 跟踪、零 $ret 包装，任意嵌套深度（if/while/for/match 臂/闭包
+            # 体/值位 if 块内）直达函数边界；宿主 br $ret 的三类深度事故
+            # 在此方案下结构性不存在。
+            # 当前函数返回 vt 读 cg.cgh "cret"（comp_one_fn/compile_closure
+            # 体前后 set/restore）——不读 ret_vt 形参：值位块（comp_val_blk）
+            # 的形参通道是硬编码 "void"，值位 if 块内的 return 语句须以
+            # cg 键为单一事实源（cg 是共享引用——宿主 current_ret 先例）。
+            # 值宽度与签名 result 一致（comp_ex 产出与 vt_hex 同宽，与
+            # comp_tail 尾表达式同口径，无需补码）。
+            let cret = cg_str(cg.cgh, "cret")
+            match opt
+                None =>
+                    if cret != "void"
+                        return Err(subset_err("return 无值但函数返回 '" + cret + "'——宿主 TYPE010 warning 面，L2 编译期拒"))
+                    end
+                    Ok("0f")
+                end
+                Some(e) =>
+                    if cret == "void"
+                        return Err(subset_err("void 函数的 return 不能带值——宿主 TYPE010 warning 面，L2 编译期拒"))
+                    end
+                    let t = infer_ex(e, env, fns)?
+                    if !vt_compatible(t, cret)
+                        return Err(subset_err("return 值类型不符（期望 " + cret + " 得 " + t + "）——宿主 TYPE010 warning 面，L2 编译期拒"))
+                    end
+                    let code = comp_ex(e, env, fns, cg, locals, localvt)?
+                    Ok(code + "0f")
+                end
+            end
+        end
         _ => Err(subset_err("该语句形态（match/解构留后续批次）"))
     end
 end
@@ -8096,7 +8217,13 @@ fn comp_one_fn(params: List<Prm>, ret: Option<Ty>, body: Blk, fns: Map<String, {
     let k = bind_params(params, env, fns)?
     map_set(locals, "n", k)
     let rv = tyopt_vt(ret, fns)?
+    # L2.3 return 收官批：当前函数返回 vt 线程化（cg.cgh "cret"）——
+    # 函数间顺序编译不嵌套，save/restore 为对称防御（compile_closure
+    # 嵌套编译闭包体时依赖该键正确指向外层函数）
+    let saved_cret = cg_str(cg.cgh, "cret")
+    map_set(cg.cgh, "cret", rv)
     let code = comp_blk(body, env, fns, cg, locals, localvt, rv)?
+    map_set(cg.cgh, "cret", saved_cret)
     # local 声明段：只声明 let 槽（绝对槽 k..n），每组 count=1
     let total = match map_get(locals, "n")
         Some(v) => v
@@ -9123,6 +9250,9 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             # 模块级编译状态（Map 引用语义跨函数共享）
             let cgs = map_empty()
             let cgh = map_empty()
+            # L2.3 return 收官批：当前函数返回 vt 的缺省（函数体编译入口
+            # comp_one_fn/compile_closure 必然覆写——此预置仅防御漏设路径）
+            map_set(cgh, "cret", "void")
             map_set(cgs, "nfun", nfun)
             map_set(cgs, "ibase", ibase)
             map_set(cgs, "tbase", ibase)

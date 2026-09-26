@@ -1,0 +1,23 @@
+# L2.3 return 收官批：while 体内提前 return（Collatz 步数上限熔断）。
+fn collatz_steps(n: Int) -> Int
+    let mut i = 0
+    let mut x = n
+    while x != 1
+        if x % 2 == 0
+            x = x / 2
+        else
+            x = 3 * x + 1
+        end
+        i = i + 1
+        if i > 50
+            return 0 - 1
+        end
+    end
+    i
+end
+
+fn main() -> Unit ! [IO]
+    println(collatz_steps(1))
+    println(collatz_steps(6))
+    println(collatz_steps(27))
+end

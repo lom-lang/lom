@@ -1,0 +1,36 @@
+# L2.3 return 收官批：for 体内 ? 与 return 同函数混用——循环内 ? 的
+# Err 提前返回（0x0f 穿 block/loop 双层）与显式 return Err 熔断并存。
+fn div(a: Int, b: Int) -> Result<Int, Int>
+    if b == 0
+        Err(0 - 1)
+    else
+        Ok(a / b)
+    end
+end
+
+fn sum_quotas(total: Int, b: Int) -> Result<Int, Int>
+    let mut acc = 0
+    for i in 0..5
+        let q = div(i * 10 + 5, b)?
+        acc = acc + q
+        if acc > total
+            return Err(0 - 100)
+        end
+    end
+    Ok(acc)
+end
+
+fn main() -> Unit ! [IO]
+    match sum_quotas(1000, 5)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match sum_quotas(1000, 0)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+    match sum_quotas(3, 5)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+end

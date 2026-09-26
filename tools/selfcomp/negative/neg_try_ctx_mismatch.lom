@@ -1,0 +1,21 @@
+# 校验 #2（裁决 3 甲）：函数返回 en:Result{i64;st} 而 ? 作用于
+# en:Result{i64;f64}——Err 载荷错配（宿主仅查族 warning，L2 严格查载荷）。
+fn g(a: Float) -> Result<Int, Float>
+    if a > 0.0
+        Ok(1)
+    else
+        Err(a)
+    end
+end
+
+fn f(a: Float) -> Result<Int, String>
+    let v = g(a)?
+    Ok(v * 2)
+end
+
+fn main() -> Unit ! [IO]
+    match f(1.5)
+        Ok(v) => println(v)
+        Err(e) => println(e)
+    end
+end
