@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lom 第十七轮体系内独立敌手审查 — 2026-09-27（十六审整改 + json/包/return 三批）</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, "Microsoft YaHei", sans-serif; line-height: 1.55; }
+  body { max-width: 1120px; margin: 0 auto; padding: 32px 22px 80px; color: #202734; background: #fff; }
+  h1, h2, h3 { line-height: 1.3; color: #17283b; }
+  h1 { border-bottom: 3px solid #274e76; padding-bottom: 12px; }
+  h2 { border-bottom: 1px solid #c6d1dc; padding-bottom: 6px; margin-top: 34px; }
+  .lead { padding: 18px 22px; border-left: 5px solid #a04539; background: #fff4f1; }
+  .good { color: #176341; } .bad { color: #9a2d22; } .muted { color: #5a6470; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .94rem; }
+  th, td { border: 1px solid #cbd3dc; padding: 9px 11px; vertical-align: top; }
+  th { background: #eef3f8; text-align: left; }
+  tr:nth-child(even) { background: #f8fafc; }
+  code, pre { font-family: Consolas, "Cascadia Code", monospace; }
+  code { background: #f1f4f7; padding: 1px 4px; overflow-wrap: anywhere; }
+  pre { background: #172130; color: #e8eef6; padding: 13px 16px; overflow-x: auto; border-radius: 5px; line-height: 1.42; }
+  pre code { background: none; padding: 0; color: inherit; }
+  details { margin: 12px 0; padding: 8px 12px; border: 1px solid #cbd3dc; border-radius: 5px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .tag { display: inline-block; background: #81372d; color: white; font-weight: 700; padding: 1px 8px; border-radius: 4px; }
+  .note { border-left: 4px solid #607b97; padding: 8px 14px; background: #f2f6fa; }
+  a { color: #19558b; }
+</style>
+</head>
+<body>
+<h1>Lom 第十七轮体系内独立敌手审查（十六审整改 R86-R89 + json/包/return 三批）</h1>
+<p class="muted">2026-09-27（Asia/Shanghai） · 基线 <code>8bf1e27</code> = tag <code>v1.3.1</code>（HEAD 与宣称复核锚点重合，无前移——git 只读全称一致）· 对照十六审报告 <a href="review-2026-09-26-2.html">review-2026-09-26-2.html</a>（基线 <code>7f71456</code>/v1.2.13，总评 A-，开账 R86-R89）· 审查增量：v1.2.14（R86-R89 整改）、v1.2.15（json 批）、v1.3.0（包批）、v1.3.1（return 收官批）</p>
+<div class="lead">
+  <p><strong>本轮评级：A-（维持；仅评本轮时点与检验面，历史轨迹不外推，本轮结论不预支 L2.4 自举闭环状态）。</strong>审查增量四批交付的全部可复核宣称经本轮亲手复核<strong>主体零失真</strong>：① <strong>三段存量 hex 恒等独立对拍全等</strong>——本轮用 <code>git show</code> 导出 v1.2.14/v1.2.15/v1.3.0 三个旧版编译器，由同一宿主解释器（v1.3.1 的 lom.exe）对拍：v1.2.14↔v1.2.15 的 90 用例 <strong>90/90 逐字节全等</strong>、v1.2.15↔v1.3.0 的 100 用例 <strong>100/100 全等</strong>、v1.3.0↔v1.3.1 的 100 单文件 + 4 包展开单元 <strong>104/104 全等</strong>（0 差异）；② verify_selfcomp <strong>255/255 名实相符</strong>（目录实数 cases 111 文件 + pkg 4 项目 + negative 140 = 255，验收器逐例真实双侧执行）；③ self_comp <strong>9491 行</strong>、四版行数链（8627→8633→9295→9361→9491）逐节对上；④ 0x0f 发射抽查：105 用例 hex 恰 <strong>255 字节、4 处 0f</strong>（与修订 26 宣称逐字吻合），11 个 return 用例全部含 0x0f 发射；⑤ 8 个 return 负例文案逐条重触发全中、无 hex；⑥ R86/R89 探针原形重建（HOF 中转 println(Bool) 仍拒且登记面吻合 / void 实参单列文案生效且既有容器文案不倒）；⑦ json 批"执行者限额夭折、规划者兜底"的实施波折登记属实，兜底后的验收链经本轮独立复跑为实。基线 14 项全绿。本轮自构敌手探针 <strong>27 形态零行为击穿</strong>（20 例双侧 stdout+rc 逐字一致 + 7 例干净 COMPILE-ERROR 无 hex——其中 5 例属已登记信任边界、2 例见新发现）。新开账 <strong>R90/R91（2×P3，登记面缺口，无行为级修复需求）</strong>，无 P1/P2——连续第三轮无 P2+ 代码发现。唯一宣称精度瑕疵：包批"+297 行 Rust"实为 <strong>296 行</strong>（cli.rs 254 + main.rs 42），差 1 行。</p>
+  <p><strong>边界：</strong>这是项目体系内 agent 分工的独立敌手审查，<strong>不是外部同行审计</strong>。审查阶段未改任何产品源码、测试、工具或治理文档；唯一写盘物为本报告，自构探针只置于 <code>target/probes/</code>（gitignored）并在报告完成后清理，全部探针原文内嵌于 §4 保复现。<code>docs/designs/0010-l2.4-records-bootstrap.md</code> 为审查开始后新增的未来工作设计文档（工作树 untracked），按任务界定不在本轮检验面内、未读未动。本轮只开账，不修码、不提交、不推送、不切 tag。</p>
+</div>
+
+<h2>1. 方法、范围与可复现入口</h2>
+<p>先独立阅读 docs/TODO.md 顶部、RFC-0004 修订 20-26、designs/0007（json）/0008（包）/0009（return）、HANDOVER §1/§9/§11.6、十六审报告（方法节与 §2 R86-R89 开账原文），再读 <code>examples/selfhost/self_comp.lom</code> 的三批改动区与 <code>tools/verify_selfcomp.py</code> 的 PKG_CASES/NEG_PKGS 机制，然后构造探针。正例全部穿真实 CLI 全链路：</p>
+<pre><code>$case = 'a6_nested_enum_err'   # §4 中任一探针名（置于 target/probes/r17/）
+./target/release/lom.exe build "target/probes/r17/adv/$case.lom" --target wasm -o "$case.host.wasm"
+./target/release/lom.exe examples/selfhost/self_comp.lom -- "target/probes/r17/adv/$case.lom" "$case.hex"
+python tools/hex2wasm.py "$case.hex" "$case.l2.wasm"
+node eval/runner/run_wasm.mjs "$case.host.wasm"
+node tools/selfcomp/run_selfcomp.mjs "$case.l2.wasm"      # stdout + rc 逐字对照（diff）
+# 包探针额外走：lom pkg-expand main.lom --list → 第三参；lom pkg-expand main.lom → 展开单元</code></pre>
+<p>负例查真实 L2 CLI 的 <code>COMPILE-ERROR</code> 输出与 hex 不存在（L2 驱动 COMPILE-ERROR 时进程 rc 可为 0，只看输出）。git 严格只读（show/log/status/ls-tree/diff/tag/describe）。"存量 hex 恒等"三段宣称的复核方法（沿十六审先例）：<code>git show &lt;tag&gt;:examples/selfhost/self_comp.lom</code> 只读导出旧版编译器 → 同一宿主 lom.exe 1.3.1 分别驱动旧/新编译器对同一用例集产 hex → 逐文件 <code>cmp</code>；三段各自做<strong>精确配对</strong>（旧版↔紧邻新版，而非各段都对 HEAD），另加各段对 HEAD 的传递性对拍。包用例 hex 基准按 verify_selfcomp 的 PKG_CASES 流程取：<code>pkg-expand</code> 展开单元 + <code>--list</code> 包名清单第三参，两侧编译同一展开单元。版本边界经 <code>git ls-tree</code> 核定：v1.2.14 = 90 cases + 116 neg；v1.2.15 = 100 + 130；v1.3.0 = 100 + 134 + 4 pkg；v1.3.1 = 111 + 140 + 4 pkg；四版 self_comp 行数 8633/9295/9361/9491。宿主 src 改动面：v1.2.14→v1.2.15 零差异（"宿主 src 零改动"宣称 ✓）；v1.2.15→v1.3.0 <strong>+296 行</strong>（cli.rs +254、main.rs +42，含 4 个 <code>#[test]</code>——宣称"+297"差 1 行）；v1.3.0→v1.3.1 零差异（return 批"宿主零改动"宣称 ✓）。</p>
+
+<h2>2. 新发现：声明、反例、证据与建议（R90/R91，全部 P3）</h2>
+<table>
+  <thead><tr><th>编号 / 严重性</th><th>现行声明与受影响范围</th><th>独立证据（stdout、rc、产物）</th><th>读码根因及只开账建议</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag">R90 · P3</span><br>包源内 <code>as</code> 别名经 pkg-expand 后丢失——"两种形态行为等价"宣称存在反例</td>
+      <td>designs/0008（§2/裁决 1）与 RFC-0004 修订 24 宣称：pkg-expand 剥包内顶层 import"对齐宿主解释器语义"，且"宿主 WASM 路径保留包内 import 并由 known_packages 放行——<strong>两种形态行为等价</strong>"。别名的登记面只覆盖主文件 import（103 用例、修订 24"as 别名=真名摘要整条复制"）。<strong>包源文件内部</strong>使用 <code>from X import { y as z }</code> 的形态未在任何文档点名。</td>
+      <td>自构包项目 <code>c2_aliaschain</code>（libouter 包源内 <code>from libinner import { triple as t3 }</code> 后调 <code>t3(t3(x))</code>；主文件 <code>from libouter import { outer_run as run2 }</code> 链式调用）：宿主 <code>lom build --target wasm</code> 编译运行正常（<code>18/162/729</code>，rc0）；L2 管线 <code>pkg-expand</code> 展开单元中 libouter 的 import 行被剥除、别名映射随之丢失 → <code>COMPILE-ERROR: codegen error: 未定义变量 't3'</code>，无 hex（干净拒绝）。<strong>第三声音</strong>：宿主解释器 <code>lom main.lom</code> 同项目 <code>[RUNTIME002] 未定义函数: 't3'</code> rc1——即宿主双后端自身在该形态分叉（wasm 收、解释器拒），与 map_remove 挂账同类但未登记。对照：libouter 改用真名（无 as）后同一项目 L2 全链路 <strong>MATCH</strong>（18/162/729）——缺口精确圈定为<strong>包源内 as 别名</strong>，非别名机制整体（主文件别名链 c2-run2/twice、103 用例均过）。</td>
+      <td>pkg-expand 按"剥除包内顶层 import"设计逐行剥除，不区分纯许可 import 与携带别名映射的 import；后者是符号改名信息，剥除即丢失。L2 的 known_pkg 别名注册只作用于展开单元中幸存的主文件 import。建议（三选一，待用户裁决）：① pkg-expand 对包源 import 保留 as 别名行（或转写为主文件等价 import）；② designs/0008/RFC 修订 24 登记信任边界"包源内 as 别名不迁移（对齐解释器拒收面）"；③ 宿主双后端该形态分叉并入挂账清单。只开账。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R91 · P3</span><br>值语境 return 臂的边界登记只点名 <code>if</code> 形态——match 臂同型分叉未点名、文案不指向 return</td>
+      <td>RFC-0004 修订 26 / designs/0009 / SPEC §13 v1.3.1 的边界登记均为"值语境 <strong>if</strong> 的 return 臂（<code>if c {return x} else {5}</code> 作值使用）维持既有编译期拒（宿主-L2 既有分叉面）"。同型的<strong>值语境 match return 臂</strong>（<code>match n 5 => return 55 end _ => n*2 end</code> 作值使用）未点名；对修复 LLM 而言登记面窄于实际拒绝面（与 R86 同型缺口）。</td>
+      <td><code>d3b_match_retarm</code>：宿主 WASM <code>55/7</code> rc0（值位 match 的 return-only 臂按宿主语义提前返回）；L2 <code>COMPILE-ERROR: match 臂值类型不一致（'void' vs 'i64'）</code>，无 hex——走<strong>通用臂值一致性检查</strong>而非 return 指向的文案，拒绝方向正确但诊断不指向"return 臂"这一修复目标。对照：a7（if 形态）文案为"if 表达式各分支值类型不一致（'i64' vs 'void'）"，同为通用文案但该形态已在登记面内。</td>
+      <td>值位 if 与值位 match 共用"分支/臂值类型一致"通用校验，return-only 臂的块类型为 void 触发该检查。行为安全（干净拒绝、无坏 wasm），宿主-L2 分叉本身已登记（if 形态）。建议：边界登记从"值语境 if 的 return 臂"扩为"值语境 if/match 的 return 臂"；文案是否单列留后续评估。只开账。</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">R90/R91 按台账顺延（R86-R89 已修于 v1.2.14）。P3 沿十六审口径 = 登记精度/覆盖面/诊断文案缺口；P1 = 静默错值/损坏、P2 = 行为级错误但非静默——本轮<strong>未发现任何 P1/P2</strong>：20 例正例探针双侧 stdout+rc 逐字一致，7 例拒绝路径全部干净（COMPILE-ERROR、无 hex、零坏 wasm）。另记一处<strong>宣称精度备注</strong>（不开账）：包批"+297 行 Rust 含 4 测试"实为 +296 行（git diff --stat 逐文件核定：cli.rs 254 + main.rs 42；4 个 #[test] 属实、535→539 属实）——差 1 行，属计数口径误差非虚报。</p>
+
+<h2>3. 独立复验矩阵</h2>
+<h3>3.1 基线复验（14 项全部亲手跑）</h3>
+<table>
+  <thead><tr><th>#</th><th>检查</th><th>结果（真实输出摘录）</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>cargo build --release 零 warning</td><td><span class="good">✓</span> <code>cargo clean --release -p lom</code>（Removed 37 files, 94.2MiB）强制重编 25.94s 后 grep warning 零命中（touch src/main.rs 重跑复核 0）</td></tr>
+    <tr><td>2</td><td>cargo test --release</td><td><span class="good">✓</span> 539 passed + 0 failed（单元）+ 1 + 7 = 8 集成全过</td></tr>
+    <tr><td>3</td><td>cargo clippy --release -- -D warnings</td><td><span class="good">✓</span> Finished, 零输出</td></tr>
+    <tr><td>4</td><td>cargo fmt --all -- --check</td><td><span class="good">✓</span> rc0 零 diff</td></tr>
+    <tr><td>5</td><td>python tools/doc_audit.py</td><td><span class="good">✓</span> RESULT: PASS（67/67 项通过）</td></tr>
+    <tr><td>6</td><td>python tools/spec_examples_check.py</td><td><span class="good">✓</span> RESULT: PASS（正例 51 / 反例 5 / skip：json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1）</td></tr>
+    <tr><td>7</td><td>python tools/eval_prompt_check.py</td><td><span class="good">✓</span> RESULT: PASS（校验 24 / 失真 0）</td></tr>
+    <tr><td>8</td><td>verify_selfhost 六模式逐个</td><td><span class="good">✓</span> dump 154/154；tokens 154/154（列坐标已知差异 1）；diags 12/12；static 坏 22 + 干净 ALIGNED 154/DIFF 0；run 31/31；wasm layer2 151/151 + layer3 golden 逐字 + selfapply 逐字——六模式全部 RESULT: PASS</td></tr>
+    <tr><td>9</td><td>python tools/verify_selfcomp.py</td><td><span class="good">✓</span> RESULT: PASS（255/255 项通过）；名实核对：PASS 分类计数 = 正例 111 + PASS-PKG 4 + PASS-NEG 140；目录实数 cases/ 111 个 .lom（01-100 + 105-115——编号 101-104 让渡给 pkg_cases 的 4 个包项目；100 存量 + 11 return 新增）+ pkg_cases/ 4 项目 + negative/ 140 个 = 255 ✓；PKG_CASES 循环与 NEG_PKGS 第三参机制读码确认真实双侧执行</td></tr>
+    <tr><td>10</td><td>eval runner 双后端</td><td><span class="good">✓</span> <code>run.ps1 -Verify -LomBin ./target/release/lom.exe</code>：Total 121 / Passed 121；<code>-Backend wasm</code> 同 121/121</td></tr>
+    <tr><td>11</td><td>Lom fmt gate（examples 递归，apply_test 豁免——CI 同款 pwsh 命令）</td><td><span class="good">✓</span> 37 文件全过（含 self_comp.lom 9491 行）</td></tr>
+    <tr><td>12</td><td>golden</td><td><span class="good">✓</span> <code>lom.exe examples/bootstrap/stmt_interp.lom</code> 输出与 stmt_interp.expected.txt diff 为空（GOLDEN identical）</td></tr>
+    <tr><td>13</td><td>git/Cargo 版本</td><td><span class="good">✓</span> <code>git describe</code> = v1.3.1（tag 恰在 HEAD 8bf1e27，宣称复核锚点无前移）；Cargo.toml version = "1.3.1"；<code>lom --version</code> = lom 1.3.1；工作树仅 untracked docs/designs/0010（任务界定不在检验面）</td></tr>
+    <tr><td>14</td><td>GitHub API 实查 CI（HEAD = 8bf1e27）</td><td><span class="good">✓</span> run <code>36262831760</code>（2026-09-26T18:31:14Z）六 job（doc gates/clippy/selfhost verify/macos/windows/ubuntu）全 <code>success</code>；check-run annotations 恰 <strong>4 条</strong>，全部为 Ubuntu 26 迁移 notice（clippy/doc gates/ubuntu/selfhost verify 各 1，macos/windows 0 条），零 warning/error。前七 run（6057c6b/c09eb58/50ad44d/916609e/e73e2dc/8fedb7b/a87020d）全 success。<strong>备注</strong>：feat 提交 191a971/f97761e/71f72e4 自身无独立 CI run（与 docs 成对推送时 Actions 只触发 push 头提交——同推 docs 提交包含全部代码变更，覆盖不受损；此为 GitHub 触发机制非项目缺口）</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 R86-R89 整改宣称复核（v1.2.14）</h3>
+<table>
+  <thead><tr><th>宣称</th><th>独立复核方法与结果</th></tr></thead>
+  <tbody>
+    <tr><td>R86 登记面扩写（HOF 产 Bool 中转仍拒）</td><td><span class="good">✓</span> 十六审 pf1 探针原形重建（<code>list_fold(Bool 闭包, True, xs)</code> 结果绑定后 println，全程单函数）：宿主 <code>true</code> rc0；L2 <code>COMPILE-ERROR: println(Bool) 需要 String 设施（data/print_str）——深层 Bool 流未被预扫覆盖（如跨函数参数传递）…</code> 无 hex——仍拒且 RFC 修订 20 / SPEC §13 v1.2.14 条目登记的"跨函数 Bool 参数流转<strong>与 HOF 产 Bool 中转</strong>"与实测拒绝面吻合（编译器文案仍举"跨函数"为例，但整改本就登记在文档侧——预扫扩放行留后续批次，登记如实）</td></tr>
+    <tr><td>R89 void 实参单列文案</td><td><span class="good">✓</span> 探针 <code>println(map_remove(m,"a"))</code>：L2 <code>COMPILE-ERROR: println 实参求值为 void/Unit（map_remove/map_set 等内建返回 void，void 返回函数同理）——void 值不可打印；去掉 println 包裹或改用语句形式调用</code>，无 hex——与 self_comp L4833 新文案逐字一致；既有容器兜底文案不倒（neg_println_map/neg_println_list 锁"容器显示留后续批次"原文、neg_enum_print 锁原文，三者均在 255/255 中实跑通过）</td></tr>
+    <tr><td>206/206 = 90 对拍 + 116 负例；self_comp 8633 行</td><td><span class="good">✓</span> git ls-tree v1.2.14：cases 恰 90（01-90）、negative 恰 116；<code>git show v1.2.14:self_comp.lom | wc -l</code> = 8633；neg_println_void 在册（EXPECTED 锁"println 实参求值为 void"）</td></tr>
+    <tr><td>存量 90 对拍 hex 恒等</td><td><span class="good">✓ 独立全量复证（见 §3.6 段 1）</span>：90/90 逐字节全等</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 json 批宣称复核（v1.2.15）</h3>
+<table>
+  <thead><tr><th>宣称</th><th>独立复核方法与结果</th></tr></thead>
+  <tbody>
+    <tr><td>230/230 = 100 对拍 + 130 负例</td><td><span class="good">✓</span> git ls-tree v1.2.15：cases 恰 100（新增 91-100 共 10）、negative 恰 130（新增 neg_json_* 恰 14 个，逐名核对与修订 22 清单一致）</td></tr>
+    <tr><td>新对拍 10（91-100）名实相符</td><td><span class="good">✓</span> 抽读 6 个（91 roundtrip/92 field/95 nested 深链/97 stringify 广参数/99 trap/100 bool+null）：内容与命名全部相符、无空壳——91 含转义与中文、95 含三层 .field 链与 list_get 交叉、97 覆盖标量四枚 + ls + mp 键序、99 双侧 trap rc1 且 trap 前 stdout 保留；本轮另手动全链路重跑 91：双侧逐字一致（8 行含 <code>{"esc":"q\"w\\e\nr","cn":"中文"}</code>）</td></tr>
+    <tr><td>存量 90 hex 恒等</td><td><span class="good">✓</span> §3.6 段 1：v1.2.14↔v1.2.15 精确配对 90/90 全等</td></tr>
+    <tr><td>self_comp 9295 行；harness +149 行</td><td><span class="good">✓</span> v1.2.15 self_comp = 9295（8633→9295）；<code>git diff v1.2.14 v1.2.15 --stat -- run_selfcomp.mjs</code> = <strong>+149 行</strong>（逐字吻合）；宿主 src 零 diff（"语言面与宿主 src 零改动"宣称 ✓）</td></tr>
+    <tr><td>实施波折如实登记（执行者限额夭折、规划者兜底）</td><td><span class="good">✓</span> TODO 顶部交接声明与 RFC-0004 修订 22 均载"执行者子智能体在使用限额耗尽前完成主体，规划者盘点遗留后亲自兜底（负例文案实跑 + EXPECTED 扩表 + 全部验收与全量回归亲跑）"；<strong>验收链是否仍实由本轮独立复跑回答</strong>——255/255 全过、14 负例文案全中、91 手动全链路一致：兜底后的验收为实</td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 包批宣称复核（v1.3.0）</h3>
+<table>
+  <thead><tr><th>宣称</th><th>独立复核方法与结果</th></tr></thead>
+  <tbody>
+    <tr><td>238/238 = 104 对拍 + 134 负例</td><td><span class="good">✓</span> git ls-tree v1.3.0：cases 100 + pkg_cases 4 目录 + negative 134（新增 neg_pkg_* 恰 4）；本轮 verify_selfcomp 实跑 PASS-PKG ×4</td></tr>
+    <tr><td>4 包项目内容名实相符</td><td><span class="good">✓</span> 4 个全读：101 单包（mathlib 三函数）、102 三包链 C→B→A（跨包 import 在包源内）、103 别名 + 包内 enum + match、104 enum 载荷 + 双包（libutil→libshape 桥）——与修订 24 清单逐项相符；本轮手动全链路重跑 102（pkg-expand + 第三参 libc,libb,liba）：双侧 <code>110/18/530/142</code> 逐字一致</td></tr>
+    <tr><td>pkg-expand 幂等 / --list / 剥包内 import</td><td><span class="good">✓</span> 102 展开单元再 pkg-expand 一次 = 逐字节恒等（幂等）；<code>--list</code> 出 <code>libc,libb,liba</code>；展开单元中包源 import 全剥除（主文件 import 保留——设计如此，"主文件 import 保留——它是符号许可与别名的载体"）</td></tr>
+    <tr><td>存量 100 hex 恒等（argv 向后兼容）</td><td><span class="good">✓</span> §3.6 段 2：v1.2.15↔v1.3.0 精确配对 100/100 全等</td></tr>
+    <tr><td>Rust 535→539（pkg-expand ×4 测试）+297 行</td><td><span class="good">✓（数字）/ 瑕疵（行数）</span> cargo test 539 passed；src diff 含 4 个 <code>#[test]</code>；<strong>净增实为 296 行</strong>（cli.rs 254 + main.rs 42）——宣称 297 差 1 行，§2 备注登记</td></tr>
+    <tr><td>未知模块 import 行即拒（堵静默落空）</td><td><span class="good">✓</span> 负例 neg_pkg_unknown_module 在 255/255 中实跑（COMPILE-ERROR 无 hex）；文案"未知模块 'X'（非内建模块且不在包清单……）"与修订 24 一致</td></tr>
+  </tbody>
+</table>
+
+<h3>3.5 return 收官批宣称复核（v1.3.1）</h3>
+<table>
+  <thead><tr><th>宣称</th><th>独立复核方法与结果</th></tr></thead>
+  <tbody>
+    <tr><td>255/255 = 115 对拍 + 140 负例</td><td><span class="good">✓</span> 目录实数 111 cases（104 存量含 4 包 + 11 新 return 用例 105-115）+ 140 negative = 255；用例抽读 4 个（105 first_even 双函数深嵌/109 闭包边界双段/113 值位 if 内 ? 含 f64 豁免面/114 Err 载荷 st·ls）名实相符</td></tr>
+    <tr><td>存量 104 对拍 hex 恒等（0x0f 零包装零新键）</td><td><span class="good">✓</span> §3.6 段 3：v1.3.0↔v1.3.1 精确配对 100 单文件 + 4 包展开单元 = 104/104 全等</td></tr>
+    <tr><td>0x0f 发射（105 用例 4 处 0f、255 bytes）</td><td><span class="good">✓</span> 本轮独立抽查：105 hex 长 510 字符 = <strong>255 bytes</strong>、0f 子串恰 <strong>4 处</strong>（上下文 <code>20 XX 0f</code> = local.get + return），与修订 26 宣称逐字吻合；扩展抽查 105-115 全部 11 例均含 0f（1-7 处不等）</td></tr>
+    <tr><td>8 个 return 负例锁原因</td><td><span class="good">✓</span> neg_try_non_result / neg_try_unit_operand / neg_try_ctx_mismatch / neg_try_in_void_fn / neg_return_type_mismatch / neg_return_void_with_value / neg_return_value_in_void_fn / neg_return_missing_value 全部独立重触发，文案与 EXPECTED 表逐字一致、无 hex；neg_try_ctx_mismatch 实证"校验严于宿主"（函数 en:Result{i64;st} vs 操作数 en:Result{i64;f64} 的 Err 载荷相容查）</td></tr>
+    <tr><td>边界登记：值位 if return 臂维持拒 / Fn 参数注解宿主不支持</td><td><span class="good">✓（含 R91 扩面）</span> a7 探针（<code>let v = if n&gt;0 return n*2 else 5 end</code> 值使用）：宿主 8/6 rc0，L2 拒（"if 表达式各分支值类型不一致"）无 hex——维持拒属实；同型 match 臂未入登记面 → <strong>R91</strong>。Fn 注解：探针实测 L2 拒"Fn 类型注解留后续批次"（宿主 PARSE001 同不支持，109 用例 let 绑定规避——登记相符）</td></tr>
+    <tr><td>转正删除 2（neg_return_stmt/neg_c2_try_deferred）</td><td><span class="good">✓</span> git ls-tree v1.3.0↔v1.3.1 差集恰含两文件删除 + 8 新增</td></tr>
+  </tbody>
+</table>
+
+<h3>3.6 三段存量 hex 恒等独立对拍（本轮核心增量）</h3>
+<table>
+  <thead><tr><th>段</th><th>配对</th><th>用例集（git 界定）</th><th>方法</th><th>结果</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>v1.2.14 ↔ v1.2.15</td><td>v1.2.14 的 cases 01-90（与工作树逐文件 diff 为空——存量用例未被改动）</td><td>git show 导出两版编译器，同一 lom.exe 1.3.1 驱动，逐例产 hex 后 cmp</td><td><span class="good">90/90 IDENTICAL，0 DIFF</span>（另：v1.2.14↔HEAD/v1.3.1 传递对拍同 90/90）</td></tr>
+    <tr><td>2</td><td>v1.2.15 ↔ v1.3.0</td><td>v1.2.15 的 cases 01-100（工作树一致）</td><td>同上</td><td><span class="good">100/100 IDENTICAL，0 DIFF</span></td></tr>
+    <tr><td>3</td><td>v1.3.0 ↔ v1.3.1</td><td>v1.3.0 的 cases 01-100 + pkg_cases 4 项目（按 PKG_CASES 流程：当前宿主 pkg-expand 展开单元 + --list 第三参，两侧编译同一展开单元）</td><td>同上 + 包单元流程</td><td><span class="good">100/100 + 4/4 = 104/104 IDENTICAL，0 DIFF</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">三段合计 294 对 hex 全等、0 差异——四批"存量 hex 逐字节不变"宣称全部独立复证（十六审方法先例的延续：旧编译器只读导出、同宿主解释器驱动，未用 worktree/stash）。附带观察（非宣称面）：v1.2.15 编译器对包展开单元亦能产出其中 3 个项目与 v1.3.0 相同的 hex（第三参被旧驱动忽略 + 未知模块静默落空时期的遗留放行）——与包批"堵静默落空"动机互证。</p>
+
+<h3>3.7 文档数字对账</h3>
+<table>
+  <thead><tr><th>位置</th><th>宣称</th><th>实测</th></tr></thead>
+  <tbody>
+    <tr><td>README.md L8/L71</td><td>v1.3.1、self_comp 9491 行、539+8、verifier 255/255（115+140）、存量 104 hex、eval 121/121</td><td><span class="good">✓</span> 全部与实测一致（本轮 §3.1/§3.5/§3.6）</td></tr>
+    <tr><td>LANGUAGE_SPEC.md §13 L1352-L1355（v1.3.1/v1.3.0/v1.2.15/v1.2.14 四条目）</td><td>四版全部数字与边界登记（255/238/230/206、104/100/90 hex、9491/9361/9295/8633、539+8、值位 if return 臂、enum 重名、json 双后端规避面等）</td><td><span class="good">✓</span> 逐条对上（v1.2.14 条目 R86-R88 登记面与 RFC 修订 20 一致）；R91 的 match 臂扩面为增量建议</td></tr>
+    <tr><td>docs/HANDOFF_PROMPT.md</td><td>v1.3.1、9491、255/255 = 115（104+11）+ 140</td><td><span class="good">✓</span> L46/127/135-136/217/331 逐处相符</td></tr>
+    <tr><td>docs/HANDOVER.md §1/§9</td><td>同上 + CI/tag 轨迹 + R1-R89 关闭状态</td><td><span class="good">✓</span> §1 快照行/§9 检查单第 2/3/5 条相符；v1.3.1 tag 已切于 8bf1e27（git describe 证实）</td></tr>
+    <tr><td>docs/TODO.md 顶部</td><td>四段交接声明（return/包/json/R86-R89）全部数字</td><td><span class="good">✓</span> 与 git 界定及实测一致（"+297 行"差 1 见 §2 备注）</td></tr>
+    <tr><td>doc_audit</td><td>67/67</td><td><span class="good">✓</span> 落盘前 PASS；报告落盘后复跑见 §6（review HTML 非锚定对象，预期 PASS）</td></tr>
+  </tbody>
+</table>
+
+<h2>4. 自构敌手探针（27 形态；原文内嵌保复现）</h2>
+<h3>4.1 结果总表</h3>
+<table>
+  <thead><tr><th>探针（族 / 形态）</th><th>宿主 WASM（stdout, rc）</th><th>L2</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td colspan="4"><strong>return 深组合（A 族）</strong></td></tr>
+    <tr><td>a1 match Form A 臂表达式内 ?（值位 let 消费）</td><td><code>8/odd/100</code>, 0</td><td>同左, 0（hex 918B）</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>a2 闭包内 ? 与 return 混用（四路：正常/? 拒/return 拒/return 放行）</td><td><code>9/odd/zero/2000</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — 闭包自身边界（cret 双 save/restore 行为面）✓</td></tr>
+    <tr><td>a3a for-in-String 体内 return（多字节字符）</td><td><code>你/?</code>, 0</td><td>同左, 0（hex 含 3 处 0f）</td><td><span class="good">MATCH</span> — for 四路径之三（Int/List 见 106）</td></tr>
+    <tr><td>a3b for-in-json-array 体内 return（计数器条件）</td><td><code>2/-1</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — for 四路径之四</td></tr>
+    <tr><td>a4 return 后不可达码（if 臂 + while 体两处）</td><td><code>7/42/5</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — 0x0f 后同块代码 Node 验证器收、不执行</td></tr>
+    <tr><td>a5 Result? 同族链（三跳，三失败路）</td><td><code>14/div0/too big</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>a5b Option? 同族链（map_get 两跳）</td><td><code>7/-1</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>a5c 跨族：Option? 在 Result 返回函数内</td><td><code>70</code> 后 trap rc1（宿主 wasm 自身 None 直通后 match 落空 trap）</td><td>COMPILE-ERROR（Err 载荷不符：函数 en:Result{i64;st} 操作数 en:Option{i64}），无 hex</td><td><span class="good">✓ 校验甲如实</span> — L2 编译期拦住宿主"可编译但运行时坏"的形态（严于宿主登记面）</td></tr>
+    <tr><td>a6 Err 载荷嵌套递归枚举直通（Tree）</td><td><code>15/-2</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>a7 值位 if 内 return 臂（边界复验）</td><td><code>8/6</code>, 0</td><td>COMPILE-ERROR（if 分支值类型不一致），无 hex</td><td><span class="good">✓ 维持拒</span>（登记面内；match 同型见 R91）</td></tr>
+    <tr><td>a8 裸语句位 ?（十六审 pt1 原形——当时拒"留 return 批"）</td><td><code>10/neg</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — pt1 拒绝面如期释放 ✓</td></tr>
+    <tr><td colspan="4"><strong>json 深组合（B 族）</strong></td></tr>
+    <tr><td>b1 js 经闭包捕获 + HOF 中转（list_map 产 .field 链）</td><td><code>alice/alice/3/1/3/{…}</code>, 0</td><td>COMPILE-ERROR（list_map 第 2 参期望 List 得 js），无 hex</td><td><span class="good">✓ 边界内干净拒</span> — designs/0007 B1 枚举消费面为 get/head/tail/for-in（修订 22：is_empty/head/tail/length/get/cons），HOF 不在宣称面；闭包捕获 js 部分（grab/wrap）已由 96/b3 覆盖</td></tr>
+    <tr><td>b2 .field 深链 × ?（json 字段喂 Result 门函数）</td><td><code>cfg/2/20/skipped/99</code>, 0</td><td>COMPILE-ERROR（Ok(js 载荷) 与返回 Result<Int,String> 尾类型不符），无 hex</td><td><span class="good">✓ 边界内干净拒</span> — js 值支持面（.field/println/stringify/list 消费）不含进入类型化载荷/算术（文案即登记面）</td></tr>
+    <tr><td>b3 json × 包（包函数返回 js + 主文件闭包捕获消费）</td><td><code>local/8080/8080/8080/remote/9090</code>, 0</td><td>同左, 0（pkg-expand + libconf）</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td colspan="4"><strong>包深组合（C 族）</strong></td></tr>
+    <tr><td>c1 包函数内闭包（含 return）+ 包内 return/? + 枚举跨界</td><td><code>12/1000/H/L/20/neg</code>, 0</td><td>同左, 0（pkg-expand + libmk）</td><td><span class="good">MATCH</span> — R66-R68 域语句在包函数内行为一致</td></tr>
+    <tr><td>c2 包源内 as 别名链（libouter 别名引 libinner）</td><td><code>18/162/729</code>, 0</td><td>COMPILE-ERROR（未定义变量 't3'），无 hex；宿主解释器 rc1 RUNTIME002</td><td><span class="bad">→ R90</span>（去别名同项目 MATCH 18/162/729——主文件别名链不受影响）</td></tr>
+    <tr><td colspan="4"><strong>校验边界（D 族）</strong></td></tr>
+    <tr><td>d1 match 消费后再 ?（操作数全解析）</td><td><code>11/2</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>d1b 值位 if 合流产物 ?（Ok/Err 两臂合流）</td><td><code>11/2</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — en:Result{?} 未解析载荷操作数在本形态不出现（合流即解析）</td></tr>
+    <tr><td>d1c 裸 Result 注解参数</td><td>宿主可编（9752B）</td><td>COMPILE-ERROR（泛型枚举 'Result' 期望 2 个类型参数），无 hex</td><td><span class="good">✓ 干净拒</span> — 未解析载荷的 ? 入口在上游被拦</td></tr>
+    <tr><td>d2 闭包内闭包 return 双层（立即调用内层）</td><td><code>14/126/-960</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span> — cret 嵌套 save/restore</td></tr>
+    <tr><td>d3 0x0f 与 match/for/while br 深度混排（三层）</td><td><code>200/100/55/7</code>, 0</td><td>同左, 0</td><td><span class="good">MATCH</span></td></tr>
+    <tr><td>d3b 值位 match return-only 臂（a7 同型）</td><td><code>55/7</code>, 0</td><td>COMPILE-ERROR（match 臂值类型不一致 void vs i64），无 hex</td><td><span class="bad">→ R91</span></td></tr>
+  </tbody>
+</table>
+<p>合计：<strong>20 例双侧 stdout+rc 逐字一致</strong>（含 json 91 / return 105 / 包 102 三个官方用例的手动全链路重跑），<strong>7 例干净拒绝</strong>（COMPILE-ERROR、无 hex、零坏 wasm——a5c/a7/b1/b2/d1c 为登记面内或枚举面内，c2/d3b 开账 R90/R91），零 stdout/rc 失配。</p>
+
+<h3>4.2 探针原文（复制即复现——置于 target/probes/r17/，已随审查完成清理）</h3>
+<details><summary>a1_match_formA_try.lom（Form A 臂内 ?）</summary>
+<pre><code>fn half_even(n: Int) -> Result&lt;Int, String&gt;
+    if n % 2 == 0
+        Ok(n / 2)
+    else
+        Err("odd")
+    end
+end
+
+fn relay(n: Int) -> Result&lt;Int, String&gt;
+    let v =
+    match n
+        0 =&gt; half_even(100)?
+        _ =&gt; half_even(n)?
+    end
+    Ok(v * 2)
+end
+
+fn main() -> Unit ! [IO]
+    match relay(8)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match relay(7)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match relay(0)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+end</code></pre></details>
+<details><summary>a2_closure_try_return_mix.lom（闭包内 ? 与 return 混用）</summary>
+<pre><code>fn half(n: Int) -> Result&lt;Int, String&gt;
+    if n % 2 == 0
+        Ok(n / 2)
+    else
+        Err("odd")
+    end
+end
+
+fn main() -> Unit ! [IO]
+    let step = fn(x: Int) -> Result&lt;Int, String&gt;
+        if x == 0
+            return Err("zero")
+        end
+        if x &gt; 100
+            return Ok(x * 10)
+        end
+        let base = half(x)?
+        Ok(base + 5)
+    end
+    match step(8)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match step(7)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match step(0)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match step(200)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+end</code></pre></details>
+<details><summary>a3a_for_string_return.lom / a3b_for_json_return.lom（for-String / for-json return）</summary>
+<pre><code># a3a
+from string import { len }
+
+fn first_wide(s: String) -> String
+    for c in s
+        if c == "你"
+            return c
+        end
+    end
+    "?"
+end
+
+fn main() -> Unit ! [IO]
+    println(first_wide("abc你好def"))
+    println(first_wide("abcdef"))
+end
+
+# a3b
+from json import { json_parse }
+
+fn second_elem(arr: _Any) -> Int
+    let mut i = 0
+    for x in arr
+        i = i + 1
+        if i == 2
+            return i
+        end
+    end
+    0 - 1
+end
+
+fn main() -> Unit ! [IO]
+    let arr = json_parse("[5, 30, 12, 99, 3]")
+    println(second_elem(arr))
+    let arr2 = json_parse("[5]")
+    println(second_elem(arr2))
+end</code></pre></details>
+<details><summary>a5c_cross_family.lom（跨族 ?——校验甲拒）</summary>
+<pre><code>from map import { map_empty, map_set, map_get }
+
+fn find(m: Map&lt;String, Int&gt;, k: String) -> Option&lt;Int&gt;
+    map_get(m, k)
+end
+
+fn pick(m: Map&lt;String, Int&gt;, k: String) -> Result&lt;Int, String&gt;
+    let v = find(m, k)?
+    Ok(v * 10)
+end
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 7)
+    match pick(m, "a")
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match pick(m, "zz")
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+end</code></pre></details>
+<details><summary>b1_json_closure_hof.lom（HOF 中转——枚举面外拒）</summary>
+<pre><code>from json import { json_parse, json_stringify }
+from list import { list_cons, list_empty, list_map, list_get, list_length }
+
+fn main() -> Unit ! [IO]
+    let d = json_parse("{\"u\":{\"name\":\"alice\",\"tags\":[\"x\",\"y\"]}}")
+    let grab = fn(k: String) -> _Any
+        d.u.name
+    end
+    println(grab("name"))
+    let wrap = fn() -> _Any
+        d.u
+    end
+    let u = wrap()
+    println(u.name)
+    let rows = json_parse("[{\"id\":1},{\"id\":2},{\"id\":3}]")
+    let ids = list_map(fn(r: _Any) -> _Any
+        r.id
+    end, rows)
+    println(list_length(ids))
+    println(list_get(ids, 0))
+    println(list_get(ids, 2))
+    println(json_stringify(d))
+end</code></pre></details>
+<details><summary>c2_aliaschain（R90 证据——三文件包项目）</summary>
+<pre><code># lom.toml（根）
+name = "app_c2"
+version = "0.1.0"
+
+[dependencies]
+libouter = { path = "libouter" }
+
+# libouter/lom.toml
+name = "libouter"
+version = "0.1.0"
+
+[dependencies]
+libinner = { path = "../libinner" }
+
+# libinner/lom.toml
+name = "libinner"
+version = "0.1.0"
+
+# libinner/inner.lom
+fn triple(x: Int) -> Int
+    x * 3
+end
+
+# libouter/outer.lom  ← 别名在包源内（R90 触发点）
+from libinner import { triple as t3 }
+
+fn outer_run(x: Int) -> Int
+    t3(t3(x))
+end
+
+# main.lom
+from libouter import { outer_run as run2 }
+
+fn twice(x: Int) -> Int
+    run2(run2(x))
+end
+
+fn main() -> Unit ! [IO]
+    println(run2(2))
+    println(twice(2))
+    println(twice(run2(1)))
+end</code></pre></details>
+<details><summary>d3b_match_retarm.lom（R91 证据——值位 match return 臂）</summary>
+<pre><code>fn f(n: Int) -> Int
+    let v =
+    match n
+        5 =&gt;
+            return 55
+        end
+        _ =&gt;
+            n * 2
+        end
+    end
+    v + 1
+end
+
+fn main() -> Unit ! [IO]
+    println(f(5))
+    println(f(3))
+end</code></pre></details>
+<details><summary>其余探针（a4/a5/a5b/a6/a7/a8/b2/b3/c1/d1/d1b/d1c/d2/d3）原文要点</summary>
+<pre><code># a4：if 臂内 return 后接 println+表达式、while 内 return 后接语句（双侧 7/42/5 MATCH）
+# a5：div/add1/div 三跳 ? 链（14/div0/too big MATCH）；a5b：find/find Option? 两跳（7/-1 MATCH）
+# a6：enum Tree = Leaf | Node(Tree, Int, Tree)；Err(Node(Leaf,n,Leaf)) 经 ? 直通后 sum（15/-2 MATCH）
+# a7：let v = if n&gt;0 return n*2 else 5 end 作值使用（宿主 8/6；L2 拒——登记面内）
+# a8：consume 内两条裸语句 check(n)? / check(n+1)?（10/neg MATCH——十六审 pt1 释放）
+# b2：gate(cfg:_Any) 按 cfg.mode 分流 Ok(cfg.limits.max)（宿主 cfg/2/20/skipped/99；L2 拒 js 入类型化载荷）
+# b3：包 libconf 的 load_defaults() -> _Any 返回 json_parse 产物 + 主文件闭包 get_port 捕获（MATCH）
+# c1：包 libmk 的 apply_k（内含 let 闭包+return）/classify（return）/double_step（?）+ Level 枚举跨界（MATCH）
+# d1：let r = mk(ok); match r 消费; 再 mk(ok)?（11/2 MATCH）；d1b：值位 if Ok/Err 合流后 ?（11/2 MATCH）
+# d1c：fn f(r: Result)（L2 拒"期望 2 个类型参数"）
+# d2：mk 闭包内立即调用 deep 闭包，双层 return 边界（14/126/-960 MATCH）
+# d3：match n%3 → while → for → if return；臂 _ 内 for → match Form B → return（200/100/55/7 MATCH）</code></pre></details>
+
+<h2>5. 敌手视角下的机制评注（非发现，供后续批次参考）</h2>
+<p>① <strong>0x0f 方案的免疫性本轮再次得到行为印证</strong>：a4（return 后不可达码）、d3（三层控制流混排）、a3a/a3b（for 四路径）全部一次通过——这些正是宿主 br $ret 方案的三类深度事故（7.2/7.5/W-2）高仿形态，0x0f 下无深度概念故无事故面；② <strong>? 校验甲的"严于宿主"在本轮抓到一枚宿主自身的行为坑</strong>（a5c：宿主 wasm 对跨族 ? 可编译但运行时 trap rc1）——L2 编译期拦截与 designs/0009 裁决 3 的论证（"错配产坏 wasm 违背不留坏 wasm 承诺"）方向一致；③ json 消费面（js 当 ls{js}）在 for-in/get/head/tail/length 一侧稳定，HOF 一侧为设计枚举面外——若后续 record/容器显示批扩面，HOF 中转是自然候选（b1 探针可复用）；④ pkg-expand 的剥 import 对"纯许可 import"是无损的（102 三包链全等），唯一信息损失点是别名映射（R90）。</p>
+
+<h2>6. 结论</h2>
+<p>① 十六审整改 R86-R89 与 json/包/return 三批的全部可复核宣称（对拍计数、行数链、hex 恒等、0x0f 发射、负例文案、边界登记、实施波折登记）经本轮独立复核<strong>零失真</strong>（唯一瑕疵：包批 Rust 行数 297 实为 296，差 1 行）；② 基线 14 项全绿（HEAD=8bf1e27=v1.3.1 tag，CI 六 job success + 4 条 Ubuntu 26 迁移 notice）；③ 三段存量 hex 恒等独立对拍 294/294 全等；④ 敌手探针 27 形态零行为击穿（20 MATCH + 7 干净拒），连续第三轮无 P2+ 代码发现；⑤ 新开账 <strong>R90（包源内 as 别名经 pkg-expand 丢失，"两种形态行为等价"宣称反例 + 宿主双后端该形态分叉未登记）、R91（值语境 return 臂边界登记只点名 if，match 同型未入）</strong>——均 P3 登记面缺口，处理顺序待用户裁决（建议：R90 优先——它同时牵连一条等价性宣称与一条宿主双后端分叉登记；R91 随下次文档刷新顺手扩句）。⑥ doc_audit 在本报告落盘后复跑一次（review HTML 非锚定对象，预期 67/67 PASS——实测见仓库运行记录）。</p>
+<p class="muted">本报告为第十七轮体系内 agent 分工的独立敌手审查记录，结论仅对本轮时点（2026-09-27，基线 8bf1e27/v1.3.1）与检验面负责，不构成外部审计，不预支 L2.4 自举闭环与后续批次状态。审查期间未改动任何产品源码/测试/工具/治理文档；探针已清理，原文全部内嵌于 §4。</p>
+</body>
+</html>

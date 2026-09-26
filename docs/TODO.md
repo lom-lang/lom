@@ -1,5 +1,19 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **审查登记（2026-09-27 第十七轮独立审查收官）**：总评 **A-（维持；
+> 报告 [review-2026-09-27.html](reviews/review-2026-09-27.html)，基线
+> 8bf1e27/v1.3.1）**——R86-R89 整改与 json/包/return 三批宣称经独立
+> 复核零失真主体成立（**三段存量 hex 恒等独立对拍 294/294 全等**：
+> 90+100+104，git show 导出三旧编译器逐字节 cmp）；基线 14 项全绿；
+> 敌手 27 形态零行为击穿（20 MATCH + 7 干净拒，连续第三轮无 P2+）。
+> 开账 **R90（P3：包源内 as 别名经 pkg-expand 剥除丢失——宿主 wasm
+> 收/L2 拒/宿主解释器自身 RUNTIME002，宿主双后端分叉未登记——规划者
+> 三声音亲复现一致）与 R91（P3：值语境 return 臂登记面只点名 if，
+> match 同型未入且文案不指向 return）**。R90 随 record 批顺带修（选
+> ①：pkg-expand 对含 as 的包内 import 转写保留）；R91 随文档成对
+> 扩句。唯一精度瑕疵：包批"+297 行"实为 296（登记不开账）。整改后
+> 评级待下一轮复审；本轮 A- 不外推 L2.4。
+>
 > **交接声明（2026-09-27 L2.3 return 收官批交付 + v1.3.1）——L2.3
 > 语句面收官**：仓库版本 v1.3.1。return 批按用户裁决"执行"交付
 > （designs/0009 三裁决点全按建议项：0x0f 直发 / B1+B2+B3 全批 /
@@ -226,6 +240,19 @@
 > 报告 [review-2026-09-21-2.html](reviews/review-2026-09-21-2.html)）确认
 > 七项验收零失真，新开 R62-R64。挂账观察项：ubuntu-latest→Ubuntu 26
 > 镜像迁移（2026-10-19 窗口）。**
+
+## 第十七轮体系内独立审查 + R90/R91 开账（2026-09-27）✅ review done / remediation 挂 record 批
+
+- **报告**：[review-2026-09-27.html](reviews/review-2026-09-27.html)；基线 8bf1e27/v1.3.1；总评 **A-（维持）**——宣称全对账零失真 + 连续第三轮无 P2+ + 三段 hex 恒等 294/294 独立全量。体系内 agent 分工，非外部同行审计。
+- **规划者验收**：亲读报告关键节 + **R90 三声音亲手复现逐字一致**（宿主 wasm `18` rc0 / 宿主解释器 `[RUNTIME002] 未定义函数: 't3'` / L2 `codegen error: 未定义变量 't3'` COMPILE-ERROR 无 hex——libouter 包源 `from libinner import { triple as t3 }` 的别名在 pkg-expand 剥 import 时丢失）；doc_audit 落盘后复跑 67/67。
+
+### R90 — 包源内 as 别名经 pkg-expand 剥除丢失（P3）open（随 record 批修）
+
+包源内 `from X import {y as z}` 的别名映射随"剥包内 import"设计丢失：宿主 wasm 路径保留包内 import 经 known_packages 放行（收，18/162/729）；L2 展开单元拒"未定义变量 'z'"；**宿主解释器自身 RUNTIME002 拒（宿主双后端分叉未登记——map_remove 同类新成员）**。主文件别名与真名包调用不受影响（缺口精确圈定包源内 as）。**修法（随 record 批顺带，选审查建议①）**：pkg-expand 对含 as 的包内 import 行**转写保留**（等价别名 import 迁至展开单元主文件段）；宿主解释器分叉并入挂账清单；对拍正例（aliaschain 形态）+ 负例锁定。
+
+### R91 — 值语境 return 臂登记面只点名 if（P3）open（随文档成对扩句）
+
+值语境 **match** return 臂（`match n 5 => return 55 end _ => n*2 end` 作值）与 if 同型：宿主 wasm 收（55/7）、L2 走通用臂值一致性检查拒（文案不指向 return——R86 同型登记面缺口）。随 record 批文档成对扩句（"值语境 if 与 match 的 return 臂"）。
 
 ## 第十六轮体系内独立审查 + R86-R89 整改（2026-09-26）✅ review done / remediation done（v1.2.14）
 
