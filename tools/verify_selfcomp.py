@@ -23,17 +23,51 @@ file/env/math/io 内建）+ pkg_cases 105_pkg_alias_in_pkg（R90 包源内 as
 CASE_ARGS 向两侧 harness 透传 argv。
 
 用法：python tools/verify_selfcomp.py [--lom-bin PATH]
+      python tools/verify_selfcomp.py --bootstrap [--ci-smoke] [--lom-bin PATH]
+
+--bootstrap（L2.4 自举闭环，designs/0010 §6，结构借 verify_selfhost.py --wasm）：
+  ① 自举层：宿主跑 self_comp 编译自身 → hex2wasm → wasm self_comp 再编译
+     最小用例（COMPILED + hex 非空 + 与宿主产 hex 逐字节对拍）；
+  ② 三层对拍：wasm self_comp 编译代表子集（各批核心 11 例 + 1 pkg 展开
+     单元带第三参）→ 产物 hex 与宿主跑 self_comp 产的 hex 逐字节对拍
+     （确定性编译器应一致；不一致降级行为级并登记差异）→ hex2wasm →
+     node 跑 → stdout+rc 与宿主 lom build 产物对拍；
+  ③ 自施加（加分项）：wasm self_comp 编译 self_comp.lom 源码 → hex 与
+     ① 的 selfcomp.hex 逐字节对拍（一致 = 强 quine 证明）。
+  --ci-smoke 子档：仅 ① + ② 的 1 个最小用例（预算 <300s，CI 冒烟用；
+  是否接入 CI 由规划者定）。
 """
 import os
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, 'tools', 'selfcomp', 'cases')
 PKG_CASES = os.path.join(ROOT, 'tools', 'selfcomp', 'pkg_cases')
 NEGATIVES = os.path.join(ROOT, 'tools', 'selfcomp', 'negative')
 SELF_COMP = os.path.join(ROOT, 'examples', 'selfhost', 'self_comp.lom')
+HEX2WASM = os.path.join(ROOT, 'tools', 'hex2wasm.py')
+RUN_SELFCOMP = os.path.join(ROOT, 'tools', 'selfcomp', 'run_selfcomp.mjs')
+RUN_WASM = os.path.join(ROOT, 'eval', 'runner', 'run_wasm.mjs')
+
+# L2.4 --bootstrap 代表子集（designs/0010 §6：各批核心形态各抽 1；
+# 121 含 file 四件套真实落盘——与主循环同 cwd 语义）
+BOOTSTRAP_SUBSET = [
+    '01_arith_int.lom',        # L2.2 算术
+    '06_if_stmt.lom',          # L2.3-a 控制流
+    '17_closure_ctrlflow.lom', # L2.3-b 闭包
+    '21_enum_guard.lom',       # L2.3-c 枚举 match（guard）
+    '55_string_builtins.lom',  # String 批
+    '67_list_map.lom',         # List 批 HOF
+    '80_map_basic.lom',        # Map 批
+    '91_json_roundtrip.lom',   # json 批
+    '110_try_basic.lom',       # return/? 批
+    '116_record_basic.lom',    # record/tuple 批
+    '121_file_builtin.lom',    # file/env 批（真实 IO）
+]
+BOOTSTRAP_PKG = '101_pkg_single'  # pkg 展开 + 第三参包名透传
 
 # L2.3 包批（designs/0008 §6.4）：需要向 self_comp 传第三参包名清单的负例
 # （单文件模拟：import 命中包清单成员——否则会先命中"未知模块"拒绝）
@@ -204,8 +238,141 @@ def run(cmd, **kw):
     # Windows 的子 Python（hex2wasm.py）向 pipe 写中文时默认走系统代码页；
     # 父进程明确按 UTF-8 解码，故统一固定子进程输出编码。
     kw.setdefault('env', {**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+    kw.setdefault('timeout', 600)
     return subprocess.run(cmd, capture_output=True, text=True,
-                          encoding='utf-8', timeout=600, **kw)
+                          encoding='utf-8', **kw)
+
+
+def _read(path):
+    with open(path, 'rb') as f:
+        return f.read()
+
+
+def run_bootstrap(lom, ci_smoke=False):
+    """L2.4 自举闭环三层自证（designs/0010 §6）。返回 0/1。"""
+    t_all = time.time()
+    ok = fail = 0
+    node_base = ['node', '--stack-size=60000', RUN_SELFCOMP]
+
+    def note(passed, label, extra=''):
+        nonlocal ok, fail
+        if passed:
+            ok += 1
+            print('PASS-B %-26s %s' % (label, extra))
+        else:
+            fail += 1
+            print('FAIL-B %-26s %s' % (label, extra))
+
+    with tempfile.TemporaryDirectory() as td:
+        # ---------- ① 自举层 ----------
+        t1 = time.time()
+        self_hex = os.path.join(td, 'selfcomp.hex')
+        r = run([lom, SELF_COMP, '--', SELF_COMP, self_hex], cwd=ROOT, timeout=1200)
+        if 'COMPILED' not in r.stdout or not os.path.exists(self_hex) or os.path.getsize(self_hex) == 0:
+            note(False, 'L1 host self-compile', r.stdout.strip()[:200])
+            print('RESULT: FAIL（自举层未通过：%d/%d）' % (ok, ok + fail))
+            return 1
+        nbytes = int([l for l in r.stdout.splitlines() if l.startswith('COMPILED')][0].split()[1])
+        self_wasm = os.path.join(td, 'selfcomp.wasm')
+        rg = run(['python', HEX2WASM, self_hex, self_wasm])
+        if rg.returncode != 0:
+            note(False, 'L1 hex2wasm', rg.stderr[:200])
+            return 1
+        t_host = time.time() - t1
+
+        # wasm self_comp 编译最小用例（层 1 完成判定）+ 与宿主产 hex 逐字节对拍
+        smoke_case = os.path.join(CASES, '01_arith_int.lom')
+        w_smoke_hex = os.path.join(td, 'w01.hex')
+        h_smoke_hex = os.path.join(td, 'h01.hex')
+        rh = run([lom, SELF_COMP, '--', smoke_case, h_smoke_hex], cwd=ROOT)
+        rw = run(node_base + [self_wasm, smoke_case, w_smoke_hex], timeout=900)
+        t_wasm_small = None
+        passed = ('COMPILED' in rw.stdout and os.path.exists(w_smoke_hex)
+                  and os.path.getsize(w_smoke_hex) > 0)
+        ident = passed and _read(w_smoke_hex) == _read(h_smoke_hex)
+        if passed and not ident:
+            print('  [登记] wasm 产 hex 与宿主产 hex 不一致——降级行为级（层 2 对拍以行为判定）')
+        note(passed, 'L1 wasm compiles case',
+             '%d bytes; hex %s; host-self %.1fs' %
+             (os.path.getsize(w_smoke_hex) // 2 if passed else 0,
+              'byte-identical' if ident else 'DIFFERS', t_host))
+
+        # ---------- ② 三层对拍（代表子集） ----------
+        t2 = time.time()
+        subset = ['01_arith_int.lom'] if ci_smoke else BOOTSTRAP_SUBSET
+        for name in subset:
+            case = os.path.join(CASES, name)
+            # 宿主产 hex（解释器跑 self_comp）
+            h_hex = os.path.join(td, name + '.host.hex')
+            rh = run([lom, SELF_COMP, '--', case, h_hex], cwd=ROOT)
+            if 'COMPILED' not in rh.stdout:
+                note(False, 'L2 %s host-hex' % name, rh.stdout.strip()[:150])
+                continue
+            # wasm self_comp 产 hex
+            w_hex = os.path.join(td, name + '.wasm.hex')
+            rw = run(node_base + [self_wasm, case, w_hex], timeout=900)
+            if 'COMPILED' not in rw.stdout:
+                note(False, 'L2 %s wasm-compile' % name, rw.stdout.strip()[:150])
+                continue
+            ident = _read(w_hex) == _read(h_hex)
+            # 行为级：宿主 lom build 产物 vs wasm 产物的运行对拍
+            host_wasm = os.path.join(td, name + '.host.wasm')
+            rb = run([lom, 'build', case, '--target', 'wasm', '-o', host_wasm])
+            if rb.returncode != 0:
+                note(False, 'L2 %s host build' % name, rb.stderr[:150])
+                continue
+            rh_run = run(['node', RUN_WASM, host_wasm])
+            l3_wasm = os.path.join(td, name + '.l3.wasm')
+            rg = run(['python', HEX2WASM, w_hex, l3_wasm])
+            if rg.returncode != 0:
+                note(False, 'L2 %s hex2wasm' % name, rg.stderr[:150])
+                continue
+            rl_run = run(['node', RUN_SELFCOMP, l3_wasm])
+            beh = (rh_run.stdout == rl_run.stdout and rh_run.returncode == rl_run.returncode)
+            note(ident and beh, 'L2 %s' % name,
+                 'hex %s; behavior %s (stdout %d lines, rc=%d)' %
+                 ('identical' if ident else 'DIFFERS',
+                  'match' if beh else 'MISMATCH',
+                  len(rl_run.stdout.splitlines()), rl_run.returncode))
+        t_subset = time.time() - t2
+
+        # pkg 展开单元 + 第三参（仅全量档）
+        if not ci_smoke:
+            case_dir = os.path.join(PKG_CASES, BOOTSTRAP_PKG)
+            main_lom = os.path.join(case_dir, 'main.lom')
+            rl = run([lom, 'pkg-expand', main_lom, '--list'])
+            pkgs = rl.stdout.strip()
+            ru = run([lom, 'pkg-expand', main_lom])
+            expanded = os.path.join(td, BOOTSTRAP_PKG + '.expanded.lom')
+            with open(expanded, 'w', encoding='utf-8', newline='') as f:
+                f.write(ru.stdout)
+            h_hex = os.path.join(td, BOOTSTRAP_PKG + '.host.hex')
+            w_hex = os.path.join(td, BOOTSTRAP_PKG + '.wasm.hex')
+            rh = run([lom, SELF_COMP, '--', expanded, h_hex] + ([pkgs] if pkgs else []), cwd=ROOT)
+            rw = run(node_base + [self_wasm, expanded, w_hex] + ([pkgs] if pkgs else []), timeout=900)
+            okp = ('COMPILED' in rh.stdout and 'COMPILED' in rw.stdout)
+            ident = okp and _read(w_hex) == _read(h_hex)
+            note(okp and ident, 'L2-PKG %s' % BOOTSTRAP_PKG,
+                 'pkgs=%s; hex %s' % (pkgs, 'identical' if ident else 'DIFFERS'))
+
+        # ---------- ③ 自施加（加分项；全量档） ----------
+        t3s = time.time()
+        if not ci_smoke:
+            quine_hex = os.path.join(td, 'selfcomp.quine.hex')
+            rq = run(node_base + [self_wasm, SELF_COMP, quine_hex], timeout=1200)
+            if 'COMPILED' not in rq.stdout or not os.path.exists(quine_hex):
+                note(False, 'L3 self-apply', rq.stdout.strip()[:150])
+            else:
+                ident = _read(quine_hex) == _read(self_hex)
+                note(ident, 'L3 self-apply (quine)',
+                     '%d bytes; %s; %.1fs' % (os.path.getsize(quine_hex) // 2,
+                                              'byte-identical' if ident else 'DIFFERS',
+                                              time.time() - t3s))
+
+    print('RESULT: %s（--bootstrap%s：%d/%d 项通过；总耗时 %.1fs）' %
+          ('PASS' if fail == 0 else 'FAIL', ' --ci-smoke' if ci_smoke else '',
+           ok, ok + fail, time.time() - t_all))
+    return 0 if fail == 0 else 1
 
 
 def main():
@@ -217,6 +384,8 @@ def main():
     if not os.path.exists(lom):
         print('lom binary not found; cargo build --release first')
         return 2
+    if '--bootstrap' in args:
+        return run_bootstrap(lom, ci_smoke=('--ci-smoke' in args))
 
     import glob
     cases = sorted(glob.glob(os.path.join(CASES, '*.lom')))

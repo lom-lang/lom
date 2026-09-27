@@ -133,6 +133,8 @@ jobs:
         run: python3 tools/verify_selfhost.py --run
       - name: Selfhost wasm (8.4 三段验收, v1.1.1 起规模限制解除)
         run: python3 tools/verify_selfhost.py --wasm
+      - name: Selfcomp bootstrap ci-smoke (L2.4 三层自证冒烟, v1.4.0 起)
+        run: python3 tools/verify_selfcomp.py --bootstrap --ci-smoke
 
   # 第四轮评审整改（2026-08-31）：clippy 存量清零后转 gate（只跑 ubuntu，风格 lint 与平台无关）
   # 注意：clippy 随 stable 演进，未来新版新增 lint 可能让旧代码报错——届时修掉或按需 allow，别降 gate

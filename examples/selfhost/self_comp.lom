@@ -31,7 +31,10 @@
 # 留 L2.3 精度专项（挂账）。
 # ============================================================================
 
-from string import { split, contains, len, string_to_int, int_to_string, starts_with, ends_with, trim, upper, lower, replace, char_from_code }
+# L2.4 自举改写：import 不再含 string_to_int——它返回 Int|Unit 联合，
+# self_comp 自身的内建面（B3 表）无法编译该形态，自编译（self_comp 编译
+# self_comp 源码）要求源码不依赖它（等价替代 dig_val/sti2 见 Part B 前）。
+from string import { split, contains, len, int_to_string, starts_with, ends_with, trim, upper, lower, replace, char_from_code }
 from list import { list_empty, list_cons, list_head, list_tail, list_is_empty, list_length, list_get }
 from map import { map_empty, map_set, map_get, map_has, map_size, map_keys, map_remove }
 from file import { file_read, file_exists, file_write, file_append }
@@ -634,14 +637,80 @@ fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, e
     {toks: toks, n: i, errs: rev_err(errs)}
 end
 
-# 整数字面量辅助：string_to_int 的返回约定是裸 Int（成功）或 Unit（失败）——
-# 内建协议层 Ok(Some(Value)) 解包后用户拿到的不是 Option 枚举（与 map_get 不同）。
-# 无 type_of 反射（RFC-0003 冻结），用拼接提升的 to_display 形态判定：Unit 显示为 "()"
+# ============================================================================
+# L2.4 自举改写：string_to_int 的纯 Lom 等价替代（dig_val + sti2）。
+# 背景：string_to_int 返回 Int|Unit 联合（成功裸 Int 失败 Unit）——self_comp
+# 自身的内建面（B3 表）在 untagged 表示下无法编译它，自编译（self_comp 编译
+# self_comp 源码）要求源码不依赖该内建。替代是编译逻辑等价变换：
+#   dig_val：单字符 → 数字值（与 char_from_code(48..57) 造的十个单字符串
+#   逐个 == 比较——String 批 == 已支持），非数字返回 -1；
+#   sti2：逐位累加乘 10，任一位非数字或 i64 溢出返回 -1 哨兵（调用域约定：
+#   解析目标均为无 '-'/'+' 前缀的十进制串，见下）。
+# 与宿主 string_to_int（s.parse::<i64>()）的等价性论证：
+#   输入域核验（负号边界结论）：全部调用点输入均无符号前缀——词法 ip 由
+#   is_digit 逐位收集（L3xx，首字符必为 digit）；slotl/hidx/stroff 键由
+#   int_to_string(非负 slot/idx/off) 产；float_int_part 输入恒非负（f64_bits_le
+#   两调用点：denormal 路径 f=ax*2^1074（ax=|x|）、mantissa 路径 (m-1)*2^52
+#   （m∈[1,2)），display 整数部分无 '-'）；or_zero 的 ln/cl 为非负行列表号。
+#   溢出检测（非负域完备）：归纳不变量 v ∈ [0, i64::MAX] 且为已读位数真值；
+#   每步 v2 = v*10+d（真值 < 2^66.32）——真值 < 2^63 时 v2=真值非负且
+#   (v2-d)/10 == v（精确整除）通过；真值 ∈ [2^63, 2^64) 时 v2=真值-2^64 < 0
+#   捕获；真值 ∈ [2^64, 2^64+2^63) 时 v2=真值-2^64 非负但 (v2-d)/10 与 v
+#   相差 ~2^64/10 ≠ 0 捕获；真值 ≥ 2^64+2^63 时 v2 最高位为 1（i64 负）捕获。
+#   故 sti2(s) >= 0 ⟺ 宿主 parse 成功且值相同（无符号前缀十进制串域全等）。
+# ============================================================================
+# 单字符 → 数字值（0-9；非数字 -1）
+fn dig_val(c: String) -> Int
+    let mut k = 0
+    let mut r = -1
+    while k < 10
+        if c == char_from_code(48 + k)
+            r = k
+        end
+        k = k + 1
+    end
+    r
+end
+
+# 十进制数字串 → Int（无符号前缀域；非数字/空串/溢出 → -1 哨兵）
+fn sti2(s: String) -> Int
+    let chars = split(s, "")
+    let n = list_length(chars)
+    if n == 0
+        return -1
+    end
+    let mut v = 0
+    let mut i = 0
+    let mut bad = False
+    while i < n and bad == False
+        let d = dig_val(list_get(chars, i))
+        if d < 0
+            bad = True
+        else
+            let v2 = v * 10 + d
+            if v2 < 0 or (v2 - d) / 10 != v
+                bad = True
+            else
+                v = v2
+            end
+        end
+        i = i + 1
+    end
+    if bad
+        -1
+    else
+        v
+    end
+end
+
+# 整数字面量辅助（原 string_to_int 判失败的拼接提升形态已随 L2.4 改写
+# 撤除——sti2 哨兵 -1 即失败信号，语义与宿主 parse 成败判定全等价）
 fn try_sti(s: String) -> Option<Int>
-    if "" + string_to_int(s) == "()"
+    let v = sti2(s)
+    if v < 0
         None
     else
-        Some(string_to_int(s))
+        Some(v)
     end
 end
 
@@ -855,6 +924,19 @@ fn rev_sfld(xs: List<(String, Ex)>) -> List<(String, Ex)>
     acc
 end
 
+# L2.4 自举改写：(String, String) 对列表反转——rev_sfld（(String, Ex) 签名）
+# 被 vt 构造路径复用时元素类型不符（宿主 typechecker 容忍、self_comp
+# 自身类型流拒），同构复制单列（反转逻辑与 rev_sfld 逐行相同）
+fn rev_spair(xs: List<(String, String)>) -> List<(String, String)>
+    let mut acc = list_empty()
+    let mut cur = xs
+    while !list_is_empty(cur)
+        acc = list_cons(list_head(cur), acc)
+        cur = list_tail(cur)
+    end
+    acc
+end
+
 fn rev_sfty(xs: List<(String, Ty)>) -> List<(String, Ty)>
     let mut acc = list_empty()
     let mut cur = xs
@@ -1049,10 +1131,16 @@ fn pk_tk(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, In
 end
 
 # advance：Eof 不前进（对齐宿主）
-fn adv(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Unit
+# L2.4 自举改写：adv 返回 Unit 时调用方 `let _ = adv(...)` 触发"let 绑定
+# void 值"自拒（B2 校验）——返回 Int 0（丢弃语义不变：裸调用经 drop、
+# let _ 绑定合法；Unit 函数体内裸调用先例原样保留）
+fn adv(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>) -> Int
     match pk_tk(ts, n, pm)
-        TkEof => ()
-        _ => map_set(pm, "pos", get_pos(pm) + 1)
+        TkEof => 0
+        _ =>
+            map_set(pm, "pos", get_pos(pm) + 1)
+            0
+        end
     end
 end
 
@@ -1099,10 +1187,10 @@ fn err_here(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String,
 end
 
 # expect（宿主：期望 X，得到 Y；位置 = 当前 token）
-fn expt(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, want: Tok, what: String) -> Result<Unit, String>
+fn expt(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, want: Tok, what: String) -> Result<String, String>
     if chk(ts, n, pm, want)
         adv(ts, n, pm)
-        Ok(())
+        Ok("")
     else
         Err(err_here(ts, n, pm, "期望 " + what + "，得到 " + tok_name(pk_tk(ts, n, pm))))
     end
@@ -1202,11 +1290,13 @@ fn sync_to_stmt_boundary(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm
     end
 end
 
-# 保证解析进度（宿主 ensure_progress）
+# 保证解析进度（宿主 ensure_progress；L2.4 改写：尾置 () 保持 Unit 块值
+# ——adv 已改 Int 返回，裸调用的值经块尾丢弃语义不适用，显式 Unit 尾）
 fn ensure_progress(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, saved: Int) -> Unit
     if get_pos(pm) <= saved
         adv(ts, n, pm)
     end
+    ()
 end
 
 # ============================================================================
@@ -1638,7 +1728,11 @@ end
 # 块解析（宿主 parse_block：终止于 end/elif/else/eof，只消费 end；容错插 Hole）
 fn parse_block(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<Blk, String>
     let mut stmts = list_empty()
-    let mut tail = None
+    # L2.4 自举改写：let 注解固化 Option<Ex>——裸 None 推断 en:Option{?}
+    # （未知参数占位），BlkOf 变体构造校验（template_unify 无子级 ? 让步）
+    # 拒之；注解位经 let_vt 注解优先路径固化（vt_merge 顶层 ? 让步兼容
+    # None 初值的注解校验）
+    let mut tail: Option<Ex> = None
     let mut has_tail = False
     let mut go = True
     while go and !chk(ts, n, pm, TkEnd) and !chk(ts, n, pm, TkElif) and !chk(ts, n, pm, TkElse) and !chk(ts, n, pm, TkEof)
@@ -1737,7 +1831,9 @@ fn parse_if(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String,
     let cond = parse_expr(ts, n, pm, em)?
     let body = parse_block(ts, n, pm, em)?
     let mut branches = list_cons((cond, body), list_empty())
-    let mut els = None
+    # L2.4 自举改写：let 注解固化 Option<Blk>（同 parse_block 的 tail——
+    # IfR 变体构造校验拒 en:Option{?}）
+    let mut els: Option<Blk> = None
     let mut has_else = False
     let mut go = True
     while go
@@ -1776,11 +1872,15 @@ end
 
 fn parse_return(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, pm: Map<String, Int>, em: Map<String, {code: String, msg: String, ln: Int, cl: Int}>) -> Result<St, String>
     let _ = adv(ts, n, pm)
-    if chk(ts, n, pm, TkEnd) or chk(ts, n, pm, TkEof)
-        Ok(StReturn(None))
+    # L2.4 自举改写：StReturn 实参经 if 值块固化——两臂 vt_merge 合流
+    # en:Option{en:Ex}（字面量 None 直作变体构造实参推断 en:Option{?}，
+    # variant_call_type 的 template_unify 无子级 ? 让步，拒）
+    let opt = if chk(ts, n, pm, TkEnd) or chk(ts, n, pm, TkEof)
+        None
     else
-        Ok(StReturn(Some(parse_expr(ts, n, pm, em)?)))
+        Some(parse_expr(ts, n, pm, em)?)
     end
+    Ok(StReturn(opt))
 end
 
 # ============================================================================
@@ -2278,13 +2378,14 @@ fn sleb128_hex(n: Int) -> String
     out
 end
 
-# 整数字符串 → Float（逐位 val*10+d，< 2^53 精确）
+# 整数字符串 → Float（逐位 val*10+d，< 2^53 精确；L2.4 改写：单字符数字值
+# 经 dig_val——digits 由 split 产且源串为词法 digit 串，域内无 -1 哨兵）
 fn int_str_to_float(s: String) -> Float
     let digits = split(s, "")
     let mut v = 0.0
     let mut i = 0
     while i < list_length(digits)
-        v = v * 10.0 + string_to_int(list_get(digits, i))
+        v = v * 10.0 + dig_val(list_get(digits, i))
         i = i + 1
     end
     v
@@ -2304,17 +2405,18 @@ fn parse_float_str(s: String) -> Float
     let digits = split(list_get(parts, 1), "")
     let mut i = list_length(digits) - 1
     while i >= 0
-        frac = (frac + string_to_int(list_get(digits, i))) / 10.0
+        frac = (frac + dig_val(list_get(digits, i))) / 10.0
         i = i - 1
     end
     ip + frac
 end
 
-# 整数值 Float（< 2^53）→ Int（to_display + split + string_to_int）
+# 整数值 Float（< 2^53）→ Int（to_display + split + sti2——L2.4 改写；
+# 输入域恒非负（f64_bits_le 两调用点），display 整数部分为纯 digit 串）
 fn float_int_part(fx: Float) -> Int
     let s = "" + fx
     let parts = split(s, ".")
-    string_to_int(list_get(parts, 0))
+    sti2(list_get(parts, 0))
 end
 
 # f64 → 8 字节小端 hex（L2.1 spike 的纯算术拆解，16 向量已验证）
@@ -2620,7 +2722,7 @@ fn rc_vt_fields(vt: String) -> Result<List<(String, String)>, String>
         end
         out = list_cons((name, vtpart), out)
     end
-    Ok(rev_sfld(out))
+    Ok(rev_spair(out))
 end
 
 # tp 内层串（同 rc_body 的 3 前缀——"tp{" 同长）
@@ -2754,7 +2856,7 @@ fn vt_merge(a: String, b: String) -> Result<String, String>
             merged = list_cons((pa.0, vt_merge(pa.1, pb.1)?), merged)
             i = i + 1
         end
-        return Ok(rc_vt_make(rev_sfld(merged)))
+        return Ok(rc_vt_make(rev_spair(merged)))
     end
     if tp_vt(a) and tp_vt(b)
         let ea = tp_vt_elems(a)?
@@ -2849,7 +2951,7 @@ fn template_resolve(tpl: String, subs: Map<String, String>) -> Result<String, St
         for f in fields
             out = list_cons((f.0, template_resolve(f.1, subs)?), out)
         end
-        Ok(rc_vt_make(rev_sfld(out)))
+        Ok(rc_vt_make(rev_spair(out)))
     elif tp_vt(tpl)
         # tuple 元素里的 tv: 递归替换
         let elems = tp_vt_elems(tpl)?
@@ -2864,13 +2966,13 @@ fn template_resolve(tpl: String, subs: Map<String, String>) -> Result<String, St
 end
 
 # 构造器载荷对模板做结构统一；重复出现的同一参数必须一致。
-fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result<Unit, String>
+fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result<String, String>
     if starts_with(tpl, "tv:")
         let key = type_var_name(tpl)
         match map_get(subs, key)
             Some(old) =>
                 map_set(subs, key, vt_merge(old, got)?)
-                Ok(())
+                Ok("")
             end
             None => Err(subset_err("未声明的枚举类型参数 '" + key + "'"))
         end
@@ -2888,7 +2990,7 @@ fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result
             template_unify(list_get(a.args, i), list_get(b.args, i), subs)?
             i = i + 1
         end
-        Ok(())
+        Ok("")
     elif rc_vt(tpl)
         # L2.3 record/tuple 批：record 载荷对模板做结构统一（嵌套 tv:
         # 参数经 subs 消费；字段集/序不符 → 编译期拒）
@@ -2908,7 +3010,7 @@ fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result
             template_unify(list_get(fa, i).1, list_get(fb, i).1, subs)?
             i = i + 1
         end
-        Ok(())
+        Ok("")
     elif tp_vt(tpl)
         # tuple 载荷逐元统一
         if !tp_vt(got)
@@ -2924,10 +3026,10 @@ fn template_unify(tpl: String, got: String, subs: Map<String, String>) -> Result
             template_unify(list_get(ea, i), list_get(eb, i), subs)?
             i = i + 1
         end
-        Ok(())
+        Ok("")
     else
         if vt_compatible(tpl, got)
-            Ok(())
+            Ok("")
         else
             Err(subset_err("载荷类型不符（期望 '" + tpl + "' 得 '" + got + "'）"))
         end
@@ -3037,7 +3139,7 @@ fn ty_vt_with_params(t: Ty, fns: Map<String, {idx: Int, ret: String, nprm: Int, 
                 end
                 fvt = list_cons((f.0, vt), fvt)
             end
-            Ok(rc_vt_make(rev_sfld(fvt)))
+            Ok(rc_vt_make(rev_spair(fvt)))
         end
         TyTuple(args) =>
             # L2.3 record/tuple 批：位置化无字段名；元素 vt 递归
@@ -3229,7 +3331,10 @@ fn variant_call_type(name: String, args: List<Ex>, env: Map<String, {slot: Int, 
             if enum_meta.nprm < 0
                 return Err("内部错误：变体 '" + name + "' 缺所属枚举")
             end
-            let subs = map_empty()
+            # L2.4 自举改写：let 注解固化 Map<String, String>——map_set 在
+            # nprm>0 条件块内、map_get 在另一条件块内，静态类型流不跨块
+            # 回写绑定 vt（mp{?} 拒 map_get）；注解位单点固化
+            let subs: Map<String, String> = map_empty()
             if enum_meta.nprm > 0
                 for tp in split(enum_meta.prms, ",")
                     map_set(subs, tp, "?")
@@ -4018,7 +4123,7 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 end
                 fvt = list_cons((pair.0, vt), fvt)
             end
-            Ok(rc_vt_make(rev_sfld(fvt)))
+            Ok(rc_vt_make(rev_spair(fvt)))
         end
         ExTuple(elems) =>
             # 位置化构造；void 元素拒
@@ -4046,7 +4151,9 @@ fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String,
                 None =>
                     for pair in branches
                         let bt = blk_val_ty(pair.1, env, fns)?
-                        if bt != "void"
+                        # L2.4 补支持（自举闸门 9 附面）：return 终止臂（"?"
+                        # bottom）的语句位 if 无 else 放行——值语境不可达
+                        if bt != "void" and bt != "?"
                             return Err(subset_err("非 void 语境的 if 必须带 else（分支值类型 '" + bt + "'）"))
                         end
                     end
@@ -4080,7 +4187,7 @@ end
 # 补全的 c2 ? 机制同族）。仅语句位置生效（值位置 set 无从回写绑定）；
 # scan_block_lets（预扫）与 comp_one_stmt（真实发射）两处同步调用，
 # 防预扫/发射类型分叉（R82 教训）。
-fn refine_map_set(ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Unit, String>
+fn refine_map_set(ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match ex
         ExCall(callee, args) =>
             match callee
@@ -4109,10 +4216,10 @@ fn refine_map_set(ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, 
         end
         _ => ()
     end
-    Ok(())
+    Ok("")
 end
 
-fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, prefix: String) -> Result<Unit, String>
+fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, prefix: String) -> Result<String, String>
     for s in stmts
         match s
             StLet(_, name, tyo, ex) =>
@@ -4157,7 +4264,7 @@ fn scan_block_lets(stmts: List<St>, block_env: Map<String, {slot: Int, vt: Strin
             _ => ()
         end
     end
-    Ok(())
+    Ok("")
 end
 
 # 块的值类型：临时块作用域先综合本块 let，再综合尾表达式；无尾 → void。
@@ -4167,7 +4274,27 @@ fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap:
             let block_env = copy_bindings(env)
             scan_block_lets(stmts, block_env, fns, "")?
             match tail
-                None => Ok("void")
+                None =>
+                    # L2.4 补支持（自举闸门 9）：无尾块以 return 语句终止
+                    # → bottom（"?" 占位）——与对侧类型经 vt_merge 既有 ?
+                    # 让步合流取对方（宿主语义：return 臂不产生值；发射路
+                    # return 语句经 cg.cgh "cret" 直发 return 指令，wasm
+                    # unreachable 后栈免检——宿主编译 self_comp 的同形态
+                    # 先例）。仅末位语句判定（return 后代码不可达不写）。
+                    if list_length(stmts) > 0
+                        let term = match list_get(stmts, list_length(stmts) - 1)
+                            StReturn(_) => True
+                            _ => False
+                        end
+                        if term
+                            Ok("?")
+                        else
+                            Ok("void")
+                        end
+                    else
+                        Ok("void")
+                    end
+                end
                 Some(te) => infer_ex(te, block_env, fns)
             end
         end
@@ -4213,9 +4340,9 @@ fn variant_field_vts(v: {idx: Int, ret: String, nprm: Int, prms: String}, scrut_
     Ok(rev_str(out))
 end
 
-fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Unit, String>
+fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match p
-        PatWildcard => Ok(())
+        PatWildcard => Ok("")
         PatBinder(name) =>
             match map_get(fns, "@variant:" + name)
                 Some(v) =>
@@ -4228,19 +4355,19 @@ fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: 
                         if !valid
                             return Err(subset_err("无参变体模式 '" + name + "' 与被测类型 '" + scrut_vt + "' 不符"))
                         end
-                        return Ok(())
+                        return Ok("")
                     end
                 end
                 None => ()
             end
             map_set(arm_env, name, {slot: 0, vt: scrut_vt, sig: "", cap: False})
-            Ok(())
+            Ok("")
         end
         PatLit(lit) =>
             # L2.3 String 批：ExStr 综合 "st"，走通用类型校验（scrut 类型不符即拒）
             let lt = infer_ex(lit, arm_env, fns)?
             if scrut_vt == lt or (scrut_vt == "i64" and lt == "f64") or (scrut_vt == "f64" and lt == "i64")
-                Ok(())
+                Ok("")
             else
                 Err(subset_err("字面量模式类型不符（被测 " + scrut_vt + " 模式 " + lt + "）"))
             end
@@ -4264,7 +4391,7 @@ fn pattern_types(p: Pat, scrut_vt: String, arm_env: Map<String, {slot: Int, vt: 
                     i = i + 1
                 end
             end
-            Ok(())
+            Ok("")
         end
     end
 end
@@ -4277,7 +4404,27 @@ fn match_block_type(b: Blk, arm_env: Map<String, {slot: Int, vt: String, sig: St
             let block_env = copy_bindings(arm_env)
             scan_block_lets(stmts, block_env, fns, "match 臂内 ")?
             match tail
-                None => Ok("void")
+                None =>
+                    # L2.4 补支持（自举闸门 9）：无尾块以 return 语句终止
+                    # → bottom（"?" 占位）——与对侧类型经 vt_merge 既有 ?
+                    # 让步合流取对方（宿主语义：return 臂不产生值；发射路
+                    # return 语句经 cg.cgh "cret" 直发 return 指令，wasm
+                    # unreachable 后栈免检——宿主编译 self_comp 的同形态
+                    # 先例）。仅末位语句判定（return 后代码不可达不写）。
+                    if list_length(stmts) > 0
+                        let term = match list_get(stmts, list_length(stmts) - 1)
+                            StReturn(_) => True
+                            _ => False
+                        end
+                        if term
+                            Ok("?")
+                        else
+                            Ok("void")
+                        end
+                    else
+                        Ok("void")
+                    end
+                end
                 Some(te) => infer_ex(te, block_env, fns)
             end
         end
@@ -4537,7 +4684,7 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
             let mut k = 0
             while k < n
-                out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(fvtl, k), 4 + 8 * k)
+                out = out + fld_store_hex(p, sti2(list_get(slotl, k)), list_get(fvtl, k), 4 + 8 * k)
                 k = k + 1
             end
             Ok(out + "20" + leb128_hex(p) + "ad")
@@ -4568,7 +4715,7 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             + "20" + leb128_hex(p) + "41" + leb128_hex(n) + "3600" + "00"
             let mut k = 0
             while k < n
-                out = out + fld_store_hex(p, string_to_int(list_get(slotl, k)), list_get(evtl, k), 4 + 8 * k)
+                out = out + fld_store_hex(p, sti2(list_get(slotl, k)), list_get(evtl, k), 4 + 8 * k)
                 k = k + 1
             end
             Ok(out + "20" + leb128_hex(p) + "ad")
@@ -5740,11 +5887,11 @@ fn alloc_body_hex() -> String
 end
 
 # heap_on 防御（预扫漏判时 fail-safe：宁可编译错误不可产引用缺失 alloc 的 wasm）
-fn need_heap(cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Unit, String>
+fn need_heap(cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
     if cg_int(cg.cgs, "heap_on") == 0
         Err("内部错误：堆预扫漏判（heap 未启用）——请报维护者")
     else
-        Ok(())
+        Ok("")
     end
 end
 
@@ -5812,9 +5959,8 @@ end
 fn intern_str_lit(s: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Int
     match map_get(cg.cgh, "stroff:" + s)
         Some(off_s) =>
-            match string_to_int(off_s)
-                n => n
-            end
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(off) 产）
+            sti2(off_s)
         end
         None =>
             let off = cg_int(cg.cgs, "data_len")
@@ -6662,9 +6808,8 @@ end
 fn ensure_str_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
     match map_get(cg.cgh, "hidx:" + name)
         Some(idx_s) =>
-            match string_to_int(idx_s)
-                n => Ok(n)
-            end
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(fidx) 产）
+            Ok(sti2(idx_s))
         end
         None =>
             let alloc_idx = cg_int(cg.cgs, "alloc_idx")
@@ -6739,9 +6884,8 @@ end
 fn ensure_ls_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
     match map_get(cg.cgh, "hidx:" + name)
         Some(idx_s) =>
-            match string_to_int(idx_s)
-                n => Ok(n)
-            end
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(fidx) 产）
+            Ok(sti2(idx_s))
         end
         None =>
             let alloc_idx = cg_int(cg.cgs, "alloc_idx")
@@ -7259,9 +7403,8 @@ end
 fn ensure_mp_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
     match map_get(cg.cgh, "hidx:" + name)
         Some(idx_s) =>
-            match string_to_int(idx_s)
-                n => Ok(n)
-            end
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(fidx) 产）
+            Ok(sti2(idx_s))
         end
         None =>
             let alloc_idx = cg_int(cg.cgs, "alloc_idx")
@@ -7645,9 +7788,8 @@ end
 fn ensure_js_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<Int, String>
     match map_get(cg.cgh, "hidx:" + name)
         Some(idx_s) =>
-            match string_to_int(idx_s)
-                n => Ok(n)
-            end
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(fidx) 产）
+            Ok(sti2(idx_s))
         end
         None =>
             let alloc_idx = cg_int(cg.cgs, "alloc_idx")
@@ -9125,7 +9267,9 @@ fn tyopt_has_string(t: Option<Ty>) -> Bool
 end
 
 # string 模块内建表（B3 子集；string_to_int 返回 Int|Unit 联合在 untagged 下
-# 不可表达、split 返回 List——两者明确拒绝并锁负例）
+# 不可表达、split 返回 List——两者明确拒绝并锁负例。L2.4 自举改写后
+# self_comp 自身源码不再调用 string_to_int（等价替代 dig_val/sti2），
+# 用户程序调用仍拒——负例域不变）
 fn st_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: String, ret: String}, String>
     if name == "len"
         return Ok({helper: "st_len", nprm: 1, prms: "st", ret: "i64"})
@@ -10053,7 +10197,9 @@ end
 # L2.3 包批（designs/0008 §6.2，裁决 3 甲）：pkgs = 驱动第三参解析出的包名
 # 集（Map<String, Bool> 当集合用）——缺省空表，单文件路径零变化。
 fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
-    let fns = map_empty()
+    # L2.4 自举改写：let 注解固化 fns 值类型——collect_sigs 的跨函数
+    # map_set 不回写本绑定 vt（静态 mp{?} 拒 map_get(fns, ...)）
+    let fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}> = map_empty()
     # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
     # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
     # 含 ExStr——st 值的三个来源全覆盖；模式内 ExStr 必伴随其一。
