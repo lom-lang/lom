@@ -786,4 +786,39 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   self_comp 9491→**10402 行**（+948）；Rust **539→541**（R90 ×2）
   +8。宿主 src 改动 = cli.rs +125（R90 修复 + 2 测试）。十七审
   A- 不评此新增范围；升版 v1.3.2（record 批 L2 面 patch + R90
-  宿主工具修复）。**L2.4 闭环（第二段）待续。**
+  宿主工具修复）。**L2.4 闭环（第二段）待续。*
+- **修订 29（2026-09-27）：L2.4 自举闭环收官——RFC-0004 全部目标
+  达成，升 minor v1.4.0。** 用户裁决路线甲"继续"。**三层自证全通 +
+  自施加达强 quine 级**：① 自举层——self_comp 编译自身源码
+  COMPILED **234734 bytes**（10402→10548 行源码，宿主解释器载体
+  热跑 12-14s）；② 三层对拍——wasm self_comp（node --stack-size
+  =60000）编译 12 代表用例（各批核心 + pkg 101 第三参透传）全部
+  **hex 与宿主产逐字节一致 + 行为 match**；③ 自施加——wasm
+  self_comp 编译 self_comp.lom **1.1s** 产 234734 字节与宿主产
+  **逐字节一致（sha256 双侧相同 420bba86…77df8）——强 quine
+  证明**（未降级）。`--bootstrap` 14/14（96.9-103.5s）+ `--ci-smoke`
+  2/2 接入 CI selfhost job（96.6s）。**九闸门拆除实录**（8 项源码
+  等价改写 + 1 项编译器真实缺口补支持）：① string_to_int 自引用
+  闸门（dig_val/sti2 手写数字解析替换 12 调用点，i64 溢出检测与
+  宿主 parse 全等价）；② Result<Unit,String> 签名 ×6 改 String 载荷；
+  ③ adv 返回 Unit 绑定改 Int（中间踩坑：裸调用替换致 3 处尾位
+  返回类型分叉，回退 Int 方案）；④⑤⑥ Option{?} 未知参数占位
+  （let 注解固化 ×2 + StReturn(None) 改 if 值块合流）；⑦ rev_sfld
+  签名复用歧义（同构 rev_spair 拆分）；⑧ 跨块/跨函数 map_set 不
+  回写绑定 vt（两处 let 注解）；⑨ **值位 if/match 的 return 终止
+  臂 bottom 语义补支持**（无尾块末位 StReturn → 块值综合产 `?`
+  bottom 占位，经 vt_merge `?` 让步与任意类型合流——**唯一非等价
+  改写项**；blk_val_ty/match_block_type/infer_if_expr 三处）。
+  **R91 登记面翻转**：Form B/if 块形态的 return 终止臂由"维持拒"
+  翻转为**双侧一致通过**（规划者亲拍 55/14/1/2 逐字）；Form A
+  单行表达式臂内 return（宿主收/L2 拒）成为剩余分叉面（新登记）。
+  **验收**：verify_selfcomp 279/279 保持 + **存量 127 对拍 hex
+  逐字节不变**（改写前后——编译逻辑等价证明）+ --bootstrap
+  14/14 + fmt gate 过（上批 CI 红教训后执行者收尾即查）；cargo
+  零改动（本段纯 L2 面）。**RFC-0004 闭环**：L2.1 spike → L2.2
+  最小子集 → L2.3 十一批（控制流/闭包/枚举/泛型/String/List/Map/
+  json/包/return/record-tuple）→ L2.4 自举闭环 + 强 quine——
+  "用 Lom 写的编译器把 Lom 编译为 WASM"的自举叙事完整落地。
+  Unresolved 5 关闭（栈深 60000 实测充裕，wasm 载体 V8 JIT 远快
+  于预期）；信任边界第 5 条（CI 只冒烟）落地。十七审 A- 不评
+  此新增范围。

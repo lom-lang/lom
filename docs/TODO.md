@@ -1,6 +1,22 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-27 record/tuple 编译子批交付 + v1.3.2 + 十七审
+> **交接声明（2026-09-27 L2.4 自举闭环收官 + v1.4.0——RFC-0004 全部
+> 目标达成）**：仓库版本 v1.4.0。三层自证全通（self_comp 编译自身
+> COMPILED 234734 bytes；wasm self_comp 编译 12 代表用例 hex 逐字节
+> 一致；自施加 wasm self_comp 编译 self_comp.lom 1.1s 产 234734
+> 字节与宿主产**逐字节一致 sha256 相同——强 quine**）。九闸门拆除
+> （8 源码等价改写 + 1 编译器补支持：值位 if/match return 终止臂
+> bottom 语义——**R91 Form B/if 形态翻转通过**（规划者亲拍双侧
+> 55/14/1/2 逐字），Form A 单行臂内 return 剩余分叉新登记）。
+> --bootstrap 14/14 + --ci-smoke 2/2 接入 CI；存量 127 对拍 hex
+> 逐字节不变；verify_selfcomp 279/279 保持；cargo 零改动。规划者
+> 升版后亲跑全量回归全绿。**RFC-0004 闭环（L2.1→L2.4），Unresolved
+> 5 关闭**。下一步由用户裁决：下一轮独立复审（R90/R91 整改 + record
+> 批 + L2.4 收官后评级）或休整/容器显示批等可选深化；宿主挂账
+> （map_remove 与包内 as 别名解释器 RUNTIME002 双后端分叉）。
+> 语言面与外部发布线继续冻结。
+>
+> **前次交接声明（2026-09-27 record/tuple 编译子批交付 + v1.3.2 + 十七审
 > R90/R91 收口）**：仓库版本 v1.3.2。record 批按路线甲第一段交付
 > （designs/0010；RFC-0004 修订 28）：vt rc{name:vt}/tp{vt}、
 > [n][8B 槽] 不 pad、编译期偏移访问、file/env 四内建宿主中介
