@@ -44,11 +44,10 @@
 
 【当前真实状态】
 - 仓库版本 v1.4.1（容器显示批交付——designs/0011 四裁决点全按
-  建议项；RFC-0004 修订 32。tag 于 CI 六 job 全绿后切；首回合
-  仍须实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
-  v1.4.0 之前为 L2.4 自举闭环收官（RFC-0004 全部目标达成，强
-  quine；tag 切于 e9aad15，CI run 36296411754 含 bootstrap
-  ci-smoke）。
+  建议项；RFC-0004 修订 32；tag 切于 a697474，CI run 36452201064
+  六 job 全绿；首回合仍须实查最新 main CI 与 annotations）；语言
+  面与外部发布线冻结。此前 v1.4.0 = L2.4 自举闭环收官（RFC-0004
+  全部目标达成，强 quine；tag 切于 e9aad15）。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
   1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
@@ -71,25 +70,19 @@
   R97（P3：scan_has_display 不追踪 match 臂 Binder 容器载荷）、
   R98（P3：designs/0010 分项残留 + 更正批清点口径 5/7 不一）。
   **当前 open：R94（挂账）/R95-R98；整改顺序待用户裁决**。
-  历史轨迹：十八审 A-（86d4d1c/v1.4.0，R92/R93 已修）；十七审
-  A-（8bf1e27/v1.3.1，R90/R91 已收口于 v1.3.2）——历史评级
-  不外推。事实源 docs/TODO.md 顶部。
-  最新 docs/reviews/review-2026-09-28.html 为体系内 agent 分工独立
-  复核，非外部同行审计。十七审（基线 8bf1e27/v1.3.1）开账 R90/R91
-  已收口于 v1.3.2；十八审（基线 86d4d1c/v1.4.0）record 批与 L2.4
-  收官宣称零失真复证——两段存量 hex 115+127=242/242 全等、自施
-  加强 quine sha256 逐字吻合、39 敌手探针零行为击穿（连续第四轮
-  无 P1/P2）；开账 R92/R93（2×P3 文档登记类：Form A 剩余分叉登记
-  不可复现、交接文档时点漏刷群）已随 2026-09-28 文档更正批关闭，
-  R1-R93 全部关闭。历史轨迹：十六审 A-（7f71456/v1.2.13）开账
-  R86-R89 已修于 v1.2.14（RFC-0004 修订 20）；十五审 B+ 只评
-  44954e2/v1.2.11-3；十四审 B 只评 5c92f59/v1.2.6——历史评级
-  不外推，十八审 A- 亦不预支后续批次（宿主挂账与可选深化待用户
-  裁决）。事实源 docs/TODO.md 顶部。
+  历史轨迹：十八审 A-（86d4d1c/v1.4.0，record 批与 L2.4 收官
+  零失真复证——hex 242/242、quine sha256 逐字吻合、39 探针零
+  击穿；开账 R92/R93 已修于 2026-09-28 文档更正批）；十七审 A-
+  （8bf1e27/v1.3.1，R90/R91 已收口于 v1.3.2）；十六审 A-
+  （7f71456/v1.2.13，R86-R89 已修于 v1.2.14）——历史评级不外推，
+  十九审 B+ 亦不预支 R95-R98 整改后（二十审重估）。各轮报告均为
+  体系内 agent 分工独立复核，非外部同行审计。事实源 docs/TODO.md
+  顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，**修订 1-30
-  收官——修订 29 交付 L2.4 自举闭环与强 quine；修订 30 为十八审
-  R92/R93 纯文档更正**）：
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，**修订 1-33——
+  修订 29 交付 L2.4 自举闭环与强 quine；修订 30 为十八审 R92/R93
+  纯文档更正；修订 31/32 为容器显示批设计/交付；修订 33 为十九审
+  开账登记**）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -170,10 +163,12 @@
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
   修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19、
   十六审整改按修订 20、json 批按修订 22、包批按修订 24、return
-  收官批按修订 26、record 批按修订 28、L2.4 自举闭环按修订 29
-  交付——**RFC-0004 收官（L2.1 spike→L2.2 子集→L2.3 十一批→
-  L2.4 自举+强 quine）**；不可称容器全覆盖。
-- 测试基线 539 单元 + 8 集成（v1.3.0 新增 pkg-expand ×4；tests/：r56 ×1、r58 套件 ×7）；eval
+  收官批按修订 26、record 批按修订 28、L2.4 自举闭环按修订 29、
+  容器显示批按修订 31/32 交付——**RFC-0004 收官（L2.1 spike→
+  L2.2 子集→L2.3 十一批→L2.4 自举+强 quine）+ 容器显示收口**；
+  仍不可称容器全覆盖（R95-R98 open：双 return 臂算术分叉/闭包内
+  println/match 臂 Binder 预扫缺口等）。
+- 测试基线 541 单元 + 8 集成（v1.3.0 pkg-expand ×4；v1.3.2 R90 ×2；tests/：r56 ×1、r58 套件 ×7）；eval
   双后端 121/121；selfhost 六模式；doc_audit 67/67；spec_examples
   PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
 - 最新教训（HANDOVER §11.6）：块尾裸表达式归 Tail 不归 stmts；Lom 语句
@@ -232,10 +227,11 @@
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
    review-2026-09-29.html（十九审——最新轮）及
    review-2026-09-28.html（十八审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（RFC-0004 已收官，修订 1-30——
-   修订 30 为十八审 R92/R93 文档更正），
-   docs/designs/0001~0010 十份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return/record+自举，
-   含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
+   0004-l2-selfhost-compiler.md（RFC-0004 已收官，修订 1-33——
+   修订 31/32 容器显示批、修订 33 十九审开账），
+   docs/designs/0001~0011 十一份批次设计（闭包/作用域/泛型/String/
+   List/Map/json/包/return/record+自举/容器显示，含各批实施修正
+   记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
    子智能体整理供料，规划者复核关键结论。
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
@@ -249,7 +245,7 @@
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（期望 286/286 = 139 用例双产物行为一致（134 单文件 + 5 包项目）+ 147 负例拒绝）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——L2.4 三层自证与自施加强 quine，~100s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——L2.4 三层自证与自施加强 quine；耗时随机器负载 ~100s-400s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -389,8 +385,8 @@
   逐字节一致（强 quine，sha256 相同）；值位 if/match 的 Form B/if
   块形态 return 终止臂双侧一致（bottom `?` 占位合流——R91 翻转）；
   Form A 单行臂内 return 双侧同拒（宿主语法层 PARSE001、两侧文案
-  一致——十八审 R92 更正：值位 if/match return 终止臂已全量双侧
-  一致，无剩余分叉面）。
+  一致——十八审 R92 时点更正"无剩余分叉面"；**十九审 R95 再更正**：
+  双 return 臂且绑定后参与算术的形态仍有分叉——见下方十九审锚点行）。
   verify_selfcomp 279/279 + --bootstrap 14/14；存量 127 hex 恒等；
   十七审 A- 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
