@@ -60,7 +60,20 @@
 - 环境状态（2026-09-26 已整理）：git stash 已清空（旧 WIP drop）、
   松散对象已打包、本地调试残留（.w0/.lom/__pycache__）已物理清理；
   目录结构健康未重组。eval/candidates_rerun（LLM 复测 raw 证据）保留。
-- 审查状态：**十八轮审查，总评 A-（维持；仅评本轮时点与检验面）**。
+- 审查状态：**十九轮审查，最新十九审总评 B+（基线 a697474/
+  v1.4.1，报告 review-2026-09-29.html；仅评本轮时点与检验面）**。
+  十九审：容器显示批宣称零失真复证（286/286 名实、存量 127 hex
+  恒等 127/127、quine 247009 bytes、宿主零改动）；开账
+  **R95（P2，五轮来首个：值位 if 两臂全 return 形态宿主 warning
+  收/L2 编译期拒——bottom 合流"绑定后算术"路径缺口，证伪
+  "无剩余分叉面"总括登记——四处已随 RFC 修订 33 收窄）**、
+  R96（P3：闭包体内调用内建 println 宿主收/L2 拒，未登记）、
+  R97（P3：scan_has_display 不追踪 match 臂 Binder 容器载荷）、
+  R98（P3：designs/0010 分项残留 + 更正批清点口径 5/7 不一）。
+  **当前 open：R94（挂账）/R95-R98；整改顺序待用户裁决**。
+  历史轨迹：十八审 A-（86d4d1c/v1.4.0，R92/R93 已修）；十七审
+  A-（8bf1e27/v1.3.1，R90/R91 已收口于 v1.3.2）——历史评级
+  不外推。事实源 docs/TODO.md 顶部。
   最新 docs/reviews/review-2026-09-28.html 为体系内 agent 分工独立
   复核，非外部同行审计。十七审（基线 8bf1e27/v1.3.1）开账 R90/R91
   已收口于 v1.3.2；十八审（基线 86d4d1c/v1.4.0）record 批与 L2.4
@@ -202,20 +215,23 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：宿主挂账小包（map_remove 双后端分叉修否、
-  包内 as 别名解释器 RUNTIME002、R94 json 星面键序 harness 修否
-  ——三项同族可统筹）/ println(Bool) 预扫扩放行评估 / typechecker
-  for 变量可变性 quirk 立项与否（TODO R65 证据区）/ 下一轮独立
-  复审（十九审，容器显示批后评级）或休整；MoonBit 1.0 Q3 复核
-  （月底窗口）；ubuntu-26 镜像迁移观察 2026-10-19。
+- 下一步由用户裁决：**R95-R98 整改包（R95 P2 优先——vt_merge/
+  尾值校验对 bottom 再让步（行为修复）或登记收窄二选一；R96
+  free_vars 内建名豁免或登记；R97 预扫描 ArmR 或收窄；R98 纯
+  文档）** / 宿主挂账统筹小包（map_remove 双后端分叉、as 别名
+  解释器 RUNTIME002、R94 json 星面键序 harness 修否——同族）/
+  println(Bool) 预扫扩放行评估 / typechecker for 变量可变性
+  quirk 立项与否（TODO R65 证据区）/ 二十审复审（R95-R98 整改
+  后评级）或休整；MoonBit 1.0 Q3 复核（窗口将过）；ubuntu-26
+  镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
-   review-2026-09-28.html（十八审——最新轮）及
-   review-2026-09-27.html（十七审），LANGUAGE_SPEC §14，docs/rfc/
+   review-2026-09-29.html（十九审——最新轮）及
+   review-2026-09-28.html（十八审），LANGUAGE_SPEC §14，docs/rfc/
    0004-l2-selfhost-compiler.md（RFC-0004 已收官，修订 1-30——
    修订 30 为十八审 R92/R93 文档更正），
    docs/designs/0001~0010 十份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return/record+自举，
@@ -239,14 +255,13 @@
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R1-R94 全部关闭
-   （R94 为 json 星面键序宿主双后端分叉挂账登记项——设计期供料
-   实证、修否待裁）；RFC-0004 收官 + 容器显示批交付（v1.4.1）；
-   下一方向可选：宿主挂账小包（map_remove 双后端分叉、as 别名
-   解释器 RUNTIME002、R94 json 键序 harness 修否）/ println(Bool)
-   预扫扩放行评估 / for 变量可变性 quirk 立项 / 十九审复审（容器
-   显示批后评级）/ MoonBit 1.0 Q3 复核 / ubuntu-26 迁移观察。
-   外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。**当前 open：R94（挂账）
+   + R95-R98（十九审开账待裁决）**；RFC-0004 收官 + 容器显示批
+   交付（v1.4.1）；下一方向可选：R95-R98 整改包（R95 P2 优先）/
+   宿主挂账统筹小包（map_remove、as 别名 RUNTIME002、R94 json
+   键序）/ println(Bool) 预扫扩放行 / for 变量 quirk / 二十审
+   复审或休整；MoonBit 1.0 Q3 复核（窗口将过）/ ubuntu-26 迁移
+   观察。外部发布线继续冻结。
 4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
    → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
@@ -391,7 +406,9 @@
   显式取 .0/.1；用例全文 grep "Fn" 自查。
 - 十八审后（2026-09-28 文档更正批）：R92——match Form A 臂内
   return 双侧同拒（宿主语法层 PARSE001 文案逐字一致）、if 单行
-  return 臂双侧同收，值位 return 终止臂全量双侧一致无剩余分叉；
+  return 臂双侧同收，值位 return 终止臂**单 return 臂形态**双侧
+  一致（R95 开账：双 return 臂且绑定后参与算术的形态宿主 warning
+  收/L2 拒——bottom 合流缺口，修否待裁）；
   verify_selfcomp 279/279 = 127 对拍（122 单文件 + 5 pkg）+ 152
   负例；十八审 A- 不评本批文档更正。
 - 容器显示批后（v1.4.1）：六类容器（ls/mp/rc/tp/en/cl）println/
@@ -408,6 +425,14 @@
   分叉——显示面不受影响，json 面挂账）；十八审 A- 不评此新增
   范围。
 
+- 十九审后（2026-09-29，open R94-R98）：R95——值位 if 双 return
+  臂（绑定后算术作尾值）宿主 TYPE001 warning 收（运行正确 1/2）/
+  L2 编译期拒（"尾表达式类型与返回类型不符"）；对照 bottom 绑定
+  直尾值双侧均收（121 bytes）。R96——闭包体内 println(n) 宿主
+  7/7 收/L2 拒（"闭包捕获了未定义变量 'println'"——内建名不在
+  fns 表）。R97——无字面量程序 match Some(xs) => println(xs) 落
+  ibase 兜底拒（带字面量同形态过）。R98——designs/0010 状态行
+  分项残留。规划者亲验 R95/R96 逐字一致。
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
 

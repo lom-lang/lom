@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lom 第十九轮体系内独立敌手审查 — 2026-09-29（十八审整改 R92/R93 + 容器显示批 v1.4.1）</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, "Microsoft YaHei", sans-serif; line-height: 1.55; }
+  body { max-width: 1120px; margin: 0 auto; padding: 32px 22px 80px; color: #202734; background: #fff; }
+  h1, h2, h3 { line-height: 1.3; color: #17283b; }
+  h1 { border-bottom: 3px solid #274e76; padding-bottom: 12px; }
+  h2 { border-bottom: 1px solid #c6d1dc; padding-bottom: 6px; margin-top:  34px; }
+  .lead { padding: 18px 22px; border-left: 5px solid #a04539; background: #fff4f1; }
+  .good { color: #176341; } .bad { color: #9a2d22; } .muted { color: #5a6470; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .94rem; }
+  th, td { border: 1px solid #cbd3dc; padding: 9px 11px; vertical-align: top; }
+  th { background: #eef3f8; text-align: left; }
+  tr:nth-child(even) { background: #f8fafc; }
+  code, pre { font-family: Consolas, "Cascadia Code", monospace; }
+  code { background: #f1f4f7; padding: 1px 4px; overflow-wrap: anywhere; }
+  pre { background: #172130; color: #e8eef6; padding: 13px 16px; overflow-x: auto; border-radius: 5px; line-height: 1.42; }
+  pre code { background: none; padding: 0; color: inherit; }
+  details { margin: 12px 0; padding: 8px 12px; border: 1px solid #cbd3dc; border-radius: 5px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .tag { display: inline-block; background: #81372d; color: white; font-weight: 700; padding: 1px 8px; border-radius: 4px; }
+  .note { border-left: 4px solid #607b97; padding: 8px 14px; background: #f2f6fa; }
+  a { color: #19558b; }
+</style>
+</head>
+<body>
+
+<h1>Lom 第十九轮体系内独立敌手审查报告</h1>
+<p class="muted">2026-09-29 ｜ 基线 HEAD <code>a697474</code> = tag <code>v1.4.1</code>（工作树干净）｜ 增量 = 十八审基线 <code>86d4d1c</code>/v1.4.0 之后四笔提交：<code>8a8d5a5</code>（十八审报告入库 + R92/R93 纯文档更正批）、<code>46dabab</code>（designs/0011 + RFC 修订 31）、<code>2f01d67</code>（容器显示批 feat，v1.4.1）、<code>a697474</code>（docs 成对 + R94 开账）｜ 审查执行者：第十九轮独立审查 agent</p>
+
+<div class="lead">
+<p><strong>本轮评级：B+（仅对本轮时点与检验面；历史轨迹不外推，本轮结论不预支后续）。</strong>本轮主审面（容器显示批 v1.4.1）的全部可复核交付宣称经独立复核<strong>零失真</strong>：verify_selfcomp <strong>286/286 名实相符</strong>（目录实数 134 单文件 + 5 pkg + 147 负例，验收器逐类输出 PASS 134 + PASS-PKG 5 + PASS-NEG 147）；<strong>存量 127 对拍 hex 恒等独立对拍 127/127 全等</strong>（git show 只读导出 v1.4.0 旧编译器、同一宿主 lom.exe 1.4.1 驱动逐文件 cmp，0 DIFF 0 MISSING）；--bootstrap <strong>14/14</strong>（142.0s，L3 自施加强 quine <strong>247009 bytes 双侧逐字节一致</strong> 1.3s）；宿主 <code>src/</code> 零改动（<code>git diff v1.4.0 HEAD --stat -- src/</code> 空）；self_comp 11321 行；基线 14 项全绿（HEAD CI run 36452201064 六 job success + 4 条 Ubuntu 26 迁移 notice）；文档五件套数字逐处对上。敌手探针 <strong>19 正例双侧 stdout+rc 逐字一致 + 3 自举外推 hex 全等 + 8 拒绝/同拒面全部干净</strong>，零静默错值、零坏 wasm。但本轮新开 <strong>R95（P2，五轮来首个 P2）</strong>：值位 if <strong>两臂全 return</strong> 形态（单行臂/块臂）宿主收（TYPE001 warning 不拦截、运行值正确）vs L2 编译期拒——R92/R93 更正后的现行登记“值位 if/match 的 return 终止臂<strong>已全量双侧一致……无剩余分叉面</strong>”（RFC 修订 29 尾句/HANDOVER §9-5/README L8/SPEC §13 v1.4.0 条目四处）被证伪，机制定位为 bottom 合流在“bottom 绑定后参与算术再作尾值”路径的缺口（同族对照 d2：bottom 绑定直尾值双侧均收）。另开 <strong>R96（P3：闭包体内调用内建 println 宿主收/L2 拒，信任边界清单未登记）</strong>、<strong>R97（P3：scan_has_display 预扫不追踪 match 臂 Binder 绑定的容器载荷——无字面量程序同函数自然写法落 ibase 兜底拒，“一层 vt 判定即覆盖自然写法”宣称收窄，R85 同型）</strong>、<strong>R98（P3：designs/0010 状态行“279/279 = 122 对拍 + 152 负例”算术不闭合残留 + R92/R93 更正批分项笔误清点口径 5 处/7 处不一）</strong>。</p>
+</div>
+
+<p><strong>边界：</strong>这是项目体系内 agent 分工的独立敌手审查，<strong>不是外部同行审计</strong>。审查阶段未改任何产品源码、测试、工具或治理文档；唯一写盘物为本报告，自构探针只置于 <code>target/probes/r19/</code>（gitignored）并在报告完成后清理，全部探针原文内嵌于 §4 保复现。<code>cargo clean --release -p lom</code> 强制重编属于构建缓存操作（产物在 gitignored target/，非仓库内容）。git 严格只读。本轮只开账，不修码、不提交、不推送、不切 tag。</p>
+
+<h2>1. 审查方法</h2>
+<p>先独立阅读 docs/TODO.md 顶部三段（容器显示批交接声明/R94 开账/十八审登记）、RFC-0004 修订 30/31/32、designs/0011 全文、HANDOVER §1/§9/§11.6（容器显示批踩坑五枚段）、十八审报告（方法节 + R92/R93 开账原文 + §4 探针原文），再读 <code>examples/selfhost/self_comp.lom</code> 的 display_code（L4800-4845）/disp_ls|mp|rc|tp|en_body（L7990-8232）/ensure_disp_helper（L8236）/disp_ref_hex（L7962）/patch_disp_bodies + patch_disp_refs（L8309-8384）/comp_println 容器臂与 ibase 兜底（L5664-5722）/comp_print_builtin（L5636）/comp_binary 拼接豁免（L4883/L4952-4961）/scan_has_display 族（L10357-10597，disp_cont_expr/disp_scan_ex/disp_scan_block）/build_module disp 区发射（L11122-11232）与 <code>tools/verify_selfcomp.py</code> 的 EXPECTED_NEGATIVE_MESSAGES/PKG_CASES 变更。正例全部穿真实 CLI 全链路：</p>
+<pre><code>$case = '&lt;探针名&gt;'   # §4 中任一探针（置于 target/probes/r19/）
+./target/release/lom.exe build "target/probes/r19/$case.lom" --target wasm -o "$case.host.wasm"
+./target/release/lom.exe examples/selfhost/self_comp.lom -- "target/probes/r19/$case.lom" "$case.hex"
+python tools/hex2wasm.py "$case.hex" "$case.l2.wasm"
+node eval/runner/run_wasm.mjs "$case.host.wasm"          # 宿主 stdout + rc
+node tools/selfcomp/run_selfcomp.mjs "$case.l2.wasm"     # L2 stdout + rc（逐字对照）</code></pre>
+<p>负例查真实 L2 CLI 的 <code>COMPILE-ERROR</code> 输出与 hex 不存在（L2 驱动 COMPILE-ERROR 时进程 rc 可为 0，只看输出）。“存量 127 hex 恒等”宣称的复核方法（沿十六/十七/十八审先例）：<code>git show v1.4.0:examples/selfhost/self_comp.lom</code> 只读导出旧版编译器 → 同一宿主 lom.exe v1.4.1 分别驱动旧/新编译器对 v1.4.0 用例集（<code>git ls-tree v1.4.0</code> 的 122 单文件 + pkg 5 按 PKG_CASES 流程：pkg-expand 展开 + <code>--list</code> 第三参）产 hex 逐文件 <code>cmp</code>。版本边界经 ls-tree 核定：v1.4.0 = 122 cases + 5 pkg + 152 neg；HEAD = 134 cases + 5 pkg + 147 neg。cargo 命令严格串行。自举外推（q 族）：宿主 self_comp 编译自身产 quine.host.wasm → wasm self_comp 编译自构探针 → 与宿主 self_comp 产 hex 逐字节 cmp（<code>--stack-size=60000</code>）。</p>
+
+<h2>2. 新发现开账（R95：P2；R96/R97/R98：P3）</h2>
+<table>
+  <thead><tr><th style="width:12%">编号</th><th>声明（一句话）</th><th style="width:38%">证据与复现</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag">R95 · P2</span><br>值位 if 两臂全 return 的剩余分叉——bottom 合流在“绑定后算术”路径误拒合法程序，证伪“无剩余分叉面”登记</td>
+      <td>R92/R93 更正后的现行登记宣称“值位 if/match 的 return 终止臂<strong>已全量双侧一致</strong>（R91 翻转 + 十八审 R92 更正，<strong>无剩余分叉面</strong>）”（RFC 修订 29 尾句、HANDOVER §9-5、README L8、SPEC §13 v1.4.0 条目四处一致口径）。本轮探针 d1（单行双 return 臂）/d3（块臂双 return）实测：<strong>宿主收</strong>——typecheck 打 TYPE001 warning（“'+' 不支持 Unit 和 Int”，不拦截执行），运行输出正确（g(200)=1、g(1)=2，rc=0）；<strong>L2 编译期拒</strong>——codegen error “尾表达式类型与返回类型不符”，无 hex。十八审 R92 的 8 变体（d4-d10/a7）均不含“两臂全 return”组合，d5 只测了“一臂值一臂 return”。机制定位：L2 的 bottom（<code>?</code>）合流在<strong>bottom 绑定后参与算术再作尾值</strong>的路径上综合仍产 bottom 而非让步（对照 d2：bottom 绑定直接作尾值双侧均收——L2 内部两路径不一致；宿主则把全-return-if 综合为 Unit 打 warning 后运行正确）。性质＝误拒宿主正确运行的合法程序（R82 同型）+ 击穿明确宣称句（R92 同向镜像）。</td>
+      <td>§4 d1/d2/d3 原文；双侧输出原文：<br>宿主 d1：<code>[type] warning (0:0): [TYPE001] '+' 不支持 Unit 和 Int … 1 2 rc=0</code>；L2 d1：<code>codegen error: 尾表达式类型与返回类型不符 / COMPILE-ERROR</code>，hex 不存在。d3（块臂）同形态同结论；d2：<code>COMPILED 121 bytes</code> 双侧输出 1/2 一致（宿主附 TYPE010 warning）。修否待裁：可在 vt_merge/尾值校验对 bottom 再让步（与 bottom 合流闸门同窗口），或登记收窄为“单 return 臂形态无分叉；双 return 臂形态宿主 warning 收/L2 拒”——四处登记句需同步。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R96 · P3</span><br>闭包体内调用内建 println：宿主收 / L2 拒，信任边界清单未登记</td>
+      <td>d5c 最小复现：<code>let f = fn(n: Int) -> Int … println(n) … end</code>（闭包体内调用 println）。宿主正确运行（输出 7/7，rc=0）；L2 拒 <code>codegen error: 闭包捕获了未定义变量 'println'</code>，无 hex。根因：compile_closure 的自由变量判定（free_vars_block 收集调用位 ExIdent）对内建调用名（println 不在 fns 用户函数/变体表）走“闭包捕获了未定义变量”拒绝；import 符号（如 int_to_string）因 import 表在 fns 而放行（138 用例先例）——<strong>println 是语言内建（无需 import）故成为缺口</strong>。现登记面（HANDOFF_PROMPT 拒绝清单 L267“闭包值算术比较/闭包体内赋值捕获变量/调用非闭包值”、HANDOVER §9-5 拒绝清单）均未列此条；HANDOVER §4 坑 6 只登记“闭包不可捕获 import 符号”（不同类）。本轮 p5（闭包内构造容器显示）探针即被此面阻断——闭包内任何 println 在 L2 不可写。</td>
+      <td>§4 d5c 原文；双侧输出：宿主 <code>7 7 rc=0</code>；L2 <code>COMPILE-ERROR</code>。修否待裁：free_vars 判定加内建调用名豁免（行为修复），或补登记为 L2 子集信任边界（纯文档）。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R97 · P3</span><br>scan_has_display 预扫不追踪 match 臂 Binder 绑定的容器载荷——无字面量程序同函数自然写法落 ibase 兜底拒</td>
+      <td>RFC 修订 32 登记“预扫 scan_has_display（println/print 实参 + 拼接两侧 + 一层 let——跨函数流转不识，<strong>实施确认一层 vt 判定即覆盖自然写法</strong>）”。n4 实测：无 String 字面量程序中 <code>match Some(xs) => println(xs)</code>（Form B 块臂 Binder 绑定容器载荷后同函数显示）——宿主正确运行（输出 <code>[1]</code> rc=0）；L2 拒 ibase 兜底文案（“println(容器值) 需要 String 设施……深层容器流未被预扫覆盖”），无 hex。读码定位：disp_cont_expr 的 ExIdent 只查 cont_names（一层 let 绑定表，StLet 分支维护），match 臂 Binder（ArmR 模式绑定）不入表；disp_scan_ex 的 ExMatch 分支递归臂体但 println(xs) 的实参 ExIdent 查表 miss。带 String 字面量的同形态（p18）正常通过——缺口只在 ibase&lt;4 程序。R85（十五审 P3：println(Bool) 预扫三层不识别值位 if/match/局部闭包产 Bool）同型先例；落双防线兜底（显性拒、非坏 wasm）。</td>
+      <td>§4 n4 原文；双侧输出：宿主 <code>[1] rc=0</code>；L2 <code>COMPILE-ERROR</code>（ibase 兜底新文案）+ hex 不存在。p18 对照（同形态带字面量）MATCH。修否待裁：预扫描 ArmR 模式绑定名入 cont_names（保守宁滥），或登记收窄“自然写法”口径排除 match 臂 Binder 形态。</td>
+    </tr>
+    <tr>
+      <td><span class="tag">R98 · P3</span><br>分项笔误整改后残留一处算术不闭合 + 更正批清点口径 5 处/7 处不一</td>
+      <td>十八审精度备注（不开账）指出 verify_selfcomp 分项句“122 对拍（117 单文件 + 5 pkg）+ 152 负例 = 279”算术不闭合（274≠279，正确 127 = 122 单文件 + 5 pkg），R92/R93 更正批（8a8d5a5）宣称“分项笔误 7 处更正”（commit message）/“5 处”（TODO 整改关闭段与 RFC 修订 30）。本轮全仓 grep：①“117 单文件/117 single-file”零命中 ✓；②但 <strong>docs/designs/0010 L6 状态行仍残留“verify_selfcomp 279/279 = 122 对拍 + 152 负例”</strong>（122+152=274≠279，同款算术不闭合；非引述语境，是状态行事实陈述）——十八审开账清点（5 处）与更正批清点（7 处）均未含此位；③commit message“7 处”与 TODO/RFC 修订 30“5 处”同提交内两种计数并存，无一处解释差异构成。</td>
+      <td>复现：<code>grep -rn "122 对拍" docs/ README.md LANGUAGE_SPEC.md</code> → 仅 docs/TODO.md L48（十八审引述句，合理保留）与 docs/designs/0010 L6（残留）；<code>git show 8a8d5a5 --stat | head -3</code> vs TODO L59/RFC 修订 30 L843。修法：designs/0010 L6 改“127 对拍（122 单文件 + 5 pkg）”+ 清点口径统一（纯文档）。</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">台账顺延说明：R94 已由容器显示批开账（json 星面键序挂账，P3）；本轮新发现自 <strong>R95</strong> 起。P1 = 静默错值/损坏、P2 = 行为级错误但非静默、P3 = 登记精度/覆盖面/文案缺口。R95 的 P2 定级依据：L2 误拒宿主正确运行的合法程序（R82“合法分支内 let 尾值误拒”开 P2 同型）且击穿“无剩余分叉面”明确宣称句——拒绝本身显性（COMPILE-ERROR、无坏 wasm、无静默错值）。若规划者裁定其属“宿主 warning 收 vs L2 编译期拒”既有分叉类别（十八审 §5-②归纳）而仅收窄登记，可降 P3——但该归纳类别未覆盖“宣称句明示无分叉”的形态，本轮按 P2 开账。</p>
+
+<h2>3. 复验矩阵</h2>
+<h3>3.1 基线 14 项（全部亲手跑）</h3>
+<table>
+  <thead><tr><th style="width:4%">#</th><th style="width:30%">项</th><th>结果（真实输出摘录）</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>cargo build --release 零 warning（clean -p lom 强制重编后）</td><td><span class="good">✓</span> <code>cargo clean --release -p lom</code>（Removed 83 files, 136.5MiB）→ 重编 1m33s 输出仅 Compiling/Finished；<code>cargo build --release 2>&1 | grep -ci warning</code> = <strong>0</strong></td></tr>
+    <tr><td>2</td><td>cargo test --release</td><td><span class="good">✓</span> <strong>541 passed; 0 failed</strong>（单元，2.08s）+ r56 ×1 + r58 ×7 = <strong>8 集成全过</strong>（541+8 名实相符）</td></tr>
+    <tr><td>3</td><td>cargo clippy --release -- -D warnings</td><td><span class="good">✓</span> 零输出（仅 Checking/Finished），exit 0</td></tr>
+    <tr><td>4</td><td>cargo fmt --all -- --check</td><td><span class="good">✓</span> 零 diff，exit 0</td></tr>
+    <tr><td>5</td><td>python tools/doc_audit.py</td><td><span class="good">✓</span> <strong>RESULT: PASS（67/67 项通过）</strong></td></tr>
+    <tr><td>6</td><td>python tools/spec_examples_check.py</td><td><span class="good">✓</span> RESULT: PASS（正例 51 / 反例 5 / skip 24）</td></tr>
+    <tr><td>7</td><td>python tools/eval_prompt_check.py</td><td><span class="good">✓</span> RESULT: PASS（校验 <strong>24</strong> / 失真 0）</td></tr>
+    <tr><td>8</td><td>verify_selfhost 六模式逐个</td><td><span class="good">✓</span> dump 154/154（Latin-1 折叠等价 0）/ tokens 154/154（列坐标系已知差异 1）/ diags 12/12 / static 坏 22 + 干净 154 / run 31/31 / <strong>wasm-layer2 151 + layer3 golden 39 条 + selfapply</strong> 全 PASS</td></tr>
+    <tr><td>9</td><td>python tools/verify_selfcomp.py</td><td><span class="good">✓</span> <strong>RESULT: PASS（286/286）</strong>；名实核对：目录实数 cases <strong>134</strong> + pkg_cases <strong>5</strong> + negative <strong>147</strong> = 286；验收器逐类输出 <code>PASS</code> ×134 + <code>PASS-PKG</code> ×5 + <code>PASS-NEG</code> ×147 逐项对上</td></tr>
+    <tr><td>10</td><td>verify_selfcomp --bootstrap</td><td><span class="good">✓</span> <strong>14/14，总耗时 142.0s</strong>；末三项原文：<code>PASS-B L2-PKG 101_pkg_single pkgs=mathlib; hex identical</code> ／ <code>PASS-B L3 self-apply (quine) 247009 bytes; byte-identical; 1.3s</code> ／ <code>RESULT: PASS（--bootstrap：14/14 项通过；总耗时 142.0s）</code>——quine 247009 bytes 与宣称逐字一致</td></tr>
+    <tr><td>11</td><td>eval 双后端 run.ps1</td><td><span class="good">✓</span> native <strong>Total: 121 / Passed: 121</strong>；wasm <strong>Total: 121 / Passed: 121</strong></td></tr>
+    <tr><td>12</td><td>Lom fmt 递归 examples</td><td><span class="good">✓</span> <code>files=37 fail=0</code>（apply_test 豁免；经落盘 .ps1 执行规避 Git Bash 双引号预展开）</td></tr>
+    <tr><td>13</td><td>golden（stmt_interp）</td><td><span class="good">✓</span> 输出与 expected.txt <code>diff</code> 为空（GOLDEN-DIFF-EMPTY）；stderr 0 行</td></tr>
+    <tr><td>14</td><td>版本一致 + CI 实查</td><td><span class="good">✓</span> git describe = <strong>v1.4.1</strong>；Cargo.toml <code>version = "1.4.1"</code>；lom --version = <strong>1.4.1</strong>；GitHub API：HEAD a697474e… → <strong>run 36452201064</strong>（run_number 196）六 job 全 success（selfhost verify/clippy/macos/windows/doc gates/ubuntu）+ check-runs 合计 <strong>4 条 annotations</strong>（实测 message = “The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026”——Ubuntu 26 迁移 notice，与先例一致）；最近 runs 列表 HEAD 即最新（46dabab → run 36434080033 亦 success），无更新 run</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 R92/R93 整改宣称复核（8a8d5a5）——零失真（附带 R98 两点瑕疵）</h3>
+<table>
+  <thead><tr><th style="width:22%">项</th><th>复核结论</th></tr></thead>
+  <tbody>
+    <tr><td>R92 六处登记更正</td><td><span class="good">✓ 全部落地</span>：①RFC 修订 29 尾句（L812-816“match Form A 臂内 return 双侧同拒（宿主语法层 PARSE001、两侧文案逐字一致），if 单行 return 臂双侧同收……剩余分叉面实测为无”）②TODO v1.4.0 段（L73-75 同口径）③SPEC §13 v1.4.0 条目（L1353“rejected identically by both sides at the syntax layer (PARSE001, matching messages)…no remaining divergence, per the eighteenth-review R92 correction”）④HANDOVER §9-5（L603“值位 if/match 的 return 终止臂已全量双侧一致（R91 翻转 + 十八审 R92 更正，无剩余分叉面）”）⑤HANDOFF_PROMPT 锚点段（L376）⑥README L8 英文句（“a return inside a Form-A single-line match arm is rejected identically by both sides at the syntax layer (no remaining divergence; eighteenth-review R92 correction)”）+ RFC 新增修订 30 在位。<strong>但“if 单行 return 臂双侧同收/无剩余分叉面”句被本轮 R95 证伪（两臂全 return 形态）</strong>——见 §2。</td></tr>
+    <tr><td>R92 证据探针复跑</td><td><span class="good">✓</span> d4（值位 match Form A 臂 return）十八审原形复跑：宿主 <code>[parse] error (5:14): [PARSE001] 期望表达式，得到 Return</code> rc=1；L2 <code>parse error 5:14 [PARSE001] 期望表达式，得到 Return / COMPILE-ERROR</code>，hex 不存在——<strong>双侧同拒、位置与核心文案逐字一致</strong>（宿主 hint/诊断计数行为 CLI 包装差异，十八审口径内）</td></tr>
+    <tr><td>R93 六处时点刷新</td><td><span class="good">✓ 全部落地</span>：HANDOVER §1 Rust 行 <strong>541/541 + 8 集成</strong>（L300）与历史链（“v1.3.0：539（pkg-expand ×4）；v1.3.2：541（R90 ×2）”）；v1.3.1 段 <strong>539+8</strong>（L84）；§9-1 指向<strong>十八审</strong>报告（L599“最新十八审报告（review-2026-09-28.html）与十七审报告”）；§9-5 十八审口径（L603）；README 恒等数 <strong>127</strong>（L8“the 127 pre-record pairs produce byte-identical hex”）；HANDOFF_PROMPT 下一步/方向菜单条目（L144-151 v1.4.1 口径）</td></tr>
+    <tr><td>分项笔误 7 处 127 口径</td><td><span class="good">✓ 主体</span>＋<span class="bad">✗ 一处残留 → R98</span>：“117 单文件/117 single-file”全仓 <strong>零命中</strong>；“122 对拍”仅两处——TODO L48（十八审引述句，描述性引用语境，合理）与 <strong>designs/0010 L6（状态行残留，算术不闭合 274≠279，非引用语境）</strong>；RFC 修订 28/SPEC v1.3.2 条目/HANDOVER §2.2/TODO v1.3.2 段均已改 127 口径</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 容器显示批宣称复核（v1.4.1 主审面）——交付宣称零失真</h3>
+<table>
+  <thead><tr><th style="width:26%">宣称</th><th>复核结论</th></tr></thead>
+  <tbody>
+    <tr><td>verify_selfcomp 279→286/286 = 139 对拍 + 147 负例</td><td><span class="good">✓</span> 名实双核定（§3.1 #9）；12 新对拍 128-139 在位（128 List 全形态/129 Map/130 枚举/131 record/132 tuple/133 闭包/134-135 拼接两侧/136 print/137 递归枚举/138 HOF/139 混合深层）；9 预留负例转正删除（neg_println_list/neg_println_map/neg_record_println/neg_enum_print/neg_c2_print_generic/neg_println_closure/neg_list_concat_promote/neg_map_concat/neg_record_concat 均不在 negative/ 目录）；4 新深层负例锁定串核对（EXPECTED_NEGATIVE_MESSAGES L229-232 统一锁“println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖”）</td></tr>
+    <tr><td>12 新对拍抽读 ≥6 枚名实</td><td><span class="good">✓</span> 全读 128/130/131/132/137/138 六枚：内容与命名相符、无空壳——128 覆盖空/单/多元素/String/Bool/Float/双层嵌套/拼接两侧；130 覆盖零参/单/多载荷/String/Bool/Float 载荷/Tree 递归/Rose en↔ls 互递归/内建 Option/Result 实例/拼接两侧；131 覆盖声明序/四标量字段/嵌套/List 值/空 List 值/三层深嵌；132 覆盖单元素补逗号 (a,)/Bool-Float 混/嵌套/tuple 含 List/record/枚举/五元；137 覆盖 build(3) 递归/不对称树/Rose 深层/拼接；138 覆盖 map/filter 产物/List of List/fold 串/拼接链</td></tr>
+    <tr><td><strong>存量 127 对拍 hex 逐字节不变</strong></td><td><span class="good">✓ 独立对拍全等</span>：<code>git show v1.4.0:…self_comp.lom</code> 导出旧编译器 → 同一 lom.exe 1.4.1 驱动旧/新编译器对 v1.4.0 用例集（122 单文件 + 5 pkg 展开）产 hex 逐文件 cmp → <strong>IDENTICAL=127 DIFF=0 MISSING=0</strong>（脚本 hex127.sh，§4 内嵌）</td></tr>
+    <tr><td>self_comp 10548→11321 行；宿主 src 零改动（Rust 541+8）</td><td><span class="good">✓</span> wc -l = <strong>11321</strong>（10548+773=11321 算术吻合）；<code>git diff v1.4.0 HEAD --stat -- src/</code> 输出<strong>空</strong>（零改动）；38 文件 changed = self_comp + cases + negative + verify_selfcomp.py（+2628/-177）</td></tr>
+    <tr><td>disp 独立区占位 patch 机制（读码四点）</td><td><span class="good">✓ 四处确认</span>：①占位偶字符——disp_ref_hex（L7962-7969）奇数位序号补前导 0 成偶位数（g012h 形态），注释明示“占位恒偶字符，不破坏 hex 字节对齐”；②重放式前缀重写——patch_disp_bodies（L8309-8344）按 [leb 长度前缀+体] 逐条重放、patch 后 <code>leb128_hex(len(pb)/2)</code> 重写前缀（直拼产 section 尺寸错位的教训登记对应）；③ndisp=0 零追加直通——build_module L11124-11131/11171-11176/11226-11231 三处 while 循环 ndisp=0 时空串、patch_disp_bodies contains("g")==False 直通（存量 bodies 无 g/h 字符即原样返回）；④has_str 防漏判内部错误防御——ensure_disp_helper L8243-8245：has_str==0 时 Err“内部错误：显示 helper 在 String 设施未启用时 ensure（预扫/兜底漏判）——请报维护者”</td></tr>
+    <tr><td>scan_has_display 预扫 + ibase 兜底双防线</td><td><span class="good">✓ 主体</span>＋<span class="bad">✗ match Binder 缺口 → R97</span>：读码（L10357-10597：disp_cont_expr 白名单 = range/record/tuple/闭包字面量/list_cons/list_empty/list_map/list_filter/map_empty/枚举变体构造 + ExIdent 查一层 let 表 cont_names；disp_scan_ex 覆盖 Add 两侧/println·print 实参/match·if·闭包体递归；has_str 联动 L10947 probe_str_sigs or scan_has_string or scan_has_bool_display or scan_has_display）；自然写法放行验证：<strong>p16</strong>（无字面量程序直接容器 println：list/range/注解空 Map/嵌套 List/Bool List）双侧 MATCH——预扫覆盖宣称成立；<strong>n4</strong>（match 臂 Binder 绑定）预扫 miss 落兜底拒（R97）；comp_println/comp_print_builtin 的 ibase 兜底新文案在位（L5640-5641/L5690-5691/L5709-5712）</td></tr>
+    <tr><td>comp_binary 枚举防御臂拼接豁免</td><td><span class="good">✓</span> L4883：<code>(enum_vt(l) or enum_vt(r)) and (op != "Add" or (l != "st" and r != "st"))</code> 才拒——枚举 + Add + 有 st 侧豁免走拼接（L4952-4961 display_code 双侧 + st_concat）；p9 实测 <code>Val(9) + "&lt;-" + xs</code> 双侧一致</td></tr>
+    <tr><td>println(闭包) 信任边界翻转消除（"&lt;闭包&gt;"）</td><td><span class="good">✓</span> display_code L4816-4818：cl → intern "&lt;闭包&gt;" 静态串（1a drop 保副作用 + i32.const + wrap）；133/p5/n3r 三路实测双侧 <code>&lt;闭包&gt;</code> 逐字一致（含无字面量程序 n3r——ExClosure 在预扫白名单，ibase 由预扫置起）；json 拼接维持拒（EXPECTED 表 neg_json_concat 锁定串在位）</td></tr>
+    <tr><td>负例面收窄登记（Map/print/闭包深层流“不可构造”）</td><td><span class="good">✓ 论断验证成立</span>：Map——n2 变量键跨函数 map_get 构造：String 签名参数 k → probe_str_sigs 命中 → has_str 开 → <strong>双侧均收且输出一致</strong>（None/None rc0=rc0，L2 COMPILED 1262 bytes）——“Map 键恒 String 即开 has_str 设施”机制性论断实证；print——必 import io → probe_str_sigs module=="io" 命中（L10624-10629）+ p17 实证；闭包——跨函数闭包流转需 cl 参数签名而 Lom 无 Fn 类型注解不可构造（语法性论断）+ 闭包字面量直接显示被预扫覆盖（n3r 放行）</td></tr>
+    <tr><td>--bootstrap 14/14 + quine 247009 bytes</td><td><span class="good">✓</span> §3.1 #10（142.0s 本轮实测，十八审 396.3s 与记载 96.9-103.5s 的时点差异均为机器负载方差——L3 self-apply 1.3s 与记载同量级）</td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 敌手探针总账</h3>
+<table>
+  <thead><tr><th style="width:30%">族</th><th>计数与结论</th></tr></thead>
+  <tbody>
+    <tr><td>正例全链路（p 族）</td><td><strong>19/19 MATCH</strong>（stdout+rc 逐字）：深组合 6（Map&lt;List&lt;Map&gt;/List&lt;record&gt;/record 混合字段/tuple↔record 深嵌/闭包构造容器/HOF 内联产物）+ 格式边界 2（空容器族/大 Int ±2^59/负数/中文/Float .0；120 元素长 List）+ 拼接链 3（多段交替链/拼接产物进容器/println 嵌套）+ 占位边界 4（多特化共存含 Option 两实例/递归枚举 5 层 63 节点/Rose 3 层深层/同特化多调用点去重）+ 预扫放行 2（无字面量直接容器 println/print 内建容器）+ match Binder 有字面量 1 + R91 回归 1（match Form B 双 return 臂 + 值臂合流）</td></tr>
+    <tr><td>自举外推（q 族）</td><td><strong>3/3 IDENTICAL</strong>：wasm self_comp（quine 产物）编译 p1/p12/p13 与宿主 self_comp 产 hex 逐字节一致——286 用例之外的外推面成立</td></tr>
+    <tr><td>拒绝/同拒面（n/d 族）</td><td><strong>8 面全部干净</strong>（零坏 wasm、零静默错值）：n1 tuple 跨函数流转（既有 4 负例同文案类别内干净拒）；n2/n3r 双侧收且一致（收窄论断验证，非负例）；d4 R92 同拒复证；d1/d3 → <strong>R95</strong>（宿主 warning 收/L2 拒）；d5c → <strong>R96</strong>（宿主收/L2 拒未登记）；n4 → <strong>R97</strong>（ibase 兜底拒，R85 同型）。另有 p7 修正前 ((),) 单元 tuple 形态（宿主收/L2 拒“tuple 元素不能为 void 值”——L2 校验严于宿主的既有类别，十八审 §5-②归纳内，非新发现）；p16 修正前裸 mp{?} println（L2 编译期拒——已登记“裸 mp{?}/ls{?} 子块细化”边界）；p17 修正前无 io import 的 print（L2 拒“未定义变量 'print'”——§11.6 五坑尾注“print 必 import io”已登记机制）</td></tr>
+  </tbody>
+</table>
+
+<h3>3.5 文档数字对账</h3>
+<table>
+  <thead><tr><th style="width:22%">文档</th><th>核对结论</th></tr></thead>
+  <tbody>
+    <tr><td>README.md</td><td><span class="good">✓</span> L8 v1.4.1 主句：139（134+5）/147/127 恒等/247009/541+8/11321/R92 更正句全部与实测一致；L71 541/541+8、11321、121/121、38 .lom（fmt 覆盖 37 = 38−1 apply_test 豁免）✓</td></tr>
+    <tr><td>LANGUAGE_SPEC.md §13</td><td><span class="good">✓</span> v1.4.1 条目（L1352）：286/286 = 134 + 5 + 147、127 恒等、10548→11321、14/14、quine 247009、宿主 src untouched（Rust 541+8）、九负例转正/四新负例、scan_has_display + ibase 兜底、comp_binary 豁免闭环、机制偏离（inline-fidx → placeholder-patched disp section）登记——逐条与实测/读码一致</td></tr>
+    <tr><td>docs/HANDOFF_PROMPT.md</td><td><span class="good">✓</span> 锚点段 L143-155：11321/286=139（134+5）+147/12 新对拍/9 转正/4 新负例/247009/127 恒等/541+8/行数链 9295-9361-9491-10402-…；下一步段 L400-410 同口径 + R94 开账段 ✓</td></tr>
+    <tr><td>docs/HANDOVER.md</td><td><span class="good">✓</span> §1 版本行 v1.4.1（RFC 修订 32/R94 挂账/十八审 A- 边界句）；§2.2 基线 286/286（139=134+5+147）；§9-5 状态句（含容器显示批交付描述与拒绝清单）；§11.6 容器显示批踩坑五枚段（①互递归 fidx ②偶字符 ③重放式前缀 ④累积表注解 ⑤防御臂序——与读码逐条对应）+ 尾注“Map/print/闭包深层流不可构造”（本轮 n2/n3r 实证）；§12.2 顺延指针 R94+ ✓</td></tr>
+    <tr><td>docs/TODO.md 顶部</td><td><span class="good">✓</span> 交接声明（六类/三入口/disp 机制偏离/286/127 恒等/247009/11321/541+8）+ R94 开账段（星面键序分叉、显示面不受影响、修否待裁）+ 十八审登记段 ✓</td></tr>
+    <tr><td>docs/positioning.html</td><td><span class="good">✓</span> L30/L81：v1.4.1 时点、十八审 A- 口径（“容器显示批（v1.4.1）交付后状态不在十八审检验面内，评级待下一轮复审”）——与实际边界一致 ✓</td></tr>
+    <tr><td>RFC-0004 修订 30/31/32</td><td><span class="good">✓</span> 修订 30（R92/R93 关闭 + 5 处笔误更正记载——与 commit message“7 处”差异见 R98）；修订 31（设计方案产出，代码零改动）；修订 32（交付：+773 行 = 11321−10548 算术吻合、机制偏离登记、九转正四新增、R94 同批开账）逐条与实测一致</td></tr>
+    <tr><td>docs/designs/0011</td><td><span class="good">✓ 主体</span>（基线 8a8d5a5/v1.4.0/10548/279 口径为设计时点正确值；§11-1 预估“285-295 项、+300-550 行（主观推测）”自标）；<span class="bad">✗</span> designs/<strong>0010</strong> L6 残留 → R98</td></tr>
+  </tbody>
+</table>
+
+<h2>4. 自构敌手探针（原文全内嵌，复制即复现——置于 target/probes/r19/，已随审查完成清理）</h2>
+<h3>4.1 结果总表</h3>
+<table>
+  <thead><tr><th>探针</th><th>宿主（stdout, rc）</th><th>L2</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td colspan="4"><strong>发现族（d）——R95/R96 证据</strong></td></tr>
+    <tr><td>d1_if_both_ret（值位 if 单行双 return 臂 + 绑定后算术）</td><td>TYPE001 warning“‘+’ 不支持 Unit 和 Int”（不拦截）；输出 <code>1 2</code> rc=0</td><td><code>codegen error: 尾表达式类型与返回类型不符 / COMPILE-ERROR</code>，无 hex</td><td><span class="bad">→ R95（P2）</span>宿主收（值正确）/L2 拒——“无剩余分叉面”宣称证伪</td></tr>
+    <tr><td>d2_bothret_tail（双 return 臂 + bottom 绑定直尾值）</td><td>TYPE010 warning“声明返回 Int 实际返回 Unit”；输出 <code>1 2</code> rc=0</td><td><code>COMPILED 121 bytes</code>；输出 <code>1 2</code> rc=0</td><td><span class="good">✓ 双侧收且值一致</span>（宿主 warning）——对照证明 L2 内 bottom 直尾值路径让步、算术路径不让步（R95 机制定位）</td></tr>
+    <tr><td>d3_bothret_block（值位 if 块臂双 return）</td><td>同 d1（TYPE001 warning；<code>1 2</code> rc=0）</td><td>同 d1（COMPILE-ERROR，无 hex）</td><td><span class="bad">→ R95</span>块臂形态同拒</td></tr>
+    <tr><td>d5c_closure_println（闭包体内调用内建 println）</td><td>输出 <code>7 7</code> rc=0</td><td><code>codegen error: 闭包捕获了未定义变量 'println' / COMPILE-ERROR</code>，无 hex</td><td><span class="bad">→ R96（P3）</span>宿主收/L2 拒，信任边界清单未登记</td></tr>
+    <tr><td>d4_formA_retarm（十八审 R92 证据原形复跑）</td><td><code>[parse] error (5:14): [PARSE001] 期望表达式，得到 Return</code> rc=1</td><td><code>parse error 5:14 [PARSE001] 期望表达式，得到 Return / COMPILE-ERROR</code>，无 hex</td><td><span class="good">✓ 双侧同拒</span>（位置/核心文案逐字一致）——R92 更正登记复证成立</td></tr>
+    <tr><td colspan="4"><strong>预扫/防御面（n）——R97 证据 + 收窄论断验证</strong></td></tr>
+    <tr><td>n1_deep_tp_param（tuple 跨函数参数流转 println）</td><td>输出 <code>(1, 2)</code> rc=0</td><td>COMPILE-ERROR（ibase 兜底新文案），无 hex</td><td><span class="good">✓ 既有类别内干净拒</span>（与 4 负例同文案同机制，tuple 族未入负例清单——机制评注 ③）</td></tr>
+    <tr><td>n2_map_deep_flow（Map 变量键跨函数 map_get println）</td><td>输出 <code>None</code> rc=0</td><td><code>COMPILED 1262 bytes</code>；输出 <code>None</code> rc=0</td><td><span class="good">✓ 双侧收且一致</span>——“Map 键恒 String 即开 has_str”收窄论断机制实证（String 签名参数 → 预探测命中）</td></tr>
+    <tr><td>n3_closure_nolit（无字面量 println(闭包字面量)）</td><td>输出 <code>&lt;闭包&gt;</code> rc=0</td><td><code>COMPILED 405 bytes</code>；输出 <code>&lt;闭包&gt;</code> rc=0</td><td><span class="good">✓ 双侧一致</span>——预扫对闭包显示放行（ExClosure 白名单）</td></tr>
+    <tr><td>n4_match_binder_nolit（无字面量 match 臂 Binder 绑定容器 println）</td><td>输出 <code>[1]</code> rc=0</td><td>COMPILE-ERROR（“println(容器值) 需要 String 设施……深层容器流未被预扫覆盖”），无 hex</td><td><span class="bad">→ R97（P3）</span>同函数自然写法落兜底拒（R85 同型；p18 对照带字面量同形态 MATCH）</td></tr>
+    <tr><td colspan="4"><strong>正例族（p）19 枚全 MATCH（stdout+rc 逐字）</strong></td></tr>
+    <tr><td>p1 Map&lt;List&lt;Map&gt;&gt; 三层深组合 + List&lt;Map&gt; + List&lt;Map&lt;Map&gt;&gt; + 拼接</td><td colspan="2">双侧逐字一致</td><td rowspan="19"><span class="good">19/19 MATCH</span>——含 2 例百级/大数边界（p7 空 Map/List 族、±(2^59−1)=±576460752303423487、Float 0.0/-0.5/3.25、中文键值；p8 120 元素累积 List + range 1..100）与拼接两侧链、占位多特化共存（List&lt;Int&gt;/&lt;String&gt;/&lt;Float&gt;/&lt;List&lt;Int&gt;&gt; + Option{st}/{i64} + Result 同发射）、递归枚举 build(5) 63 节点、Rose 三层互递归、同特化三调用点去重、无字面量直接容器 println（预扫放行）、io import 后 print 各容器、match 臂绑定有字面量、R91 match Form B return 臂原形回归</td></tr>
+    <tr><td>p2 List&lt;record&gt; 元素 + record List 字段互嵌 + 拼接两侧</td></tr>
+    <tr><td>p3 record 含 Map/枚举/tuple/闭包混合字段 + 双层嵌</td></tr>
+    <tr><td>p4 tuple 嵌 record + record 嵌 tuple 双向深组合</td></tr>
+    <tr><td>p5 闭包构造容器（返回 List/List&lt;List&gt;/闭包作元素与字段）+ 拼接</td></tr>
+    <tr><td>p6 HOF 内联产物直接 println（map/filter/组合嵌套/拼接/进容器）</td></tr>
+    <tr><td>p7 格式边界（空容器族 ×6 / 负数 / ±2^59−1 / Float .0 / Bool / 中文键值）</td></tr>
+    <tr><td>p8 长 List（range 1..100 + 120 元素累积 + 拼接）</td></tr>
+    <tr><td>p9 多段拼接链（"a"+ls+"b"+mp+en+"c"+tp 容器两侧交替）</td></tr>
+    <tr><td>p10 拼接产物再进容器（List 元素/record 字段/enum 载荷）+ println 嵌套</td></tr>
+    <tr><td>p12 多特化共存（四 List 特化 + Option/Result 多实例同发射）</td></tr>
+    <tr><td>p13 递归枚举深嵌（build(4) 31 节点 + build(5) 63 节点 + 拼接 + 进 List）</td></tr>
+    <tr><td>p14 Rose 互递归三层（多元素混合 + 拼接 + Rose 作 List 元素）</td></tr>
+    <tr><td>p15 同特化键多调用点（三 println + 双侧拼接 + 进容器/record/tuple——去重）</td></tr>
+    <tr><td>p16 无字面量直接容器 println（list/range/注解空 Map/嵌套/Bool——预扫放行）</td></tr>
+    <tr><td>p17 print 内建容器（io import 后 ls/tp/mp/en/cl/rc 六类 + 换行交错）</td></tr>
+    <tr><td>p18 match 臂 Binder 绑定容器后 println（Form A/B 两式 + 有字面量语境）</td></tr>
+    <tr><td>p19 R91 回归：if 单 return 臂（块）+ match 双 return 臂 + 值臂合流</td></tr>
+    <tr><td>p20 R91 回归：match Form B return 臂原形（55/7）+ 深嵌变体（100/200/20）</td></tr>
+    <tr><td colspan="4"><strong>自举外推（q）</strong></td></tr>
+    <tr><td>q p1/p12/p13（wasm self_comp = quine 产物编译三枚自构探针）</td><td>宿主 self_comp 产 hex</td><td>wasm self_comp 产 hex</td><td><span class="good">3/3 IDENTICAL</span>（--stack-size=60000 逐字节 cmp）</td></tr>
+    <tr><td colspan="4"><strong>修正前超界形态（不计 MATCH，均既有类别/已登记）</strong></td></tr>
+    <tr><td>p7 初版 ((),) 单元 tuple</td><td>宿主收</td><td>拒“tuple 元素不能为 void 值”</td><td>“宿主收 vs L2 编译期拒”既有类别（十八审 §5-②归纳内；六类显示宣称面不含 Unit 元素）</td></tr>
+    <tr><td>p16 初版裸 println(map_empty() 无注解)</td><td>宿主打 <code>{}</code></td><td>拒“未知 Map 值类型——显示需完整类型”</td><td>已登记“裸 mp{?}/ls{?} 子块细化”边界（同族既有分叉类别）</td></tr>
+    <tr><td>p17 初版无 io import 的 print</td><td>宿主收（print 全局内建）</td><td>拒“未定义变量 'print'”</td><td>§11.6 五坑尾注“print 必 import io 即开设施”已登记机制</td></tr>
+  </tbody>
+</table>
+
+<h3>4.2 探针原文</h3>
+<details><summary>发现族 d1/d2/d3/d5c/d4（R95/R96 证据 + R92 复证）</summary>
+<pre><code># d1_if_both_ret.lom（R95 主证——值位 if 单行双 return 臂）
+fn g(n: Int) -> Int
+    let w = if n &gt; 100 return 1 else return 2 end
+    w + 0
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end
+
+# d2_bothret_tail.lom（对照——bottom 绑定直尾值，双侧均收）
+fn g(n: Int) -> Int
+    let w = if n &gt; 100 return 1 else return 2 end
+    w
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end
+
+# d3_bothret_block.lom（R95 块臂形态）
+fn g(n: Int) -> Int
+    let w = if n &gt; 100
+        return 1
+    else
+        return 2
+    end
+    w + 0
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end
+
+# d5c_closure_println.lom（R96——闭包体内调用内建 println）
+fn main() -&gt; Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        println(n)
+        n
+    end
+    println(f(7))
+end
+
+# d4_formA_retarm.lom（十八审 R92 证据原形复跑——值位 match Form A 臂 return）
+fn f(n: Int) -> Int
+    let v =
+    match n
+        5 =&gt; return 55
+        _ =&gt; n * 2
+    end
+    v + 1
+end
+fn main() -&gt; Unit ! [IO]
+    println(f(5))
+    println(f(3))
+end</code></pre></details>
+
+<details><summary>预扫/防御面 n1/n2/n3_closure_nolit/n4（R97 证据 + 收窄论断验证）</summary>
+<pre><code># n1_deep_tp_param.lom（tuple 跨函数流转——ibase 兜底拒原面变体）
+fn show(t: (Int, Int)) -> Unit ! [IO]
+    println(t)
+end
+fn main() -&gt; Unit ! [IO]
+    show((1, 2))
+end
+
+# n2_map_deep_flow.lom（Map 变量键跨函数 map_get——收窄论断"不可构造 ibase&lt;4"验证）
+from map import { map_empty, map_set, map_get }
+fn show(m: Map&lt;String, Int&gt;, k: String) -> Unit ! [IO]
+    println(map_get(m, k))
+end
+fn main() -&gt; Unit ! [IO]
+    let m = map_empty()
+    show(m, "k")
+end
+# 实测：双侧均收（String 签名参数 → probe_str_sigs 命中 → has_str 开）——非负例，论断成立
+
+# n3_closure_nolit.lom（无字面量 println(闭包字面量)——预扫放行验证）
+fn main() -&gt; Unit ! [IO]
+    let f = fn(n: Int) -> Int n + 1 end
+    println(f)
+end
+
+# n4_match_binder_nolit.lom（R97——无字面量 match 臂 Binder 绑定容器 println）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) =&gt;
+            println(xs)
+        end
+        None =&gt;
+            println(0)
+        end
+    end
+end</code></pre></details>
+
+<details><summary>正例族 p1-p10（深组合 + 格式边界 + 拼接链）</summary>
+<pre><code># p1_deep_mlm.lom（Map&lt;List&lt;Map&gt;&gt; 三层深组合）
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let inner: Map&lt;String, Int&gt; = map_empty()
+    map_set(inner, "x", 1)
+    map_set(inner, "y", 2)
+    let row2: Map&lt;String, Int&gt; = map_empty()
+    map_set(row2, "z", 3)
+    let rows = list_cons(inner, list_cons(row2, list_empty()))
+    let table: Map&lt;String, List&lt;Map&lt;String, Int&gt;&gt; = map_empty()
+    map_set(table, "rows", rows)
+    println(table)
+    let grid = list_cons(table, list_empty())
+    println(grid)
+    let mm: Map&lt;String, Map&lt;String, Int&gt; = map_empty()
+    map_set(mm, "a", inner)
+    map_set(mm, "b", row2)
+    let wrap = list_cons(mm, list_empty())
+    println(wrap)
+    println("t=" + table)
+end
+
+# p2_list_record.lom（List&lt;record&gt; + record List 字段互嵌）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let a = {n: 1, t: "one"}
+    let b = {n: 2, t: "two"}
+    let rs = list_cons(a, list_cons(b, list_empty()))
+    println(rs)
+    let c = {n: 3, t: "three"}
+    let rs2 = list_cons(c, rs)
+    println(rs2)
+    let holder = {items: rs, name: "set"}
+    println(holder)
+    let nested = list_cons(holder, list_empty())
+    println(nested)
+    println("rs=" + rs)
+    println(nested + "=nl")
+end
+
+# p3_rc_mixed.lom（record 含 Map/枚举/tuple/闭包混合字段）
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+enum Kind
+    | Zero
+    | Tag(String)
+end
+fn main() -&gt; Unit ! [IO]
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "k", 9)
+    let mixed = {mp: m, en: Tag("t"), tp: (1, "x"), num: 2.5, ok: True}
+    println(mixed)
+    let deep = {inner: mixed, e2: Zero, pair: (mixed, 1)}
+    println(deep)
+    let f = fn(n: Int) -> Int n end
+    let withcl = {cb: f, v: 1}
+    println(withcl)
+    println("mx=" + mixed)
+end
+
+# p4_tp_rc.lom（tuple 嵌 record + record 嵌 tuple 双向深组合）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let r = {a: 1, b: 2}
+    println((r, (3, 4)))
+    println(({x: r, y: (5,)}, 6))
+    let deep = {top: (r, (7, 8)), bot: ((9,), r)}
+    println(deep)
+    let lt = list_cons((r, 1), list_empty())
+    println(lt)
+    let rt = {pairs: lt, single: (True,)}
+    println(rt)
+    println("d=" + deep)
+    println((r, r) + "=pair")
+end
+
+# p5_closure_disp.lom（闭包构造容器显示；体内 println 形态见 d5c 单列）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let mk = fn(n: Int) -> List&lt;Int&gt; list_cons(n, list_empty()) end
+    println(mk(7))
+    let mk2 = fn(n: Int) -> List&lt;List&lt;Int&gt;&gt; list_cons(list_cons(n, list_empty()), list_empty()) end
+    println(mk2(3))
+    let cl = fn(n: Int) -> Int n + 1 end
+    println(list_cons(cl, list_empty()))
+    let rc = {cb: cl, v: 1}
+    println(rc)
+    println("mk=" + mk(9))
+    let t = (mk(1), cl)
+    println(t)
+end
+
+# p6_hof_inline.lom（HOF 产物内联直接 println）
+from list import { list_map, list_filter, list_cons, list_empty }
+fn double(n: Int) -> Int
+    n * 2
+end
+fn even(n: Int) -> Bool
+    n % 2 == 0
+end
+fn main() -&gt; Unit ! [IO]
+    println(list_map(double, 1..5))
+    println(list_filter(even, 1..8))
+    println(list_map(double, list_filter(even, 1..6)))
+    println("m=" + list_map(double, 1..3))
+    println(list_cons(list_map(double, 1..2), list_empty()))
+end
+
+# p7_fmt_edge.lom（格式边界：空容器族/负数/±2^59−1/Float .0/Bool/中文）
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let ei: List&lt;Int&gt; = list_empty()
+    let ef: List&lt;Float&gt; = list_empty()
+    let es: List&lt;String&gt; = list_empty()
+    let eb: List&lt;Bool&gt; = list_empty()
+    let et: List&lt;(Int, String)&gt; = list_empty()
+    println(ei)
+    println(ef)
+    println(es)
+    println(eb)
+    println(et)
+    let m0: Map&lt;String, Int&gt; = map_empty()
+    println(m0)
+    println(list_cons(-5, list_empty()))
+    println(list_cons(576460752303423487, list_cons(-576460752303423487, list_empty())))
+    println(list_cons(0.0, list_cons(-0.5, list_cons(3.25, list_empty()))))
+    println(list_cons(True, list_cons(False, list_empty())))
+    println(list_cons("中", list_cons("文", list_cons("键", list_empty()))))
+    let mc: Map&lt;String, String&gt; = map_empty()
+    map_set(mc, "键一", "值一")
+    map_set(mc, "k2", "值二")
+    println(mc)
+end
+
+# p8_long_list.lom（长 List——range 1..100 + 120 元素累积）
+from list import { list_cons, list_empty, list_length }
+fn main() -&gt; Unit ! [IO]
+    println(1..100)
+    let mut acc: List&lt;Int&gt; = list_empty()
+    let mut i = 0
+    while i &lt; 120
+        acc = list_cons(i, acc)
+        i = i + 1
+    end
+    println(acc)
+    println(list_length(acc))
+    let words = list_cons("aaaa", list_cons("bbbb", list_cons("cccc", list_empty())))
+    println(words)
+    println("acc=" + acc)
+end
+
+# p9_concat_chain.lom（多段拼接链——容器两侧交替）
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+enum E
+    | Plain
+    | Val(Int)
+end
+fn main() -&gt; Unit ! [IO]
+    let xs = 1..3
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "k", 5)
+    println("a" + xs + "b" + m + Plain + "c" + (1, 2))
+    println(xs + "|" + m)
+    println(Val(9) + "&lt;-" + xs)
+    println((True,) + ".." + m + ".." + xs)
+    println("单" + xs + "双" + m + "尾")
+end
+
+# p10_concat_container.lom（拼接产物再进容器 + println 嵌套）
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+enum E
+    | Tag(String)
+end
+fn main() -&gt; Unit ! [IO]
+    let xs = 1..3
+    let joined = "v=" + xs
+    let holder = list_cons(joined, list_empty())
+    println(holder)
+    let m: Map&lt;String, Int&gt; = map_empty()
+    map_set(m, "n", 8)
+    let r = {text: "m is " + m, raw: m}
+    println(r)
+    println(list_cons(Tag("e") + "!", list_empty()))
+    println("[" + xs + "]" + " {" + m + "}")
+    println(("x=" + xs, 1))
+end</code></pre></details>
+
+<details><summary>正例族 p12-p20（占位边界 + 预扫放行 + R91 回归）</summary>
+<pre><code># p12_multi_spec.lom（同程序多特化共存）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let li = list_cons(1, list_cons(2, list_empty()))
+    let ls = list_cons("a", list_cons("b", list_empty()))
+    let lf = list_cons(1.5, list_cons(2.0, list_empty()))
+    let ll = list_cons(li, list_cons(list_cons(9, list_empty()), list_empty()))
+    println(li)
+    println(ls)
+    println(lf)
+    println(ll)
+    let os: Result&lt;Int, String&gt; = Ok(5)
+    let oe: Result&lt;Int, String&gt; = Err("e")
+    let oi = Some(3)
+    let ostr = Some("s")
+    println(os)
+    println(oe)
+    println(oi)
+    println(ostr)
+    println(list_cons(os, list_empty()))
+    println("li=" + li + " ls=" + ls)
+end
+
+# p13_deep_enum.lom（递归枚举 build(4)/build(5) 深嵌）
+from list import { list_cons, list_empty }
+enum Tree
+    | Leaf
+    | Node(Tree, Int, Tree)
+end
+fn build(depth: Int) -> Tree
+    if depth == 0
+        Leaf
+    else
+        Node(build(depth - 1), depth, build(depth - 1))
+    end
+end
+fn main() -&gt; Unit ! [IO]
+    println(build(4))
+    println(build(5))
+    println("t4=" + build(4))
+    println(list_cons(build(3), list_empty()))
+end
+
+# p14_rose_deep.lom（Rose 互递归三层）
+from list import { list_cons, list_empty }
+enum Rose
+    | Bud
+    | Branch(String, List&lt;Rose&gt;)
+end
+fn main() -&gt; Unit ! [IO]
+    let l1 = Branch("leaf1", list_empty())
+    let l2 = Branch("leaf2", list_empty())
+    let mid1 = Branch("m1", list_cons(l1, list_cons(l2, list_empty())))
+    let mid2 = Branch("m2", list_cons(Bud, list_empty()))
+    let root = Branch("root", list_cons(mid1, list_cons(mid2, list_cons(Bud, list_empty()))))
+    println(root)
+    println("r=" + root)
+    println(list_cons(root, list_cons(root, list_empty())))
+end
+
+# p15_multi_callsite.lom（同特化键多调用点——去重验证）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let xs = list_cons(4, list_cons(5, list_cons(6, list_empty())))
+    println(xs)
+    println(xs)
+    println(xs)
+    println("x=" + xs)
+    println(xs + "=x")
+    println(list_cons(xs, list_cons(xs, list_empty())))
+    let r = {v: xs, w: xs}
+    println(r)
+    println((xs, xs))
+end
+
+# p16_prescan_direct.lom（无字面量直接容器 println——预扫放行）
+from list import { list_cons, list_empty }
+from map import { map_empty }
+fn main() -&gt; Unit ! [IO]
+    println(list_cons(7, list_cons(8, list_empty())))
+    println(1..4)
+    let m: Map&lt;String, Int&gt; = map_empty()
+    println(m)
+    println(list_cons(1..2, list_empty()))
+    println(list_cons(True, list_empty()))
+end
+
+# p17_print_builtin.lom（print 内建容器——io import 后）
+from io import { println, print }
+from list import { list_cons, list_empty }
+from map import { map_empty, map_set }
+enum E
+    | Val(Int)
+end
+fn main() -&gt; Unit ! [IO]
+    print(list_cons(1, list_empty()))
+    print((1, "a"))
+    println("|end")
+    let m = map_empty()
+    map_set(m, "k", 1)
+    print(m)
+    print(Val(2))
+    println("|end2")
+    let f = fn(n: Int) -> Int n end
+    print(f)
+    print({a: 1})
+    println("|end3")
+end
+
+# p18_match_binder.lom（match 臂 Binder 绑定容器后 println——有字面量语境）
+from list import { list_cons, list_empty }
+fn main() -&gt; Unit ! [IO]
+    let v = Some(list_cons(1, list_cons(2, list_empty())))
+    match v
+        Some(xs) =&gt;
+            println(xs)
+            println("got=" + xs)
+        end
+        None =&gt;
+            println("none")
+        end
+    end
+    match v
+        Some(xs) => println(list_cons(xs, list_empty()))
+        None => println(0)
+    end
+    let e: Result&lt;Int, String&gt; = Ok(5)
+    match e
+        Ok(n) => println(n)
+        Err(_) => println(-1)
+    end
+end
+
+# p19_r91_if.lom（R91 回归：if 单 return 臂 + match 双 return 臂 + 值臂合流）
+fn f(n: Int) -> Int
+    let v = if n &gt; 0
+        return n * 10
+    else
+        5
+    end
+    v + 1
+end
+fn h(n: Int) -> Int
+    let w =
+    match n
+        1 =&gt;
+            return 100
+        end
+        2 =&gt;
+            return 200
+        end
+        _ =&gt;
+            let u = n + 1
+            u * 3
+        end
+    end
+    w - 1
+end
+fn main() -&gt; Unit ! [IO]
+    println(f(3))
+    println(f(-3))
+    println(h(1))
+    println(h(2))
+    println(h(7))
+end
+
+# p20_r91_match.lom（R91 回归：match Form B return 臂原形 55/7 + 深嵌 100/200/20）
+fn f(n: Int) -> Int
+    let v =
+    match n
+        5 =&gt;
+            return 55
+        end
+        _ =&gt;
+            n * 2
+        end
+    end
+    v + 1
+end
+fn h(n: Int) -> Int
+    let w =
+    match n
+        1 =&gt;
+            return 100
+        end
+        2 =&gt;
+            return 200
+        end
+        _ =&gt;
+            let u = n + 1
+            u * 3
+        end
+    end
+    w - 1
+end
+fn main() -&gt; Unit ! [IO]
+    println(f(5))
+    println(f(3))
+    println(h(1))
+    println(h(2))
+    println(h(7))
+end</code></pre></details>
+
+<details><summary>脚本原文（hex127.sh / qrun.sh / drive.sh 核心）</summary>
+<pre><code># hex127.sh（存量 127 hex 恒等对拍——本轮核心增量）：
+git show v1.4.0:examples/selfhost/self_comp.lom > old/sc_140.lom   # 只读导出旧编译器
+cp examples/selfhost/self_comp.lom new/sc_head.lom
+for rel in $(git ls-tree v1.4.0 --name-only tools/selfcomp/cases/ | grep '\.lom$'); do
+  ./target/release/lom.exe old/sc_140.lom -- "$rel" old/$(basename $rel .lom).hex
+  ./target/release/lom.exe new/sc_head.lom -- "$rel" new/$(basename $rel .lom).hex
+  cmp -s old/x.hex new/x.hex || echo "DIFF: $rel"
+done
+# pkg 5：lom pkg-expand &lt;pkg&gt;/main.lom --list 取第三参 → pkg-expand 展开单元 → 两侧编译同一单元
+# 输出：RESULT: IDENTICAL=127 DIFF=0 MISSING=0
+
+# qrun.sh（自举外推）：宿主 self_comp 编译自身 → quine.hex → quine.host.wasm；
+# 对 p1/p12/p13：宿主 self_comp 产 hex vs node --stack-size=60000 run_selfcomp.mjs quine.host.wasm &lt;p&gt;.lom 产 hex 逐字节 cmp
+# 输出：q-p1/q-p12/q-p13: IDENTICAL ×3
+
+# drive.sh（正例全链路）：lom build --target wasm → node run_wasm.mjs（宿主）；
+# lom self_comp.lom -- p.lom p.hex → hex2wasm.py → node run_selfcomp.mjs（L2）；stdout+rc 双 cmp
+# 输出：POSITIVE RESULT: MATCH=19 MISMATCH=0</code></pre></details>
+
+<h2>5. 敌手视角下的机制评注（非发现，供后续批次参考）</h2>
+<p>① <strong>disp 独立区占位 patch 机制在深组合面上表现稳健</strong>：本轮 19 正例覆盖三层容器互嵌（Map&lt;List&lt;Map&gt;&gt;）、五特化同发射、63 节点递归枚举、Rose 三层互递归、同特化多调用点去重、±2^59−1 边界、120 元素长表——双侧 stdout+rc 逐字一致；重放式前缀重写（偶字符占位保证字节对齐）与 ndisp=0 直通（127 存量恒等的机制保证）在读码与行为两面均得到独立印证。q 族 3 例 wasm self_comp 外推全等说明该机制在自举层同样稳定。② <strong>bottom 合流的“路径不一致”是 R95 的深层根因</strong>：d2（bottom 绑定直尾值）收而 d1（bottom 绑定后算术）拒——同为 bottom 值，让步只发生在尾值校验处而不在算术综合处；宿主侧则把全-return-if 综合为 Unit（TYPE001/TYPE010 warning）后运行正确。两侧类型系统对该形态的语义不同（L2 bottom vs 宿主 Unit），后续若修 R95 应先裁定“全-return 表达式的规范类型”（bottom 或 Unit），再统一让步点，避免打地鼠式补丁。③ <strong>ibase 兜底拒的“族覆盖”与“负例锁定”不同步</strong>：4 负例锁 list/rc/enum/enum_ls 四族，但同机制的 tuple 族（n1）、match-Binder 族（n4）落同一文案兜底而未入负例清单——文案是族通用的所以行为一致，但负例清单的代表性挑选未在登记中说明“非穷举”，后续可补一句口径。④ <strong>“L2 校验严于宿主”格局新增三个实例</strong>（R95 双 return 臂、R96 闭包内 println、p7 初版 Unit tuple）——连同十八审 p2b/p2d/p16，该格局已连续三轮扩张；建议与 map_remove/RUNTIME002/R94 同入宿主挂账族统筹呈现，而非逐批散点登记。⑤ <strong>预扫白名单式识别的固有边界</strong>：disp_cont_expr 按产生形态白名单识别（range/record/tuple/closure/list_cons/…/变体构造），凡经“另一层语言机制”（跨函数参数、match Binder、非白名单内建如 map_get/list_fold）中转的容器值都依赖 ibase 兜底——Bool 批 R85、本批 R97 都是同一结构在批间的重演；若后续批次再开显示/打印面，可考虑把“容器 vt 经签名可判定”的宣称与“预扫白名单可枚举”的实现对齐审查前置。</p>
+
+<h2>6. 结论</h2>
+<p>① <strong>容器显示批（v1.4.1）全部核心可复核宣称经本轮独立复核零失真</strong>：286/286 名实相符（134+5+147 双重核定）；<strong>存量 127 对拍 hex 恒等独立对拍 127/127 全等</strong>（git show 导出 v1.4.0 旧编译器、同一 lom.exe 1.4.1 驱动，0 DIFF 0 MISSING）；--bootstrap 14/14（142.0s；quine 247009 bytes 双侧逐字节一致 1.3s）；self_comp 11321 行；宿主 src/ 零改动；12 新对拍抽读六枚无空壳；9 转正 + 4 新负例锁定串核对；disp 机制读码四点确认；预扫自然写法放行与负例面收窄论断（Map/print/闭包“不可构造”）实证成立。② <strong>R92/R93 整改宣称复核零失真</strong>（六处 + 六处全部落地，R92 证据探针 d4 双侧同拒复证），仅余 designs/0010 一处算术不闭合残留与清点口径 5/7 不一（R98）。③ 基线 14 项全绿（HEAD run 36452201064 六 job success + 4 条 Ubuntu 26 迁移 notice，无更新 run）。④ 敌手探针 <strong>19 正例 MATCH + 3 自举外推全等 + 8 拒绝/同拒面干净</strong>，零静默错值、零坏 wasm；但新开 <strong>R95（P2：值位 if 两臂全 return——宿主 warning 收且值正确 vs L2 编译期拒，“无剩余分叉面”四处登记被证伪；bottom 合流在绑定后算术路径的缺口，R82“误拒合法程序”同型）</strong>与 R96/R97/R98（3×P3）。⑤ 文档五件套 + positioning + RFC 修订 32 数字逐处对账一致（R98 两点除外）。⑥ <strong>评级 B+</strong>：主审面工程实质与宣称零失真、连续五轮无 P1 且静默错值面继续为零，但 R95 是十五审 R84 以来首个 P2——L2 对 R91/R92 家族自然形态（两臂全 return 的值位 if）的误拒直接击穿了上一轮更正后的明确宣称句；按项目轨迹（P2 存在的轮次评级 ≤ B+）与 R82 先例定级。本轮 B+ 不预支后续（R95-R98 整改与宿主挂账族 map_remove/包内 as RUNTIME002/R94 json 星面键序统筹裁决待用户）。⑦ doc_audit 在本报告落盘后复跑一次（review HTML 非锚定对象）：<strong>RESULT: PASS（67/67 项通过）</strong>。</p>
+<p class="muted">本报告为第十九轮体系内 agent 分工的独立敌手审查记录，结论仅对本轮时点（2026-09-29，基线 a697474/v1.4.1）与检验面负责，不构成外部审计，不预支后续批次状态。审查期间未改动任何产品源码/测试/工具/治理文档；探针已清理（target/probes/r19/ 移除），原文全部内嵌于 §4。</p>
+
+</body>
+</html>
