@@ -1,5 +1,0 @@
-# L2.3 record/tuple 批校验 #4：record 拼接提升拒（容器显示族）
-fn main() -> Unit ! [IO]
-    let p = {a: 1}
-    println("v=" + p)
-end

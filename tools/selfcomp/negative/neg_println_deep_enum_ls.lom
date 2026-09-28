@@ -1,0 +1,16 @@
+# 负例（容器显示批）：枚举 List 载荷（en↔ls 组合）经跨函数参数流转后
+# println——预扫外深层容器流，ibase 防御兜底拒
+from list import { list_cons, list_empty }
+
+enum Forest
+    | Shrub
+    | Grove(List<Forest>)
+end
+
+fn show(f: Forest) -> Unit ! [IO]
+    println(f)
+end
+
+fn main() -> Unit ! [IO]
+    show(Shrub)
+end

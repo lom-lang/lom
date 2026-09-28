@@ -1,0 +1,32 @@
+# L2.3 容器显示批（designs/0011 §10 #131）：record 形态——简单/嵌套/
+# List 值/空 List 值/四标量字段（对拍基准 p4：字段声明序、无引号、嵌套
+# 递归）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    # 简单（声明序显示）
+    let p = {a: 1, b: 2}
+    println(p)
+    # 四标量字段混合（i64/f64/st/i32）
+    let q = {a: 1, b: 2.5, c: "hi", d: True}
+    println(q)
+    # 嵌套 record（递归显示）
+    let inner = {x: 7, y: 8}
+    let outer = {m: inner, n: 3}
+    println(outer)
+    # List 值字段
+    let r1 = {name: "xs", items: 1..4}
+    println(r1)
+    let r2 = {name: "one", items: list_cons(9, list_empty())}
+    println(r2)
+    # 空 List 值字段（注解定型）
+    let none: List<Int> = list_empty()
+    let r3 = {name: "none", items: none}
+    println(r3)
+    # record 嵌 record 嵌 List
+    let deep = {top: {mid: 1..2, leaf: {v: 5}}, flag: False}
+    println(deep)
+    # 拼接提升两侧
+    println("p=" + p)
+    println(outer + "=o")
+end

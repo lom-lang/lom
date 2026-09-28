@@ -1,0 +1,39 @@
+# L2.3 容器显示批（designs/0011 §10 #138）：容器进 HOF 的产物显示——
+# list_map/list_filter 产物 println、list_fold 累加串、HOF 链拼接。
+from list import { list_map, list_filter, list_fold, list_length, list_get, list_cons, list_empty }
+from string import { int_to_string }
+
+fn double(n: Int) -> Int
+    n * 2
+end
+
+fn even(n: Int) -> Bool
+    n % 2 == 0
+end
+
+fn singleton(n: Int) -> List<Int>
+    list_cons(n, list_empty())
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..6
+    # map 产物显示（Int / String 元素）
+    let ys = list_map(double, xs)
+    println(ys)
+    let ss = list_map(fn(n: Int) -> String int_to_string(n) end, xs)
+    println(ss)
+    # map 转容器元素（List of List——import 名不可被闭包捕获，外提具名函数）
+    let zs = list_map(singleton, xs)
+    println(zs)
+    # filter 产物显示
+    let es = list_filter(even, xs)
+    println(es)
+    # fold 数值 + 拼串
+    let total = list_fold(fn(acc: Int, n: Int) -> Int acc + n end, 0, ys)
+    println(total)
+    let joined = list_fold(fn(acc: String, n: Int) -> String acc + int_to_string(n) + "," end, "", xs)
+    println(joined)
+    # HOF 产物拼接 + 长度混合
+    println("ys=" + ys + " n=" + int_to_string(list_length(ys)))
+    println("first=" + list_get(ss, 0) + " rest=" + es)
+end

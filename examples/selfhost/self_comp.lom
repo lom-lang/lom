@@ -4007,21 +4007,10 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             let lt = infer_ex(l, env, fns)?
             let rt = infer_ex(r, env, fns)?
             if op == "Add" and (lt == "st" or rt == "st")
-                # 拼接提升（v0.4.1 宿主语义）：任一侧 String → 两侧 to_display 后拼接。
-                # Bool/Unit 侧经显示串；枚举/闭包显示留后续。
-                if lt == "cl" or rt == "cl" or enum_vt(lt) or enum_vt(rt)
-                    return Err(subset_err("闭包/枚举值的显示留后续批次（拼接提升）"))
-                end
-                if ls_vt(lt) or ls_vt(rt)
-                    return Err(subset_err("List 值的显示留后续批次（拼接提升；与 println(List) 同边界）"))
-                end
-                if mp_vt(lt) or mp_vt(rt)
-                    return Err(subset_err("Map 值的显示留后续批次（拼接提升；与 println(Map) 同边界）"))
-                end
-                # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：容器显示拒
-                if rc_vt(lt) or rc_vt(rt) or tp_vt(lt) or tp_vt(rt)
-                    return Err(subset_err("Record/Tuple 值的显示留后续批次（拼接提升；与 println(Record/Tuple) 同边界）"))
-                end
+                # 拼接提升（v0.4.1 宿主语义）：任一侧 String → 两侧 to_display
+                # 后拼接。容器显示批（designs/0011 §8.3）：cl/en/ls/mp/rc/tp
+                # 六类容器侧解禁（负例族转正）；json 侧维持拒（_Any 动态
+                # 语义信任边界——designs/0007 既定）
                 if lt == "js" or rt == "js"
                     return Err(subset_err("json 值参与算术/拼接（L2 子集外；json 值仅支持 .field 访问/println/stringify/list 消费）"))
                 end
@@ -4802,9 +4791,13 @@ fn i32_ord_op(op: String) -> Result<String, String>
     end
 end
 
-# 拼接提升的显示化：code（栈上值）→ String 值（宿主 to_display 子集——
-# Int/Float 走 helper，Bool/Unit 编译期静态串；st 原样；cl/en 已在上游拒）
-fn disp_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}) -> Result<String, String>
+# 容器显示批（designs/0011 §8.1）：显示分派（编译期 vt → 发射序列，栈上
+# 值 → 栈上 st 值——宿主 to_display 单点同构）。五标量沿用标量路径（st 原样/
+# Int→itoa/Float→ftoa/Bool→select/Unit→"()"）；容器五类经 ensure_disp_helper
+# 特化（调用位发射 "10" + g<disp 序号>h 占位——disp 区排在 extra 区之后，
+# 绝对 fidx 由 build_module 发射期统一 patch）；闭包 drop 后压 "<闭包>"
+# 静态串（保持求值副作用对齐宿主）。
+fn display_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if vt == "st"
         Ok(code)
     elif vt == "i64"
@@ -4817,9 +4810,37 @@ fn disp_code(code: String, vt: String, cg: {cgs: Map<String, Int>, cgh: Map<Stri
         let t_off = intern_str_lit("true", cg)
         let f_off = intern_str_lit("false", cg)
         Ok(code + "047e" + "41" + sleb128_hex(t_off) + "ad" + "05" + "41" + sleb128_hex(f_off) + "ad" + "0b")
-    else
+    elif vt == "void"
         let u_off = intern_str_lit("()", cg)
         Ok(code + "41" + sleb128_hex(u_off) + "ad")
+    elif vt == "cl"
+        let c_off = intern_str_lit("<闭包>", cg)
+        Ok(code + "1a" + "41" + sleb128_hex(c_off) + "ad")
+    else
+        if ls_vt(vt)
+            if ls_inner(vt) == "?"
+                return Err(subset_err("未知 List 元素类型——显示需完整类型（注解或构造上下文）"))
+            end
+            let k = ensure_disp_helper("disp_ls|" + ls_inner(vt), cg, fns)?
+            Ok(code + "10" + disp_ref_hex(k))
+        elif mp_vt(vt)
+            if mp_inner(vt) == "?"
+                return Err(subset_err("未知 Map 值类型——显示需完整类型（注解或 set 上下文）"))
+            end
+            let k = ensure_disp_helper("disp_mp|" + mp_inner(vt), cg, fns)?
+            Ok(code + "10" + disp_ref_hex(k))
+        elif rc_vt(vt)
+            let k = ensure_disp_helper("disp_rc|" + vt, cg, fns)?
+            Ok(code + "10" + disp_ref_hex(k))
+        elif tp_vt(vt)
+            let k = ensure_disp_helper("disp_tp|" + vt, cg, fns)?
+            Ok(code + "10" + disp_ref_hex(k))
+        elif enum_vt(vt)
+            let k = ensure_disp_helper("disp_en|" + vt, cg, fns)?
+            Ok(code + "10" + disp_ref_hex(k))
+        else
+            Err(subset_err("json 值不走显示通道（仅 println 标量/stringify/list 消费）——'" + vt + "'"))
+        end
     end
 end
 
@@ -4857,7 +4878,9 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     let _ = infer_ex(ExBinary(op, l, r), env, fns)?
     let left_vt = infer_ex(l, env, fns)?
     let right_vt = infer_ex(r, env, fns)?
-    if enum_vt(left_vt) or enum_vt(right_vt)
+    # 容器显示批（designs/0011 §8.3）：拼接提升（Add + st 侧）的枚举侧
+    # 解禁——豁免本防御臂走拼接路径；非拼接算术/比较维持拒
+    if (enum_vt(left_vt) or enum_vt(right_vt)) and (op != "Add" or (left_vt != "st" and right_vt != "st"))
         return Err(subset_err("枚举值参与算术/比较（结构相等留后续批次）"))
     end
     # L2.3 json 批（校验 #7 防御兜底——infer 侧已拦，不产坏 wasm）
@@ -4928,9 +4951,12 @@ fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String
     let rc = comp_ex(r, env, fns, cg, locals, localvt)?
     if op == "Add" and (left_vt == "st" or right_vt == "st")
         # L2.3 String 批：拼接提升（v0.4.1 宿主语义）——非 String 侧
-        # to_display 后拼接（Bool/Unit 静态串、Int/Float 走 helper）
-        let ld = disp_code(lc, left_vt, cg)?
-        let rd = disp_code(rc, right_vt, cg)?
+        # to_display 后拼接（Bool/Unit 静态串、Int/Float 走 helper）。
+        # 容器显示批（designs/0011 §8.3）：容器/闭包侧经 display_code 特化
+        # 解禁（json 侧维持拒——infer 已拦；拼接的 st 侧来源必命中 has_str
+        # 预扫——字面量/签名/String 内建 import，无 ibase 缺口）
+        let ld = display_code(lc, left_vt, cg, fns)?
+        let rd = display_code(rc, right_vt, cg, fns)?
         let idx = ensure_str_helper("st_concat", cg)?
         return Ok(ld + rd + "10" + leb128_hex(idx))
     end
@@ -5604,7 +5630,9 @@ fn comp_fileenv_builtin(name: String, args: List<Ex>, env: Map<String, {slot: In
     Ok("10" + leb128_hex(eargs))
 end
 
-# io.print：不换行显示打印（与 println 同显示面，去尾部 '\n' 路）
+# io.print：不换行显示打印（与 println 同显示面，去尾部 '\n' 路）。
+# 容器显示批（designs/0011 §8.3）：容器六类（ls/mp/rc/tp/en/cl）与 println
+# 同面解禁——display_code 特化 → print_str 出口。
 fn comp_print_builtin(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     if list_length(args) != 1
         return Err("print 期望 1 个参数")
@@ -5613,11 +5641,11 @@ fn comp_print_builtin(args: List<Ex>, env: Map<String, {slot: Int, vt: String, s
         return Err(subset_err("print 需要 String 设施（print_str/data）——io import 预扫未覆盖的深层形态；请显式 from io import"))
     end
     let at = infer_ex(list_get(args, 0), env, fns)?
-    if at != "i64" and at != "f64" and at != "st" and at != "i32"
-        return Err(subset_err("print 只接受 Int/Float/String/Bool（与 println 同显示面）"))
+    if at != "i64" and at != "f64" and at != "st" and at != "i32" and at != "cl" and ls_vt(at) == False and mp_vt(at) == False and rc_vt(at) == False and tp_vt(at) == False and enum_vt(at) == False
+        return Err(subset_err("print 只接受 Int/Float/String/Bool/容器值（与 println 同显示面）"))
     end
     let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
-    let pc = disp_code(ac, at, cg)?
+    let pc = display_code(ac, at, cg, fns)?
     let sp = st_arg_split(pc, locals, localvt)
     Ok(sp.pre + sp.pcode + sp.lcode + "10" + "02")
 end
@@ -5662,7 +5690,7 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                     if cg_int(cg.cgs, "ibase") < 4
                         return Err(subset_err("println(Bool) 需要 String 设施（data/print_str）——深层 Bool 流未被预扫覆盖（如跨函数参数传递）；用局部比较或含 String 字面量/签名的形态"))
                     end
-                    let pc = disp_code(ac, "i32", cg)?
+                    let pc = display_code(ac, "i32", cg, fns)?
                     Ok(print_st_hex(pc, locals, localvt))
                 else
                     if at == "js"
@@ -5673,13 +5701,19 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
                         let idx = ensure_js_helper("js_print", cg)?
                         Ok(ac + "10" + leb128_hex(idx))
                     else
-                        # L2.3 record/tuple 批（designs/0010 §7 校验 #4）：
-                        # 容器显示拒（单列文案——与既有 List/Map 锁定串互不
-                        # 干扰）
-                        if rc_vt(at) or tp_vt(at)
-                            return Err(subset_err("println 只接受 Int/Float/String/Bool（Record/Tuple 显示留后续批次——容器显示批边界）"))
+                        # L2.3 容器显示批（designs/0011 §8.3）：六类容器
+                        # （rc/tp/ls/mp/en/cl）经 display_code 特化 →
+                        # print_st_hex 出口（与 st 臂同路）。深层容器流
+                        # （预扫外——如跨函数参数传递）由 ibase 防御兜底
+                        # 拒绝（不产坏 wasm——Bool 批 R85 双防线同型）
+                        if rc_vt(at) or tp_vt(at) or ls_vt(at) or mp_vt(at) or enum_vt(at) or at == "cl"
+                            if cg_int(cg.cgs, "ibase") < 4
+                                return Err(subset_err("println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖（如跨函数参数传递）；用含 String 字面量/签名的形态或显式 from io import"))
+                            end
+                            let pc = display_code(ac, at, cg, fns)?
+                            return Ok(print_st_hex(pc, locals, localvt))
                         end
-                        Err(subset_err("println 只接受 Int/Float/String/Bool（List/Map/枚举显示留后续批次）"))
+                        Err(subset_err("println 实参类型子集外（'" + at + "'）"))
                     end
                 end
             end
@@ -7897,6 +7931,459 @@ fn ensure_js_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, S
 end
 
 
+# ============================================================================
+# L2.3 容器显示批（designs/0011）：显示 helper 族（disp_ls/disp_mp/disp_rc/
+# disp_tp/disp_en；闭包零 helper——display_code 直接静态串）。特化键 "|"
+# 分隔（vt 字符集不含 "|"），rc/tp/en 带完整 vt（枚举载荷 vt 依赖泛型实例
+# ——裁决 2 甲 per-实例特化）。
+#
+# 机制（§2.3 递归枚举/互递归支持）：
+#   - fidx 分配：disp 区接在 extra 区之后，fidx = ibase+nfun+n_extra_fns+
+#     <disp 序号>——n_extra_fns 编译期未终止，body 内与用户函数体内的 disp
+#     调用一律以 "g<disp 序号>h" 占位（g/h 不在 hex 字符集），发射期
+#     build_module 统一 patch 为绝对 fidx。
+#   - 进入即占号缓存（hidx 存 disp 序号，非 fidx）——递归枚举自引用
+#     （en:Tree 载荷含自身实例）与 en↔ls 互递归（Rose 树 List 载荷）在
+#     body 组装期即可解析引用（json 批"依赖先 ensure"的 DAG 序在环上
+#     失效，占号制天然免疫）。
+#   - has_str 防御：显示依赖 data/print_str，ensure 首行校验（scan_
+#     has_display 预扫 + comp_println 的 ibase 兜底双防线漏判时 fail-safe
+#     ——need_heap 同型）。
+# ============================================================================
+
+# 静态串作 st 值的发射（data 段偏移零扩展——disp_code 标量臂同型）
+fn disp_lit_hex(off: Int) -> String
+    "41" + sleb128_hex(off) + "ad"
+end
+
+# disp 调用占位（"g<十进制序号>h"，序号补前导零成偶位数——占位恒偶字符，
+# 不破坏 hex 字节对齐：体长度前缀 len/2 精确、code section 重放器可按
+# 字节切条目边界）
+fn disp_ref_hex(k: Int) -> String
+    let ks = int_to_string(k)
+    if len(ks) % 2 == 1
+        "g0" + ks + "h"
+    else
+        "g" + ks + "h"
+    end
+end
+
+# i32 基址字段读（偏移走 load memarg 立即数）：rc/tp 布局 [n:i32@0][fld@4+8k]、
+# 枚举布局 [idx:i32@0][arity:i32@4][payload@8+8j]——按宽 load（f64.load/
+# i32.load/i64.load；i32.load 已产 i32，无需再 wrap）
+fn disp_fld_load(base_l: Int, vt: String, off: Int) -> String
+    if vt == "f64"
+        "20" + leb128_hex(base_l) + "2b00" + leb128_hex(off)
+    else
+        if vt == "i32"
+            "20" + leb128_hex(base_l) + "2800" + leb128_hex(off)
+        else
+            "20" + leb128_hex(base_l) + "2900" + leb128_hex(off)
+        end
+    end
+end
+
+# disp_ls|T: (i64 xs) -> i64；Nil=0 哨兵遍历（rt_list_str 平移），acc 逐元素
+# concat（首元素前无分隔符；空表即 "["+"]"）。元素显示经 display_code 递归
+# 特化（嵌套 ls/容器元素——互递归占号制）。
+# locals: 1=cur,2=acc（i64）、3=first（i32）、4=elem（按 T）
+fn disp_ls_body(elem_vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let c_idx = ensure_str_helper("st_concat", cg)?
+    let eb = ls_vt_bt(elem_vt)?
+    let head_ld = ls_load_head(1, elem_vt)?
+    let ob = intern_str_lit("[", cg)
+    let cb = intern_str_lit("]", cg)
+    let cs = intern_str_lit(", ", cg)
+    let disp = display_code("20" + leb128_hex(4), elem_vt, cg, fns)?
+    Ok("03" + "027e" + "017f" + "01" + eb
+    + disp_lit_hex(ob) + "2102"
+    + "4101" + "2103"
+    + "2000" + "2101"
+    + "0240" + "0340"
+    + "2001" + "50" + "0d01"
+    + "2003" + "45" + "0440"
+    + "2002" + disp_lit_hex(cs) + "10" + leb128_hex(c_idx) + "2102"
+    + "0b"
+    + head_ld + "2104"
+    + "2002" + disp + "10" + leb128_hex(c_idx) + "2102"
+    + "4100" + "2103"
+    + "2001" + "a7" + "2900" + "08" + "2101"
+    + "0c00"
+    + "0b" + "0b"
+    + "2002" + disp_lit_hex(cb) + "10" + leb128_hex(c_idx) + "2102"
+    + "2002"
+    + "0b")
+end
+
+# disp_mp|V: (i64 m) -> i64；map_keys 键序（字节序）逐键 probe 取值（rt_map_
+# str 平移——键序 = mp_keys = 宿主 Map 键排序语义）；空 Map 即 "{"+"}"。
+# locals: 1=keys,2=acc,4=k（i64）、3=first,5=bi（i32）、6=m（i64）
+fn disp_mp_body(v_vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let c_idx = ensure_str_helper("st_concat", cg)?
+    let keys_idx = ensure_mp_helper("mp_keys", cg)?
+    let probe_idx = ensure_mp_helper("mp_probe", cg)?
+    let ob = intern_str_lit("{", cg)
+    let cb = intern_str_lit("}", cg)
+    let cs = intern_str_lit(", ", cg)
+    let csp = intern_str_lit(": ", cg)
+    # 值读：wrap(m)+load32(m+0)=buckets、+bi*16+8 → 按 V 宽 load
+    let val_ld =
+    if v_vt == "f64"
+        "2006" + "a7" + "2800" + "00" + "2005" + "4110" + "6c" + "6a" + "2b00" + "08"
+    else
+        if v_vt == "i32"
+            "2006" + "a7" + "2800" + "00" + "2005" + "4110" + "6c" + "6a" + "2800" + "08"
+        else
+            "2006" + "a7" + "2800" + "00" + "2005" + "4110" + "6c" + "6a" + "2900" + "08"
+        end
+    end
+    let disp = display_code(val_ld, v_vt, cg, fns)?
+    Ok("05" + "027e" + "017f" + "017e" + "017f" + "017e"
+    + "2000" + "10" + leb128_hex(keys_idx) + "2101"
+    + disp_lit_hex(ob) + "2102"
+    + "4101" + "2103"
+    + "2000" + "2106"
+    + "0240" + "0340"
+    + "2001" + "50" + "0d01"
+    + "2003" + "45" + "0440"
+    + "2002" + disp_lit_hex(cs) + "10" + leb128_hex(c_idx) + "2102"
+    + "0b"
+    + "2001" + "a7" + "2900" + "00" + "2104"
+    + "2002" + "2004" + "10" + leb128_hex(c_idx) + "2102"
+    + "2002" + disp_lit_hex(csp) + "10" + leb128_hex(c_idx) + "2102"
+    + "2006" + "2004" + "10" + leb128_hex(probe_idx) + "2105"
+    + "2002" + disp + "10" + leb128_hex(c_idx) + "2102"
+    + "4100" + "2103"
+    + "2001" + "a7" + "2900" + "08" + "2101"
+    + "0c00"
+    + "0b" + "0b"
+    + "2002" + disp_lit_hex(cb) + "10" + leb128_hex(c_idx) + "2102"
+    + "2002"
+    + "0b")
+end
+
+# disp_rc|<rcvt>: (i64 p) -> i64；字段名/序/偏移从 vt 解析（声明序——rc_vt_
+# fields 单点），编译期展开（rt_record_str 平移——L2 字段名在 vt 无存储，
+# intern 静态串）。locals: 1=acc（i64）、2=p（i32）
+fn disp_rc_body(rcvt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let c_idx = ensure_str_helper("st_concat", cg)?
+    let fields = rc_vt_fields(rcvt)?
+    let n = list_length(fields)
+    let ob = intern_str_lit("{", cg)
+    let cb = intern_str_lit("}", cg)
+    let cs = intern_str_lit(", ", cg)
+    let csp = intern_str_lit(": ", cg)
+    let mut out = "02" + "017e" + "017f"
+    + "2000" + "a7" + "2102"
+    + disp_lit_hex(ob) + "2101"
+    let mut k = 0
+    while k < n
+        if k > 0
+            out = out + "2001" + disp_lit_hex(cs) + "10" + leb128_hex(c_idx) + "2101"
+        end
+        let f = list_get(fields, k)
+        let fn_off = intern_str_lit(f.0, cg)
+        out = out + "2001" + disp_lit_hex(fn_off) + "10" + leb128_hex(c_idx) + "2101"
+        out = out + "2001" + disp_lit_hex(csp) + "10" + leb128_hex(c_idx) + "2101"
+        out = out + "2001" + display_code(disp_fld_load(2, f.1, 4 + 8 * k), f.1, cg, fns)? + "10" + leb128_hex(c_idx) + "2101"
+        k = k + 1
+    end
+    out = out + "2001" + disp_lit_hex(cb) + "10" + leb128_hex(c_idx) + "2101" + "2001" + "0b"
+    Ok(out)
+end
+
+# disp_tp|<tpvt>: (i64 p) -> i64；逐槽偏移读（rt_tuple_str 平移）；单元素
+# 补 ","（宿主 (a,) 形态）。locals: 1=acc（i64）、2=p（i32）
+fn disp_tp_body(tpvt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let c_idx = ensure_str_helper("st_concat", cg)?
+    let elems = tp_vt_elems(tpvt)?
+    let n = list_length(elems)
+    let ob = intern_str_lit("(", cg)
+    let cb = intern_str_lit(")", cg)
+    let cs = intern_str_lit(", ", cg)
+    let cm = intern_str_lit(",", cg)
+    let mut out = "02" + "017e" + "017f"
+    + "2000" + "a7" + "2102"
+    + disp_lit_hex(ob) + "2101"
+    let mut k = 0
+    while k < n
+        if k > 0
+            out = out + "2001" + disp_lit_hex(cs) + "10" + leb128_hex(c_idx) + "2101"
+        end
+        let evt = list_get(elems, k)
+        out = out + "2001" + display_code(disp_fld_load(2, evt, 4 + 8 * k), evt, cg, fns)? + "10" + leb128_hex(c_idx) + "2101"
+        k = k + 1
+    end
+    if n == 1
+        out = out + "2001" + disp_lit_hex(cm) + "10" + leb128_hex(c_idx) + "2101"
+    end
+    out = out + "2001" + disp_lit_hex(cb) + "10" + leb128_hex(c_idx) + "2101" + "2001" + "0b"
+    Ok(out)
+end
+
+# disp_en|<完整实例vt>: (i64 v) -> i64；①从 fns 筛该枚举全部变体（@variant:
+# 键 .ret 属主匹配，按 idx 升序选择）；②运行时 idx（load32(p+0)）→ 嵌套
+# if (result i64) 链选变体名静态串；③每臂 nprm/载荷 vt 编译期已知
+# （variant_field_vts 按实例实例化）——nprm>0 时 "(" + 逐载荷（偏移
+# 8+8j）递归显示 + ", " + ")"（rt_enum_str 平移）；载荷递归遇自身实例 →
+# 占号缓存命中（g<自序号>h——递归枚举自引用）。locals: 1=acc（i64）、
+# 2=p、3=idx（i32）
+fn disp_en_body(inst_vt: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let c_idx = ensure_str_helper("st_concat", cg)?
+    let parts = enum_vt_parts(inst_vt)?
+    # 收集属主匹配的变体（idx/名/元数据三平行表——map_keys 字节序无关）
+    # let 注解定型（list_empty 的 ls{?} 经 mut 赋值不回填声明 vt——
+    # 后续 list_get 的特化键需要完整元素类型）
+    let mut idxs: List<Int> = list_empty()
+    let mut names: List<String> = list_empty()
+    let mut metas: List<{idx: Int, ret: String, nprm: Int, prms: String}> = list_empty()
+    for key in map_keys(fns)
+        if starts_with(key, "@variant:")
+            match map_get(fns, key)
+                Some(v) =>
+                    let own = match enum_vt_parts(v.ret)
+                        Ok(op) => op.name == parts.name
+                        Err(_) => False
+                    end
+                    if own
+                        idxs = list_cons(v.idx, idxs)
+                        names = list_cons(list_get(split(key, ":"), 1), names)
+                        metas = list_cons(v, metas)
+                    end
+                end
+                None => ()
+            end
+        end
+    end
+    let cnt = list_length(idxs)
+    if cnt == 0
+        return Err(subset_err("内部错误：枚举 '" + parts.name + "' 无变体可显示"))
+    end
+    # 按 idx 升序选择排序（每轮选未用最大头插——List 不可变，遍历即升序）
+    let mut sidxs: List<Int> = list_empty()
+    let mut snames: List<String> = list_empty()
+    let mut smetas: List<{idx: Int, ret: String, nprm: Int, prms: String}> = list_empty()
+    let used = map_empty()
+    let mut q = 0
+    while q < cnt
+        let mut best = -1
+        let mut best_pos = -1
+        let mut w = 0
+        while w < cnt
+            if map_has(used, int_to_string(w)) == False
+                if best < 0 or list_get(idxs, w) > best
+                    best = list_get(idxs, w)
+                    best_pos = w
+                end
+            end
+            w = w + 1
+        end
+        map_set(used, int_to_string(best_pos), True)
+        sidxs = list_cons(list_get(idxs, best_pos), sidxs)
+        snames = list_cons(list_get(names, best_pos), snames)
+        smetas = list_cons(list_get(metas, best_pos), smetas)
+        q = q + 1
+    end
+    let ob = intern_str_lit("(", cg)
+    let cb = intern_str_lit(")", cg)
+    let cs = intern_str_lit(", ", cg)
+    # 逐变体臂体（acc = 变体名静态串；nprm>0 时括号载荷段）
+    let mut arms: List<String> = list_empty()
+    let mut q2 = 0
+    while q2 < cnt
+        let vm = list_get(smetas, q2)
+        let name_off = intern_str_lit(list_get(snames, q2), cg)
+        let mut abody = disp_lit_hex(name_off) + "2101"
+        if vm.nprm > 0
+            let fvts = variant_field_vts(vm, inst_vt, fns)?
+            abody = abody + "2001" + disp_lit_hex(ob) + "10" + leb128_hex(c_idx) + "2101"
+            let mut t = 0
+            while t < vm.nprm
+                if t > 0
+                    abody = abody + "2001" + disp_lit_hex(cs) + "10" + leb128_hex(c_idx) + "2101"
+                end
+                let evt = list_get(fvts, t)
+                abody = abody + "2001" + display_code(disp_fld_load(2, evt, 8 + 8 * t), evt, cg, fns)? + "10" + leb128_hex(c_idx) + "2101"
+                t = t + 1
+            end
+            abody = abody + "2001" + disp_lit_hex(cb) + "10" + leb128_hex(c_idx) + "2101"
+        end
+        abody = abody + "2001"
+        arms = list_cons(abody, arms)
+        q2 = q2 + 1
+    end
+    # if 链从最后变体往前包（最后臂无比较直接体——正常程序 idx 必命中）
+    let mut chain = list_get(arms, 0)
+    let mut w2 = cnt - 2
+    while w2 >= 0
+        chain = "2003" + "41" + sleb128_hex(list_get(sidxs, w2)) + "46"
+        + "04" + "7e"
+        + list_get(arms, cnt - 1 - w2)
+        + "05"
+        + chain
+        + "0b"
+        w2 = w2 - 1
+    end
+    Ok("02" + "017e" + "027f"
+    + "2000" + "a7" + "2102"
+    + "2002" + "2800" + "00" + "2103"
+    + chain
+    + "0b")
+end
+
+# 显示 helper 注册（disp 区序号制——进入即占号缓存，body 组装可递归引用；
+# hidx 存 disp 序号，调用方以 g<序号>h 占位）
+fn ensure_disp_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<Int, String>
+    match map_get(cg.cgh, "hidx:" + name)
+        Some(idx_s) =>
+            # L2.4 改写：单绑定臂解包 → sti2 直调（键由 int_to_string(序号) 产）
+            Ok(sti2(idx_s))
+        end
+        None =>
+            if cg_int(cg.cgs, "has_str") == 0
+                return Err(subset_err("内部错误：显示 helper 在 String 设施未启用时 ensure（预扫/兜底漏判）——请报维护者"))
+            end
+            let parts = split(name, "|")
+            let head = list_get(parts, 0)
+            let k = cg_int(cg.cgs, "n_disp")
+            map_set(cg.cgs, "n_disp", k + 1)
+            map_set(cg.cgh, "hidx:" + name, int_to_string(k))
+            let body =
+            if head == "disp_ls"
+                disp_ls_body(list_get(parts, 1), cg, fns)?
+            elif head == "disp_mp"
+                disp_mp_body(list_get(parts, 1), cg, fns)?
+            elif head == "disp_rc"
+                disp_rc_body(list_get(parts, 1), cg, fns)?
+            elif head == "disp_tp"
+                disp_tp_body(list_get(parts, 1), cg, fns)?
+            else
+                disp_en_body(list_get(parts, 1), cg, fns)?
+            end
+            map_set(cg.cgh, "disp_body:" + int_to_string(k), body)
+            Ok(k)
+        end
+    end
+end
+
+# 单 hex 字符 → 值（0-9a-f；code section 重放器用）
+fn disp_hex_val(c: String) -> Int
+    if c == "0"
+        0
+    elif c == "1"
+        1
+    elif c == "2"
+        2
+    elif c == "3"
+        3
+    elif c == "4"
+        4
+    elif c == "5"
+        5
+    elif c == "6"
+        6
+    elif c == "7"
+        7
+    elif c == "8"
+        8
+    elif c == "9"
+        9
+    elif c == "a"
+        10
+    elif c == "b"
+        11
+    elif c == "c"
+        12
+    elif c == "d"
+        13
+    elif c == "e"
+        14
+    else
+        15
+    end
+end
+
+# code section 体序列的占位 patch（重放式）：[leb(字节数) + 体hex]*
+# 逐条重放——patch 改变体长，长度前缀按 patch 后重写（直拼式前缀失配
+# 会产 section 尺寸错位的非法 wasm）。无占位时 contains 直通。
+fn patch_disp_bodies(h: String, disp_base: Int) -> String
+    if contains(h, "g") == False
+        return h
+    end
+    let chars = split(h, "")
+    let n = list_length(chars)
+    let mut out = ""
+    let mut i = 0
+    while i < n
+        # 读长度前缀（leb 字节序，每字节 2 hex 字符）
+        let mut blen = 0
+        let mut shift = 1
+        let mut cont = True
+        while cont
+            let hb = disp_hex_val(list_get(chars, i)) * 16 + disp_hex_val(list_get(chars, i + 1))
+            i = i + 2
+            blen = blen + (hb % 128) * shift
+            shift = shift * 128
+            if hb < 128
+                cont = False
+            end
+        end
+        # 体 hex 段（blen 字节）
+        let body_chars = blen * 2
+        let mut body = ""
+        let mut q = 0
+        while q < body_chars
+            body = body + list_get(chars, i + q)
+            q = q + 1
+        end
+        i = i + body_chars
+        let pb = patch_disp_refs(body, disp_base)
+        out = out + leb128_hex(len(pb) / 2) + pb
+    end
+    out
+end
+
+# 发射期解析 disp 调用占位（"g<十进制序号>h" → call 的 fidx leb）。g/h
+# 不在 hex 字符集，占位唯一来源是 display_code 的容器分支；无占位时
+# contains 快速直通（存量 bodies 逐字节不变）。
+fn patch_disp_refs(h: String, disp_base: Int) -> String
+    if contains(h, "g") == False
+        return h
+    end
+    let chars = split(h, "")
+    let n = list_length(chars)
+    let mut out = ""
+    let mut i = 0
+    while i < n
+        let c = list_get(chars, i)
+        if c == "g"
+            let mut num = ""
+            let mut j = i + 1
+            let mut scanning = True
+            while scanning
+                if j < n
+                    let d = list_get(chars, j)
+                    if d == "0" or d == "1" or d == "2" or d == "3" or d == "4" or d == "5" or d == "6" or d == "7" or d == "8" or d == "9"
+                        num = num + d
+                        j = j + 1
+                    else
+                        scanning = False
+                    end
+                else
+                    scanning = False
+                end
+            end
+            out = out + leb128_hex(disp_base + sti2(num))
+            i = j + 1
+        else
+            out = out + c
+            i = i + 1
+        end
+    end
+    out
+end
+
+
 # 闭包创建点编译（宿主 compile_closure 平移）。返回 (code, e 槽, caps 名单)：
 # code 在父函数里执行——分配 env 对象 + 闭包对象，栈上留闭包值。
 # 递归闭包（预绑定 + 补丁）由 comp_one_stmt 特判调用本函数后追加补丁。
@@ -9855,6 +10342,260 @@ fn scan_has_bool_display(prg: Prg) -> Bool
     end
 end
 
+# ============================================================================
+# L2.3 容器显示批（designs/0011 §8.4，裁决 3 甲）：容器显示预扫——println/
+# print 实参与拼接侧的"容器直接产"识别（AST 层启发 + 一层 let 绑定追踪；
+# 容器经签名/注解的跨函数参数流转不识——该深层流由 comp_println 的 ibase
+# 防御兜底拒绝，双防线；Bool 批 scan_has_bool_display 同型样板）。
+# 容器产形态：range 字面量 / record / tuple / 闭包字面量 / list_cons /
+# list_empty / list_map / list_filter / map_empty / 枚举变体构造（含内建
+# Some/None/Ok/Err）。容器 vt 经签名跟踪可判定，一层识别即覆盖自然写法
+# （实施确认——§6 预判成立）。
+# ============================================================================
+
+# 容器产表达式判定（println/print 实参与拼接侧共用）
+fn disp_cont_expr(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+    match e
+        ExRange(_, _) => True
+        ExRecord(_) => True
+        ExTuple(_) => True
+        ExClosure(_, _, _) => True
+        ExIdent(x, _, _) => map_has(cont_names, x)
+        ExGroup(i) => disp_cont_expr(i, cont_names, variant_names)
+        ExCall(callee, _) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    n == "list_cons" or n == "list_empty" or n == "list_map" or n == "list_filter" or n == "map_empty" or map_has(variant_names, n)
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+# 值位扫描：println/print 实参命中 + 拼接 Add 两侧容器产 + 复合表达式递归
+fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+    match e
+        ExBinary(op, l, r) =>
+            (op == "Add" and (disp_cont_expr(l, cont_names, variant_names) or disp_cont_expr(r, cont_names, variant_names)))
+            or disp_scan_ex(l, cont_names, variant_names) or disp_scan_ex(r, cont_names, variant_names)
+        end
+        ExLogical(_, l, r) => disp_scan_ex(l, cont_names, variant_names) or disp_scan_ex(r, cont_names, variant_names)
+        ExUnary(_, i) => disp_scan_ex(i, cont_names, variant_names)
+        ExGroup(i) => disp_scan_ex(i, cont_names, variant_names)
+        ExCall(callee, args) =>
+            let mut hit = False
+            match callee
+                ExIdent(n, _, _) =>
+                    if (n == "println" or n == "print") and list_length(args) == 1
+                        if disp_cont_expr(list_get(args, 0), cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                end
+                _ => ()
+            end
+            if disp_scan_ex(callee, cont_names, variant_names)
+                hit = True
+            end
+            for a in args
+                if disp_scan_ex(a, cont_names, variant_names)
+                    hit = True
+                end
+            end
+            hit
+        end
+        ExIndex(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
+        ExField(i, _) => disp_scan_ex(i, cont_names, variant_names)
+        ExIf(ifr) => disp_scan_if(ifr, cont_names, variant_names)
+        ExMatch(scrut, arms, _) =>
+            let mut hit = disp_scan_ex(scrut, cont_names, variant_names)
+            for arm in arms
+                match arm
+                    ArmR(_, guard, ab) =>
+                        match guard
+                            Some(g) =>
+                                if disp_scan_ex(g, cont_names, variant_names)
+                                    hit = True
+                                end
+                            end
+                            None => ()
+                        end
+                        match ab
+                            ABExpr(ae) =>
+                                if disp_scan_ex(ae, cont_names, variant_names)
+                                    hit = True
+                                end
+                            end
+                            ABBlock(bb) =>
+                                if disp_scan_block(bb, cont_names, variant_names)
+                                    hit = True
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            hit
+        end
+        ExClosure(_, _, body) => disp_scan_block(body, cont_names, variant_names)
+        ExTry(i) => disp_scan_ex(i, cont_names, variant_names)
+        ExPipe(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
+        ExRange(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
+        ExRecord(flds) =>
+            let mut hit = False
+            for f in flds
+                if disp_scan_ex(f.1, cont_names, variant_names)
+                    hit = True
+                end
+            end
+            hit
+        end
+        ExTuple(args) =>
+            let mut hit = False
+            for a in args
+                if disp_scan_ex(a, cont_names, variant_names)
+                    hit = True
+                end
+            end
+            hit
+        end
+        _ => False
+    end
+end
+
+fn disp_scan_if(ifr: IfR, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+    match ifr
+        IfR(branches, else_b) =>
+            let mut hit = False
+            for pair in branches
+                if disp_scan_ex(pair.0, cont_names, variant_names) or disp_scan_block(pair.1, cont_names, variant_names)
+                    hit = True
+                end
+            end
+            match else_b
+                Some(eb) =>
+                    if disp_scan_block(eb, cont_names, variant_names)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+# 块扫描：一层 let 绑定追踪（容器产 let 名入 cont_names——兄弟语句可见，
+# 保守方向宁滥勿缺）+ 语句/尾值递归
+fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+    match b
+        BlkOf(stmts, tail) =>
+            let mut hit = False
+            for s in stmts
+                match s
+                    StLet(_, name, _, e) =>
+                        if disp_cont_expr(e, cont_names, variant_names)
+                            map_set(cont_names, name, True)
+                        end
+                        if disp_scan_ex(e, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StDestruct(_, e) =>
+                        if disp_scan_ex(e, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StAssign(_, _, _, e) =>
+                        if disp_scan_ex(e, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StIf(ifr) =>
+                        if disp_scan_if(ifr, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StWhile(c, wb) =>
+                        if disp_scan_ex(c, cont_names, variant_names) or disp_scan_block(wb, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StFor(_, i, fb) =>
+                        if disp_scan_ex(i, cont_names, variant_names) or disp_scan_block(fb, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StReturn(oe) =>
+                        match oe
+                            Some(e) =>
+                                if disp_scan_ex(e, cont_names, variant_names)
+                                    hit = True
+                                end
+                            end
+                            None => ()
+                        end
+                    end
+                    StExpr(e) =>
+                        if disp_scan_ex(e, cont_names, variant_names)
+                            hit = True
+                        end
+                    end
+                    StHole(_, _) => ()
+                end
+            end
+            match tail
+                Some(t) =>
+                    if disp_scan_ex(t, cont_names, variant_names)
+                        hit = True
+                    end
+                end
+                None => ()
+            end
+            hit
+        end
+    end
+end
+
+fn scan_has_display(prg: Prg) -> Bool
+    match prg
+        Prg(items) =>
+            # 变体名集（内建四枚 + 用户枚举——AST 直收，无 fns 依赖）
+            let variant_names = map_empty()
+            map_set(variant_names, "Some", True)
+            map_set(variant_names, "None", True)
+            map_set(variant_names, "Ok", True)
+            map_set(variant_names, "Err", True)
+            for it in items
+                match it
+                    ItEnum(_, _, variants) =>
+                        for vr in variants
+                            match vr
+                                VarR(vname, _) => map_set(variant_names, vname, True)
+                            end
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            let mut hit = False
+            for it in items
+                match it
+                    ItFn(_, _, _, _, body, _, _) =>
+                        if disp_scan_block(body, map_empty(), variant_names)
+                            hit = True
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            hit
+        end
+    end
+end
+
 # 签名/import 路的 String 预探测（不注册 fns——ibase 判定先行）
 fn probe_str_sigs(prg: Prg) -> Bool
     match prg
@@ -10203,7 +10944,7 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
     # L2.3 String 批：has_str 预扫先于签名收集（ibase 依赖它）。
     # 口径（宁滥勿缺）：import string 模块 / 签名 Ty 含 String / 表达式
     # 含 ExStr——st 值的三个来源全覆盖；模式内 ExStr 必伴随其一。
-    let has_str0 = probe_str_sigs(prg) or scan_has_string(prg) or scan_has_bool_display(prg)
+    let has_str0 = probe_str_sigs(prg) or scan_has_string(prg) or scan_has_bool_display(prg) or scan_has_display(prg)
     # L2.3 json 批（designs/0007 §6.2）：has_json 预扫（import json 出现
     # 即发）——import 追加 lom_json_parse/stringify、export 追加 alloc。
     # has_json → has_str 保守置真：json_stringify 返回 st，println(st)
@@ -10300,6 +11041,9 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
             end)
             map_set(cgs, "n_extra_types", 0)
             map_set(cgs, "n_extra_fns", 0)
+            # 容器显示批（designs/0011 §8.2）：disp 区序号计数（fidx = 发射期
+            # disp_base + 序号）
+            map_set(cgs, "n_disp", 0)
             map_set(cgs, "n_table", 0)
             map_set(cgs, "alloc_idx", 0)
             if has_str
@@ -10375,7 +11119,16 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                 types_head = types_head + "60027f7f017e" + "60047f7f7f7f00" + "60027f7f017f" + "6000017e"
                 ntypes = ntypes + 4
             end
-            let types_c = leb128_hex(ntypes + cg_int(cgs, "n_extra_types")) + types_head + tentries + cg_str(cgh, "extra_types")
+            # 容器显示批（designs/0011 §8.2）：disp 区条目 type 全族统一
+            # (i64)->i64（显示 helper 入参裸指针/值、返回 st 指针）
+            let ndisp = cg_int(cgs, "n_disp")
+            let mut disp_types = ""
+            let mut dq = 0
+            while dq < ndisp
+                disp_types = disp_types + "60017e017e"
+                dq = dq + 1
+            end
+            let types_c = leb128_hex(ntypes + cg_int(cgs, "n_extra_types") + ndisp) + types_head + tentries + cg_str(cgh, "extra_types") + disp_types
             # import section：env.print_i64(t0) / env.print_f64(t1)；
             # has_str 加 env.print_str(t2) / env.ftoa(t3)；has_json 加
             # env.lom_json_parse / env.lom_json_stringify（import 段尾部，
@@ -10407,9 +11160,20 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                 + "03" + "656e76" + "0c" + "6c6f6d5f656e765f61726773" + "00" + leb128_hex(ftbase + 3)
             end
             let imp_c = leb128_hex(n_imp) + imp_body
-            # function section（用户 + extra：alloc/闭包体/shim/helper）
-            let nfn_total = nfun2 + cg_int(cgs, "n_extra_fns")
-            let func_c = leb128_hex(nfn_total) + fidxs + cg_str(cgh, "extra_fidxs")
+            # function section（用户 + extra：alloc/闭包体/shim/helper + disp）
+            # 容器显示批：disp 区接在 extra 区之后（fidx = ibase+nfun+
+            # n_extra_fns+序——发射期终值可算；编译期 body 与用户函数体内的
+            # disp 调用以 g<序号>h 占位、code section 处统一 patch）
+            let disp_base = ibase + nfun2 + cg_int(cgs, "n_extra_fns")
+            let disp_tbase = tbase0 + nfun2 + cg_int(cgs, "n_extra_types")
+            let mut disp_fidxs = ""
+            let mut fq = 0
+            while fq < ndisp
+                disp_fidxs = disp_fidxs + leb128_hex(disp_tbase + fq)
+                fq = fq + 1
+            end
+            let nfn_total = nfun2 + cg_int(cgs, "n_extra_fns") + ndisp
+            let func_c = leb128_hex(nfn_total) + fidxs + cg_str(cgh, "extra_fidxs") + disp_fidxs
             # L2.3-b 按需 section（table/memory/global 在 export 前、elem 在
             # export 后——WASM section id 升序：4/5/6 < 7 < 9 < 10 < 11）
             let ntab = cg_int(cgs, "n_table")
@@ -10455,8 +11219,17 @@ fn build_module(prg: Prg, pkgs: Map<String, Bool>) -> Result<String, String>
                 exp_body = exp_body + "09" + "6c6f6d5f616c6c6f63" + "00" + leb128_hex(cg_int(cgs, "alloc_idx"))
             end
             let exp_c = leb128_hex(exp_n) + exp_body
-            # code section
-            let code_c = leb128_hex(nfn_total) + bodies + cg_str(cgh, "extra_bodies")
+            # code section（用户体/extra 体/disp 体均含 disp 调用占位——
+            # g/h 不在 hex 字符集；重放式 patch 按条目重写长度前缀，无占位
+            # 时 contains 直通，存量逐字节不变）
+            let mut disp_code_c = ""
+            let mut bq = 0
+            while bq < ndisp
+                let pb = patch_disp_refs(cg_str(cgh, "disp_body:" + int_to_string(bq)), disp_base)
+                disp_code_c = disp_code_c + leb128_hex(len(pb) / 2) + pb
+                bq = bq + 1
+            end
+            let code_c = leb128_hex(nfn_total) + patch_disp_bodies(bodies, disp_base) + patch_disp_bodies(cg_str(cgh, "extra_bodies"), disp_base) + disp_code_c
             # data section(11)：排 code(10) 之后（section id 升序）；active 全量装载
             let mut data_c = ""
             if has_str

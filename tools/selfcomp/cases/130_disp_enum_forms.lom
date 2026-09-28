@@ -1,0 +1,61 @@
+# L2.3 容器显示批（designs/0011 §10 #130）：枚举显示形态——零参裸名/
+# 单载荷/多载荷/String 载荷/List 载荷/Bool 载荷/递归嵌套（对拍基准 p3：
+# 载荷 `名(a, b)` 逗号空格分隔、递归完整打印）。
+from list import { list_cons, list_empty }
+
+enum Shape
+    | Dot
+    | Circle(Int)
+    | Rect(Int, Int)
+end
+
+enum Tag
+    | Plain
+    | Named(String)
+    | Both(String, Int)
+end
+
+enum Lit
+    | On(Bool)
+    | Num(Float)
+end
+
+enum Tree
+    | Leaf
+    | Node(Tree, Int, Tree)
+end
+
+enum Rose
+    | Bud
+    | Branch(String, List<Rose>)
+end
+
+fn main() -> Unit ! [IO]
+    # 零参裸名 / 单载荷 / 多载荷
+    println(Dot)
+    println(Circle(3))
+    println(Rect(2, 5))
+    # String 载荷 / 混合载荷
+    println(Named("hi"))
+    println(Both("n", 7))
+    # Bool / Float 载荷
+    println(On(True))
+    println(On(False))
+    println(Num(2.0))
+    # 递归枚举完整打印（自引用）
+    println(Node(Leaf, 1, Leaf))
+    println(Node(Node(Leaf, 2, Leaf), 3, Node(Leaf, 4, Node(Leaf, 5, Leaf))))
+    # 枚举 List 载荷（en↔ls 互递归显示）
+    println(Bud)
+    println(Branch("a", list_cons(Bud, list_empty())))
+    println(Branch("root", list_cons(Branch("a", list_empty()), list_cons(Bud, list_empty()))))
+    # 内建枚举显示（Option/Result 实例——裸模板形态不可实例化，注解定型）
+    println(Some(5))
+    let bad: Result<Int, String> = Err("bad")
+    println(bad)
+    let half: Result<Float, String> = Ok(1.5)
+    println(half)
+    # 拼接提升两侧
+    println("s=" + Circle(9))
+    println(Rect(1, 2) + "=r")
+end

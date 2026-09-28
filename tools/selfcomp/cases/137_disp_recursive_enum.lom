@@ -1,0 +1,41 @@
+# L2.3 容器显示批（designs/0011 §10 #137）：递归枚举深嵌套——Tree 自引用
+# disp_en 递归 call 自 fidx（占号制）+ Rose 树 en↔ls 互递归显示。
+from list import { list_cons, list_empty }
+
+enum Tree
+    | Leaf
+    | Node(Tree, Int, Tree)
+end
+
+enum Rose
+    | Bud
+    | Branch(String, List<Rose>)
+end
+
+fn build(depth: Int) -> Tree
+    if depth == 0
+        Leaf
+    else
+        Node(build(depth - 1), depth, build(depth - 1))
+    end
+end
+
+fn main() -> Unit ! [IO]
+    # 浅层
+    println(Leaf)
+    println(Node(Leaf, 1, Leaf))
+    # 深层递归（build 4 层 → 15 节点完整打印）
+    println(build(2))
+    println(build(3))
+    # 不对称树
+    let t = Node(Node(Leaf, 1, Node(Leaf, 2, Leaf)), 3, Leaf)
+    println(t)
+    # Rose 互递归（List 载荷含自身）
+    println(Bud)
+    println(Branch("x", list_cons(Bud, list_empty())))
+    let r2 = Branch("root", list_cons(Branch("a", list_cons(Bud, list_empty())), list_cons(Branch("b", list_empty()), list_empty())))
+    println(r2)
+    # 递归枚举经拼接
+    println("t=" + build(2))
+    println(r2 + "=rose")
+end

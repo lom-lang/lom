@@ -1,0 +1,36 @@
+# L2.3 容器显示批（designs/0011 §10 #134）：拼接提升——容器在右侧全类型
+# （"x=" + List/Map/枚举/record/tuple/闭包/嵌套容器；v0.4.1 宿主语义）。
+from list import { list_cons, list_empty }
+from map import { map_empty, map_set }
+
+enum Color
+    | Red
+    | RGB(Int, Int, Int)
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..3
+    let e: List<Int> = list_empty()
+    let m = map_empty()
+    map_set(m, "a", 1)
+    let p = {x: 1, y: 2.5}
+    let f = fn(n: Int) -> Int n end
+    # 右侧逐类型
+    println("xs=" + xs)
+    println("e=" + e)
+    println("m=" + m)
+    println("c=" + Red)
+    println("rgb=" + RGB(1, 2, 3))
+    println("p=" + p)
+    println("t=" + (1, "a"))
+    println("one=" + (7,))
+    println("f=" + f)
+    # 右侧标量对照（Int/Float/Bool）
+    println("i=" + 42)
+    println("fl=" + 1.5)
+    println("b=" + True)
+    # 右侧嵌套容器
+    println("nest=" + list_cons(xs, list_empty()))
+    println("deep=" + {inner: p, xs: xs})
+    println("mix=" + (xs, m, Red))
+end

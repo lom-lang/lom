@@ -1,0 +1,46 @@
+# L2.3 容器显示批（designs/0011 §10 #129）：Map 形态——空/多键/多字节
+# UTF-8 键/嵌套值/List 值（键序 = mp_keys 字节序 = 宿主 Map 键排序）。
+from map import { map_empty, map_set }
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    # 空 Map
+    let m0: Map<String, Int> = map_empty()
+    println(m0)
+    # 多键（乱序插入——显示键序字节序）
+    let m = map_empty()
+    map_set(m, "zebra", 1)
+    map_set(m, "apple", 2)
+    map_set(m, "mango", 3)
+    println(m)
+    # 多字节 UTF-8 键 + 值类型混合表
+    let mm = map_empty()
+    map_set(mm, "苹果", 7)
+    map_set(mm, "banana", 2)
+    map_set(mm, "Apple", 9)
+    println(mm)
+    # Float / String 值
+    let mf = map_empty()
+    map_set(mf, "pi", 3.5)
+    map_set(mf, "half", 0.5)
+    println(mf)
+    let ms = map_empty()
+    map_set(ms, "k1", "v1")
+    map_set(ms, "k2", "v2")
+    println(ms)
+    # List 值（嵌套显示）
+    let ml: Map<String, List<Int>> = map_empty()
+    map_set(ml, "one", list_cons(1, list_empty()))
+    map_set(ml, "two", 1..3)
+    println(ml)
+    # 嵌套 Map 值
+    let mo: Map<String, Map<String, Int>> = map_empty()
+    let inner: Map<String, Int> = map_empty()
+    map_set(inner, "x", 10)
+    map_set(inner, "y", 20)
+    map_set(mo, "in", inner)
+    println(mo)
+    # 拼接提升两侧
+    println("m=" + m)
+    println(m0 + "=empty")
+end

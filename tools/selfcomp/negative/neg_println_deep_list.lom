@@ -1,0 +1,12 @@
+# 负例（容器显示批）：List 经跨函数参数流转后 println——深层容器流
+# 未被 scan_has_display 预扫覆盖（自然写法识别不含签名路），ibase<4
+# 防御兜底拒绝（不产坏 wasm——Bool 批 R85 双防线同型）
+from list import { list_cons, list_empty }
+
+fn show(xs: List<Int>) -> Unit ! [IO]
+    println(xs)
+end
+
+fn main() -> Unit ! [IO]
+    show(list_cons(1, list_empty()))
+end

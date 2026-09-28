@@ -1,0 +1,14 @@
+# 负例（容器显示批）：枚举经跨函数参数流转后 println——预扫外深层
+# 容器流，ibase 防御兜底拒
+enum Shape
+    | Dot
+    | Ring(Int)
+end
+
+fn show(s: Shape) -> Unit ! [IO]
+    println(s)
+end
+
+fn main() -> Unit ! [IO]
+    show(Ring(4))
+end

@@ -1,0 +1,47 @@
+# L2.3 容器显示批（designs/0011 §10 #136）：io.print（不换行）容器显示
+# ——与 println 同显示面、去尾部换行路（st_arg_split 出口）。
+from io import { println, print }
+from list import { list_cons, list_empty }
+from map import { map_empty, map_set }
+
+enum Pt
+    | Origin
+    | At(Int, Int)
+end
+
+fn main() -> Unit ! [IO]
+    let xs = 1..3
+    let m = map_empty()
+    map_set(m, "a", 1)
+    # print 逐容器（无换行——行内拼接）
+    print(xs)
+    print("|")
+    print(m)
+    print("|")
+    print(Origin)
+    print("|")
+    print(At(2, 3))
+    print("|")
+    print({r: 1, g: 2})
+    print("|")
+    print((1, "a"))
+    print("|")
+    print((9,))
+    print("|")
+    let f = fn(n: Int) -> Int n end
+    print(f)
+    println("")
+    # print 后接 println 混排
+    print("head:")
+    print(list_cons("x", list_empty()))
+    println("|tail")
+    print(1.5)
+    print(",")
+    print(False)
+    println("")
+    # 多行交替
+    print(xs)
+    println("")
+    print(m)
+    println("")
+end

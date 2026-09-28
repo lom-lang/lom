@@ -1,0 +1,32 @@
+# L2.3 容器显示批（designs/0011 §10 #133）：闭包显示——println(闭包字面量)
+# /拼接 `x=<闭包>` 与反向/闭包作 List 元素与 record 字段（宿主静态串
+# "<闭包>"；drop 后压静态串保持求值副作用对齐）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    # 闭包字面量直接 println
+    let f = fn(n: Int) -> Int n + 1 end
+    println(f)
+    # 拼接：闭包两侧
+    println("f=" + f)
+    println(f + "=f")
+    # 嵌套捕获闭包（内层捕外层参数——显示面同静态串）
+    let g = fn(n: Int) -> Int (fn(x: Int) -> Int x + n end)(n) end
+    println(g)
+    println("g=" + g)
+    # 闭包求值副作用保持（显示前闭包体不执行——显示值即静态串）
+    let applied = f(1)
+    println(applied)
+    println(f)
+    # 闭包作 List 元素 / record 字段
+    let fs = list_cons(f, list_empty())
+    println(fs)
+    let holder = {cb: f, tag: "h"}
+    println(holder)
+    # 闭包 List 经拼接
+    println("fs=" + fs)
+    # 双闭包独立显示
+    let h = fn(s: String) -> String s + "!" end
+    println(("two", h))
+    println(h + "|")
+end

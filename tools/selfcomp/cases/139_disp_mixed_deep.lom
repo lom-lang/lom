@@ -1,0 +1,42 @@
+# L2.3 容器显示批（designs/0011 §10 #139）：组合深嵌套——容器作枚举载荷
+# 显示、record 含 Map/List/枚举/tuple、跨类全树混合（特化键去重与多实例
+# 互引的综合性检定）。
+from list import { list_cons, list_empty }
+from map import { map_empty, map_set }
+
+enum Cell
+    | Num(Int)
+    | Text(String)
+    | Row(List<Cell>)
+    | Keyed(String, Map<String, Int>)
+end
+
+fn main() -> Unit ! [IO]
+    # 枚举作枚举载荷 + List 载荷递归
+    println(Num(1))
+    println(Text("t"))
+    let row = Row(list_cons(Num(1), list_cons(Text("b"), list_empty())))
+    println(row)
+    let nested = Row(list_cons(row, list_cons(Num(9), list_empty())))
+    println(nested)
+    # Map 载荷枚举
+    let m = map_empty()
+    map_set(m, "x", 1)
+    map_set(m, "a", 2)
+    println(Keyed("meta", m))
+    # record 全混（Map/List/枚举/tuple/闭包字段）
+    let f = fn(n: Int) -> Int n end
+    let doc = {title: "doc", tags: list_cons("a", list_empty()), vals: 1..3, meta: m, mark: Num(7), pos: (1, 2.5), cb: f}
+    println(doc)
+    # tuple 包 record 包 Map 包 List
+    let root = (doc, list_cons(row, list_empty()), Keyed("k", m))
+    println(root)
+    # 全树拼接
+    println("doc=" + doc)
+    println(row + "=row")
+    println("[" + nested + "]")
+    # 同型二次显示（特化键去重——同 helper 复用）
+    println(1..3)
+    println(4..6)
+    println({title: "d2", tags: list_cons("b", list_empty()), vals: 1..2, meta: m, mark: Text("z"), pos: (3, 4.5), cb: f})
+end
