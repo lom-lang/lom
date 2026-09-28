@@ -872,3 +872,42 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   项、存量 127 对拍 hex 恒等、self_comp +300-550 行（**主观
   推测**）、升版 v1.4.1（纯 L2 面 patch，宿主零改动）。
   **代码零改动——纯设计文档交付；动工在裁决后。**
+- **修订 32（2026-09-28）：容器显示批交付（用户裁决"按建议执行"
+  ——四裁决点全按建议项甲/甲/甲/甲；designs/0011）。升 v1.4.1
+  （纯 L2 patch，宿主 src 零改动）。** 六类容器（ls/mp/rc/tp/
+  en/cl）println/print/拼接三入口全解禁，宿主/L2 双侧 stdout+rc
+  逐字一致（对拍基准 = 设计期供料双后端实测锚定：List
+  "[1, a, true]"、Map 字节序 "{a: 1, 中: 2}"、record 声明序
+  "{a: 1, b: x}"、tuple 含单元素 "(a,)"、枚举 "Node(Leaf, 1,
+  Leaf)" 含递归与 en↔ls 互递归、闭包 "<闭包>"——**原"println
+  (闭包) 拒"信任边界翻转消除**；json 拼接/算术维持拒）。实现：
+  display_code 单点分派（三入口单一事实源）+ ensure_disp_helper
+  家族（"|" 特化键：disp_ls|T / disp_mp|V / disp_rc|<rcvt> /
+  disp_tp|<tpvt> / **disp_en|<完整实例 vt>**——untagged 无运行时
+  tag 故按实例特化；变体名经 intern 物化 + idx select 链 + 载荷
+  按实例化宽度递归）。**机制偏离登记（实施发现）**：设计的
+  "reg_extra_fn 即得 fidx 自递归"在 en↔ls 互递归（Rose 树）上
+  失效——fidx 依赖 n_extra_fns 终值而互递归需占位先行；正解为
+  **disp 独立区**（排 extra 区后）+ g<序号>h 偶字符占位 +
+  发射期 patch_disp_bodies **重放式**重写长度前缀；ndisp=0 零
+  追加直通（存量逐字节不变的机制保证）。预扫 scan_has_display
+  （println/print 实参 + 拼接两侧 + 一层 let——跨函数流转不识，
+  实施确认一层 vt 判定即覆盖自然写法）+ comp_println/comp_
+  binary 的 ibase 兜底双防线（新文案）。**实施顺手收口**：
+  comp_binary 枚举全局防御臂加"Add 且有 st 侧"拼接豁免（设计
+  §8.3 未列的防御臂序缺口）。验收：verify_selfcomp 279→
+  **286/286 = 139 对拍（134 单文件 + 5 pkg）+ 147 负例**（12
+  新对例 128-139 覆盖六类全形态/拼接两侧/递归互递归/HOF 产物；
+  9 枚预留负例转正删除 + 4 枚新深层负例——Map/print/闭包深层
+  流在 L2 机制下不可构造 ibase<4 形态，负例面收窄为机制性事实
+  登记）；**存量 127 对拍用例产物 hex 逐字节不变**（执行者基准
+  副本全量对拍 + 规划者 git show 导出旧编译器独立抽验恒等）；
+  --bootstrap 14/14（self_comp 自身无容器显示点 grep 实证；
+  quine 现 **247009 bytes** 双侧逐字节一致——行数增长的自然
+  结果）；self_comp 10548→**11321 行**（+773，设计预估 300-550
+  上方——占位 patch 机制与四例 body 的注释密度所致）；Rust
+  541+8 零改动；六模式/eval 双后端 121/121/doc_audit 67/67
+  （锚同步后）全绿复验。**R94 同批开账**（裁决 4 甲）：json_
+  stringify 星面键序宿主双后端分叉挂账（详见 TODO R94 段）。
+  开发踩坑五枚入档 HANDOVER §11.6。十八审 A- 不评此新增范围；
+  整改后评级待下一轮复审。

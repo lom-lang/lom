@@ -43,10 +43,12 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.4.0（tag 切于 e9aad15，CI run 36296411754 六 job
-  全绿含新接入的 bootstrap ci-smoke；L2.4 自举闭环收官——RFC-0004
-  全部目标达成，自施加强 quine；首回合仍须实查最新 main CI 与
-  annotations）；语言面与外部发布线冻结。
+- 仓库版本 v1.4.1（容器显示批交付——designs/0011 四裁决点全按
+  建议项；RFC-0004 修订 32。tag 于 CI 六 job 全绿后切；首回合
+  仍须实查最新 main CI 与 annotations）；语言面与外部发布线冻结。
+  v1.4.0 之前为 L2.4 自举闭环收官（RFC-0004 全部目标达成，强
+  quine；tag 切于 e9aad15，CI run 36296411754 含 bootstrap
+  ci-smoke）。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
   1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
@@ -138,11 +140,20 @@
   含 as 的包内 import 原位保留——三声音修复，Rust 测试 ×2）；
   **R91 登记面扩"if 与 match"**。
   json/包/return 批时点：230/238/255（100/104/115 对拍）、self_comp
-  9295/9361/9491/10402 行。L2.4 收官现值（v1.4.0）：
-  self_comp.lom 10548 行，verify_selfcomp **279/279 保持 + --bootstrap 14/14**
-  （三层自证 12 代表用例 + pkg 101 第三参透传 hex 逐字节一致 +
-  自施加强 quine）；**存量 127 对拍用例产物 hex 逐字节不变**
-  （九闸门改写前后编译逻辑等价证明）；Rust 541+8（cargo 零改动）。
+  9295/9361/9491/10402 行。L2.4 收官（v1.4.0）后 **容器显示批
+  （v1.4.1，RFC-0004 修订 32）**：self_comp.lom 11321 行，
+  verify_selfcomp **286/286 = 139 对拍（134 单文件 + 5 pkg）+
+  147 负例**（12 新对拍 128-139 + 9 负例转正删 + 4 新深层负例）
+  + --bootstrap 14/14（quine 现 247009 bytes 双侧逐字节一致）；
+  **存量 127 对拍用例产物 hex 逐字节不变**（disp helper 全按需
+  发射、零追加直通）；六类容器（ls/mp/rc/tp/en/cl）println/print/
+  拼接三入口全解禁（per-实例特化 + disp 独立区占位 patch 机制
+  ——en↔ls 互递归的设计偏离如实登记修订 32）；Rust 541+8（宿主
+  零改动）。L2.4 收官时点（v1.4.0）：self_comp 10548 行、
+  verify_selfcomp 279/279 保持、自施加强 quine
+  （三层自证 12 代表用例 + pkg 101 第三参透传 hex 逐字节一致）；
+  存量 127 对拍用例产物 hex 逐字节不变（九闸门改写前后编译逻辑
+  等价证明）；cargo 零改动。
   **R79-R82 已按 RFC 修订 10/11 收官，c2 按修订 12、String 批按
   修订 14、List 批按修订 16、十五审整改按修订 17、Map 批按修订 19、
   十六审整改按修订 20、json 批按修订 22、包批按修订 24、return
@@ -191,12 +202,12 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：容器显示批 / 宿主挂账小包（map_remove 双后端
-  分叉修否、包内 as 别名解释器 RUNTIME002）/ println(Bool) 预扫
-  扩放行评估 / typechecker for 变量可变性 quirk 立项与否（TODO
-  R65 证据区）/ 下一轮独立复审（十九审，R92/R93 整改后评级）或
-  休整；MoonBit 1.0 Q3 复核（月底窗口）；ubuntu-26 镜像迁移观察
-  2026-10-19。
+- 下一步由用户裁决：宿主挂账小包（map_remove 双后端分叉修否、
+  包内 as 别名解释器 RUNTIME002、R94 json 星面键序 harness 修否
+  ——三项同族可统筹）/ println(Bool) 预扫扩放行评估 / typechecker
+  for 变量可变性 quirk 立项与否（TODO R65 证据区）/ 下一轮独立
+  复审（十九审，容器显示批后评级）或休整；MoonBit 1.0 Q3 复核
+  （月底窗口）；ubuntu-26 镜像迁移观察 2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
@@ -221,19 +232,21 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 279/279 = 127 用例双产物行为一致（122 单文件 + 5 包项目）+ 152 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 286/286 = 139 用例双产物行为一致（134 单文件 + 5 包项目）+ 147 负例拒绝）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——L2.4 三层自证与自施加强 quine，~100s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R1-R93 全部关闭；
-   RFC-0004 收官（v1.4.0，十八审 A- 维持零失真复证）；下一方向
-   可选：容器显示批 / 宿主挂账小包（map_remove 双后端分叉、
-   as 别名解释器 RUNTIME002）/ println(Bool) 预扫扩放行评估 /
-   for 变量可变性 quirk 立项 / MoonBit 1.0 Q3 复核 /
-   ubuntu-26 迁移观察。外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。R1-R94 全部关闭
+   （R94 为 json 星面键序宿主双后端分叉挂账登记项——设计期供料
+   实证、修否待裁）；RFC-0004 收官 + 容器显示批交付（v1.4.1）；
+   下一方向可选：宿主挂账小包（map_remove 双后端分叉、as 别名
+   解释器 RUNTIME002、R94 json 键序 harness 修否）/ println(Bool)
+   预扫扩放行评估 / for 变量可变性 quirk 立项 / 十九审复审（容器
+   显示批后评级）/ MoonBit 1.0 Q3 复核 / ubuntu-26 迁移观察。
+   外部发布线继续冻结。
 4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
    → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
@@ -381,6 +394,19 @@
   return 臂双侧同收，值位 return 终止臂全量双侧一致无剩余分叉；
   verify_selfcomp 279/279 = 127 对拍（122 单文件 + 5 pkg）+ 152
   负例；十八审 A- 不评本批文档更正。
+- 容器显示批后（v1.4.1）：六类容器（ls/mp/rc/tp/en/cl）println/
+  print/拼接三入口双侧逐字一致（List "[1, a]"、Map 字节序
+  "{a: 1}"、record 声明序、tuple 单元素 "(a,)"、枚举 per-实例
+  变体名 select 链含递归/互递归、闭包 "<闭包>"——信任边界翻转
+  消除）；json 拼接/算术维持拒；裸 ls{?}/mp{?} 显示友好拒；
+  深层容器流（跨函数）ibase 兜底拒（4 负例锁）；**disp 独立区
+  占位 patch 机制**（g<序号>h 偶字符占位 + 重放式长度前缀重写
+  ——en↔ls 互递归使设计的 inline-fidx 失效，偏离如实登记修订
+  32）；verify_selfcomp 286/286 = 139 对拍（134 单文件 + 5 pkg）
+  + 147 负例；存量 127 hex 恒等；--bootstrap 14/14（quine
+  247009 bytes 双侧一致）；R94 开账（json 星面键序宿主双后端
+  分叉——显示面不受影响，json 面挂账）；十八审 A- 不评此新增
+  范围。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```
