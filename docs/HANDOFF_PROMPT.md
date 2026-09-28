@@ -58,26 +58,23 @@
 - 环境状态（2026-09-26 已整理）：git stash 已清空（旧 WIP drop）、
   松散对象已打包、本地调试残留（.w0/.lom/__pycache__）已物理清理；
   目录结构健康未重组。eval/candidates_rerun（LLM 复测 raw 证据）保留。
-- 审查状态：**十六轮审查，总评 A-（回升；仅评 7f71456/v1.2.13 时点）**。
-  最新 docs/reviews/review-2026-09-26-2.html 为体系内 agent 分工独立
-  复核，非外部同行审计。十六审确认：R84/R85 整改与 Map 批全部可复核
-  宣称零失真——存量 79 对拍用例 hex 由 git show v1.2.12 旧编译器
-  **独立全量对拍 79/79 全等**；敌手 36 自构 + 11 重建形态零行为
-  击穿（连续第二轮无 P2+ 代码发现）。新开 **R86-R89（4×P3：R86
-  println(Bool) 残余面描述偏窄/R87 mp{?} if 分支补全未入档/R88
-  fold 结果细化不对称未登记/R89 println(void) 文案误导——void
-  实参被误导向"容器显示留后续批次"）**，全部登记精度/文案类，
-  **已修于 v1.2.14（RFC-0004 修订 20）**：R86-R88 登记收口
-  （残余拒绝面扩写含 HOF 产 Bool 中转；mp{?} 分支/循环内 set
-  不回写外层为通用句；fold 结果 vt 从 init 推断的不对称登记），
-  R89 comp_println 对 void 实参单列诊断（点名 map_remove/map_set
-  等返回 void 的内建；neg_println_void 锁新文案 + 无 hex）。
-  R1-R89 全部关闭。十五审 B+ 只评 44954e2/v1.2.11-3；十四审 B 只评
-  5c92f59/v1.2.6——历史评级不外推，十六审 A- 亦不外推 json/包/return
-  未交付批次与 R86-R89 整改后状态（后者待下一轮复审）。事实源 docs/TODO.md 顶部。
+- 审查状态：**十八轮审查，总评 A-（维持；仅评本轮时点与检验面）**。
+  最新 docs/reviews/review-2026-09-28.html 为体系内 agent 分工独立
+  复核，非外部同行审计。十七审（基线 8bf1e27/v1.3.1）开账 R90/R91
+  已收口于 v1.3.2；十八审（基线 86d4d1c/v1.4.0）record 批与 L2.4
+  收官宣称零失真复证——两段存量 hex 115+127=242/242 全等、自施
+  加强 quine sha256 逐字吻合、39 敌手探针零行为击穿（连续第四轮
+  无 P1/P2）；开账 R92/R93（2×P3 文档登记类：Form A 剩余分叉登记
+  不可复现、交接文档时点漏刷群）已随 2026-09-28 文档更正批关闭，
+  R1-R93 全部关闭。历史轨迹：十六审 A-（7f71456/v1.2.13）开账
+  R86-R89 已修于 v1.2.14（RFC-0004 修订 20）；十五审 B+ 只评
+  44954e2/v1.2.11-3；十四审 B 只评 5c92f59/v1.2.6——历史评级
+  不外推，十八审 A- 亦不预支后续批次（宿主挂账与可选深化待用户
+  裁决）。事实源 docs/TODO.md 顶部。
 - 活跃工作包：**L2.3 进行中**（按批交付——a/b/c1/c2/String/List/Map 已
-  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，**修订 1-29
-  收官——L2.4 自举闭环达成，自施加强 quine**）：
+  实现）。L2 自举编译器（RFC-0004 方案 A，accepted，**修订 1-30
+  收官——修订 29 交付 L2.4 自举闭环与强 quine；修订 30 为十八审
+  R92/R93 纯文档更正**）：
   L2.1 spike + L2.2 子集编译器 + R66-R68/R74 整改 + **L2.3-a 控制流
   批** + **L2.3-b 闭包与捕获批**（designs/0001 四裁决点全按建议项）+
   **L2.3-c1 非泛型用户枚举与 match** + **L2.3-c2 内建 Result/Option
@@ -194,20 +191,22 @@
   println(...) 常在尾不在 stmts——L2.2 首版教训的预扫版）；
   map/filter 的反转段遍历指针是 out 槽非主循环 cur 槽；61 用例
   名不副实（string_pipeline 无管道语法）——查先例先验内容。
-- 下一步由用户裁决：下一轮独立复审（R90/R91 整改 + record 批 +
-  L2.4 收官后评级）或休整/容器显示批等可选深化；另有 typechecker
-  for 变量 define 覆盖同名外层可变性标记不恢复的既有 quirk 是否立项
-  （TODO R65 证据区）；宿主 map_remove 双后端分叉修否（Map 批挂账）；
-  MoonBit 1.0 Q3 复核等月底窗口；ubuntu-26 镜像迁移观察 2026-10-19。
+- 下一步由用户裁决：容器显示批 / 宿主挂账小包（map_remove 双后端
+  分叉修否、包内 as 别名解释器 RUNTIME002）/ println(Bool) 预扫
+  扩放行评估 / typechecker for 变量可变性 quirk 立项与否（TODO
+  R65 证据区）/ 下一轮独立复审（十九审，R92/R93 整改后评级）或
+  休整；MoonBit 1.0 Q3 复核（月底窗口）；ubuntu-26 镜像迁移观察
+  2026-10-19。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（2026-09-21 用户裁决
   制度化；本文件是持续维护文档，交接必刷）。
 
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4 分工规范），docs/TODO.md 顶部，docs/reviews/
-   review-2026-09-26-2.html（十六审——最新轮）及
-   review-2026-09-26.html（十五审），LANGUAGE_SPEC §14，docs/rfc/
-   0004-l2-selfhost-compiler.md（RFC-0004 已收官，修订 1-29），
+   review-2026-09-28.html（十八审——最新轮）及
+   review-2026-09-27.html（十七审），LANGUAGE_SPEC §14，docs/rfc/
+   0004-l2-selfhost-compiler.md（RFC-0004 已收官，修订 1-30——
+   修订 30 为十八审 R92/R93 文档更正），
    docs/designs/0001~0010 十份批次设计（闭包/作用域/泛型/String/List/Map/json/包/return/record+自举，
    含各批实施修正记录）；涉及架构时再派子智能体供料读 RFC-0003。
    交付中的关键路径读码（下一批动工前的现状拒绝点/宿主蓝本）派
@@ -222,19 +221,19 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 279/279 = 122 用例双产物行为一致（117 单文件 + 5 包项目）+ 152 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 279/279 = 127 用例双产物行为一致（122 单文件 + 5 包项目）+ 152 负例拒绝）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——L2.4 三层自证与自施加强 quine，~100s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决。R1-R85 全部关闭、
-   R86-R89 open（4×P3，十六审开账待裁决）；L2.3-c2、String 批、
-   List 批、十五审整改（R84/R85）与 Map 批均已交付并经十六审
-   零失真复证；下一方向可选 R86-R89 整改包（或顺带）、json / 包 /
-   return 逐批交付（string_to_int 与容器显示留各自后续批）。
-   外部发布线继续冻结。
+3. 如实报告基线，只给用户方向菜单等裁决。R1-R93 全部关闭；
+   RFC-0004 收官（v1.4.0，十八审 A- 维持零失真复证）；下一方向
+   可选：容器显示批 / 宿主挂账小包（map_remove 双后端分叉、
+   as 别名解释器 RUNTIME002）/ println(Bool) 预扫扩放行评估 /
+   for 变量可变性 quirk 立项 / MoonBit 1.0 Q3 复核 /
+   ubuntu-26 迁移观察。外部发布线继续冻结。
 4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
    → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
@@ -361,7 +360,9 @@
   全部 hex 逐字节一致 + 行为 match；自施加 wasm 编译自身 1.1s
   逐字节一致（强 quine，sha256 相同）；值位 if/match 的 Form B/if
   块形态 return 终止臂双侧一致（bottom `?` 占位合流——R91 翻转）；
-  Form A 单行表达式臂内 return 宿主收 L2 拒（剩余分叉登记）。
+  Form A 单行臂内 return 双侧同拒（宿主语法层 PARSE001、两侧文案
+  一致——十八审 R92 更正：值位 if/match return 终止臂已全量双侧
+  一致，无剩余分叉面）。
   verify_selfcomp 279/279 + --bootstrap 14/14；存量 127 hex 恒等；
   十七审 A- 不评此新增范围。
 - 十四审基线：**上述 a/b/c1 宣称当时受 R79-R82 四条反例限定**。
@@ -375,6 +376,11 @@
   嵌套 if 时外层 else 被内层吞——嵌套 if 需自带 else 或提前 return
   改写）；Form B 臂 end 计数（宿主语义：每臂独立 end）；多返回值调用点
   显式取 .0/.1；用例全文 grep "Fn" 自查。
+- 十八审后（2026-09-28 文档更正批）：R92——match Form A 臂内
+  return 双侧同拒（宿主语法层 PARSE001 文案逐字一致）、if 单行
+  return 臂双侧同收，值位 return 终止臂全量双侧一致无剩余分叉；
+  verify_selfcomp 279/279 = 127 对拍（122 单文件 + 5 pkg）+ 152
+  负例；十八审 A- 不评本批文档更正。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```

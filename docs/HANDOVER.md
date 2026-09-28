@@ -1,3 +1,19 @@
+> 最后更新：2026-09-28（**第十八轮独立审查收官（A- 维持，基线
+> 86d4d1c/v1.4.0，报告 review-2026-09-28.html）+ R92/R93 纯文档
+> 更正批——不升版、零代码、零行为变化**。十八审：record 批与
+> L2.4 收官宣称独立复核零失真——两段存量 hex 115+127=242/242
+> 全等、自施加强 quine sha256 逐字复证、39 敌手探针零行为击穿
+> （连续第四轮无 P1/P2）；开账 R92（P3：Form A 单行臂内 return
+> "宿主收、L2 拒"剩余分叉面宣称 8 变体实测不可复现——双侧同拒/
+> 无剩余分叉）与 R93（P3：交接文档时点漏刷群）。本批改动面：R92
+> 五处登记更正（RFC 修订 29/TODO 顶部/SPEC §13/HANDOVER §9-5/
+> HANDOFF_PROMPT 锚点段）；R93 五处刷新（§1 Rust 行 541/541+8
+> 与历史链、v1.3.1 段 539+8、§9-1/§9-5 审查指向、README 恒等数
+> 127）；分项笔误更正 5 处（127 对拍 = 122 单文件 + 5 pkg）；
+> HANDOFF_PROMPT 时点残留清点；§12.2 顺延指针 R94+；RFC 新增
+> 修订 30（含两条精度备注：cli.rs +124/-4、--bootstrap 396.3s
+> 机器负载差异）。doc_audit 67/67 与 spec_examples PASS 复验；
+> 十八审 A- 不评本批文档更正；提交推送与 CI 由规划者执行。）
 > 最后更新：2026-09-27（**L2.4 自举闭环收官 + v1.4.0——RFC-0004 全部
 > 目标达成，自施加强 quine**。用户裁决路线甲"继续"。三层自证：① self_comp
 > 编译自身 COMPILED 234734 bytes（10548 行源码）；② wasm self_comp
@@ -6,7 +22,8 @@
 > 一致（sha256 相同）——强 quine 证明**。九闸门拆除（8 源码等价改写
 > + 1 编译器补支持：值位 if/match return 终止臂 bottom 语义——
 > **R91 Form B/if 形态翻转通过**（规划者亲拍 55/14/1/2 逐字）；
-> Form A 单行臂内 return 剩余分叉新登记）。--bootstrap 14/14 +
+> Form A 单行臂内 return 剩余分叉新登记（十八审 R92 更正：该形态
+> 双侧同拒——宿主语法层 PARSE001，无剩余分叉面））。--bootstrap 14/14 +
 > --ci-smoke 2/2 接入 CI；存量 127 对拍 hex 逐字节不变（改写前后
 > 编译逻辑等价）；verify_selfcomp 279/279 保持；cargo 零改动。
 > Rust 541+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验
@@ -21,8 +38,9 @@
 > 内联 + io no-op；**R90 收口**：pkg-expand 对含 as 的包内 import 原位
 > 保留——三声音修复（宿主 wasm 18/L2 MATCH 18/解释器 RUNTIME002 挂账
 > 维持）+ Rust 测试 ×2（541+8）；**R91 登记面扩"if 与 match"**。
-> verify_selfcomp 255→**279/279 = 122 对拍 + 152 负例**（含 R90 用例
-> 105_pkg_alias_in_pkg）；**存量 115 对拍 hex 逐字节不变**（R90 转写
+> verify_selfcomp 255→**279/279 = 127 对拍 + 152 负例**（含 R90 用例
+> 105_pkg_alias_in_pkg；分项笔误更正：127 = 122 单文件 + 5 包）；
+> **存量 115 对拍 hex 逐字节不变**（R90 转写
 > 仅触含 as 包源，存量无此形态）；self_comp 9491→**10402 行**；宿主
 > cli.rs +125。clippy"9 错"澄清：--all-targets 存量测试 lint 不在
 > gate（§1 既有登记），CI 口径 rc=0 零输出（执行者口径误判，规划者
@@ -41,7 +59,7 @@
 > 全收**（else 臂 unreachable 豁免实测，113 固化）。用例 11（105-115）
 > + 负例 8 + 转正 2。verify_selfcomp 238→**255/255 = 115 对拍 + 140
 > 负例**；**存量 104 对拍用例产物 hex 逐字节不变**；self_comp
-> 9361→**9491 行**；Rust 541+8/六模式/eval 双后端 121/121/
+> 9361→**9491 行**；Rust 539+8/六模式/eval 双后端 121/121/
 > doc_audit 67/67 全绿复验（升版 v1.3.1 后规划者亲跑）。**边界登记**：
 > 值语境 if 的 return 臂维持既有编译期拒（宿主-L2 分叉面）；Fn 参数
 > 注解宿主不支持（用例规避）。语言面与宿主 src 零改动。**L2.3 语句面
@@ -256,10 +274,10 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.4.0**（Cargo.toml/lock 一致；2026-09-27 L2.4 自举闭环收官（RFC-0004 修订 29）——自施加强 quine，升 minor；v1.3.2 tag 已切于 19c99bd；v1.4.0 tag 于本次提交 CI 六 job 全绿后切；外部发布线继续冻结；历次变更见 LANGUAGE_SPEC §13） |
-| Rust 测试 | **535/535 通过 + 8 集成**（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
+| 版本 | **v1.4.0**（Cargo.toml/lock 一致；2026-09-27 L2.4 自举闭环收官（RFC-0004 修订 29）——自施加强 quine，升 minor；v1.3.2 tag 已切于 19c99bd；v1.4.0 tag 于本次提交 CI 六 job 全绿后切；外部发布线继续冻结；十八审 A-（基线 86d4d1c/v1.4.0）R1-R93 全部关闭；历次变更见 LANGUAGE_SPEC §13） |
+| Rust 测试 | **541/541 通过 + 8 集成**（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；v1.3.0：539（pkg-expand ×4）；v1.3.2：541（R90 ×2）；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **121/121**（runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
-| CI | **v1.4.0 交接树 e9aad15 六 job 全绿**（run 36296411754；selfhost job 新接入 bootstrap ci-smoke step；tag v1.4.0 切于 e9aad15；annotations 四条 Ubuntu 26 迁移 notice、零 warning/error；v1.3.2 时点曾有一次 fmt gate 三平台红——执行者收尾漏 fmt + 规划者验收 tail 截断，§11.3 双教训入档；新交接提交推送后仍须重查首跑） |
+| CI | **v1.4.0 交接树 e9aad15 六 job 全绿**（run 36296411754；selfhost job 新接入 bootstrap ci-smoke step；tag v1.4.0 切于 e9aad15；annotations 四条 Ubuntu 26 迁移 notice、零 warning/error；v1.3.2 时点曾有一次 fmt gate 三平台红——执行者收尾漏 fmt + 规划者验收 tail 截断，§11.3 双教训入档；十八审报告 review-2026-09-28.html 已入库（由本批 docs 提交）；新交接提交推送后仍须重查首跑） |
 | LLM 实测 | **三层证据**：① 基线 99/100（2026-08-03）见 eval/REPORT.md；② 四模型单采样（2026-08-31，eval/REPORT-2026-08-31-multimodel.md）：deepseek-v4-pro+thinking 113/113（100%）、deepseek-v4-flash 112/113、glm-4.7 112/113、glm-5.3 112/113（唯一失败 078 = prompt 歧义锚点）；③ **pass@k 复测（2026-09-07 L 工作包，eval/REPORT-2026-09-07-passk.md）**：deepseek-v4-pro+thinking 与 glm-5.3 各 10 采样 × temperature=1.0 × 116 任务集，**两模型 pass@1 = pass@5 = pass@10 = 99.1%**（无偏估计；唯一系统性失败 078 两模型均 0/10——上轮"thinking 通过 078"被推翻为边缘事件；051/104 各 9/10 为温度方差，pass@5 覆盖）；115-117 三任务首次 LLM 实测；采集断连两次经断点续跑零成本补齐，管线沉淀 --samples/--from-raw/passk_summarize.py |
 | 自举验证 | 4 个 bootstrap 文件全通过（stmt_interp 14 程序 39 条输出与 golden 文件逐字一致） |
 | **Phase 8.1** | **完成（2026-09-01）**：`examples/selfhost/self_interp.lom`（~2670 行：完整 lexer+parser+dump+token/诊断输出）。验收 `python tools/verify_selfhost.py [--tokens|--diags]`：dump 146/146（todo.lom 18 处 Str 为 Latin-1 折叠等价）、tokens 146/146（todo.lom 列坐标系已知差异）、diags 5/5（LEX/PARSE 口径）。同轮交付：宿主 `--dump-tokens`、**宿主 `?` 提前返回穿透 bug 修复**（块尾 if 表达式/match Form B 臂内 ControlFlow::Return 被当块值消费——静默失效，与 WASM 语义分叉；+2 回归测试） |
@@ -282,8 +300,8 @@
 | **第十三轮审查** | **复审完成（2026-09-22，总评 B+；报告 review-2026-09-22-2.html，基线 1418536/v1.2.5）**：R73-R76 整改零失真（✓×4）；基线 14 项全绿；**代码面敌手探针 22 形态零击穿（九审以来五轮首次；MUT001 定位面四轮击穿链断）**；仅 2×P3 文档对账（R77 漏改 4 处开账即修、R78 README 存量算术残留 open）。**裁定：B+ 回升；L2.3 建议放行（R74 收口达成，动工授权待用户）；发布冻结维持；v1.2.5 tag 无需撤回。** |
 | **第十二轮审查** | **复审完成（2026-09-22，总评 B；报告 review-2026-09-22.html，基线 aab6f95/v1.2.4）**：R65-R72 八项整改在自列验收面上**零失真（✓×8）**（含扩展探针：elif/嵌套 for/未定义赋值目标语句拒绝、闭包捕获+外层重赋混合、注解一致正例）；基线复验全绿；敌手探针新开 R73（P1，同轮多 MUT001 双 Replace 产 `let mut mut`——证伪"永不可能"宣称）/R74（P2，self_comp call 路径无实参类型/arity 校验产非法 wasm）/R75-R76（P3）。头条 P1 维护会话已亲手复现确认。**裁定：B 针对本轮时点（问题面较十一审 2×P1+3×P2 收窄至 1×P1+1×P2）；R73/R74 入 v1.2.5；L2.3 暂缓条件推进为 R74 收口；发布冻结维持。** |
 | **第十一轮审查** | **复审完成（2026-09-21，总评 B；报告 review-2026-09-21-3.html，基线 65e51dc）**：R62/R63 整改在自列验收面上**零失真**（三探针真实 apply 复现：applied=0/源码逐字不变/ok:false；边界扩展与基线九件套全绿；L2.1 双载体 24 向量 + L2.2 验收 5/5 复证）。敌手探针新开 R65-R72：R65（P1，MUT001 嵌套作用域错目标+非幂等改坏源码——证伪"闭包/match 臂内降级 hint"宣称）、R66（P1，self_comp 语句级子集拒绝死臂——Err 值在语句位置被丢弃，if/while/for/return 静默蒸发产错行为 wasm）、R67/R68（P2，return 死臂/let 注解信任边界）、R69（P2，case1 字节锚陈旧）、R70-R72（P3）。头条两 P1 维护会话已亲手复现确认。**裁定：B 针对本轮时点；L2.3 暂缓先收口 R65-R72；发布冻结维持。** |
-| 下一步 | **L2.4 自举闭环收官 + v1.4.0（2026-09-27）——RFC-0004 全部目标达成**：三层自证 14/14 + 自施加强 quine（逐字节一致）；R91 Form B/if 形态随 bottom 臂补支持翻转、Form A 单行臂内 return 剩余分叉登记。**RFC-0004 至此闭环（L2.1→L2.4）**。下一步由用户裁决：发起下一轮独立复审（R90/R91 整改 + record 批 + L2.4 收官后评级）或休整/其他方向（容器显示批、宿主 map_remove 与包内 as 别名解释器分叉挂账等）；MoonBit 1.0 Q3 复核窗口；ubuntu-26 迁移观察 2026-10-19。外部发布线继续冻结，推送后须实查 CI 首跑。 |
-| 遗留挂账 | **R1-R89 全部关闭（R86-R89 已修于 v1.2.14）；十六审 A- 不外推未交付批次，整改后评级待下一轮复审**。宿主侧：map_remove 返回值双后端分叉（解释器/TC=Bool vs WASM=Unit，designs/0006 实证——修否待用户裁决）；typechecker for 变量 define 覆盖同名外层可变性标记不恢复（v1.2.3 既有 quirk）；WASM Int 安全值域 ±2^59 的结构根治（RFC 级）；Float 字面量正确舍入精度专项；包注册中心/调试器/概率类型；CLI 粘合层覆盖；V8 默认栈深限制；doc_audit 命令行完整性锚（R64 根治方向）；RFC 修订记录序列锚（R83 遗留观察）。L2 侧：json/包/return 与 L2.4 闭环；容器显示批（println(List)/println(Map)/枚举显示）；裸 mp{?}/ls{?} 子块细化边界；println(Bool) 预扫补 HOF 结果识别与 fold 结果从闭包签名细化（R86/R88 的代码路径，已登记留后续评估）。历史已关闭项不得因评级回退而重开。 |
+| 下一步 | **L2.4 自举闭环收官 + v1.4.0（2026-09-27）——RFC-0004 全部目标达成**：三层自证 14/14 + 自施加强 quine（逐字节一致）；R91 Form B/if 形态随 bottom 臂补支持翻转（Form A 单行臂内 return 经十八审 R92 更正：双侧同拒、无剩余分叉面）。**RFC-0004 至此闭环（L2.1→L2.4）**；十八审收官（A- 维持、R1-R93 全部关闭）后待用户裁决：容器显示批 / 宿主挂账（map_remove 双后端分叉、包内 as 别名解释器 RUNTIME002）/ println(Bool) 预扫扩放行评估 / for 变量可变性 quirk 立项 / MoonBit 1.0 Q3 复核窗口 / ubuntu-26 迁移观察 2026-10-19。外部发布线继续冻结，推送后须实查 CI 首跑。 |
+| 遗留挂账 | **R1-R93 全部关闭（R86-R89 已修于 v1.2.14；R92/R93 已修于 2026-09-28 文档更正批）；十八审 A- 不预支后续批次**。宿主侧：map_remove 返回值双后端分叉（解释器/TC=Bool vs WASM=Unit，designs/0006 实证——修否待用户裁决）；typechecker for 变量 define 覆盖同名外层可变性标记不恢复（v1.2.3 既有 quirk）；WASM Int 安全值域 ±2^59 的结构根治（RFC 级）；Float 字面量正确舍入精度专项；包注册中心/调试器/概率类型；CLI 粘合层覆盖；V8 默认栈深限制；doc_audit 命令行完整性锚（R64 根治方向）；RFC 修订记录序列锚（R83 遗留观察）。L2 侧：json/包/return 与 L2.4 闭环；容器显示批（println(List)/println(Map)/枚举显示）；裸 mp{?}/ls{?} 子块细化边界；println(Bool) 预扫补 HOF 结果识别与 fold 结果从闭包签名细化（R86/R88 的代码路径，已登记留后续评估）。历史已关闭项不得因评级回退而重开。 |
 
 **评审整改记录（2026-08-22，第二轮评审后执行）**：外部 subagent 评审（总评 B+）提出的问题中已修复：① **类型检查默认可见**——此前 `lom file` 运行完全跳过类型检查（"渐进式类型"名不副实），现运行模式照常检查、诊断走 stderr、**永不拦截执行**（渐进式承诺不变）；eval runner 同步改为只比对 stdout + 要求退出码 0（此前合并 stderr 比对且不查退出码）。② **CI 三 gate**：自举回归从行数防线升级为 golden 逐字比对（stmt_interp.expected.txt）；`lom fmt --check` 接入 CI（全部示例幂等要求）；零依赖 CI 强制检查（坐实 SECURITY.md 承诺）。③ **文档腐坏清扫**：HANDOVER §2.2 陈旧数字（287→345）、eval/README "100 任务"→108、guide 锚点 id 补上（README 的 #2.7/#2.8 此前是死链）、SPEC/SPEC_FOR_AI 的 `pub` 明确标"未实现"（它连保留字都不是，是普通标识符）、README EFF001 行号按实测修正。④ **版本纪律**：v0.6.0 升版 + tag（6.4/6.5 加了用户可见功能没升版，属自我违背）。⑤ **build warning 清零**（19 个：真误用就删，有意保留的 API/schema 字段加 #[allow(dead_code)] 注释）。未修复（如实保留）：eval 的 99% 是 2026-08-03 原 100 任务集数据（101-108 未跑 LLM 实测，guide §2.8 已注明）；栈溢出无结构化诊断（编译器阶段的活）；error_repair 类目扩充与第三方复测需要真实 LLM 资源。
 
@@ -326,7 +344,7 @@ foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFi
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 121/121（2026-09-16 ③ 包起；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 154/154（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
-python tools\verify_selfcomp.py                         # L2.3/L2.4 验收：279/279（122 对拍 + 152 负例）+ --bootstrap 14/14（三层自证与自施加强 quine，v1.4.0 起；RFC-0004 修订 29；另有 --ci-smoke 子档已接入 CI）
+python tools\verify_selfcomp.py                         # L2.3/L2.4 验收：279/279（127 对拍 = 122 单文件 + 5 包项目 + 152 负例）+ --bootstrap 14/14（三层自证与自施加强 quine，v1.4.0 起；RFC-0004 修订 29；另有 --ci-smoke 子档已接入 CI）
 python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
 python tools/fuzz_smoke.py                             # Q4 随机冲击冒烟（固定种子 80 轮正常终态断言；CI doc-gates 常驻）
 python tools/diff_test.py --probe                      # D 包探针：验证 §11f 八条中六条可执行分歧仍如档案（trim Unicode 需非 ASCII 不在探针集；守护白名单）
@@ -556,11 +574,11 @@ end
 
 ## 9. 快速上手检查单（新 AI 第一天）
 
-1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6/§12、TODO 顶部、最新十五审报告（review-2026-09-26.html）；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
+1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6/§12、TODO 顶部、最新十八审报告（review-2026-09-28.html）与十七审报告（review-2026-09-27.html）；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
 2. `cargo build --release && cargo test --release` 确认 541/541（另有 tests/ 集成 ×8）、零 warning、`./target/release/lom.exe --version` 显示 1.4.0
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 279/279）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 确认工作区干净（`git status`）、CI 最新 run 全绿并检查 annotations（§11 有 API 查法）
-5. **当前状态：v1.4.0、语言面/外部发布线冻结；十六轮审查 A-（回升，基线 7f71456/v1.2.13，review-2026-09-26-2.html），R1-R89 全部关闭（R86-R89 已修于 v1.2.14：登记收口×3 + void 实参文案单列）；R84/R85 整改与 Map 批宣称经十六审零失真（存量 79 用例 hex 独立全量对拍 79/79 全等），整改后评级待下一轮复审。活跃工作包 L2.3：a 控制流、b 闭包、c1 非泛型 enum/match、c2 内建 Result/Option 与泛型用户 enum、String 批（B1+B2+B3）、List 批（B1+B2+B3+B4 + 严格性甲）、十五审整改（R84/R85）、Map 批（B1+B2 + 裁决 2 甲 + 严格性甲）、十六审整改（R86-R89）、json 批（混合中介 + B1+B2 + 数字甲）、包批（丙+丁：宿主 pkg-expand + L2 known_pkg）、return 收官批（0x0f 直发 + 全批 + 校验甲）、record/tuple 编译子批（designs/0010 第一段）、L2.4 自举闭环（第二段：三层自证 14/14 + 自施加强 quine——wasm self_comp 编译自身 234734 字节逐字节一致 sha256 相同）已实现（RFC-0004 修订 29 收官；self_comp 10548 行，verify_selfcomp 279/279 + --bootstrap 14/14，存量 127 对拍用例 hex 逐字节不变）——**RFC-0004 全部目标达成（L2.1 spike → L2.2 子集 → L2.3 十一批 → L2.4 自举+强 quine），自举叙事完整落地**。Map 批交付 vt mp{V}/8 内建全量/map_get→Option 对接/结构相等 mp_eq 特化/map_remove void 对齐宿主 WASM（宿主双后端分叉挂账待裁）。仍拒 string_to_int/println(List|Map)/拼接提升容器侧/管道语法/枚举显示与 record 字面量（record 批）、json 值算术/比较（_Any 动态语义信任边界，已登记）、跨函数 Bool 参数流转与 HOF 产 Bool 中转（println(Bool) 残余边界，已登记）、裸 mp{?}/ls{?} 子块细化（分支/循环内 set 不回写外层，已登记）；L2.4 后剩余为可选深化（容器显示批/宿主挂账等）——值位 if/match 的 Form B/if 块形态 return 终止臂已随 bottom 语义补支持**翻转通过**（R91 更新），Form A 单行表达式臂内 return 维持拒（宿主收 L2 拒——剩余分叉面登记），下一方向待用户裁决。** 历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行）、selfhost 六模式；doc_audit 现为 67 项。维护流程见 §12；CI 与 tag 状态须实查。
+5. **当前状态：v1.4.0、语言面/外部发布线冻结；十八轮审查 A-（维持，基线 86d4d1c/v1.4.0，review-2026-09-28.html），R1-R93 全部关闭（R92/R93 已修于 2026-09-28 文档更正批）；十七/十八审对 record 批与 L2.4 收官宣称经独立复核零失真（两段存量 hex 115+127=242/242 全等、自施加强 quine sha256 复证逐字吻合）。活跃工作包 L2.3：a 控制流、b 闭包、c1 非泛型 enum/match、c2 内建 Result/Option 与泛型用户 enum、String 批（B1+B2+B3）、List 批（B1+B2+B3+B4 + 严格性甲）、十五审整改（R84/R85）、Map 批（B1+B2 + 裁决 2 甲 + 严格性甲）、十六审整改（R86-R89）、json 批（混合中介 + B1+B2 + 数字甲）、包批（丙+丁：宿主 pkg-expand + L2 known_pkg）、return 收官批（0x0f 直发 + 全批 + 校验甲）、record/tuple 编译子批（designs/0010 第一段）、L2.4 自举闭环（第二段：三层自证 14/14 + 自施加强 quine——wasm self_comp 编译自身 234734 字节逐字节一致 sha256 相同）已实现（RFC-0004 修订 29 收官；self_comp 10548 行，verify_selfcomp 279/279 + --bootstrap 14/14，存量 127 对拍用例 hex 逐字节不变）——**RFC-0004 全部目标达成（L2.1 spike → L2.2 子集 → L2.3 十一批 → L2.4 自举+强 quine），自举叙事完整落地**。Map 批交付 vt mp{V}/8 内建全量/map_get→Option 对接/结构相等 mp_eq 特化/map_remove void 对齐宿主 WASM（宿主双后端分叉挂账待裁）。仍拒 string_to_int/println(List|Map)/拼接提升容器侧/管道语法/枚举显示与 record 字面量（record 批）、json 值算术/比较（_Any 动态语义信任边界，已登记）、跨函数 Bool 参数流转与 HOF 产 Bool 中转（println(Bool) 残余边界，已登记）、裸 mp{?}/ls{?} 子块细化（分支/循环内 set 不回写外层，已登记）；L2.4 后剩余为可选深化（容器显示批/宿主挂账等）——值位 if/match 的 Form B/if 块形态 return 终止臂已随 bottom 语义补支持**翻转通过**（R91 更新），Form A 单行臂内 return 双侧同拒（宿主语法层 PARSE001、两侧文案一致——十八审 R92 更正：值位 if/match return 终止臂已全量双侧一致，无剩余分叉面），下一方向待用户裁决。** 历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6；self_interp.lom（5727 行）、selfhost 六模式；doc_audit 现为 67 项。维护流程见 §12；CI 与 tag 状态须实查。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
@@ -924,7 +942,7 @@ end
 - **性质**：agent 分工的体系内独立审查，**不是外部同行审计**——报告必须如实标注该边界（九审先例）。
 - **方法**：敌手式——"绿矩阵不是证明"；从真实 CLI 进程 / LSP stdio / repair apply / 退出码 / 协议边界 / 三实现对齐构造反例；上轮整改的验收探针必须亲手复跑。
 - **纪律**：审查阶段不改产品源码；报告落 `docs/reviews/review-<date>[-N].html`（自包含 HTML）。
-- **整改开账**：新发现从下一号起（当前顺延至 **R83+**；R79-R82 已开账）开入 TODO，由用户裁决整改顺序；整改项必须带"应修"+"绝不能这样修"的负向测试锁定。
+- **整改开账**：新发现从下一号起（当前顺延至 **R94+**；R92/R93 已开账并关闭）开入 TODO，由用户裁决整改顺序；整改项必须带"应修"+"绝不能这样修"的负向测试锁定。
 - **评级**：每轮独立评级；历史 A/A-/B 轨迹不得外推——整改后状态只能由下一轮复审重估。
 
 ### 12.3 交接清单（HANDOFF_PROMPT 为必要环节）
