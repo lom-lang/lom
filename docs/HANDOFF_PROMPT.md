@@ -43,9 +43,10 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】
-- 仓库版本 v1.4.0（L2.4 自举闭环收官——RFC-0004 全部目标达成，
-  自施加强 quine；首回合仍须实查最新 main CI 与 annotations）；
-  语言面与外部发布线冻结。
+- 仓库版本 v1.4.0（tag 切于 e9aad15，CI run 36296411754 六 job
+  全绿含新接入的 bootstrap ci-smoke；L2.4 自举闭环收官——RFC-0004
+  全部目标达成，自施加强 quine；首回合仍须实查最新 main CI 与
+  annotations）；语言面与外部发布线冻结。
 - Map 批 CI 轨迹（如实）：feat dbbb4c6 + docs 28ad799 首跑 **doc gates
   红**——dbbb4c6 的 git add 显式清单漏 Cargo.toml/Cargo.lock（提交树
   1.2.12 vs 文档 1.2.13，五项 FAIL）；补提交 7d8dded 后六 job 全绿
@@ -222,6 +223,7 @@
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（期望 279/279 = 122 用例双产物行为一致（117 单文件 + 5 包项目）+ 152 负例拒绝）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——L2.4 三层自证与自施加强 quine，~100s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
