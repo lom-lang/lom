@@ -53,9 +53,10 @@
   的 Logical 短路 if 补压 Label::If（W-2 先例）——and/or 右侧实际执行
   return 时三侧对齐（0/9/1/8 rc0）；Rust e2e 测试
   e2e_return_inside_logical_rhs 锁定，**541→542**；L2 侧零改动；
-  升版 v1.4.7（宿主行为修复 patch）。**R101 关闭**——裁决 1/2 完成，
-  仅剩 3（二十审 review-2026-09-30.html → 交接五件套）。当前 open
-  仅 R94 宿主挂账。
+  升版 v1.4.7（宿主行为修复 patch）；提交 `22a37a6` 推送后 CI run
+  `36612026578`（#209）六 job 全绿，tag v1.4.7 已切。
+  **R101 关闭**——裁决 1/2 完成，仅剩 3（二十审
+  review-2026-09-30.html → 交接五件套）。当前 open 仅 R94 宿主挂账。
 - **批1（E甲扩围+R100）已交付 v1.4.6**（`96c26b6`，CI #207 六 job
   绿后切 tag）：Bool 家族
   三盲点修复（bbind 知识表对称 cbind 分层保 pb5 边界、match_bool_disp
