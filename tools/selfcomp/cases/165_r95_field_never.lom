@@ -1,0 +1,9 @@
+fn g(c: Bool) -> Int
+    let x = (if c return 1 else return 2 end).a
+    x
+end
+
+fn main() -> Unit ! [IO]
+    println(g(True))
+    println(g(False))
+end

@@ -1,0 +1,7 @@
+fn g(n: Int) -> Int
+    let w = if n > 0 return 1 end
+    w + 0
+end
+fn main() -> Unit ! [IO]
+    println(g(1))
+end

@@ -1,0 +1,13 @@
+# 第一臂可产值；后臂 guard 必终止，不能误判整个 match 为 never。
+fn g(n: Int) -> Int
+    let w = match n
+        20 => 100
+        x if (if x > 0 return 1 else return 2 end) => 200
+    end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(20))
+    println(g(7))
+    println(g(0))
+end

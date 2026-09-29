@@ -1,0 +1,12 @@
+fn main() -> Unit ! [IO]
+    let f = fn(x: Result<Int, Int>)
+        let y = x?
+        return x
+    end
+    let ok: Result<Int, Int> = Ok(3)
+    let err: Result<Int, Int> = Err(4)
+    let a = f(ok)
+    println(1)
+    let b = f(err)
+    println(2)
+end

@@ -1,3 +1,4 @@
+# B甲：Bool 返回路径的 never 签名与 wasm 栈效应。
 fn g(n: Int) -> Bool
     let w = if n > 100 return True else return False end
     w

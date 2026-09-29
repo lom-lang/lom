@@ -230,16 +230,13 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_println_deep_rc.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
     'neg_println_deep_enum.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
     'neg_println_deep_enum_ls.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
-    # ---- R99 安全闸：全终止值位 if/match 显性拒，禁止 COMPILED 坏 WASM ----
-    'neg_r99_if_bound_int.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_if_annot_int.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_if_bound_float.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_if_bound_bool.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_if_bound_string.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_match_bound.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_if_direct_tail.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_match_direct_tail.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
-    'neg_r99_nested_termination.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    # ---- R95 B甲：全终止路径转正；留下精确签名/可达路径负例 ----
+    'neg_r95_closure_mixed_returns.lom': "类型不符（'i64' vs 'f64'）",
+    'neg_r95_closure_param_leak.lom': "未定义变量 'secret'",
+    'neg_r95_closure_partial_return.lom': 'void 函数的 return 不能带值',
+    'neg_r95_closure_unknown_list_ret.lom': '全终止闭包返回类型不可精确推断',
+    'neg_r95_closure_try_mixed_return.lom': '类型不符',
+    'neg_r95_if_no_else_value.lom': 'let 绑定 void 值',
 }
 
 

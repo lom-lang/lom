@@ -1,7 +1,7 @@
-# R95–R97 整改与 R99 坏 WASM 前置设计（已裁：A甲先行）
+# R95–R97 整改与 R99 坏 WASM 前置设计（A甲已交付，B甲本地完成）
 
-- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲代码与单项验证已完成，文档配对及规划者全量回归、提交/CI 待验；B甲/C甲/D甲/E甲尚未实施。R95/R96/R97 仍 open；R99 的最终闭账以规划者门禁为准。另发现 R100 P2，已开账待用户裁决，不在本设计实施范围。
-- **设计基线**：HEAD `6d7a88d`、v1.4.1；A甲拟升仓库版本 v1.4.2（CI/tag 待验）。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6 为准。
+- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲已提交 `8012c38`、CI run `36549057031` 六 job 全绿后切 v1.4.2 tag，R99 关闭。B甲代码与单项验证本地完成，拟升 v1.4.3，规划者全量回归及提交/CI/tag 待验；R95 原形态本地修复，正式闭账待门禁。C甲/R96、D甲/R97、E甲证据尚未实施；R100/R101 P2 open 待用户另裁。
+- **设计基线**：初始 HEAD `6d7a88d`、v1.4.1；A甲交付基线 `8012c38`/v1.4.2；B甲工作区拟升 v1.4.3。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6–7 为准。
 - **证据性质**：R95/R99 的 `target/probes/r95_design/` 探针为本批独立重跑；R96/R97 的 d5c/n4 原形态有十九审 `docs/reviews/review-2026-09-29.html` §4 原文，本批审阅者又对 `println`/`print`/嵌套闭包、match Form A/B/guard/嵌套及邻近 Bool Binder/`for` 做了全链路探针，机制经读码核对。未在本文列出逐项原始输出的扩展探针须在实施验收时存档，不能把这批已实测形态写成“尚未核定”。主观推测单独标示。
 - **数字落盘前门禁**：写本文前运行 `python tools/doc_audit.py`，结果 `RESULT: PASS（67/67 项通过）`。
 
@@ -83,7 +83,7 @@ not enough arguments on the stack for local.set (need 1, got 0) @+100
 
 ## 3. 裁决时菜单与建议（历史备查）
 
-用户现已裁决 **A甲→B甲/C甲/D甲/E甲**；以下建议栏保留设计时的备选论证。当前仅 A甲已实施并通过单项验证；后续路线不因列在表中就视为完成。
+用户现已裁决 **A甲→B甲/C甲/D甲/E甲**；以下建议栏保留设计时的备选论证。A甲已通过 CI/tag，B甲代码本地完成待规划者门禁，C甲/D甲/E甲未实施；路线不因列在表中就视为完成。
 
 | 裁决点 | 可选路线 | 建议与负面风险 |
 |---|---|---|
@@ -123,7 +123,7 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 
 ## 4. 分阶段交付与验收门禁
 
-1. **用户已裁决 A甲→B甲/C甲/D甲/E甲**。当前仅执行 A甲；后续阶段按此顺序经规划者验收推进，R100 不含在原裁决内。规划者负责设计裁决、派发与验收；执行者只改获准面、跑单项并报原始输出，不能 git add/commit/push/tag。
+1. **用户已裁决 A甲→B甲/C甲/D甲/E甲**。A甲已交付，B甲本地完成待验收；C甲/D甲/E甲按序推进。R100/R101 不含在原裁决内，修法待用户另裁。规划者负责设计裁决、派发与验收；执行者只改获准面、跑单项并报原始输出，不能 git add/commit/push/tag。
 2. **安全阶段**优先锁 R99 坏产物矩阵，再按 B–D 裁决实施行为修复。行为改动与文档成对交付；勘误十九审 d2 与“零坏 wasm”字句，TODO/RFC/HANDOVER/README/SPEC 的相关总括口径同步核对。改现存登记前查 `tools/doc_audit.py` 与 `tools/claims.json` 锚点；新文档含数字先跑 doc_audit。
 3. **差分与存量约束**：A甲前 `verify_selfcomp.py` 基线为 **286/286 = 139 对拍（134 单文件 + 5 包）+ 147 负例**；新增用例会改变总数，应按目录与验收器重算后登记。用旧编译器和新编译器对 v1.4.0 的 **127** 个存量对拍逐份比较 hex，再对 A甲前 **139** 个对拍做同法比较。A甲实测结果见 §6；R97 乙若引起 hex 变化，逐例说明 String 设施/ibase 原因且先获用户接受。
 4. **自举与全量回归**：A甲前 `verify_selfcomp.py --bootstrap` 为 **14/14**，强 quine **247009 bytes** 双侧逐字节一致；A甲后新实测见 §6。提交前按 HANDOVER §2.2 跑 release Rust 单元与集成、Lom fmt 递归门禁、bootstrap golden、双后端 eval、verify_selfhost 六模式、selfcomp 普通与 bootstrap、spec_examples、fuzz/diff、eval_prompt_check、doc_audit；另跑 `cargo build --release`、`cargo clippy --release -- -D warnings`、`cargo fmt --all -- --check`。规划者亲自复核 selfcomp 与 doc_audit，并抽验 R99 的显性拒绝与控制用例、R96/R97 的 stdout+rc。
@@ -133,9 +133,17 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 
 不改 v1.0 语法、20 关键字、诊断码、43 内建；需要变化须新 RFC。新增 warning 检查即使属于安全区也要用户裁决。Cargo 维持零第三方 crate、Rust 零 unsafe。任何含反斜杠转义的内容只用 Write/Edit/apply_patch 落盘，禁用 heredoc/printf 直写。Lom 探针与验收用例写前核对 HANDOVER §11.6：`True/False` 大写、无 List 字面量（用 `list_cons`/`range`）、match Form B 每臂独立 `end`、dangling-else 归内、无 `break/continue`、`Fn` 注解是负例形态、Int 安全值域 ±2^59、多返回值显式取 `.0/.1`、新增/修改 .lom 必过递归 fmt gate。计算结果要给复现命令、stdout、rc、hex 有无、WASM 可实例化结论；推测明确标为主观推测。
 
-## 6. A甲实施记录（2026-09-29；规划者全量回归与 CI 待验）
+## 6. A甲实施记录（2026-09-29；已提交、CI 全绿、tag v1.4.2）
 
 - **实际代码边界**：`self_comp.lom` 增加 `if_no_value`、`match_no_value`、`arm_no_value`、`st_no_value`、`blk_no_value`、`ex_no_value`，按 AST 控制流证明值表达式无正常产值，刻意不复用兼任泛型未知的 vt `?`。`infer_if_expr`/`infer_match_expr`、`comp_ex`/`comp_if_expr`/`comp_match_expr`、`let_vt` 与 `comp_tail` 均在产物发射前设同文案门禁；全 return 的值位 if/match 现为 `COMPILE-ERROR`，无 hex。单 return 臂、泛型未知空 List、语句级全 return 有正常对照。A甲不实现 B甲的完整 bottom 值位放行，R95 算术形态继续显性拒绝。
 - **计数闭合**：旧验收 **286 = 134 单文件 + 5 pkg + 147 负例**；新增 **3 单文件正例控制 + 9 负例 = 12**，现 **298/298 = 137 单文件 + 5 pkg + 156 负例**。目录数可用 `python -c` 按 `tools/selfcomp/cases/*.lom`、`pkg_cases/*` 与 `negative/*.lom` 分别计数，验收以 `python tools/verify_selfcomp.py` 输出为准。`self_comp.lom` 换行计数 **11321→11469（+148）**；`python tools/verify_selfcomp.py --bootstrap` **14/14**，新 quine **249786 bytes** 双侧逐字节一致。Rust 541 单元 + 8 集成、eval 双后端各 121/121 数量未变。
 - **存量产物对拍**：规划者组织旧编译器与 A甲新编译器在同一宿主下对 A甲前 **139** 个对拍逐份比较，输出 **IDENTICAL=139、DIFF=0、MISSING=0**；其中 v1.4.0 子集 **127/127** 全等。复现入口 `python target/r99-hex-compare/compare.py`（忽略目录证据，不进仓库）；01_arith_int 的旧/新 SHA-256 同为 `bd5d02a6764f0143892a19c249bbfec12d326bbfd2cfb232d4f19b9c87cec4e2`，101_pkg_single 同为 `2dc9025b024fa1a388bcca629f5fa969a50423b4ff146c2a98b5ba56ae992230`。
-- **新开邻近面**：`target/probes/r99_review/generic_unknown_control.lom` 中注解空 List + `list_length` 由 L2 `COMPILED 138 bytes`，hex 276 字符、转 WASM 成功，但 `WebAssembly.validate=false`，Node rc=1，报 `memory index 0 exceeds number of declared memories (0) @+127`；宿主 wasm 输出 `0`、rc=0。两执行者独立复现的 R100（P2）已入 TODO，只登记，不在 A甲内修复。R96/C甲、R97/D甲及 E甲邻近面仍待实施；仓库版本 v1.4.2 的提交/CI/tag 由规划者把关，外部发布线维持冻结。
+- **新开邻近面**：`target/probes/r99_review/generic_unknown_control.lom` 中注解空 List + `list_length` 由 L2 `COMPILED 138 bytes`，hex 276 字符、转 WASM 成功，但 `WebAssembly.validate=false`，Node rc=1，报 `memory index 0 exceeds number of declared memories (0) @+127`；宿主 wasm 输出 `0`、rc=0。两执行者独立复现的 R100（P2）已入 TODO，只登记，不在 A甲内修复。R96/C甲、R97/D甲及 E甲邻近面仍待实施；v1.4.2 的提交/CI/tag 由规划者完成，外部发布线维持冻结。
+
+## 7. B甲实施记录（2026-09-29；代码冻结，规划者全量回归/CI 待验）
+
+- **冻结代码与实际修正**：`examples/selfhost/self_comp.lom` SHA-256 `3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d`，换行计数 **11926 行**。内部 `never` 与未知泛型 `?` 分离，`vt_merge` 对不可达臂让步给可达类型；推断按真实求值顺序处理严格操作数、if/match/guard、while 条件、for 迭代器和闭包 return。发射只到首个终止子式，终止结构后补 `unreachable` 关闭验证器可见的 fallthrough；短路右侧 never 不作整个表达式无条件终止。无注解闭包形参推断的既有缺口在父 env 副本中补绑定，33/34/35 专项探针覆盖形参可见、外层同名遮蔽及捕获；新仓库负例 `neg_r95_closure_param_leak.lom` 继续锁定外层访问形参 `secret` 必须报“未定义变量 'secret'”、无 hex。混型、局部可达无值与未知泛型 return 仍严格拒，未扩语言面。R95 d1/d3 原算术误拒和 d2/直尾值坏产物本地已修；关闭待规划者门禁。
+- **计数闭合与产物**：A甲 **298 = 137 单文件 + 5 包 + 156 负例**；B甲把 9 枚 R99 安全拒负例转成合法行为对拍并删除负例，新增 **143–175 共 33 单文件对拍**，另加 6 精确拒绝负例，现 **328/328 = 170 单文件 + 5 包 + 153 负例**（`298+33−9+6=328`；新增/迁移 .lom **39 = 33 正例 + 6 负例**，examples 原 37 个有效文件 fmt 覆盖不变）。`self_comp` **11469→11926 行（+457）**；`--bootstrap` **14/14**，新强 quine **262137 bytes** 双侧逐字节一致。Rust 541 单元 + 8 集成、eval 两宿主后端各 121/121 的数量不变。
+- **存量 hex**：旧 v1.4.2 的 **142** 对拍在同一宿主下比较，`python target/r95-b-hex-compare/compare.py`（忽略目录证据）得 **140 相同 / 2 有意变化 / 0 缺**。108 旧 **299→新 300 bytes**：末位新增 `unreachable`；142 旧 **118→新 117 bytes**：死尾裁除。两例旧/新模块都可验证，stdout+rc 一致；不得笼统声称 142/142 hex 恒等。
+- **性能证据边界**：同机 N120 单次旧 3.030s、新 3.008s；早期未优化 B 探针曾 128.948s，但最终自编第①步 A甲 315.5s、B甲 328.5s。只说明该输入与该次负载下的实测，**不称全面提速**。
+- **R101 邻近面，仅开账**：审阅者对最小 `and/or` 右侧实际执行 return 两例独立复证；文档执行者用 `target/probes/r95_design/short_circuit_rhs_return_divergence.lom` 新鲜重跑四分支合成探针：宿主解释器 stdout `0/9/1/8`、rc 0；宿主 WASM 仅 stdout `0` 后 `wasm trap: unreachable`、rc 1；B甲 L2 `COMPILED 189 bytes`、hex 378 字符，Node stdout `0/9/1/8`、rc 0。`src/wasm_codegen.rs` 的 `ExprKind::Logical` 发 `if_i64`，没有像相邻 `compile_if` 一样压入 `Label::If`，return 分支 br 深度少一层。此为宿主 WASM 既有分叉，B甲不改 `src/`、不模拟 trap；正例只锁短路使右侧不执行的路径。**R101 P2 与 R100 P2 均 open，修法待用户另裁**；R96/C甲、R97/D甲、E甲尚未实施。十九审 B+ 仍只属 a697474/v1.4.1，不预评 B甲。

@@ -1,0 +1,29 @@
+fn mark(n: Int) -> Int ! [IO]
+    println(n)
+    n
+end
+
+fn sink(a: Int, b: Int) -> Int
+    a + b
+end
+
+fn g(c: Bool) -> Int ! [IO]
+    let z = mark(10) + (if c return 1 else return 2 end)
+    z
+end
+
+fn h(c: Bool) -> Int ! [IO]
+    let z = (if c return 3 else return 4 end) + mark(99)
+    z
+end
+
+fn k(c: Bool) -> Int ! [IO]
+    let z = sink(mark(20), if c return 5 else return 6 end)
+    z
+end
+
+fn main() -> Unit ! [IO]
+    println(g(True))
+    println(h(False))
+    println(k(True))
+end

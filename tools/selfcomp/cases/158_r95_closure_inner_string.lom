@@ -1,0 +1,11 @@
+fn main() -> Unit ! [IO]
+    let outer = fn(n: Int)
+        let inner = fn(m: Int)
+            let w = if m > 0 return "s" else return "t" end
+            w
+        end
+        if n > 0 return 11 else return 22 end
+    end
+    println(outer(1))
+    println(outer(-1))
+end

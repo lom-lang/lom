@@ -1,0 +1,9 @@
+from list import { list_cons, list_empty, list_length }
+
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int)
+        let w = if n > 0 return list_empty() else return list_cons(1, list_empty()) end
+        w
+    end
+    println(list_length(f(1)))
+end

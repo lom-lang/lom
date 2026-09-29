@@ -1,0 +1,11 @@
+from map import { map_empty, map_set }
+
+fn g(n: Int) -> Int
+    let m = map_empty()
+    map_set(m, "k", if n > 0 return 1 else return 2 end)
+    3
+end
+fn main() -> Unit ! [IO]
+    println(g(7))
+    println(g(0))
+end

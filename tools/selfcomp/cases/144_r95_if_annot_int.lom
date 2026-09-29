@@ -1,3 +1,4 @@
+# B甲：显式注解不能给无正常产值的 let 虚构一个 local.set。
 fn g(n: Int) -> Int
     let w: Int = if n > 100 return 1 else return 2 end
     w

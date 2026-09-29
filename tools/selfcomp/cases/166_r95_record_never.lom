@@ -1,0 +1,13 @@
+fn mark(n: Int) -> Int ! [IO]
+    println(n)
+    n
+end
+
+fn g(c: Bool) -> Int ! [IO]
+    let rec = {a: mark(40), b: if c return 5 else return 6 end}
+    rec.a
+end
+
+fn main() -> Unit ! [IO]
+    println(g(True))
+end

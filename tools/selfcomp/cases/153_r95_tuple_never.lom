@@ -1,0 +1,13 @@
+fn mark(n: Int) -> Int ! [IO]
+    println(n)
+    n
+end
+
+fn g(c: Bool) -> Int ! [IO]
+    let pair = (mark(30), if c return 7 else return 8 end)
+    pair.0
+end
+
+fn main() -> Unit ! [IO]
+    println(g(True))
+end

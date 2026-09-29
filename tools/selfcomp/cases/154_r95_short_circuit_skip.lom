@@ -1,0 +1,16 @@
+# RHS 是全终止表达式，但下列输入均由 and/or 左侧短路。
+# RHS 被执行时宿主 WASM 现有 trap 分叉另挂账，不能计作本用例对拍。
+fn test_and(c: Bool) -> Int
+    let q = c and (if c return 9 else return 8 end)
+    if q 1 else 0 end
+end
+
+fn test_or(c: Bool) -> Int
+    let q = c or (if c return 9 else return 8 end)
+    if q 1 else 0 end
+end
+
+fn main() -> Unit ! [IO]
+    println(test_and(False))
+    println(test_or(True))
+end

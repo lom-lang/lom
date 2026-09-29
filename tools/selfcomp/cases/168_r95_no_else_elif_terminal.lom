@@ -1,0 +1,10 @@
+# 前臂可产值，后续 elif 条件必终止；隐含 Unit 仍不可达。
+fn g(n: Int) -> Int
+    let w = if n > 10 100 elif (if n > 0 return 1 else return 2 end) 200 end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(20))
+    println(g(7))
+    println(g(0))
+end

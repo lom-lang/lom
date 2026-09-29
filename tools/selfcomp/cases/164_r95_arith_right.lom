@@ -1,5 +1,6 @@
 fn g(n: Int) -> Int
-    if n > 100 return 1 else return 2 end
+    let w = if n > 100 return 1 else return 2 end
+    0 + w
 end
 fn main() -> Unit ! [IO]
     println(g(200))

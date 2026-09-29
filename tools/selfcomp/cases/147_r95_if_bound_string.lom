@@ -1,3 +1,4 @@
+# B甲：String 返回路径的 never 签名与 wasm 栈效应。
 fn g(n: Int) -> String
     let w = if n > 100 return "yes" else return "no" end
     w

@@ -1,3 +1,4 @@
+# B甲：全终止 match 直接作函数尾值。
 fn g(n: Int) -> Int
     match n
         5 =>

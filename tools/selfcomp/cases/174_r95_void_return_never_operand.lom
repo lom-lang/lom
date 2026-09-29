@@ -1,0 +1,15 @@
+fn g(n: Int) -> Unit
+    return (match n
+        1 =>
+            return
+        end
+        _ =>
+            return
+        end
+    end)
+end
+fn main() -> Unit ! [IO]
+    g(1)
+    g(2)
+    println(3)
+end

@@ -1,0 +1,8 @@
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int)
+        let w = if n > 0 return 1 else return 2 end
+        w + 0
+    end
+    println(f(1))
+    println(f(-1))
+end

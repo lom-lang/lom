@@ -2821,6 +2821,13 @@ fn vt_merge(a: String, b: String) -> Result<String, String>
     if a == b
         return Ok(a)
     end
+    # B甲：never 是控制流无正常产值，独立于泛型未知 "?"。
+    if a == "never"
+        return Ok(b)
+    end
+    if b == "never"
+        return Ok(a)
+    end
     if a == "?"
         return Ok(b)
     end
@@ -3285,32 +3292,250 @@ fn sig_type_hex(sig: String) -> String
     end
 end
 
+# B甲：无注解且全终止的闭包没有普通尾值。收集所有可达 return/? 的
+# 返回类型并合流；未知泛型 ? 不能作为 call_indirect 的精确签名。
+fn ret_hint_merge(a: String, b: String) -> Result<String, String>
+    if a == ""
+        return Ok(b)
+    end
+    if b == ""
+        return Ok(a)
+    end
+    if contains(a, "?") or contains(b, "?") or a == "never" or b == "never"
+        return Err(subset_err("全终止闭包返回类型不可精确推断——需显式返回注解"))
+    end
+    vt_merge(a, b)
+end
+
+fn ret_hints_if(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match ifr
+        IfR(branches, else_b) =>
+            let mut out = ""
+            for pair in branches
+                out = ret_hint_merge(out, ret_hints_ex(pair.0, env, fns)?)?
+                if ex_no_value(pair.0)
+                    return Ok(out)
+                end
+                out = ret_hint_merge(out, ret_hints_blk(pair.1, env, fns)?)?
+            end
+            match else_b
+                None => Ok(out)
+                Some(eb) => ret_hint_merge(out, ret_hints_blk(eb, env, fns)?)
+            end
+        end
+    end
+end
+
+fn ret_hints_match(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    let mut out = ret_hints_ex(scrut, env, fns)?
+    if ex_no_value(scrut)
+        return Ok(out)
+    end
+    let svt = infer_ex(scrut, env, fns)?
+    for arm in arms
+        match arm
+            ArmR(pat, guard, body) =>
+                let arm_env = copy_bindings(env)
+                pattern_types(pat, svt, arm_env, fns)?
+                let mut guard_never = False
+                match guard
+                    None => ()
+                    Some(g) =>
+                        out = ret_hint_merge(out, ret_hints_ex(g, arm_env, fns)?)?
+                        if ex_no_value(g)
+                            guard_never = True
+                        end
+                    end
+                end
+                if !guard_never
+                    match body
+                        ABExpr(e) =>
+                            out = ret_hint_merge(out, ret_hints_ex(e, arm_env, fns)?)?
+                        end
+                        ABBlock(b) =>
+                            out = ret_hint_merge(out, ret_hints_blk(b, arm_env, fns)?)?
+                        end
+                    end
+                end
+            end
+        end
+    end
+    Ok(out)
+end
+
+fn ret_hints_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match e
+        ExGroup(inner) => ret_hints_ex(inner, env, fns)
+        ExUnary(_, inner) => ret_hints_ex(inner, env, fns)
+        ExField(inner, _) => ret_hints_ex(inner, env, fns)
+        ExIf(ifr) => ret_hints_if(ifr, env, fns)
+        ExMatch(scrut, arms, _) => ret_hints_match(scrut, arms, env, fns)
+        ExBinary(_, l, r) =>
+            let out = ret_hints_ex(l, env, fns)?
+            if ex_no_value(l)
+                return Ok(out)
+            end
+            ret_hint_merge(out, ret_hints_ex(r, env, fns)?)
+        end
+        ExLogical(_, l, r) =>
+            let out = ret_hints_ex(l, env, fns)?
+            if ex_no_value(l)
+                return Ok(out)
+            end
+            ret_hint_merge(out, ret_hints_ex(r, env, fns)?)
+        end
+        ExCall(callee, args) =>
+            let mut out = ""
+            for a in args
+                out = ret_hint_merge(out, ret_hints_ex(a, env, fns)?)?
+                if ex_no_value(a)
+                    return Ok(out)
+                end
+            end
+            ret_hint_merge(out, ret_hints_ex(callee, env, fns)?)
+        end
+        ExIndex(l, r) => ret_hint_merge(ret_hints_ex(l, env, fns)?, ret_hints_ex(r, env, fns)?)
+        ExPipe(l, r) => ret_hint_merge(ret_hints_ex(l, env, fns)?, ret_hints_ex(r, env, fns)?)
+        ExRange(l, r) => ret_hint_merge(ret_hints_ex(l, env, fns)?, ret_hints_ex(r, env, fns)?)
+        ExTry(inner) =>
+            let out = ret_hints_ex(inner, env, fns)?
+            if ex_no_value(inner)
+                return Ok(out)
+            end
+            let t = infer_ex(inner, env, fns)?
+            let _ = try_parts(t)?
+            ret_hint_merge(out, t)
+        end
+        ExRecord(fields) =>
+            let mut out = ""
+            for pair in fields
+                out = ret_hint_merge(out, ret_hints_ex(pair.1, env, fns)?)?
+                if ex_no_value(pair.1)
+                    return Ok(out)
+                end
+            end
+            Ok(out)
+        end
+        ExTuple(elems) =>
+            let mut out = ""
+            for el in elems
+                out = ret_hint_merge(out, ret_hints_ex(el, env, fns)?)?
+                if ex_no_value(el)
+                    return Ok(out)
+                end
+            end
+            Ok(out)
+        end
+        # 闭包字面量不执行自己的 body；其 return 不属于外层函数。
+        _ => Ok("")
+    end
+end
+
+fn ret_hints_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match s
+        StReturn(opt) =>
+            match opt
+                None => Ok("void")
+                Some(e) =>
+                    let out = ret_hints_ex(e, env, fns)?
+                    if ex_no_value(e)
+                        return Ok(out)
+                    end
+                    ret_hint_merge(out, infer_ex(e, env, fns)?)
+                end
+            end
+        end
+        StLet(_, name, tyo, e) =>
+            let out = ret_hints_ex(e, env, fns)?
+            if ex_no_value(e)
+                return Ok(out)
+            end
+            let vt = let_vt(tyo, e, env, fns)?
+            let sig = if vt == "cl" ex_sig(e, env, fns)? else "" end
+            map_set(env, name, {slot: 0, vt: vt, sig: sig, cap: False})
+            Ok(out)
+        end
+        StAssign(_, _, _, e) => ret_hints_ex(e, env, fns)
+        StExpr(e) => ret_hints_ex(e, env, fns)
+        StIf(ifr) => ret_hints_if(ifr, env, fns)
+        StWhile(cond, body) => ret_hint_merge(ret_hints_ex(cond, env, fns)?, ret_hints_blk(body, env, fns)?)
+        StFor(var, iter, body) =>
+            let out = ret_hints_ex(iter, env, fns)?
+            if ex_no_value(iter)
+                return Ok(out)
+            end
+            let it = infer_ex(iter, env, fns)?
+            let iv = if ls_vt(it) ls_inner(it) elif it == "st" "st" else "i64" end
+            let loop_env = copy_bindings(env)
+            map_set(loop_env, var, {slot: 0, vt: iv, sig: "", cap: False})
+            ret_hint_merge(out, ret_hints_blk(body, loop_env, fns)?)
+        end
+        StDestruct(_, _) => Err(subset_err("全终止闭包含未支持解构，返回类型不可精确推断"))
+        StHole(_, _) => Err(subset_err("全终止闭包含代码洞，返回类型不可精确推断"))
+    end
+end
+
+fn ret_hints_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    match b
+        BlkOf(stmts, tail) =>
+            let block_env = copy_bindings(env)
+            let mut out = ""
+            for s in stmts
+                out = ret_hint_merge(out, ret_hints_stmt(s, block_env, fns)?)?
+                if st_no_value(s)
+                    return Ok(out)
+                end
+            end
+            match tail
+                None => Ok(out)
+                Some(te) => ret_hint_merge(out, ret_hints_ex(te, block_env, fns)?)
+            end
+        end
+    end
+end
+
 # 闭包返回段综合：reto Some → ty_vt（Fn 拒）；None → 体尾 ex_rv（嵌套闭包
 # 递归编码）。env' = 闭包参数 + 捕获绑定（由调用方构造——compile_closure
 # 的 caps 或外层上下文）。
 fn closure_rv(reto: Option<Ty>, body: Blk, env2: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     match reto
         Some(t) => ty_vt(t, fns)
-        None => blk_rv(body, env2, fns)
+        None =>
+            let rv = blk_rv(body, env2, fns)?
+            if rv == "never"
+                let inferred = ret_hints_blk(body, env2, fns)?
+                if inferred == "" or inferred == "never" or contains(inferred, "?")
+                    return Err(subset_err("全终止闭包返回类型不可精确推断——需显式返回注解"))
+                end
+                return Ok(inferred)
+            end
+            Ok(rv)
+        end
     end
 end
 
 # 闭包完整签名：ps（参数 vt 逗号串）+ "@" + rv
 fn closure_sig(params: List<Prm>, reto: Option<Ty>, body: Blk, env2: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     let mut ps = ""
+    # ex_sig 在闭包创建点调用此函数时，传入的是父 env；类型综合必须
+    # 另建体环境并绑定本闭包形参。compile_closure 传来的 env2 已含形参，
+    # 拷贝后同型覆盖不改变其真实槽位/捕获发射。
+    let hint_env = copy_bindings(env2)
     let mut k = 0
     for p in params
         match p
-            Prm(_, pt) =>
+            Prm(pn, pt) =>
                 if k > 0
                     ps = ps + ","
                 end
-                ps = ps + ty_vt(pt, fns)?
+                let pvt = ty_vt(pt, fns)?
+                ps = ps + pvt
+                map_set(hint_env, pn, {slot: 0, vt: pvt, sig: "", cap: False})
             end
         end
         k = k + 1
     end
-    let rv = closure_rv(reto, body, env2, fns)?
+    let rv = closure_rv(reto, body, hint_env, fns)?
     Ok(mk_sig(ps, rv))
 end
 
@@ -3688,6 +3913,9 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
 end
 
 fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if ex_no_value(e)
+        return Ok("never")
+    end
     match e
         ExClosure(params, reto, body) =>
             let s = closure_sig(params, reto, body, env, fns)?
@@ -3756,7 +3984,7 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                         None =>
                             for pair in branches
                                 let br = blk_rv(pair.1, env, fns)?
-                                if br != "void"
+                                if br != "void" and br != "never"
                                     return Err(subset_err("非 void 语境的 if 必须带 else（分支返回 '" + br + "'）"))
                                 end
                             end
@@ -3792,6 +4020,9 @@ end
 
 # 块的返回段（尾表达式 ex_rv；无尾 = void）
 fn blk_rv(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if blk_no_value(b)
+        return Ok("never")
+    end
     match b
         BlkOf(stmts, tail) =>
             let block_env = copy_bindings(env)
@@ -3918,6 +4149,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             if op == "Not"
                 # L2.3-a：! 综合 Bool（操作数须 Bool）
                 let it = infer_ex(inner, env, fns)?
+                if it == "never"
+                    return Ok("never")
+                end
                 if it != "i32"
                     return Err(subset_err("逻辑非操作数须为 Bool"))
                 end
@@ -3928,6 +4162,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             end
             # 闭包与枚举裸指针不参与一元负。
             let itn = infer_ex(inner, env, fns)?
+            if itn == "never"
+                return Ok("never")
+            end
             if itn == "cl" or enum_vt(itn) or itn == "st" or mp_vt(itn)
                 return Err(subset_err("闭包/枚举/String/Map 值参与一元负"))
             end
@@ -3949,7 +4186,13 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 # L2.3-a：比较运算产 Bool（i32）——操作数 void/cl 拒绝，
                 # Int/Float 混合按宿主提升语义比较
                 let lt = infer_ex(l, env, fns)?
+                if lt == "never"
+                    return Ok("never")
+                end
                 let rt = infer_ex(r, env, fns)?
+                if rt == "never"
+                    return Ok("never")
+                end
                 if lt == "void" or rt == "void"
                     return Err(subset_err("void 参与比较"))
                 end
@@ -4005,7 +4248,13 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 return Err(subset_err("二元运算 '" + op + "'"))
             end
             let lt = infer_ex(l, env, fns)?
+            if lt == "never"
+                return Ok("never")
+            end
             let rt = infer_ex(r, env, fns)?
+            if rt == "never"
+                return Ok("never")
+            end
             if op == "Add" and (lt == "st" or rt == "st")
                 # 拼接提升（v0.4.1 宿主语义）：任一侧 String → 两侧 to_display
                 # 后拼接。容器显示批（designs/0011 §8.3）：cl/en/ls/mp/rc/tp
@@ -4050,8 +4299,11 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
         ExLogical(_, l, r) =>
             # L2.3-a：and/or 短路——操作数须 Bool（宿主静态口径对齐）
             let lt = infer_ex(l, env, fns)?
+            if lt == "never"
+                return Ok("never")
+            end
             let rt = infer_ex(r, env, fns)?
-            if lt != "i32" or rt != "i32"
+            if lt != "i32" or (rt != "i32" and rt != "never")
                 return Err(subset_err("逻辑运算操作数须为 Bool"))
             end
             Ok("i32")
@@ -4062,6 +4314,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             # L2.3 return 收官批（designs/0009 §6.2）：操作数须 Result/Option
             # 族（校验 #1），产出 Ok/Some 载荷 vt
             let t = infer_ex(inner, env, fns)?
+            if t == "never"
+                return Ok("never")
+            end
             let parts = try_parts(t)?
             Ok(parts.ok_vt)
         end
@@ -4069,7 +4324,13 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             # L2.3 List 批：a..b → ls{i64}（左闭右开）；两端须 Int
             # （宿主 TYPE001 warning 的编译期严格化——R68 同族）
             let lt = infer_ex(a, env, fns)?
+            if lt == "never"
+                return Ok("never")
+            end
             let rt = infer_ex(b, env, fns)?
+            if rt == "never"
+                return Ok("never")
+            end
             if lt != "i64" or rt != "i64"
                 return Err(subset_err("range 两端须为 Int（得到 '" + lt + "' 与 '" + rt + "'）"))
             end
@@ -4084,6 +4345,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             # （未知字段名编译期拒——校验 #2）；tp{...} 按位置（parser 产
             # ExField(name="N") 数字串形态；越界拒——校验 #3）
             let it = infer_ex(inner, env, fns)?
+            if it == "never"
+                return Ok("never")
+            end
             if it == "js"
                 Ok("js")
             else
@@ -4094,9 +4358,17 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
                 end
             end
         end
-        ExCall(callee, _) =>
+        ExCall(callee, args) =>
             # L2.3-b：统一走 ex_rv（直调 println/fns → ret；闭包调用 → 被调
             # rv 段；任意 callee 同口径）——返回段 → vt
+            for arg in args
+                if infer_ex(arg, env, fns)? == "never"
+                    return Ok("never")
+                end
+            end
+            if ex_no_value(callee)
+                return Ok("never")
+            end
             let rv = ex_rv(e, env, fns)?
             Ok(rv_vt(rv))
         end
@@ -4107,6 +4379,9 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             let mut fvt = list_empty()
             for pair in fields
                 let vt = infer_ex(pair.1, env, fns)?
+                if vt == "never"
+                    return Ok("never")
+                end
                 if vt == "void"
                     return Err(subset_err("record 字段 '" + pair.0 + "' 不能为 void 值"))
                 end
@@ -4119,12 +4394,22 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
             let mut evt = list_empty()
             for el in elems
                 let vt = infer_ex(el, env, fns)?
+                if vt == "never"
+                    return Ok("never")
+                end
                 if vt == "void"
                     return Err(subset_err("tuple 元素不能为 void 值"))
                 end
                 evt = list_cons(vt, evt)
             end
             Ok(tp_vt_make(rev_str(evt)))
+        end
+        ExIndex(a, b) =>
+            if infer_ex(a, env, fns)? == "never" or infer_ex(b, env, fns)? == "never"
+                Ok("never")
+            else
+                Err(subset_err("该表达式形态"))
+            end
         end
         _ => Err(subset_err("该表达式形态"))
     end
@@ -4139,18 +4424,21 @@ fn if_no_value(ifr: IfR) -> Bool
             if list_length(branches) == 0
                 return False
             end
+            let mut prior_arms_never = True
+            for pair in branches
+                # 条件按源序求值；该条件必终止时，后续臂与隐含 Unit
+                # 路径均不可达。此前任一可达臂产值则整体仍可产值。
+                if ex_no_value(pair.0)
+                    return prior_arms_never
+                end
+                if !blk_no_value(pair.1)
+                    prior_arms_never = False
+                end
+            end
             match else_b
                 None => False
                 Some(eb) =>
-                    if !blk_no_value(eb)
-                        return False
-                    end
-                    for pair in branches
-                        if !blk_no_value(pair.1)
-                            return False
-                        end
-                    end
-                    True
+                    prior_arms_never and blk_no_value(eb)
                 end
             end
         end
@@ -4170,8 +4458,12 @@ fn match_no_value(arms: List<ArmR>) -> Bool
     end
     for arm in arms
         match arm
-            ArmR(_, _, body) =>
-                if !arm_no_value(body)
+            ArmR(_, guard, body) =>
+                let guard_never = match guard
+                    None => False
+                    Some(g) => ex_no_value(g)
+                end
+                if !guard_never and !arm_no_value(body)
                     return False
                 end
             end
@@ -4262,17 +4554,43 @@ end
 # 得 Unit"的渐进式语义收紧为编译期一致，非 void 值语境必须写全 else）。
 fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if if_no_value(ifr)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+        return Ok("never")
     end
     match ifr
         IfR(branches, else_b) =>
+            # 若某个 elif 条件必终止，只有它之前的臂可能产值；此条件
+            # 之后的臂/else 与无 else 时的隐含 Unit 路径均不可达。
+            let mut stop = -1
+            let mut ci = 0
+            while ci < list_length(branches) and stop < 0
+                if ex_no_value(list_get(branches, ci).0)
+                    stop = ci
+                end
+                ci = ci + 1
+            end
+            if stop >= 0
+                let mut reachable = "never"
+                let mut bi = 0
+                while bi < stop
+                    let bt = blk_val_ty(list_get(branches, bi).1, env, fns)?
+                    let merged = match vt_merge(reachable, bt)
+                        Ok(vt) => vt
+                        Err(_) => ""
+                    end
+                    if merged == ""
+                        return Err(subset_err("if 表达式各分支值类型不一致"))
+                    end
+                    reachable = merged
+                    bi = bi + 1
+                end
+                return Ok(reachable)
+            end
             match else_b
                 None =>
                     for pair in branches
                         let bt = blk_val_ty(pair.1, env, fns)?
-                        # L2.4 补支持（自举闸门 9 附面）：return 终止臂（"?"
-                        # bottom）的语句位 if 无 else 放行——值语境不可达
-                        if bt != "void" and bt != "?"
+                        # return 终止臂无正常产值；无 else 的假路径仍产 void。
+                        if bt != "void" and bt != "never"
                             return Err(subset_err("非 void 语境的 if 必须带 else（分支值类型 '" + bt + "'）"))
                         end
                     end
@@ -4388,32 +4706,15 @@ end
 
 # 块的值类型：临时块作用域先综合本块 let，再综合尾表达式；无尾 → void。
 fn blk_val_ty(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if blk_no_value(b)
+        return Ok("never")
+    end
     match b
         BlkOf(stmts, tail) =>
             let block_env = copy_bindings(env)
             scan_block_lets(stmts, block_env, fns, "")?
             match tail
-                None =>
-                    # L2.4 补支持（自举闸门 9）：无尾块以 return 语句终止
-                    # → bottom（"?" 占位）——与对侧类型经 vt_merge 既有 ?
-                    # 让步合流取对方（宿主语义：return 臂不产生值；发射路
-                    # return 语句经 cg.cgh "cret" 直发 return 指令，wasm
-                    # unreachable 后栈免检——宿主编译 self_comp 的同形态
-                    # 先例）。仅末位语句判定（return 后代码不可达不写）。
-                    if list_length(stmts) > 0
-                        let term = match list_get(stmts, list_length(stmts) - 1)
-                            StReturn(_) => True
-                            _ => False
-                        end
-                        if term
-                            Ok("?")
-                        else
-                            Ok("void")
-                        end
-                    else
-                        Ok("void")
-                    end
-                end
+                None => Ok("void")
                 Some(te) => infer_ex(te, block_env, fns)
             end
         end
@@ -4518,32 +4819,15 @@ end
 # Form B 臂的尾表达式可读取臂内 let；先在拷贝作用域上做类型走查，
 # 再由 comp_val_blk 真正发射语句，不让类型预扫改变外层 env。
 fn match_block_type(b: Blk, arm_env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if blk_no_value(b)
+        return Ok("never")
+    end
     match b
         BlkOf(stmts, tail) =>
             let block_env = copy_bindings(arm_env)
             scan_block_lets(stmts, block_env, fns, "match 臂内 ")?
             match tail
-                None =>
-                    # L2.4 补支持（自举闸门 9）：无尾块以 return 语句终止
-                    # → bottom（"?" 占位）——与对侧类型经 vt_merge 既有 ?
-                    # 让步合流取对方（宿主语义：return 臂不产生值；发射路
-                    # return 语句经 cg.cgh "cret" 直发 return 指令，wasm
-                    # unreachable 后栈免检——宿主编译 self_comp 的同形态
-                    # 先例）。仅末位语句判定（return 后代码不可达不写）。
-                    if list_length(stmts) > 0
-                        let term = match list_get(stmts, list_length(stmts) - 1)
-                            StReturn(_) => True
-                            _ => False
-                        end
-                        if term
-                            Ok("?")
-                        else
-                            Ok("void")
-                        end
-                    else
-                        Ok("void")
-                    end
-                end
+                None => Ok("void")
                 Some(te) => infer_ex(te, block_env, fns)
             end
         end
@@ -4559,7 +4843,7 @@ end
 
 fn infer_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if ex_no_value(scrut) or match_no_value(arms)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+        return Ok("never")
     end
     let svt = infer_ex(scrut, env, fns)?
     if svt == "void" or svt == "cl"
@@ -4572,16 +4856,21 @@ fn infer_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt
             ArmR(pat, guard, body) =>
                 let arm_env = copy_bindings(env)
                 pattern_types(pat, svt, arm_env, fns)?
+                let mut guard_never = False
                 match guard
                     None => ()
                     Some(g) =>
-                        let gt = infer_ex(g, arm_env, fns)?
-                        if gt != "i32"
-                            return Err(subset_err("match guard 须为 Bool（得到 '" + gt + "'）"))
+                        if ex_no_value(g)
+                            guard_never = True
+                        else
+                            let gt = infer_ex(g, arm_env, fns)?
+                            if gt != "i32"
+                                return Err(subset_err("match guard 须为 Bool（得到 '" + gt + "'）"))
+                            end
                         end
                     end
                 end
-                let bt = match_arm_type(body, arm_env, fns)?
+                let bt = if guard_never "never" else match_arm_type(body, arm_env, fns)? end
                 if first
                     out = bt
                     first = False
@@ -4609,10 +4898,69 @@ end
 
 # ---- X2：表达式编译（产物 hex；值留栈上；void 不产值） ----
 
-fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
-    if ex_no_value(e)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+fn comp_strict_never(l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    let lc = comp_ex(l, env, fns, cg, locals, localvt)?
+    if ex_no_value(l)
+        return Ok(lc)
     end
+    # 左值按原求值序执行；右侧提前 return，故不发运算 opcode。
+    Ok(lc + comp_ex(r, env, fns, cg, locals, localvt)?)
+end
+
+# B甲：严格求值表达式只发到首个无后继子式；其 code 末位带 wasm
+# unreachable（if/match 全终止块后补 00），先前栈值在该帧内变为多态。
+# and/or 右侧不在此路：短路时它可能根本不求值。
+fn comp_never_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    match e
+        ExGroup(inner) => comp_ex(inner, env, fns, cg, locals, localvt)
+        ExIf(ifr) => comp_if_expr(ifr, env, fns, cg, locals, localvt)
+        ExMatch(scrut, arms, _) => comp_match_expr(scrut, arms, env, fns, cg, locals, localvt)
+        ExUnary(_, inner) => comp_ex(inner, env, fns, cg, locals, localvt)
+        ExBinary(_, l, r) => comp_strict_never(l, r, env, fns, cg, locals, localvt)
+        ExLogical(_, l, _) => comp_ex(l, env, fns, cg, locals, localvt)
+        ExCall(callee, args) =>
+            let mut out = ""
+            # 对齐解释器/emit_closure_call：先求实参，再求被调值。
+            for a in args
+                out = out + comp_ex(a, env, fns, cg, locals, localvt)?
+                if ex_no_value(a)
+                    return Ok(out)
+                end
+            end
+            if ex_no_value(callee)
+                return Ok(out + comp_ex(callee, env, fns, cg, locals, localvt)?)
+            end
+            Err("内部错误：无后继调用缺终止子式")
+        end
+        ExIndex(l, r) => comp_strict_never(l, r, env, fns, cg, locals, localvt)
+        ExField(inner, _) => comp_ex(inner, env, fns, cg, locals, localvt)
+        ExTry(inner) => comp_ex(inner, env, fns, cg, locals, localvt)
+        ExRange(l, r) => comp_strict_never(l, r, env, fns, cg, locals, localvt)
+        ExRecord(fields) =>
+            let mut out = ""
+            for pair in fields
+                out = out + comp_ex(pair.1, env, fns, cg, locals, localvt)?
+                if ex_no_value(pair.1)
+                    return Ok(out)
+                end
+            end
+            Err("内部错误：无后继 record 缺终止字段")
+        end
+        ExTuple(elems) =>
+            let mut out = ""
+            for el in elems
+                out = out + comp_ex(el, env, fns, cg, locals, localvt)?
+                if ex_no_value(el)
+                    return Ok(out)
+                end
+            end
+            Err("内部错误：无后继 tuple 缺终止元素")
+        end
+        _ => Err(subset_err("该无后继表达式形态暂不支持发射"))
+    end
+end
+
+fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
     match e
         ExInt(n) => Ok("42" + sleb128_hex(n))
         ExFloat(s) => Ok("44" + f64_bits_le(parse_float_str(s)))
@@ -4663,6 +5011,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             if op == "Not"
                 # L2.3-a：! = i32.eqz（操作数须 Bool）
                 let it = infer_ex(inner, env, fns)?
+                if it == "never"
+                    return comp_ex(inner, env, fns, cg, locals, localvt)
+                end
                 if it != "i32"
                     return Err(subset_err("逻辑非操作数须为 Bool"))
                 end
@@ -4672,6 +5023,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
                 return Err(subset_err("一元运算 '" + op + "'"))
             end
             let it = infer_ex(inner, env, fns)?
+            if it == "never"
+                return comp_ex(inner, env, fns, cg, locals, localvt)
+            end
             if it == "i32"
                 return Err(subset_err("Bool 参与一元负"))
             end
@@ -4700,6 +5054,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             # 返回。return 后 unreachable，else 臂按 wasm 规范豁免
             # (result bt) 栈匹配（Node 实测见 designs/0009 §11-2）。
             let t = infer_ex(inner, env, fns)?
+            if t == "never"
+                return comp_ex(inner, env, fns, cg, locals, localvt)
+            end
             let parts = try_parts(t)?
             # 上下文校验（裁决 3 甲，校验 #2）：所在函数返回 vt 须同族且
             # Err 载荷相容——宿主仅查族（渐进式 warning），L2 严格查载荷
@@ -4748,6 +5105,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
         end
         ExRange(a, b) =>
             # L2.3 List 批：call rt_ls_range（infer 已保证两端 i64）
+            if infer_ex(a, env, fns)? == "never" or infer_ex(b, env, fns)? == "never"
+                return comp_strict_never(a, b, env, fns, cg, locals, localvt)
+            end
             let _ = need_heap(cg)?
             let idx = ensure_ls_helper("ls_range", cg)?
             let ac = comp_ex(a, env, fns, cg, locals, localvt)?
@@ -4763,6 +5123,9 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             # 读取（untagged 静态类型：名字/位置 → 序号 → 4+8*idx 偏移 +
             # 宽度补码；类型校验在 infer_ex 层完成——此处仅发射）
             let it = infer_ex(inner, env, fns)?
+            if it == "never"
+                return comp_ex(inner, env, fns, cg, locals, localvt)
+            end
             if it == "js"
                 let base = comp_ex(inner, env, fns, cg, locals, localvt)?
                 let key_off = intern_str_lit(fname, cg)
@@ -4789,7 +5152,11 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             let n = list_length(fields)
             let mut fvts = list_empty()
             for pair in fields
-                fvts = list_cons(infer_ex(pair.1, env, fns)?, fvts)
+                let vt = infer_ex(pair.1, env, fns)?
+                if vt == "never"
+                    return comp_never_ex(e, env, fns, cg, locals, localvt)
+                end
+                fvts = list_cons(vt, fvts)
             end
             let fvtl = rev_str(fvts)
             let mut out = ""
@@ -4820,7 +5187,11 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             let n = list_length(elems)
             let mut evts = list_empty()
             for el in elems
-                evts = list_cons(infer_ex(el, env, fns)?, evts)
+                let vt = infer_ex(el, env, fns)?
+                if vt == "never"
+                    return comp_never_ex(e, env, fns, cg, locals, localvt)
+                end
+                evts = list_cons(vt, evts)
             end
             let evtl = rev_str(evts)
             let mut out = ""
@@ -4845,6 +5216,13 @@ fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Boo
             end
             Ok(out + "20" + leb128_hex(p) + "ad")
         end
+        ExIndex(l, r) =>
+            if infer_ex(l, env, fns)? == "never" or infer_ex(r, env, fns)? == "never"
+                comp_strict_never(l, r, env, fns, cg, locals, localvt)
+            else
+                Err(subset_err("该表达式形态"))
+            end
+        end
         _ => Err(subset_err("该表达式形态"))
     end
 end
@@ -4852,6 +5230,9 @@ end
 # L2.3-a：and/or 短路编译——if (result i32) 结构保证右侧仅在必要时求值
 # （宿主 WASM 后端同为短路；and：左假产 0 不看右；or：左真产 1 不看右）
 fn comp_logical(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if infer_ex(l, env, fns)? == "never"
+        return comp_ex(l, env, fns, cg, locals, localvt)
+    end
     let lc = comp_ex(l, env, fns, cg, locals, localvt)?
     let rc = comp_ex(r, env, fns, cg, locals, localvt)?
     if op == "And"
@@ -5010,10 +5391,16 @@ fn f64_cmp_op(op: String) -> Result<String, String>
 end
 
 fn comp_binary(op: String, l: Ex, r: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
-    # 发射前先走完整类型校验；非法 Bool 组合不得流入 f64 opcode。
-    let _ = infer_ex(ExBinary(op, l, r), env, fns)?
     let left_vt = infer_ex(l, env, fns)?
+    if left_vt == "never"
+        return comp_ex(l, env, fns, cg, locals, localvt)
+    end
     let right_vt = infer_ex(r, env, fns)?
+    if right_vt == "never"
+        return comp_strict_never(l, r, env, fns, cg, locals, localvt)
+    end
+    # 正常路径发射前仍走完整类型校验；非法 Bool 不得流入 f64 opcode。
+    let _ = infer_ex(ExBinary(op, l, r), env, fns)?
     # 容器显示批（designs/0011 §8.3）：拼接提升（Add + st 侧）的枚举侧
     # 解禁——豁免本防御臂走拼接路径；非拼接算术/比较维持拒
     if (enum_vt(left_vt) or enum_vt(right_vt)) and (op != "Add" or (left_vt != "st" and right_vt != "st"))
@@ -5248,8 +5635,8 @@ fn comp_match_arm_body(body: ArmB, arm_env: Map<String, {slot: Int, vt: String, 
 end
 
 fn comp_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
-    if ex_no_value(scrut) or match_no_value(arms)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    if ex_no_value(scrut)
+        return comp_ex(scrut, env, fns, cg, locals, localvt)
     end
     let result_vt = infer_match_expr(scrut, arms, env, fns)?
     let svt = infer_ex(scrut, env, fns)?
@@ -5267,12 +5654,16 @@ fn comp_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt:
                         out = out + comp_match_arm_body(body, arm_env, fns, cg, locals, localvt)? + "0c01"
                     end
                     Some(g) =>
-                        let gt = infer_ex(g, arm_env, fns)?
-                        if gt != "i32"
-                            return Err(subset_err("match guard 须为 Bool"))
+                        if ex_no_value(g)
+                            out = out + comp_ex(g, arm_env, fns, cg, locals, localvt)?
+                        else
+                            let gt = infer_ex(g, arm_env, fns)?
+                            if gt != "i32"
+                                return Err(subset_err("match guard 须为 Bool"))
+                            end
+                            out = out + comp_ex(g, arm_env, fns, cg, locals, localvt)? + "0440"
+                            out = out + comp_match_arm_body(body, arm_env, fns, cg, locals, localvt)? + "0c02" + "0b"
                         end
-                        out = out + comp_ex(g, arm_env, fns, cg, locals, localvt)? + "0440"
-                        out = out + comp_match_arm_body(body, arm_env, fns, cg, locals, localvt)? + "0c02" + "0b"
                     end
                 end
                 out = out + "0b"
@@ -5280,10 +5671,25 @@ fn comp_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt:
         end
     end
     # 宿主无匹配臂时运行时错误；L2 对齐为 trap，不默默造默认值。
-    Ok(out + "00" + "0b")
+    let finished = out + "00" + "0b"
+    if result_vt == "never"
+        # wasm block(void) 的 end 在验证器眼中仍可 fallthrough，显式封口。
+        Ok(finished + "00")
+    else
+        Ok(finished)
+    end
 end
 
 fn comp_call(callee: Ex, args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    # 调用求值序：实参先于 callee；遇 never 不发 arity/调用指令。
+    for arg in args
+        if infer_ex(arg, env, fns)? == "never"
+            return comp_never_ex(ExCall(callee, args), env, fns, cg, locals, localvt)
+        end
+    end
+    if ex_no_value(callee)
+        return comp_never_ex(ExCall(callee, args), env, fns, cg, locals, localvt)
+    end
     match callee
         ExIdent(name, _, _) =>
             if map_has(env, name) == False and map_has(fns, "@variant:" + name)
@@ -9238,7 +9644,7 @@ end
 # 运行时值胜出"的渐进式语义是已登记的信任边界差异（RFC-0004 修订 4）。
 fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
     if ex_no_value(ex)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+        return Ok("never")
     end
     match tyo
         None => infer_ex(ex, env, fns)
@@ -9260,6 +9666,10 @@ end
 fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match s
         StLet(_, name, tyo, ex) =>
+            if ex_no_value(ex)
+                # 初始化器终止，let 永不绑定；不声明 local，也不发 local.set。
+                return comp_ex(ex, env, fns, cg, locals, localvt)
+            end
             match ex
                 ExClosure(params, reto, body) =>
                     # L2.3-b 递归闭包特判（宿主 compile_stmt StLet 同款）：
@@ -9302,6 +9712,9 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
             Ok(code + "21" + leb128_hex(slot))
         end
         StAssign(name, _, _, ex) =>
+            if ex_no_value(ex)
+                return comp_ex(ex, env, fns, cg, locals, localvt)
+            end
             match map_get(env, name)
                 None => Err("赋值给未定义变量 '" + name + "'")
                 Some(bnd) =>
@@ -9333,12 +9746,15 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
         end
         StExpr(ex) =>
             let t = infer_ex(ex, env, fns)?
+            if t == "never"
+                return comp_ex(ex, env, fns, cg, locals, localvt)
+            end
             # L2.3 Map 批：map_set 语句的 mp{?} 绑定细化（真实发射路——
             # 与 scan_block_lets 预扫路同步，防类型分叉）；let 绑定形态
             # （裸 f(...)? 语句的解析边角规避，scan 侧同）
             let rms_r = refine_map_set(ex, env, fns)?
             let code = comp_ex(ex, env, fns, cg, locals, localvt)?
-            if t == "void"
+            if t == "void" or t == "never"
                 Ok(code)
             else
                 Ok(code + "1a")
@@ -9368,6 +9784,9 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
                     Ok("0f")
                 end
                 Some(e) =>
+                    if ex_no_value(e)
+                        return comp_ex(e, env, fns, cg, locals, localvt)
+                    end
                     if cret == "void"
                         return Err(subset_err("void 函数的 return 不能带值——宿主 TYPE010 warning 面，L2 编译期拒"))
                     end
@@ -9385,13 +9804,24 @@ fn comp_one_stmt(s: St, env: Map<String, {slot: Int, vt: String, sig: String, ca
 end
 
 # 编译块：语句（值丢弃：非 void 的裸表达式 drop）+ 尾表达式（= 返回值）
+fn finish_dead_stmt(out: String, s: St) -> String
+    match s
+        StReturn(_) => out
+        _ => out + "00"
+    end
+end
+
 fn comp_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
     match b
         BlkOf(stmts, tail) =>
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                out = out + comp_one_stmt(list_get(stmts, si), env, fns, cg, locals, localvt, ret_vt)?
+                let s = list_get(stmts, si)
+                out = out + comp_one_stmt(s, env, fns, cg, locals, localvt, ret_vt)?
+                if st_no_value(s)
+                    return Ok(finish_dead_stmt(out, s))
+                end
                 si = si + 1
             end
             comp_tail(tail, env, fns, cg, out, ret_vt, locals, localvt)
@@ -9409,7 +9839,11 @@ fn comp_stmt_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, c
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                out = out + comp_one_stmt(list_get(stmts, si), block_env, fns, cg, locals, localvt, ret_vt)?
+                let s = list_get(stmts, si)
+                out = out + comp_one_stmt(s, block_env, fns, cg, locals, localvt, ret_vt)?
+                if st_no_value(s)
+                    return Ok(finish_dead_stmt(out, s))
+                end
                 si = si + 1
             end
             match tail
@@ -9419,12 +9853,17 @@ fn comp_stmt_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, c
                         ExIf(ifr) =>
                             # L2.3-a：语句体块尾的 if——按语句执行（分支值
                             # 丢弃），走 comp_if_stmt 的 void 形态
-                            Ok(out + comp_if_stmt(ifr, block_env, fns, cg, locals, localvt, ret_vt)?)
+                            let code = comp_if_stmt(ifr, block_env, fns, cg, locals, localvt, ret_vt)?
+                            if if_no_value(ifr)
+                                Ok(out + code + "00")
+                            else
+                                Ok(out + code)
+                            end
                         end
                         _ =>
                             let tt = infer_ex(te, block_env, fns)?
                             let code = comp_ex(te, block_env, fns, cg, locals, localvt)?
-                            if tt == "void"
+                            if tt == "void" or tt == "never"
                                 Ok(out + code)
                             else
                                 Ok(out + code + "1a")
@@ -9455,6 +9894,9 @@ fn comp_if_from(branches: List<(Ex, Blk)>, else_b: Option<Blk>, bi: Int, env: Ma
         end
     else
         let pair = list_get(branches, bi)
+        if ex_no_value(pair.0)
+            return comp_ex(pair.0, env, fns, cg, locals, localvt)
+        end
         let ct = infer_ex(pair.0, env, fns)?
         if ct != "i32"
             return Err(subset_err("if 条件须为 Bool（得到 '" + ct + "'）"))
@@ -9469,14 +9911,16 @@ end
 # L2.3-a：块尾 if 表达式编译——(result bt) 形态产值；bt 由综合类型定。
 # 分支体产值（comp_val_blk：语句照常 + 尾值留栈；void 分支不产值）。
 fn comp_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
-    if if_no_value(ifr)
-        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
-    end
     match ifr
         IfR(branches, else_b) =>
             let t = infer_if_expr(ifr, env, fns)?
             let bt = vt_bt(t)
-            comp_if_expr_from(branches, else_b, bt, 0, env, fns, cg, locals, localvt)
+            let code = comp_if_expr_from(branches, else_b, bt, 0, env, fns, cg, locals, localvt)?
+            if t == "never"
+                Ok(code + "00")
+            else
+                Ok(code)
+            end
         end
     end
 end
@@ -9489,6 +9933,9 @@ fn comp_if_expr_from(branches: List<(Ex, Blk)>, else_b: Option<Blk>, bt: String,
         end
     else
         let pair = list_get(branches, bi)
+        if ex_no_value(pair.0)
+            return comp_ex(pair.0, env, fns, cg, locals, localvt)
+        end
         let ct = infer_ex(pair.0, env, fns)?
         if ct != "i32"
             return Err(subset_err("if 条件须为 Bool（得到 '" + ct + "'）"))
@@ -9509,7 +9956,11 @@ fn comp_val_blk(b: Blk, env: Map<String, {slot: Int, vt: String, sig: String, ca
             let mut out = ""
             let mut si = 0
             while si < list_length(stmts)
-                out = out + comp_one_stmt(list_get(stmts, si), block_env, fns, cg, locals, localvt, "void")?
+                let s = list_get(stmts, si)
+                out = out + comp_one_stmt(s, block_env, fns, cg, locals, localvt, "void")?
+                if st_no_value(s)
+                    return Ok(finish_dead_stmt(out, s))
+                end
                 si = si + 1
             end
             match tail
@@ -9545,6 +9996,9 @@ end
 
 # L2.3-a：while——block/loop + 条件取反 br_if 退出 + br 0 回环
 fn comp_while(cond: Ex, body: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    if ex_no_value(cond)
+        return comp_ex(cond, env, fns, cg, locals, localvt)
+    end
     let ct = infer_ex(cond, env, fns)?
     if ct != "i32"
         return Err(subset_err("while 条件须为 Bool（得到 '" + ct + "'）"))
@@ -9558,6 +10012,9 @@ end
 # 遮蔽 = 新槽（对齐宿主：循环后外层同名绑定不变）；String/List 迭代
 # 留后续批次。iter 表达式循环前求值一次存槽。
 fn comp_for(var: String, iter: Ex, body: Blk, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>, ret_vt: String) -> Result<String, String>
+    if ex_no_value(iter)
+        return comp_ex(iter, env, fns, cg, locals, localvt)
+    end
     let it = infer_ex(iter, env, fns)?
     # ---- Int 迭代（L2.3-a 原路径，0..n）----
     if it == "i64"
@@ -9675,7 +10132,7 @@ fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String, sig: Str
         None => Ok(out)
         Some(te) =>
             if ex_no_value(te)
-                return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+                return Ok(out + comp_ex(te, env, fns, cg, locals, localvt)?)
             end
             match te
                 ExIf(ifr) =>

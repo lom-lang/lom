@@ -1,3 +1,4 @@
+# B甲：Float 返回路径的 never 签名与 wasm 栈效应。
 fn g(n: Int) -> Float
     let w = if n > 100 return 1.5 else return 2.5 end
     w

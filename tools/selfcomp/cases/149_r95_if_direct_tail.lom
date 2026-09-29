@@ -1,0 +1,8 @@
+# B甲：全终止 if 直接作函数尾值，函数不得 fallthrough 缺栈值。
+fn g(n: Int) -> Int
+    if n > 100 return 1 else return 2 end
+end
+fn main() -> Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end

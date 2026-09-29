@@ -1,0 +1,11 @@
+# Binder guard 求值提前 return，臂体不可达。
+fn g(n: Int) -> Int
+    let w = match n
+        x if (if x > 0 return 1 else return 2 end) => 3
+    end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(7))
+    println(g(0))
+end

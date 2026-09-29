@@ -1,0 +1,9 @@
+# 首条件必终止，隐含 Unit 路径不可达。
+fn g(n: Int) -> Int
+    let w = if (if n > 0 return 1 else return 2 end) 3 end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(7))
+    println(g(0))
+end

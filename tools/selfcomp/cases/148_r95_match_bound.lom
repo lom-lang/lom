@@ -1,3 +1,4 @@
+# B甲：Form B 双 return 臂绑定后直尾值。
 fn g(n: Int) -> Int
     let w = match n
         5 =>

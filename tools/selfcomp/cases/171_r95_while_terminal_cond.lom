@@ -1,0 +1,10 @@
+fn g(n: Int) -> Int
+    while (if n > 0 return 1 else return 2 end)
+        println(9)
+    end
+    3
+end
+fn main() -> Unit ! [IO]
+    println(g(7))
+    println(g(0))
+end

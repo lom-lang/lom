@@ -1,0 +1,11 @@
+fn main() -> Unit ! [IO]
+    let base = 7
+    let outer = fn(n: Int)
+        let inner = fn(m: Int)
+            let w = if m > 0 return base + n + m else return base - n - m end
+            w + 0
+        end
+        inner(1)
+    end
+    println(outer(2))
+end

@@ -1,3 +1,4 @@
+# B甲：全终止 if 绑定后直作函数尾值，需真正执行并返回。
 fn g(n: Int) -> Int
     let w = if n > 100 return 1 else return 2 end
     w

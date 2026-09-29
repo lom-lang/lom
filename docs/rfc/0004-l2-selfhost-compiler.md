@@ -942,8 +942,9 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   本修订仅登记开账与总括句收窄（不含行为修复），不升版。
 
 - **修订 34（2026-09-29）：R99 A甲安全闸（用户裁决 A甲→B甲/C甲/
-  D甲/E甲；本修订只记 A甲，仓库版本拟升 v1.4.2，CI/tag 待规划者
-  门禁）。** 十九审 d2 的 `COMPILED 121 bytes` 记录属实，但“L2
+  D甲/E甲；本修订只记 A甲，仓库版本 v1.4.2；事后验收：提交
+  8012c38 的 CI run 36549057031 六 job 全绿后已切 tag）。** 十九审
+  d2 的 `COMPILED 121 bytes` 记录属实，但“L2
   输出 1/2、零坏 wasm”结论经后续独立全链复证为误判：模块
   `WebAssembly.validate=false`，Node 实例化在 `local.set` 报栈下溢；
   全 return 的值位 if/match 直尾值另有 fallthrough 缺值同族。十九审
@@ -970,3 +971,42 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   而含 memory 指令的 WASM（138 bytes 代表探针；Node 报
   `memory index 0 exceeds number of declared memories (0) @+127`）；
   本阶段只登记，修法与先后次序待用户另裁，未改其代码路径。
+
+- **修订 35（2026-09-29）：R95 B甲完整 bottom 放行（用户已裁决，
+  v1.4.3 本地代码与单项验证完成，规划者全量回归/提交/CI/tag 待验）。**
+  R99 A甲的“全终止值表达式安全拒绝”现由 B甲转为正确发射；内部
+  vt 新增 `never` 表示无正常产值，与泛型未知 `?` 严格分离。
+  `vt_merge(never,T)=T`，全终止 if/match 结果为 never；严格求值
+  家族按源序发射至首个终止子表达式，保留此前副作用而不发后续
+  opcode；短路 `and/or` 的右侧 never 不把整个表达式无条件判 never。
+  `if`/`match`/guard/while 条件/for 迭代器/闭包体 return 综合与
+  WASM 栈效应一并校准，终止结构的 `end` 后按需发 `unreachable`
+  封闭验证器可见的 fallthrough。附带修复既有无注解闭包签名推断
+  漏绑定自身形参：在父 env 副本中绑定，不泄漏父作用域；
+  `neg_r95_closure_param_leak.lom` 新鲜 CLI 复证外层访问形参
+  `secret` 报“未定义变量 'secret'”且无 hex，作为长期负例锁。
+  不把混型或未知泛型 return 强行宽放（6 新负例锁定严格拒绝）。
+  原 R95 d1/d3 绑定后算术、d2/直尾值与其他全终止代表形态
+  经本地全链验证同宿主正确；**R95 关闭待规划者全量回归和 CI**。
+  `verify_selfcomp` **328/328 = 170 单文件 + 5 包 + 153 负例**：
+  A甲 **298 = 137 + 5 + 156**，新增 143–175 共 **33** 个正例，
+  9 枚 R99 安全拒负例转正删除，新增 6 严格性负例，净增
+  **33−9+6=30**（本批新增/迁移 .lom 合计 **39 = 33+6**；
+  examples 原 37 个有效文件 fmt 覆盖不变）。`self_comp`
+  **11469→11926 行（+457）**；
+  `--bootstrap` **14/14**，新强 quine **262137 bytes** 双侧逐字节
+  一致。旧 v1.4.2 **142** 个对拍同宿主 hex 全量比较：
+  **140 相同 + 2 有意变化 + 0 缺**；108 的 **299→300 bytes**
+  是末位 `unreachable`，142 的 **118→117 bytes** 是死尾裁除，
+  两例旧/新 wasm 均可验证且行为一致。复现脚本在忽略目录
+  `target/r95-b-hex-compare/compare.py`，不作为仓库内锁定文件。
+  性能只记同机单次证据：N120 旧 3.030s/新 3.008s；自编第①步
+  A甲 315.5s/B甲 328.5s（早期未优化 B 曾 128.948s 的探针
+  不可外推成全面提速）。Rust 541+8、eval 宿主双后端各 121/121
+  数量不变；语言面/20 关键字/诊断码/43 内建未动，外部发布冻结。
+  **R101 P2 新开待用户另裁**：`and/or` 右侧实际执行 return 时，
+  宿主解释器及 L2 WASM 正常，宿主 WASM 在首项后 `unreachable`
+  trap；`src/wasm_codegen.rs` 的 `ExprKind::Logical` 生成 if 却未
+  push `Label::If`，return 的 br 深度少一层。B甲不修宿主、不模拟
+  trap，正例只锁右侧不执行的短路路径。R100 空 List 缺 memory
+  仍 open；R96/C甲、R97/D甲及 E甲邻近证据均未实施。

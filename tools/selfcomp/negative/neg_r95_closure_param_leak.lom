@@ -1,0 +1,7 @@
+# B甲：闭包参数仅属于自身词法作用域，不得泄漏到外层 main。
+fn main() -> Unit ! [IO]
+    let f = fn(secret: Int)
+        if secret > 0 return secret else return 0 end
+    end
+    println(secret)
+end

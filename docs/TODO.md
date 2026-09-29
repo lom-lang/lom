@@ -1,9 +1,75 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前交接声明（2026-09-29，R99 A甲安全阶段本地完成、提交/CI 待验）**：
+> **当前交接声明（2026-09-29，R95 B甲本地完成、v1.4.3 待门禁）**：
+> 用户已裁决 A甲→B甲/C甲/D甲/E甲。A甲/R99 已提交 `8012c38`，
+> CI run `36549057031`（#200）六 job 全绿、annotations 5 条 notice
+> （Ubuntu 26 四条 + macOS arm64 容量一条，零 warning/error），
+> 后切 tag v1.4.2；外部发布线仍冻结。B甲完整 bottom 代码已冻结，
+> 仓库工作区拟升 v1.4.3，规划者全量回归、提交/CI/tag 待验。
+> `self_comp.lom` SHA-256 为
+> `3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d`，
+> **11926 行**（A甲 11469，+457）。内部 `never` 与泛型未知 `?`
+> 分离，按严格求值序发射到首个终止子式，if/match/guard/while/for/
+> 闭包 return 与 wasm 栈效应结构性修正；终止块后按需 `unreachable`
+> 封闭 fallthrough。无注解闭包签名推断的既有形参漏绑定也在父 env
+> 副本中修复；新增负例 `neg_r95_closure_param_leak.lom` 锁住外层
+> 使用形参 `secret` 必须报“未定义变量 'secret'”、无 hex。
+> **R95 d1/d3 算术误拒本地修复，闭账待规划者
+> 全量回归和 CI**；R99 已关闭，R96/C甲、R97/D甲、E甲仍未实施。
+> `verify_selfcomp` **328/328 = 170 单文件 + 5 包 + 153 负例**：
+> A甲 298 = 137+5+156；新增 143–175 共 33 对拍、删除转正的
+> 9 枚旧负例、加 6 严格性负例，**298+33−9+6=328**；本批
+> 新增/迁移 .lom 合计 **39 = 33 正例 + 6 负例**，examples 的
+> 递归 fmt 覆盖仍是原 37 个有效文件。
+> `--bootstrap` **14/14**，新强 quine **262137 bytes** 双侧一致；
+> Rust 541+8、eval 双宿主后端各 121/121 数量不变。旧 v1.4.2
+> **142 对拍 hex** 同宿主比较 **140 相同/2 有意变化/0 缺**：
+> 108 旧 299→新 300 bytes（补 unreachable），142 旧 118→新
+> 117 bytes（死尾裁除），两者旧/新 wasm 均 valid、行为一致。
+> 忽略目录复现脚本 `target/r95-b-hex-compare/compare.py` 不进仓库。
+> 性能只报具体单次：N120 旧 3.030s/新 3.008s；自编第①步 A甲
+> 315.5s/B甲 328.5s；初版 B 曾 128.948s，不宣称全面提速。
+> **当前 open**：R94（宿主挂账）、R95（本地修复待CI）、R96、R97、
+> R100（空 List 设施缺 memory）、R101（见下）；R99/R98 已关闭。
+> 十九审 B+ 只评 a697474/v1.4.1，勘误不重评，B甲后评级待用户
+> 发起二十审。语言面与外部发布线继续冻结。
+>
+> **R101 开账（2026-09-29，P2，修法待用户另裁；本批不修宿主）**：
+> `and/or` 的短路右侧若**实际执行** `return`，宿主解释器与
+> B甲 L2 WASM 正常，宿主 WASM 在首项后 `unreachable` trap。
+> 审阅者独立复证最小 and/or 两例；文档执行者用下面同族四分支
+> 探针新鲜全链复跑：解释器 stdout `0/9/1/8`、rc 0；宿主 WASM
+> 仅 stdout `0` 后 `wasm trap: unreachable`、rc 1；B甲 L2
+> `COMPILED 189 bytes`（hex 378 字符），Node stdout `0/9/1/8`、
+> rc 0。`src/wasm_codegen.rs` 的 `ExprKind::Logical` 发 `if_i64`
+> 而未压 `Label::If`，return 的 br 深度少一层。B甲不改 `src/`，
+> 也不让 L2 模仿 trap；B甲正例只锁右侧**不执行**的短路路径。
+> R100 与 R101 均 open，不把底层 return 称作三实现全覆盖。
+
+```lom
+fn test_and(c: Bool) -> Int
+    let q = c and (if c return 9 else return 8 end)
+    if q 1 else 0 end
+end
+
+fn test_or(c: Bool) -> Int
+    let q = c or (if c return 9 else return 8 end)
+    if q 1 else 0 end
+end
+
+fn main() -> Unit ! [IO]
+    println(test_and(False))
+    println(test_and(True))
+    println(test_or(True))
+    println(test_or(False))
+end
+```
+
+> **A甲交付回顾（2026-09-29，v1.4.2；事后补齐门禁）**：
 > 用户已裁决 A甲→B甲/C甲/D甲/E甲；本阶段**仅 A甲**代码和用例
-> 已实施，拟升仓库版本 v1.4.2，规划者尚须完成全量回归、提交推送、
-> CI 首跑与 tag 门禁。语言面与外部发布线继续冻结。十九审
+> 已实施，规划者完成全量回归并提交 `8012c38`，CI run
+> `36549057031` 六 job 全绿后切 tag v1.4.2。语言面与外部发布线
+> 继续冻结。十九审
 > [报告](reviews/review-2026-09-29.html)的历史 B+ 不重评：原 d2
 > “COMPILED 121 bytes”属实，但“L2 输出 1/2、零坏 wasm”经独立
 > 复证为误判——`WebAssembly.validate=false`，Node 实例化报
@@ -21,7 +87,7 @@
 > IDENTICAL=139、DIFF=0、MISSING=0；忽略目录脚本
 > `target/r99-hex-compare/compare.py` 仅为本地复现证据）。Rust
 > 541 单元 + 8 集成、eval 双后端各 121/121 数量不变。**R99
-> 本地修复待规划者全量回归及 CI 确认后闭账；R95 仍 open**；
+> 已随 v1.4.2 CI/tag 门禁闭账；R95 在 A甲时仍 open**；
 > R96/C甲、R97/D甲、E甲邻近面均未实施，不预称收口。R94 宿主
 > 挂账继续；新增 R100 open 如下。外部发布线不解冻。
 >
