@@ -1140,3 +1140,21 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   提交 `96c26b6` 推送后 CI run `36608219947`（#207）六 job 全绿
   （annotations 五条环境 notice，零 warning/error），tag v1.4.6
   已切。**
+
+- **修订 39（2026-09-30）：R101 宿主修复交付（用户裁决"继续执行
+  1，2，3"批 2；v1.4.7 全量验收后提交，CI/tag 门禁见本修订尾部
+  回填）。** designs/0012 §13：src/wasm_codegen.rs 的
+  ExprKind::Logical 短路 if 未压 Label::If——and/or 右侧**实际
+  执行** return 时 br 深度少一层、宿主 WASM 在首项后 unreachable
+  trap（宿主解释器与 L2 WASM 一直正确）。修复按 compile_if 的
+  W-2 先例在 if_i64 后 push、end 后 pop Label::If。R101 四分支
+  探针（target/probes/r101_fix/）三侧对齐：解释器/宿主 WASM/
+  L2 各输出 0/9/1/8、rc 0（修复前宿主 WASM 仅 0 后 trap rc1；
+  L2 189 bytes 与 B甲登记一致）。Rust e2e 测试
+  e2e_return_inside_logical_rhs（W-2 形态）锁定，**541→542**。
+  L2 侧零改动（其短路本就正确，B甲正例锁的是右侧不执行路径，
+  与本修复正交）。升版 **v1.4.7**（宿主行为修复 patch——仅
+  代码生成 bug 修复，非语义变化，语言面不涉）；eval 双后端各
+  121/121、verify_selfcomp 360/360、六模式不变（全量门禁复验）。
+  **R101 关闭**——用户裁决 1（E甲扩围）、2（R100/R101）全部
+  完成，仅剩 3（二十审）→ 交接；R94 宿主挂账维持。

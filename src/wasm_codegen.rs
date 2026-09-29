@@ -1692,6 +1692,9 @@ impl Codegen {
                 self.compile_expr(ctx, a, left)?;
                 a.lset(sc);
                 a.lget(sc).call(RT_TRUTHY).if_i64();
+                // 短路 if 也是 label，右侧内 return 的 br 深度必须计入
+                // （R101：漏计导致 and/or 右侧实际执行 return 时 trap）
+                ctx.labels.push(Label::If);
                 match lop {
                     LogicalOp::And => {
                         self.compile_expr(ctx, a, right)?;
@@ -1706,6 +1709,7 @@ impl Codegen {
                     }
                 }
                 a.end();
+                ctx.labels.pop();
                 Ok(())
             }
             ExprKind::Call { callee, args } => self.compile_call(ctx, a, callee, args),
@@ -6701,6 +6705,18 @@ mod e2e {
             "fn find(xs: List<Int>) -> Int\n    for x in xs\n        if x > 1\n            return x\n        end\n    end\n    -1\nend\nfn main() -> Unit\n    let a = 1..5\n    let b = 7..9\n    println(find(a))\n    println(find(b))\nend",
             "ret_in_for",
             "2\n7\n",
+        );
+    }
+
+    /// 回归 R101：Logical 短路的 if 未压 Label::If → and/or 右侧实际执行
+    /// return 时 br 深度少一层、宿主 WASM 在首项后 unreachable trap
+    /// （宿主解释器与 L2 WASM 正常——三侧对齐后此测试锁定 WASM 侧）
+    #[test]
+    fn e2e_return_inside_logical_rhs() {
+        check(
+            "fn test_and(c: Bool) -> Int\n    let q = c and (if c return 9 else return 8 end)\n    if q 1 else 0 end\nend\nfn test_or(c: Bool) -> Int\n    let q = c or (if c return 9 else return 8 end)\n    if q 1 else 0 end\nend\nfn main() -> Unit ! [IO]\n    println(test_and(False))\n    println(test_and(True))\n    println(test_or(True))\n    println(test_or(False))\nend",
+            "ret_in_logical_rhs",
+            "0\n9\n1\n8\n",
         );
     }
 

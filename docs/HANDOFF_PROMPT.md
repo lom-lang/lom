@@ -48,8 +48,16 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **E甲扩围+R100 已交付 v1.4.6**（2026-09-30，RFC-0004 修订 38、
-  designs/0012 §12；用户裁决"继续执行 1，2，3"后批 1）：Bool 家族
+- **R101 已交付 v1.4.7**（2026-09-30，RFC-0004 修订 39、designs/0012
+  §13；用户裁决"继续执行 1，2，3"批 2）：宿主 src/wasm_codegen.rs
+  的 Logical 短路 if 补压 Label::If（W-2 先例）——and/or 右侧实际执行
+  return 时三侧对齐（0/9/1/8 rc0）；Rust e2e 测试
+  e2e_return_inside_logical_rhs 锁定，**541→542**；L2 侧零改动；
+  升版 v1.4.7（宿主行为修复 patch）。**R101 关闭**——裁决 1/2 完成，
+  仅剩 3（二十审 review-2026-09-30.html → 交接五件套）。当前 open
+  仅 R94 宿主挂账。
+- **批1（E甲扩围+R100）已交付 v1.4.6**（`96c26b6`，CI #207 六 job
+  绿后切 tag）：Bool 家族
   三盲点修复（bbind 知识表对称 cbind 分层保 pb5 边界、match_bool_disp
   语句/值位共用、严格形态播种）+ 容器家族 for 迭代变量 @ec: 元素知识
   + R100 开堆白名单（发 load 的五枚只读内建）。五枚 §11 缺口全转正；
@@ -111,7 +119,7 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 541/541；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
+   - cargo test --release（期望 542/542；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 67/67）

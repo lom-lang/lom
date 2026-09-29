@@ -188,3 +188,10 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
   - **R100 开堆白名单**：发 load 的五枚（head/tail/length/get/fold）入 scan_ex；is_empty/empty 不触发。空表 head/tail/get 宿主运行期 trap（wasm trap: unreachable），正例用条件保护形态。
 - **验证边界**：五缺口全转正（双侧 stdout+rc 逐字一致）；对照面（for_bool_direct/for_bool_let）字节恒等；十六枚既有负例逐枚点名实测不倒；R100 无自然负例面（纯放行），负例仅 neg_r97e_no_ret_bool_helper 一枚。
 - **R101 未在本批**（宿主 src 面，v1.4.7 独立批）；R94 挂账维持。
+
+## 13. R101 宿主修复实施记录（2026-09-30 交付，v1.4.7，批 2）
+
+- **修复**：src/wasm_codegen.rs 的 ExprKind::Logical 在 if_i64 后补 `ctx.labels.push(Label::If)`、end 后补 pop——compile_if 的 W-2 先例（L1574/L1597）同款。两行修复 + 注释。
+- **验证**：R101 四分支探针三侧对齐（解释器 0/9/1/8 rc0；宿主 WASM 修复前仅 `0` 后 `wasm trap: unreachable` rc1 → 修复后 0/9/1/8 rc0；L2 0/9/1/8 rc0，189 bytes 与 B甲登记一致）；Rust e2e 测试 e2e_return_inside_logical_rhs（W-2 形态，源码即 TODO R101 段原形）锁定，Rust **541→542**。
+- **边界**：L2 侧零改动（其短路本就正确）；B甲正例锁的是右侧不执行路径，与本修复正交；宿主产物中仅"右侧实际执行 return"的形态行为变化（原 trap 形态，eval 121 不含）；语言面不涉（codegen bug 修复非语义变化）。
+- **收官意义**：用户裁决 1（E甲扩围）/2（R100+R101）全部完成，仅剩 3（二十审）→ 交接五件套。
