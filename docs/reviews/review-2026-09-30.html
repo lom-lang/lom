@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十轮体系内独立敌手审查 — 2026-09-30</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.r102{background:#fce4ec;border:2px solid #c62828;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十轮体系内独立敌手审查报告</h1>
+<p><b>2026-09-30</b> ｜ 基线 HEAD <code>d5ea6df</code> = tag v1.4.7 之后两笔 docs 提交（工作树干净，<code>git describe</code> = <code>v1.4.7-2-gd5ea6df</code>）｜ 增量 = 十九审基线 <code>a697474</code>/v1.4.1 之后的全部交付：v1.4.2（A甲/R99 安全闸，<code>8012c38</code>）→ v1.4.3（B甲/R95 完整 bottom，<code>a5dac74</code>）→ v1.4.4（C甲/R96 闭包 prelude，<code>1851964</code>）→ v1.4.5（D甲/R97 match Binder 预扫，<code>df7f83b</code>）→ v1.4.6（批1：E甲扩围 Bool 家族 + R100 开堆白名单，<code>96c26b6</code>）→ v1.4.7（批2：R101 宿主 Logical 压 Label::If，<code>22a37a6</code>）+ 各回填 docs 提交 ｜ 审查执行者：第二十轮独立审查 agent</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：这是项目体系内 agent 分工的独立敌手审查，<b>不是外部同行审计</b>。本轮评级独立作出：十九审 B+ 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何产品源码/测试/工具/治理文档；唯一写盘物为本报告与 <code>target/probes/r20/</code> 探针（gitignored，按二十审任务书先例<b>保留</b>供整改复验）。git 严格只读（<code>git show</code> 只读导出旧编译器做对拍除外）。cargo 命令严格串行。</p>
+
+<div class="verdict">
+<b>本轮评级：A-</b>（仅对本轮时点与检验面；历史轨迹不外推，本轮结论不预支后续）。
+<b>一行式总评</b>：六批交付（A甲→批2）的全部可复核宣称经独立敌手复核<b>零失真</b>——基线 14 项全绿且名实双核对干净、B甲 142 对拍全量复算 140 恒等 + 2 有意变化与 RFC 修订 35 逐字吻合、C/D/批1 的存量对拍抽查（13+12+13 枚，含 22/43/66 三关键回归面）零 DIFF、五批新增正负例逐枚亲跑干净；22 枚自构敌手探针（never 家族/闭包 prelude/match Binder/Bool-for/R100 空表/R101 同族扩散六方向）<b>零静默错值、零坏 wasm、零负例翻转</b>，R101 修复的四个扩散面（<code>?</code> EarlyReturn 在 and 右侧、嵌套 Logical、for/while 多重 label 深度、or 三连）全部三侧对齐；本轮唯一新开账 <b>R102（P3：v1.4.7 的 CI run 编号登记 #209，GitHub API 实测为 #210</b>——run id 36612026578、六 job success、annotations 五条 notice 本身全部属实，仅 # 编号笔误，波及五处文档与一笔 commit message）。较十九审（彼时在场一枚 P2 行为级误拒 R95）本轮检验面无任何行为级发现，按项目轨迹惯例（行为零失真 + 登记面仅存小笔误）定 A-；未给 A 的保留项：R102 五处一致性笔误、以及 §6 备注的若干"宿主宽容收/L2 保守拒"形态未逐项入信任边界清单的精度弱面。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先独立阅读 docs/TODO.md 顶部（R101 交付段/批1 交付段/D甲/C甲/B甲交付记录/R101 开账段）、RFC-0004 修订 34–39 全文、designs/0012 §1–§13、十九审报告（方法节 + R95–R98 开账原文 + 事后勘误）、HANDOVER §11.6/§12.2；随后：(一) 基线矩阵 14 项全部亲手跑并记原始输出；(二) 对六批交付的验收宣称逐项独立复核——十九审 §4 探针原形重建复跑（d1/d2/d3/direct_tail/match_tail/single 六枚三侧全链）、B甲 142 对拍<b>全量</b>重算（git show v1.4.2 只读导出旧编译器、同一宿主 lom.exe v1.4.7 驱动、v1.4.2 用例集 137 单文件 + 5 pkg 逐枚 cmp）、C/D/批1 的存量对拍恒等宣称按十九审先例抽查（git show v1.4.3 / v1.4.4 / v1.4.5 分别导出旧编译器，各抽 10 枚 + 强制覆盖 22_enum_closure / 43_generic_either / 66_for_list 三关键面）；(三) 敌手探针 22 枚自构穿真实 CLI 全链（宿主解释器 + 宿主 WASM + L2 WASM 三侧 stdout+rc 逐字对照，WASM 有效性用 node <code>WebAssembly.validate</code>），针对六方向新放行面构造反例。</p>
+<p>三侧全链命令形态（每枚探针同款）：</p>
+<pre>./target/release/lom.exe  &lt;probe&gt;.lom                                  # 宿主解释器（stdout+rc，诊断走 stderr）
+./target/release/lom.exe build &lt;probe&gt;.lom --target wasm -o host.wasm
+node eval/runner/run_wasm.mjs host.wasm                               # 宿主 WASM
+./target/release/lom.exe examples/selfhost/self_comp.lom -- &lt;probe&gt;.lom l2.hex
+python tools/hex2wasm.py l2.hex l2.wasm
+node tools/selfcomp/run_selfcomp.mjs l2.wasm                          # L2 WASM
+node -p "WebAssembly.validate(require('fs').readFileSync(process.argv[1]))" l2.wasm</pre>
+<p>负例查真实 L2 CLI 的 COMPILE-ERROR 输出与 hex 不存在（L2 驱动 COMPILE-ERROR 时进程 rc 可为 0，只看输出与产物）。探针目录 <code>target/probes/r20/</code>（<code>adv/</code> 敌手矩阵、<code>b_jia/</code> B甲探针、<code>b_hexcmp/</code> 142 对拍、<code>snapcmp/</code> 三轮抽查、<code>c_jia/</code>），按任务书保留。</p>
+
+<h2>2. 基线矩阵 14 项（全部亲手跑，真实输出摘录）</h2>
+<table>
+<tr><th>#</th><th>项</th><th>结果</th></tr>
+<tr><td>1</td><td>cargo build --release</td><td class="ok">✓ <code>cargo clean --release -p lom</code>（Removed 223 files, 347.3MiB）→ 重编 25.65s，输出仅 Compiling/Finished；<code>grep -ci warning</code> = <b>0</b></td></tr>
+<tr><td>2</td><td>cargo test --release</td><td class="ok">✓ <b>542 passed; 0 failed</b>（单元，2.07s）+ 集成 r56 ×1 + r58 ×7 = <b>542+8</b> 名实相符（541→542 为 R101 e2e 新增）</td></tr>
+<tr><td>3</td><td>定向集成（r56/r58）</td><td class="ok">✓ 含于上项（1 passed + 7 passed，全过）</td></tr>
+<tr><td>4</td><td>cargo clippy --release -- -D warnings</td><td class="ok">✓ 零输出（仅 Checking/Finished），exit 0</td></tr>
+<tr><td>5</td><td>cargo fmt --all -- --check</td><td class="ok">✓ 零 diff，exit 0</td></tr>
+<tr><td>6</td><td>python tools/doc_audit.py</td><td class="ok">✓ <b>RESULT: PASS（67/67 项通过）</b></td></tr>
+<tr><td>7</td><td>python tools/spec_examples_check.py</td><td class="ok">✓ RESULT: PASS（正例 51 / 反例 5 / skip 24）</td></tr>
+<tr><td>8</td><td>python tools/eval_prompt_check.py</td><td class="ok">✓ RESULT: PASS（<b>校验 24 / 失真 0</b>）</td></tr>
+<tr><td>9</td><td>verify_selfhost 六模式逐个</td><td class="ok">✓ dump 154/154（Latin-1 折叠等价 0）/ tokens 154/154（列坐标系已知差异 1）/ diags 12/12 / static 坏 22 + 干净 154 / run 31/31 / wasm-layer2 + layer3 + selfapply 全 PASS</td></tr>
+<tr><td>10</td><td>python tools/verify_selfcomp.py</td><td class="ok">✓ RESULT: PASS（<b>360/360</b>）；名实双核对：验收器逐类输出 PASS ×195 + PASS-PKG ×5 + PASS-NEG ×160 = 360；目录实数 cases <b>195</b> + pkg_cases <b>5</b> + negative <b>160</b>——两口径逐类对上</td></tr>
+<tr><td>11</td><td>verify_selfcomp --bootstrap</td><td class="ok">✓ <b>14/14</b>，总耗时 116.1s；末三项原文：PASS-B L2-PKG 101_pkg_single pkgs=mathlib; hex identical ／ PASS-B L3 self-apply (quine) <b>269510 bytes; byte-identical; 1.5s</b> ／ RESULT: PASS（--bootstrap：14/14 项通过；总耗时 116.1s）——quine 269510 bytes 与宣称逐字一致</td></tr>
+<tr><td>12</td><td>eval 双后端</td><td class="ok">✓ native Total: 121 / Passed: 121；wasm Total: 121 / Passed: 121</td></tr>
+<tr><td>13</td><td>Lom fmt 递归 examples</td><td class="ok">✓ files=<b>37</b> fail=0（apply_test 豁免；落盘 .ps1 执行规避 Git Bash 引号预展开）</td></tr>
+<tr><td>14</td><td>版本一致 + CI 实查</td><td><span class="warn">△</span> <code>lom --version</code>=1.4.7、Cargo.toml=1.4.7、git describe=v1.4.7-2-gd5ea6df、六 tag 指向逐一核对（v1.4.2→8012c38 … v1.4.7→22a37a6）全对；GitHub API 匿名实查：HEAD d5ea6df → run <b>36612663963（#212）六 job 全部 success</b>；22a37a6 → run 36612026578 六 job success，check-runs annotations 实拉 5 条全为 notice（Ubuntu 26 迁移 ×4 + macOS arm64 容量 ×1，零 warning/error）与宣称一致；<b>但该 run 的 run_number 实测 #210，文档五处登记 #209</b> → <b>R102（P3）</b>，详见 §5</td></tr>
+</table>
+<p class="small">补充（十九审先例项）：golden 对照 <code>stmt_interp</code> 输出与 expected.txt diff 为空（GOLDEN-DIFF-EMPTY，stderr 0 行，rc 0）。</p>
+
+<h2>3. 各批复核结论</h2>
+<table>
+<tr><th>批次</th><th>复核面</th><th>独立复核方法</th><th>结论</th></tr>
+<tr><td><b>B甲</b>（v1.4.3）<br>R95/R99 修复</td><td>never 与 <code>?</code> 分离；d1/d3 算术放行；d2/direct-tail 有效发射；142 对拍 140 恒等 + 2 有意变化</td><td>十九审/designs §1 探针原形重建：d1/d2/d3/direct_tail/match_tail/single 六枚三侧全链（含 <code>WebAssembly.validate</code>）；142 对拍<b>全量</b>重算（非抽查）——git show v1.4.2 导出旧编译器（11469 行）、同一宿主驱动、v1.4.2 用例集（git ls-tree 核定 137 cases + 5 pkg）逐枚 cmp；两枚变化的新旧 hex 各自 hex2wasm 后 validate + 运行对照</td><td class="ok">零失真。六探针三侧一致（d1/d2/d3 均 1/2、direct_tail 1/2、match_tail 55/22、single 1/2，全部 valid=true，wasm 117/117/117/116/214/120 bytes）；对拍 <b>IDENTICAL=140 DIFF=2 MISSING=0 total=142</b> 与修订 35 逐字一致；108_return_in_match hex 598→600 chars（=299→300 bytes）、142_r99_stmt_if_returns 236→234（=118→117 bytes）两枚新旧 wasm 均 valid=true 且行为逐字一致（100/1000/900/-88/900/0 与 1/2）</td></tr>
+<tr><td><b>C甲</b>（v1.4.4）<br>R96 闭包 prelude</td><td>176–183 八正例；neg_r96_* 四负例；裸值位拒/同名遮蔽两式；175 对拍恒等</td><td>五枚关键正例（176/178/179/180/181）三侧全链亲跑；三枚负例（naked_println_value/print_arity/unimported_len）CLI 复现拒绝文案 + 无 hex；175 对拍抽查 13 枚（随机 10 + 22/43/66 强制面，v1.4.3 旧编译器同宿主）</td><td class="ok">零失真。176: 7/7、178（三层嵌套 print/println 混用）: 234/7、179（同名父局部直接调用 prelude 优先）: 7/80、180（同名值位真实捕获）: 314、181: 77/7——三侧逐字一致全 valid；三负例拒绝文案逐字复现（未定义变量 'println' / print 期望 1 个参数 / 闭包捕获了未定义变量 'len'）；抽查 13/13 IDENTICAL</td></tr>
+<tr><td><b>D甲</b>（v1.4.5）<br>R97 match Binder</td><td>184–193 十正例；两负例；机制（ExMatch 臂处理/StLet 双行为/cbind 三表/load_cont_expr）；183 对拍恒等</td><td>十正例三侧全链亲跑；两负例 CLI 复现；读码 self_comp.lom L11190–L11530（disp_cont_expr 键值读/scrut_is_cont 三路/ExMatch 臂拷贝 + @arm_local/disp_scan_block StLet 双行为/@ec: 播种）与 L11279/L11295（fn_ret_cont/load_cont_expr）；183 对拍抽查 12 枚（v1.4.4 旧编译器）</td><td class="ok">零失真。十正例全 MATCH 全 valid（184–187/190–193 输出 [1]、188: [7]、189: 7）；neg_r97_no_ret_helper 拒于"void 函数的尾表达式产值"（与修订 37 记载"拒绝点更早"一致）、neg_r97_param_direct 拒于 ibase 兜底（深层流边界维持）；机制读码与登记逐条对上（臂内 StLet 见哨兵精确覆盖、外层只置 True、scrut 三路、闭包参数播种）；抽查 12/12 IDENTICAL 含 <b>22_enum_closure 1580 hex chars（=790 bytes）恒等</b>——修订 37"补修后恢复 790B"复核成立</td></tr>
+<tr><td><b>批1</b>（v1.4.6）<br>E甲扩围 + R100</td><td>194–200 七正例；neg_r97e；bbind 分层/@ec:/ty_seeds_bool 机制；<b>敌对面：43_generic_either 与 66_for_list 初版被拦两形态现行为应与 v1.4.5 一致</b>；pb5 边界；193 对拍恒等</td><td>七正例三侧亲跑；neg_r97e 与 neg_bool_param_flow（pb5）CLI 复现；读码 ty_seeds_bool（L11108）/match_bool_disp（L10791）/expr_bool_disp_stmt（L10823）/scan_ex 开堆白名单（L9407）；193 对拍抽查 13 枚（v1.4.5 旧编译器，随机 10 + 22/43/66 强制面）</td><td class="ok">零失真。七正例全 MATCH 全 valid（194–196: true、197: true/false、198: [1, 2]/[4, 5]、<b>199_r100_empty_read = 217 bytes</b> 与修订 38"138 字节坏模块转 217 字节有效模块"逐字吻合、200: 0/0/0/0）；neg_r97e 拒于 void 文案、pb5 拒于"println(Bool) 需要 String 设施——深层 Bool 流"（零翻转）；ty_seeds_bool 严格三形态（TyBool/TyOption(TyBool)/List&lt;TyBool&gt;）与白名单名单（head/tail/length/get/fold 入、is_empty/empty 不入）读码确认；<b>抽查 13/13 IDENTICAL——43_generic_either（948 hex chars）与 66_for_list（1368 hex chars）与 v1.4.5 逐字节一致</b>，初版拦截两形态的收紧复核成立</td></tr>
+<tr><td><b>批2</b>（v1.4.7）<br>R101 宿主修复</td><td>Logical 修复 diff；e2e 测试在位；<b>敌对面：R101 同族扩散——<code>?</code> 在 and/or 右侧实际执行（EarlyReturn 路径）、嵌套 and/or（left 也是 Logical）、and/or 右侧深度敏感形态（for/while 内右侧 return 多重 label）</b></td><td>git show 22a37a6 diff 审读 + e2e_return_inside_logical_rhs 源码核对；扩散面探针 p16–p20 三侧全链（§4）；R101 四分支原形探针（target/probes/r101_fix/probe.lom）同款形态由 p17/p19 覆盖</td><td class="ok">零失真。diff 确为两行 push/pop Label::If（if_i64 后 push、end 后 pop，注释齐全）+ 12 行 e2e 测试（源码即 TODO R101 段原形）；<b>四个扩散面全部三侧一致</b>：p16（<code>?</code> EarlyReturn 在 and 右侧实际执行：1/neg/0）、p17（for 内 and 右侧 return：false×3/90）、p19（嵌套 Logical left：7/1/0/7）、p20（while 内同款：false×4/90）、p18（or 三连：42/1）——修复对 EarlyReturn 的 br 深度与多重循环 label 嵌套同样生效，宿主 WASM 全部 valid 且与解释器/L2 逐字对齐</td></tr>
+</table>
+
+<h2>4. 敌手探针（22 枚，全部穿真实 CLI 三侧全链）</h2>
+<p>自构探针置于 <code>target/probes/r20/adv/</code>（gitignored，保留）。L2 全部 COMPILED 项的 wasm <code>WebAssembly.validate</code> 记于各行；"宿主"= 宿主 WASM。</p>
+<table>
+<tr><th>探针</th><th>方向/意图</th><th>宿主解释器</th><th>宿主 WASM</th><th>L2 WASM</th><th>定性</th></tr>
+<tr><td>p01_never_nested_if</td><td>1 never：值位 if 嵌 if 全 return 绑定直尾值</td><td>1/2/3 rc0（TYPE010 warning 不拦截）</td><td>1/2/3 rc0 valid</td><td>1/2/3 rc0 valid=true 137B</td><td class="ok">三侧一致</td></tr>
+<tr><td>p02_never_match_nested</td><td>1 never：match 块臂嵌 if 全 return</td><td>10/20/21 rc0</td><td>10/20/21 rc0</td><td>10/20/21 rc0 valid=true 247B</td><td class="ok">三侧一致</td></tr>
+<tr><td>p03_never_as_arg</td><td>1 never：全终止 if 作函数实参</td><td>1/2 rc0（TYPE003 warning 不拦截）</td><td>1/2 rc0</td><td>1/2 rc0 valid=true 132B</td><td class="ok">三侧一致</td></tr>
+<tr><td>p04_never_closure_val</td><td>1 never：闭包体值位 if 全 return 作值</td><td>100/200 rc0</td><td>100/200 rc0</td><td>100/200 rc0 valid=true 304B</td><td class="ok">三侧一致</td></tr>
+<tr><td>p05_triple_closure</td><td>2 prelude：三层嵌套闭包 print/println 混用</td><td>234/9 rc0</td><td>234/9 rc0</td><td>234/9 rc0 valid=true 838B</td><td class="ok">三侧一致（C甲豁免深度无界外溢）</td></tr>
+<tr><td>p06_user_fn_println</td><td>2 prelude：用户 fn println 与 prelude 冲突</td><td>7/8 rc0 + <b>NAM002 error</b>（--check rc=1）；运行时 println 按 prelude 优先</td><td>7/8 rc0</td><td>COMPILE-ERROR：用户函数不得命名 'println'，无 hex</td><td class="warn">双侧<b>非法结论一致</b>（宿主 error 级诊断/L2 编译拒），拒绝点与文案不同——精度备注（§6-①），不开账</td></tr>
+<tr><td>p07_binder_reassign</td><td>3 Binder：臂内 Binder 再赋值非容器后 println</td><td>[1]/5 rc0</td><td>[1]/5 rc0</td><td>[1]/5 rc0 valid=true 922B</td><td class="ok">三侧一致（@arm_local 精确覆盖正确）</td></tr>
+<tr><td>p08_binder_escape</td><td>3 Binder：Binder 跨函数传参后 println（应仍拒）</td><td>[1] rc0</td><td>[1] rc0</td><td>COMPILE-ERROR：ibase 兜底（深层容器流），无 hex</td><td class="ok">负例边界维持（neg_r97_param_direct 同族，未翻转）</td></tr>
+<tr><td>p09_nested_match_iso</td><td>3 Binder：嵌套 match 臂隔离（List 套 Int 字面量臂）</td><td>[1] rc0（无 error 诊断）</td><td>[1] rc0</td><td>COMPILE-ERROR：字面量模式类型不符（被测 ls{i64} 模式 i64），无 hex</td><td class="warn">宿主宽容收/L2 拒——既有字面量模式负例族（neg_match_num_str_pattern 同文案族）；精度备注（§6-②），不开账</td></tr>
+<tr><td>p10_for_match_bool</td><td>4 Bool：无注解 list_cons 构造 Bool List + for 迭代 match println</td><td>true/false rc0</td><td>true/false rc0</td><td>COMPILE-ERROR：深层 Bool 流未被预扫覆盖，无 hex</td><td class="warn">设计内保守边界（修订 38"严格形态播种仅注解三形态，保守不播"；注解形态 197 用例已放行）——精度备注（§6-③），不开账</td></tr>
+<tr><td>p11_deep_bool_list</td><td>4 Bool：无注解 List&lt;List&lt;Bool&gt;&gt; 双层 for println</td><td>true rc0</td><td>true rc0</td><td>COMPILE-ERROR：同上族，无 hex</td><td class="warn">同 p10（嵌套容器保守不播为修订 38 明文）——不开账</td></tr>
+<tr><td>p12_for_iter_closure</td><td>4 Bool：for 迭代变量闭包捕获后 println</td><td>true/false rc0</td><td>true/false rc0</td><td>true/false rc0 valid=true 561B</td><td class="ok">三侧一致（cl_bools 闭包产 Bool 放行正确）</td></tr>
+<tr><td>p13_empty_multiflow</td><td>5 R100：list_empty 经两函数流转后只读</td><td>0/true rc0</td><td>0/true rc0</td><td>0/true rc0 valid=true 427B</td><td class="ok">三侧一致（白名单跨函数流转生效）</td></tr>
+<tr><td>p14_is_empty_noheap</td><td>5 R100：is_empty 只读对照</td><td>true rc0</td><td>true rc0</td><td>true rc0 valid=true 342B</td><td class="ok">三侧一致（模块含 memory 段系 println(Bool) 的 String 设施所需；scan_ex 白名单名单读码确认 is_empty/empty 不在其中）</td></tr>
+<tr><td>p15_empty_head_trap</td><td>5 R100：无注解空表 head（ls{?}）</td><td>—</td><td>—</td><td>COMPILE-ERROR：未知 List 元素类型——需注解或构造上下文（list_head），无 hex</td><td class="ok">既有泛型未知拒绝面（R82 批负例族）</td></tr>
+<tr><td>p15b_empty_head_annot</td><td>5 R100：注解空表 head 运行期边界</td><td>RUNTIME000 rc1 stdout 空</td><td>wasm trap: unreachable rc1</td><td>wasm trap: unreachable rc1 valid=true 183B</td><td class="ok">三侧 trap 对齐（rc/stdout 一致）</td></tr>
+<tr><td>p15c_empty_get_annot</td><td>5 R100：注解空表 get(0) 越界</td><td>RUNTIME000 rc1</td><td>trap rc1</td><td>trap rc1 valid=true 234B</td><td class="ok">三侧 trap 对齐</td></tr>
+<tr><td>p16_try_logical_rhs</td><td>6 R101：<code>?</code> 在 and 右侧实际执行 EarlyReturn</td><td>1/neg/0 rc0</td><td>1/neg/0 rc0 valid</td><td>1/neg/0 rc0 valid=true 872B</td><td class="ok">三侧一致——<b>R101 修复对 EarlyReturn 的 br 深度同样生效</b></td></tr>
+<tr><td>p17_for_logical_return</td><td>6 R101：for 内 and 右侧实际执行 return（loop+If 双 label）</td><td>false×3/90 rc0</td><td>false×3/90 rc0 valid</td><td>false×3/90 rc0 valid=true 493B</td><td class="ok">三侧一致（多重 label 深度正确）</td></tr>
+<tr><td>p18_or_chain3</td><td>6 R101：or 三连最右实际执行 return</td><td>42/1 rc0</td><td>42/1 rc0</td><td>42/1 rc0 valid=true 175B</td><td class="ok">三侧一致</td></tr>
+<tr><td>p19_nested_logical_left</td><td>6 R101：嵌套 and/or（left 也是 Logical）右侧 return</td><td>7/1/0/7 rc0</td><td>7/1/0/7 rc0</td><td>7/1/0/7 rc0 valid=true 169B</td><td class="ok">三侧一致（两分支右侧实际执行 return 7）</td></tr>
+<tr><td>p20_while_logical_return</td><td>6 R101：while 内 and 右侧实际执行 return</td><td>false×4/90 rc0</td><td>false×4/90 rc0</td><td>false×4/90 rc0 valid=true 410B</td><td class="ok">三侧一致</td></tr>
+</table>
+<p><b>R101 原四分支探针（target/probes/r101_fix/probe.lom，二十审新鲜复跑）</b>：宿主解释器 <code>0/9/1/8</code> rc0；宿主 WASM <code>0/9/1/8</code> rc0（修复后——R101 开账时该侧仅 <code>0</code> 后 <code>wasm trap: unreachable</code> rc1）；L2 <code>COMPILED 189 bytes</code>、<code>0/9/1/8</code> rc0——三侧对齐与 RFC 修订 39/B甲登记逐字一致。</p>
+<p><b>探针原文（全部内嵌，供复现）</b>——探针在 <code>target/probes/r20/adv/</code> 下同名 .lom：</p>
+<pre># p01_never_nested_if.lom
+fn g(n: Int) -> Int
+    let w = if n &lt; 100
+        if n &lt; 50 return 1 else return 2 end
+    else
+        return 3
+    end
+    w
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(10))
+    println(g(80))
+    println(g(500))
+end
+
+# p02_never_match_nested.lom
+fn g(n: Int) -&gt; Int
+    let w = match n
+        1 =&gt;
+            if n &lt; 10 return 10 else return 11 end
+        end
+        _ =&gt;
+            if n &lt; 100 return 20 else return 21 end
+        end
+    end
+    w
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(1))
+    println(g(50))
+    println(g(500))
+end
+
+# p03_never_as_arg.lom
+fn add(a: Int, b: Int) -&gt; Int
+    a + b
+end
+fn g(n: Int) -&gt; Int
+    add(if n &gt; 0 return 1 else return 2 end, 5)
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(3))
+    println(g(0 - 1))
+end
+
+# p04_never_closure_val.lom
+fn g(n: Int) -&gt; Int
+    let f = fn(x: Int) -&gt; Int
+        if x &gt; 0 return 100 else return 200 end
+    end
+    f(n)
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(3))
+    println(g(0 - 1))
+end
+
+# p05_triple_closure.lom
+fn main() -&gt; Unit ! [IO]
+    let outer = fn(a: Int) -&gt; Int
+        let mid = fn(b: Int) -&gt; Int
+            let inner = fn(c: Int) -&gt; Int
+                print(a)
+                print(b)
+                println(c)
+                a + b + c
+            end
+            inner(4)
+        end
+        mid(3)
+    end
+    println(outer(2))
+end
+
+# p06_user_fn_println.lom
+fn println(x: Int) -&gt; Int
+    x * 2
+end
+fn main() -&gt; Unit ! [IO]
+    let f = fn(n: Int) -&gt; Int
+        println(n)
+        n + 1
+    end
+    println(f(7))
+end
+
+# p07_binder_reassign.lom（首行 from list import { list_cons, list_empty }）
+fn main() -&gt; Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) =&gt;
+            println(xs)
+            let xs = 5
+            println(xs)
+        end
+        None =&gt; println(0)
+    end
+end
+
+# p08_binder_escape.lom（首行 from list import { list_cons, list_empty }）
+fn show(xs: List&lt;Int&gt;) -&gt; Unit ! [IO]
+    println(xs)
+end
+fn main() -&gt; Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) =&gt; show(xs)
+        None =&gt; println(0)
+    end
+end
+
+# p09_nested_match_iso.lom（首行 from list import { list_cons, list_empty }）
+fn main() -&gt; Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) =&gt;
+            match xs
+                1 =&gt; println(xs)
+                _ =&gt; println(xs)
+            end
+        end
+        None =&gt; println(0)
+    end
+end
+
+# p10_for_match_bool.lom（首行 from list import { list_cons, list_empty }）
+fn main() -&gt; Unit ! [IO]
+    let flags = list_cons(True, list_cons(False, list_empty()))
+    for b in flags
+        match b
+            True =&gt; println(b)
+            False =&gt; println(b)
+        end
+    end
+end
+
+# p11_deep_bool_list.lom（首行 from list import { list_cons, list_empty }）
+fn main() -&gt; Unit ! [IO]
+    let inner = list_cons(True, list_empty())
+    let rows = list_cons(inner, list_empty())
+    for r in rows
+        for b in r
+            println(b)
+        end
+    end
+end
+
+# p12_for_iter_closure.lom（首行 from list import { list_cons, list_empty }）
+fn main() -&gt; Unit ! [IO]
+    let flags = list_cons(True, list_cons(False, list_empty()))
+    for b in flags
+        let f = fn() -&gt; Bool
+            b
+        end
+        println(f())
+    end
+end
+
+# p13_empty_multiflow.lom（首行 from list import { list_cons, list_empty, list_length, list_is_empty }）
+fn mk() -&gt; List&lt;Int&gt;
+    list_empty()
+end
+fn ident(xs: List&lt;Int&gt;) -&gt; List&lt;Int&gt;
+    xs
+end
+fn main() -&gt; Unit ! [IO]
+    let a = mk()
+    let b = ident(a)
+    println(list_length(b))
+    println(list_is_empty(b))
+end
+
+# p14_is_empty_noheap.lom（首行 from list import { list_empty, list_is_empty }）
+fn main() -&gt; Unit ! [IO]
+    let a = list_empty()
+    println(list_is_empty(a))
+end
+
+# p15_empty_head_trap.lom（首行 from list import { list_empty, list_head }）
+fn main() -&gt; Unit ! [IO]
+    let a = list_empty()
+    println(list_head(a))
+end
+
+# p15b_empty_head_annot.lom（首行 from list import { list_empty, list_head }）
+fn main() -&gt; Unit ! [IO]
+    let a: List&lt;Int&gt; = list_empty()
+    println(list_head(a))
+end
+
+# p15c_empty_get_annot.lom（首行 from list import { list_empty, list_get }）
+fn main() -&gt; Unit ! [IO]
+    let a: List&lt;Int&gt; = list_empty()
+    println(list_get(a, 0))
+end
+
+# p16_try_logical_rhs.lom
+fn mk(n: Int) -&gt; Result&lt;Int, String&gt;
+    if n &gt; 0 Ok(n) else Err("neg") end
+end
+fn g(c: Bool, n: Int) -&gt; Result&lt;Int, String&gt;
+    let q = c and (mk(n)? &gt; 0)
+    Ok(if q 1 else 0 end)
+end
+fn main() -&gt; Unit ! [IO]
+    match g(True, 5)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match g(True, 0 - 3)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+    match g(False, 0 - 3)
+        Ok(v) =&gt; println(v)
+        Err(e) =&gt; println(e)
+    end
+end
+
+# p17_for_logical_return.lom
+fn g() -&gt; Int
+    for i in 1..5
+        let q = (i &gt; 2) and (if i &gt; 3 return 90 else False end)
+        println(q)
+    end
+    return 0
+end
+fn main() -&gt; Unit ! [IO]
+    println(g())
+end
+
+# p18_or_chain3.lom
+fn f1() -&gt; Bool
+    False
+end
+fn f2() -&gt; Bool
+    False
+end
+fn f3() -&gt; Bool
+    True
+end
+fn g(c: Int) -&gt; Int
+    let q = f1() or f2() or (if c &gt; 0 return 42 else f3() end)
+    if q 1 else 0 end
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(5))
+    println(g(0 - 1))
+end
+
+# p19_nested_logical_left.lom
+fn g(a: Bool, b: Bool, c: Bool) -&gt; Int
+    let q = (a and b) or (if c return 7 else False end)
+    if q 1 else 0 end
+end
+fn main() -&gt; Unit ! [IO]
+    println(g(False, True, True))
+    println(g(True, True, False))
+    println(g(False, False, False))
+    println(g(True, False, True))
+end
+
+# p20_while_logical_return.lom
+fn g() -&gt; Int
+    let mut i = 0
+    while i &lt; 5
+        let q = (i &gt; 2) and (if i &gt; 3 return 90 else False end)
+        println(q)
+        i = i + 1
+    end
+    return 0
+end
+fn main() -&gt; Unit ! [IO]
+    println(g())
+end</pre>
+<p class="small">编写勘误（审查者自查，非产品缺陷）：match Form A 臂不收 return 语句（match_tail 探针两次改写为 Form B 块臂 + 每臂独立 end）；range <code>1..4</code> 含头不含尾（p17/p20 初版未触达 return 分支，改 <code>1..5</code>/<code>i&lt;5</code> 后才构成敌对面）；list 内建逐名导入（p07–p15 初版漏 import 系探针写法错误，补 import 后重跑）。此三条均为探针自身修正，未掩盖任何产品行为。</p>
+
+<h2>5. 新发现开账（R102 起；P1=静默错值/损坏、P2=行为级错误非静默、P3=登记精度/文案）</h2>
+<div class="r102">
+<p><b>R102 · P3：v1.4.7 的 CI run 编号登记 #209 与 GitHub 实测 #210 不符</b></p>
+<p><b>证据</b>：GitHub API 匿名实查（curl api.github.com/repos/lom-lang/lom/actions/runs?head_sha=&lt;sha&gt;）——22a37a6 的 run id <code>36612026578</code> 的 <code>run_number</code> 实测为 <b>210</b>（event=push，conclusion=success，created 2026-09-29T18:26:08Z）；run_number 209 实属提交 <code>0ba9145</code>（v1.4.6 的 docs 回填提交，run id 36608842154）。逐批核对其余宣称编号全部对上：8012c38→#200（36549057031）、a5dac74→#201（36563915297）、1851964→#202（36578254262）、df7f83b→#204（36594643927）、96c26b6→#207（36608219947）、d5ea6df→#212（36612663963）——唯 v1.4.7 一处错位。实质门禁不受影响：run id、六 job success、annotations 五条 notice（零 warning/error）均复核属实。</p>
+<p><b>波及面（全仓 grep "36612026578\|#209" 清点 5 处 + 1 笔 commit message）</b>：docs/TODO.md L10、docs/HANDOFF_PROMPT.md L57、docs/HANDOVER.md L376 与 L379、docs/rfc/0004 修订 39（L1161）、提交 aa470d6 的 message。</p>
+<p><b>修法建议（纯文档）</b>：五处 #209 → #210（或去编号只留 run id——id 已唯一且正确）；下轮 CI 编号登记建议以 API run_number 为准回填。负向锁定：改编号时不得动 run id 36612026578 本身；不得把 #209 的 36608842154 误植到 v1.4.7 段（那属于 0ba9145）。</p>
+</div>
+<p><b>本轮无 P1/P2 新开账。</b>台账顺延说明：R94（宿主 json 星面键序挂账）维持 open；R95–R101 已由六批交付关闭，本轮对其关闭条件全部复核认可。</p>
+
+<h2>6. 机制评注与精度备注（不开账，供下轮与交接参考）</h2>
+<ol>
+<li><b>p06——L2 拒绝面"用户函数不得命名 'println'"无负例锁</b>：宿主对该形态报 NAM002 error（--check rc=1，运行模式不拦截 error 是宿主普遍行为，HANDOVER 坑1 已登记），L2 编译期以专属文案拒绝——两侧非法结论一致、非行为分叉；但 L2 负例族中 neg_builtin_import_clash 锁的是 import 名冲突，prelude 名（println/print）的用户函数命名面没有对应负例。<b>建议（可选）</b>：补一枚 neg_user_fn_named_println 锁文案与无 hex。</li>
+<li><b>p09——宿主对"容器值 match 标量字面量"零诊断</b>：宿主 tagged rt_eq 语义下 Int 字面量与 List 永不命中、静默走通配臂（设计语义，18_match_scalar 批确立），L2 以"字面量模式类型不符"拒（既有负例文案族，但既有负例锁的都是 i64/st 交错，未锁 ls{i64} 被测形态）。属 L2 子集严格性自然延伸，登记面完整度可随下轮顺手补。</li>
+<li><b>p10/p11——无注解 Bool List 构造的 for 迭代显示仍拒</b>：修订 38 明文"严格形态播种仅注解三形态，保守不播"（初版全递归被存量对拍拦截后收紧），故为设计内边界而非缺口；但"自然写法不含注解时 Bool 容器显示仍落 ibase 兜底拒"这一点在 HANDOFF_PROMPT 拒绝清单中未逐项点名（清单只有跨函数参数传递族）。<b>建议（可选）</b>：信任边界清单补一句"无注解构造的 Bool/嵌套容器迭代显示保守拒"。</li>
+<li><b>R101 修复质量评注</b>：两行修复沿 compile_if 的 W-2 先例，本轮四个扩散面（EarlyReturn br 深度、嵌套 Logical、for/while 多重 label、or 链）全部实测通过，且 L2 侧零改动零扰动（193 存量对拍抽查零 DIFF 佐证）——该修复的完备性在本轮构造面内无可复反例。</li>
+<li><b>二十审先例确认</b>：探针目录按任务书保留于 target/probes/r20/（十九审及之前为报告完成后清理）；B甲 142 对拍本轮做了<b>全量</b>重算（非抽查），复现脚本 target/probes/r20/b_hexcmp/compare.py（含 pkg lom.toml 与嵌套目录结构的导出修正），可供后续轮直接复用。</li>
+</ol>
+
+<h2>7. 总评与评级</h2>
+<p><b>总评（一行式）</b>：v1.4.2→v1.4.7 六批整改交付（R95/R96/R97/R99/R100/R101 关闭 + E甲五缺口转正）经第二十轮独立敌手复核<b>宣称零失真、行为零缺陷证据</b>——基线 14 项全绿名实相符，B甲 142 对拍全量复算逐字节吻合，C/D/批1 存量对拍抽查 38 枚零 DIFF（含 22/43/66 关键回归面与 22 的 790B 恢复），22 枚六方向敌手探针零静默错值/零坏 wasm/零负例翻转，R101 修复四扩散面全绿；唯一开账 R102（P3，CI run 编号 #209→#210 五处文档笔误，实质门禁不受影响）。</p>
+<p><b>评级：A-</b>。定级依据：本轮检验面内无任何 P1/P2 级发现（对照十九审 B+ 时在场一枚 P2 行为级误拒）；全部数字宣称（含 quine 269510B、199 的 217B、108/142 的两枚有意变化字节）逐字复核成立；扣分项为 R102 一致性笔误与 §6 三条精度弱面（L2 信任边界清单未逐项覆盖 prelude 命名/无注解 Bool 迭代/容器字面量 match 三形态）。历史评级不外推、本轮结论不预支后续；R94 宿主挂账维持，交接前建议先修 R102（纯文档、五处 +1 commit message 不可改，仅需改在档文档）。</p>
+<p class="small">审查执行纪律回顾：git 全程只读（git show 仅用于导出 v1.4.2/v1.4.3/v1.4.4/v1.4.5 旧编译器做对拍）；cargo 命令串行；未改任何产品源码/测试/工具/治理文档；唯一写盘物为本报告与 target/probes/r20/ 探针（保留）。本报告落盘后 python tools/doc_audit.py 复跑 67/67（review HTML 非锚定对象）。</p>
+
+</body>
+</html>
