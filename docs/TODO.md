@@ -18,8 +18,10 @@
 > 121/121/fmt 37+12）；规划者亲验 verify_selfcomp 与 doc_audit。
 > ignored `target/probes/r96_c_impl`、`r96_c_review`、
 > `r96_hex_compare` 证据保留。**R96 关闭**；升版 v1.4.4（纯 L2
-> patch，宿主 src 零改动）。提交/推送/CI 首跑/tag 由规划者执行，
-> 结果以 CI 为准——若首跑绿即切 tag v1.4.4 并回填本段与 SPEC §13。
+> patch，宿主 src 零改动）。**提交 `1851964` 推送后 CI run
+> `36578254262`（#202）六 job 全绿**（annotations 五条环境
+> notice：Ubuntu 26 迁移四条 + macOS arm64 容量一条，零
+> warning/error），已切 tag v1.4.4；本段与 SPEC §13 已回填。
 > 当前 open：R94（宿主挂账）、R97、R100、R101；D甲/R97 与 E甲
 > 邻近证据尚未动工，R100/R101 修法另待用户裁决。
 >

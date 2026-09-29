@@ -58,8 +58,9 @@
   逐字节恒等**（IDENTICAL=175/0/0）；self_comp.lom 11938 行（较 v1.4.3 +12）；
   bootstrap **14/14**，强 quine **262552 bytes** 双侧一致；全量回归
   16 项全绿；规划者亲验 verify_selfcomp 与 doc_audit。Cargo.toml/lock
-  均为 1.4.4。**R96 已关闭**；提交推送/CI 首跑/tag v1.4.4 由规划者
-  执行中——新任以 `git log`/CI 实查为准，首跑非绿先处理 CI。
+  均为 1.4.4。**R96 已关闭**；提交 `1851964` 推送后 CI run
+  `36578254262`（#202）六 job 全绿（annotations 五条环境 notice，
+  零 warning/error），tag v1.4.4 已切。
 - tag 基线链：v1.4.2（A甲/R99，`8012c38`，CI #200）→ v1.4.3
   （B甲/R95，`a5dac74`，CI #201 六 job 绿，annotations 五条环境
   notice 零 warning）→ v1.4.4（C甲/R96，CI/tag 见实查）。v1.4.3
