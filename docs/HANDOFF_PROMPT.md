@@ -58,7 +58,8 @@
   v1.4.5 全部 **193 对拍 hex 逐字节恒等**；self_comp.lom 12525 行；
   bootstrap **14/14**（quine 269510 bytes 双侧一致）；十六枚既有负例
   逐枚复核不倒。Cargo.toml/lock 均为 1.4.6。**R100 关闭、E甲转正**；
-  提交/CI 首跑/tag 由规划者执行——新任以 `git log`/CI 实查为准。
+  提交 `96c26b6` 推送后 CI run `36608219947`（#207）六 job 全绿，
+  tag v1.4.6 已切。
 - **D甲/R97 已交付 v1.4.5**（`df7f83b`，CI #204 六 job 绿后切 tag）：显示预扫补追踪 match 臂 Binder 容器载荷——三流入路（直接
   构造链/参数注解/helper 返回签名）全通；预扫保持 AST-only（三张
   直收表 + cbind 知识/放行分层 + 臂内拷贝 `@arm_local` 哨兵 + 规划者
