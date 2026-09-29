@@ -59,8 +59,9 @@
   存量 v1.4.4 全部 **183 对拍 hex 逐字节恒等**（IDENTICAL=183/0/0）；
   self_comp.lom 12199 行；bootstrap **14/14**，强 quine **266073 bytes**
   双侧一致；规划者亲验 verify_selfcomp 与 hex 抽查。Cargo.toml/lock
-  均为 1.4.5。**R97 已关闭**；提交/CI 首跑/tag v1.4.5 由规划者执行
-  ——新任以 `git log`/CI 实查为准，首跑非绿先处理 CI。
+  均为 1.4.5。**R97 已关闭**；提交 `df7f83b` 推送后 CI run
+  `36594643927`（#204）六 job 全绿（annotations 五条环境 notice，
+  零 warning/error），tag v1.4.5 已切。
 - **C甲/R96 已交付 v1.4.4**（`1851964`，CI #202 六 job 绿后切 tag）：
   闭包内 prelude `println`/`print` 放行（父 env 优先、仅豁免两名）；
   verify_selfcomp 340/340、存量 175 hex 恒等、quine 262552B、

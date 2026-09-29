@@ -15,8 +15,9 @@
 > `--bootstrap` **14/14**，强 quine **266073 bytes** 双侧一致；
 > ignored `target/probes/r97_design`、`r97_hex_compare` 证据
 > 保留。**R97 关闭**；升版 v1.4.5（纯 L2 patch，宿主 src 零
-> 改动）。提交/推送/CI 首跑/tag 由规划者执行，结果以 CI 为
-> 准——若首跑绿即切 tag v1.4.5 并回填本段与 SPEC §13。
+> 改动）。**提交 `df7f83b` 推送后 CI run `36594643927`（#204）
+> 六 job 全绿**（annotations 五条环境 notice，零 warning/error），
+> 已切 tag v1.4.5；本段与 SPEC §13 已回填。
 > 当前 open：R94（宿主挂账）、R100、R101；E甲邻近证据待整理
 > 另呈扩围裁决，R100/R101 修法另待用户裁决。
 >
