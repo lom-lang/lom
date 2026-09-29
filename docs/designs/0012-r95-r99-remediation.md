@@ -171,3 +171,10 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 - **用例与计数**：十正 184–193（三条关闭标准 + 嵌套/guard/兄弟臂隔离/臂内标量遮蔽/闭包/用户枚举/Result 混合；193 以 Int 替 String 载荷——String 字面量会先开设施测不到预扫路径）两负（neg_r97_no_ret_helper——实测拒绝点更早为 void 文案、保守边界成立；neg_r97_param_direct——参数不经 match 直接 println 仍拒）。verify_selfcomp **352/352 = 188 单文件 + 5 包 + 159 负例**；既有 neg_deep_flow 四负例零翻转。
 - **验收**：存量 v1.4.4 全部 **183 对拍（178 单文件 + 5 包）同宿主 hex 逐字节恒等**（补修后 IDENTICAL=183/0/0，`target/probes/r97_hex_compare/compare_hex.py` 为忽略目录证据）；self_comp **11938→12199 行（+261）**；`--bootstrap` **14/14**，强 quine **266073 bytes** 双侧一致；宿主 src 零改动。
 - **收口**：升版 v1.4.5（纯 L2 patch）；语言面与发布线冻结不变。**R97 关闭**，"一层 vt 判定即覆盖自然写法"宣称随本批解除收窄。按已裁顺序仅剩 **E甲**整理邻近 Bool Binder/`for` 证据另呈扩围裁决（§3 E：未获裁决不在本包实施）；R94/R100/R101 继续 open。
+
+## 11. E甲邻近证据整理（2026-09-29，v1.4.5 上新鲜复测；呈扩围裁决，未实施）
+
+- **性质**：按 §3 E 裁决甲——只整理证据另呈用户扩围裁决，本批零代码。探针 `target/probes/e_jia/`（gitignored）；规划者亲验 #1/#8 两枚拒绝文案一致。
+- **八枚探针结论**：**邻近缺口（宿主收/L2 拒）五枚**——① `match Some(True) Some(flag) => println(flag)`（Bool Binder 原探针）；② for 容器迭代变量 `for xs in rows println(xs)`（原探针）；③ `fn show(v: Option<Bool>)` 参数注解流入 match Binder；④ `fn flag() -> Bool` 返回流入 match Binder；⑤ 注解 `List<Bool>` 的 for 迭代 println。**已覆盖两枚**（for 内值位比较 `x % 2 == 0`、for 内一层 let 绑定 Bool）——编译且双侧逐字一致，证明 scan→ibase 路径健康。**对照一枚**（注解 `List<List<Int>>` 的 for 迭代）证明 D甲 cbind 知识覆盖 match Binder 而不外溢 for。
+- **三个结构性盲点**（行号佐证 self_comp.lom @ v1.4.5）：① bool_disp_expr 的 ExMatch（约 L10744）丢 scrut 且臂体走 bool_disp_expr（对 println 恒 False）——match 臂内任何 Bool println 形态不可见；② 两家族 StFor（bool L10861 / disp L11349）首字段迭代变量绑定均丢弃；③ scan_has_bool_display（L10931）只收返回注解、无参数注解收集——与容器家族（cbind 播种）不对称。
+- **若裁决扩围的最小改动面（主观推测，供参考）**：bool_disp 的 ExMatch 补 scrut 递归与臂内 println_bool_ex 调用、两家族 StFor 播种迭代变量（类型来源：迭代表达式推断或注解）、Bool 家族补参数注解收集。未获裁决不动工；扩围后须按 D甲同款门禁（存量 hex 恒等或列明有意变化、负例锁、全量回归）。
