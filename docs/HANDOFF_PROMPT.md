@@ -5,7 +5,7 @@
 > 事实源指针**两段式：代码块只保留行为契约（铁律）与活信息（版本/审查/
 > open 项/菜单/第一回合清单/关键锚点索引），交付史、教训、逐批行为锚点
 > 不再手写拷贝于此——其唯一事实源（RFC-0004 修订记录、HANDOVER §11.6、
-> SPEC §13、TODO 顶部、designs/0001~0011、verify_selfcomp 用例集）全部
+> SPEC §13、TODO 顶部、designs/0001~0012、verify_selfcomp 用例集）全部
 > 位于第一回合阅读清单内，信息零丢失、拷贝零漂移（此前 416 行版本的多
 > 拷贝漂移实录见当日提交记录）。交接门禁不变：doc_audit 67/67 + CI 全绿。
 > 完整维护流程、审查节奏与交接五件套规范见 [HANDOVER §12](HANDOVER.md)。
@@ -48,59 +48,58 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- 仓库版本 v1.4.1（容器显示批交付，designs/0011 四裁决点全按建议项，
-  RFC-0004 修订 32；tag 切于 a697474，CI run 36452201064 六 job 全绿；
-  首回合仍须实查最新 main CI 与 annotations）。语言面与外部发布线冻结。
-  此前 v1.4.0 = L2.4 自举闭环收官（RFC-0004 全部目标达成，强 quine）。
-- 提交门禁教训（两起实录，升版/收尾必查）：① Map 批 feat 提交的 git
-  add 显式清单漏 Cargo.toml/lock——本地门禁跑在工作区≠验提交树，
-  提交前 `git show --stat HEAD` 核对 bump 文件在树；② v1.3.2 时点执行
-  者收尾漏跑 lom fmt + 规划者验收 tail 截断漏看 FAIL 行——新增/修改
-  .lom 提交前必过 fmt --check（CI 同款递归检查）。
+- 仓库工作区拟升 v1.4.2（R99 A甲安全闸，本地代码与单项验证完成；
+  规划者全量回归、提交推送、CI 首跑及 tag 待验）。最近已确认的 tag
+  仍是 v1.4.1（容器显示批，a697474；当时 CI run 36452201064 六 job
+  全绿）；首回合仍须实查最新 main CI 与 annotations。语言面 v1.0
+  和外部发布线继续冻结。v1.4.0 为 RFC-0004 L2.4 自举闭环收官。
+- 提交门禁教训：① Map 批 feat 提交 git add 清单漏 Cargo.toml/lock，
+  本地门禁验工作区不等于验提交树；提交前 git show --stat HEAD 核对
+  bump 文件。② v1.3.2 执行者漏跑 Lom fmt、规划者 tail 截断漏看
+  FAIL；新增/修改 .lom 提交前必过 CI 同款递归 fmt --check。
 - 环境状态（2026-09-26 已整理）：git stash 空、松散对象已打包、调试
-  残留已清理；目录结构健康。eval/candidates_rerun（LLM raw 证据）保留。
-- 审查状态：**十九轮体系内独立审查（非外部同行审计），最新十九审
-  总评 B+**（基线 a697474/v1.4.1，报告 review-2026-09-29.html）——
-  容器显示批宣称零失真复证（286/286 名实、存量 127 hex 独立对拍
-  127/127、quine 247009 bytes、宿主零改动）；敌手 19 正例 MATCH +
-  3 自举外推全等，零静默错值零坏 wasm。历史轨迹一行：十八审 A-
-  （R92/R93 已修）← 十七审 A-（R90/R91 已收口）← 十六审 A-
-  （R86-R89 已修）← 更早见 TODO；历史评级不外推，十九审 B+ 不预支
-  整改后（二十审重估）。
-- **当前 open（整改顺序待用户裁决）**：R95（P2，五轮来首个：值位 if
-  两臂全 return 且绑定后参与算术——宿主 TYPE001 warning 收/L2 编译期
-  拒，bottom 合流"绑定后算术"路径缺口；修否二选一：vt_merge/尾值校验
-  对 bottom 再让步（行为修复）或登记收窄）、R96（P3：闭包体内调用
-  内建 println 宿主收/L2 拒——内建名不在 fns 表被当自由变量）、R97
-  （P3：scan_has_display 预扫不追踪 match 臂 Binder 容器载荷——无
-  字面量程序自然写法落 ibase 兜底拒）、R94（挂账：json_stringify
-  星面键序宿主双后端分叉——U+E000 与 U+10000+ 键并存时 Rust 字节序
-  vs JS UTF-16 码元序，显示面不受影响）。
-- 交付史一句话 + 指针：RFC-0004 已收官（L2.1 spike→L2.2 子集→L2.3
-  十一批→L2.4 自举+强 quine→容器显示收口；**修订 1-33**，其中 33 为
-  十九审开账登记）；逐批交付细节/机制偏离/实施修正的唯一事实源 =
-  RFC-0004 修订记录 + SPEC §13 changelog + docs/designs/0001~0011 +
-  docs/TODO.md 顶部——勿在本文复述（多拷贝漂移实录：旧版提示词曾
-  因此累计 10 处失真）。仍不可称容器全覆盖（R95-R97 open）。
-- 测试基线：Rust 541 单元 + 8 集成；verify_selfcomp 286/286 = 139
-  对拍（134 单文件 + 5 pkg）+ 147 负例，--bootstrap 14/14（quine
-  247009 bytes 双侧逐字节一致）；eval 双后端 121/121 ×2；selfhost
-  六模式；self_comp.lom 11321 行；doc_audit 67/67；spec_examples
-  PASS；eval_prompt_check 24/24；cargo fmt --check 零 diff。
-- 下一步由用户裁决：**R95-R97 整改包（R95 P2 优先）** / 宿主挂账
-  统筹小包（map_remove 双后端分叉、包内 as 别名解释器 RUNTIME002、
-  R94 json 键序 harness 修否——同族三项）/ println(Bool) 预扫扩放行
-  评估 / typechecker for 变量可变性 quirk 立项与否（TODO R65 证据
-  区）/ 二十审复审（R95-R97 整改后评级）或休整；观察项：MoonBit 1.0
-  Q3 复核（窗口将过）、ubuntu-26 镜像迁移观察 2026-10-19。
+  残留已清理；eval/candidates_rerun 的 LLM raw 证据保留。当前 A甲
+  工作区含待提交源码、用例、文档与版本改动，不能称工作区干净。
+- 审查状态：十九轮体系内独立审查（非外部同行审计），十九审历史
+  总评 B+（a697474/v1.4.1；报告 review-2026-09-29.html），不外推
+  A甲后评级。报告 d2 原记 COMPILED 121 bytes 及双侧运行一致，后续
+  独立复证为 L2 模块 Node local.set 栈下溢、不可实例化；首页已有
+  事后勘误，原评级/探针原文保留。此前容器显示批 286/286、存量
+  127 hex 恒等及 247009-byte quine 都是 v1.4.1 时点事实，不作现值。
+  十八审 A-、十七审 A- 的评级同样只属各自基线。
+- 用户已裁决 A甲→B甲/C甲/D甲/E甲，本阶段仅 A甲已实施：R99 P2
+  全终止值位 if/match 坏 WASM 改为编译期显性拒且无 hex；AST 判定
+  与未知泛型 ? 分开。R99 最终闭账待规划者全量门禁和 CI。R95 P2
+  （宿主正确运行的 bottom 绑定后算术，L2 仍误拒）open，B甲完整
+  行为放行尚未做；R96 P3 闭包内 println/print 与 R97 P3 match
+  Binder 显示预扫均 open，C甲/D甲待实施；E甲邻近 Bool Binder/for
+  证据阶段待实施。R94 json 星面键序宿主挂账继续。
+- 新开 R100 P2（修法与次序待用户裁决，不在 A甲范围）：无 String/
+  heap 的空 List 只读内建可令 L2 COMPILED 后产缺 memory 段的 WASM；
+  代表探针 138 bytes、Node 报 memory index 0 exceeds number of
+  declared memories (0) @+127；宿主输出 0。证据见 TODO 顶部。
+- A甲实测：Rust 541 单元 + 8 集成、eval 双后端各 121/121 数量
+  不变；verify_selfcomp 298/298 = 137 单文件 + 5 包 + 156 负例
+  （旧 286 = 134+5+147，新增 3 正例控制 + 9 负例）；--bootstrap
+  14/14，新强 quine 249786 bytes 双侧逐字节一致；
+  self_comp.lom 11469 行（旧 11321，+148）；旧/新同宿主存量 139 hex 独立对拍
+  139/139 全等（含 v1.4.0 子集 127/127）。doc_audit 67 项、
+  spec_examples、selfhost 六模式及 §2.2 全量回归仍需规划者最终汇总。
+- 交付史与机制细节事实源：RFC-0004 修订 1-34、SPEC §13 changelog、
+  designs/0001~0012、TODO 顶部和 HANDOVER §11.6；不在提示词复制
+  逐批记录。当前不能称 R95-R97 或 R100 已关闭。
+- 下一步按已裁顺序：规划者验收并完成 A甲提交/CI/tag 门禁；随后
+  B甲完整 bottom 对齐、C甲 R96、D甲 R97、E甲邻近证据整理。
+  R100 的修法/次序另待用户裁决；二十审发起及评级重估也仅由用户
+  决定。宿主挂账族、MoonBit 1.0 Q3 复核及 ubuntu-26 镜像迁移
+  2026-10-19 观察仍在案。发布线不解冻。
 - 维护流程/审查节奏/交接五件套规范：HANDOVER §12（含 §12.4 分工）。
-
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-09-29.html
    （十九审——最新轮）及 review-2026-09-28.html（十八审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-33 全读），docs/designs/0001~0011 十一份批次设计（含各批实施
+   1-34 全读），docs/designs/0001~0012 十二份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
@@ -114,7 +113,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 286/286 = 139 用例双产物行为一致（134 单文件 + 5 包项目）+ 147 负例拒绝）
+   - python tools/verify_selfcomp.py（期望 298/298 = 142 用例双产物行为一致（137 单文件 + 5 包项目）+ 156 负例拒绝）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine；耗时随机器负载 ~100s-400s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
@@ -128,12 +127,13 @@
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
 
 【关键锚点索引（当前行为要点；逐批行为基线已由 verify_selfcomp
-  286 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
-  §4 探针原文与 designs 实施修正记录）】
+  298 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+  §4 探针原文与事后勘误、designs 实施修正记录）】
 - open 项复现要点（规划者已亲验 R95/R96 逐字一致）：R95——`let v =
   if c return 1 else return 2 end; v + 0` 作函数尾值：宿主 TYPE001
   warning 收（运行正确 1/2）vs L2 拒"尾表达式类型与返回类型不符"；
-  对照 `v` 直尾值双侧均收（121 bytes）。R96——闭包体内 println(n)：
+  对照 `v` 直尾值在旧 L2 虽 COMPILED 121 bytes，但 Node 实例化
+  local.set 栈下溢（R99），A甲后编译期显性拒且无 hex。R96——闭包体内 println(n)：
   宿主 7/7 收 vs L2 拒"闭包捕获了未定义变量 'println'"。R97——无
   字面量程序 `match Some(xs) => println(xs)` 落 ibase 兜底拒（带
   String 字面量同形态过）。
@@ -148,7 +148,8 @@
   指令族与偶字符占位（容器显示批教训）。
 - R92/R95 登记链（防再证伪）：值位 return 终止臂"单 return 臂形态"
   双侧一致（十八审 R92）；"双 return 臂 + 绑定后算术"形态仍有分叉
-  （十九审 R95 开账）——现行登记已按此收窄，勿回退到"无剩余分叉"。
+  （十九审 R95 开账），双 return 臂绑定直尾值旧 L2 是 R99 坏
+  WASM，A甲后安全拒绝——勿回退到"无剩余分叉"。
 
 现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
 ```

@@ -1,0 +1,7 @@
+fn g(n: Int) -> Int
+    if n > 100 return 1 else return 2 end
+end
+fn main() -> Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end

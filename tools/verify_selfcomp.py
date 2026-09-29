@@ -230,6 +230,16 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_println_deep_rc.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
     'neg_println_deep_enum.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
     'neg_println_deep_enum_ls.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
+    # ---- R99 安全闸：全终止值位 if/match 显性拒，禁止 COMPILED 坏 WASM ----
+    'neg_r99_if_bound_int.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_if_annot_int.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_if_bound_float.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_if_bound_bool.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_if_bound_string.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_match_bound.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_if_direct_tail.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_match_direct_tail.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
+    'neg_r99_nested_termination.lom': '全终止值表达式无正常产值（R99 安全拒绝）',
 }
 
 

@@ -1,0 +1,15 @@
+fn g(n: Int) -> Int
+    let w = match n
+        5 =>
+            return 55
+        end
+        _ =>
+            return 22
+        end
+    end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(5))
+    println(g(3))
+end

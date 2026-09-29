@@ -1,0 +1,10 @@
+from list import { list_cons, list_empty, list_length }
+
+fn g(c: Bool) -> Int
+    let xs = if c list_empty() else list_cons(1, list_empty()) end
+    list_length(xs)
+end
+fn main() -> Unit ! [IO]
+    println(g(True))
+    println(g(False))
+end

@@ -1,0 +1,14 @@
+fn g(n: Int) -> Int
+    match n
+        5 =>
+            return 55
+        end
+        _ =>
+            return 22
+        end
+    end
+end
+fn main() -> Unit ! [IO]
+    println(g(5))
+    println(g(3))
+end

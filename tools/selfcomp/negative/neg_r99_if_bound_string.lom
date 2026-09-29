@@ -1,0 +1,8 @@
+fn g(n: Int) -> String
+    let w = if n > 100 return "yes" else return "no" end
+    w
+end
+fn main() -> Unit ! [IO]
+    println(g(200))
+    println(g(1))
+end

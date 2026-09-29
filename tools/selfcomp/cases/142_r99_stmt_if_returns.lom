@@ -1,0 +1,12 @@
+fn g(n: Int) -> Int
+    if n > 0
+        return 1
+    else
+        return 2
+    end
+    0
+end
+fn main() -> Unit ! [IO]
+    println(g(1))
+    println(g(-1))
+end

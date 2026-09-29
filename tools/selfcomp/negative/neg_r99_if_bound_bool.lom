@@ -1,0 +1,8 @@
+fn g(n: Int) -> Bool
+    let w = if n > 100 return True else return False end
+    w
+end
+fn main() -> Unit ! [IO]
+    if g(200) println(1) else println(0) end
+    if g(1) println(1) else println(0) end
+end

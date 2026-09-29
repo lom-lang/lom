@@ -4130,10 +4130,140 @@ fn infer_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bo
     end
 end
 
+# R99 安全闸：只按 AST 控制流判定表达式是否完全没有正常产值。
+# 不能用 vt 字符串 "?" 判定：它同时表示 List/Map 泛型元素未知。
+# 这里保守判定；未证明全终止的形态交给原类型/发射校验。
+fn if_no_value(ifr: IfR) -> Bool
+    match ifr
+        IfR(branches, else_b) =>
+            if list_length(branches) == 0
+                return False
+            end
+            match else_b
+                None => False
+                Some(eb) =>
+                    if !blk_no_value(eb)
+                        return False
+                    end
+                    for pair in branches
+                        if !blk_no_value(pair.1)
+                            return False
+                        end
+                    end
+                    True
+                end
+            end
+        end
+    end
+end
+
+fn arm_no_value(body: ArmB) -> Bool
+    match body
+        ABExpr(e) => ex_no_value(e)
+        ABBlock(b) => blk_no_value(b)
+    end
+end
+
+fn match_no_value(arms: List<ArmR>) -> Bool
+    if list_length(arms) == 0
+        return False
+    end
+    for arm in arms
+        match arm
+            ArmR(_, _, body) =>
+                if !arm_no_value(body)
+                    return False
+                end
+            end
+        end
+    end
+    # 无臂匹配时发射路 trap；其余臂全终止时无正常产值。
+    True
+end
+
+fn st_no_value(s: St) -> Bool
+    match s
+        StReturn(_) => True
+        StLet(_, _, _, e) => ex_no_value(e)
+        StDestruct(_, e) => ex_no_value(e)
+        StAssign(_, _, _, e) => ex_no_value(e)
+        StExpr(e) => ex_no_value(e)
+        StIf(ifr) => if_no_value(ifr)
+        StWhile(cond, _) => ex_no_value(cond)
+        StFor(_, iter, _) => ex_no_value(iter)
+        StHole(_, _) => False
+    end
+end
+
+fn blk_no_value(b: Blk) -> Bool
+    match b
+        BlkOf(stmts, tail) =>
+            for s in stmts
+                if st_no_value(s)
+                    return True
+                end
+            end
+            match tail
+                None => False
+                Some(te) => ex_no_value(te)
+            end
+        end
+    end
+end
+
+fn ex_no_value(e: Ex) -> Bool
+    match e
+        ExGroup(inner) => ex_no_value(inner)
+        ExIf(ifr) => if_no_value(ifr)
+        ExMatch(scrut, arms, _) => ex_no_value(scrut) or match_no_value(arms)
+        ExUnary(_, inner) => ex_no_value(inner)
+        ExBinary(_, l, r) => ex_no_value(l) or ex_no_value(r)
+        # and/or 可短路；仅左侧必求值。
+        ExLogical(_, l, _) => ex_no_value(l)
+        ExCall(callee, args) =>
+            if ex_no_value(callee)
+                return True
+            end
+            for a in args
+                if ex_no_value(a)
+                    return True
+                end
+            end
+            False
+        end
+        ExIndex(a, b) => ex_no_value(a) or ex_no_value(b)
+        ExField(inner, _) => ex_no_value(inner)
+        ExTry(inner) => ex_no_value(inner)
+        ExPipe(a, b) => ex_no_value(a) or ex_no_value(b)
+        ExRange(a, b) => ex_no_value(a) or ex_no_value(b)
+        ExRecord(fields) =>
+            for pair in fields
+                if ex_no_value(pair.1)
+                    return True
+                end
+            end
+            False
+        end
+        ExTuple(elems) =>
+            for el in elems
+                if ex_no_value(el)
+                    return True
+                end
+            end
+            False
+        end
+        # 闭包字面量只构造函数值，不执行其 body。
+        _ => False
+    end
+end
+
 # L2.3-a：块尾 if 表达式的类型综合——带 else 时各分支值类型须一致；
 # 无 else 时仅 void 语境合法（各分支值类型须 void——宿主运行时"条件假
 # 得 Unit"的渐进式语义收紧为编译期一致，非 void 值语境必须写全 else）。
 fn infer_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if if_no_value(ifr)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     match ifr
         IfR(branches, else_b) =>
             match else_b
@@ -4428,6 +4558,9 @@ fn match_arm_type(body: ArmB, arm_env: Map<String, {slot: Int, vt: String, sig: 
 end
 
 fn infer_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if ex_no_value(scrut) or match_no_value(arms)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     let svt = infer_ex(scrut, env, fns)?
     if svt == "void" or svt == "cl"
         return Err(subset_err("match 被测值类型不支持（'" + svt + "'）"))
@@ -4477,6 +4610,9 @@ end
 # ---- X2：表达式编译（产物 hex；值留栈上；void 不产值） ----
 
 fn comp_ex(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if ex_no_value(e)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     match e
         ExInt(n) => Ok("42" + sleb128_hex(n))
         ExFloat(s) => Ok("44" + f64_bits_le(parse_float_str(s)))
@@ -5112,6 +5248,9 @@ fn comp_match_arm_body(body: ArmB, arm_env: Map<String, {slot: Int, vt: String, 
 end
 
 fn comp_match_expr(scrut: Ex, arms: List<ArmR>, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if ex_no_value(scrut) or match_no_value(arms)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     let result_vt = infer_match_expr(scrut, arms, env, fns)?
     let svt = infer_ex(scrut, env, fns)?
     let scrut_code = comp_ex(scrut, env, fns, cg, locals, localvt)?
@@ -9098,6 +9237,9 @@ end
 # 非法 wasm，失败面推迟到实例化）。与宿主"注解不匹配仅 TYPE001 warning、
 # 运行时值胜出"的渐进式语义是已登记的信任边界差异（RFC-0004 修订 4）。
 fn let_vt(tyo: Option<Ty>, ex: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>) -> Result<String, String>
+    if ex_no_value(ex)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     match tyo
         None => infer_ex(ex, env, fns)
         Some(tt) =>
@@ -9327,6 +9469,9 @@ end
 # L2.3-a：块尾 if 表达式编译——(result bt) 形态产值；bt 由综合类型定。
 # 分支体产值（comp_val_blk：语句照常 + 尾值留栈；void 分支不产值）。
 fn comp_if_expr(ifr: IfR, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}>, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: String}>, cg: {cgs: Map<String, Int>, cgh: Map<String, String>, shims: Map<String, Int>, sigty: Map<String, Int>}, locals: Map<String, Int>, localvt: Map<String, String>) -> Result<String, String>
+    if if_no_value(ifr)
+        return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+    end
     match ifr
         IfR(branches, else_b) =>
             let t = infer_if_expr(ifr, env, fns)?
@@ -9529,6 +9674,9 @@ fn comp_tail(tail: Option<Ex>, env: Map<String, {slot: Int, vt: String, sig: Str
     match tail
         None => Ok(out)
         Some(te) =>
+            if ex_no_value(te)
+                return Err(subset_err("全终止值表达式无正常产值（R99 安全拒绝）"))
+            end
             match te
                 ExIf(ifr) =>
                     # L2.3-a：块尾 if 表达式——(result bt) 产值（类型校验走

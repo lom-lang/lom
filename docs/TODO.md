@@ -1,6 +1,51 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **交接声明（2026-09-29 十九审收官 + 交接就绪）**：仓库版本
+> **当前交接声明（2026-09-29，R99 A甲安全阶段本地完成、提交/CI 待验）**：
+> 用户已裁决 A甲→B甲/C甲/D甲/E甲；本阶段**仅 A甲**代码和用例
+> 已实施，拟升仓库版本 v1.4.2，规划者尚须完成全量回归、提交推送、
+> CI 首跑与 tag 门禁。语言面与外部发布线继续冻结。十九审
+> [报告](reviews/review-2026-09-29.html)的历史 B+ 不重评：原 d2
+> “COMPILED 121 bytes”属实，但“L2 输出 1/2、零坏 wasm”经独立
+> 复证为误判——`WebAssembly.validate=false`，Node 实例化报
+> `not enough arguments on the stack for local.set (need 1, got 0) @+100`；
+> 报告首页已加事后勘误，原探针及评级留存。**R99（P2）**
+> 将“全终止值位 if/match 编译后坏 WASM”与 R95“合法算术误拒”分账。
+> A甲引入 AST 全终止判定，与泛型未知 `?` 分开，已证明无正常
+> 产值的值表达式在发射前显性报“全终止值表达式无正常产值（R99
+> 安全拒绝）”且不产 hex。目录与验收器实数：**298/298 = 137
+> 单文件对拍 + 5 包项目 + 156 负例**（旧 286 = 134 + 5 +
+> 147；新增 3 正例控制 + 9 负例锁定）；`self_comp.lom`
+> **11321→11469 行（+148）**；`--bootstrap` **14/14**，新强
+> quine **249786 bytes** 双侧逐字节一致。旧/新同宿主存量 hex
+> 独立对拍 **139/139 全等**（含 v1.4.0 子集 127/127；输出
+> IDENTICAL=139、DIFF=0、MISSING=0；忽略目录脚本
+> `target/r99-hex-compare/compare.py` 仅为本地复现证据）。Rust
+> 541 单元 + 8 集成、eval 双后端各 121/121 数量不变。**R99
+> 本地修复待规划者全量回归及 CI 确认后闭账；R95 仍 open**；
+> R96/C甲、R97/D甲、E甲邻近面均未实施，不预称收口。R94 宿主
+> 挂账继续；新增 R100 open 如下。外部发布线不解冻。
+>
+> **R100 开账（2026-09-29，P2，修法及次序待用户裁决；本阶段不修）**：
+> 无 String 字面量、未开启 heap 的程序使用 `list_empty`，随后
+> `list_length`/`list_head`/`list_tail`/`list_get` 等只读内建，
+> L2 可报告 COMPILED，但发出 memory 指令时模块没有 memory 段，
+> Node 实例化失败。两执行者独立全链复现；文档执行者新鲜复跑
+> `target/probes/r99_review/generic_unknown_control.lom`（原文为
+> `from list import { list_empty, list_length }`，`main` 中
+> `let xs: List<Int> = list_empty()` 后 `println(list_length(xs))`）：
+> 宿主 `lom build --target wasm` rc=0、9723 bytes，Node stdout
+> `0`/rc=0；L2 `COMPILED 138 bytes`、hex 276 字符，`hex2wasm`
+> rc=0；`WebAssembly.validate=false`，Node rc=1：
+> `memory index 0 exceeds number of declared memories (0) @+127`。
+> 无注解 `list_length(list_empty())` 同族 132 bytes；空表
+> head/tail/get 代表形态分别 104/155/154 bytes 均 invalid。
+> `list_cons` 非空表与开启 String 设施的对照可验证且输出正确。
+> 机制读码：`scan_ex` 将这些只读名归为不开 heap，`comp_list_builtin`
+> 实际发 memory 指令/调用含 load 的 helper；R99 A甲补丁未触此路。
+> **R100 不因 A甲安全闸而关闭，等待用户方向裁决。**
+>
+> **交接声明（2026-09-29 十九审收官 + 交接就绪；历史时点，d2
+> 勘误见上）**：仓库版本
 > v1.4.1（tag 切于 a697474，CI run 36452201064 六 job 全绿）。
 > 第十九轮独立审查（[review-2026-09-29.html](reviews/review-2026-09-29.html)，
 > 基线 a697474/v1.4.1）总评 **B+**：容器显示批全部可复核宣称
