@@ -1,0 +1,11 @@
+# E甲扩围（R97 邻近缺口③）：Bool 返回注解 helper 流入 match Binder——
+# flag() -> Bool 经 ret_bool_fns 表，match flag() 裸 binder 臂 println(b)。
+fn flag() -> Bool
+    3 > 2
+end
+
+fn main() -> Unit ! [IO]
+    match flag()
+        b => println(b)
+    end
+end

@@ -1,0 +1,9 @@
+# E甲扩围（R97 邻近缺口①）：match 臂 Binder 的 Bool 载荷——scrut 变体
+# 构造实参 Bool 字面量 → Some(flag) 臂内 println(flag)。宿主 true；修复前
+# bool 家族 ExMatch 丢 scrut 且臂体对 println 恒 False，ibase 防御拒。
+fn main() -> Unit ! [IO]
+    match Some(True)
+        Some(flag) => println(flag)
+        None => println(False)
+    end
+end

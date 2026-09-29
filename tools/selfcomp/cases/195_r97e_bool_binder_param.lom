@@ -1,0 +1,13 @@
+# E甲扩围（R97 邻近缺口③）：参数注解 Option<Bool> 流入 match Binder——
+# v 经 bbind 播种（scrut 判定读），Some(flag) 臂内 println(flag) 放行；
+# 直接 println(v) 仍走保守边界（neg_bool_param_flow 不翻转）。
+fn show(v: Option<Bool>) -> Unit ! [IO]
+    match v
+        Some(flag) => println(flag)
+        None => println(False)
+    end
+end
+
+fn main() -> Unit ! [IO]
+    show(Some(True))
+end

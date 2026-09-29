@@ -251,6 +251,11 @@ EXPECTED_NEGATIVE_MESSAGES = {
     # 既有跨函数容器流边界不翻转 ----
     'neg_r97_no_ret_helper.lom': 'void 函数的尾表达式产值',
     'neg_r97_param_direct.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
+    # ---- E甲扩围（Bool 家族三盲点）边界负例：无返回注解 helper 产 Bool
+    # 经 match Binder println——ret_bool_fns 只收 Some(TyBool)（保守 False），
+    # scrut 判定不中、臂 Binder 不播种；无注解调用点先按 void 尾表达式
+    # 产值被拒（与容器版 neg_r97_no_ret_helper 同文案路径） ----
+    'neg_r97e_no_ret_bool_helper.lom': 'void 函数的尾表达式产值',
 }
 
 

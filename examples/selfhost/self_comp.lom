@@ -9416,10 +9416,17 @@ fn scan_ex(e: Ex, fns: Map<String, {idx: Int, ret: String, nprm: Int, prms: Stri
             # L2.3 List 批：alloc 类内建（产新表——cons/map/filter/split）
             # 命中即开堆；读类（head/tail/length/get/is_empty/fold/empty）
             # 不触发（纯读程序无需堆设施）。L2.3 Map 批：map_empty 同入
-            # alloc 类（Map 值的唯一来源——set/get 等不另触发）
+            # alloc 类（Map 值的唯一来源——set/get 等不另触发）。
+            # R100（空 List 只读设施缺 memory）：head/tail 编译发内联
+            # i32.load、length/get/fold 发含 load 的 helper——无 memory 段
+            # 模块的产物不可实例化（代表探针 r99_review/generic_unknown_
+            # control）。四读 + fold 与 alloc 类同入开堆白名单（对齐宿主
+            # 正确编译运行）；is_empty（eqz）/empty（i32.const 0）不发
+            # memory 指令、维持不触发。扩大面只含原本产坏 WASM 的形态
+            # （正常程序 needs_heap 已 True）——存量 hex 恒等。
             let alloc_builtin =
             match callee
-                ExIdent(name, _, _) => (name == "list_cons" or name == "list_map" or name == "list_filter" or name == "split" or name == "map_empty")
+                ExIdent(name, _, _) => (name == "list_cons" or name == "list_map" or name == "list_filter" or name == "split" or name == "map_empty" or name == "list_head" or name == "list_tail" or name == "list_length" or name == "list_get" or name == "list_fold")
                 _ => False
             end
             if alloc_builtin
@@ -10732,37 +10739,16 @@ end
 # 追踪/Bool 返回函数直调）；深层 Bool 流由 comp_println 的 ibase 防御兜底
 # 拒绝（不产坏 wasm）。存量用例零影响（唯一 println(Bool) 的 62 已含
 # String 签名）。
-fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match e
         ExBool(_) => True
         ExBinary(op, _, _) => op == "Eq" or op == "NotEq" or op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
         ExLogical(_, _, _) => True
         ExUnary(op, _) => op == "Not"
-        ExGroup(i) => bool_disp_expr(i, bool_names, ret_bool_fns, cl_bools)
+        ExGroup(i) => bool_disp_expr(i, bool_names, ret_bool_fns, cl_bools, bbind)
         ExIdent(x, _, _) => map_has(bool_names, x)
-        ExIf(ifr) => bool_disp_if_val(ifr, bool_names, ret_bool_fns, cl_bools)
-        ExMatch(_, arms, _) =>
-            let mut hit = False
-            for arm in arms
-                match arm
-                    ArmR(_, _, body) =>
-                        match body
-                            ABExpr(ae) =>
-                                if bool_disp_expr(ae, bool_names, ret_bool_fns, cl_bools)
-                                    hit = True
-                                end
-                            end
-                            ABBlock(ab) =>
-                                if blk_tail_bool(ab, bool_names, ret_bool_fns, cl_bools)
-                                    hit = True
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            hit
-        end
+        ExIf(ifr) => bool_disp_if_val(ifr, bool_names, ret_bool_fns, cl_bools, bbind)
+        ExMatch(scrut, arms, _) => match_bool_disp(scrut, arms, bool_names, ret_bool_fns, cl_bools, bbind)
         ExCall(callee, _) =>
             match callee
                 ExIdent(n, _, _) =>
@@ -10772,7 +10758,23 @@ fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String
                         map_has(ret_bool_fns, n) or n == "list_is_empty" or n == "starts_with" or n == "ends_with" or n == "contains" or map_has(cl_bools, n)
                     end
                 end
-                ExClosure(_, creto, cbody) => closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools)
+                ExClosure(prms, creto, cbody) =>
+                    # E甲盲点③延伸：闭包参数注解含 Bool 播种 bbind（知识表
+                    # 共享——泄漏无害，仅 scrut/迭代判定读；容器家族 D甲
+                    # ExClosure 播种 cbind 先例对称。closure_ret_bool 的体尾
+                    # 值位消费仍在 bool_names 一侧——无 reto 闭包参数裸返回
+                    # 形态保守不判）
+                    for p in prms
+                        match p
+                            Prm(pn, pt) =>
+                                if ty_seeds_bool(pt)
+                                    map_set(bbind, pn, True)
+                                end
+                            end
+                        end
+                    end
+                    closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools, bbind)
+                end
                 _ => False
             end
         end
@@ -10780,12 +10782,141 @@ fn bool_disp_expr(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String
     end
 end
 
+# E甲盲点①：match 的 Bool 显示扫描（值位 ExMatch 与语句级/尾位 match
+# 共用）——补 scrut Bool 性判定 + 臂拷贝隔离 + 臂体 println 识别（原
+# 实现丢 scrut 且臂体走 bool_disp_expr——对 println 调用恒 False，match
+# 臂内任何 Bool println 形态不可见）。臂拷贝阻断臂内写向兄弟臂/臂后
+# 泄漏（容器家族 D甲 臂隔离同款机制——bool 家族臂内无同名遮蔽精确
+# 覆盖需求，PatBinder 只写 True，拷贝即隔离）。
+fn match_bool_disp(scrut: Ex, arms: List<ArmR>, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
+    let mut hit = False
+    let scb = scrut_is_bool(scrut, bool_names, ret_bool_fns, cl_bools, bbind)
+    for arm in arms
+        match arm
+            ArmR(pat, _, body) =>
+                let arm_names = copy_bool_map(bool_names)
+                let arm_bbind = copy_bool_map(bbind)
+                if scb
+                    pat_binders_bool(pat, arm_names, arm_bbind)
+                end
+                match body
+                    ABExpr(ae) =>
+                        if bool_disp_expr(ae, arm_names, ret_bool_fns, cl_bools, arm_bbind) or println_bool_ex(ae, arm_names, ret_bool_fns, cl_bools, arm_bbind)
+                            hit = True
+                        end
+                    end
+                    ABBlock(ab) =>
+                        if bool_disp_block(ab, arm_names, ret_bool_fns, cl_bools, arm_bbind) or blk_tail_bool(ab, arm_names, ret_bool_fns, cl_bools, arm_bbind)
+                            hit = True
+                        end
+                    end
+                end
+            end
+        end
+    end
+    hit
+end
+
+# E甲盲点①：语句位/尾位表达式的 Bool 显示识别（println 单参形态 +
+# 语句级 match 臂内识别——值位 match 由 bool_disp_expr 的 ExMatch 走
+# match_bool_disp，语句/尾位不经过值位判定，需本入口分派）
+fn expr_bool_disp_stmt(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
+    match e
+        ExMatch(scrut, arms, _) => match_bool_disp(scrut, arms, bool_names, ret_bool_fns, cl_bools, bbind)
+        _ => println_bool_ex(e, bool_names, ret_bool_fns, cl_bools, bbind)
+    end
+end
+
+# E甲盲点①：match scrut Bool 性判定三路——名字 Bool 载荷知识（bbind 值读，
+# 参数/let 注解播种——容器家族 cbind 对称）/ 变体构造实参 Bool 产（内建
+# Some/Ok/Err——用户枚举变体载荷无知识表，保守不判）/ ret_bool_fns 调用
+# （无返回注解 helper 不登记，保守 False）；Bool 字面量与比较算子直判。
+# 不中则臂 Binder 不播种（println 走既有 ibase 防御边界不变）。
+fn scrut_is_bool(scrut: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
+    match scrut
+        ExIdent(x, _, _) => bool_map_val(bbind, x)
+        ExGroup(i) => scrut_is_bool(i, bool_names, ret_bool_fns, cl_bools, bbind)
+        ExBool(_) => True
+        ExBinary(op, _, _) => op == "Eq" or op == "NotEq" or op == "Lt" or op == "Gt" or op == "LtEq" or op == "GtEq"
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if map_has(ret_bool_fns, n) or map_has(cl_bools, n)
+                        True
+                    else
+                        if n == "Some" or n == "Ok" or n == "Err"
+                            let mut hit = False
+                            for a in args
+                                if bool_disp_expr(a, bool_names, ret_bool_fns, cl_bools, bbind)
+                                    hit = True
+                                end
+                            end
+                            hit
+                        else
+                            False
+                        end
+                    end
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+# E甲盲点①：scrut Bool 时臂 Pat 的 Binder 全标（bool_names 值位显示知识 +
+# bbind 载荷知识——臂内再 match 该名可链式判定）。保守宁滥——两臂载荷
+# 异质时标量臂也被标，println 按实际 vt 走既有路径行为不变。
+fn pat_binders_bool(pat: Pat, arm_names: Map<String, Bool>, arm_bbind: Map<String, Bool>)
+    match pat
+        PatBinder(n) =>
+            map_set(arm_names, n, True)
+            map_set(arm_bbind, n, True)
+        end
+        PatVariant(_, subs) =>
+            for sp in subs
+                pat_binders_bool(sp, arm_names, arm_bbind)
+            end
+        end
+        PatLit(_) => ()
+        PatWildcard => ()
+    end
+end
+
+# E甲盲点③延伸：闭包参数纯 Bool 注解播种（返回本层新增名——同名遮蔽时
+# 外层绑定保留；fv_push 同款语义）
+fn seed_closure_bool_prm(prms: List<Prm>, bool_names: Map<String, Bool>) -> List<String>
+    let mut added = list_empty()
+    for p in prms
+        match p
+            Prm(pn, pt) =>
+                match pt
+                    TyBool =>
+                        if map_has(bool_names, pn) == False
+                            map_set(bool_names, pn, True)
+                            added = list_cons(pn, added)
+                        end
+                    end
+                    _ => ()
+                end
+            end
+        end
+    end
+    added
+end
+
+fn unseed_closure_bool_prm(added: List<String>, bool_names: Map<String, Bool>)
+    for nm in added
+        map_remove(bool_names, nm)
+    end
+end
+
 # 块值位置的 Bool 判定：块值 = tail（blk_val_ty 同口径——None 即 void）
-fn blk_tail_bool(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn blk_tail_bool(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match b
         BlkOf(_, tail) =>
             match tail
-                Some(te) => bool_disp_expr(te, bool_names, ret_bool_fns, cl_bools)
+                Some(te) => bool_disp_expr(te, bool_names, ret_bool_fns, cl_bools, bbind)
                 None => False
             end
         end
@@ -10793,18 +10924,18 @@ fn blk_tail_bool(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String
 end
 
 # 值位 if 产 Bool：任一分支/else 的块尾产 Bool 即命中（R85 pb3）
-fn bool_disp_if_val(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn bool_disp_if_val(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match ifr
         IfR(branches, else_b) =>
             let mut hit = False
             for pair in branches
-                if blk_tail_bool(pair.1, bool_names, ret_bool_fns, cl_bools)
+                if blk_tail_bool(pair.1, bool_names, ret_bool_fns, cl_bools, bbind)
                     hit = True
                 end
             end
             match else_b
                 Some(eb) =>
-                    if blk_tail_bool(eb, bool_names, ret_bool_fns, cl_bools)
+                    if blk_tail_bool(eb, bool_names, ret_bool_fns, cl_bools, bbind)
                         hit = True
                     end
                 end
@@ -10817,60 +10948,96 @@ end
 
 # 局部闭包返回 Bool 判定：reto 显式 Bool 直判；未注解时保守查体尾
 # （单层启发——深层形态由 comp_println 的 ibase 防御兜底）
-fn closure_ret_bool(reto: Option<Ty>, body: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn closure_ret_bool(reto: Option<Ty>, body: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match reto
         Some(TyBool) => True
-        _ => blk_tail_bool(body, bool_names, ret_bool_fns, cl_bools)
+        _ => blk_tail_bool(body, bool_names, ret_bool_fns, cl_bools, bbind)
     end
 end
 
-fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match b
         BlkOf(stmts, tail) =>
             let mut hit = False
             for s in stmts
                 match s
-                    StLet(_, n, _, ex) =>
-                        if bool_disp_expr(ex, bool_names, ret_bool_fns, cl_bools)
+                    StLet(_, n, ann, ex) =>
+                        if bool_disp_expr(ex, bool_names, ret_bool_fns, cl_bools, bbind)
                             map_set(bool_names, n, True)
                         end
+                        # E甲盲点③：注解含 Bool（TyBool 直判；Option/Result/
+                        # List/record/tuple 内递归——List<Bool> 迭代出 Bool）
+                        # 播种 bbind（Bool 载荷知识——scrut 判定与 for 迭代
+                        # 判定读）。不放行直接 println（显示知识仍在
+                        # bool_names 一侧——neg_bool_param_flow 边界不翻转）。
+                        # 无注解不写（缺席与 False 同读——保守方向）。
+                        match ann
+                            Some(t) =>
+                                if ty_seeds_bool(t)
+                                    map_set(bbind, n, True)
+                                end
+                            end
+                            None => ()
+                        end
                         match ex
-                            ExClosure(_, creto, cbody) =>
-                                if closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools)
+                            ExClosure(cprms, creto, cbody) =>
+                                # E甲盲点③延伸：闭包参数纯 Bool 播种（配对恢复）
+                                let saved = seed_closure_bool_prm(cprms, bool_names)
+                                if closure_ret_bool(creto, cbody, bool_names, ret_bool_fns, cl_bools, bbind)
                                     map_set(cl_bools, n, True)
                                 end
+                                unseed_closure_bool_prm(saved, bool_names)
                             end
                             _ => ()
                         end
                     end
                     StExpr(e) =>
-                        if println_bool_ex(e, bool_names, ret_bool_fns, cl_bools)
+                        if expr_bool_disp_stmt(e, bool_names, ret_bool_fns, cl_bools, bbind)
                             hit = True
                         end
                     end
                     StIf(ifr) =>
-                        if bool_disp_if(ifr, bool_names, ret_bool_fns, cl_bools)
+                        if bool_disp_if(ifr, bool_names, ret_bool_fns, cl_bools, bbind)
                             hit = True
                         end
                     end
                     StWhile(_, body) =>
-                        if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools)
+                        if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools, bbind)
                             hit = True
                         end
                     end
-                    StFor(_, _, body) =>
-                        if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools)
-                            hit = True
+                    StFor(var, i, body) =>
+                        # E甲盲点②：迭代变量 Bool 播种——迭代表达式的 Bool 载荷
+                        # 知识（bbind 值读——List<Bool> 绑定经参数/let 注解播种）
+                        # → 迭代变量入 bool_names（词法上仅体内可见——R79 作用
+                        # 域原则：播种前记录、扫完恢复原值/移除，fv_push/fv_pop
+                        # add/remove 配对同款；无名容器/无注解来源保守不判）。
+                        if iter_binds_bool(i, bbind)
+                            let had = map_has(bool_names, var)
+                            let old = bool_map_val(bool_names, var)
+                            map_set(bool_names, var, True)
+                            if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools, bbind)
+                                hit = True
+                            end
+                            if had
+                                map_set(bool_names, var, old)
+                            else
+                                map_remove(bool_names, var)
+                            end
+                        else
+                            if bool_disp_block(body, bool_names, ret_bool_fns, cl_bools, bbind)
+                                hit = True
+                            end
                         end
                     end
                     _ => ()
                 end
             end
             # 块尾裸表达式归 Tail 不归 stmts（println(...) 常见于此——
-            # L2.2 首版教训同族）
+            # L2.2 首版教训同族；语句级 match 尾同走 expr_bool_disp_stmt）
             match tail
                 Some(t) =>
-                    if println_bool_ex(t, bool_names, ret_bool_fns, cl_bools)
+                    if expr_bool_disp_stmt(t, bool_names, ret_bool_fns, cl_bools, bbind)
                         hit = True
                     end
                 end
@@ -10881,14 +11048,24 @@ fn bool_disp_block(b: Blk, bool_names: Map<String, Bool>, ret_bool_fns: Map<Stri
     end
 end
 
+# E甲盲点②：迭代表达式的 Bool 载荷知识查询（bbind 值读——名字/分组两形；
+# 直接迭代容器构造（无注解 list_cons）知识不足保守不判）
+fn iter_binds_bool(i: Ex, bbind: Map<String, Bool>) -> Bool
+    match i
+        ExIdent(x, _, _) => bool_map_val(bbind, x)
+        ExGroup(g) => iter_binds_bool(g, bbind)
+        _ => False
+    end
+end
+
 # println(单个 Bool 产实参) 形态判定（bool_disp_block 的 tail/stmts 共用）
-fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match e
         ExCall(callee, args) =>
             match callee
                 ExIdent(n, _, _) =>
                     if n == "println" and list_length(args) == 1
-                        bool_disp_expr(list_get(args, 0), bool_names, ret_bool_fns, cl_bools)
+                        bool_disp_expr(list_get(args, 0), bool_names, ret_bool_fns, cl_bools, bbind)
                     else
                         False
                     end
@@ -10900,18 +11077,18 @@ fn println_bool_ex(e: Ex, bool_names: Map<String, Bool>, ret_bool_fns: Map<Strin
     end
 end
 
-fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>) -> Bool
+fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<String, Bool>, cl_bools: Map<String, Bool>, bbind: Map<String, Bool>) -> Bool
     match ifr
         IfR(branches, else_b) =>
             let mut hit = False
             for pair in branches
-                if bool_disp_block(pair.1, bool_names, ret_bool_fns, cl_bools)
+                if bool_disp_block(pair.1, bool_names, ret_bool_fns, cl_bools, bbind)
                     hit = True
                 end
             end
             match else_b
                 Some(eb) =>
-                    if bool_disp_block(eb, bool_names, ret_bool_fns, cl_bools)
+                    if bool_disp_block(eb, bool_names, ret_bool_fns, cl_bools, bbind)
                         hit = True
                     end
                 end
@@ -10919,6 +11096,35 @@ fn bool_disp_if(ifr: IfR, bool_names: Map<String, Bool>, ret_bool_fns: Map<Strin
             end
             hit
         end
+    end
+end
+
+# E甲盲点③：Bool 载荷知识播种条件（严格形态——不做全递归泛化）。
+# TyBool 直判（match 裸 binder/参数直值）；TyOption(TyBool) 单载荷
+# （Some(b) 臂解包出 Bool——精确）；TyGeneric("List",[TyBool]) 迭代
+# 出 Bool 元素。其余（用户泛型如 Either<Int,Bool> 双参异质、Result、
+# record/tuple、嵌套容器）保守不播——臂 Binder 异质时误标会让已通过
+# 程序的 scan 命中翻转（存量 hex 恒等关键；43_generic_either 取证）。
+fn ty_seeds_bool(t: Ty) -> Bool
+    match t
+        TyBool => True
+        TyOption(i) =>
+            match i
+                TyBool => True
+                _ => False
+            end
+        end
+        TyGeneric(n, args) =>
+            if n == "List" and list_length(args) == 1
+                match list_get(args, 0)
+                    TyBool => True
+                    _ => False
+                end
+            else
+                False
+            end
+        end
+        _ => False
     end
 end
 
@@ -10940,10 +11146,24 @@ fn scan_has_bool_display(prg: Prg) -> Bool
             let mut hit = False
             for it in items
                 match it
-                    ItFn(_, _, _, _, body, _, _) =>
+                    ItFn(_, params, _, _, body, _, _) =>
                         let names = map_empty()
                         let cls = map_empty()
-                        if bool_disp_block(body, names, rf, cls)
+                        # E甲盲点③：参数注解含 Bool 播种 bbind（Bool 载荷知识
+                        # ——scrut 判定与 for 迭代判定读；容器家族 cbind 对称。
+                        # 直接 println 参数仍走 bool_names 未播种边界——
+                        # neg_bool_param_flow 保守边界不翻转）
+                        let bb = map_empty()
+                        for p in params
+                            match p
+                                Prm(pn, pt) =>
+                                    if ty_seeds_bool(pt)
+                                        map_set(bb, pn, True)
+                                    end
+                                end
+                            end
+                        end
+                        if bool_disp_block(body, names, rf, cls, bb)
                             hit = True
                         end
                     end
@@ -11106,6 +11326,55 @@ fn cbind_expr(e: Ex, cbind: Map<String, Bool>) -> Bool
     end
 end
 
+# E甲盲点②：Ty 是"元素含容器的 List"（List<List<Int>> → True；List<Int>/
+# 用户泛型/Map → False——for 迭代仅 List，Map 迭代不支持）
+fn ty_list_elem_cont(t: Ty, enum_defs: Map<String, Bool>) -> Bool
+    match t
+        TyGeneric(n, args) =>
+            if n == "List" and list_length(args) == 1
+                ty_has_container(list_get(args, 0), enum_defs)
+            else
+                False
+            end
+        end
+        _ => False
+    end
+end
+
+# E甲盲点②：无注解 let 的元素容器判定——list_cons 首参容器产/容器绑定
+# （1..3 构造的嵌套行表）；list_map/list_filter 等返回型未知保守 False
+fn cons_elems_cont(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, cbind: Map<String, Bool>) -> Bool
+    match e
+        ExGroup(g) => cons_elems_cont(g, cont_names, variant_names, cbind)
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if n == "list_cons" and list_length(args) >= 1
+                        let h = list_get(args, 0)
+                        load_cont_expr(h, cont_names, variant_names, cbind) or cbind_expr(h, cbind)
+                    else
+                        False
+                    end
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+# E甲盲点②：迭代表达式的元素容器判定（迭代变量绑定元素——只有元素是
+# 容器才播显示知识）。名字经 @ec: 知识（let 注解/cons 首参播种）；直接
+# 迭代 list_cons 嵌套构造按首参判
+fn iter_elems_cont(i: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, cbind: Map<String, Bool>) -> Bool
+    match i
+        ExIdent(x, _, _) => bool_map_val(cbind, "@ec:" + x)
+        ExGroup(g) => iter_elems_cont(g, cont_names, variant_names, cbind)
+        ExCall(_, _) => cons_elems_cont(i, cont_names, variant_names, cbind)
+        _ => False
+    end
+end
+
 # r97：match scrut 容器性判定——名字容器知识（cbind）/变体构造实参
 # 容器产/容器返回 fn 直调三路；不中则臂 Binder 不标（标量臂 println 走
 # i64 路不被误开设施）
@@ -11238,13 +11507,15 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
             hit
         end
         ExClosure(prms, _, body) =>
-            # r97：闭包参数注解播种 cbind（知识表共享——泄漏无害，仅 scrut 读）
+            # r97：闭包参数注解播种 cbind（知识表共享——泄漏无害，仅 scrut 读）；
+            # E甲盲点②：元素容器知识（@ec:）同步播种
             for p in prms
                 match p
                     Prm(pn, pt) =>
                         if ty_has_container(pt, enum_defs)
                             map_set(cbind, pn, True)
                         end
+                        map_set(cbind, "@ec:" + pn, ty_list_elem_cont(pt, enum_defs))
                     end
                 end
             end
@@ -11319,6 +11590,17 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
                             None => load_cont_expr(e, cont_names, variant_names, cbind) or call_ret_cont(e, fn_ret_cont)
                         end
                         map_set(cbind, name, lc)
+                        # E甲盲点②：元素容器知识（@ec: 前缀键挂 cbind——迭代
+                        # 变量=元素，"值是容器"不等于"元素是容器"：for cell in
+                        # row 的 row 是容器而 cell 是标量，误播 cell 会让
+                        # println(cell) 误命中容器显示翻转存量 scan——精确
+                        # 记"该 List 的元素含容器"。新键无存量语义，外层也
+                        # 精确写 True/False；有注解按 List 元素型，无注解按
+                        # list_cons 首参容器产/容器绑定判（其余保守 False）
+                        map_set(cbind, "@ec:" + name, match ann
+                            Some(t) => ty_list_elem_cont(t, enum_defs)
+                            None => cons_elems_cont(e, cont_names, variant_names, cbind)
+                        end)
                         if map_has(cont_names, "@arm_local")
                             map_set(cont_names, name, lc)
                         end
@@ -11346,9 +11628,51 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
                             hit = True
                         end
                     end
-                    StFor(_, i, fb) =>
-                        if disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(fb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
-                            hit = True
+                    StFor(var, i, fb) =>
+                        # E甲盲点②：迭代变量容器知识播种——条件是"迭代表达式
+                        # 的元素是容器"（迭代变量绑定元素）：@ec: 前缀键查
+                        # （let 注解 List<容器> 或 list_cons 首参容器产播种），
+                        # 或迭代表达式本身即元素容器构造（直接迭代 list_cons
+                        # 形态）。命中 → 迭代变量入 cont_names（显示知识）+
+                        # cbind（scrut 判定知识）。词法上仅体内可见——R79
+                        # 作用域原则：播种前记录、扫完恢复原值/移除（fv_push/
+                        # fv_pop add/remove 配对同款；@ec:var 遮蔽同款恢复；
+                        # 臂内 @arm_local 场景同值覆盖语义保持）。迭代变量的
+                        # 自身元素容器性未知（三层 List 保守不判——@ec:var
+                        # 清除防外层同名残留）
+                        let fc = iter_elems_cont(i, cont_names, variant_names, cbind)
+                        if fc
+                            let had_c = map_has(cont_names, var)
+                            let old_c = bool_map_val(cont_names, var)
+                            let had_b = map_has(cbind, var)
+                            let old_b = bool_map_val(cbind, var)
+                            let had_e = map_has(cbind, "@ec:" + var)
+                            let old_e = bool_map_val(cbind, "@ec:" + var)
+                            map_set(cont_names, var, True)
+                            map_set(cbind, var, True)
+                            map_set(cbind, "@ec:" + var, False)
+                            if disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(fb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+                                hit = True
+                            end
+                            if had_c
+                                map_set(cont_names, var, old_c)
+                            else
+                                map_remove(cont_names, var)
+                            end
+                            if had_b
+                                map_set(cbind, var, old_b)
+                            else
+                                map_remove(cbind, var)
+                            end
+                            if had_e
+                                map_set(cbind, "@ec:" + var, old_e)
+                            else
+                                map_remove(cbind, "@ec:" + var)
+                            end
+                        else
+                            if disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(fb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+                                hit = True
+                            end
                         end
                     end
                     StReturn(oe) =>
@@ -11451,7 +11775,8 @@ fn scan_has_display(prg: Prg) -> Bool
                 match it
                     ItFn(_, params, _, _, body, _, _) =>
                         let names = map_empty()
-                        # r97：参数注解播种 cbind（容器绑定知识起步集）
+                        # r97：参数注解播种 cbind（容器绑定知识起步集）；
+                        # E甲盲点②：元素容器知识（@ec:）同步播种
                         let cbind = map_empty()
                         for p in params
                             match p
@@ -11459,6 +11784,7 @@ fn scan_has_display(prg: Prg) -> Bool
                                     if ty_has_container(pt, enum_defs)
                                         map_set(cbind, pn, True)
                                     end
+                                    map_set(cbind, "@ec:" + pn, ty_list_elem_cont(pt, enum_defs))
                                 end
                             end
                         end

@@ -1,0 +1,28 @@
+# R100 变体：head/tail/get 只读内建 + list_empty。空表 head/tail/get 宿主
+# 为 unreachable trap（双侧 rc1）——本例取条件保护形态：三内建编译期出现
+# （触发开堆白名单同一路径），运行时走 else 分支不执行。宿主 0/0/0/0。
+from list import { list_empty, list_length, list_head, list_tail, list_get }
+
+fn main() -> Unit ! [IO]
+    let xs: List<Int> = list_empty()
+    let n = list_length(xs)
+    let h = if n > 0
+        list_head(xs)
+    else
+        0
+    end
+    let t = if n > 0
+        list_length(list_tail(xs))
+    else
+        0
+    end
+    let g = if n > 0
+        list_get(xs, 0)
+    else
+        0
+    end
+    println(n)
+    println(h)
+    println(t)
+    println(g)
+end

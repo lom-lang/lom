@@ -1,0 +1,10 @@
+# R100（空 List 只读设施缺 memory）：list_empty + list_length 只读内建
+# 程序——修复前 scan_ex 归读类不开 heap，产物无 memory 段却发含 load 的
+# ls_len helper，Node 实例化失败（memory index 0 exceeds...）；修复后
+# 与 alloc 类同入开堆白名单。宿主 0。
+from list import { list_empty, list_length }
+
+fn main() -> Unit ! [IO]
+    let xs: List<Int> = list_empty()
+    println(list_length(xs))
+end

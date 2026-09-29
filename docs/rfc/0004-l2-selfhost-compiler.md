@@ -1101,3 +1101,39 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   回填：提交 `df7f83b` 推送后 CI run `36594643927`（#204）六 job
   全绿（annotations 五条环境 notice，零 warning/error），tag
   v1.4.5 已切。**
+
+- **修订 38（2026-09-30）：E甲扩围 + R100 交付（用户裁决"继续
+  执行 1，2，3"；v1.4.6 全量验收后提交，CI/tag 门禁见本修订尾部
+  回填）。** 按 designs/0012 §11 证据三盲点修复 + §6 R100 修法：
+  **Bool 家族**——新增 bbind 载荷知识表（对称 D甲 cbind，仅供
+  scrut/for 迭代判定读，显示放行表 bool_names 只由 match 臂拷贝
+  （copy_bool_map）与 for 体内播种（fv push/pop 配对恢复先例），
+  R85 pb5 边界零翻转）；match_bool_disp 提取（值位 ExMatch 与
+  语句/尾位共用——盲点①探针全是语句级 match，StExpr/tail 原不
+  分派）；scrut 三路（bbind/变体构造实参 Bool 产/ret_bool_fns·
+  cl_bools）；参数注解严格形态播种 ty_seeds_bool（仅 TyBool/
+  TyOption(TyBool)/List<[TyBool]>——用户泛型/Result/record/
+  tuple/嵌套容器保守不播）。**容器家族 for 迭代变量**——@ec:
+  前缀元素容器知识（"元素是容器"才播显示知识；来源：List<容器>
+  注解与 list_cons 首参容器产）；**R100**——scan_ex 开堆白名单
+  加 list_head/tail/length/get/fold（发 load 的五枚），is_empty/
+  empty 不触发；原 138 字节坏模块转 217 字节有效模块双侧输出
+  0。**实施纪律实录**：初版全递归 ty_has_bool 被存量对拍当场
+  拦截（43_generic_either 的 Either<Int,Bool> 参数误判 + 66_
+  for_list 的 Int 元素误播——两枚存量 DIFF），执行者停手取证后
+  收紧为严格形态播种，193 存量归零恒等——"存量 hex 对拍是防
+  线不是仪式"的再应验。正例 194–200 七枚（五缺口转正 + R100
+  两枚，空表 head/tail/get 宿主实测 trap 故用条件保护形态）+
+  负例 neg_r97e_no_ret_bool_helper（无返回注解 helper 保守边界）；
+  十六枚既有负例逐枚复核不倒（neg_bool_param_flow/deep 流族/
+  neg_r95_*/neg_r96_*/neg_r97_*/binder 泄漏族全点名实测）。验收：
+  verify_selfcomp 352→**360/360 = 195 单文件 + 5 包 + 160 负例**；
+  **存量 v1.4.5 全部 193 对拍同宿主 hex 逐字节恒等**（IDENTICAL=
+  193/0/0，复现脚本 `target/probes/r97e_r100_hex_compare/
+  compare.py` 为忽略目录证据）；self_comp **12199→12525 行
+  （+326）**；`--bootstrap` **14/14**，强 quine **269510 bytes**
+  双侧逐字节一致；宿主 src 零改动，Rust 541+8 与 eval 双后端各
+  121/121 数量不变。升版 **v1.4.6**（纯 L2 面 patch）；语言面/
+  发布线冻结。**R100 关闭、E甲五缺口全部转正**（designs/0012
+  §11 的"若裁决扩围"三盲点最小改动面全部落地）；下一步按用户
+  裁决顺序 R101 宿主修复（v1.4.7）→ 二十审 → 交接。

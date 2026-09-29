@@ -1,0 +1,12 @@
+# 负例（E甲扩围盲点①边界）：无返回注解 helper 产 Bool 经 match Binder
+# println——ret_bool_fns 只收 Some(TyBool)（保守 False 边界），scrut 判定
+# 不中、臂 Binder 不播种，ibase 防御兜底拒（不产坏 wasm）。
+fn mk(v: Int)
+    v > 0
+end
+
+fn main() -> Unit ! [IO]
+    match mk(1)
+        b => println(b)
+    end
+end

@@ -48,8 +48,18 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **D甲/R97 已交付 v1.4.5**（2026-09-29，RFC-0004 修订 37、designs/0012
-  §10）：显示预扫补追踪 match 臂 Binder 容器载荷——三流入路（直接
+- **E甲扩围+R100 已交付 v1.4.6**（2026-09-30，RFC-0004 修订 38、
+  designs/0012 §12；用户裁决"继续执行 1，2，3"后批 1）：Bool 家族
+  三盲点修复（bbind 知识表对称 cbind 分层保 pb5 边界、match_bool_disp
+  语句/值位共用、严格形态播种）+ 容器家族 for 迭代变量 @ec: 元素知识
+  + R100 开堆白名单（发 load 的五枚只读内建）。五枚 §11 缺口全转正；
+  初版全递归被存量对拍拦截后收紧（43_generic_either/66_for_list 两枚
+  DIFF 归零）。验收：verify_selfcomp **360/360 = 195+5+160**；存量
+  v1.4.5 全部 **193 对拍 hex 逐字节恒等**；self_comp.lom 12525 行；
+  bootstrap **14/14**（quine 269510 bytes 双侧一致）；十六枚既有负例
+  逐枚复核不倒。Cargo.toml/lock 均为 1.4.6。**R100 关闭、E甲转正**；
+  提交/CI 首跑/tag 由规划者执行——新任以 `git log`/CI 实查为准。
+- **D甲/R97 已交付 v1.4.5**（`df7f83b`，CI #204 六 job 绿后切 tag）：显示预扫补追踪 match 臂 Binder 容器载荷——三流入路（直接
   构造链/参数注解/helper 返回签名）全通；预扫保持 AST-only（三张
   直收表 + cbind 知识/放行分层 + 臂内拷贝 `@arm_local` 哨兵 + 规划者
   `load_cont_expr` 补修——首轮存量对拍 1 例 DIFF（22_enum_closure，
@@ -74,17 +84,17 @@
   末位 unreachable、142 −1B 死尾裁除）；v1.4.3→v1.4.4 存量 175
   对拍全恒等。Rust 541 单元 + 8 集成、eval 双后端各 121/121 不变。
   语言面 v1.0 与外部发布线继续冻结。
-- 当前 open：R94 宿主 json 键序挂账；R100 P2 空 List 只读设施缺
-  memory、R101 P2 宿主 WASM `and/or` 右侧实际执行 return 时 label
-  深度错。R95/R99/R98/R96/R97 已关闭。E甲邻近 Bool Binder/for
-  证据待整理另呈扩围裁决；R100/R101 修法与次序另待用户裁决。
-  十九审 B+ 仅评 a697474/v1.4.1，d2 事后勘误在报告首页；二十审及
-  评级重估只能由用户发起。发布线不解冻。
-- 下一步沿已裁顺序：**E甲**仅整理邻近 Bool Binder/for 证据另呈
-  扩围裁决（未获裁决不实施）。提交前核暂存树含版本文件与全部
-  新增 `.lom`，fmt --check 不能只看 tail；含反斜杠转义仅
-  Write/Edit/apply_patch。
-- 交付史与机制事实源：RFC-0004 修订 1–37、SPEC §13、
+- 当前 open：R94 宿主 json 键序挂账、R101 P2 宿主 WASM `and/or`
+  右侧实际执行 return 时 label 深度错（批 2 v1.4.7 实施中——
+  src/wasm_codegen.rs 的 Logical 补压 Label::If，compile_if 先例）。
+  R95/R96/R97/R99/R100 已关闭；E甲缺口已转正。十九审 B+ 仅评
+  a697474/v1.4.1；二十审已获用户授权（v1.4.7 后发起）。
+  发布线不解冻。
+- 下一步沿已裁顺序：批 2 R101 宿主修复（v1.4.7）→ 二十审
+  （review-2026-09-30.html，开账 R102+）→ 交接五件套刷新。
+  提交前核暂存树含版本文件与全部新增 `.lom`，fmt --check 不能
+  只看 tail；含反斜杠转义仅 Write/Edit/apply_patch。
+- 交付史与机制事实源：RFC-0004 修订 1–38、SPEC §13、
   designs/0001–0012、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。十九审/十八审评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
@@ -107,13 +117,13 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交 v1.4.5 基线 352/352 = 188 单文件 + 5 包 + 159 负例）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 266073 bytes；耗时随机器负载 ~100s-400s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py（已提交 v1.4.6 基线 360/360 = 195 单文件 + 5 包 + 160 负例）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269510 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
-   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check：C甲 12 枚 + D甲 12 枚（正例 184–193 + 负例 neg_r97_* 2 枚）已入 v1.4.4/v1.4.5；examples 原 37 个有效文件不变。
+   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check：C甲 12 + D甲 12 + 批1 8 枚（正例 194–200 + 负例 neg_r97e_* 1 枚）已入 v1.4.4–v1.4.6；examples 原 37 个有效文件不变。
    - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
 3. 如实报告 tag 基线核验边界。D甲/E甲方向已有用户裁决可按序推进；
    R100/R101、二十审等新方向仍只呈菜单待裁。外部发布线继续冻结。
@@ -121,8 +131,8 @@
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 提交推送并看 CI 首跑；
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
-【关键锚点索引（当前行为要点；已提交 v1.4.5 基线由 verify_selfcomp
-  352 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+【关键锚点索引（当前行为要点；已提交 v1.4.6 基线由 verify_selfcomp
+  360 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2
   end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确

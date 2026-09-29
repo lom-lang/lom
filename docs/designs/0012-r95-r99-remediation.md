@@ -178,3 +178,13 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 - **八枚探针结论**：**邻近缺口（宿主收/L2 拒）五枚**——① `match Some(True) Some(flag) => println(flag)`（Bool Binder 原探针）；② for 容器迭代变量 `for xs in rows println(xs)`（原探针）；③ `fn show(v: Option<Bool>)` 参数注解流入 match Binder；④ `fn flag() -> Bool` 返回流入 match Binder；⑤ 注解 `List<Bool>` 的 for 迭代 println。**已覆盖两枚**（for 内值位比较 `x % 2 == 0`、for 内一层 let 绑定 Bool）——编译且双侧逐字一致，证明 scan→ibase 路径健康。**对照一枚**（注解 `List<List<Int>>` 的 for 迭代）证明 D甲 cbind 知识覆盖 match Binder 而不外溢 for。
 - **三个结构性盲点**（行号佐证 self_comp.lom @ v1.4.5）：① bool_disp_expr 的 ExMatch（约 L10744）丢 scrut 且臂体走 bool_disp_expr（对 println 恒 False）——match 臂内任何 Bool println 形态不可见；② 两家族 StFor（bool L10861 / disp L11349）首字段迭代变量绑定均丢弃；③ scan_has_bool_display（L10931）只收返回注解、无参数注解收集——与容器家族（cbind 播种）不对称。
 - **若裁决扩围的最小改动面（主观推测，供参考）**：bool_disp 的 ExMatch 补 scrut 递归与臂内 println_bool_ex 调用、两家族 StFor 播种迭代变量（类型来源：迭代表达式推断或注解）、Bool 家族补参数注解收集。未获裁决不动工；扩围后须按 D甲同款门禁（存量 hex 恒等或列明有意变化、负例锁、全量回归）。
+
+## 12. E甲扩围 + R100 实施记录（2026-09-30 交付，v1.4.6）
+
+- **交付链**：用户 2026-09-30 裁决"继续执行 1，2，3"（E甲扩围/R100+R101/二十审）。本批合并 E甲扩围（§11 三盲点）与 R100（§6）——同属预扫/设施域。验收数字与机制见 RFC-0004 修订 38；本节记设计偏离：
+  - **bbind 知识表**（盲点③偏离 §11 原提示的"bool_names 播种"）：直接播种会翻转 R85 pb5 负例——对称 D甲 cbind 分层（知识仅供 scrut/迭代判定，放行表只由臂拷贝/for 体内播种）。
+  - **严格形态播种 ty_seeds_bool**：初版全递归被存量对拍拦截（43_generic_either/66_for_list 两枚 DIFF：泛型 Either<Int,Bool> 参数误判、Int for 元素误播），收紧为 TyBool/TyOption(TyBool)/List<[TyBool]> 三形态。
+  - **@ec: 元素容器知识**：for 迭代变量绑定的是**元素**——"元素是容器"（List<容器> 注解或 list_cons 首参容器产）才播显示知识；@ec: 前缀不可拼出、播种后配对恢复。
+  - **R100 开堆白名单**：发 load 的五枚（head/tail/length/get/fold）入 scan_ex；is_empty/empty 不触发。空表 head/tail/get 宿主运行期 trap（wasm trap: unreachable），正例用条件保护形态。
+- **验证边界**：五缺口全转正（双侧 stdout+rc 逐字一致）；对照面（for_bool_direct/for_bool_let）字节恒等；十六枚既有负例逐枚点名实测不倒；R100 无自然负例面（纯放行），负例仅 neg_r97e_no_ret_bool_helper 一枚。
+- **R101 未在本批**（宿主 src 面，v1.4.7 独立批）；R94 挂账维持。

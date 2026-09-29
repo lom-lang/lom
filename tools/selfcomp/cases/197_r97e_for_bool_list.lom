@@ -1,0 +1,11 @@
+# E甲扩围（R97 邻近缺口②③）：注解 List<Bool> 的 for 迭代——let 注解
+# ty_has_bool 递归播种 bbind，迭代变量 b 入 bool_names（体内可见），
+# println(b) 放行。宿主 true/false。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let bs: List<Bool> = list_cons(True, list_cons(False, list_empty()))
+    for b in bs
+        println(b)
+    end
+end
