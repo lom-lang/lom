@@ -1053,3 +1053,48 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   `1851964` 推送后 CI run `36578254262`（#202）六 job 全绿
   （annotations 五条环境 notice，零 warning/error），tag v1.4.4
   已切。**
+
+- **修订 37（2026-09-29）：R97 D甲交付（用户已裁决 A甲→B甲/C甲/
+  D甲/E甲 顺序；v1.4.5 全量验收后提交，CI/tag 门禁见本修订尾部
+  回填）。** 按 designs/0012 §3.4 甲路线实施：显示预扫补追踪
+  match 臂 Binder 容器载荷——无 String 字面量程序
+  `let v = Some(list_cons(1, list_empty())); match v
+  Some(xs) => println(xs)` 不再落 ibase 兜底拒。**预扫保持
+  AST-only**（build_module 的 has_str→ibase→collect_sigs 硬序
+  零改动）：三张 AST 直收表（enum_defs 用户枚举载荷容器性 /
+  fn_ret_cont 有注解容器返回 fn——ret=None 不登记保守 False /
+  cbind 容器绑定知识——per-fn 起步从参数注解播种，闭包参数
+  同播种）+ scrut_is_cont 三路判定（ExIdent 查 cbind / 变体
+  构造实参容器 / fn_ret_cont 直调）+ **臂内拷贝注入**
+  （copy_bool_map 沿编译侧 copy_bindings 样板 + `@arm_local`
+  哨兵沿 C甲 `@closure:prelude` 先例——臂内 StLet 见哨兵则
+  True/False 精确覆盖，外层共享表维持只置 True 现状）。
+  **规划者实施期补修（load_cont_expr 语义精确化）**：cbind
+  无注解分支的变体构造按"实参含容器"判载荷容器性——枚举
+  本身的显示语义（任何变体构造=容器产）留在放行表 cont_names
+  侧；实施首轮存量对拍曾因此出现 1 例 DIFF（22_enum_closure：
+  `let b = Full(4)` 纯 Int 载荷枚举被误标，臂内 `v + n` 拼接
+  启发式误命中多开设施，行为双侧正确、hex 790→916B），根因
+  隔离复现后由 load_cont_expr 补修归零（22 恢复 790B 逐字节
+  恒等）。**知识/放行分层不变量**：跨函数容器参数不经 match
+  Binder 直接 println 仍拒——既有 neg_deep_flow 四负例零翻转，
+  新负例 neg_r97_param_direct 锁该边界；neg_r97_no_ret_helper
+  锁无返回注解 helper 边界（实测拒绝点更早：void 函数尾表达式
+  产值文案，保守边界成立）。用例十正（184–193：n4 直接链/
+  参数注解流入/helper 返回流入/嵌套 match/guard 引用 Binder/
+  臂内同名标量遮蔽精确覆盖/兄弟臂隔离/闭包内 match/用户枚举
+  载荷/Result 混合载荷宁滥行为正确——193 以 Int 替 String 载荷
+  因 String 字面量会先开设施测不到预扫路径）两负。**验收**：
+  verify_selfcomp 340→**352/352 = 188 单文件 + 5 包 + 159
+  负例**；**存量 v1.4.4 全部 183 对拍（178 单文件 + 5 包）同
+  宿主 hex 逐字节恒等**（IDENTICAL=183/0/0，补修后；复现脚本
+  `target/probes/r97_hex_compare/compare_hex.py` 为忽略目录
+  证据）；self_comp **11938→12199 行（+261）**；
+  `--bootstrap` **14/14**，强 quine **266073 bytes** 双侧逐字节
+  一致；宿主 src 零改动，Rust 541+8 与 eval 双后端各 121/121
+  数量不变。升版 **v1.4.5**（纯 L2 面 patch）；语言面/20 关键字/
+  诊断码/43 内建不变，外部发布线冻结。**R97 关闭**；"一层 vt
+  判定即覆盖自然写法"的容器显示宣称随本批解除收窄（match 臂
+  Binder 三流入路全通）；按已裁顺序仅剩 E甲整理邻近证据；R94
+  宿主挂账与 R100/R101 继续 open（修法与次序待用户另裁）；
+  十九审 B+ 不评本批，整改后评级待二十审（用户发起）。

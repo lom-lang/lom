@@ -1,0 +1,19 @@
+# r97 正例：用户 enum 载荷 List 的变体 Binder println——enum_defs
+# 表（枚举容器性）经参数注解 TyNamed 查表路径。
+from list import { list_cons, list_empty }
+
+enum Bag
+    | Items(List<Int>)
+    | Bare
+end
+
+fn show(b: Bag) -> Unit ! [IO]
+    match b
+        Items(xs) => println(xs)
+        Bare => println(0)
+    end
+end
+
+fn main() -> Unit ! [IO]
+    show(Items(list_cons(1, list_empty())))
+end

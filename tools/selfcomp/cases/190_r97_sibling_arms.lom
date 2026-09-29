@@ -1,0 +1,19 @@
+# r97 正例：兄弟臂 Binder 同名——一臂容器一臂标量；每臂独立拷贝表，
+# 宁滥标记下 println 按臂实际类型出值，互不污染。
+from list import { list_cons, list_empty }
+
+enum Mixed
+    | Many(List<Int>)
+    | One(Int)
+end
+
+fn main() -> Unit ! [IO]
+    match Many(list_cons(1, list_empty()))
+        Many(xs) => println(xs)
+        One(xs) => println(xs)
+    end
+    match One(7)
+        Many(xs) => println(xs)
+        One(xs) => println(xs)
+    end
+end

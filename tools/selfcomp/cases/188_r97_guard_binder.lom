@@ -1,0 +1,14 @@
+# r97 正例：guard 引用臂 Binder + Form A/B 混合——guard 在绑定求值后
+# 用臂表扫描（Binder 容器知识对 guard 可见）。
+from list import { list_cons, list_empty, list_length }
+
+fn main() -> Unit ! [IO]
+    let v = Some(list_cons(7, list_empty()))
+    match v
+        Some(xs) if list_length(xs) > 0 =>
+            println(xs)
+        end
+        Some(xs) => println(0)
+        None => println(0)
+    end
+end

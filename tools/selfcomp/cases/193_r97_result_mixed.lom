@@ -1,0 +1,14 @@
+# r97 正例：Result 两臂 Ok/Err 载荷异质——scrut 为容器返回 fn 直调
+# （fn_ret_cont 直判路），宁滥标记下标量臂 println 按实际类型走 i64 路。
+from list import { list_cons, list_empty }
+
+fn mk() -> Result<List<Int>, Int>
+    Ok(list_cons(1, list_empty()))
+end
+
+fn main() -> Unit ! [IO]
+    match mk()
+        Ok(xs) => println(xs)
+        Err(n) => println(n)
+    end
+end

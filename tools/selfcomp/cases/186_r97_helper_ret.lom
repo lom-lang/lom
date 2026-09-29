@@ -1,0 +1,15 @@
+# r97 正例：容器返回 fn 表（fn_ret_cont）——helper 构造 Option<List<Int>>，
+# main 里 let 接收后 match 臂 Binder println（cbind 的容器返回直调路）。
+from list import { list_cons, list_empty }
+
+fn mk() -> Option<List<Int>>
+    Some(list_cons(1, list_empty()))
+end
+
+fn main() -> Unit ! [IO]
+    let v = mk()
+    match v
+        Some(xs) => println(xs)
+        None => println(0)
+    end
+end

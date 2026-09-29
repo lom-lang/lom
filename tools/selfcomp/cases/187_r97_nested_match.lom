@@ -1,0 +1,16 @@
+# r97 正例：嵌套两层 match——外层臂 Binder 进 arm_cbind 后作为内层
+# scrut 的容器知识（臂拷贝向内传递，臂写不外泄）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let v = Some(Some(list_cons(1, list_empty())))
+    match v
+        Some(outer) =>
+            match outer
+                Some(inner) => println(inner)
+                None => println(0)
+            end
+        end
+        None => println(0)
+    end
+end

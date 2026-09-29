@@ -1,0 +1,14 @@
+# r97 正例：容器参数注解播种 cbind——fn 形参 Option<List<Int>> 内
+# match 臂 Binder println（参数注解路径，非跨函数直接 println 边界）。
+from list import { list_cons, list_empty }
+
+fn show(v: Option<List<Int>>) -> Unit ! [IO]
+    match v
+        Some(xs) => println(xs)
+        None => println(0)
+    end
+end
+
+fn main() -> Unit ! [IO]
+    show(Some(list_cons(1, list_empty())))
+end

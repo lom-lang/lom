@@ -1,0 +1,10 @@
+# 负例（r97 match 臂 Binder 批）：容器参数不经 match Binder 直接 println
+# （tuple 变体）——参数注解播种的是 cbind 知识（仅 scrut 判定读），不
+# 放行直接 println；既有跨函数容器流边界不翻转，ibase 防御兜底拒
+fn show(t: (Int, Int)) -> Unit ! [IO]
+    println(t)
+end
+
+fn main() -> Unit ! [IO]
+    show((1, 2))
+end

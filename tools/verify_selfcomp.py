@@ -244,6 +244,13 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_r96_closure_naked_print_value.lom': "未定义变量 'print'",
     'neg_r96_closure_print_arity.lom': 'print 期望 1 个参数',
     'neg_r96_closure_unimported_len.lom': "闭包捕获了未定义变量 'len'",
+    # ---- R97（D甲）：match 臂 Binder 容器载荷批边界负例。无返回注解
+    # helper 不登记 fn_ret_cont（保守 False），无注解调用点按 void 处理
+    # 在 comp 侧先行被拒；容器参数不经 match Binder 直接 println（tuple
+    # 变体）仍落 ibase 兜底——参数播种的 cbind 知识仅 scrut 判定读，
+    # 既有跨函数容器流边界不翻转 ----
+    'neg_r97_no_ret_helper.lom': 'void 函数的尾表达式产值',
+    'neg_r97_param_direct.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
 }
 
 

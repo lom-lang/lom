@@ -1,7 +1,26 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前交接状态（2026-09-29，C甲/R96 已交付 v1.4.4；CI/tag 门禁
-> 见本段尾）**：用户裁决 A甲→B甲/C甲/D甲/E甲 顺序下，C甲按
+> **当前交接状态（2026-09-29，D甲/R97 已交付 v1.4.5；CI/tag 门禁
+> 见本段尾）**：D甲按 designs/0012 §3.4 甲路线实施——显示预扫补
+> 追踪 match 臂 Binder 容器载荷，无字面量程序
+> `match Some(xs) => println(xs)` 三流入路（直接链/参数注解/
+> helper 返回签名）全通；预扫保持 AST-only（三张直收表 +
+> cbind 知识/放行分层 + 臂内拷贝 `@arm_local` 哨兵 + 规划者
+> load_cont_expr 补修使纯标量载荷枚举不误标——首轮存量对拍
+> 1 例 DIFF 经根因隔离后归零）。十正例 184–193 + 两负例（无
+> 返回注解 helper 边界、参数不经 match 直接 println 仍拒）；
+> 既有深层流负例零翻转。验收：verify_selfcomp
+> **352/352 = 188 单文件 + 5 包 + 159 负例**；存量 v1.4.4 全部
+> **183 对拍 hex 逐字节恒等**；self_comp **12199 行（+261）**；
+> `--bootstrap` **14/14**，强 quine **266073 bytes** 双侧一致；
+> ignored `target/probes/r97_design`、`r97_hex_compare` 证据
+> 保留。**R97 关闭**；升版 v1.4.5（纯 L2 patch，宿主 src 零
+> 改动）。提交/推送/CI 首跑/tag 由规划者执行，结果以 CI 为
+> 准——若首跑绿即切 tag v1.4.5 并回填本段与 SPEC §13。
+> 当前 open：R94（宿主挂账）、R100、R101；E甲邻近证据待整理
+> 另呈扩围裁决，R100/R101 修法另待用户裁决。
+>
+> **C甲交付记录（2026-09-29，v1.4.4 已收官）**：用户裁决 A甲→B甲/C甲/D甲/E甲 顺序下，C甲按
 > designs/0012 §3.3 窄修边界恢复并收口：闭包自由变量终审先查父
 > env、再仅豁免 prelude `println`/`print`（其余内建不随同放行），
 > 哨兵键 `@closure:prelude` 使闭包内直接 `print` 综合为 void，

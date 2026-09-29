@@ -1,0 +1,13 @@
+# r97 正例：闭包体内 match 臂 Binder println——闭包参数注解播种
+# cbind（知识表随闭包体扫描共享）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let f = fn(v: Option<List<Int>>) -> Unit
+        match v
+            Some(xs) => println(xs)
+            None => println(0)
+        end
+    end
+    f(Some(list_cons(1, list_empty())))
+end

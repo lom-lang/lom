@@ -1,0 +1,14 @@
+# r97 正例：臂内同名标量 let 遮蔽 Binder——@arm_local 哨兵下 StLet
+# 精确覆盖（False 条目），println 按实际标量走 i64 路，不错值不误开设施。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) =>
+            let xs = 7
+            println(xs)
+        end
+        None => println(0)
+    end
+end

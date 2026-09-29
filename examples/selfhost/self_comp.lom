@@ -10973,7 +10973,9 @@ fn disp_cont_expr(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<Strin
         ExRecord(_) => True
         ExTuple(_) => True
         ExClosure(_, _, _) => True
-        ExIdent(x, _, _) => map_has(cont_names, x)
+        # r97：键存在性读改值读——臂内 @arm_local 精确覆盖会写 False 条目
+        # （外层共享表只写 True，值读与 map_has 行为恒等）
+        ExIdent(x, _, _) => bool_map_val(cont_names, x)
         ExGroup(i) => disp_cont_expr(i, cont_names, variant_names)
         ExCall(callee, _) =>
             match callee
@@ -10987,17 +10989,187 @@ fn disp_cont_expr(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<Strin
     end
 end
 
+# r97（R97 match 臂 Binder 容器载荷）：Ty 是否含容器（递归）。口径——
+# Option/Result 深入内层（Option<Int> 非容器：标量载荷臂的 println 走
+# i64 路不需要显示设施）；List/Map 泛型名本身即容器；record/tuple
+# 泛型参数递归；TyNamed 查用户枚举容器表（内建 Some/Ok 等不入表——
+# 载荷是模板，容器性由被测实例侧判）。enum_defs 单遍直收，前向引用
+# 枚举按未含容器处理（保守拒绝方向）。
+fn ty_has_container(t: Ty, enum_defs: Map<String, Bool>) -> Bool
+    match t
+        TyOption(i) => ty_has_container(i, enum_defs)
+        TResult(a, b) => ty_has_container(a, enum_defs) or ty_has_container(b, enum_defs)
+        TyGeneric(n, args) =>
+            if n == "List" or n == "Map"
+                True
+            else
+                let mut hit = False
+                for a in args
+                    if ty_has_container(a, enum_defs)
+                        hit = True
+                    end
+                end
+                hit
+            end
+        end
+        TyRecord(flds) =>
+            let mut hit = False
+            for f in flds
+                if ty_has_container(f.1, enum_defs)
+                    hit = True
+                end
+            end
+            hit
+        end
+        TyTuple(args) =>
+            let mut hit = False
+            for a in args
+                if ty_has_container(a, enum_defs)
+                    hit = True
+                end
+            end
+            hit
+        end
+        TyNamed(n) => map_has(enum_defs, n)
+        _ => False
+    end
+end
+
+# Bool 值读：False 覆盖条目与缺席同读（臂内精确覆盖的前提）
+fn bool_map_val(m: Map<String, Bool>, k: String) -> Bool
+    match map_get(m, k)
+        Some(b) => b
+        None => False
+    end
+end
+
+# 逐项复制 Bool 表（Map 引用语义——match 臂扫描用拷贝阻断写泄漏）
+fn copy_bool_map(m: Map<String, Bool>) -> Map<String, Bool>
+    let out = map_empty()
+    for key in map_keys(m)
+        match map_get(m, key)
+            Some(b) => map_set(out, key, b)
+            None => ()
+        end
+    end
+    out
+end
+
+# 容器返回用户 fn 直调判定（fn_ret_cont 表——无返回注解不登记，保守 False）
+fn call_ret_cont(e: Ex, fn_ret_cont: Map<String, Bool>) -> Bool
+    match e
+        ExGroup(i) => call_ret_cont(i, fn_ret_cont)
+        ExCall(callee, _) =>
+            match callee
+                ExIdent(n, _, _) => map_has(fn_ret_cont, n)
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+# r97 修正：cbind 无注解分支的"载荷容器"判定——变体构造仅当实参含
+# 容器产/容器绑定才算（Full(4) 这类纯标量载荷枚举值不标，枚举本身的
+# 显示语义留在 cont_names 侧不变——存量 22_enum_closure hex 恒等关键）
+fn load_cont_expr(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, cbind: Map<String, Bool>) -> Bool
+    match e
+        ExGroup(i) => load_cont_expr(i, cont_names, variant_names, cbind)
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if map_has(variant_names, n)
+                        let mut hit = False
+                        for a in args
+                            if disp_cont_expr(a, cont_names, variant_names) or cbind_expr(a, cbind)
+                                hit = True
+                            end
+                        end
+                        hit
+                    else
+                        disp_cont_expr(e, cont_names, variant_names)
+                    end
+                end
+                _ => disp_cont_expr(e, cont_names, variant_names)
+            end
+        end
+        _ => disp_cont_expr(e, cont_names, variant_names)
+    end
+end
+
+# 实参位名字的容器绑定知识查询（scrut 变体构造实参侧）
+fn cbind_expr(e: Ex, cbind: Map<String, Bool>) -> Bool
+    match e
+        ExIdent(x, _, _) => bool_map_val(cbind, x)
+        ExGroup(i) => cbind_expr(i, cbind)
+        _ => False
+    end
+end
+
+# r97：match scrut 容器性判定——名字容器知识（cbind）/变体构造实参
+# 容器产/容器返回 fn 直调三路；不中则臂 Binder 不标（标量臂 println 走
+# i64 路不被误开设施）
+fn scrut_is_cont(scrut: Ex, cbind: Map<String, Bool>, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, fn_ret_cont: Map<String, Bool>) -> Bool
+    match scrut
+        ExIdent(x, _, _) => bool_map_val(cbind, x)
+        ExGroup(i) => scrut_is_cont(i, cbind, cont_names, variant_names, fn_ret_cont)
+        ExCall(callee, args) =>
+            match callee
+                ExIdent(n, _, _) =>
+                    if map_has(fn_ret_cont, n)
+                        True
+                    else
+                        if map_has(variant_names, n)
+                            let mut hit = False
+                            for a in args
+                                if disp_cont_expr(a, cont_names, variant_names) or cbind_expr(a, cbind)
+                                    hit = True
+                                end
+                            end
+                            hit
+                        else
+                            False
+                        end
+                    end
+                end
+                _ => False
+            end
+        end
+        _ => False
+    end
+end
+
+# r97：scrut 容器时臂 Pat 的 Binder 全标容器（保守宁滥——Result 两臂
+# Ok/Err 载荷异质时标量臂也被标，println 按实际类型走 i64 路行为不变）
+fn pat_binders_cont(pat: Pat, arm_cont: Map<String, Bool>, arm_cbind: Map<String, Bool>)
+    match pat
+        PatBinder(n) =>
+            map_set(arm_cont, n, True)
+            map_set(arm_cbind, n, True)
+        end
+        PatVariant(_, subs) =>
+            for sp in subs
+                pat_binders_cont(sp, arm_cont, arm_cbind)
+            end
+        end
+        PatLit(_) => ()
+        PatWildcard => ()
+    end
+end
+
 # 值位扫描：println/print 实参命中 + 拼接 Add 两侧容器产 + 复合表达式递归。
 # C甲：闭包内直接调用 prelude print 总需 String 设施；顶层旧边界不动。
-fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
+# r97：cbind（容器绑定知识——scrut 判定读，不放行）/ fn_ret_cont（容器
+# 返回 fn 表）/ enum_defs（用户枚举容器表）三表线程，match 臂拷贝阻断写泄漏
+fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool, cbind: Map<String, Bool>, fn_ret_cont: Map<String, Bool>, enum_defs: Map<String, Bool>) -> Bool
     match e
         ExBinary(op, l, r) =>
             (op == "Add" and (disp_cont_expr(l, cont_names, variant_names) or disp_cont_expr(r, cont_names, variant_names)))
-            or disp_scan_ex(l, cont_names, variant_names, in_closure) or disp_scan_ex(r, cont_names, variant_names, in_closure)
+            or disp_scan_ex(l, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_ex(r, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
         end
-        ExLogical(_, l, r) => disp_scan_ex(l, cont_names, variant_names, in_closure) or disp_scan_ex(r, cont_names, variant_names, in_closure)
-        ExUnary(_, i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
-        ExGroup(i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
+        ExLogical(_, l, r) => disp_scan_ex(l, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_ex(r, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExUnary(_, i) => disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExGroup(i) => disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
         ExCall(callee, args) =>
             let mut hit = False
             match callee
@@ -11013,27 +11185,36 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
                 end
                 _ => ()
             end
-            if disp_scan_ex(callee, cont_names, variant_names, in_closure)
+            if disp_scan_ex(callee, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                 hit = True
             end
             for a in args
-                if disp_scan_ex(a, cont_names, variant_names, in_closure)
+                if disp_scan_ex(a, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                     hit = True
                 end
             end
             hit
         end
-        ExIndex(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
-        ExField(i, _) => disp_scan_ex(i, cont_names, variant_names, in_closure)
-        ExIf(ifr) => disp_scan_if(ifr, cont_names, variant_names, in_closure)
+        ExIndex(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_ex(b, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExField(i, _) => disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExIf(ifr) => disp_scan_if(ifr, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
         ExMatch(scrut, arms, _) =>
-            let mut hit = disp_scan_ex(scrut, cont_names, variant_names, in_closure)
+            let mut hit = disp_scan_ex(scrut, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+            # r97：scrut 容器 → 臂拷贝（@arm_local 哨兵标记臂内 StLet 需
+            # 精确覆盖）+ Pat Binder 标容器；拷贝阻断臂写向兄弟臂/臂后泄漏
+            let scr_c = scrut_is_cont(scrut, cbind, cont_names, variant_names, fn_ret_cont)
             for arm in arms
                 match arm
-                    ArmR(_, guard, ab) =>
+                    ArmR(pat, guard, ab) =>
+                        let arm_cont = copy_bool_map(cont_names)
+                        map_set(arm_cont, "@arm_local", True)
+                        let arm_cbind = copy_bool_map(cbind)
+                        if scr_c
+                            pat_binders_cont(pat, arm_cont, arm_cbind)
+                        end
                         match guard
                             Some(g) =>
-                                if disp_scan_ex(g, cont_names, variant_names, in_closure)
+                                if disp_scan_ex(g, arm_cont, variant_names, in_closure, arm_cbind, fn_ret_cont, enum_defs)
                                     hit = True
                                 end
                             end
@@ -11041,12 +11222,12 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
                         end
                         match ab
                             ABExpr(ae) =>
-                                if disp_scan_ex(ae, cont_names, variant_names, in_closure)
+                                if disp_scan_ex(ae, arm_cont, variant_names, in_closure, arm_cbind, fn_ret_cont, enum_defs)
                                     hit = True
                                 end
                             end
                             ABBlock(bb) =>
-                                if disp_scan_block(bb, cont_names, variant_names, in_closure)
+                                if disp_scan_block(bb, arm_cont, variant_names, in_closure, arm_cbind, fn_ret_cont, enum_defs)
                                     hit = True
                                 end
                             end
@@ -11056,14 +11237,26 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
             end
             hit
         end
-        ExClosure(_, _, body) => disp_scan_block(body, cont_names, variant_names, True)
-        ExTry(i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
-        ExPipe(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
-        ExRange(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
+        ExClosure(prms, _, body) =>
+            # r97：闭包参数注解播种 cbind（知识表共享——泄漏无害，仅 scrut 读）
+            for p in prms
+                match p
+                    Prm(pn, pt) =>
+                        if ty_has_container(pt, enum_defs)
+                            map_set(cbind, pn, True)
+                        end
+                    end
+                end
+            end
+            disp_scan_block(body, cont_names, variant_names, True, cbind, fn_ret_cont, enum_defs)
+        end
+        ExTry(i) => disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExPipe(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_ex(b, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
+        ExRange(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_ex(b, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
         ExRecord(flds) =>
             let mut hit = False
             for f in flds
-                if disp_scan_ex(f.1, cont_names, variant_names, in_closure)
+                if disp_scan_ex(f.1, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                     hit = True
                 end
             end
@@ -11072,7 +11265,7 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
         ExTuple(args) =>
             let mut hit = False
             for a in args
-                if disp_scan_ex(a, cont_names, variant_names, in_closure)
+                if disp_scan_ex(a, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                     hit = True
                 end
             end
@@ -11082,18 +11275,18 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
     end
 end
 
-fn disp_scan_if(ifr: IfR, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
+fn disp_scan_if(ifr: IfR, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool, cbind: Map<String, Bool>, fn_ret_cont: Map<String, Bool>, enum_defs: Map<String, Bool>) -> Bool
     match ifr
         IfR(branches, else_b) =>
             let mut hit = False
             for pair in branches
-                if disp_scan_ex(pair.0, cont_names, variant_names, in_closure) or disp_scan_block(pair.1, cont_names, variant_names, in_closure)
+                if disp_scan_ex(pair.0, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(pair.1, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                     hit = True
                 end
             end
             match else_b
                 Some(eb) =>
-                    if disp_scan_block(eb, cont_names, variant_names, in_closure)
+                    if disp_scan_block(eb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                         hit = True
                     end
                 end
@@ -11106,49 +11299,62 @@ end
 
 # 块扫描：一层 let 绑定追踪（容器产 let 名入 cont_names——兄弟语句可见，
 # 保守方向宁滥勿缺）+ 语句/尾值递归
-fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
+fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool, cbind: Map<String, Bool>, fn_ret_cont: Map<String, Bool>, enum_defs: Map<String, Bool>) -> Bool
     match b
         BlkOf(stmts, tail) =>
             let mut hit = False
             for s in stmts
                 match s
-                    StLet(_, name, _, e) =>
+                    StLet(_, name, ann, e) =>
                         if disp_cont_expr(e, cont_names, variant_names)
                             map_set(cont_names, name, True)
                         end
-                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
+                        # r97：cbind 知识维护——有注解按 ty_has_container 精确
+                        # 写 True/False；无注解按容器产/容器返回 fn 直调宁滥。
+                        # 臂内（@arm_local 哨兵在）cont_names 同值精确覆盖
+                        # （同名标量 let 遮蔽 Binder 后不再误命中）；外层维持
+                        # 现状只置 True——存量 hex 恒等的关键
+                        let lc = match ann
+                            Some(t) => ty_has_container(t, enum_defs)
+                            None => load_cont_expr(e, cont_names, variant_names, cbind) or call_ret_cont(e, fn_ret_cont)
+                        end
+                        map_set(cbind, name, lc)
+                        if map_has(cont_names, "@arm_local")
+                            map_set(cont_names, name, lc)
+                        end
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StDestruct(_, e) =>
-                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StAssign(_, _, _, e) =>
-                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StIf(ifr) =>
-                        if disp_scan_if(ifr, cont_names, variant_names, in_closure)
+                        if disp_scan_if(ifr, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StWhile(c, wb) =>
-                        if disp_scan_ex(c, cont_names, variant_names, in_closure) or disp_scan_block(wb, cont_names, variant_names, in_closure)
+                        if disp_scan_ex(c, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(wb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StFor(_, i, fb) =>
-                        if disp_scan_ex(i, cont_names, variant_names, in_closure) or disp_scan_block(fb, cont_names, variant_names, in_closure)
+                        if disp_scan_ex(i, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs) or disp_scan_block(fb, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
                     StReturn(oe) =>
                         match oe
                             Some(e) =>
-                                if disp_scan_ex(e, cont_names, variant_names, in_closure)
+                                if disp_scan_ex(e, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                                     hit = True
                                 end
                             end
@@ -11156,7 +11362,7 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
                         end
                     end
                     StExpr(e) =>
-                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end
@@ -11165,7 +11371,7 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
             end
             match tail
                 Some(t) =>
-                    if disp_scan_ex(t, cont_names, variant_names, in_closure)
+                    if disp_scan_ex(t, cont_names, variant_names, in_closure, cbind, fn_ret_cont, enum_defs)
                         hit = True
                     end
                 end
@@ -11185,6 +11391,9 @@ fn scan_has_display(prg: Prg) -> Bool
             map_set(variant_names, "None", True)
             map_set(variant_names, "Ok", True)
             map_set(variant_names, "Err", True)
+            # r97：用户枚举容器表（枚举名 → 任变体载荷含容器；单遍直收，
+            # 前向引用枚举按未含容器处理——保守拒绝方向；内建四枚不入表）
+            let enum_defs = map_empty()
             for it in items
                 match it
                     ItEnum(_, _, variants) =>
@@ -11197,11 +11406,63 @@ fn scan_has_display(prg: Prg) -> Bool
                     _ => ()
                 end
             end
+            for it in items
+                match it
+                    ItEnum(ename, _, variants) =>
+                        let mut any_c = False
+                        for vr in variants
+                            match vr
+                                VarR(_, tys) =>
+                                    for t in tys
+                                        if ty_has_container(t, enum_defs)
+                                            any_c = True
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if any_c
+                            map_set(enum_defs, ename, True)
+                        end
+                    end
+                    _ => ()
+                end
+            end
+            # r97：容器返回 fn 表（ItFn 有返回注解且含容器才登记；ret=None
+            # 保守不登记——该边界由 comp 侧 void/ibase 兜底拒）
+            let fn_ret_cont = map_empty()
+            for it in items
+                match it
+                    ItFn(name, _, ret, _, _, _, _) =>
+                        match ret
+                            Some(rt) =>
+                                if ty_has_container(rt, enum_defs)
+                                    map_set(fn_ret_cont, name, True)
+                                end
+                            end
+                            None => ()
+                        end
+                    end
+                    _ => ()
+                end
+            end
             let mut hit = False
             for it in items
                 match it
-                    ItFn(_, _, _, _, body, _, _) =>
-                        if disp_scan_block(body, map_empty(), variant_names, False)
+                    ItFn(_, params, _, _, body, _, _) =>
+                        let names = map_empty()
+                        # r97：参数注解播种 cbind（容器绑定知识起步集）
+                        let cbind = map_empty()
+                        for p in params
+                            match p
+                                Prm(pn, pt) =>
+                                    if ty_has_container(pt, enum_defs)
+                                        map_set(cbind, pn, True)
+                                    end
+                                end
+                            end
+                        end
+                        if disp_scan_block(body, names, variant_names, False, cbind, fn_ret_cont, enum_defs)
                             hit = True
                         end
                     end

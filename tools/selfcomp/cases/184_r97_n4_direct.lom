@@ -1,0 +1,11 @@
+# r97 正例：Some(list_cons(...)) 直接链的 match 臂 Binder println——
+# 一层 let 容器知识（cont_names/cbind）+ scrut 名字判定识别。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) => println(xs)
+        None => println(0)
+    end
+end

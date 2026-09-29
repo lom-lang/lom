@@ -1,7 +1,7 @@
-# R95–R97 整改与 R99 坏 WASM 前置设计（A/B/C 已交付，D甲待续）
+# R95–R97 整改与 R99 坏 WASM 前置设计（A/B/C/D 已交付，E甲待续）
 
-- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲已提交 `8012c38`，CI run `36549057031` 绿后切 v1.4.2 tag、R99 关闭；B甲已提交 `a5dac74`，CI run `36563915297` 六 job 绿后切 v1.4.3 tag、R95 关闭。C甲/R96 已按 §3.3 窄修边界实施并于 2026-09-29 交付 v1.4.4（实施记录见 §8/§9），R96 关闭；D甲/R97、E甲未动。R100/R101 P2 open 待用户另裁。
-- **设计基线**：初始 HEAD `6d7a88d`、v1.4.1；A甲 `8012c38`/v1.4.2；B甲 `a5dac74`/v1.4.3；C甲基线 v1.4.3 工作区恢复。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6–9 为准。
+- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲已提交 `8012c38`，CI run `36549057031` 绿后切 v1.4.2 tag、R99 关闭；B甲已提交 `a5dac74`，CI run `36563915297` 六 job 绿后切 v1.4.3 tag、R95 关闭；C甲已提交 `1851964`，CI run `36578254262`（#202）六 job 绿后切 v1.4.4 tag、R96 关闭；D甲/R97 已按 §3.4 甲路线实施并于 2026-09-29 交付 v1.4.5（实施记录见 §8/§9/§10），R97 关闭。仅剩 E甲整理邻近证据。R100/R101 P2 open 待用户另裁。
+- **设计基线**：初始 HEAD `6d7a88d`、v1.4.1；A甲 `8012c38`/v1.4.2；B甲 `a5dac74`/v1.4.3；C甲基线 v1.4.3 工作区恢复；D甲基线 v1.4.4 工作区。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6–10 为准。
 - **证据性质**：R95/R99 的 `target/probes/r95_design/` 探针为本批独立重跑；R96/R97 的 d5c/n4 原形态有十九审 `docs/reviews/review-2026-09-29.html` §4 原文，本批审阅者又对 `println`/`print`/嵌套闭包、match Form A/B/guard/嵌套及邻近 Bool Binder/`for` 做了全链路探针，机制经读码核对。未在本文列出逐项原始输出的扩展探针须在实施验收时存档，不能把这批已实测形态写成“尚未核定”。主观推测单独标示。
 - **数字落盘前门禁**：写本文前运行 `python tools/doc_audit.py`，结果 `RESULT: PASS（67/67 项通过）`。
 
@@ -162,3 +162,12 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 - **用例**：正例 176–183（普通闭包 println/print、嵌套、同名直接调用优先、同名值位真实捕获、io import 对照、递归闭包、String 字面量对照）；负例 4 枚——`neg_r96_closure_naked_println_value`/`neg_r96_closure_naked_print_value`（裸值位拒，`未定义变量 'println'/'print'`）、`neg_r96_closure_print_arity`（零参 `print` 过 1 参校验）、`neg_r96_closure_unimported_len`（其余内建不随同放行，`闭包捕获了未定义变量 'len'`）；`missing`/`ghost` 候选与既有 `neg_closure_undef_capture` 同路径去重不建。
 - **计数与产物**：verify_selfcomp 328→**340/340 = 178 单文件 + 5 包 + 157 负例**；**存量 v1.4.3 全部 175 对拍同宿主 hex 逐字节恒等**（IDENTICAL=175/DIFF=0/MISSING=0，`target/probes/r96_hex_compare/compare.py` 为忽略目录证据；抽验 176/177 在 v1.4.3 编译器下正是旧拒绝面）；self_comp **11926→11938 行（+12）**；`--bootstrap` **14/14**（104.6s），强 quine **262552 bytes** 双侧逐字节一致。Rust 541+8、eval 双后端各 121/121 数量不变，宿主 `src/` 零改动。
 - **收口**：升版 v1.4.4（纯 L2 面 patch）；语言面/20 关键字/诊断码/43 内建不变，外部发布线冻结。**R96 关闭**。下一步按已裁顺序 D甲/R97（§3.4 边界：仅追 n4 直接构造链不能关闭 R97，参数注解与 helper 返回签名流入须纳入关闭标准），E甲仅整理邻近证据另呈裁决；R94/R100/R101 继续 open。十九审 B+ 不评本批。
+
+## 10. D甲/R97 实施记录（2026-09-29 交付，v1.4.5）
+
+- **恢复流程**：规划者派执行者读码供料（预扫家族/ibase 固定序/类型流入路径/两方案评估，探针 `target/probes/r97_design/`），四关键区亲自复核后定"方案 a 精化版"——知识与放行分层：新增 cbind 容器绑定知识表（AST 直收，仅供 match 臂 Binder 判定）不经臂内注入不放行任何直接流转（既有深层流负例不翻转）；放行表 cont_names 外层行为不变（保存量 hex 恒等）。
+- **实施落定**：三张 AST 直收表（enum_defs/fn_ret_cont/cbind——ret=None 不登记保守 False）+ scrut_is_cont 三路 + 臂内拷贝注入（copy_bool_map + `@arm_local` 哨兵，臂内 StLet 精确覆盖、外层只置 True）+ 家族签名 +3 参 + ExClosure 参数播种。StDestruct 为纯元组名解构不含 Pat，按现状未注入。
+- **实施期 DIFF 与规划者补修**：首轮存量对拍 1 例 DIFF（22_enum_closure：`let b = Full(4)` 纯 Int 载荷枚举被 cbind 继承显示语义"变体构造=容器产"误标，臂内 `v + n` 拼接启发式误命中多开设施；790→916B，行为双侧正确）。执行者按铁律停手取证（段级解析 + 两枚隔离复现），规划者定修：新增 load_cont_expr 使 cbind 无注解分支的变体构造按"实参含容器"判载荷容器性（显示语义留在 cont_names 侧），亲手补修后 22 恢复 790B 逐字节恒等，全量 183 对比归零。
+- **用例与计数**：十正 184–193（三条关闭标准 + 嵌套/guard/兄弟臂隔离/臂内标量遮蔽/闭包/用户枚举/Result 混合；193 以 Int 替 String 载荷——String 字面量会先开设施测不到预扫路径）两负（neg_r97_no_ret_helper——实测拒绝点更早为 void 文案、保守边界成立；neg_r97_param_direct——参数不经 match 直接 println 仍拒）。verify_selfcomp **352/352 = 188 单文件 + 5 包 + 159 负例**；既有 neg_deep_flow 四负例零翻转。
+- **验收**：存量 v1.4.4 全部 **183 对拍（178 单文件 + 5 包）同宿主 hex 逐字节恒等**（补修后 IDENTICAL=183/0/0，`target/probes/r97_hex_compare/compare_hex.py` 为忽略目录证据）；self_comp **11938→12199 行（+261）**；`--bootstrap` **14/14**，强 quine **266073 bytes** 双侧一致；宿主 src 零改动。
+- **收口**：升版 v1.4.5（纯 L2 patch）；语言面与发布线冻结不变。**R97 关闭**，"一层 vt 判定即覆盖自然写法"宣称随本批解除收窄。按已裁顺序仅剩 **E甲**整理邻近 Bool Binder/`for` 证据另呈扩围裁决（§3 E：未获裁决不在本包实施）；R94/R100/R101 继续 open。

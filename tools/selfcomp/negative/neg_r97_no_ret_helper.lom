@@ -1,0 +1,16 @@
+# 负例（r97 match 臂 Binder 批）：无返回注解 helper 返回容器——ret=None
+# 不登记 fn_ret_cont（保守 False 边界），无注解调用点按 void 处理被拒
+# （不产坏 wasm）
+from list import { list_cons, list_empty }
+
+fn mk(v: Int)
+    Some(list_cons(v, list_empty()))
+end
+
+fn main() -> Unit ! [IO]
+    let v = mk(1)
+    match v
+        Some(xs) => println(xs)
+        None => println(0)
+    end
+end
