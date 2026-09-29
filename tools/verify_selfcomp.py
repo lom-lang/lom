@@ -237,6 +237,13 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_r95_closure_unknown_list_ret.lom': '全终止闭包返回类型不可精确推断',
     'neg_r95_closure_try_mixed_return.lom': '类型不符',
     'neg_r95_if_no_else_value.lom': 'let 绑定 void 值',
+    # ---- R96（C甲收尾）：闭包内 prelude 豁免边界负例。机制①豁免仅覆盖
+    # 调用面：裸值引用仍拒（前两枚）；机制④闭包内 print 总开 String 设施
+    # 仍须过 1 参 arity 校验；豁免名单外的内建（len）走捕获终审拒绝 ----
+    'neg_r96_closure_naked_println_value.lom': "未定义变量 'println'",
+    'neg_r96_closure_naked_print_value.lom': "未定义变量 'print'",
+    'neg_r96_closure_print_arity.lom': 'print 期望 1 个参数',
+    'neg_r96_closure_unimported_len.lom': "闭包捕获了未定义变量 'len'",
 }
 
 

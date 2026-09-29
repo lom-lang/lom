@@ -1,0 +1,8 @@
+# C甲：print(Int) 无 import/无 String 字面量，闭包预扫须开启显示设施。
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        print(n)
+        n
+    end
+    println(f(7))
+end

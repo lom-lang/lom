@@ -1,0 +1,7 @@
+# R96 负例：闭包内未导入内建 len——机制①豁免仅限 println/print，其余名走捕获终审拒绝
+fn main() -> Unit ! [IO]
+    let f = fn() -> Int
+        len("a")
+    end
+    println(f())
+end

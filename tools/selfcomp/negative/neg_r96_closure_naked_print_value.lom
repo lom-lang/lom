@@ -1,0 +1,8 @@
+# R96 负例：闭包内 print 作裸值引用——机制①豁免仅覆盖调用面，值用仍拒绝
+fn main() -> Unit ! [IO]
+    let f = fn() -> Int
+        let p = print
+        1
+    end
+    println(f())
+end

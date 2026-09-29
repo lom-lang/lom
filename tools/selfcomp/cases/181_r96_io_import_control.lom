@@ -1,0 +1,11 @@
+# C甲：显式 io 导入继续等价使用 prelude；不是本次放行的必要条件。
+from io import { println, print }
+
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        print(n)
+        println(n)
+        n
+    end
+    println(f(7))
+end

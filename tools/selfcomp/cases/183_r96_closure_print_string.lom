@@ -1,0 +1,8 @@
+# C甲：String 字面量本就开显示设施，确认自由变量豁免独立生效。
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        print("x")
+        n
+    end
+    println(f(7))
+end

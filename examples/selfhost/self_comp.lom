@@ -3521,6 +3521,9 @@ fn closure_sig(params: List<Prm>, reto: Option<Ty>, body: Blk, env2: Map<String,
     # 另建体环境并绑定本闭包形参。compile_closure 传来的 env2 已含形参，
     # 拷贝后同型覆盖不改变其真实槽位/捕获发射。
     let hint_env = copy_bindings(env2)
+    # C甲：仅闭包体内的 prelude print 可无 import 直接调用；哨兵键
+    # 含 @，源语言标识符不可拼出，不污染父 env 或顶层旧边界。
+    map_set(hint_env, "@closure:prelude", {slot: -1, vt: "void", sig: "", cap: False})
     let mut k = 0
     for p in params
         match p
@@ -3949,6 +3952,8 @@ fn ex_rv(e: Ex, env: Map<String, {slot: Int, vt: String, sig: String, cap: Bool}
                     if map_has(env, name) == False and map_has(fns, "@variant:" + name)
                         variant_call_type(name, args, env, fns)
                     elif name == "println"
+                        Ok("void")
+                    elif name == "print" and map_has(env, "@closure:prelude")
                         Ok("void")
                     else
                         match map_get(fns, name)
@@ -8947,7 +8952,9 @@ fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<Stri
                 capnames = list_cons(nm, capnames)
             end
             None =>
-                if map_has(fns, nm) == False and map_has(fns, "@variant:" + nm) == False
+                # println/print 是无须 import 的 prelude：父 env 优先捕获，
+                # 否则与宿主 compile_closure 的全局来源解析一致。
+                if map_has(fns, nm) == False and map_has(fns, "@variant:" + nm) == False and nm != "println" and nm != "print"
                     return Err("闭包捕获了未定义变量 '" + nm + "'")
                 end
             end
@@ -8959,6 +8966,7 @@ fn compile_closure(params: List<Prm>, reto: Option<Ty>, body: Blk, env: Map<Stri
     # 2. 闭包体 env'：参数（slot 1..n；local 0 = env）+ 捕获（slot=捕获位、cap=True）
     let np = list_length(params)
     let env2 = map_empty()
+    map_set(env2, "@closure:prelude", {slot: -1, vt: "void", sig: "", cap: False})
     let localvt2 = map_empty()
     let mut k = 0
     while k < np
@@ -10979,20 +10987,24 @@ fn disp_cont_expr(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<Strin
     end
 end
 
-# 值位扫描：println/print 实参命中 + 拼接 Add 两侧容器产 + 复合表达式递归
-fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+# 值位扫描：println/print 实参命中 + 拼接 Add 两侧容器产 + 复合表达式递归。
+# C甲：闭包内直接调用 prelude print 总需 String 设施；顶层旧边界不动。
+fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
     match e
         ExBinary(op, l, r) =>
             (op == "Add" and (disp_cont_expr(l, cont_names, variant_names) or disp_cont_expr(r, cont_names, variant_names)))
-            or disp_scan_ex(l, cont_names, variant_names) or disp_scan_ex(r, cont_names, variant_names)
+            or disp_scan_ex(l, cont_names, variant_names, in_closure) or disp_scan_ex(r, cont_names, variant_names, in_closure)
         end
-        ExLogical(_, l, r) => disp_scan_ex(l, cont_names, variant_names) or disp_scan_ex(r, cont_names, variant_names)
-        ExUnary(_, i) => disp_scan_ex(i, cont_names, variant_names)
-        ExGroup(i) => disp_scan_ex(i, cont_names, variant_names)
+        ExLogical(_, l, r) => disp_scan_ex(l, cont_names, variant_names, in_closure) or disp_scan_ex(r, cont_names, variant_names, in_closure)
+        ExUnary(_, i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
+        ExGroup(i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
         ExCall(callee, args) =>
             let mut hit = False
             match callee
                 ExIdent(n, _, _) =>
+                    if in_closure and n == "print" and list_length(args) == 1
+                        hit = True
+                    end
                     if (n == "println" or n == "print") and list_length(args) == 1
                         if disp_cont_expr(list_get(args, 0), cont_names, variant_names)
                             hit = True
@@ -11001,27 +11013,27 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
                 end
                 _ => ()
             end
-            if disp_scan_ex(callee, cont_names, variant_names)
+            if disp_scan_ex(callee, cont_names, variant_names, in_closure)
                 hit = True
             end
             for a in args
-                if disp_scan_ex(a, cont_names, variant_names)
+                if disp_scan_ex(a, cont_names, variant_names, in_closure)
                     hit = True
                 end
             end
             hit
         end
-        ExIndex(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
-        ExField(i, _) => disp_scan_ex(i, cont_names, variant_names)
-        ExIf(ifr) => disp_scan_if(ifr, cont_names, variant_names)
+        ExIndex(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
+        ExField(i, _) => disp_scan_ex(i, cont_names, variant_names, in_closure)
+        ExIf(ifr) => disp_scan_if(ifr, cont_names, variant_names, in_closure)
         ExMatch(scrut, arms, _) =>
-            let mut hit = disp_scan_ex(scrut, cont_names, variant_names)
+            let mut hit = disp_scan_ex(scrut, cont_names, variant_names, in_closure)
             for arm in arms
                 match arm
                     ArmR(_, guard, ab) =>
                         match guard
                             Some(g) =>
-                                if disp_scan_ex(g, cont_names, variant_names)
+                                if disp_scan_ex(g, cont_names, variant_names, in_closure)
                                     hit = True
                                 end
                             end
@@ -11029,12 +11041,12 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
                         end
                         match ab
                             ABExpr(ae) =>
-                                if disp_scan_ex(ae, cont_names, variant_names)
+                                if disp_scan_ex(ae, cont_names, variant_names, in_closure)
                                     hit = True
                                 end
                             end
                             ABBlock(bb) =>
-                                if disp_scan_block(bb, cont_names, variant_names)
+                                if disp_scan_block(bb, cont_names, variant_names, in_closure)
                                     hit = True
                                 end
                             end
@@ -11044,14 +11056,14 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
             end
             hit
         end
-        ExClosure(_, _, body) => disp_scan_block(body, cont_names, variant_names)
-        ExTry(i) => disp_scan_ex(i, cont_names, variant_names)
-        ExPipe(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
-        ExRange(a, b) => disp_scan_ex(a, cont_names, variant_names) or disp_scan_ex(b, cont_names, variant_names)
+        ExClosure(_, _, body) => disp_scan_block(body, cont_names, variant_names, True)
+        ExTry(i) => disp_scan_ex(i, cont_names, variant_names, in_closure)
+        ExPipe(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
+        ExRange(a, b) => disp_scan_ex(a, cont_names, variant_names, in_closure) or disp_scan_ex(b, cont_names, variant_names, in_closure)
         ExRecord(flds) =>
             let mut hit = False
             for f in flds
-                if disp_scan_ex(f.1, cont_names, variant_names)
+                if disp_scan_ex(f.1, cont_names, variant_names, in_closure)
                     hit = True
                 end
             end
@@ -11060,7 +11072,7 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
         ExTuple(args) =>
             let mut hit = False
             for a in args
-                if disp_scan_ex(a, cont_names, variant_names)
+                if disp_scan_ex(a, cont_names, variant_names, in_closure)
                     hit = True
                 end
             end
@@ -11070,18 +11082,18 @@ fn disp_scan_ex(e: Ex, cont_names: Map<String, Bool>, variant_names: Map<String,
     end
 end
 
-fn disp_scan_if(ifr: IfR, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+fn disp_scan_if(ifr: IfR, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
     match ifr
         IfR(branches, else_b) =>
             let mut hit = False
             for pair in branches
-                if disp_scan_ex(pair.0, cont_names, variant_names) or disp_scan_block(pair.1, cont_names, variant_names)
+                if disp_scan_ex(pair.0, cont_names, variant_names, in_closure) or disp_scan_block(pair.1, cont_names, variant_names, in_closure)
                     hit = True
                 end
             end
             match else_b
                 Some(eb) =>
-                    if disp_scan_block(eb, cont_names, variant_names)
+                    if disp_scan_block(eb, cont_names, variant_names, in_closure)
                         hit = True
                     end
                 end
@@ -11094,7 +11106,7 @@ end
 
 # 块扫描：一层 let 绑定追踪（容器产 let 名入 cont_names——兄弟语句可见，
 # 保守方向宁滥勿缺）+ 语句/尾值递归
-fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>) -> Bool
+fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<String, Bool>, in_closure: Bool) -> Bool
     match b
         BlkOf(stmts, tail) =>
             let mut hit = False
@@ -11104,39 +11116,39 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
                         if disp_cont_expr(e, cont_names, variant_names)
                             map_set(cont_names, name, True)
                         end
-                        if disp_scan_ex(e, cont_names, variant_names)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StDestruct(_, e) =>
-                        if disp_scan_ex(e, cont_names, variant_names)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StAssign(_, _, _, e) =>
-                        if disp_scan_ex(e, cont_names, variant_names)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StIf(ifr) =>
-                        if disp_scan_if(ifr, cont_names, variant_names)
+                        if disp_scan_if(ifr, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StWhile(c, wb) =>
-                        if disp_scan_ex(c, cont_names, variant_names) or disp_scan_block(wb, cont_names, variant_names)
+                        if disp_scan_ex(c, cont_names, variant_names, in_closure) or disp_scan_block(wb, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StFor(_, i, fb) =>
-                        if disp_scan_ex(i, cont_names, variant_names) or disp_scan_block(fb, cont_names, variant_names)
+                        if disp_scan_ex(i, cont_names, variant_names, in_closure) or disp_scan_block(fb, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
                     StReturn(oe) =>
                         match oe
                             Some(e) =>
-                                if disp_scan_ex(e, cont_names, variant_names)
+                                if disp_scan_ex(e, cont_names, variant_names, in_closure)
                                     hit = True
                                 end
                             end
@@ -11144,7 +11156,7 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
                         end
                     end
                     StExpr(e) =>
-                        if disp_scan_ex(e, cont_names, variant_names)
+                        if disp_scan_ex(e, cont_names, variant_names, in_closure)
                             hit = True
                         end
                     end
@@ -11153,7 +11165,7 @@ fn disp_scan_block(b: Blk, cont_names: Map<String, Bool>, variant_names: Map<Str
             end
             match tail
                 Some(t) =>
-                    if disp_scan_ex(t, cont_names, variant_names)
+                    if disp_scan_ex(t, cont_names, variant_names, in_closure)
                         hit = True
                     end
                 end
@@ -11189,7 +11201,7 @@ fn scan_has_display(prg: Prg) -> Bool
             for it in items
                 match it
                     ItFn(_, _, _, _, body, _, _) =>
-                        if disp_scan_block(body, map_empty(), variant_names)
+                        if disp_scan_block(body, map_empty(), variant_names, False)
                             hit = True
                         end
                     end

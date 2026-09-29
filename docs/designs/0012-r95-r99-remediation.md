@@ -1,7 +1,7 @@
-# R95–R97 整改与 R99 坏 WASM 前置设计（A甲已交付，B甲本地完成）
+# R95–R97 整改与 R99 坏 WASM 前置设计（A/B/C 已交付，D甲待续）
 
-- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲已提交 `8012c38`、CI run `36549057031` 六 job 全绿后切 v1.4.2 tag，R99 关闭。B甲代码与单项验证本地完成，拟升 v1.4.3，规划者全量回归及提交/CI/tag 待验；R95 原形态本地修复，正式闭账待门禁。C甲/R96、D甲/R97、E甲证据尚未实施；R100/R101 P2 open 待用户另裁。
-- **设计基线**：初始 HEAD `6d7a88d`、v1.4.1；A甲交付基线 `8012c38`/v1.4.2；B甲工作区拟升 v1.4.3。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6–7 为准。
+- **状态**：用户裁决 A甲→B甲/C甲/D甲/E甲。A甲已提交 `8012c38`，CI run `36549057031` 绿后切 v1.4.2 tag、R99 关闭；B甲已提交 `a5dac74`，CI run `36563915297` 六 job 绿后切 v1.4.3 tag、R95 关闭。C甲/R96 已按 §3.3 窄修边界实施并于 2026-09-29 交付 v1.4.4（实施记录见 §8/§9），R96 关闭；D甲/R97、E甲未动。R100/R101 P2 open 待用户另裁。
+- **设计基线**：初始 HEAD `6d7a88d`、v1.4.1；A甲 `8012c38`/v1.4.2；B甲 `a5dac74`/v1.4.3；C甲基线 v1.4.3 工作区恢复。语言面 v1.0 与外部发布线继续冻结。下文 §1–4 的探针与备选路线为裁决前档案，实际进度以 §6–9 为准。
 - **证据性质**：R95/R99 的 `target/probes/r95_design/` 探针为本批独立重跑；R96/R97 的 d5c/n4 原形态有十九审 `docs/reviews/review-2026-09-29.html` §4 原文，本批审阅者又对 `println`/`print`/嵌套闭包、match Form A/B/guard/嵌套及邻近 Bool Binder/`for` 做了全链路探针，机制经读码核对。未在本文列出逐项原始输出的扩展探针须在实施验收时存档，不能把这批已实测形态写成“尚未核定”。主观推测单独标示。
 - **数字落盘前门禁**：写本文前运行 `python tools/doc_audit.py`，结果 `RESULT: PASS（67/67 项通过）`。
 
@@ -140,10 +140,25 @@ WASM 发射须显式表达无后继：全终止 if/match 可用 void blocktype�
 - **存量产物对拍**：规划者组织旧编译器与 A甲新编译器在同一宿主下对 A甲前 **139** 个对拍逐份比较，输出 **IDENTICAL=139、DIFF=0、MISSING=0**；其中 v1.4.0 子集 **127/127** 全等。复现入口 `python target/r99-hex-compare/compare.py`（忽略目录证据，不进仓库）；01_arith_int 的旧/新 SHA-256 同为 `bd5d02a6764f0143892a19c249bbfec12d326bbfd2cfb232d4f19b9c87cec4e2`，101_pkg_single 同为 `2dc9025b024fa1a388bcca629f5fa969a50423b4ff146c2a98b5ba56ae992230`。
 - **新开邻近面**：`target/probes/r99_review/generic_unknown_control.lom` 中注解空 List + `list_length` 由 L2 `COMPILED 138 bytes`，hex 276 字符、转 WASM 成功，但 `WebAssembly.validate=false`，Node rc=1，报 `memory index 0 exceeds number of declared memories (0) @+127`；宿主 wasm 输出 `0`、rc=0。两执行者独立复现的 R100（P2）已入 TODO，只登记，不在 A甲内修复。R96/C甲、R97/D甲及 E甲邻近面仍待实施；v1.4.2 的提交/CI/tag 由规划者完成，外部发布线维持冻结。
 
-## 7. B甲实施记录（2026-09-29；代码冻结，规划者全量回归/CI 待验）
+## 7. B甲实施记录（2026-09-29；`a5dac74`/v1.4.3 已验收）
 
-- **冻结代码与实际修正**：`examples/selfhost/self_comp.lom` SHA-256 `3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d`，换行计数 **11926 行**。内部 `never` 与未知泛型 `?` 分离，`vt_merge` 对不可达臂让步给可达类型；推断按真实求值顺序处理严格操作数、if/match/guard、while 条件、for 迭代器和闭包 return。发射只到首个终止子式，终止结构后补 `unreachable` 关闭验证器可见的 fallthrough；短路右侧 never 不作整个表达式无条件终止。无注解闭包形参推断的既有缺口在父 env 副本中补绑定，33/34/35 专项探针覆盖形参可见、外层同名遮蔽及捕获；新仓库负例 `neg_r95_closure_param_leak.lom` 继续锁定外层访问形参 `secret` 必须报“未定义变量 'secret'”、无 hex。混型、局部可达无值与未知泛型 return 仍严格拒，未扩语言面。R95 d1/d3 原算术误拒和 d2/直尾值坏产物本地已修；关闭待规划者门禁。
+- **冻结代码与实际修正**：`examples/selfhost/self_comp.lom` 在 v1.4.3 tag 的 SHA-256 为 `3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d`，换行计数 **11926 行**。内部 `never` 与未知泛型 `?` 分离，`vt_merge` 对不可达臂让步给可达类型；推断按真实求值顺序处理严格操作数、if/match/guard、while 条件、for 迭代器和闭包 return。发射只到首个终止子式，终止结构后补 `unreachable` 关闭验证器可见的 fallthrough；短路右侧 never 不作整个表达式无条件终止。无注解闭包形参推断的既有缺口在父 env 副本中补绑定，33/34/35 专项探针覆盖形参可见、外层同名遮蔽及捕获；仓库负例 `neg_r95_closure_param_leak.lom` 锁定外层访问形参 `secret` 必须报“未定义变量 'secret'”、无 hex。混型、局部可达无值与未知泛型 return 仍严格拒，未扩语言面。R95 d1/d3 原算术误拒和 d2/直尾值坏产物经全量回归及 CI 绿后关闭。
 - **计数闭合与产物**：A甲 **298 = 137 单文件 + 5 包 + 156 负例**；B甲把 9 枚 R99 安全拒负例转成合法行为对拍并删除负例，新增 **143–175 共 33 单文件对拍**，另加 6 精确拒绝负例，现 **328/328 = 170 单文件 + 5 包 + 153 负例**（`298+33−9+6=328`；新增/迁移 .lom **39 = 33 正例 + 6 负例**，examples 原 37 个有效文件 fmt 覆盖不变）。`self_comp` **11469→11926 行（+457）**；`--bootstrap` **14/14**，新强 quine **262137 bytes** 双侧逐字节一致。Rust 541 单元 + 8 集成、eval 两宿主后端各 121/121 的数量不变。
 - **存量 hex**：旧 v1.4.2 的 **142** 对拍在同一宿主下比较，`python target/r95-b-hex-compare/compare.py`（忽略目录证据）得 **140 相同 / 2 有意变化 / 0 缺**。108 旧 **299→新 300 bytes**：末位新增 `unreachable`；142 旧 **118→新 117 bytes**：死尾裁除。两例旧/新模块都可验证，stdout+rc 一致；不得笼统声称 142/142 hex 恒等。
 - **性能证据边界**：同机 N120 单次旧 3.030s、新 3.008s；早期未优化 B 探针曾 128.948s，但最终自编第①步 A甲 315.5s、B甲 328.5s。只说明该输入与该次负载下的实测，**不称全面提速**。
-- **R101 邻近面，仅开账**：审阅者对最小 `and/or` 右侧实际执行 return 两例独立复证；文档执行者用 `target/probes/r95_design/short_circuit_rhs_return_divergence.lom` 新鲜重跑四分支合成探针：宿主解释器 stdout `0/9/1/8`、rc 0；宿主 WASM 仅 stdout `0` 后 `wasm trap: unreachable`、rc 1；B甲 L2 `COMPILED 189 bytes`、hex 378 字符，Node stdout `0/9/1/8`、rc 0。`src/wasm_codegen.rs` 的 `ExprKind::Logical` 发 `if_i64`，没有像相邻 `compile_if` 一样压入 `Label::If`，return 分支 br 深度少一层。此为宿主 WASM 既有分叉，B甲不改 `src/`、不模拟 trap；正例只锁短路使右侧不执行的路径。**R101 P2 与 R100 P2 均 open，修法待用户另裁**；R96/C甲、R97/D甲、E甲尚未实施。十九审 B+ 仍只属 a697474/v1.4.1，不预评 B甲。
+- **R101 邻近面，仅开账**：审阅者对最小 `and/or` 右侧实际执行 return 两例独立复证；文档执行者用 `target/probes/r95_design/short_circuit_rhs_return_divergence.lom` 新鲜重跑四分支合成探针：宿主解释器 stdout `0/9/1/8`、rc 0；宿主 WASM 仅 stdout `0` 后 `wasm trap: unreachable`、rc 1；B甲 L2 `COMPILED 189 bytes`、hex 378 字符，Node stdout `0/9/1/8`、rc 0。`src/wasm_codegen.rs` 的 `ExprKind::Logical` 发 `if_i64`，没有像相邻 `compile_if` 一样压入 `Label::If`，return 分支 br 深度少一层。此为宿主 WASM 既有分叉，B甲不改 `src/`、不模拟 trap；正例只锁短路使右侧不执行的路径。**R101 P2 与 R100 P2 均 open，修法待用户另裁**；R96/C甲是 tag 后本地 WIP，R97/D甲、E甲未动。十九审 B+ 仍只属 a697474/v1.4.1，不预评 B甲。
+
+## 8. C甲/R96 交接中断点（2026-09-29 中断时点史实；已恢复并交付）
+
+- 工作区 main 仍指 `a5dac74`/tag v1.4.3；未提交的 `self_comp.lom` 修改为物理 11938 行（较 tag +12），另有未跟踪的正例 176–183 八枚。无负例、验收映射、Cargo、交接文档或宿主 `src/` 行为改动；本节记录的是交接修订前的代码停点。
+- 已落机制：闭包自由变量终审先查父 env，再只对 prelude `println`/`print` 豁免；闭包体的内部不可拼写标记让直接 `print` 在返回类型综合中视为 void；显示预扫仅在闭包体内发现直接 `print` 时开启 String 设施。顶层无 import `print` 仍是既有拒面。
+- 中断后只读聚焦验证：`self_comp --check`、该文件及八例 fmt 9/9、`git diff --check` 均过；标准 verify_selfcomp **336/336 = 178 单文件 + 5 包 + 153 负例**。单项闭包 println/print、嵌套与同名遮蔽探针的 WASM 可实例化且输出对齐；ignored `target/probes/r96_c_impl`、`target/probes/r96_c_review` 保留。
+- 未完成：C甲负例与拒绝文案锁、存量 hex、bootstrap/新 quine、§2.2 全量回归、文档/版本成对、推送后 CI 与 tag。R96 仍 open；恢复时先核工作区与探针，不能把 v1.4.3 的 CI #201 外推到本地 C甲。
+
+## 9. C甲/R96 实施记录（2026-09-29 恢复后交付，v1.4.4）
+
+- **恢复流程**：规划者按 §8 核对工作区（diff 四机制与本文记载逐条一致）与 ignored 探针后，先在 WIP 上跑全套基线 16 项全绿（含 §2.2 全量与 `--bootstrap` 14/14，新 quine 262552 bytes 双侧一致），再派执行者补齐负例锁/存量 hex/自举复核，规划者亲验（verify_selfcomp 与 doc_audit 双亲跑、四枚负例逐字复验拒绝、hex 日志抽查、验收器 diff 核对仅扩表）。
+- **机制落定**（与 §3.3 边界逐条对齐）：`compile_closure` 自由变量终审先查父 env，再仅豁免 `println`/`print` 两名；哨兵键 `@closure:prelude`（含 `@`，源标识符不可拼出）使闭包内直接 `print` 在返回综合中为 void；`disp_scan_ex/if/block` 族新增 `in_closure` 参数（`ExClosure` 分支置 True），闭包内直接 `print`（1 参）总开 String 设施；顶层无 import `print` 仍拒。`fv_expr` 不区分使用位置——裸值位引用继续由 `infer_ex`/`comp_ex` 拒（负例锁定），不宣称"仅豁免调用位"。
+- **用例**：正例 176–183（普通闭包 println/print、嵌套、同名直接调用优先、同名值位真实捕获、io import 对照、递归闭包、String 字面量对照）；负例 4 枚——`neg_r96_closure_naked_println_value`/`neg_r96_closure_naked_print_value`（裸值位拒，`未定义变量 'println'/'print'`）、`neg_r96_closure_print_arity`（零参 `print` 过 1 参校验）、`neg_r96_closure_unimported_len`（其余内建不随同放行，`闭包捕获了未定义变量 'len'`）；`missing`/`ghost` 候选与既有 `neg_closure_undef_capture` 同路径去重不建。
+- **计数与产物**：verify_selfcomp 328→**340/340 = 178 单文件 + 5 包 + 157 负例**；**存量 v1.4.3 全部 175 对拍同宿主 hex 逐字节恒等**（IDENTICAL=175/DIFF=0/MISSING=0，`target/probes/r96_hex_compare/compare.py` 为忽略目录证据；抽验 176/177 在 v1.4.3 编译器下正是旧拒绝面）；self_comp **11926→11938 行（+12）**；`--bootstrap` **14/14**（104.6s），强 quine **262552 bytes** 双侧逐字节一致。Rust 541+8、eval 双后端各 121/121 数量不变，宿主 `src/` 零改动。
+- **收口**：升版 v1.4.4（纯 L2 面 patch）；语言面/20 关键字/诊断码/43 内建不变，外部发布线冻结。**R96 关闭**。下一步按已裁顺序 D甲/R97（§3.4 边界：仅追 n4 直接构造链不能关闭 R97，参数注解与 helper 返回签名流入须纳入关闭标准），E甲仅整理邻近证据另呈裁决；R94/R100/R101 继续 open。十九审 B+ 不评本批。

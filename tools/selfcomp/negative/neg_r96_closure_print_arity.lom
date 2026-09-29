@@ -1,0 +1,8 @@
+# R96 负例：闭包内 print 零参调用——机制④总开 String 设施仍须过 1 参 arity 校验
+fn main() -> Unit ! [IO]
+    let f = fn() -> Int
+        print()
+        1
+    end
+    println(f())
+end

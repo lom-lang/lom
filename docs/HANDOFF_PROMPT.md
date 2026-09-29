@@ -48,60 +48,47 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- 仓库工作区拟升 v1.4.3（R95 B甲完整 bottom，本地代码与单项
-  验证完成；规划者全量回归、提交、CI 首跑及 tag 待验）。最近
-  已确认的 main/tag 为 `8012c38`/v1.4.2：CI run `36549057031`
-  （#200）六 job 全绿，annotations 5 条 notice（Ubuntu 26 四 +
-  macOS arm64 容量一），零 warning/error。首回合仍须实查最新
-  main CI。语言面 v1.0 与外部发布线继续冻结。
-- A甲/R99 已交付并闭账：全终止值位 if/match 先显性安全拒，
-  v1.4.2 经全量门禁及 CI 绿后切 tag。十九审 d2 原“L2 运行一致”
-  结论已由报告首页事后勘误纠正；十九审 B+ 只评旧 a697474/
-  v1.4.1，不预评 A/B 阶段。十八审 A-、十七审 A- 亦仅属各自
-  基线；评级重估只能由用户发起独立二十审。
-- B甲当前代码冻结：`self_comp.lom` SHA-256
-  `3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d`，
-  self_comp.lom 11926 行。内部 `never` 与泛型未知 `?` 分离，严格求值序、
-  if/match/guard/while/for/闭包 return 与 wasm 栈效应修正；
-  无注解闭包形参推断既有缺口在父 env 副本中补绑定；新增
-  `neg_r95_closure_param_leak.lom` 锁外层使用 `secret` 为未定义
-  变量，COMPILE-ERROR 且无 hex。R95 d1/d3
-  算术误拒本地已修，正式闭账待规划者全量门禁和 CI。混型及
-  未知泛型 return 仍按既有子集严格拒绝。
-- 本地 B甲验收：Rust 541 单元 + 8 集成、eval 双宿主后端各
-  121/121 数量不变；verify_selfcomp 328/328 = 170 单文件 +
-  5 包 + 153 负例（旧 A甲 298 = 137+5+156；新 143–175
-  共 33 对拍，9 旧负例转正删除、6 新负例，净 +30；本批
-  新增/迁移 .lom 共 39 = 33+6，examples fmt 37 不变）；
-  --bootstrap 14/14，新强 quine 262137 bytes 双侧逐字节一致。
-  旧 v1.4.2 的 142 存量对拍 hex：140 相同/2 有意变化/0 缺，
-  108 299→300B 加 unreachable，142 118→117B 裁死尾，
-  两例旧/新均 valid、行为同。N120 单次 3.030s 旧/3.008s 新，
-  自编第①步 315.5s A甲/328.5s B甲；不称全面提速。
-- 当前 open：R94 json 星面键序宿主挂账；R95（B甲本地修复待 CI）；
-  R96 P3 闭包内 println/print（C甲未实施）、R97 P3 match
-  Binder 容器显示预扫（D甲未实施）；R100 P2 空 List 只读设施
-  缺 memory；新开 R101 P2：and/or 右侧实际执行 return，宿主
-  解释器与 L2 WASM 正常，宿主 WASM 首项后 unreachable trap。
-  根因宿主 Logical 生成 if 未压 Label::If；B甲不修 src、不模拟
-  trap。R100/R101 的修法和次序只由用户另裁。E甲邻近证据待实施。
-- 提交门禁教训仍在：Map 批 git add 清单曾漏版本文件；提交前
-  以 git show --stat HEAD 核对树。v1.3.2 曾漏 Lom fmt 且 tail
-  截断未见 FAIL；新增/修改 .lom 必过递归 fmt --check。
-- 交付史与机制细节事实源：RFC-0004 修订 1-35、SPEC §13、
-  designs/0001~0012、TODO 顶部、HANDOVER §11.6 和 selfcomp
-  用例集；不在提示词重复逐批交付。环境历史清理见 HANDOVER。
-- 下一步依已裁顺序：规划者验收并完成 B甲提交/CI/tag 门禁；
-  然后 C甲 R96、D甲 R97、E甲邻近证据。R100/R101 另待用户
-  裁决；二十审发起也仅用户决定。MoonBit Q3 和 ubuntu-26
-  迁移观察仍在案。发布线不解冻。
+- **C甲/R96 已交付 v1.4.4**（2026-09-29 恢复并收口，RFC-0004 修订 36、
+  designs/0012 §9）：闭包自由变量终审先查父 env、再仅豁免 prelude
+  `println`/`print`（其余内建不随同放行）；哨兵键 `@closure:prelude`
+  使闭包内直接 `print` 综合为 void；显示预扫 `in_closure` 参数让
+  闭包内直接 `print` 总开 String 设施；顶层无 import `print` 仍拒。
+  正例 176–183 八枚 + 负例 4 枚。验收：verify_selfcomp **340/340 =
+  178 单文件 + 5 包 + 157 负例**；存量 v1.4.3 全部 **175 对拍 hex
+  逐字节恒等**（IDENTICAL=175/0/0）；self_comp.lom 11938 行（较 v1.4.3 +12）；
+  bootstrap **14/14**，强 quine **262552 bytes** 双侧一致；全量回归
+  16 项全绿；规划者亲验 verify_selfcomp 与 doc_audit。Cargo.toml/lock
+  均为 1.4.4。**R96 已关闭**；提交推送/CI 首跑/tag v1.4.4 由规划者
+  执行中——新任以 `git log`/CI 实查为准，首跑非绿先处理 CI。
+- tag 基线链：v1.4.2（A甲/R99，`8012c38`，CI #200）→ v1.4.3
+  （B甲/R95，`a5dac74`，CI #201 六 job 绿，annotations 五条环境
+  notice 零 warning）→ v1.4.4（C甲/R96，CI/tag 见实查）。v1.4.3
+  基线为 328/328 = 170+5+153、quine 262137B、self_comp 11926 行；
+  v1.4.2→v1.4.3 存量 142 对拍 140 相同/2 有意变化（108 +1B 的
+  末位 unreachable、142 −1B 死尾裁除）；v1.4.3→v1.4.4 存量 175
+  对拍全恒等。Rust 541 单元 + 8 集成、eval 双后端各 121/121 不变。
+  语言面 v1.0 与外部发布线继续冻结。
+- 当前 open：R94 宿主 json 键序挂账；R97 P3 match Binder 显示预扫
+  （D甲未动）、R100 P2 空 List 只读设施缺 memory、R101 P2 宿主 WASM
+  `and/or` 右侧实际执行 return 时 label 深度错。R95/R99/R98/R96 已
+  关闭。E甲邻近 Bool Binder/for 证据待整理；R100/R101 修法与次序
+  另待用户裁决。十九审 B+ 仅评 a697474/v1.4.1，d2 事后勘误在报告
+  首页；二十审及评级重估只能由用户发起。发布线不解冻。
+- 下一步沿已裁顺序：**D甲/R97**（designs/0012 §3.4 边界——仅追 n4
+  直接构造链不能关闭 R97，参数注解与 helper 返回签名流入须纳入
+  关闭标准；乙路线的 hex 变化须用户先接受），E甲仅整理邻近证据。
+  提交前核暂存树含版本文件与全部新增 `.lom`，fmt --check 不能只看
+  tail；含反斜杠转义仅 Write/Edit/apply_patch。
+- 交付史与机制事实源：RFC-0004 修订 1–36、SPEC §13、
+  designs/0001–0012、TODO 顶部、HANDOVER §11.6 和 selfcomp
+  用例集。十九审/十八审评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
    §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-09-29.html
    （十九审——最新轮）及 review-2026-09-28.html（十八审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-35 全读），docs/designs/0001~0012 十二份批次设计（含各批实施
+   1-36 全读），docs/designs/0001~0012 十二份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
@@ -115,31 +102,33 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（期望 328/328 = 175 用例双产物行为一致（170 单文件 + 5 包项目）+ 153 负例拒绝）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine；耗时随机器负载 ~100s-400s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py（已提交 v1.4.4 基线 340/340 = 178 单文件 + 5 包 + 157 负例）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 262552 bytes；耗时随机器负载 ~100s-400s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
-   - 新增/迁移的 tools/selfcomp 用例也须逐个 fmt --check（本批 39 = 33 正例 + 6 负例）；examples 原 37 个有效文件不变。
-   - git status 干净；GitHub 最新 main CI 绿并查看 annotations。
-3. 如实报告基线，只给用户方向菜单等裁决（菜单见【当前真实状态】末
-   两条）。外部发布线继续冻结。
-4. 动工裁决后：规划者产出/更新批次设计方案（含裁决点）→ 用户裁决
-   → 实施派子智能体（任务书含验收标准与 §11.6 坑清单）→ 规划者
-   验收（全量回归 + 存量 hex 对比 + 抽查）→ 规划者提交推送看 CI。
+   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check：C甲 12 枚（正例 176–183 + 负例 neg_r96_* 4 枚）已入 v1.4.4；examples 原 37 个有效文件不变。
+   - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
+3. 如实报告 tag 基线核验边界。D甲/E甲方向已有用户裁决可按序推进；
+   R100/R101、二十审等新方向仍只呈菜单待裁。外部发布线继续冻结。
+4. 已裁批次：规划者更新方案与自包含任务书 → 派执行者实施 → 规划者
+   验收（全量回归 + 存量 hex 对比 + 抽查）→ 提交推送并看 CI 首跑；
+   CI 绿后才切 tag。新增裁决点仍由用户决定。
 
-【关键锚点索引（当前行为要点；逐批行为基线已由 verify_selfcomp
-  328 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+【关键锚点索引（当前行为要点；已提交 v1.4.4 基线由 verify_selfcomp
+  340 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录）】
-- open 项复现要点：R95 原形态 `let v = if c return 1 else return 2
+- 复现锚点：R95 原形态 `let v = if c return 1 else return 2
   end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确
-  1/2），A甲 L2 拒；B甲本地已全链通过，关闭待 CI。原 `v` 直尾
-  旧 L2 COMPILED 121B 后栈下溢（R99），A甲安全拒，B甲转为
-  可验证且行为一致。R96——闭包体内 println(n)：
-  宿主 7/7 收 vs L2 拒"闭包捕获了未定义变量 'println'"。R97——无
-  字面量程序 `match Some(xs) => println(xs)` 落 ibase 兜底拒（带
-  String 字面量同形态过）。
+  1/2），A甲 L2 拒；B甲已于 `a5dac74`/v1.4.3 经 CI 绿后修复
+  并关闭 R95。原 `v` 直尾旧 L2 COMPILED 121B 后栈下溢（R99），
+  A甲安全拒，B甲转为可验证且行为一致。R96——闭包体内
+  println(n)：宿主 7/7 收，v1.4.3 的 L2 拒"闭包捕获了未定义
+  变量 'println'"；C甲已在 v1.4.4 放行（父 env 优先 + 仅豁免
+  两名 prelude）并关闭 R96；裸值位引用仍拒（负例锁定）。R97——
+  无字面量程序 `match Some(xs) => println(xs)` 落 ibase 兜底拒
+  （带 String 字面量同形态过）。
 - 写 Lom 代码最高频坑（全档见 HANDOVER §11.6 与 §4——写探针/用例
   前过一遍）：布尔字面量大写 True/False；无 [..] List 字面量（用
   range/list_cons）；`not` 不是运算符（用 !x）；match Form B 每臂
@@ -151,10 +140,11 @@
   指令族与偶字符占位（容器显示批教训）。
 - R92/R95/R99 登记链：单 return 臂历史双侧一致；双 return
   臂绑定后算术十九审 R95 误拒、绑定直尾值 R99 坏 WASM；A甲
-  安全拒后 B甲本地正确发射。不可据此宣称三实现所有 bottom
+  安全拒后 B甲在 v1.4.3 正确发射。不可据此宣称三实现所有 bottom
   形态全覆盖：R101 短路右侧实际 return 是宿主 WASM 既有分叉。
 
-现在从上手三步开始。只读核验完成后向我汇报并等待裁决。
+现在从上手三步开始。先报告只读核验，再按已裁顺序推进 D甲/R97；
+新方向仍待用户裁决。
 ```
 
 ## 维护者备注

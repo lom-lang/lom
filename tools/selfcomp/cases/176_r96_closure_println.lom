@@ -1,0 +1,8 @@
+# C甲：println 为 prelude，闭包体无 io import 也可直接调用。
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        println(n)
+        n
+    end
+    println(f(7))
+end

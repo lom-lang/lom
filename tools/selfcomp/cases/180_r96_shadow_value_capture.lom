@@ -1,0 +1,15 @@
+# C甲：局部同名值位引用必须被真实捕获，不能因 prelude 豁免丢值。
+fn main() -> Unit ! [IO]
+    let println = fn(x: Int) -> Int
+        x + 100
+    end
+    let print = fn(x: Int) -> Int
+        x + 200
+    end
+    let f = fn(n: Int) -> Int
+        let g = println
+        let h = print
+        g(n) + h(n)
+    end
+    println(f(7))
+end

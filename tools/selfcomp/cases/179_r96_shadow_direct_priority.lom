@@ -1,0 +1,11 @@
+# C甲：同名父局部先按值捕获，直接调用仍按现有 prelude 优先。
+fn main() -> Unit ! [IO]
+    let println = 42
+    let print = 99
+    let f = fn() -> Int
+        println(7)
+        print(8)
+        0
+    end
+    println(f())
+end

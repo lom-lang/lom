@@ -1,6 +1,29 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前交接声明（2026-09-29，R95 B甲本地完成、v1.4.3 待门禁）**：
+> **当前交接状态（2026-09-29，C甲/R96 已交付 v1.4.4；CI/tag 门禁
+> 见本段尾）**：用户裁决 A甲→B甲/C甲/D甲/E甲 顺序下，C甲按
+> designs/0012 §3.3 窄修边界恢复并收口：闭包自由变量终审先查父
+> env、再仅豁免 prelude `println`/`print`（其余内建不随同放行），
+> 哨兵键 `@closure:prelude` 使闭包内直接 `print` 综合为 void，
+> 显示预扫 `in_closure` 参数让闭包内直接 `print` 总开 String 设施，
+> 顶层无 import `print` 仍拒。正例 176–183 八枚 + 负例 4 枚
+> （裸值位两枚/零参 arity/未 import `len`；`missing`/`ghost` 与
+> `neg_closure_undef_capture` 去重不建）。验收：verify_selfcomp
+> **340/340 = 178 单文件 + 5 包 + 157 负例**；**存量 v1.4.3 全部
+> 175 对拍同宿主 hex 逐字节恒等**（IDENTICAL=175/0/0，抽验 176/177
+> 在旧编译器下正是旧拒绝面）；self_comp **11938 行（+12）**；
+> `--bootstrap` **14/14**，强 quine **262552 bytes** 双侧一致；
+> WIP 全量回归 16 项全绿（541+8/clippy/fmt/doc_audit 67/67/
+> spec_examples/eval_prompt 24/24/selfhost 六模式/eval 双后端
+> 121/121/fmt 37+12）；规划者亲验 verify_selfcomp 与 doc_audit。
+> ignored `target/probes/r96_c_impl`、`r96_c_review`、
+> `r96_hex_compare` 证据保留。**R96 关闭**；升版 v1.4.4（纯 L2
+> patch，宿主 src 零改动）。提交/推送/CI 首跑/tag 由规划者执行，
+> 结果以 CI 为准——若首跑绿即切 tag v1.4.4 并回填本段与 SPEC §13。
+> 当前 open：R94（宿主挂账）、R97、R100、R101；D甲/R97 与 E甲
+> 邻近证据尚未动工，R100/R101 修法另待用户裁决。
+>
+> **B甲交付前记录（2026-09-29，当时 v1.4.3 待门禁；历史时点）**：
 > 用户已裁决 A甲→B甲/C甲/D甲/E甲。A甲/R99 已提交 `8012c38`，
 > CI run `36549057031`（#200）六 job 全绿、annotations 5 条 notice
 > （Ubuntu 26 四条 + macOS arm64 容量一条，零 warning/error），

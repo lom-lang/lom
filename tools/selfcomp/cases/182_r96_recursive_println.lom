@@ -1,0 +1,11 @@
+# C甲：递归闭包自身捕获与全局 prelude 同时存在。
+fn main() -> Unit ! [IO]
+    let f = fn(n: Int) -> Int
+        if n <= 0
+            return 0
+        end
+        println(n)
+        f(n - 1)
+    end
+    println(f(2))
+end

@@ -1,0 +1,12 @@
+# C甲：内层闭包沿用 prelude，print 不换行而 println 换行。
+fn main() -> Unit ! [IO]
+    let outer = fn(n: Int) -> Int
+        let inner = fn(m: Int) -> Int
+            print(n)
+            println(m)
+            n + m
+        end
+        inner(4)
+    end
+    println(outer(3))
+end
