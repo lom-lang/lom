@@ -1,6 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **R108/R109 整改交付记录（2026-09-30，v1.4.11——包 enum 变体 --check 放行 + NAM006 真别名限定；门禁回填见段尾）**：用户裁决"继续"（建议项：R108+R109 行为小批先行）。纯 typecheck 两处：**R108** Ident 对 ∈ externals 放行（与 fn 同构；不并入 is_variant_constructor 避免元数假阳性）——103 用例 --check rc=1 三错 → rc=0 干净，负向（拼错/图外）仍拒；**R109** NAM006 终检只在真别名触发——101 用例 build 3 条噪音 → 零，真别名遮蔽（r104 测试）与主文件 fn 撞包 fn（收敛点分支）均不倒。tests/r108_variant_externals.rs 集成 ×5 → 集成 16→**21**；selfcomp 负例锁不到宿主 typecheck 面（落位说明见 RFC 修订 44）；verify_selfcomp 364/364 不变、quine 269521 不变。**R108/R109 关闭；open 仅 R107（P1 撞名族选边待裁：后 import 声明赢 vs 取首个）**。
+> **R108/R109 整改交付记录（2026-09-30，v1.4.11——包 enum 变体 --check 放行 + NAM006 真别名限定；门禁回填见段尾）**：用户裁决"继续"（建议项：R108+R109 行为小批先行）。纯 typecheck 两处：**R108** Ident 对 ∈ externals 放行（与 fn 同构；不并入 is_variant_constructor 避免元数假阳性）——103 用例 --check rc=1 三错 → rc=0 干净，负向（拼错/图外）仍拒；**R109** NAM006 终检只在真别名触发——101 用例 build 3 条噪音 → 零，真别名遮蔽（r104 测试）与主文件 fn 撞包 fn（收敛点分支）均不倒。tests/r108_variant_externals.rs 集成 ×5 → 集成 16→**21**；selfcomp 负例锁不到宿主 typecheck 面（落位说明见 RFC 修订 44）；verify_selfcomp 364/364 不变、quine 269521 不变。**R108/R109 关闭；open 仅 R107（P1 撞名族选边待裁：后 import 声明赢 vs 取首个）**。**门禁回填：提交 `13a4cf4` 推送后 CI run `36714193624`（#223）六 job 全绿，tag v1.4.11 已切。**
 >
 > **第二十二轮独立审查登记（2026-09-30，总评 B+；报告
 > [review-2026-09-30-3.html](reviews/review-2026-09-30-3.html)，基线
