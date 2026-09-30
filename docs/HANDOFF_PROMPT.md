@@ -87,10 +87,10 @@
   v1.4.9 R94 批 2（`e71749e`，#216）→ 二十一审 B + R106 即修
   （`51923b4`，#218）→ v1.4.10 R104/R105 整改（本轮）。**已提交
   基线**：verify_selfcomp
-  **364/364 = 196 单文件 + 7 包 + 161 负例**、bootstrap **14/14**
-  （强 quine 269521 bytes 双侧一致）、self_comp.lom 12529 行、
-  Rust **543 单元 + 21 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
-  r104_dedup_order×6 + r108_variant_externals×5）、
+  **365/365 = 196 单文件 + 8 包 + 161 负例**、bootstrap **14/14**
+  （强 quine 269555 bytes 双侧一致）、self_comp.lom 12544 行、
+  Rust **543 单元 + 25 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
+  r104_dedup_order×6 + r108_variant_externals×5 + r107_alias_clash×4）、
   eval 双后端各 121/121；存量 hex 对比 198 恒等 + 2 有意变化
   （批 2a，v1.4.9 起）。Cargo.toml/lock 均为 1.4.10。
 - R101 修复后**三实现短路 return 全对齐**（0/9/1/8 rc0）；
@@ -108,12 +108,13 @@
   3 条，同源静默/改文案修法）。工具治理批（doc_audit 71/71 入锚
   + D5 探针 8/8）已交付复核通过。轨迹：二十审 A-→二十一审 B→
   二十二审 B+（不外推）。
-- **v1.4.11（R108/R109 整改）已交付，open 仅 R107**：R108 包
-  enum 变体 --check 放行（103 用例 rc=0）；R109 NAM006 真别名
-  限定（101 用例 build 零噪音）；集成 16→21。
-- 下一步：**R107 撞名族选边待裁**（两包 import 同一别名真名不同：
-  解释器/WASM 恒声明序后者 vs L2 恒首个——建议"后 import 声明赢"
-  对齐解释器/宿主只改 L2，配 NAM006 变体 warning）。其余在案：
+- **v1.4.12（R107 整改）已交付，台账 open 清空**：两包同别名
+  统一"后 import 声明赢"（L2 后写覆盖）+ NAM006 别名重复变体
+  （用户裁决）——三侧 103 一致；集成 21→25、365/365、quine 269555。
+- 下一步：**交接就绪，无在制工作**（R94-R109 全关、台账 open 清空）。
+  待裁菜单：二十三审发起时机（v1.4.11/v1.4.12 两批整改后评级
+  待复审重估）、typechecker for 可变性 quirk、`lom build` 逐文件
+  视图 NAM003、下一阶段方向（发布线继续冻结直至解冻）。其余在案：
   typechecker for 可变性 quirk、`lom build` 逐文件视图 NAM003、
   二十三审时机、下一阶段方向（发布线继续冻结直至解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–42、SPEC §13、
@@ -132,15 +133,15 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals，×21）
+   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash，×25）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交基线 364/364 = 196 单文件 + 7 包 + 161 负例）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269521 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py（已提交基线 365/365 = 196 单文件 + 8 包 + 161 负例）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269555 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -154,7 +155,7 @@
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
 【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
-  364 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+  365 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2
   end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确

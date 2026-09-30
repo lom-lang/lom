@@ -12075,6 +12075,10 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
             # 但单文件程序 import 可先于同名 fn 声明，统一延迟保序不破）。
             # 校验口径对齐宿主 process_import 的 public_symbols 检查：
             # fn/枚举类型/变体三者任一命中即通过。
+            # alias_regs（R107 批新增）：本 pass 已注册过的别名集——区分
+            # fns[alias] 既有条目来源（pass 1 fn 定义 vs 本 pass 先前别名），
+            # 见下方撞名两分注释。
+            let alias_regs: Map<String, Bool> = map_empty()
             for it in items
                 match it
                     ItImport(module, im_items) =>
@@ -12089,15 +12093,26 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                                         # as 别名注册（宿主 import_aliases 语义——调用点
                                         # 按真名解析）：用户 fn 的摘要整条复制到别名下，
                                         # comp_call 零改动即按真名摘要走 R74 arity/类型
-                                        # 校验。别名与既有函数重名时对齐宿主分派优先级
-                                        # （fn_idx.get(orig) 先于 real）——不覆盖，保留既有。
+                                        # 校验。撞名两分（R107/二十二审整改，v1.4.12 用户
+                                        # 裁决"后 import 声明赢"，designs/0008"别名与既有
+                                        # 函数重名静默保留既有摘要"口径就此翻转——仅限
+                                        # 别名撞别名子形态）：既有条目来自 pass 1 fn 定义
+                                        # （本地/包 fn）→ 不覆盖，真名/本地定义优先（b4
+                                        # 别名撞他包真名、b5 本地撞包真名语义保持，对齐
+                                        # 宿主分派 functions 优先于 import_aliases）；既有
+                                        # 条目来自本 pass 先前注册的别名（alias_regs 可
+                                        # 辨）→ 后写覆盖——两包各自 import 同一别名时
+                                        # 声明序后者赢，对齐宿主 import_aliases 的 item
+                                        # 序 insert 覆盖，修复修复前 L2 首个赢（恒 4）与
+                                        # 解释器/宿主 WASM（恒 103）跨后端静默分叉。
                                         if alias != iname and map_has(fns, iname)
-                                            if map_has(fns, alias) == False
+                                            if map_has(fns, alias) == False or map_has(alias_regs, alias)
                                                 let ent = match map_get(fns, iname)
                                                     Some(e) => e
                                                     None => {idx: 0, ret: "void", nprm: 0, prms: ""}
                                                 end
                                                 map_set(fns, alias, ent)
+                                                map_set(alias_regs, alias, True)
                                             end
                                         end
                                     end

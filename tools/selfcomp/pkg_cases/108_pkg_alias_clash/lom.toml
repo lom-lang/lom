@@ -1,0 +1,8 @@
+# R107 批（二十二审 R107 整改）：主项目清单——双依赖 libr/libs（两包符号
+# 经同一别名 g 导入）。
+name = "app108"
+version = "0.1.0"
+
+[dependencies]
+libr = { path = "libr" }
+libs = { path = "libs" }

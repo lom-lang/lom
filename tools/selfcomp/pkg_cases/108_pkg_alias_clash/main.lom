@@ -1,0 +1,12 @@
+# R107 批（二十二审 R107 整改，v1.4.12 用户裁决"后 import 声明赢"）对拍
+# 108：两包各自 import 同一别名 g（真名不同，libr.origin=+1/libs.base2=+100）
+# 后调用——锁定面：后写声明赢（恒 103，期望输出 "103"），三侧一致
+# （修复前解释器/宿主 WASM 恒 103、L2 恒 4——跨后端静默不同值零诊断；
+# NAM006"import 别名重复"变体显性化在宿主侧，L2 侧 self_comp 后写覆盖）。
+
+from libr import { origin as g }
+from libs import { base2 as g }
+
+fn main() -> Unit ! [IO]
+    println(g(3))
+end

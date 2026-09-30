@@ -188,7 +188,35 @@ impl TypeChecker {
         // 差异。三形态各归其位：真别名撞本地 fn 此处仍报；无别名同源静默；
         // 主文件 fn 撞包 fn（合并单元重复 ItFn）走 collect_fn_sig 收敛点的
         // NAM006 分支（重复名 ∈ externals →"本地定义遮蔽包符号"）仍报。
-        for ia in std::mem::take(&mut self.imported_aliases) {
+        // R107 批（二十二审 R107 整改，v1.4.12 用户裁决"后 import 声明赢"）：
+        // 第四形态"两包各自 import 同一别名（真名不同，alias 撞 alias）"——
+        // 此前跨后端静默不同值零诊断（解释器/宿主 WASM 取声明序后者、L2
+        // 取首个）。裁决对齐宿主 import_aliases 的 item 序后写覆盖语义：
+        // 同一真别名重复出现时对后写者发 NAM006 warning 显性化遮蔽（不拦
+        // 截，照 NAM005/NAM006 形态；注册走下方既有分支——HashMap/HashSet
+        // insert 天然后写覆盖）。与"真别名撞本地 fn"形态各自独立报（同程
+        // 序两条 warning 属合理）；无别名（alias == name）不进宿主
+        // import_aliases，结构性同名豁免照 R109 口径不报。
+        let imported_aliases = std::mem::take(&mut self.imported_aliases);
+        let mut prev_alias_owner: HashMap<String, (String, String)> = HashMap::new();
+        for ia in &imported_aliases {
+            if ia.alias != ia.name {
+                if let Some((prev_module, prev_name)) = prev_alias_owner.get(&ia.alias) {
+                    self.push_diag(
+                        Severity::Warning,
+                        "NAM006".into(),
+                        format!(
+                            "import 别名 '{}' 重复——取后写声明（遮蔽 {}::{}）",
+                            ia.alias, prev_module, prev_name
+                        ),
+                        ia.span.line,
+                        ia.span.col,
+                    );
+                }
+                prev_alias_owner.insert(ia.alias.clone(), (ia.module.clone(), ia.name.clone()));
+            }
+        }
+        for ia in imported_aliases {
             if ia.alias != ia.name && self.user_fns.contains(&ia.alias) {
                 self.push_diag(
                     Severity::Warning,
@@ -1687,7 +1715,9 @@ impl TypeEnv {
 fn type_hint(code: &str) -> Option<String> {
     match code {
         "NAM002" => Some("重命名重复的函数/枚举".into()),
-        "NAM006" => Some("本地定义优先；重命名 import 别名或本地函数以消除遮蔽".into()),
+        "NAM006" => Some(
+            "撞名不拒：别名撞本地定义时本地优先，别名重复时后写声明赢；重命名以消除遮蔽".into(),
+        ),
         "MUT001" => Some(
             "局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本"
                 .into(),
