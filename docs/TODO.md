@@ -1,5 +1,31 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **第二十一轮独立审查登记（2026-09-30，总评 B；报告
+> [review-2026-09-30-2.html](reviews/review-2026-09-30-2.html)，基线
+> 250f0ef/v1.4.9，增量 = v1.4.8/v1.4.9 两批）**：两批交付宣称
+> 经独立敌手复核**零失真**（存量对比独立全量重算 198 恒等 + 2 有意
+> 变化逐字吻合、星面键三出口十六进制取证、105 三侧 18/18、
+> 362/362 名实双核对、基线 14 项全绿）；24 主探针 + 4 变体中新
+> 放行面（map_remove 族 11 枚含 R101 交叉面、json 键序族 5 枚、
+> 包内 as 正常形态族）**零击穿**；但**撞名族两枚 P1**（规划者已
+> 亲手复现属实）：**R104（P1）两包同名符号冲突——解释器输出同
+> 后端跨运行非确定**（p15b 亲跑 10 次 11×6/22×4，HashMap 遍历序
+> 决定覆盖方向[根因标注主观推测]，WASM/L2 恒取后写者，零诊断；
+> D5 生成器按 designs/0008 裁决点 2 构造性规避该形态致全库零
+> 覆盖；非 v1.4.9 引入）；**R105（P1）包符号别名与主文件用户
+> 函数同名——解释器静默走别名绕过用户函数（p16 亲跑恒 4/4）而
+> WASM/L2 走用户函数（恒 15/4），遮蔽方向相反零诊断**（designs/
+> 0008 L150"主文件赢"口径与解释器实测相悖；连带观察：包 fn 真名
+> 不经 import 即可用）。两者同根（跨模块同名解析无规范语义），
+> **修法需用户语义选边裁决**（本地定义优先 vs import 优先；
+> 撞名/遮蔽是否加 warning——铁律 5）。**R106（P3）批 2 文档
+> 时点残留 5 处（R103 同族复发：HANDOFF_PROMPT 基线清单 542/×8
+> 与同文件状态段自相矛盾、HANDOVER §9-3 quine/§9-5 整段、README
+> L78 两处）已开账即修**；报告另建议"当前值位入 doc_audit 锚"
+> 防复发（待裁）。审查轨迹：二十审 A- → 二十一审 B（均不外推；
+> B 非本批引入所致——两 P1 为存量撞名覆盖洞，整改关闭后待复审
+> 重估）。
+>
 > **批 2 交付记录（2026-09-30，v1.4.9——map_remove 统一 Bool + 包内 as 别名；门禁回填见段尾）**：用户裁决"按你的提议执行"批 2，设计 [designs/0013](designs/0013-r94-ledger-remediation.md) §1.2/§1.3，双执行者顺序实施、规划者亲验（verify_selfcomp/doc_audit/105 三侧/map_remove 三侧探针）。**map_remove 统一 Bool**（对齐 SPEC §9.7 冻结宣称，翻转 v1.2.13 裁决 2 甲的 L2 选边）：宿主 build_map_remove 尾部 V_UNIT → probe 命中结果 Bool tag（蓝本 build_map_has，墓碑+size-- 不变，e2e 测试锁定）；L2 两处 "void" 裁决落点/helper 表/R89 文案（map_remove 撤出例句）/发射签名同步 i32——三侧 println 形态 **true/false/true 逐字一致**（修复前宿主 WASM ()/()、L2 COMPILE-ERROR，旧编译器导出取证）。存量对比（同一新 lom.exe 驱动 v1.4.8 导出旧编译器）：**198 恒等 + 2 有意变化**（81/84 helper 签名字节 +14/+16，各自 valid 行为一致）。负例连锁：neg_map_remove_unit_bind 删（拒绝面消失）、neg_println_void 改 map_set 形态续锁 R89、新正例 201——verify_selfcomp 重组 **362/362 = 196 单文件 + 5 包 + 161 负例**；self_comp 12525→**12529 行**、quine **269521B** 双侧一致；Rust 542→**543**。**包内 as 别名**：解释器 load_packages 的 Item::Import 整体跳过 → 镜像 process_import 注册（两个插入都做，顺带打通包内 stdlib 别名暗坑 `from io import {println as log}`）；build 路径 typecheck 改传包 externals——105 用例**三侧一致 18/18**（解释器修复前 RUNTIME002；build 修复前 **3 条** NAM003 假阳性 → 零诊断——十八审登记"2 条"系笔误已随批更正；WASM/L2 本就正确）。集成测试 ×2（tests/r94_pkg_alias.rs）→ 集成 8→**10**。**登记不修边界**：`lom build` 包管理流程（逐文件无 externals）下包源内别名仍 NAM003（需按依赖图传公开符号，超最小面）；clippy --all-targets 有 9 条存量测试 lint（rust-1.97.0 漂移，HEAD 既有非本批引入，CI 口径零输出不受影响）。**R94 全部关闭**；当前台账无 open 项（typechecker for 可变性 quirk 等既有登记维持）。**门禁回填：提交 `e71749e` 推送后 CI run
 > `36677072901`（#216）六 job 全绿，tag v1.4.9 已切。**
 >

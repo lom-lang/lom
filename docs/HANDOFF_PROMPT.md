@@ -64,11 +64,23 @@
   **包内 as 别名**——解释器 load_packages 注册补齐（顺带打通
   包内 stdlib 别名暗坑）+ build 路径 externals，105 用例三侧
   18/18、3 条 NAM003 假阳性清零（十八审"2 条"系笔误随批更正）。
-  R95-R103 全关；**台账无 open 项**。登记在案不修边界：`lom
-  build` 包管理流程逐文件视图下包源内别名仍 NAM003；clippy
-  --all-targets 有 9 条存量测试 lint（rust-1.97.0 漂移、CI
-  口径零输出不受影响）。二十审 A-（review-2026-09-30.html，
-  v1.4.2→v1.4.7 六批，宣称零失真 + 22 探针零击穿）不外推。
+  R95-R103 全关；**当前 open：R104/R105（二十一审 P1 开账，见下）**。
+  登记在案不修边界：`lom build` 包管理流程逐文件视图下包源内别名
+  仍 NAM003；clippy --all-targets 有 9 条存量测试 lint（rust-1.97.0
+  漂移、CI 口径零输出不受影响）。
+- **二十一审 B（review-2026-09-30-2.html，基线 250f0ef，增量 =
+  v1.4.8/v1.4.9 两批）**：两批宣称零失真（存量对比独立全量重算
+  198+2 吻合、星面键十六进制取证、105 三侧、名实双核对全绿），
+  24+4 敌手探针中新放行面零击穿；但撞名族击穿两枚 **P1（规划者
+  已亲手复现属实）**——**R104**：两包同名符号冲突下解释器输出
+  **同后端跨运行非确定**（p15b 亲跑 10 次 11×6/22×4；根因
+  load_packages 的 HashMap 遍历序决定覆盖方向——主观推测待读码
+  定位），WASM/L2 恒取后写者，零诊断，D5 生成器构造性规避致全库
+  零覆盖；**R105**：包符号别名与主文件用户函数同名时解释器静默
+  走别名绕过用户函数（p16 亲跑恒 4/4）而 WASM/L2 走用户函数
+  （恒 15/4），遮蔽方向相反零诊断；两者均存量面（非 v1.4.9 引入）
+  且同根（跨模块同名解析无规范语义），**修法需语义选边裁决**。
+  R106（P3：批 2 文档时点残留 5 处，R103 同族复发）已开账即修。
 - **交付链**：…→ v1.4.6 批1 E甲扩围+R100（`96c26b6`，#207）→
   v1.4.7 批2 R101 宿主（`22a37a6`，#210）→ 二十审 A- + R102 修正
   （`257e726`，#213）→ v1.4.8 R94 批 1（`8c86a60`，#214）→
@@ -81,10 +93,12 @@
 - R101 修复后**三实现短路 return 全对齐**（0/9/1/8 rc0）；
   map_remove 三侧 true/false/true 对齐；bottom 家族与 Map 家族
   均不再有已知宿主-L2 分叉。
-- 下一步：**交接就绪，无在制工作**。待裁菜单：typechecker for
-  可变性 quirk 等登记项处置、`lom build` 逐文件视图 NAM003 边界
-  修否、二十一审发起时机、下一阶段方向（发布线继续冻结直至
-  用户解冻）。
+- 下一步：**R104/R105 整改待用户裁决**（语义选边：本地定义优先
+  vs import 优先；撞名/遮蔽是否加 warning 诊断——warning 级新
+  检查须用户裁决；非确定根源消除方式由规划者定）。其余待裁：
+  typechecker for 可变性 quirk 等登记项处置、`lom build` 逐文件
+  视图 NAM003 边界修否、R106 防复发入锚、下一阶段方向（发布线
+  继续冻结直至用户解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–42、SPEC §13、
   designs/0001–0013、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
@@ -101,7 +115,7 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 542/542；另有集成 cargo test --release --test r56_process --test r58_lsp_process，×8）
+   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias，×10）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 67/67）
