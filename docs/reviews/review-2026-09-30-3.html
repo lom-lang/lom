@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十二轮体系内独立敌手审查 — 2026-09-30</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.r104{background:#fce4ec;border:2px solid #c62828;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十二轮体系内独立敌手审查报告</h1>
+<p><b>2026-09-30</b> ｜ 基线 HEAD <code>92502e2</code>（工作树干净，<code>git describe</code> = <code>v1.4.10-2-g92502e2</code>，tag v1.4.10 → <code>ce8c731</code>）｜ 审查增量 = 二十一审基线 <code>250f0ef</code>/v1.4.9 之后四笔提交：<code>51923b4</code>（二十一审报告入库 + R106 开账即修）、<code>ce8c731</code>（v1.4.10：R104/R105 整改——本地定义优先 + 包注册确定序 + NAM006/PKG007 双 warning）、<code>e4c5f9e</code>（docs 回填）、<code>92502e2</code>（工具治理批：doc_audit 67→71 入锚 + D5 撞名覆盖解除探针 6→8）｜ 审查执行者：第二十二轮独立审查 agent</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：这是项目体系内 agent 分工的独立敌手审查，<b>不是外部同行审计</b>。本轮评级独立作出：二十一审 B 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何产品源码/测试/工具/治理文档——唯一两处临时改动为本轮负向锁定重验的 J 锚改错（README quine 位、HANDOFF_PROMPT Rust 单元位），均在取证后立即用 Edit 原文恢复并复跑 doc_audit 71/71 + <code>git status</code> 零差异验证无痕；唯一写盘物为本报告与 <code>target/probes/r22/</code> 探针（gitignored，保留）。git 严格只读（<code>git show --stat</code> 核定增量触碰范围）；cargo 严格串行。</p>
+
+<div class="verdict">
+<b>本轮评级：B+</b>（仅对本轮时点与检验面；历史轨迹不外推，本轮结论不预支后续）。
+<b>一行式总评</b>：R104/R105 整改的<b>全部关闭条件经独立复核成立且零失真</b>——基线 15 项全绿（含 verify_selfcomp 364/364 名实双核对、quine 269521、Rust 543+16、eval 双后端 121+121、探针 8/8、CI #219/#221 六 job 实查），R104 四原形+四敌手深化形态（三包链两层撞名/同值不同副作用/enum-fn 混合/包名序与路径序交叉）解释器各 8-12 次恒定且三侧逐字一致（非确定消除敌手验证通过），R105 双序本地赢 + 闭包体/match 臂/fn 当值/交叉遮蔽/元数错误五扩散面三侧一致（遮蔽后错误元数三侧响亮拒，无静默回退），NAM006/PKG007 四路径（run/--check/--json/build）warning 不拦截、json 模式 NAM006 入结构化诊断 ok:true、负向零误报（不相交两包工程零诊断）、同文件真重复 NAM002 error 负向不倒，工具治理批 J 锚负向锁定两处改错重验红且回报精准、D5 两新探针期望值硬断言（恒 41/恒 107）属实；但 22 族自构敌手探针中<b>撞名族再出一枚 P1 形态（R107：两包各自 import 同一别名——解释器/宿主 WASM 取声明序后者而 L2 取首个，同程序跨后端静默不同值零诊断，既有面 diff 范围证明）</b>，另开 R108（P2 既有面：包 enum 变体在单文件视图 NAM003 error 误拒——存量 103 用例本身 <code>--check</code> rc=1）与 R109（P3 本批引入：build 合并单元对<b>正常单包 import</b> 逐符号发 NAM006 噪音且"遮蔽 libp::val"文案误导——"本地定义"实为 libp::val 自身）。按二十一审先例"P1 存在即不入 A 档"，不能回 A-；但本批宣称零失真、整改完全成立、且 R107 在本批增量代码路径之外（process_import/wasm_codegen/self_comp 三处零触碰），较二十一审（P1 居整改目标族核心）为轻，定 <b>B+</b>。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先独立阅读二十一审报告（review-2026-09-30-2.html——R104/R105 开账原文与方法先例）、designs/0014 全文、RFC-0004 修订 43 全文、LANGUAGE_SPEC §13 v1.4.10 条目/§8.1 名字解析语义/§4.5.3 NAM006 行、TODO 顶部、整改 diff（ce8c731 对 interpreter.rs/typechecker/mod.rs/package.rs/main.rs 的逐 hunk 读）与 resolve_dfs/eval_call/to_human/push_diag 当前源码；随后：(一) 基线矩阵 15 项全部亲手跑并记原始输出（含 CI 两笔 GitHub API 匿名实查）；(二) R104/R105 关闭条件独立复核——探针原形全部自建重建（不依赖 r21 残留）穿真实 CLI 三侧全链（解释器多次 + 宿主 WASM + L2 pkg-expand→self_comp→hex2wasm→run_selfcomp，L2 wasm 一律 <code>WebAssembly.validate</code>），并按任务书构造更刁钻敌手形态（值互换/声明序倒置/三包链两层/同值不同副作用/enum-fn 混合/包名序与路径序交叉/闭包体/match 臂/fn 当值/别名撞他包真名/别名撞别名/别名撞内建名/enum 撞别名/元数错误/无遮蔽回归/不相交负向/同文件真重复）；(三) NAM006/PKG007 诊断四路径行为 + 负向验证；(四) 工具治理批复核——J 锚自选改错两处重验负向锁定（改后恢复原文）、D5 探针源码核对硬断言、全仓当前值位漏网扫描；(五) 开账与评级。写探针前过 HANDOFF_PROMPT 高频坑清单（布尔大写/无 [..] 字面量/not 非运算符/Form B 每臂 end/±2^59/无 0x/grep "Fn"/list_map 参数序为 (f, list)——本轮 b1 初版即踩此坑与 stdlib 名笔误坑各一次，修正后通过，如实记）；探针全部用 Write 落盘。</p>
+<p>三侧全链命令形态（每枚探针同款，包工程驱动脚本 <code>target/probes/r22/three_sides_pkg.sh</code> 复刻 verify_selfcomp PKG_CASES 流程）：</p>
+<pre>./target/release/lom.exe &lt;proj&gt;/main.lom                       # 宿主解释器 ×N（记录 N 次输出分布与 stderr）
+./target/release/lom.exe build &lt;proj&gt;/main.lom --target wasm -o host.wasm
+node eval/runner/run_wasm.mjs host.wasm                        # 宿主 WASM
+./target/release/lom.exe pkg-expand &lt;proj&gt;/main.lom --list     # 包名清单（第三参）
+./target/release/lom.exe pkg-expand &lt;proj&gt;/main.lom            # L2 展开单元
+./target/release/lom.exe examples/selfhost/self_comp.lom -- expanded.lom l2.hex &lt;pkgs&gt;
+python tools/hex2wasm.py l2.hex l2.wasm &amp;&amp; node tools/selfcomp/run_selfcomp.mjs l2.wasm
+node -p "WebAssembly.validate(require('fs').readFileSync(process.argv[1]))" l2.wasm</pre>
+
+<h2>2. 基线矩阵（15 项全部亲手跑）</h2>
+<table>
+<tr><th>#</th><th>项</th><th>实测原始结果</th><th>判定</th></tr>
+<tr><td>1</td><td>cargo build --release</td><td>Finished release in 0.03s（增量，本机已是 v1.4.10 构建）</td><td class="ok">✓</td></tr>
+<tr><td>2</td><td>cargo test --release</td><td>unittests 543：<code>test result: ok. 543 passed; 0 failed</code>（2.55s）</td><td class="ok">✓ 543 与宣称一致</td></tr>
+<tr><td>3</td><td>集成测试</td><td>r104_dedup_order <b>6</b>（隔离亲跑 6/6：p15 恒 22/p15x 恒 11/PKG007 双路径/NAM006 双序/NAM002 负向）+ r56_process 1 + r58_lsp_process 7 + r94_pkg_alias 2 = <b>16</b></td><td class="ok">✓ 1+7+2+6=16</td></tr>
+<tr><td>4</td><td>cargo clippy --release -- -D warnings</td><td>零输出 rc 0（2.07s）</td><td class="ok">✓</td></tr>
+<tr><td>5</td><td>cargo fmt --all -- --check</td><td>零输出 rc 0</td><td class="ok">✓</td></tr>
+<tr><td>6</td><td>python tools/doc_audit.py</td><td><code>RESULT: PASS（71/71 项通过）</code>（J 三组互锁 6/6/7 处当前值位全一致）</td><td class="ok">✓ 71/71</td></tr>
+<tr><td>7</td><td>python tools/spec_examples_check.py</td><td><code>RESULT: PASS</code>（正例 51 / 反例 5）</td><td class="ok">✓</td></tr>
+<tr><td>8</td><td>python tools/eval_prompt_check.py</td><td><code>RESULT: PASS（校验 24 / 失真 0）</code></td><td class="ok">✓</td></tr>
+<tr><td>9</td><td>verify_selfhost 六模式</td><td>--dump 154/154（折叠 0）✓ / --tokens 154/154（列坐标差异 1）✓ / --diags 12/12 ✓ / --static 坏 22 + ALIGNED 154 ✓ / --run 31/31 ✓ / --wasm wasm-selfapply PASS ✓</td><td class="ok">✓</td></tr>
+<tr><td>10</td><td>python tools/verify_selfcomp.py</td><td><code>RESULT: PASS（364/364 项通过）</code>；<b>名实双核对</b>：验收器逐类 PASS-PKG ×7 + PASS-NEG ×161（另 196 单文件）= 364；目录实数 cases 196 + pkg_cases <b>7</b>（106/107 在位）+ negative 161 = 364——两口径逐类对上</td><td class="ok">✓ 196+7+161</td></tr>
+<tr><td>11</td><td>verify_selfcomp --bootstrap</td><td><code>RESULT: PASS（--bootstrap：14/14 项通过；总耗时 195.0s）</code>；末三项原文：PASS-B L2-PKG 101_pkg_single pkgs=mathlib; hex identical ／ PASS-B L3 self-apply (quine) <code>269521 bytes; byte-identical; 2.6s</code>——quine 字节数与宣称逐字一致</td><td class="ok">✓</td></tr>
+<tr><td>12</td><td>run.ps1 -Verify 双后端</td><td>native：<code>Total: 121 / Passed: 121</code>；wasm：<code>Total: 121 / Passed: 121</code>（-LomBin 显式传 target/release/lom.exe）</td><td class="ok">✓</td></tr>
+<tr><td>13</td><td>Lom fmt 递归</td><td>examples <code>files=37 fail=0</code>（apply_test 豁免）；tools/selfcomp 全量 <code>files=376 fail=0</code>（371 + 106/107 新增 5 个 .lom，.ps1 落盘执行沿先例）</td><td class="ok">✓</td></tr>
+<tr><td>14</td><td>diff_test --probe</td><td><code>probe: 8/8 验证通过 RESULT: PASS</code>——六分歧探针维持 + pkg_name_clash <b>41</b>（libb 路径序靠后赢）+ pkg_alias_shadow <b>107</b>（本地赢）</td><td class="ok">✓ 8/8</td></tr>
+<tr><td>15</td><td>版本一致 + CI 实查</td><td>lom --version = <code>lom 1.4.10</code>、Cargo.toml 1.4.10、git describe v1.4.10-2-g92502e2、tag v1.4.10→<code>ce8c731e…</code>；GitHub API 匿名实查（完整 sha）：<code>ce8c731</code> → run <b>36694182024（#219）</b>六 job 全 success（ubuntu/clippy/selfhost verify/windows/doc gates/macos）；<code>92502e2</code> → run <b>36705267821（#221）</b>六 job 全 success</td><td class="ok">✓ 编号零笔误</td></tr>
+</table>
+<p>基线 15 项全绿。self_comp 12529 行（wc -l 实测）、codegen/self_comp 零改动（<code>git diff 250f0ef..92502e2 --stat -- src/ examples/</code> 实核：仅 interpreter.rs/main.rs/package.rs/typechecker/mod.rs 四文件 + tests + pkg_cases）——存量构造性恒等前提成立，且 364 对拍全过为行为层独立复证。</p>
+
+<h2>3. R104/R105 关闭条件独立复核（本轮核心使命）——全部成立</h2>
+<table>
+<tr><th>关闭条件（designs/0014 §3）</th><th>独立复核方法与实测</th><th>结论</th></tr>
+<tr><td>R104 探针三侧一致（p15 恒 22/p15x 恒 11/p15c 恒 22 各 ≥8 次）</td><td>三工程全部自建重建（<code>target/probes/r22/{p15,p15x,p15c}proj/</code>）穿三侧全链：p15 解释器 <b>12/12 恒 22</b> + PKG007 stderr + 宿主 WASM 22 + L2 22（wasm valid）；p15x（值互换+声明序倒置）<b>12/12 恒 11</b> 三侧一致；p15c（包源内双依赖撞名，穿 load_packages 新路径）<b>10/10 恒 22</b> 三侧一致——修复前为 10 次混跳 11/22</td><td class="ok">成立</td></tr>
+<tr><td>R105 双序本地赢（p16/p16b 恒 15/4 三侧一致）</td><td>p16（import 在前）解释器 <b>10/10 恒 15/4</b> + NAM006 warning（锚 2:1）+ 三侧一致；p16b（fn 在前）<b>8/8 恒 15/4</b> + NAM006（锚 6:1）三侧一致——终检顺序无关实证</td><td class="ok">成立</td></tr>
+<tr><td>warning 三路径发出且不拦截（rc=0）</td><td>四路径实测（任务书要求 run/--check/build，加测 --json）：p16 run rc0+NAM006 stderr / --check rc0+NAM006 stdout（0 错误 1 警告不拦截）/ build rc0+NAM006 stderr+wasm 产物 9748B / <b>--json rc0 + ok:true + diagnostics=["NAM006"]</b>（结构化入诊断数组）；p15 同四路径 PKG007 各恰 1 次（json 模式 PKG007 走 stderr 原文不进 JSON——PKG 族 stderr 先例，stdout JSON 契约完整）</td><td class="ok">成立</td></tr>
+<tr><td>不该报的别报（负向验证）</td><td>c2 两包不相交符号工程：run stderr <b>零诊断</b>、三侧 4/9 一致——PKG007/NAM006 无误报；b6/c4 正常别名 import（无遮蔽）run 路径零 NAM006</td><td class="ok">成立（build 路径另见 R109）</td></tr>
+<tr><td>同文件真重复仍 NAM002 error</td><td>c3dup.lom：--check rc1 + <code>[type] error: [NAM002] 函数 'f' 重复定义</code>；run rc0（渐进式不拦截，NAM002 打 stderr，运行值 2=后写者赢）；build rc0 产 wasm 值 2；L2 COMPILED 值 2（designs/0008 登记"ItFn 重名无检查后写覆盖"）——三侧运行值一致、严格路径拦截，负向不倒</td><td class="ok">成立</td></tr>
+<tr><td>tests/r104_dedup_order.rs 与 pkg_cases 106/107</td><td>源码全读：p15 断恒 22、p15x 断恒 11（<b>禁止 ∈{11,22} 弱断言</b>——断言为 <code>assert_eq!(stdout, "22\n")</code> 硬等值）、PKG007 文案逐字断言、NAM006 双序断言、build 零 error 断言、NAM002 负向 rc1 断言；隔离亲跑 6/6；pkg_cases 106/107 源码与 claims 同构（106 期望 22 三侧对拍、107 期望 15/4），已含于 364/364</td><td class="ok">成立</td></tr>
+<tr><td>全量回归（364/quine 269521/543+16 等）</td><td>基线矩阵 §2 全绿；quine 逐字一致；eval 双后端 121+121</td><td class="ok">成立</td></tr>
+</table>
+<p><b>敌手深化验证（超出关闭条件的刁钻形态，任务书指定）</b>：</p>
+<table>
+<tr><th>形态</th><th>构造</th><th>实测</th><th>结论</th></tr>
+<tr><td>三包链两层撞名</td><td>a1：main→libc→(liba,libb)，liba/libb 同名 tag()（撞名沉两层之下）+ 主文件另直 import libb 真名</td><td>解释器 <b>20 行全 2</b>（10 次×2 行）恒定；宿主/L2 均 2/2；PKG007 指名 libb 赢</td><td class="ok">确定序穿透依赖链三层</td></tr>
+<tr><td>值相同副作用不同</td><td>a2：libp.mark() 打印 "P" 返 7 / libq.mark() 打印 "Q" 返 7——值对拍无法掩盖赢家</td><td>解释器 <b>10/10 恒 "Q/7"</b>；宿主/L2 逐字 "Q/7"</td><td class="ok">赢家判定不靠值，路径序后者（libq）赢</td></tr>
+<tr><td>同名 enum + 同名 fn 混合</td><td>a3：两包同时 fn val 撞名（11/22）+ enum Color 撞名（Red/Blue）</td><td>解释器 8/8 恒 <b>22/100</b>（fn 面 libq 后者赢；enum 面宿主首个赢=libp.Red）；宿主 WASM 同 22/100；L2 响亮拒 <code>重复枚举声明 'Color'（跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝）</code>——与 designs/0008 裁决 2 甲登记逐字一致；PKG007 对 'Color' 与 'val' <b>各发一条且按字典序</b></td><td class="ok">登记边界保持，fn/enum 两裁决面互不干扰</td></tr>
+<tr><td>包名序与路径序交叉</td><td>d1：包 zzz 住在目录 dir_aaa、包 aaa 住在目录 dir_zzz + dependencies 声明序倒置——按包名/声明序排序则会翻赢家</td><td>解释器 <b>8/8 恒 200</b>（dir_zzz 内的 aaa 包赢）；宿主/L2 均 200；PKG007 文案"取后者 'aaa'"正确（包名+路径序一致渲染）</td><td class="ok">排序键确为包根路径序（PathBuf Ord），非包名/声明序</td></tr>
+<tr><td>R105 扩散面五枚</td><td>b1 闭包体内调用遮蔽名 + <b>遮蔽名作为值传 HOF</b>（<code>list_map(dup, xs)</code>——eval_expr Ident 路径，R105 修复未触及）/ b2 match 臂内调用 / b4 别名撞另一包真名（base 别名 vs libx.base 真名）/ b5 本地 fn 撞包真名（无 import）/ b8 遮蔽后按本地签名错误元数调用</td><td>b1 三侧恒 <b>5/5</b>（fn 当值也本地赢）；b2 三侧 15/5；b4 三侧 1005/4（orig 优先=libx.base 真名，别名兜底不可达——与 WASM/L2 同序）；b5 三侧恒 21（本地赢）；<b>b8 三侧响亮拒</b>（解释器 RUNTIME001 元数错 rc1 / 宿主 wasm trap rc1 / L2 编译拒"实数量不符"）——无静默回退到别名</td><td class="ok">本地赢穿透闭包/match/值位；元数错误不静默</td></tr>
+<tr><td>修复回归面（正常别名不因 orig 优先破坏）</td><td>c4 stdlib 别名 + 包别名 + 真名三调用；c5 真名 import；另 pkg_cases 103/105 在 364 对拍内（宿主 build WASM vs L2 行为对）</td><td>c4 解释器/宿主 WASM 逐字一致 7/42/10（stderr 零诊断）；c5 三侧恒 4；L2 对 stdlib 别名 's' 拒为二十一审 §6-① 已登记既有边界（io 同款），响亮非静默</td><td class="ok">无遮蔽时行为与修复前一致（同 diff 范围内 codegen 零改动 + 364 对拍）</td></tr>
+</table>
+<p><b>R104/R105 关闭结论：整改宣称零失真，designs/0014 §3 验收门禁逐条独立复核通过。R104/R105 关闭。</b></p>
+
+<h2>4. 工具治理批复核（92502e2）——成立，负向锁定独立重验</h2>
+<table>
+<tr><th>项</th><th>复核方法与实测</th><th>结论</th></tr>
+<tr><td>J 锚负向锁定独立性重验（任务书：自选改错两处）</td><td>①README L8 quine 位 269521→269519（Edit）→ doc_audit <code>FAIL | J quine 字节组 | README 现行横幅@README.md quine=269519（他位 269521）</code> 总分 70/71；②HANDOFF_PROMPT L92 Rust 单元 543→542 → <code>FAIL | J Rust 计数组 … unit=543（他位 542）×6 处点名</code> 总分 70/71——两处改错均红且回报精确指名离群位与他位真值；取证后 Edit 恢复原文，复跑 <b>71/71 PASS</b> + <code>git status</code> 零差异（无痕）</td><td class="ok">负向锁定真实有效</td></tr>
+<tr><td>D5 两新探针期望值硬断言核验</td><td>diff_test.py 源码读：pkg_name_clash 断 <code>i_out == w_out and i_rc == 0 and w_rc == 0 and i_out.strip() == "41"</code>、pkg_alias_shadow 断 <code>== "107"</code>——双后端同值<b>且取指定位</b>（错侧赢也 FAIL），非弱断言；亲跑 8/8（41/107 实测在案）；生成器侧 diff_gen gen_pkg_probe 工程目录名 liba/libb 保证路径序语义自文档</td><td class="ok">硬断言属实</td></tr>
+<tr><td>入锚后漏网检查</td><td>全仓扫 269510/269511/269522、542 单元、×10/×8 集成、v1.4.9 现行位：所有命中均在历史时点标注位（SPEC §13 各版本条目、README Previous milestone 横幅、TODO 历史交付段、HANDOVER 历史更新块）——互锁组豁免面内；当前值位（README L79 543/543+16+latest v1.4.10、HANDOFF_PROMPT/HANDOVER 各 6/7 处、positioning v1.4.10）全部正确</td><td class="ok">无漏网（唯 positioning L30 一句 v1.4.8 叠句，§7-① 精度备注）</td></tr>
+<tr><td>顺带修 6 处文档残留</td><td>README plus 16/milestone v1.4.10、HANDOFF_PROMPT 364、HANDOVER §1 版本行/§2.2 行/§9-5——逐一 grep 实核在位且与基线实测一致</td><td class="ok">属实</td></tr>
+</table>
+
+<h2>5. 敌手探针总表（22 族，全部穿真实 CLI；解释器侧多次运行分布记录）</h2>
+<p>探针根目录 <code>target/probes/r22/</code>（gitignored，保留）。"三侧"= 宿主解释器 / 宿主 WASM / L2 WASM（全部 <code>WebAssembly.validate</code>=true 或响亮拒）。击穿 1 族（b3），其余 21 族三侧一致或三侧响亮拒。</p>
+<table>
+<tr><th>探针</th><th>方向</th><th>解释器（次数×分布）</th><th>宿主 WASM</th><th>L2</th><th>定性</th></tr>
+<tr><td>p15（R104 原形·别名）</td><td>两包同名 fn 双 import as s</td><td>12 次恒 22</td><td>22</td><td>22 valid</td><td class="ok">三侧一致（PKG007 在位）</td></tr>
+<tr><td>p15x（值互换+声明序倒置）</td><td>锁"路径序而非值/声明序"</td><td>12 次恒 11</td><td>11</td><td>11 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td>p15c（包内撞名）</td><td>包源内双依赖撞名（load_packages 新路径）</td><td>10 次恒 22</td><td>22</td><td>22 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td>a1（三包链两层）</td><td>撞名沉两层 + 跨层真名</td><td>10 次恒 2/2</td><td>2/2</td><td>2/2 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td>a2（同值不同副作用）</td><td>print 序区分赢家</td><td>10 次恒 Q/7</td><td>Q/7</td><td>Q/7 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td>a3（enum+fn 混合）</td><td>两包 fn val + enum Color 双撞</td><td>8 次恒 22/100</td><td>22/100</td><td>COMPILE-ERROR（裁决 2 甲登记文案）</td><td class="ok">登记边界保持（PKG007×2 按字典序）</td></tr>
+<tr><td>a3ctl（单包对照）</td><td>import 变体后单文件视图</td><td>11/100 rc0</td><td>build rc0</td><td>—</td><td class="warn">run stderr 1 条 NAM003 error（非拦截）→ R108</td></tr>
+<tr><td>p16（R105 原形）</td><td>import 在前</td><td>10 次恒 15/4</td><td>15/4</td><td>15/4 valid</td><td class="ok">三侧一致（NAM006 锚 2:1）</td></tr>
+<tr><td>p16b（fn 在前）</td><td>双序不敏感</td><td>8 次恒 15/4</td><td>15/4</td><td>15/4 valid</td><td class="ok">三侧一致（NAM006 锚 6:1）</td></tr>
+<tr><td>b1（闭包体+fn 当值）</td><td>eval_call 穿闭包 + eval_expr Ident 值位</td><td>6 次恒 5/5</td><td>5/5</td><td>5/5 valid</td><td class="ok">本地赢穿透两路径</td></tr>
+<tr><td>b2（match 臂）</td><td>臂体调用遮蔽名</td><td>6 次恒 15/5</td><td>15/5</td><td>15/5 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td><b>b3（别名撞别名）</b></td><td>两包各自 import 同一别名 g（真名不同）</td><td><b>6 次恒 103</b>（声明序后者 libs.base2）</td><td><b>恒 103</b></td><td><b>恒 4</b>（首个 libr.origin）valid</td><td class="bad"><b>击穿 → R107（P1）</b>：跨后端静默不同值零诊断</td></tr>
+<tr><td>b4（别名撞他包真名）</td><td>{other as base} vs libx.base</td><td>6 次恒 1005/4</td><td>1005/4</td><td>1005/4 valid</td><td class="ok">三侧一致（orig 优先）</td></tr>
+<tr><td>b5（本地撞包真名无 import）</td><td>auto-public 与本地优先叠加</td><td>6 次恒 21</td><td>21</td><td>21 valid</td><td class="ok">三侧一致（本地赢）</td></tr>
+<tr><td>b6（别名撞内建名）</td><td>{origin as abs} 调 abs(-5)</td><td>6 次恒 -4</td><td>-4</td><td>-4 valid</td><td class="ok">三侧一致：别名占名、包 fn 赢（import gates builtins 延伸，§7-②）</td></tr>
+<tr><td>b7（enum 撞别名）</td><td>本地 enum dup + {origin as dup}</td><td>6 次恒 42/4</td><td>42/4</td><td>42/4 valid</td><td class="ok">三侧一致：调用名走别名（enum 不占可调用名空间，§7-③）</td></tr>
+<tr><td>b8（遮蔽后元数错）</td><td>本地 dup 零参调 dup(3)</td><td>6 次 rc1 RUNTIME001</td><td>rc1 trap</td><td>COMPILE-ERROR 实数量不符</td><td class="ok">三侧响亮拒（无静默回退）</td></tr>
+<tr><td>c2（不相交负向）</td><td>PKG007/NAM006 不误报</td><td>4 次恒 4/9 零诊断</td><td>4/9</td><td>4/9 valid</td><td class="ok">run 路径零误报（build 路径 NAM006 噪音 → R109）</td></tr>
+<tr><td>c3（同文件真重复）</td><td>NAM002 负向锁定</td><td>rc0 值 2 + NAM002 stderr</td><td>rc0 值 2</td><td>COMPILED 值 2</td><td class="ok">--check rc1 拦截；三侧运行值一致（登记面）</td></tr>
+<tr><td>c4（stdlib+包别名回归）</td><td>无遮蔽时行为不变</td><td>4 次恒 7/42/10</td><td>7/42/10</td><td>stdlib 别名拒（登记边界）</td><td class="ok">宿主双侧一致；L2 拒为已登记既有面</td></tr>
+<tr><td>c5（真名 import 回归）</td><td>p17b 连带观察复证</td><td>4 次恒 4</td><td>4</td><td>4 valid</td><td class="ok">三侧一致</td></tr>
+<tr><td>d1（路径序 vs 包名序）</td><td>包名/目录名交叉+声明序倒置</td><td>8 次恒 200</td><td>200</td><td>200 valid</td><td class="ok">排序键实证为包根路径序</td></tr>
+</table>
+<p><b>击穿计数</b>：1 族（b3 → R107）。R104 确定序面 7 形态（p15/p15x/p15c/a1/a2/a3-fn 面/d1）与 R105 遮蔽面 7 形态（p16/p16b/b1/b2/b4/b5/b8）<b>零击穿</b>——整改目标面在敌手深化下全部保持；击穿出现在任务书指定扩散方向之外的<b>别名撞别名</b>子形态（R104/R105 整改设计范围外、全库测试构造性规避的覆盖洞）。</p>
+
+<h2>6. 开账（本轮新发现，R107 起）</h2>
+
+<div class="r104">
+<h3>R107（P1）——两包各自 import 同一别名：解释器/宿主 WASM 取声明序后者、L2 取首个——同程序跨后端静默不同值，全程零诊断</h3>
+<p><b>形态</b>：<code>from libr import { origin as g }</code> + <code>from libs import { base2 as g }</code>（两真名不同、别名相同、无本地 fn），调用 <code>g(3)</code>。</p>
+<p><b>证据</b>（b3proj，原文见附录 A）：解释器 6/6 恒 <b>103</b>（g→base2，后写声明赢——import_aliases 同键覆盖，按 item 序确定）；宿主 WASM 恒 <b>103</b>（4 次运行）；L2 恒 <b>4</b>（4 次运行，g→origin，首个注册摘要保留）；三侧全 rc=0、<b>零诊断</b>（PKG007 不发——两包 public_symbols 不相交；NAM006 不发——无本地 fn）。每侧各自确定，但两侧选边相反——与 R105 同为"遮蔽方向分叉"形态，且因零诊断而静默。</p>
+<p><b>根因</b>（读码 + designs/0008 登记）：解释器 process_import 的别名注册按 item 序后写覆盖；L2（self_comp）按 designs/0008 登记的"别名与既有函数重名<b>静默保留既有摘要</b>"——首个赢。该登记句自称"对齐宿主 fn_idx orig 优先级"，但对<b>别名撞别名</b>（既有"函数"是前一别名而非真 fn）宿主实际取后者——登记口径与宿主行为在此子形态相悖（与二十一审 R105 击穿 designs/0008 L150"主文件赢"句同型）。</p>
+<p><b>波及面</b>：任何两包符号经同一别名导入的程序。全库测试构造性规避——pkg_cases 103 只有一个别名、105 为别名链无同名别名、106/107 与 D5 两新探针均不含此形态（D5 解除覆盖只补了撞名两形态，未含别名撞别名）。<b>非本批引入</b>：本增量对 interpreter process_import / wasm_codegen / self_comp 三处零触碰（<code>git diff 250f0ef..92502e2 --stat</code> 实核），eval_call 改动对此形态等价（functions 无 "g" 键，别名路径不变）。SPEC §8.1 v1.4.10 新句枚举了 alias/local、包符号/local、两包同名三种撞名形态并称"Collisions are not errors: …emits NAM006/PKG007"——别名撞别名既无语义定义也无任何诊断，是该句枚举的漏项。</p>
+<p><b>修法建议</b>（供裁决）：入 R104/R105 同族一并裁决——或 SPEC 冻结"后 import 声明赢"（对齐解释器/宿主，L2 改后写覆盖），或统一取首个（解释器/宿主改）；并加 NAM006 变体（"import 别名 'g' 重复"warning）。<b>负向锁定</b>：不能只进 §11f 分歧档案——两侧不同值且无文档语义无诊断，不满足分歧档案"各侧自身确定 + 语义已冻结"的前提（R104 教训同款）；也不能只改 L2 单侧而不冻结 SPEC 选边。</p>
+</div>
+
+<div class="r104">
+<h3>R108（P2）——包 enum 变体在单文件视图报 NAM003 error：--check 对合法包 enum 程序 rc=1 误拒（存量 103 用例本身即中招）</h3>
+<p><b>形态</b>：使用包导出 enum 的变体（显式 import 变体名，或 auto-public 直用）。</p>
+<p><b>证据</b>：a3ctl（单包无撞名对照，<code>from libp import { val, Color, Red }</code> + <code>use(Red)</code>）——run 路径 rc0 输出正确但 stderr 带 <code>[type] error: [NAM003] 未定义变量 'Red'</code>；<code>--check</code> <b>rc=1</b>（error 拦截）。<b>存量 pkg_cases/103 本身</b>：run 输出 13/22/2/1/3/31 全对但 stderr 3 条 NAM003 error（Green/Red/Blue），<code>--check</code> rc=1——三侧运行/编译产物全部正确的合法程序被 --check 拒绝。</p>
+<p><b>根因</b>（读码）：typechecker <code>is_variant_constructor</code> 只查 <code>self.enums</code>（本地声明/内建），不查 <code>external_symbols</code>——import 的变体名虽进 externals 放行集，但 Ident 值位检查路径不消费它。fn 的 externals 放行（跳过 NAM003）与变体的不放行不对称。</p>
+<p><b>波及面与定性</b>：<b>既有面</b>（本增量 typechecker diff 不含 check_expr/Ident 路径；collect_import 的 externals 注册逻辑前后逐字等价——diff hunk 实核）；run/build 路径渐进式不拦截（零行为损坏），但 <code>--check</code> 是 LLM 修复环的信号源，合法程序报 3 错会诱导无谓修复（且 NAM003 附带"是否想用 'len'？"噪声 hint）。未在任何审查/信任边界文档登记（v1.4.9 清零的"3 条 NAM003 假阳性"是包内 as 别名 build 路径，不同族）。<b>修法建议</b>：Ident 检查对 ∈ external_symbols 的名放行（与 fn 同构）或 is_variant_constructor 并查 externals；负向锁定：真未定义名仍 NAM003（存量负例不倒）。</p>
+</div>
+
+<div class="note">
+<h3>R109（P3）——build 合并单元对"正常单包 import"逐符号发 NAM006 噪音，且"遮蔽 libp::X"文案误导（"本地定义"实为合并进来的 X 自身）</h3>
+<p><b>证据</b>：pkg_cases/101（mathlib 标准用法）<code>lom build</code> stderr 3 条 NAM006——<code>import 别名 'square' 与本地定义同名——本地定义优先（遮蔽 mathlib::square）</code>×3（square/cube/factorial）；103 用例 1 条（color_code；pf 走别名、Color 是 enum 故不触发）；本轮 c2/c5 各 2/1 条。v1.4.9 同路径 build stderr 干净（r94 批宣称"仅 1 行已编译信息"）——<b>本批引入</b>（合并单元里包 fn 即"本地 item"，任何 import 必与之同名）。run/--check 单文件视图无此形态（干净）。SPEC §8.1 字面覆盖该形态（"or a merged-unit package symbol collides with a local definition"），非宣称失真；但对标准包用法的逐符号 warning 噪音 + "遮蔽 X"文案（实为 X 自身经合并进入）对 LLM 修复环有诱导（可能据 warning 删 import）。<b>建议</b>：合并单元形态下，当"本地定义"与 import 同源（同一包的同一符号）时静默或改文案（如"import 与合并单元内 libp::square 同名——同源合并，无需 import"）；负向锁定：R105 真遮蔽形态（别名 vs 用户本地 fn）的 NAM006 不得随之消失（r104 集成测试已锁 NAM006 在位）。</p>
+</div>
+
+<h2>7. 精度备注（不开账，供后续裁决参考）</h2>
+<ol>
+<li><b>positioning.html L30 叠句</b>：v1.4.8 在同一句中重复两遍（"；v1.4.8（批 1 json 键序 + R103…）。前一里程碑 v1.4.8（批 1，tag 8c86a6…）"）——R102 族"叠句"微小复发，零行为影响。</li>
+<li><b>b6 别名撞内建名</b>：<code>from libr import { origin as abs }</code> 后 <code>abs(-5)</code> 三侧一致 -4（包 fn 经别名赢，内建 abs 未触发）——"import gates builtins"既定设计的自然延伸，三侧一致零分叉；建议 SPEC_FOR_AI 信任边界一句话登记（别名可占用内建名）。</li>
+<li><b>b7 enum 撞别名</b>：本地 <code>enum dup</code> 与 <code>{origin as dup}</code> 同名——NAM006 只集 fn 名不报（user_fns 不含 enum），调用 <code>dup(3)</code> 三侧一致走别名（enum 名不占可调用名空间）。行为一致无分叉，登记即可；若未来把 enum 纳入 NAM006 集需三侧同改。</li>
+<li><b>b8 好样本</b>：遮蔽后按本地签名错误元数调用三侧响亮拒（RUNTIME001 / wasm trap / L2 编译拒）——R105 修复不产生静默元数回退，整改质量正面证据。</li>
+<li><b>p15x build stderr 的 (0,0) 无锚点渲染</b>按设计工作（push_diag line=0 → source_line=None → 无 caret 行），锚点治理承诺与实现一致；同一 stderr 内 1 条 PKG007 + 3 条 NAM006（合并单元遮蔽 1 + 双 import 各 1）形态如实现注释所述。</li>
+<li><b>json 模式 PKG007 走 stderr 原文</b>不进 JSON diagnostics 数组（p15 json：ok=true、diagnostics=[]、stderr 有 PKG007）——PKG 族 stderr 先例，stdout JSON 契约完整；json 消费方看不到撞名提示，可作后续小改进项。</li>
+<li><b>探针搭建自坑两枚（如实记）</b>：b1 初版漏 import list 内建 + list_map 参数序写反（实为 (f, list)）致 RUNTIME001；c4 初版 stdlib 名笔误（to_upper 非 L2 String 批子集内）——均本审查操作误差，修正后通过，非产品面。</li>
+</ol>
+
+<h2>8. 评级依据</h2>
+<p><b>整改复核结论</b>：R104/R105 关闭条件（designs/0014 §3 全部门禁）逐条独立复核<b>全部成立</b>——三原形重建 + 敌手深化（任务书指定的三包链/同值副作用/enum-fn 混合/闭包/match/fn 当值全数覆盖）下确定序与本地赢三侧逐字一致、warning 四路径不拦截、负向零误报、NAM002 不倒；本批全部宣称（RFC 修订 43/SPEC §13/TODO/README/HANDOFF_PROMPT 数字链、CI #219/#221、364/269521/543+16/71/71/8/8）<b>零失真</b>；工具治理批 J 锚与 D5 硬断言独立重验成立。R104/R105 <b>确认关闭</b>。</p>
+<p><b>新发现</b>：R107（P1：别名撞别名跨后端静默不同值——存量面、diff 范围证明、R104/R105 整改设计范围外的同族漏项）；R108（P2：包变体单文件视图 NAM003 误拒 --check——存量面、存量用例自身中招）；R109（P3：本批引入的 build 路径 NAM006 噪音 + 文案误导——SPEC 字面覆盖，非宣称失真）。</p>
+<p><b>定级</b>：按二十一审自设的回升条件"整改关闭且下轮无新 P1/P2"——前半成立、后半不成立（R107/R108）。按"P1 存在即不入 A 档"先例，A- 不可回；但较二十一审（两枚 P1 居整改目标族核心、当时零 warning 机制、SPEC 无撞名语义）本轮 P1 在本批增量代码路径之外且本批宣称完全属实、整改目标面在 14 个深化形态下零击穿——按轨迹惯例（九审 B→十审 B+ 整改后收窄一格；十九审 1×P2→B+），定 <b>B+</b>。R107 与 R104/R105 同根（跨模块同名解析无规范语义），建议并入撞名族一次性裁决收口；R109 随裁决顺带治理。不外推、不预支。</p>
+
+<h2>附录 A：击穿探针原文（复现供料）</h2>
+<pre># b3（R107）— b3proj/{lom.toml, main.lom, libr/{lom.toml,r.lom}, libs/{lom.toml,s.lom}}
+#   lom.toml: [dependencies] libr = { path = "libr" }  libs = { path = "libs" }
+#   libr/r.lom: fn origin(x: Int) -> Int / x + 1 / end
+#   libs/s.lom: fn base2(x: Int) -> Int / x + 100 / end
+#   main.lom:
+from libr import { origin as g }
+from libs import { base2 as g }
+
+fn main() -> Unit ! [IO]
+    println(g(3))
+end
+# 复现：解释器/build wasm+run_wasm 各恒 103；pkg-expand + self_comp + hex2wasm +
+#       run_selfcomp 恒 4；三侧 rc=0 零诊断
+# R108 最小复现（a3ctl）：from libp import { val, Color, Red } + fn use(c: Color)
+#   match c / Red => 100 / _ => 200 end；println(use(Red)) —— run rc0 输出 100，
+#   stderr [NAM003] 未定义变量 'Red'；--check rc=1（存量 103 用例同款 3 条）
+# R109 最小复现：lom build tools/selfcomp/pkg_cases/101_pkg_single/main.lom
+#   --target wasm → stderr 3 条 [NAM006]（square/cube/factorial 各一）</pre>
+<p>其余探针（p15/p15x/p15c/a1/a2/a3/p16/p16b/b1/b2/b4-b8/c2-c5/d1）原文见 <code>target/probes/r22/*proj/</code>，形态与 §5 表逐一对应；三侧驱动脚本 <code>target/probes/r22/three_sides_pkg.sh</code>。</p>
+
+<p class="small">审查执行：第二十二轮独立审查 agent，2026-09-30。基线 HEAD 92502e2，全程未改产品源码/测试/工具/治理文档（J 锚负向锁定两处改错取证后已原文恢复并验证无痕）；cargo 串行；git 只读。本报告非 doc_audit 锚定对象（review HTML 历来豁免）。</p>
+
+</body>
+</html>
