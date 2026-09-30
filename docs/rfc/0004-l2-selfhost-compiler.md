@@ -1188,3 +1188,38 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   §7）。审查轨迹：十九审 B+ → 二十审 A-。R94 宿主挂账维持；
   R95-R101 全部关闭；下一动作 = 交接五件套刷新（用户已裁决
   二十审后交接）。
+
+- **修订 41（2026-09-30）：R94 挂账族批 1——json 星面键序修复 +
+  二十审精度备注收口 + R103 文档腐坏开账即修（v1.4.8；门禁回填
+  见本修订尾部）。** 用户裁决"按你的提议执行"（统筹 R94 宿主
+  挂账族 + 二十审三条精度备注 + 规划者只读核验新发现的文档
+  腐坏开账即修）。设计 designs/0013（双执行者读码供料 + 规划者
+  亲核四处代码点与探针双侧）。**json 星面键序（R94 本体）**：
+  run_wasm.mjs:139 的 readVal Map 分支排序是 Map 家族唯一 harness
+  中介路径，比较器 JS 码元序与解释器（Rust str Ord）/宿主 WASM
+  内联 rt_str_cmp（map_keys/values 排序，探针实证不分叉）/L2
+  stringify 注释宣称的字节序四方不一致；改 Buffer.compare
+  （Buffer.from utf8）对齐。探针（键=U+E000+U+1F600）修复前
+  双侧分叉（解释器 `ee 80 80` 在前 vs 宿主 WASM `f0 9f 98 80`
+  在前）、修复后逐字节一致（规划者亲验 cmp 相同）；存量用例
+  键均 ASCII/BMP，界内零踩。SPEC §9.7 引文补 "byte order —
+  UTF-8, matching map_keys" 口径。**二十审 §6-①② 负例升格**：
+  neg_user_fn_named_println（锁"用户函数不得命名 'println'"）、
+  neg_match_scalar_on_list（锁"字面量模式类型不符（被测 ls{i64}
+  模式 i64）"）——verify_selfcomp **360→362 = 195 单文件 + 5 包
+  + 162 负例**，self_comp 零改动故存量构造性恒等，--bootstrap
+  14/14 quine 269510 bytes 不变；§6-③ 信任边界清单句（无注解
+  构造的 Bool/嵌套容器迭代显示保守拒）入 HANDOFF_PROMPT 高频坑。
+  **R103 开账即修**（交接文档时点残留，R93/R98 同族四处）：
+  designs/0012 头部"E甲待续/R100-R101 open"刷新为全部交付；
+  HANDOVER §9-3 基线数字 352/266073 时点残留刷至当前；
+  HANDOFF_PROMPT 锚点段 R101"宿主 WASM 既有分叉"陈旧句改
+  v1.4.7 已修复三侧对齐、锚点段头去时点版本号、第一回合段去
+  E甲模板句。验收（规划者亲验 verify_selfcomp 362/362 与
+  doc_audit 67/67）：六模式、eval 双后端各 121/121、cargo
+  542+8、clippy/fmt 零、spec_examples PASS、eval_prompt 24/24、
+  fmt examples 37 + selfcomp 371 零失败、bootstrap 14/14。
+  **R94 的 json 键序面关闭、R103 关闭**；宿主挂账族批 2
+  （map_remove 统一 Bool 对齐 SPEC §9.7 冻结宣称 + 包内 as
+  别名解释器/typecheck 修复，designs/0013 §1.2/§1.3）随后
+  推进。语言面与外部发布线冻结不变。

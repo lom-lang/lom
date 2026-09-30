@@ -136,7 +136,7 @@ function readVal(v) {
           entries.push([readStr(rd().getUint32(b + 4, true)), readVal(rd().getBigInt64(b + 8, true))]);
         }
       }
-      entries.sort((a, b2) => (a[0] < b2[0] ? -1 : a[0] > b2[0] ? 1 : 0)); // 键排序（确定性）
+      entries.sort((a, b2) => Buffer.compare(Buffer.from(a[0], 'utf8'), Buffer.from(b2[0], 'utf8'))); // 键排序（UTF-8 字节序，对齐 Rust str Ord/rt_str_cmp——R94 修复，详见 designs/0013）
       return { k: 'map', entries };
     }
     default: throw new Error('未知 tag: ' + tag);

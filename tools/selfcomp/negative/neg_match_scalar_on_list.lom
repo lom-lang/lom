@@ -1,0 +1,12 @@
+# 负例（二十审 §6-② 精度备注，designs/0013）：List 被测配 Int 字面量臂
+# （嵌套 match 臂隔离形态）——L2 拒字面量模式类型不符（宿主宽容收 [1]，
+# 同 neg_match_num_str_pattern 字面量模式文案族；锁定 L2 侧编译拒 + 无 hex）。
+from list import { list_cons, list_empty }
+
+fn main() -> Unit ! [IO]
+    let v = Some(list_cons(1, list_empty()))
+    match v
+        Some(xs) => match xs 1 => println(xs) _ => println(xs) end
+        None => println(0)
+    end
+end

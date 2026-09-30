@@ -1,5 +1,26 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **批 1 交付记录（2026-09-30，v1.4.8——R94 json 键序 + R103 +
+> 二十审备注收口；门禁回填见段尾）**：用户裁决"按你的提议执行"
+> （统筹 R94 宿主挂账族 + 二十审三条精度备注 + 规划者只读核验
+> 新发现 R103 开账即修），设计 [designs/0013](designs/0013-r94-ledger-remediation.md)。
+> json 星面键序：run_wasm.mjs:139 比较器 JS 码元序 → Buffer.compare
+> UTF-8 字节序（Map 家族唯一 harness 排序点；map_keys/values 内联
+> rt_str_cmp 探针实证本就不分叉）；探针（键=U+E000+U+1F600）修复前
+> 双侧分叉、修复后逐字节一致（规划者亲验）；存量用例键均 ASCII/BMP
+> 界内零踩；SPEC §9.7 补 "byte order" 口径。二十审 §6-①② 负例两枚
+> neg_user_fn_named_println / neg_match_scalar_on_list（实跑文案锁定、
+> 无 hex），§6-③ 信任边界清单句入 HANDOFF_PROMPT 高频坑——
+> verify_selfcomp **360→362 = 195 单文件 + 5 包 + 162 负例**，
+> self_comp 零改动、bootstrap 14/14 quine 269510 不变。R103
+> （交接文档时点残留四处：designs/0012 头部、HANDOVER §9-3、
+> HANDOFF_PROMPT 锚点段 R101 陈旧句与 E甲模板句）开账即修。
+> 验收全绿（规划者亲验 verify_selfcomp 362/362 与 doc_audit
+> 67/67；六模式/eval 双后端 121/121/cargo 542+8/clippy/fmt 零/
+> fmt examples 37 + selfcomp 371）。**R94 的 json 键序面关闭、
+> R103 关闭**；宿主挂账族批 2（map_remove 统一 Bool + 包内 as
+> 别名，designs/0013 §1.2/§1.3）随后推进。
+>
 > **当前交接状态（2026-09-30，二十审收官 A- + R102 已修；交接就绪）**：
 > **第二十轮体系内独立审查**（[review-2026-09-30.html](reviews/review-2026-09-30.html)，
 > 基线 d5ea6df，审查增量 v1.4.2→v1.4.7 六批）总评 **A-**：六批

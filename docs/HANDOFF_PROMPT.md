@@ -48,41 +48,50 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **二十审收官 A-，交接就绪（2026-09-30）**：用户裁决"继续执行
-  1，2，3"全部完成——1 E甲扩围（v1.4.6 批1）、2 R100+R101
-  （批1/批2 v1.4.7）、3 二十审（[review-2026-09-30.html]
-  (reviews/review-2026-09-30.html)，总评 **A-**，基线 d5ea6df，
-  审查增量 v1.4.2→v1.4.7 六批）。六批复核**宣称零失真**、22 枚
-  六方向敌手探针**零静默错值/零坏 wasm/零负例翻转**、R101 四个
-  扩散面三侧一致；开账 R102（P3 CI 编号笔误）已开账即修。
-  **R95-R101 全部关闭；当前 open 仅 R94 宿主挂账**（json 星面
-  键序，修否待裁）。审查轨迹十九审 B+ → 二十审 A-（均不外推）。
-- **交付链**：v1.4.2 A甲/R99（`8012c38`，#200）→ v1.4.3 B甲/R95
-  （`a5dac74`，#201）→ v1.4.4 C甲/R96（`1851964`，#202）→
-  v1.4.5 D甲/R97（`df7f83b`，#204）→ v1.4.6 批1 E甲扩围+R100
-  （`96c26b6`，#207）→ v1.4.7 批2 R101 宿主（`22a37a6`，#210）
-  → 二十审报告 + R102 修正（本轮提交）。**已提交基线**：
-  verify_selfcomp **360/360 = 195 单文件 + 5 包 + 160 负例**、
-  bootstrap **14/14**（强 quine 269510 bytes 双侧一致）、
+- **R94 挂账族批 1 已交付 v1.4.8，批 2 在制（2026-09-30）**：用户
+  裁决"按你的提议执行"——统筹 R94 宿主挂账族 + 二十审三条精度
+  备注 + 规划者只读核验新发现 R103 开账即修，设计
+  [designs/0013](designs/0013-r94-ledger-remediation.md)。批 1
+  （零 src/ 改动、self_comp 零改动）：run_wasm.mjs 唯一 Map 排序
+  点 JS 码元序 → Buffer.compare UTF-8 字节序（**R94 的 json 星面
+  键序面关闭**，探针双侧由分叉转逐字节一致）；二十审 §6-①②
+  负例两枚（neg_user_fn_named_println / neg_match_scalar_on_list）
+  + §6-③ 清单句；R103 四处时点残留修复；顺带更正 R102 修正批
+  漏网（README 横幅 #209→#210）。**批 2 在制**：map_remove 统一
+  Bool（对齐 SPEC §9.7 冻结宣称——解释器/typechecker 本就 Bool，
+  宿主 WASM build_map_remove 的 V_UNIT 与 L2 两处 "void" 裁决落点
+  是偏差；v1.2.13 裁决 2 甲的 L2 选边随之翻转为对齐 SPEC）+
+  包内 as 别名（解释器 load_packages 的 Item::Import 跳过导致
+  RUNTIME002 + build 路径无 externals 导致 NAM003 假阳性 ×3——
+  十八审登记"2 条"系笔误，随批更正）。R95-R101/R102/R103 全部
+  关闭；**当前 open 仅 R94 剩余面（批 2 收口中）**。二十审 A-
+  （review-2026-09-30.html，基线 d5ea6df，v1.4.2→v1.4.7 六批，
+  宣称零失真 + 22 探针零击穿）不外推。
+- **交付链**：…→ v1.4.6 批1 E甲扩围+R100（`96c26b6`，#207）→
+  v1.4.7 批2 R101 宿主（`22a37a6`，#210）→ 二十审 A- + R102 修正
+  （`257e726`，#213）→ v1.4.8 R94 挂账族批 1（本轮）。**已提交
+  基线**：verify_selfcomp **362/362 = 195 单文件 + 5 包 + 162
+  负例**、bootstrap **14/14**（强 quine 269510 bytes 双侧一致）、
   self_comp.lom 12525 行、Rust **542 单元 + 8 集成**（R101
   e2e ×1）、eval 双后端各 121/121；各批存量 hex 对比全恒等
-  （175/183/193 逐批）。Cargo.toml/lock 均为 1.4.7。
+  （175/183/193 逐批）。Cargo.toml/lock 均为 1.4.8。
 - R101 修复后**三实现短路 return 全对齐**（and/or 右侧实际执行
-  return 三侧 0/9/1/8 rc0）；bottom 家族不再有已知宿主-L2 分叉
-  （R94 挂账是 json 键序，非 bottom 面）。
-- 下一步：**交接就绪，无在制工作**。待裁菜单：R94 修否（可统筹
-  宿主挂账族：map_remove 分叉/包内 as RUNTIME002）、二十审三条
-  精度备注是否升格、下一阶段方向（发布线继续冻结直至用户解冻）。
-- 交付史与机制事实源：RFC-0004 修订 1–40、SPEC §13、
-  designs/0001–0012、TODO 顶部、HANDOVER §11.6 和 selfcomp
+  return 三侧 0/9/1/8 rc0）；bottom 家族不再有已知宿主-L2 分叉。
+- 下一步：完成批 2（map_remove Bool + 包内 as，designs/0013
+  §1.2/§1.3 与 §2 验收门禁）→ 规划者全量验收 + 提交推送 + CI
+  首跑 + tag v1.4.9 → 交接五件套刷新。批 2 后待裁：typechecker
+  for 可变性 quirk 等登记项、二十一审发起时机、下一阶段方向
+  （发布线继续冻结直至用户解冻）。
+- 交付史与机制事实源：RFC-0004 修订 1–41、SPEC §13、
+  designs/0001–0013、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
-   §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-09-29.html
-   （十九审——最新轮）及 review-2026-09-28.html（十八审），
+   §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-09-30.html
+   （二十审——最新轮）及 review-2026-09-29.html（十九审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-36 全读），docs/designs/0001~0012 十二份批次设计（含各批实施
+   1-41 全读），docs/designs/0001~0013 十三份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
@@ -96,7 +105,7 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交 v1.4.6 基线 360/360 = 195 单文件 + 5 包 + 160 负例）
+   - python tools/verify_selfcomp.py（已提交基线 362/362 = 195 单文件 + 5 包 + 162 负例）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269510 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
@@ -104,14 +113,14 @@
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check：C甲 12 + D甲 12 + 批1 8 枚（正例 194–200 + 负例 neg_r97e_* 1 枚）已入 v1.4.4–v1.4.6；examples 原 37 个有效文件不变。
    - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
-3. 如实报告 tag 基线核验边界。D甲/E甲方向已有用户裁决可按序推进；
-   R100/R101、二十审等新方向仍只呈菜单待裁。外部发布线继续冻结。
+3. 如实报告 tag 基线核验边界。已裁批次（当前 = R94 挂账族批 2）
+   按 designs/0013 推进；新方向仍只呈菜单待裁。外部发布线继续冻结。
 4. 已裁批次：规划者更新方案与自包含任务书 → 派执行者实施 → 规划者
    验收（全量回归 + 存量 hex 对比 + 抽查）→ 提交推送并看 CI 首跑；
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
-【关键锚点索引（当前行为要点；已提交 v1.4.6 基线由 verify_selfcomp
-  360 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
+  362 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2
   end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确
@@ -132,15 +141,16 @@
   break/continue（flag 化）；Int 安全值域 ±2^59；无 0x 字面量；
   多返回值调用点显式取 .0/.1；写完用例全文 grep "Fn" 自查（Fn
   注解是 L2 负例形态）；裸 list_empty() 直接 println 是 ls{?} 编译
-  期拒（加注解/cons 上下文）；WASM hex 手写注意 eqz/sleb 单字节
-  指令族与偶字符占位（容器显示批教训）。
+  期拒（加注解/cons 上下文）；无注解构造的 Bool/嵌套容器迭代显示
+  保守拒（仅注解三形态播种，修订 38）；WASM hex 手写注意 eqz/sleb
+  单字节指令族与偶字符占位（容器显示批教训）。
 - R92/R95/R99 登记链：单 return 臂历史双侧一致；双 return
   臂绑定后算术十九审 R95 误拒、绑定直尾值 R99 坏 WASM；A甲
-  安全拒后 B甲在 v1.4.3 正确发射。不可据此宣称三实现所有 bottom
-  形态全覆盖：R101 短路右侧实际 return 是宿主 WASM 既有分叉。
+  安全拒后 B甲在 v1.4.3 正确发射。R101 短路右侧实际 return 的宿主
+  WASM 分叉已于 v1.4.7 修复（三侧对齐 0/9/1/8）。
 
-现在从上手三步开始。先报告只读核验，再按已裁顺序整理 E甲邻近
-证据并呈报；新方向仍待用户裁决。
+现在从上手三步开始。先报告只读核验，再按已裁批次推进并呈报；
+新方向仍待用户裁决。
 ```
 
 ## 维护者备注

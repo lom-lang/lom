@@ -256,6 +256,13 @@ EXPECTED_NEGATIVE_MESSAGES = {
     # scrut 判定不中、臂 Binder 不播种；无注解调用点先按 void 尾表达式
     # 产值被拒（与容器版 neg_r97_no_ret_helper 同文案路径） ----
     'neg_r97e_no_ret_bool_helper.lom': 'void 函数的尾表达式产值',
+    # ---- 批1 v1.4.8（designs/0013）：二十审 §6-①② 精度备注升格负例。
+    # ①用户 fn 命名 println（宿主 NAM002 error 级诊断收，双侧非法结论
+    # 一致、拒绝点与文案不同）；②List 被测配 Int 字面量臂——嵌套 match
+    # 臂隔离形态（宿主宽容收 [1]，同 neg_match_num_str_pattern
+    # 字面量模式文案族）----
+    'neg_user_fn_named_println.lom': "用户函数不得命名 'println'",
+    'neg_match_scalar_on_list.lom': '字面量模式类型不符（被测 ls{i64} 模式 i64）',
 }
 
 

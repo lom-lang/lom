@@ -1,0 +1,9 @@
+# 负例（二十审 §6-① 精度备注，designs/0013）：用户 fn 命名 println——
+# L2 明确拒绝（宿主 NAM002 error 级诊断宽容收，双侧非法结论一致、
+# 拒绝点与文案不同，锁定 L2 侧编译拒 + 无 hex）。
+fn println(x: Int) -> Int
+    x * 2
+end
+fn main() -> Unit ! [IO]
+    println(21)
+end
