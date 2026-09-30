@@ -1318,3 +1318,32 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   stdout 系既有"诊断是产品"设计（登记）。语言面与发布线
   冻结不变。**门禁回填：提交 `ce8c731` 推送后 CI run
   `36694182024`（#219）六 job 全绿，tag v1.4.10 已切。**
+
+- **修订 44（2026-09-30）：二十二审 R108/R109 整改交付
+  （v1.4.11；门禁回填见本修订尾部）。** 用户裁决"继续"（按建议：
+  R108+R109 行为小批先行，R107 选边另呈）。纯 typecheck 诊断面
+  两处（src/typechecker/mod.rs +18/-1）。**R108（P2）**：Ident
+  值位检查对包 enum 变体误报 NAM003 error（is_variant_constructor
+  只查本地/内建 enums 不查 externals）——存量 103 用例 --check
+  rc=1 三错（run 输出全对）。修法：check_expr 的 Ident 分支在
+  本地枚举之后、NAM003 之前对 ∈ external_symbols 放行为 Unknown
+  （与 check_call 尾段 fn 放行逐字同构；**不并入
+  is_variant_constructor 本身**——它另喂 check_call/check_pattern，
+  并入会给带参变体引入 TYPE003 元数假阳性并改 Binder 语义）。
+  负向锁定：拼错名/依赖图外仍 NAM003（r108 集成测试）。auto-public
+  直用形态与"包真名不经 import 可用"既定设计一致。**R109（P3，
+  v1.4.10 引入）**：NAM006 终检把合并单元"无别名 import + 同源包
+  fn"当遮蔽报（101 用例 3 条误导 warning）。修法：终检只在真别名
+  （alias != 真名）时触发——三形态分职：真别名撞本地 fn 仍报
+  （r104 集成测试不倒）、同源无别名静默、主文件 fn 撞包 fn 仍走
+  collect_fn_sig 收敛点 NAM006（该分支不动）。**R108 负向落位
+  说明**：selfcomp 负例锁 L2 编译器面锁不到宿主 typecheck NAM003，
+  故负向进 tests/r108_variant_externals.rs（穿真实 CLI --check，
+  集成 ×5）→ 集成 16→**21**；单元 543 不变；verify_selfcomp
+  364/364 不变；self_comp/codegen 零改动（quine 269521 不变）。
+  验收（规划者亲验 103 --check rc=0 / 101 build 零 NAM006 /
+  r104 6/6 不倒 + diff 抽查）：cargo 543+21、六模式、eval 双
+  后端各 121/121、clippy/fmt 零、doc_audit 71/71（J 锚 integ
+  16→21 七处同步——入锚机制首次实战拦截漏刷四处）。**R108/R109
+  关闭；open 仅 R107（撞名族选边待裁）**。语言面与发布线冻结
+  不变。

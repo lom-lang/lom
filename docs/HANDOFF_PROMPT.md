@@ -89,8 +89,8 @@
   基线**：verify_selfcomp
   **364/364 = 196 单文件 + 7 包 + 161 负例**、bootstrap **14/14**
   （强 quine 269521 bytes 双侧一致）、self_comp.lom 12529 行、
-  Rust **543 单元 + 16 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
-  r104_dedup_order×6）、
+  Rust **543 单元 + 21 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
+  r104_dedup_order×6 + r108_variant_externals×5）、
   eval 双后端各 121/121；存量 hex 对比 198 恒等 + 2 有意变化
   （批 2a，v1.4.9 起）。Cargo.toml/lock 均为 1.4.10。
 - R101 修复后**三实现短路 return 全对齐**（0/9/1/8 rc0）；
@@ -108,9 +108,12 @@
   3 条，同源静默/改文案修法）。工具治理批（doc_audit 71/71 入锚
   + D5 探针 8/8）已交付复核通过。轨迹：二十审 A-→二十一审 B→
   二十二审 B+（不外推）。
-- 下一步：**R107/R108/R109 整改待用户裁决**（建议顺序：R108+R109
-  行为小批先行——修法方向无争议；R107 撞名族选边需裁决——后
-  import 声明赢（对齐解释器/宿主，L2 改）vs 取首个）。其余在案：
+- **v1.4.11（R108/R109 整改）已交付，open 仅 R107**：R108 包
+  enum 变体 --check 放行（103 用例 rc=0）；R109 NAM006 真别名
+  限定（101 用例 build 零噪音）；集成 16→21。
+- 下一步：**R107 撞名族选边待裁**（两包 import 同一别名真名不同：
+  解释器/WASM 恒声明序后者 vs L2 恒首个——建议"后 import 声明赢"
+  对齐解释器/宿主只改 L2，配 NAM006 变体 warning）。其余在案：
   typechecker for 可变性 quirk、`lom build` 逐文件视图 NAM003、
   二十三审时机、下一阶段方向（发布线继续冻结直至解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–42、SPEC §13、
@@ -129,7 +132,7 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order，×16）
+   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals，×21）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

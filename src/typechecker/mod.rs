@@ -180,8 +180,16 @@ impl TypeChecker {
         // import 项 span；不置 ok=false，照 NAM005 形态）。本地无同名定义
         // 时按既有语义注册（真名在 functions 取签名继承；真名在
         // external_symbols（包符号）时别名加入放行集）。
+        // R109（二十二审整改）：NAM006 只对真别名（alias != 真名）发——
+        // 无别名 import（alias == name）与 build 合并单元里的同源包 fn 同名
+        // 是合并的结构性必然（包 fn 即合并进来的"本地 item"，import 必与之
+        // 同名），非用户意图遮蔽，跳过不报（修复前 101 用例 build 逐符号 3
+        // 条噪音）；该形态下落注册分支为幂等再插入（同名同签名），无行为
+        // 差异。三形态各归其位：真别名撞本地 fn 此处仍报；无别名同源静默；
+        // 主文件 fn 撞包 fn（合并单元重复 ItFn）走 collect_fn_sig 收敛点的
+        // NAM006 分支（重复名 ∈ externals →"本地定义遮蔽包符号"）仍报。
         for ia in std::mem::take(&mut self.imported_aliases) {
-            if self.user_fns.contains(&ia.alias) {
+            if ia.alias != ia.name && self.user_fns.contains(&ia.alias) {
                 self.push_diag(
                     Severity::Warning,
                     "NAM006".into(),
@@ -604,6 +612,15 @@ impl TypeChecker {
                 } else if self.is_variant_constructor(name) {
                     // 枚举变体构造器
                     self.variant_return_type(name)
+                } else if self.external_symbols.contains(name) {
+                    // R108（二十二审整改）：外部包公开符号的值位引用——包导出
+                    // enum 的变体名（Green/Red 等，fn/enum/变体均由调用方从
+                    // lom.toml 依赖图收进 externals）在单文件视图里作值使用。
+                    // 与 callee 位（check_call 尾段）的 externals 放行同构：
+                    // 枚举归属/签名此处不可知 → Unknown，不报 NAM003（修复前
+                    // 合法程序 --check rc=1 三 NAM003 误拒）。负向不倒：不在
+                    // externals 的名（拼错/依赖图外）仍走下方 NAM003 error。
+                    TypeOrUnknown::unknown()
                 } else {
                     self.push_diag(
                         Severity::Error,
