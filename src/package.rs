@@ -111,8 +111,8 @@ pub struct ResolvedPackage {
     pub name: String,
     /// 包根目录（lom.toml 所在目录）
     pub root: PathBuf,
-    /// 清单（保留字段，供后续版本校验用）
-    #[allow(dead_code)]
+    /// 清单（v1.4.13 登记项 2 起消费：`lom build` 无文件流程按包
+    /// manifest.dependencies 求传递闭包，为逐文件检查提供包级 externals）
     pub manifest: PackageManifest,
     /// 包内所有 .lom 源码文件路径
     pub source_files: Vec<PathBuf>,

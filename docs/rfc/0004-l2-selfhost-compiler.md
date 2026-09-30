@@ -1378,3 +1378,32 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   台账 open 清空**。语言面与发布线冻结不变。**门禁回填：提交
   `11cdc68` 推送后 CI run `36723102998`（#225）六 job 全绿，
   tag v1.4.12 已切。**
+
+- **修订 46（2026-10-01）：两项在案登记项整改交付（v1.4.13；
+  门禁回填见本修订尾部）。** 用户裁决"解决剩余在案登记项后执行
+  二十三审"。纯诊断/工具面（解释器/codegen/self_comp 零改动）。
+  **for 可变性 quirk**（v1.2.3 登记）：typechecker Stmt::For 的
+  env.define 在函数级 env 当前层覆盖同名外层 let mut 可变性且
+  循环后不恢复（误报 MUT001 与真不可变逐字节同形，repair-LLM
+  不可分辨；解释器每轮子作用域语义正确）——快照/恢复修法
+  （TypeEnv::local_entry 新方法，利用 vars/mutables 恒成对写入
+  不变量）；**执行者有据偏离经规划者认可**：无同名时保留条目
+  不弹出（弹出会翻"循环外读 for 变量"既有 divergence 为新
+  NAM003 error，与任务铁律"维持放行不扩面"冲突）。新单元 ×5
+  （quirk 消除/负向不倒/对照/循环内不倒/放行面锁定）；MUT001
+  族 8 + R65 族 6 全绿。**lom build 逐文件 NAM003**（v1.4.9
+  登记）：无文件流程逐文件 check_program 无 externals 命中
+  一切跨包引用（105 三条 t3/102 四条真名——登记原文只点名
+  别名，实际根因更广）——按包依赖闭包 externals 修法
+  （ResolvedPackage.manifest 去 dead_code + run_build 预计算
+  闭包表 + check_program_with_externals 接线，DFS 环保护）；
+  105/102 清零、负向（闭包外符号仍 NAM003）集成锁定；新集成
+  ×3（tests/build_closure_externals.rs，无文件形态 stdout/rc
+  恒 0 口径）。Rust **543→548 单元 + 25→28 集成**；verify_
+  selfcomp 365/365 与 quine 269555 不变（self_comp 零改动）；
+  自举六模式零影响（8.2 检查器无 MUT001 面，供料实证）。
+  残留边界登记：多文件包内跨文件引用假阳性维持（超范围）、
+  无文件流程 PKG007 不发（不过 collect_package_symbols，如实
+  登记）、循环外读 for 变量 divergence 维持。**登记项全关；
+  台账 open 清空**——二十三审随后发起。语言面与发布线冻结
+  不变。

@@ -575,8 +575,21 @@ impl TypeChecker {
                     _ => TypeOrUnknown::unknown(),
                 };
                 // for 循环变量是每轮迭代的新鲜绑定，不可变（重赋值无意义）
+                // v1.4.13 登记项 1（v1.2.3 登记 quirk）：define 直接写进当前层，
+                // 同名外层绑定（如 let mut x）的类型/可变性条目被覆盖且循环后
+                // 不恢复，循环外 `x = 5` 误报 MUT001（解释器运行正确）。
+                // 最小快照/恢复：define 前记录当前层该名条目，check_block 后还原。
+                // 当前层原无该名（寻常 for i）时保留 define 条目不弹出——
+                // 循环外读 for 变量的既有放行面是独立登记的 divergence
+                // （typechecker 放行 / 解释器 RUNTIME002），本批不触碰；若弹出，
+                // 读路径（check_expr 的 Ident else 分支）会新发 NAM003 error，
+                // 即扩面。
+                let saved = env.local_entry(var);
                 env.define(var.clone(), elem_ty, false);
                 self.check_block(body, env);
+                if let Some((ty, mutable)) = saved {
+                    env.define(var.clone(), ty, mutable);
+                }
             }
             Stmt::Return(expr) => {
                 let (ret_ty, rspan) = match expr {
@@ -1657,6 +1670,16 @@ impl TypeEnv {
     fn define(&mut self, name: String, ty: TypeOrUnknown, mutable: bool) {
         self.vars.insert(name.clone(), ty);
         self.mutables.insert(name, mutable);
+    }
+
+    /// v1.4.13 登记项 1（v1.2.3 登记 quirk 整改）：快照当前层某名的
+    /// (类型, 可变性) 条目，供 for 变量 define 后恢复。vars/mutables 恒
+    /// 成对写入（define 是唯一写点、无任何 remove），两表对同名条目共存亡；
+    /// None = 当前层无该名（查询本就落父链）。
+    fn local_entry(&self, name: &str) -> Option<(TypeOrUnknown, bool)> {
+        let ty = self.vars.get(name)?.clone();
+        let mutable = self.mutables.get(name).copied().unwrap_or(false);
+        Some((ty, mutable))
     }
 
     fn get(&self, name: &str) -> Option<TypeOrUnknown> {

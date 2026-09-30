@@ -18,6 +18,7 @@ use cli::extract_hover_params;
 use cli::merge_packages_for_wasm;
 use cli::parse_args;
 use cli::print_help;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::process;
@@ -632,6 +633,10 @@ fn run_build(json: bool) {
     }
 
     // 人类可读输出
+    // v1.4.13 登记项 2（v1.4.9 登记）：包级 externals 预计算——每包
+    // manifest.dependencies 出发的传递闭包公开符号并集（图已过环检测，
+    // DFS 安全；见 package_closure_externals）
+    let externals_map = package_closure_externals(&graph);
     println!("Lom build — 包依赖解析结果");
     println!("  项目: {} v{}", manifest.name, manifest.version);
     if graph.packages.is_empty() {
@@ -655,7 +660,20 @@ fn run_build(json: bool) {
                 let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
                 if diags.ok {
                     let program = parser::Parser::parse_recover(&src).program;
-                    typechecker::check_program(&program, &src, &path_str, &mut diags);
+                    // v1.4.13 登记项 2（v1.4.9 登记）：此前逐文件 check_program
+                    // （无 externals），包源内跨包符号引用（含 as 别名 t3 与
+                    // 非别名真名）误报 NAM003 error。改为按包依赖闭包 externals
+                    // 检查（对齐带文件路径 collect_package_symbols 的合并单元
+                    // 语义）。多文件包内跨文件引用的残留假阳性维持（登记项，
+                    // 超范围）；本流程不过 collect_package_symbols，PKG007
+                    // 撞名 warning 维持不发（如实登记）。
+                    typechecker::check_program_with_externals(
+                        &program,
+                        &src,
+                        &path_str,
+                        &mut diags,
+                        &externals_map[name],
+                    );
                 }
                 if diags.diagnostics.is_empty() {
                     println!(
@@ -674,6 +692,46 @@ fn run_build(json: bool) {
         }
     }
     println!("\n依赖解析成功，共 {} 个包。", graph.packages.len());
+}
+
+/// v1.4.13 登记项 2（v1.4.9 登记）：`lom build` 无文件流程的包级
+/// externals——包 P 检查源文件时的可见外部符号 = P 的
+/// manifest.dependencies 出发的传递闭包（不含 P 自己）各包
+/// public_symbols 并集。带文件路径（run_build_wasm）走
+/// collect_package_symbols 的全依赖图并集（合并单元整体检查），本流程
+/// 逐文件检查故按各包自身闭包收敛——依赖未声明的包符号不并入
+/// （负向面：仍 NAM003）。
+fn package_closure_externals(graph: &package::DependencyGraph) -> HashMap<String, Vec<String>> {
+    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
+    for name in graph.packages.keys() {
+        closure_symbols(graph, name, &mut memo);
+    }
+    memo
+}
+
+/// closure_externals 的 DFS 主体：先占位再递归（防御性环保护——正常
+/// 路径图已过 resolve_dependencies 的环检测/PKG003，为 DAG，不命中）；
+/// 依赖边指向未入图的包名时按空集处理（正常解析不出现）。
+fn closure_symbols(
+    graph: &package::DependencyGraph,
+    pkg_name: &str,
+    memo: &mut HashMap<String, Vec<String>>,
+) {
+    if memo.contains_key(pkg_name) {
+        return;
+    }
+    memo.insert(pkg_name.to_string(), Vec::new());
+    let mut syms: Vec<String> = Vec::new();
+    if let Some(pkg) = graph.packages.get(pkg_name) {
+        for (dep_name, _) in &pkg.manifest.dependencies {
+            if let Some(dep) = graph.packages.get(dep_name) {
+                syms.extend(dep.public_symbols.iter().cloned());
+            }
+            closure_symbols(graph, dep_name, memo);
+            syms.extend(memo[dep_name].iter().cloned());
+        }
+    }
+    memo.insert(pkg_name.to_string(), syms);
 }
 
 /// Phase 2.7: 执行 `lom fix` 子命令

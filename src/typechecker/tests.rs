@@ -1002,6 +1002,84 @@ fn mut001_mut_compound_assign_no_warn() {
     );
 }
 
+// ===== v1.4.13 登记项 1（v1.2.3 登记 quirk）：for 变量遮蔽外层绑定的
+// 可变性标记被覆盖且循环后不恢复——`let mut x` + `for x` 后循环外 `x = 5`
+// 误报 MUT001。修复 = For 分支最小快照/恢复（见 mod.rs Stmt::For）。
+// 三形态锁 + 两条回归锁：=====
+
+#[test]
+fn for_shadow_mut_outer_postloop_reassign_no_mut001() {
+    // 形态 1（quirk 消除）：let mut x + for x 遮蔽 + 循环外 x = 5 → 零 MUT001
+    // （修复前 1 条 (6:5) 误报；解释器运行正确输出 1 2 5）
+    let src = "fn main() -> Unit\n    let mut x = 1\n    for x in 1..3\n        println(x)\n    end\n    x = 5\n    println(x)\nend\n";
+    let diags = check_src(src);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        0,
+        "for 遮蔽 let mut 后循环外重赋不应报 MUT001"
+    );
+}
+
+#[test]
+fn for_shadow_immutable_outer_postloop_reassign_still_mut001() {
+    // 形态 2（负向不倒）：let x（不可变）同形态 → 仍报 MUT001，
+    // 定位在循环外赋值行 (6:5)
+    let src = "fn main() -> Unit\n    let x = 1\n    for x in 1..3\n        println(x)\n    end\n    x = 5\n    println(x)\nend\n";
+    let diags = check_src(src);
+    let d = mut001_diags(&diags);
+    assert_eq!(d.len(), 1, "for 遮蔽不可变 let 后循环外重赋仍应报 MUT001");
+    assert_eq!((d[0].line, d[0].col), (6, 5), "定位在循环外赋值行");
+}
+
+#[test]
+fn for_no_shadow_mut_outer_postloop_reassign_clean() {
+    // 形态 3（对照）：for 变量与外层绑定不同名 → 零诊断（不应误伤）
+    let src = "fn main() -> Unit\n    let mut x = 1\n    for i in 1..3\n        println(i)\n    end\n    x = 5\n    println(x)\nend\n";
+    let diags = check_src(src);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        0,
+        "不同名 for 不影响外层 let mut 重赋"
+    );
+    assert!(
+        diags.diagnostics.iter().all(|d| d.code != "NAM003"),
+        "对照形态不应引入 NAM003"
+    );
+}
+
+#[test]
+fn for_shadow_mut_outer_inner_reassign_still_mut001() {
+    // 回归锁 1（循环内不倒）：遮蔽期循环体内重赋 for 变量——以循环绑定
+    // （不可变）为准，仍报 MUT001（恢复只发生在 check_block 之后）
+    let src =
+        "fn main() -> Unit\n    let mut x = 1\n    for x in 1..3\n        x = 9\n    end\nend\n";
+    let diags = check_src(src);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "循环内重赋 for 变量（遮蔽期）仍应报 MUT001"
+    );
+}
+
+#[test]
+fn for_var_postloop_read_kept_passing() {
+    // 回归锁 2（放行面不扩）：循环外读 for 变量（无外层同名绑定）——
+    // 独立登记的 divergence（typechecker 放行 / 解释器 RUNTIME002），
+    // 本批不触碰：仍零 NAM003。
+    let src =
+        "fn main() -> Unit\n    for i in 1..3\n        println(i)\n    end\n    println(i)\nend\n";
+    let diags = check_src(src);
+    assert_eq!(
+        diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .count(),
+        0,
+        "循环外读 for 变量维持放行（既有 divergence 面不扩）"
+    );
+}
+
 // ===== Phase 3.2b：表达式级 span —— 诊断精确位置 =====
 
 #[test]
