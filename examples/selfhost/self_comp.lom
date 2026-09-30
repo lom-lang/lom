@@ -3879,8 +3879,9 @@ fn builtin_rv(name: String, args: List<Ex>, env: Map<String, {slot: Int, vt: Str
             return Ok("i32")
         end
         if name == "map_remove"
-            # 裁决 2 甲：对齐宿主 WASM（RT_MAP_REMOVE 返回 Unit）
-            return Ok("void")
+            # R94 批 2a：对齐 SPEC §9.7（map_remove(m, k) -> Bool——
+            # True iff the key existed），三侧统一 Bool（i32）
+            return Ok("i32")
         end
         let inner = mp_inner(mv)
         if inner == "?"
@@ -6216,11 +6217,12 @@ fn comp_println(args: List<Ex>, env: Map<String, {slot: Int, vt: String, sig: St
         return Err("println 期望 1 个参数")
     end
     let at = infer_ex(list_get(args, 0), env, fns)?
-    # R89（十六审 P3）：void 实参单列诊断——map_remove/map_set 等内建返回
-    # void（宿主 WASM 打 () 为挂账行为），此前落"容器显示留后续批次"兜底
-    # 方向错误（诊断文案即修复指令，会误导修复 LLM）
+    # R89（十六审 P3）：void 实参单列诊断——map_set 等内建返回 void
+    # （R94 批 2a 起 map_remove 返回 Bool，撤出例句），void 返回函数同面；
+    # 此前落"容器显示留后续批次"兜底方向错误（诊断文案即修复指令，
+    # 会误导修复 LLM）
     if at == "void"
-        return Err(subset_err("println 实参求值为 void/Unit（map_remove/map_set 等内建返回 void，void 返回函数同理）——void 值不可打印；去掉 println 包裹或改用语句形式调用"))
+        return Err(subset_err("println 实参求值为 void/Unit（map_set 等内建返回 void，void 返回函数同理）——void 值不可打印；去掉 println 包裹或改用语句形式调用"))
     end
     let ac = comp_ex(list_get(args, 0), env, fns, cg, locals, localvt)?
     if at == "i64"
@@ -7829,8 +7831,9 @@ fn mp_has_body(probe_idx: Int) -> String
     + "0b"
 end
 
-# rt_mp_remove: (i64 m, i64 k) -> void；命中→墓碑 state=2 + size--
-# （返回 void——裁决 2 甲）。local 2=r（i32）
+# rt_mp_remove: (i64 m, i64 k) -> i32（Bool）；命中→墓碑 state=2 + size--
+# 返回 True iff the key existed——对齐 SPEC §9.7（R94 批 2a；r>=0 与
+# mp_has 同表示）。local 2=r（i32）
 fn mp_remove_body(probe_idx: Int) -> String
     "01017f"
     + "2000" + "2001" + "10" + leb128_hex(probe_idx) + "2102"
@@ -7838,6 +7841,7 @@ fn mp_remove_body(probe_idx: Int) -> String
     + "2000" + "a7" + "2800" + "00" + "2002" + "4110" + "6c" + "6a" + "4102" + "3600" + "00"
     + "2000" + "a7" + "2000" + "a7" + "2800" + "08" + "4101" + "6b" + "3600" + "08"
     + "0b"
+    + "2002" + "4100" + "4e"
     + "0b"
 end
 
@@ -8061,7 +8065,7 @@ fn ensure_mp_helper(name: String, cg: {cgs: Map<String, Int>, cgh: Map<String, S
                                     let probe_idx = ensure_mp_helper("mp_probe", cg)?
                                     let body = mp_remove_body(probe_idx)
                                     let tidx = cg_int(cg.cgs, "tbase") + cg_int(cg.cgs, "nfun") + cg_int(cg.cgs, "n_extra_types")
-                                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e00")
+                                    map_set(cg.cgh, "extra_types", cg_str(cg.cgh, "extra_types") + "60027e7e017f")
                                     map_set(cg.cgs, "n_extra_types", cg_int(cg.cgs, "n_extra_types") + 1)
                                     let fidx = reg_extra_fn(tidx, body, cg)
                                     map_set(cg.cgh, "hidx:" + name, int_to_string(fidx))
@@ -10475,7 +10479,7 @@ fn mp_builtin_entry(name: String) -> Result<{helper: String, nprm: Int, prms: St
         return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "i32"})
     end
     if name == "map_remove"
-        return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "void"})
+        return Ok({helper: "-", nprm: 2, prms: "mp{?},st", ret: "i32"})
     end
     if name == "map_keys"
         return Ok({helper: "mp_keys", nprm: 1, prms: "mp{?}", ret: "ls{st}"})

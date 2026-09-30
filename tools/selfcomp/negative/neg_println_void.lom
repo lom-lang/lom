@@ -1,10 +1,11 @@
-# R89（十六审 P3）：println 包裹 map_remove——实参综合 vt 为 void（宿主
-# WASM 该形态打 () 为挂账行为）。锁定单列的 void 实参诊断；此前落
-# "容器显示留后续批次"兜底方向错误（诊断即修复指令，会误导修复 LLM）
-from map import { map_empty, map_set, map_remove }
+# R89（十六审 P3）：println 包裹 map_set——实参综合 vt 为 void。锁定单列
+# 的 void 实参诊断；此前落"容器显示留后续批次"兜底方向错误（诊断即修复
+# 指令，会误导修复 LLM）。R94 批 2a 起 map_remove 返回 Bool（不再触发
+# 本诊断），例句改用仍返回 void 的 map_set。
+from map import { map_empty, map_set }
 
 fn main() -> Unit ! [IO]
     let m = map_empty()
     map_set(m, "a", 1)
-    println(map_remove(m, "a"))
+    println(map_set(m, "b", 2))
 end

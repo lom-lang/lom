@@ -115,7 +115,7 @@ const RT_MAP_PROBE: u32 = N_IMPORTS + 54; // (i64 m, i64 k) -> i32      命中=�
 const RT_MAP_SET: u32 = N_IMPORTS + 55; // (i64 m, i64 k, i64 v) -> i64 Unit
 const RT_MAP_GET: u32 = N_IMPORTS + 56; // (i64 m, i64 k) -> i64 Option
 const RT_MAP_HAS: u32 = N_IMPORTS + 57; // (i64 m, i64 k) -> i64 Bool
-const RT_MAP_REMOVE: u32 = N_IMPORTS + 58; // (i64 m, i64 k) -> i64 Unit
+const RT_MAP_REMOVE: u32 = N_IMPORTS + 58; // (i64 m, i64 k) -> i64 Bool
 const RT_MAP_KEYS: u32 = N_IMPORTS + 59; // (i64) -> i64 List（str_cmp 插入排序，确定性）
 const RT_MAP_VALUES: u32 = N_IMPORTS + 60; // (i64) -> i64 List（同 keys 序，复用 KEYS + probe）
 const RT_MAP_STR: u32 = N_IMPORTS + 61; // (i64) -> i64 Str（排序 "{k: v}"）
@@ -4593,7 +4593,9 @@ fn build_map_has() -> Vec<u8> {
     a.b
 }
 
-/// rt_map_remove: (i64 m, i64 k) -> i64 Unit；命中 → 墓碑 + size--
+/// rt_map_remove: (i64 m, i64 k) -> i64 Bool（SPEC §9.7：True iff the
+/// key existed——R94 批 2a 对齐冻结宣称，蓝本 build_map_has 的 Bool tag）；
+/// 命中 → 墓碑 + size--
 /// locals: 2=r(i32)
 fn build_map_remove() -> Vec<u8> {
     let mut a = Asm::new();
@@ -4627,7 +4629,8 @@ fn build_map_remove() -> Vec<u8> {
             .i32_store(8);
     }
     a.end();
-    a.i64c(V_UNIT);
+    // probe 命中结果保留为返回值（r >= 0 → Bool tag；蓝本 build_map_has）
+    a.lget(2).i32c(0).op(op::I32_GE_S).bool_tag();
     a.b
 }
 
@@ -6672,6 +6675,19 @@ mod e2e {
             "from map import { map_empty, map_set, map_get, map_has, map_remove, map_keys, map_values, map_size }\nfrom string import { int_to_string }\nfn main() -> Unit\n    let m = map_empty()\n    map_set(m, \"b\", 2)\n    map_set(m, \"a\", 1)\n    map_set(m, \"c\", 3)\n    println(map_size(m))\n    println(map_get(m, \"a\"))\n    println(map_get(m, \"zz\"))\n    println(map_has(m, \"c\"))\n    map_set(m, \"a\", 100)\n    println(map_get(m, \"a\"))\n    println(map_keys(m))\n    println(map_values(m))\n    println(m)\n    map_remove(m, \"b\")\n    println(map_size(m))\n    println(map_keys(m))\n    println(map_has(m, \"b\"))\n    let big = map_empty()\n    let mut i = 0\n    while i < 20\n        map_set(big, \"k\" + int_to_string(i), i)\n        i += 1\n    end\n    println(map_size(big))\n    println(map_get(big, \"k7\"))\n    println(map_get(big, \"k19\"))\nend",
             "map",
             "3\nSome(1)\nNone\ntrue\nSome(100)\n[a, b, c]\n[100, 2, 3]\n{a: 100, b: 2, c: 3}\n2\n[a, c]\nfalse\n20\nSome(7)\nSome(19)\n",
+        );
+    }
+
+    /// 回归 R94 批 2a：宿主 WASM map_remove 曾返回 Unit（尾部 V_UNIT，
+    /// 命中信息丢失）——现对齐 SPEC §9.7 冻结宣称 `map_remove(m, k) -> Bool`
+    /// （True iff the key existed）；蓝本 build_map_has。此测试锁定 WASM 侧
+    /// 的 println 形态与绑定消费（解释器/typechecker 本就 Bool）。
+    #[test]
+    fn e2e_map_remove_returns_bool() {
+        check(
+            "from map import { map_empty, map_set, map_remove, map_size }\nfn main() -> Unit\n    let m = map_empty()\n    map_set(m, \"a\", 1)\n    map_set(m, \"b\", 2)\n    println(map_remove(m, \"a\"))\n    println(map_remove(m, \"a\"))\n    let b = map_remove(m, \"b\")\n    println(b)\n    println(map_size(m))\nend",
+            "map_remove_bool",
+            "true\nfalse\ntrue\n0\n",
         );
     }
 

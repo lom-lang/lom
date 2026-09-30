@@ -1,0 +1,15 @@
+# R94 批 2a：map_remove 返回 Bool（SPEC §9.7：True iff the key existed）
+# 的消费面——println 直接包裹（命中 true / 未命中 false）+ let 绑定后
+# println。修复前：宿主 WASM 打 ()/()，L2 编译期拒（void 实参诊断）；
+# 修复后三侧一致 true/false/true。
+from map import { map_empty, map_set, map_remove }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    map_set(m, "b", 2)
+    println(map_remove(m, "a"))
+    println(map_remove(m, "a"))
+    let b = map_remove(m, "b")
+    println(b)
+end

@@ -1,5 +1,7 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **批 2 交付记录（2026-09-30，v1.4.9——map_remove 统一 Bool + 包内 as 别名；门禁回填见段尾）**：用户裁决"按你的提议执行"批 2，设计 [designs/0013](designs/0013-r94-ledger-remediation.md) §1.2/§1.3，双执行者顺序实施、规划者亲验（verify_selfcomp/doc_audit/105 三侧/map_remove 三侧探针）。**map_remove 统一 Bool**（对齐 SPEC §9.7 冻结宣称，翻转 v1.2.13 裁决 2 甲的 L2 选边）：宿主 build_map_remove 尾部 V_UNIT → probe 命中结果 Bool tag（蓝本 build_map_has，墓碑+size-- 不变，e2e 测试锁定）；L2 两处 "void" 裁决落点/helper 表/R89 文案（map_remove 撤出例句）/发射签名同步 i32——三侧 println 形态 **true/false/true 逐字一致**（修复前宿主 WASM ()/()、L2 COMPILE-ERROR，旧编译器导出取证）。存量对比（同一新 lom.exe 驱动 v1.4.8 导出旧编译器）：**198 恒等 + 2 有意变化**（81/84 helper 签名字节 +14/+16，各自 valid 行为一致）。负例连锁：neg_map_remove_unit_bind 删（拒绝面消失）、neg_println_void 改 map_set 形态续锁 R89、新正例 201——verify_selfcomp 重组 **362/362 = 196 单文件 + 5 包 + 161 负例**；self_comp 12525→**12529 行**、quine **269521B** 双侧一致；Rust 542→**543**。**包内 as 别名**：解释器 load_packages 的 Item::Import 整体跳过 → 镜像 process_import 注册（两个插入都做，顺带打通包内 stdlib 别名暗坑 `from io import {println as log}`）；build 路径 typecheck 改传包 externals——105 用例**三侧一致 18/18**（解释器修复前 RUNTIME002；build 修复前 **3 条** NAM003 假阳性 → 零诊断——十八审登记"2 条"系笔误已随批更正；WASM/L2 本就正确）。集成测试 ×2（tests/r94_pkg_alias.rs）→ 集成 8→**10**。**登记不修边界**：`lom build` 包管理流程（逐文件无 externals）下包源内别名仍 NAM003（需按依赖图传公开符号，超最小面）；clippy --all-targets 有 9 条存量测试 lint（rust-1.97.0 漂移，HEAD 既有非本批引入，CI 口径零输出不受影响）。**R94 全部关闭**；当前台账无 open 项（typechecker for 可变性 quirk 等既有登记维持）。
+>
 > **批 1 交付记录（2026-09-30，v1.4.8——R94 json 键序 + R103 +
 > 二十审备注收口；门禁回填见段尾）**：用户裁决"按你的提议执行"
 > （统筹 R94 宿主挂账族 + 二十审三条精度备注 + 规划者只读核验
@@ -304,6 +306,8 @@ end
 > cli.rs"+125 行"实为 +124/-4。附带观察：宿主 build 对包内 as
 > 别名符号打 2 条 NAM003 仍产出可正确运行的 wasm（宿主 typecheck
 > 与 codegen 符号视野不一致，建议并入挂账族一并裁决）。
+> 【2026-09-30 更正括注：实测 3 条（7:5/11:5/11:13），"2 条"系
+> 当时清点笔误——批 2b 供料实证；该挂账已随 v1.4.9 修复关闭。】
 >
 > **整改关闭（2026-09-28 R92/R93 纯文档更正批——不升版）**：
 > R92 五处登记更正（RFC 修订 29、TODO 顶部 v1.4.0 段、SPEC §13

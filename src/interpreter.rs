@@ -557,7 +557,26 @@ impl Interpreter {
                                     }
                                 }
                             }
-                            Item::Import(_) => {} // 包内 import 暂不传递
+                            // R94 批 2b：包内 import 的 as 别名注册（此前整体跳过
+                            // ——别名→真名映射只由主文件路径的 process_import 注册，
+                            // 包内 `from libinner import {triple as t3}` 的 t3 调用
+                            // RUNTIME002；非别名因被调名==真名碰巧可用）。镜像
+                            // process_import 包分支的注册语义，两个插入都做：
+                            // 同时覆盖包内 stdlib 别名形态 `from io import
+                            // {println as log}`（call_builtin 路径缺任一插入
+                            // 即拒）。不做 PKG006/未知模块校验：graph.packages
+                            // 的 HashMap 遍历序不保证被导入包已先注册，校验
+                            // 会引入顺序脆弱性（与 codegen 对包内 import 无条件
+                            // 注册别名的视野一致）。
+                            Item::Import(imp) => {
+                                for item in &imp.items {
+                                    if item.alias != item.name {
+                                        self.import_aliases
+                                            .insert(item.alias.clone(), item.name.clone());
+                                    }
+                                    self.available_builtins.insert(item.alias.clone());
+                                }
+                            }
                         }
                     }
                 }

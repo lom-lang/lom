@@ -1225,3 +1225,50 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   推进。语言面与外部发布线冻结不变。**门禁回填：提交
   `8c86a60` 推送后 CI run `36668306358`（#214）六 job 全绿，
   tag v1.4.8 已切。**
+
+- **修订 42（2026-09-30）：R94 挂账族批 2——map_remove 统一
+  Bool + 包内 as 别名修复（v1.4.9；门禁回填见本修订尾部）。**
+  用户裁决"按你的提议执行"批 2，设计 designs/0013 §1.2/§1.3，
+  双执行者顺序实施（批 2a map_remove / 批 2b 包内 as），规划者
+  中间与总验收亲跑。**map_remove 统一 Bool**：SPEC §9.7 冻结
+  宣称 Bool，解释器/typechecker/self_interp 本就 Bool；宿主 WASM
+  build_map_remove 尾部 V_UNIT（命中信息丢失，v1.2.13 裁决 2 甲
+  曾把 L2 对齐该 Unit 侧）与 L2 两处 "void" 裁决落点是偏差——
+  本批**翻转裁决 2 甲选边、对齐冻结宣称**：宿主按 build_map_has
+  蓝本保留 probe 命中结果为 Bool tag（墓碑+size-- 不变，e2e
+  测试 e2e_map_remove_returns_bool 锁定 true/false/true），L2
+  裁决落点/helper 表/R89 文案（map_remove 撤出例句）/发射签名
+  同步改 i32——三侧 println 形态 true/false/true 逐字一致
+  （修复前宿主 WASM ()/()、L2 COMPILE-ERROR void 文案，旧编译器
+  导出复跑取证）。**存量对比（同一新 lom.exe 驱动 v1.4.8 导出
+  旧编译器）**：198 恒等 + 2 有意变化（81/84 helper 签名字节
+  增长 +14/+16，新旧各自 valid 且行为一致——存量无 println
+  (map_remove) 形态，无行为翻转）。负例连锁：neg_map_remove_
+  unit_bind 删除（绑定拒绝面消失）、neg_println_void 改 map_set
+  形态续锁 R89、新正例 201_r94_map_remove_bool——verify_selfcomp
+  重组为 **362/362 = 196 单文件 + 5 包 + 161 负例**（+1 正例
+  −1 负例总数恰不变）；self_comp 12525→**12529 行**、quine
+  **269521 bytes** 双侧一致（+11）；Rust **542→543**（e2e ×1）。
+  **包内 as 别名**：解释器 load_packages 的 Item::Import 由整体
+  跳过改镜像 process_import 包分支注册（import_aliases +
+  available_builtins 两个插入都做——同时打通包内 stdlib 别名
+  暗坑 `from io import {println as log}`，Rust 测试锁定；不做
+  PKG006 校验因 HashMap 遍历序不保证被导入包先注册）；build
+  路径 typecheck 改传 collect_package_symbols externals（对齐
+  默认运行/--check 先例）——105 用例三侧一致（解释器修复前
+  RUNTIME002 → 现 18/18 rc0；build 修复前 3 条 NAM003 假阳性
+  → 现零诊断，**十八审登记"2 条"系笔误实测 3 条，随批更正**；
+  WASM/L2 本就 18/18）。集成测试 ×2（tests/r94_pkg_alias.rs，
+  沿 r56 先例）——集成 8→**10**。**登记不修边界**：`lom build`
+  包管理流程（逐文件无 externals 视图）下包源内别名仍 NAM003
+  ——需按依赖图传公开符号，超最小面。**clippy --all-targets
+  观察登记**：rust-1.97.0 工具链漂移致 9 条存量测试 lint（
+  apply/fix/json/lexer/parser，HEAD 既有非本批引入；CI 口径
+  -D warnings 零输出不受影响）。验收（规划者亲验
+  verify_selfcomp 362/362 与 doc_audit 67/67 + 105 三侧 +
+  map_remove 三侧探针）：cargo 543+10、六模式、eval 双后端各
+  121/121、clippy/fmt 零、spec_examples PASS、eval_prompt
+  24/24、fmt examples 37 + selfcomp 全量零失败、bootstrap
+  14/14（quine 269521）。**R94 全部关闭**（批 1 json 键序 +
+  批 2 两项）；R103 已关；当前台账无 open 项（typechecker for
+  可变性 quirk 等既有登记维持）。语言面与发布线冻结不变。

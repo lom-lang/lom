@@ -319,8 +319,8 @@ pub(crate) fn merge_packages_for_wasm(
 /// 顶层判定：行未缩进且以 "from " 开头（Lom 顶层 item 只有 fn/enum/import，
 /// 列 0 的 "from" 必为 import）。import 语句不含字符串字面量，花括号配平
 /// 即可容错多行形态（`from x import {` 折行）。主文件的 import 由调用方
-/// 决定保留——它是符号许可与别名的载体（对齐宿主解释器"包内 import 暂
-/// 不传递"语义，interpreter.rs load_packages）。
+/// 决定保留——它是符号许可与别名的载体（宿主解释器 load_packages 对包内
+/// import 同样注册 as 别名——R94 批 2b，三端一致）。
 ///
 /// R90（十七审查/record 批顺带修）：包源内 `from X import {y as z}` 的
 /// 别名映射会随剥除丢失——L2 展开单元拒"未定义变量 'z'"而宿主 wasm 收
@@ -329,8 +329,9 @@ pub(crate) fn merge_packages_for_wasm(
 /// 单元的 pass 2 按真名解析注册别名——别名调用点语义与宿主 import_
 /// aliases 对齐）。判 " as " 限单行形态：多行折行 import 的起始行不含
 /// " as "（延续行不参与判定），该形态仍剥除——边界登记（存量包源单行
-/// import 为常态）。宿主解释器对该形态自身 RUNTIME002 拒（双后端分叉）
-/// 维持挂账，本修复只覆盖 pkg-expand 转写路径。
+/// import 为常态）。宿主解释器该形态的 RUNTIME002 拒曾挂账（双后端分
+/// 岔），R94 批 2b 已修（interpreter.rs load_packages 注册包内 as 别
+/// 名）——三端一致。
 fn strip_toplevel_imports(src: &str) -> String {
     /// 一行内 `{`/`}` 的净增量（import 语句无字符串/字符字面量，直接计数安全）
     fn brace_delta(line: &str) -> i32 {
@@ -826,7 +827,9 @@ end
     /// R90（十七审查开账/record 批顺带修）：包源内 `from libinner import
     /// { triple as t3 }` 的 as 别名 import 行**原位保留**（别名映射的
     /// 载体——剥除会使 L2 展开单元拒"未定义变量 't3'"，而宿主 wasm 路径
-    /// 经 known_packages 放行包内 import 是收的——三声音分叉见 TODO R90）。
+    /// 经 known_packages 放行包内 import 是收的；宿主解释器侧的 RUNTIME002
+    /// 拒 R94 批 2b 已修——interpreter.rs load_packages 注册包内 as 别名，
+    /// 三端一致）。
     /// aliaschain 形态：libouter（含 as 别名 import + 别名调用）经展开后
     /// import 行幸存、展开单元可解析（别名按真名 triple 解析注册）。
     #[test]

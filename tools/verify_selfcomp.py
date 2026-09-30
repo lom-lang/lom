@@ -95,7 +95,6 @@ EXPECTED_NEGATIVE_MESSAGES = {
     'neg_map_compare.lom': 'Map 大小比较',
     'neg_for_map.lom': 'for 迭代仅支持 Int/String/List',
     'neg_map_eq_enum_val.lom': 'Map 值相等比较暂不支持 枚举/闭包 值',
-    'neg_map_remove_unit_bind.lom': 'let 绑定 void 值',
     # ---- L2.3 json 批（designs/0007 裁决 1 甲 + B1+B2 + 数字甲）----
     'neg_json_alias.lom': '暂不支持 as 别名',
     'neg_json_arith.lom': 'json 值参与算术/拼接',

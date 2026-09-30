@@ -477,7 +477,12 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
     // 7.9：类型检查可见性对齐——编译前跑检查器，诊断走 stderr，不拦截编译（渐进式承诺与解释器一致）
     {
         let mut tdiags = diagnostics::Diagnostics::new(file);
-        typechecker::check_program(&program, &src, file, &mut tdiags);
+        // R94 批 2b：包符号 externals（对齐默认运行/--check 路径的
+        // check_program_with_externals 形态）——合并单元中包内
+        // `from libinner import {triple as t3}` 的别名经 collect_import
+        // 的 externals else-if 分支放行，NAM003 假阳性消失
+        let externals = collect_package_symbols(file);
+        typechecker::check_program_with_externals(&program, &src, file, &mut tdiags, &externals);
         if !tdiags.ok {
             eprint!("{}", tdiags.to_human());
         }
