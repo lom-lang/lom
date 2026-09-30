@@ -89,7 +89,7 @@
   基线**：verify_selfcomp
   **365/365 = 196 单文件 + 8 包 + 161 负例**、bootstrap **14/14**
   （强 quine 269555 bytes 双侧一致）、self_comp.lom 12544 行、
-  Rust **548 单元 + 28 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
+  Rust **554 单元 + 28 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
   r104_dedup_order×6 + r108_variant_externals×5 + r107_alias_clash×4 +
   build_closure_externals×3）、
   eval 双后端各 121/121；存量 hex 对比 198 恒等 + 2 有意变化
@@ -121,10 +121,13 @@
   遮蔽外层绑定的可变性泄漏（误报+漏报双向，运行时三侧块作用域
   一致；规划者亲验属实；与 for quirk 同族、入口为块内 Stmt::Let）。
   轨迹 A-→B→B+→B+（不外推）。
-- 下一步：**R110 整改待裁**（修法两向：块级快照/恢复最小修 vs
-  check_block 子层分层完整修——后者会翻"块外读块内 let"既有
-  divergence 面需评估）。其余待裁：二十四审时机、下一阶段方向
-  （发布线继续冻结直至解冻）。其余在案：
+- **v1.4.14（R110 整改）已交付，台账 open 清空**：check_block
+  块级快照/恢复（用户裁决）——双向 MUT001 失真修复、R79 用例
+  存量假阳性恰被清除（全仓对拍 4300 文件唯一差异）；Rust 554+28。
+- 下一步：**交接就绪，无在制工作**（R94-R110 全关）。待裁菜单：
+  二十四审时机（v1.4.14 整改后评级待复审重估——B+ 轨迹上若
+  复审零失真无新 P1/P2 可望回升 A-）、块内 LetDestruct 邻接面
+  是否纳入、下一阶段方向（发布线继续冻结直至解冻）。其余在案：
   typechecker for 可变性 quirk、`lom build` 逐文件视图 NAM003、
   二十三审时机、下一阶段方向（发布线继续冻结直至解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–42、SPEC §13、
@@ -143,7 +146,7 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 548/548；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
+   - cargo test --release（期望 554/554；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

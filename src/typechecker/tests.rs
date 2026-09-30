@@ -1080,6 +1080,164 @@ fn for_var_postloop_read_kept_passing() {
     );
 }
 
+// ===== R110（二十三审开账，v1.4.14 整改）：块内 let 遮蔽外层绑定——
+// typechecker 可变性条目跨块泄漏，双向失真（外层 let mut 被块内 let 遮蔽后
+// 块外赋值误报 MUT001；外层 let 被块内 let mut 遮蔽后漏报）。修复 =
+// check_block 块级快照/恢复（见 mod.rs check_block），与 v1.4.13 for 变量
+// 快照同型推广。误报清除 + 漏报复报 + 三块型 + 泄漏维持 + 嵌套恢复：=====
+
+#[test]
+fn r110_block_shadow_mut_outer_postblock_reassign_no_mut001() {
+    // 误报清除（形态 A，if/while/for 三块型）：外层 let mut x + 块内 let x
+    // 遮蔽 + 块外 x = … → 零 MUT001（修复前各 1 条误报；解释器按块作用域
+    // 运行正确，静态/动态语义对齐）
+    let cases = [
+        // if 体
+        "fn main() -> Unit\n    let mut x = 1\n    if True\n        let x = 99\n        println(x)\n    end\n    x = 4\nend\n",
+        // while 体
+        "fn main() -> Unit\n    let mut x = 1\n    let mut i = 0\n    while i < 1\n        let x = 10\n        i = i + 1\n    end\n    x = 3\nend\n",
+        // for 体（体内 Stmt::Let，非 for 变量名——与 for 变量快照恢复叠加）
+        "fn main() -> Unit\n    let mut x = 1\n    for i in 0..2\n        let x = 10\n    end\n    x = 5\nend\n",
+    ];
+    for (i, src) in cases.iter().enumerate() {
+        let diags = check_src(src);
+        assert_eq!(
+            mut001_diags(&diags).len(),
+            0,
+            "块型 {}（if/while/for）：块内 let 遮蔽 let mut 后块外重赋不应报 MUT001",
+            i
+        );
+    }
+}
+
+#[test]
+fn r110_block_shadow_immutable_outer_postblock_reassign_mut001() {
+    // 漏报复报（形态 B，if/while/for 三块型）：外层 let x（不可变）+ 块内
+    // let mut x 遮蔽 + 块外 x = … → 应报 1 条 MUT001（修复前零——负向形态
+    // 转正确），定位在块外赋值行
+    let cases = [
+        (
+            "fn main() -> Unit\n    let x = 1\n    if True\n        let mut x = 10\n    end\n    x = 5\nend\n",
+            (6, 5),
+        ),
+        (
+            "fn main() -> Unit\n    let x = 1\n    let mut i = 0\n    while i < 1\n        let mut x = 10\n        i = i + 1\n    end\n    x = 5\nend\n",
+            (8, 5),
+        ),
+        (
+            "fn main() -> Unit\n    let x = 1\n    for i in 0..2\n        let mut x = 10\n        x = 11\n    end\n    x = 5\nend\n",
+            (7, 5),
+        ),
+    ];
+    for (i, (src, pos)) in cases.iter().enumerate() {
+        let diags = check_src(src);
+        let d = mut001_diags(&diags);
+        assert_eq!(
+            d.len(),
+            1,
+            "块型 {}：块内 let mut 遮蔽不可变 let 后块外重赋应报 1 条 MUT001",
+            i
+        );
+        assert_eq!((d[0].line, d[0].col), *pos, "块型 {}：定位在块外赋值行", i);
+    }
+}
+
+#[test]
+fn r110_block_let_no_shadow_leak_divergence_maintained() {
+    // 泄漏维持（不收口）：块内 let 无同名（不触发恢复）——块外重赋块内
+    // let 名仍报 MUT001（泄漏 divergence 维持）；块外读块内 let 名仍放行
+    // （零 NAM003，独立登记 divergence，本批不触碰）
+    let src_assign = "fn main() -> Unit\n    let mut x = 1\n    if True\n        let y = 2\n        println(y)\n    end\n    y = 5\nend\n";
+    let diags = check_src(src_assign);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "块内无同名 let y 泄漏：块外 y = 5 仍应报 MUT001（divergence 维持）"
+    );
+    let src_read =
+        "fn main() -> Unit\n    if True\n        let y = 2\n    end\n    println(y)\nend\n";
+    let diags = check_src(src_read);
+    assert_eq!(
+        diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .count(),
+        0,
+        "块外读块内 let 维持放行（divergence 不扩）"
+    );
+}
+
+#[test]
+fn r110_nested_blocks_double_restore() {
+    // 嵌套块双层恢复（if 内 if）：内层恢复在前、外层恢复在后，叠加正确——
+    // 外层 let mut x + 外块 let x（不可变）+ 内块 let mut x：
+    // 内块后仍在外块内 → 外块条目（不可变）；外块后 → 原条目（可变）
+    let src_clean = "fn main() -> Unit\n    let mut x = 1\n    if True\n        let x = 10\n        if True\n            let mut x = 99\n            x = 100\n        end\n        println(x)\n    end\n    x = 2\nend\n";
+    let diags = check_src(src_clean);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        0,
+        "嵌套块双层恢复：块外 x = 2 恢复为可变，零 MUT001"
+    );
+    // 内块恢复把外块条目（let x = 10，不可变）还原——内块后在外块内
+    // 重赋应报 MUT001（不能因内块 let mut 而洗掉外块不可变）
+    let src_inner = "fn main() -> Unit\n    if True\n        let x = 10\n        if True\n            let mut x = 99\n        end\n        x = 7\n    end\nend\n";
+    let diags = check_src(src_inner);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        1,
+        "内块恢复后外块内重赋：按外块 let x（不可变）报 MUT001"
+    );
+}
+
+#[test]
+fn r110_for_body_let_shadow_stacks_with_for_var_restore() {
+    // for × 块恢复叠加（p5n 三重同名维持）：外层 let x + for var x + 体内
+    // let mut x——块恢复（体）在前、var 恢复（for 分支）在后均洗掉体内
+    // 污染，循环外 x = 5 仍正确报 1 条 MUT001
+    let src = "fn main() -> Unit\n    let x = 1\n    for x in 0..2\n        let mut x = 10\n        x = 11\n    end\n    x = 5\nend\n";
+    let diags = check_src(src);
+    let d = mut001_diags(&diags);
+    assert_eq!(d.len(), 1, "三重同名：循环外重赋仍应报 1 条 MUT001");
+    assert_eq!((d[0].line, d[0].col), (7, 5), "定位在循环外赋值行");
+    // for 变量被体内 let 遮蔽 + 循环外读 for 变量：放行面维持（零 NAM003）
+    let src_read = "fn main() -> Unit\n    for i in 0..2\n        let i = 10\n        println(i)\n    end\n    println(i)\nend\n";
+    let diags = check_src(src_read);
+    assert_eq!(
+        diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .count(),
+        0,
+        "循环外读被体内遮蔽的 for 变量维持放行（divergence 不扩）"
+    );
+}
+
+#[test]
+fn r110_closure_block_behavior_unchanged() {
+    // 闭包内块（closure_child 层）行为不变：闭包体 if 块内 let x 遮蔽外层
+    // let mut x——闭包层是子层（无同层同名），不触发恢复面；块尾表达式可见
+    // 块内绑定；闭包外层重赋照常零 MUT001
+    let src = "fn main() -> Unit\n    let mut x = 1\n    let f = fn(n: Int) -> Int\n        if True\n            let x = n * 10\n            x\n        else\n            0\n        end\n    end\n    println(f(2))\n    x = 3\nend\n";
+    let diags = check_src(src);
+    assert_eq!(
+        mut001_diags(&diags).len(),
+        0,
+        "闭包内块遮蔽不影响外层 let mut 重赋"
+    );
+    assert_eq!(
+        diags
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "NAM003")
+            .count(),
+        0,
+        "闭包块内绑定/尾表达式解析不应引入 NAM003"
+    );
+}
+
 // ===== Phase 3.2b：表达式级 span —— 诊断精确位置 =====
 
 #[test]

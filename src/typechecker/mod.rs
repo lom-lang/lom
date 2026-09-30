@@ -408,14 +408,44 @@ impl TypeChecker {
     }
 
     /// 检查块，返回块的类型（尾表达式类型或 Unit）
+    ///
+    /// R110（二十三审开账，v1.4.14 整改）：块（if/while/for 体、else 分支、
+    /// if 表达式分支、函数体、闭包体、match 臂块）此前无作用域分层——块内
+    /// `Stmt::Let` 的 `env.define` 同键直接覆盖当前层同名条目且块后不恢复，
+    /// 双向失真：外层 `let mut x` 被块内 `let x` 遮蔽后块外 `x = …` 误报
+    /// MUT001；外层 `let x` 被块内 `let mut x` 遮蔽后块外赋值漏报。解释器/
+    /// 宿主 WASM 实为真块作用域（块后外层原值）。修法与 v1.4.13 for 变量
+    /// 快照/恢复（Stmt::For）同型推广为块级：块内**首个**同名 StLet 的
+    /// define 前快照当前层条目（`TypeEnv::local_entry`），本块全部语句与
+    /// 尾表达式检查完后恢复原条目（vars+mutables 成对）；当前层原无该名
+    /// （无遮蔽的寻常块内 let）→ 保留条目不弹出——块内 let 泄漏面（块外读
+    /// 块内 let 放行 / 解释器 RUNTIME002）是独立登记的 divergence，本批
+    /// 不触碰；若弹出，读路径会新发 NAM003 error，即扩面。
+    /// 嵌套块各层各自快照/恢复（内层先恢复、外层后恢复，叠加正确）；
+    /// match 臂走 env.child()（check_match），臂块在独立子层上定义，
+    /// 同名遮蔽落子层不触外层，不经此恢复面。
     fn check_block(&mut self, block: &Block, env: &mut TypeEnv) -> TypeOrUnknown {
+        let mut saved: HashMap<String, Option<(TypeOrUnknown, bool)>> = HashMap::new();
         for stmt in &block.stmts {
+            // 块内 StLet：仅首个同名记快照（后续同名 let 遮蔽的是块内先者，
+            // 块退出时统一恢复到进块前的原条目）
+            if let Stmt::Let { name, .. } = stmt
+                && !saved.contains_key(name)
+            {
+                saved.insert(name.clone(), env.local_entry(name));
+            }
             self.check_stmt(stmt, env);
         }
-        match &block.tail {
+        let block_ty = match &block.tail {
             Some(e) => self.check_expr(e, env),
             None => TypeOrUnknown::known(Type::Unit),
+        };
+        for (name, entry) in saved {
+            if let Some((ty, mutable)) = entry {
+                env.define(name, ty, mutable);
+            }
         }
+        block_ty
     }
 
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
@@ -584,6 +614,9 @@ impl TypeChecker {
                 // （typechecker 放行 / 解释器 RUNTIME002），本批不触碰；若弹出，
                 // 读路径（check_expr 的 Ident else 分支）会新发 NAM003 error，
                 // 即扩面。
+                // R110（v1.4.14）：体内 Stmt::Let 的同名遮蔽由 check_block 的
+                // 块级快照/恢复统一处理（与下方 var 级快照独立叠加：
+                // 体恢复在前、var 恢复在后，p5n 三重同名形态两层恢复均正确）。
                 let saved = env.local_entry(var);
                 env.define(var.clone(), elem_ty, false);
                 self.check_block(body, env);
