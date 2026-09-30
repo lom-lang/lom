@@ -15,6 +15,7 @@
 #   D. self_interp/self_comp 行数：wc 口径（换行符计数）→ HANDOVER §9 +
 #      README/HANDOFF_PROMPT 的 self_comp 行数宣称位（R76/十二审）
 #   E. 版本号：Cargo.toml（+ Cargo.lock 一致性）→ HANDOVER §1/§9
+#      + README 门面 Current release 行 + latest-milestone 句（工具治理批）
 #   G. 测试数（Q4，2026-09-08）：源码 #[test] 静态计数 → HANDOVER §2.2 期望行 /
 #      §9 检查单 / README 状态段（测试数同步教训三连——R 审查两抓 + N1 三处手改）
 #   F. changelog 对账（N3，2026-09-07）：LANGUAGE_SPEC §13 条目 ↔ 版本/tag 双向——
@@ -27,6 +28,11 @@
 #   I. 源码计数（V2，2026-09-15）：diff_gen POOL_BASE 模板族数 / diff_test 探针
 #      数 / SPEC_FOR_AI §11f 分歧条数 → 文档现值宣称（含中文数字形态）——
 #      R27/R28 型口径漂移的钉子
+#   J. 跨文档互锁组（工具治理批 2026-09-30，R103/R106 根治）：verify_selfcomp
+#      计数 / quine 字节 / Rust 单元+集成计数——组内全部当前值位互锁同值
+#      （真值源 = 宣称位互相对照，沿 R76 先例；历史时点标注位不进组）。
+#      教训："gate 覆盖面 ≠ 全部出现面"——G/D 类只盯部分位置时，未覆盖位
+#      两度同型腐坏（R103 README 集成数、R106 HANDOVER §9-5 整段等）。
 #   Z. 自指项数（V2）：本工具总项数与 HANDOVER §2.2 宣称互锁——R16"监控不了
 #      自身项数"盲区关闭
 #
@@ -187,6 +193,13 @@ def main():
     # Ⓒ 一页纸（2026-09-15；日期位随九审交接校准 2026-09-21）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
     expect_all('positioning 版本位', 'docs/positioning.html',
                r'截至 <strong>20\d{2}-\d{2}-\d{2}（v([\d.]+)）</strong>', [cargo_ver])
+    # 工具治理批（2026-09-30，R103/R106 根治）：README 正文 milestone 句——
+    # E 类此前只盯门面 Current release 行，正文段 milestone 版本是升版漏改位
+    # （v1.4.10 交付时实测残留 v1.4.9，本锚补位时修正）。回填纪律：fix 提交时
+    # README 横幅与 milestone 句必须同步写新版本（CI run 号可待门禁回填，
+    # 版本号不可——本锚以 Cargo.toml 为真值，提交树上无豁免窗口）。
+    expect_all('README latest milestone 版本', 'README.md',
+               r'latest committed `main` milestone is v([\d.]+)', [cargo_ver])
 
     # ---- F. changelog 对账（N3）----
     print('F. changelog 对账（LANGUAGE_SPEC §13）')
@@ -288,6 +301,86 @@ def main():
     expect_all('I §11f/探针 @ HANDOVER §9-5', 'docs/HANDOVER.md',
                r'§11f (一|二|三|四|五|六|七|八|九|十)条分歧全档案，探针 (\d+)/(\d+)',
                [cn(div_n), probe_n, probe_n])
+
+    # ---- J. 跨文档互锁组（工具治理批 2026-09-30：R103/R106 根治）----
+    # "gate 覆盖面 ≠ 全部出现面"：同一基线数字在多文档各有当前值位，此前
+    # G/D 类只盯部分位置，其余位置两度同型腐坏（R103 README 集成测试数、
+    # R106 HANDOVER §9-5 整段/README milestone 句/HANDOFF_PROMPT 锚点段）。
+    # 本类把每组数字的全部当前值位收进互锁组：真值源 = 组内宣称位互相对照
+    # （沿 R76 self_comp 行数互锁锚先例），任何一处单改即 FAIL。历史时点
+    # 标注位不进组：带日期/版本标签的块引、SPEC §13 各版本条目、TODO 历史
+    # 交付段、"X→Y" 变迁记法（如 README 横幅 "362→364"）。宣称位措辞重构
+    # 时必须同步更新本清单（对账清单本身也是文档——§11.6 教训）。
+    def interlock(name, positions):
+        """positions = [(标签, 路径, 模式, slot 名单)]；各宣称位捕获组按 slot
+        归位对照，同 slot 全部同值才 PASS；模式未找到（措辞变/位删除）同样 FAIL。"""
+        problems = []
+        seen = {}
+        for label, path, pattern, slots in positions:
+            got = doc_number(path, pattern, re.S)
+            if got is None:
+                problems.append('%s@%s 模式未找到: %r' % (label, path, pattern))
+                continue
+            for slot, val in zip(slots, got):
+                if slot in seen and seen[slot] != val:
+                    problems.append('%s@%s %s=%s（他位 %s）'
+                                    % (label, path, slot, val, seen[slot]))
+                else:
+                    seen.setdefault(slot, val)
+        if problems:
+            check(name, False, '；'.join(problems))
+        else:
+            check(name, True, '互锁一致（%d 处当前值位：%s）' % (len(positions), seen))
+
+    print('J. 跨文档互锁组（verify_selfcomp / quine / Rust 计数）')
+    interlock('J verify_selfcomp 计数组', [
+        ('HANDOFF_PROMPT 当前状态段', 'docs/HANDOFF_PROMPT.md',
+         r'\*\*(\d+)/(\d+) = (\d+) 单文件 \+ (\d+) 包 \+ (\d+) 负例\*\*',
+         ('total', 'total', 'single', 'pkg', 'neg')),
+        ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
+         r'已提交基线 (\d+)/(\d+) = (\d+) 单文件 \+ (\d+) 包 \+ (\d+) 负例',
+         ('total', 'total', 'single', 'pkg', 'neg')),
+        ('HANDOFF_PROMPT 锚点索引', 'docs/HANDOFF_PROMPT.md',
+         r'verify_selfcomp\s+(\d+) 项用例', ('total',)),
+        ('HANDOVER §1 版本行', 'docs/HANDOVER.md',
+         r'verify_selfcomp (\d+)/(\d+) = (\d+)\+(\d+)\+(\d+)、Rust',
+         ('total', 'total', 'single', 'pkg', 'neg')),
+        ('HANDOVER §9-3', 'docs/HANDOVER.md',
+         r'verify_selfcomp (\d+)/(\d+)、--bootstrap', ('total', 'total')),
+        ('HANDOVER §9-5', 'docs/HANDOVER.md',
+         r'已提交基线 verify_selfcomp (\d+)/(\d+) = (\d+) 单文件 \+ (\d+) 包 \+ (\d+) 负例',
+         ('total', 'total', 'single', 'pkg', 'neg')),
+    ])
+    interlock('J quine 字节组', [
+        ('HANDOFF_PROMPT 当前状态段', 'docs/HANDOFF_PROMPT.md',
+         r'强 quine (\d+) bytes 双侧一致', ('quine',)),
+        ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
+         r'自施加强 quine (\d+) bytes', ('quine',)),
+        ('HANDOVER §1 版本行', 'docs/HANDOVER.md',
+         r'Rust \d+\+\d+、quine (\d+) 不变', ('quine',)),
+        ('HANDOVER §9-3', 'docs/HANDOVER.md',
+         r'--bootstrap 14/14 quine (\d+) bytes', ('quine',)),
+        ('HANDOVER §9-5', 'docs/HANDOVER.md',
+         r'bootstrap 14/14，强 quine (\d+) bytes 双侧一致', ('quine',)),
+        ('README 现行横幅', 'README.md',
+         r'quine (\d+), stock hex', ('quine',)),
+    ])
+    interlock('J Rust 计数组（单元/集成）', [
+        ('HANDOFF_PROMPT 当前状态段', 'docs/HANDOFF_PROMPT.md',
+         r'Rust \*\*(\d+) 单元 \+ (\d+) 集成\*\*', ('unit', 'integ')),
+        ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
+         r'期望 (\d+)/(\d+)；另有集成[^\n]*×(\d+)', ('unit', 'unit', 'integ')),
+        ('HANDOVER §2.2 cargo test 行', 'docs/HANDOVER.md',
+         r'期望 (\d+)/(\d+)（v[\d.]+ 集成 (\d+) = r56', ('unit', 'unit', 'integ')),
+        ('HANDOVER §9-2', 'docs/HANDOVER.md',
+         r'另有 tests/ 集成 ×(\d+)', ('integ',)),
+        ('HANDOVER §9-5', 'docs/HANDOVER.md',
+         r'Rust (\d+)\+(\d+)、eval 双后端各', ('unit', 'integ')),
+        ('HANDOVER §1 版本行', 'docs/HANDOVER.md',
+         r'Rust (\d+)\+(\d+)、quine', ('unit', 'integ')),
+        ('README 状态段', 'README.md',
+         r'plus (\d+) process-level integration tests', ('integ',)),
+    ])
 
     # ---- Z. 自指项数（R16 盲区关闭：本工具总项数与 HANDOVER 宣称一致）----
     # R16 教训："doc_audit 监控不了自身项数的自指盲区"。本项把 §2.2 的

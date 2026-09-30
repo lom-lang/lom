@@ -7,7 +7,7 @@
 > 不再手写拷贝于此——其唯一事实源（RFC-0004 修订记录、HANDOVER §11.6、
 > SPEC §13、TODO 顶部、designs/0001~0012、verify_selfcomp 用例集）全部
 > 位于第一回合阅读清单内，信息零丢失、拷贝零漂移（此前 416 行版本的多
-> 拷贝漂移实录见当日提交记录）。交接门禁不变：doc_audit 67/67 + CI 全绿。
+> 拷贝漂移实录见当日提交记录）。交接门禁不变：doc_audit 71/71 + CI 全绿。
 > 完整维护流程、审查节奏与交接五件套规范见 [HANDOVER §12](HANDOVER.md)。
 > 新会话第一回合从复制下方代码块开始。
 >
@@ -121,7 +121,7 @@
    - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order，×16）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
-   - python tools/doc_audit.py（期望 67/67）
+   - python tools/doc_audit.py（期望 71/71）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
@@ -140,7 +140,7 @@
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
 【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
-  362 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+  364 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2
   end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确

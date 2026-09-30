@@ -4,6 +4,7 @@
 # 用法：
 #   python tools/diff_test.py --rounds 500 [--seed-base 1000]   # 正常模式：随机程序对拍
 #   python tools/diff_test.py --probe                            # 探针模式：验证 §11f 白名单仍如档案所述
+#                                                                #   + 包模式定向探针 ×2（R104/R105 撞名形态）
 #   python tools/diff_test.py --rounds 20 --ci                   # CI 冒烟（固定小轮次）
 #
 # 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态，
@@ -111,8 +112,26 @@ def _pair_for_probe(kind: str, seed: int):
     return path
 
 
+def _pkg_probe_project(kind: str):
+    """包模式定向探针（工具治理批 2026-09-30，R104/R105 形态）：落盘工程并
+    返回 main.lom 路径。工程目录名沿用 liba/libb——libb 的包根路径序天然
+    大于 liba，正是 v1.4.10 注册确定序（designs/0014）的赢家判定所依赖的序。
+    """
+    files = diff_gen.gen_pkg_probe(kind)
+    root = os.path.join(TMP, "pkg_probe_%s" % kind)
+    for rel, content in files.items():
+        p = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+    return os.path.join(root, "main.lom")
+
+
 def run_probes() -> int:
-    """探针模式：验证 §11f 八条白名单中的六条可执行分歧仍如档案所述。
+    """探针模式：验证 §11f 八条白名单中的六条可执行分歧仍如档案所述，
+    另跑包模式定向探针 ×2（pkg_name_clash / pkg_alias_shadow——R104/R105
+    撞名形态的回归锁，方向与分歧探针相反：v1.4.10 修复后双后端必须同值
+    且取指定位，差异或错值即回退）。
 
     （分歧 4 trim Unicode 需非 ASCII 输入，由文档 + eval 既有用例覆盖，不在探针集；
     分歧 2 json-number 在集内；分歧 8 argv[0] 为结构性路径差异，由生成器构造性
@@ -211,6 +230,31 @@ def run_probes() -> int:
         report("deep-recursion", False, "预期双侧 rc!=0 stdout 一致，实际 interp rc=%d wasm rc=%d out_eq=%s"
                % (i_rc, w_rc, i_out == w_out))
 
+    # 7. pkg_name_clash（R104 形态回归锁，工具治理批 2026-09-30）：liba/libb
+    #    各定义同名 Int 单参 fn（liba 得 21 / libb 得 41），主文件双 import——
+    #    预期双后端同值恒 41（包根路径序靠后的 libb 赢；修复前解释器跨运行
+    #    非确定）。期望值硬断言：双侧同取 21（错侧赢）也判 FAIL。
+    p = _pkg_probe_project("pkg_name_clash")
+    i_out, i_rc = run_interp(p)
+    w_out, w_rc = run_wasm(p)
+    if i_out == w_out and i_rc == 0 and w_rc == 0 and i_out.strip() == "41":
+        report("pkg_name_clash", True, "双后端同值 41（libb 路径序靠后赢，R104 确定序保持；PKG007 warning 在 stderr）")
+    else:
+        report("pkg_name_clash", False, "预期双侧 rc=0 stdout=41（libb 赢），实际 interp rc=%d out=%r / wasm rc=%d out=%r"
+               % (i_rc, i_out.strip()[:40], w_rc, w_out.strip()[:40]))
+
+    # 8. pkg_alias_shadow（R105 形态回归锁）：import 别名 local 被本地 fn local
+    #    遮蔽（别名得 37 / 本地得 107）——预期双后端同值恒 107（本地定义优先；
+    #    修复前解释器走别名、WASM 走本地）。期望值硬断言同上。
+    p = _pkg_probe_project("pkg_alias_shadow")
+    i_out, i_rc = run_interp(p)
+    w_out, w_rc = run_wasm(p)
+    if i_out == w_out and i_rc == 0 and w_rc == 0 and i_out.strip() == "107":
+        report("pkg_alias_shadow", True, "双后端同值 107（本地定义赢，R105 对齐保持；NAM006 warning 在 stderr）")
+    else:
+        report("pkg_alias_shadow", False, "预期双侧 rc=0 stdout=107（本地赢），实际 interp rc=%d out=%r / wasm rc=%d out=%r"
+               % (i_rc, i_out.strip()[:40], w_rc, w_out.strip()[:40]))
+
     return failures
 
 
@@ -277,9 +321,9 @@ def main():
     os.makedirs(TMP, exist_ok=True)
     try:
         if args.probe:
-            print("probe 模式：验证 §11f 已知分歧白名单（6 条可执行探针）")
+            print("probe 模式：验证 §11f 已知分歧白名单（6 条可执行分歧探针）+ 包模式定向回归探针 ×2（R104/R105 撞名形态，v1.4.10 起须双后端同值）")
             fails = run_probes()
-            n = 6
+            n = 8
             print("probe: %d/%d 验证通过" % (n - fails, n))
             print("RESULT: %s" % ("PASS" if fails == 0 else "FAIL"))
             sys.exit(0 if fails == 0 else 1)

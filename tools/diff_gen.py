@@ -25,6 +25,11 @@
 #   全集见 tools/diff_test.py run_probes），供 diff_test 验证 §11f 白名单
 #   仍然如档案所述（守护白名单本身不腐坏）。deep-recursion 探针验证双后端
 #   结构化诊断 vs V8 trap——退出码都非 0，stdout 应一致为空/前缀。
+# - 包模式定向探针（工具治理批 2026-09-30，R104/R105 修复回归锁）：
+#   gen_pkg_probe 生成 pkg_name_clash / pkg_alias_shadow 两形态——与 §11f
+#   分歧探针方向相反（v1.4.10 修复后解释器与宿主 WASM 必须同值，差异即
+#   回退），由 diff_test --probe 消费；D5 随机生成池仍构造性规避撞名
+#   （mkfn 逐号命名），探针是两形态的唯一差分覆盖。
 # - 固定种子可复现（random.Random(seed)）；零第三方依赖（Python 标准库）。
 # - 数值安全：Int 结果 |x| < 2^59（对齐 §11f-7 的 WASM 安全值域；乘法操作数 ≤10^4、
 #   链深 ≤3、阶乘 n ≤15）；解释器全 i64 无此限，保守口径取双后端交集。
@@ -2641,7 +2646,62 @@ fn main() -> Unit
     println(down(0))
 end
 """
-    raise SystemExit("unknown probe kind: %s (mut-capture|div-zero|large-float|deep-recursion)" % kind)
+    raise SystemExit("unknown probe kind: %s "
+                     "(mut-capture|div-zero|large-float|json-number|int-range|deep-recursion;"
+                     " 包模式定向探针 pkg_name_clash|pkg_alias_shadow 走 gen_pkg_probe)" % kind)
+
+
+# ---------- 包模式定向探针（R104/R105 形态，工具治理批 2026-09-30）----------
+# 与 §11f 分歧探针方向相反：两形态经 v1.4.10 修复（designs/0014：包注册按
+# 包根路径序 sort + 本地定义优先 + NAM006/PKG007 双 warning）后，解释器与
+# 宿主 WASM 必须同值——探针锁"撞名三侧一致"不回退。D5 随机生成池对撞名
+# 构造性规避（mkfn 逐号命名 pf_N），这两形态此前全库零差分覆盖（二十一审
+# 开账 R104/R105 的覆盖洞），修复落地后以定向探针补上。
+
+def gen_pkg_probe(kind: str) -> dict:
+    """生成一个包模式定向探针工程。返回 {相对路径: 内容} 的文件树。
+
+    pkg_name_clash（R104 形态）：liba/libb 各定义同名 Int 单参 fn（体不同，
+    liba 得 21 / libb 得 41），主文件双 import 调用——期望双后端同值恒 41
+    （包根路径序靠后的包赢；工程目录名 liba/libb 使 libb 的根路径序天然
+    大于 liba）。修复前解释器 HashMap 遍历序决定覆盖方向、同后端跨运行
+    非确定；预期另有 PKG007 warning（stderr，不影响 stdout/rc 对拍）。
+    pkg_alias_shadow（R105 形态）：主文件 `from liba import {pf_x as local}`
+    + 本地 `fn local`（体不同，别名得 37 / 本地得 107）——期望双后端同值
+    恒 107（本地定义优先）。修复前解释器静默走别名、WASM 走本地（遮蔽
+    方向相反）；预期另有 NAM006 warning。
+    """
+    if kind == "pkg_name_clash":
+        return {
+            "lom.toml": 'name = "app"\nversion = "0.1.0"\n\n[dependencies]\n'
+                        'liba = { path = "liba" }\nlibb = { path = "libb" }\n',
+            "liba/lom.toml": 'name = "liba"\nversion = "0.1.0"\n',
+            "liba/a.lom": "fn pf_x(x: Int) -> Int\n    x * 2 + 1\nend\n",
+            "libb/lom.toml": 'name = "libb"\nversion = "0.1.0"\n',
+            "libb/b.lom": "fn pf_x(x: Int) -> Int\n    x * 3 + 11\nend\n",
+            "main.lom": "# probe: pkg_name_clash（R104 形态——预期双后端同值 41，libb（路径序靠后）赢）\n"
+                        "from liba import { pf_x }\n"
+                        "from libb import { pf_x }\n\n"
+                        "fn main() -> Unit\n"
+                        "    println(pf_x(10))\n"
+                        "end\n",
+        }
+    if kind == "pkg_alias_shadow":
+        return {
+            "lom.toml": 'name = "app"\nversion = "0.1.0"\n\n[dependencies]\n'
+                        'liba = { path = "liba" }\n',
+            "liba/lom.toml": 'name = "liba"\nversion = "0.1.0"\n',
+            "liba/a.lom": "fn pf_x(y: Int) -> Int\n    y * 5 + 2\nend\n",
+            "main.lom": "# probe: pkg_alias_shadow（R105 形态——预期双后端同值 107，本地定义赢）\n"
+                        "from liba import { pf_x as local }\n\n"
+                        "fn local(y: Int) -> Int\n"
+                        "    y + 100\n"
+                        "end\n\n"
+                        "fn main() -> Unit\n"
+                        "    println(local(7))\n"
+                        "end\n",
+        }
+    raise SystemExit("unknown pkg probe kind: %s (pkg_name_clash|pkg_alias_shadow)" % kind)
 
 
 def main():
@@ -2650,11 +2710,22 @@ def main():
     ap.add_argument("--count", type=int, default=10)
     ap.add_argument("--out", default=".diff_gen")
     ap.add_argument("--probe", default=None,
-                    help="探针模式：mut-capture|div-zero|large-float|deep-recursion")
+                    help="探针模式：mut-capture|div-zero|large-float|json-number|int-range|"
+                         "deep-recursion，包模式定向探针 pkg_name_clash|pkg_alias_shadow")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     if args.probe:
+        if args.probe.startswith("pkg_"):
+            files = gen_pkg_probe(args.probe)
+            base = os.path.join(args.out, "pkg_probe_%s" % args.probe)
+            for rel, content in files.items():
+                p = os.path.join(base, rel)
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                with open(p, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(content)
+            print("pkg probe written: %s/main.lom（工程 %d 文件）" % (base, len(files)))
+            return
         text = gen_probe(args.probe, args.seed)
         path = os.path.join(args.out, "probe_%s.lom" % args.probe)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
