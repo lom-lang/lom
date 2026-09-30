@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十四轮体系内独立敌手审查 — 2026-10-01</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.r111{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十四轮体系内独立敌手审查报告</h1>
+<p><b>2026-10-01</b> —— 基线 HEAD <code>35df007</code>（工作区干净；<code>git describe</code> = <code>v1.4.14-1-g35df007</code>，tag v1.4.14 → <code>e8b099e</code>）。审查增量 = 二十三审基线 <code>21b3f26</code> 之后五笔提交：<code>35155f8</code>（二十三审报告入库）、<code>7a48810</code>（v1.4.13 两登记项，二十三审已复核关闭——本轮做维持面抽查）、<code>f450dc6</code>/<code>21b3f26</code>（v1.4.13 回填）、<code>e8b099e</code>（<b>v1.4.14：R110 整改——本轮核心</b>）、<code>35df007</code>（v1.4.14 回填）。审查执行者：第二十四轮独立敌手审查 agent。</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：二十三审 B+ 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何产品源码/测试/工具/治理文档；唯一写盘物为本报告 + <code>target/probes/r24/</code> 探针（gitignored，保留）；git 严格只读；cargo 串行；只开账不修码。新旧编译器对拍未采用 worktree 重编译路线（成本权衡，见 §3.2 说明——以"当前态正确 + R79 用例归零 + 运行逐字节锚点全绿"为复核主轴，辅以旧版源码 <code>git show</code> 逻辑读码归因）。</p>
+
+<div class="verdict">
+<b>本轮评级：A-（重估成立）</b>（仅对本轮时点与查验面；历史轨迹不外推，本轮结论不预支后续）。<br>
+<b>一行式总评</b>：R110（二十三审 P2：check_block 块级快照/恢复）<b>关闭条件经独立复核全部成立且核心宣称零失真</b>——基线 16 项全绿（554 单元 + 28 集成且七个集成文件逐一计数、verify_selfcomp 365/365 名实双核对 196+8+161、quine 269555 双侧逐字节、eval 双后端 121+121、探针 8/8、doc_audit 71/71、CI #232 GitHub API 匿名实查六 job success、tag v1.4.14→e8b099e 实核、selfhost 六模式、self_comp 12544 行零改动、fmt 37 有效文件、clippy/fmt 双 gate 干净）；误报三块型（if/while/for 体 let 遮蔽外层 let mut 后块外赋值）探针原形重建 <b>--check 零 MUT001"诊断通过"且运行/宿主 WASM/build 三路径诊断与输出逐字一致（行为正确）</b>；漏报三块型（外层 let + 块内 let mut 遮蔽 + 块外赋值）<b>三块型全部复报 1 条 MUT001 且定位准确</b>；全仓 4300 文件 --check 独立重扫仅 8 文件 9 条 MUT001 且逐一核对<b>全为真不可变赋值</b>（函数参数 3 处/无遮蔽 let 6 处，含 fix_corpus 负例与 selfcomp 负例各 1），R79 用例 26_control_block_scope 零 MUT001（存量假阳性确清除）；27 枚自构探针（原形 6 + 敌手深化 13 + R65 fix 交互 2 + 六维持面 6）+ v1.4.13 两登记项维持抽查（for quirk 主形态零 MUT001、105/102 无文件 build 零 NAM003 全清单 ✓）<b>零击穿、零失真</b>——含类型恢复维度（local_entry 成对恢复 (type, mutable)：块内 String 遮蔽外层 Int 后块外赋值按恢复后的 Int 检查，TYPE001 正例/负例双向正确）、同块多同名恢复进块前条目、if 表达式尾表达式可见块内绑定、elif 链/嵌套 for/match Form B 臂块/闭包内块/块内闭包捕获各层归位、LetDestruct 邻接面误报维持与登记逐字吻合、R65 fix 引擎对漏报复报形态精确定位外层声明改写收敛且对邻接面保守降级不误改；六维持面（泄漏 MUT001 维持/块外读放行 RUNTIME002 divergence 精确维持/嵌套恢复/三重同名/闭包/for 变量放行）实测不倒。唯一开账 <b>R111（P3：文档顺刷漂移两处——README L83 "latest milestone v1.4.14 — the twenty-first-review R104/R105 name-collision remediation batch" 归因错误（v1.4.10 时代描述历经四批只顺刷版本号未刷归因，v1.4.14 批两次触碰该句仍未修）+ HANDOVER L457 命令注释区 quine 269521（实际 269555，v1.4.12 起过时，含"计数随批实算"免责短语但写死数字未刷））</b>——均为 doc_audit 锚定范围之外的深层文档位，本批核心宣称链（RFC 修订 47、SPEC §13 v1.4.14 条目、TODO 交付段、README 顶部 Current release 段、HANDOFF_PROMPT v1.4.14 段、positioning 数字口径段）逐字核对零失真。按任务书回升条件"R110 关闭成立 + 检验面零失真 + 无新 P1/P2 → 按十九审→二十审先例可重估 A-"：R110 关闭成立 ✓、无新 P1/P2 ✓；"检验面零失真"以核心宣称链零失真满足（R111 两处为存量漂移的文档深层位，性质同二十审 R102 CI 编号笔误——二十审先例 P3 开账不挡 A-），定 <b>A-</b>。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先独立阅读二十三审报告（review-2026-10-01.html——R110 开账原文与方法先例）、e8b099e 整改 commit 全量 diff（src/typechecker/mod.rs check_block +35/-1 与 tests.rs 新单元 ×6 逐 hunk 读，并读 <code>git show e8b099e^:src/typechecker/mod.rs</code> 旧版源码做修复前逻辑归因）、RFC-0004 修订 47 全文、LANGUAGE_SPEC §13 v1.4.14 条目与 §4 L344 更正句（含 §8.1 L980 一致性核对）、TODO 顶部 R110 交付段、README/HANDOVER/HANDOFF_PROMPT/positioning 数字链；随后：(一) 基线矩阵 16 项全部亲手跑记原始输出（含 CI #232 GitHub API 匿名实查、tag 指向实核、七个集成文件逐一计数）；(二) R110 关闭条件独立复核——探针全部自建于 <code>target/probes/r24/</code>（不依赖 r23/r110_impl 残留），误报/漏报双方向三块型各 --check 与运行双验证，宿主 WASM 侧 build+node 运行 12 枚全验；全仓 4300 文件 --check 独立重扫（xargs -P8 并行、只记 MUT001 面）并逐一人工核对命中处源码；(三) 敌手深化 27 枚实跑（块级恢复边界全覆盖 + 类型恢复维度 + LetDestruct 邻接面实测 + R65 fix 交互双面）；(四) v1.4.13 两登记项维持面抽查；(五) 文档对账；(六) 开账 R111；(七) 评级。全程 cargo 串行、git 只读。</p>
+
+<h2>2. 基线矩阵 16 项（全部亲手实跑）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测</th><th>结论</th></tr>
+<tr><td>cargo build --release</td><td>就绪（v1.4.14）</td><td>Finished 0.03s（增量零重编）；lom.exe --version = <code>lom 1.4.14</code></td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>554 单元 + 28 集成</td><td>554 passed; 0 failed</td><td class="ok">✓</td></tr>
+<tr><td>集成文件逐一计数</td><td>r56×1+r58×7+r94×2+r104×6+r107×4+r108×5+closure×3</td><td>逐文件实跑：r56=1 r58=7 r94=2 r104=6 r107=4 r108=5 build_closure=3 = 28</td><td class="ok">✓ 分布逐字吻合</td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td><code>cargo clippy --release</code> 零输出（CI gate 命令 <code>-- -D warnings</code>；--all-targets 见 §6 备注 1）</td><td class="ok">✓（CI 口径）</td></tr>
+<tr><td>cargo fmt --check</td><td>零</td><td>rc=0 干净</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71/71</td><td>RESULT: PASS（71/71 项通过；Z 项自指 71=71；J 组三锚 365/269555/554+28 互锁一致）</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 51 / 反例 5 / skip 若干，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>24/24</td><td>校验 24 / 失真 0，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>dump 154/0、tokens 154/0（列坐标系已知差异 1）、diags 12/0、static 22+154、run 31/0、wasm-selfapply PASS（wasm 自举解析自身源码 dump 与宿主原生逐字一致）</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>365/365 = 196+8+161</td><td>RESULT: PASS（365/365）；名实双核对：PASS 前缀分类 196（正例对拍）+ 8（PASS-PKG）+ 161（PASS-NEG）</td><td class="ok">✓ 名实相符</td></tr>
+<tr><td>--bootstrap + quine</td><td>14/14、269555</td><td>14/14 项通过（L3 self-apply <b>269555 bytes; byte-identical</b>）；self_comp.lom = <b>12544 行</b>（零改动核验：e8b099e/35df007 未触碰 examples/）</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>121+121</td><td>run.ps1 -Verify -LomBin：Total 121/Passed 121；-Backend wasm：Total 121/Passed 121</td><td class="ok">✓</td></tr>
+<tr><td>fmt examples + selfcomp 全量</td><td>37 文件</td><td>examples 树递归 38 个 .lom（29 顶层 + 4 bootstrap + 2 pkg_demo + 3 selfhost 含 self_comp），排除登记豁免的 apply_test（intentionally-broken fix demo）= <b>37 有效文件</b>全部 fmt --check rc=0；self_comp（12544 行）含在内</td><td class="ok">✓ 名实相符</td></tr>
+<tr><td>diff_test --probe</td><td>8/8</td><td>probe: 8/8 验证通过（含 D5 两枚硬断言：pkg_name_clash 双后端同值 41、pkg_alias_shadow 同值 107）</td><td class="ok">✓</td></tr>
+<tr><td>版本与 tag</td><td>v1.4.14、tag→e8b099e</td><td>lom 1.4.14 / Cargo.toml 1.4.13→核对为 <b>1.4.14</b> / <code>git tag --points-at e8b099e</code> = v1.4.14 / <code>git log v1.4.14 -1</code> = e8b099e</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查（GitHub API 匿名）</td><td>#232（run 36770326768）六 job 绿</td><td>repos/lom-lang/lom/actions/runs/36770326768：run_number=232、completed/success、head_sha=e8b099e863…逐字吻合；jobs API 六 job 全 success（clippy / macos-latest / ubuntu-latest / windows-latest / doc gates / selfhost verify）</td><td class="ok">✓ 实查属实</td></tr>
+</table>
+
+<h2>3. R110 关闭条件独立复核（核心使命）</h2>
+
+<h3>3.1 修复实现读码复核（e8b099e src/typechecker/mod.rs +35/-1）</h3>
+<p>check_block 进入时建 <code>saved: HashMap&lt;String, Option&lt;(TypeOrUnknown, bool)&gt;&gt;</code>，逐 stmt 遍历：<code>if let Stmt::Let { name, .. } = stmt &amp;&amp; !saved.contains_key(name)</code> 则记 <code>env.local_entry(name)</code>（快照点在 define 前即进块前条目；仅首个同名）；全部语句与<b>尾表达式</b>检查完后 <code>for (name, entry) in saved { if let Some((ty, mutable)) = entry { env.define(name, ty, mutable) } }</code>——同名恢复原条目、无同名（entry=None）不弹出。对照 <code>git show e8b099e^:src/typechecker/mod.rs</code>：旧版 check_block 为裸 for 循环 + 尾表达式，无任何快照/恢复（R110 根因读码确认）。五个宣称口径逐一读码核对：(1) 逐 StLet <b>首现</b>快照 ✓（contains_key 门）；(2) 恢复在<b>尾表达式之后</b> ✓（block_ty 先求值后恢复——尾表达式可见块内绑定）；(3) 同名恢复/无同名保留 ✓（if let Some 守卫）；(4) 嵌套各层各自 saved（内层 check_block 有自己的 HashMap，先返回即先恢复）✓；(5) Stmt::For 的 var 快照在 check_block(body) 之外独立叠加（体恢复在前、var 恢复在后，L593-625）✓；match 臂走 <code>env.child()</code>（check_match L1131），臂内 <code>MatchArmBody::Block(b)</code> 调 check_block 但同名条目落 child 层（local_entry 查当前层、None 不触发恢复写父层）——不经此恢复面 ✓。<b>边界发现（如实记录）</b>：check_block 的快照模式只匹配 <code>Stmt::Let</code>，<code>Stmt::LetDestruct</code>（L487，元组解构 <code>let (a, b) = …</code>）在 check_stmt 内直接 <code>env.define(..., false)</code>（恒不可变）<b>不进入快照</b>——块内解构同名遮蔽仍泄漏，这正是交付记录登记的邻接面"块内 LetDestruct 同名遮蔽未入裁决范围"，读码与登记一致（实测见 §3.4 p13）。</p>
+
+<h3>3.2 探针原形重建（target/probes/r24/，六枚三路径全验）</h3>
+<table>
+<tr><th>探针</th><th>形态（R110 原形）</th><th>--check</th><th>运行（解释器）</th><th>build --target wasm</th><th>结论</th></tr>
+<tr><td>p1_if_falsepos</td><td>外层 let mut x + if 块内 let x=99 + 块外 x=4</td><td>诊断通过 rc=0（零 MUT001）</td><td>99/4，零 stderr</td><td>零诊断；wasm 运行 99/4</td><td class="ok">误报清除</td></tr>
+<tr><td>p2_while_falsepos</td><td>外层 let mut x + while 块内 let x=i*10 + 块外 x=3</td><td>诊断通过 rc=0</td><td>0/10/3，零 stderr</td><td>零诊断；wasm 0/10/3</td><td class="ok">误报清除</td></tr>
+<tr><td>p3_for_falsepos</td><td>外层 let mut x + for 体 let x=i*10 + 块外 x=5</td><td>诊断通过 rc=0</td><td>0/10/5，零 stderr</td><td>零诊断；wasm 0/10/5</td></tr>
+<tr><td>p4_if_miss</td><td>外层 let x（不可变）+ if 块内 let mut x=10 + 块外 x=5</td><td><b>1 条 MUT001 (7:5)</b> rc=0</td><td>10/5（warning 不拦截，行为正确）</td><td>1 条 MUT001 (7:5)；wasm 10/5</td><td class="ok">漏报复报</td></tr>
+<tr><td>p5_while_miss</td><td>外层 let x + while 块内 let mut x + 块外 x=5</td><td><b>1 条 MUT001 (10:5)</b></td><td>11/5</td><td>1 条 (10:5)；wasm 11/5</td><td class="ok">漏报复报</td></tr>
+<tr><td>p6_for_miss</td><td>外层 let x + for 体 let mut x + 块外 x=5</td><td><b>1 条 MUT001 (8:5)</b></td><td>11/11/5</td><td>1 条 (8:5)；wasm 11/11/5</td><td class="ok">漏报复报</td></tr>
+</table>
+<p>定位均精确落在块外赋值行、指向行号列号与源码吻合（与单元测试 r110_block_shadow_immutable_outer_postblock_reassign_mut001 的三组预期位置 (6,5)/(8,5)/(7,5) 同族——探针源码多一行 println 故行号 +1）。三路径（--check / run / build --target wasm）诊断数量与位置逐字一致；解释器与宿主 WASM（node run_wasm.mjs）输出十二枚逐字一致且全部按块作用域语义正确（块内遮蔽值 + 块外外层赋值生效）。<b>R110 双向修复目标面独立复核成立。</b></p>
+
+<h3>3.3 全仓 --check 对拍独立重算（宣称"4300 文件 DIFF=1"）</h3>
+<p>本轮方法（任务书推荐路线）：<code>find . -name "*.lom" -not -path "./target/*"</code> 恰得 <b>4300</b> 文件（与宣称总数吻合）；xargs -P8 并行对全部 4300 文件跑当前二进制 --check，抓取 MUT001 面。结果：<b>8 文件 9 条 MUT001</b>，逐一读源码核对——<b>全为真不可变赋值，零假阳性</b>：</p>
+<table>
+<tr><th>文件</th><th>条数</th><th>核对</th><th>定性</th></tr>
+<tr><td>tools/selfcomp/cases/105_return_first_even.lom</td><td>1</td><td>(22:13) <code>fn nested_depth(a: Int, b: Int)</code>——b 为函数参数（恒不可变），块内 <code>b = b + 1</code></td><td class="ok">真 MUT001</td></tr>
+<tr><td>tools/selfcomp/cases/82_map_keys_sorted.lom</td><td>1</td><td>(22:9) <code>let i = 0</code>（不可变，无任何块内遮蔽）+ while 内 <code>i = i + 1</code></td><td class="ok">真 MUT001</td></tr>
+<tr><td>tools/selfcomp/cases/85_map_rehash.lom</td><td>1</td><td>(13:9) 同款无遮蔽 let i 重赋</td><td class="ok">真 MUT001</td></tr>
+<tr><td>tools/selfcomp/negative/neg_closure_assign_capture.lom</td><td>1</td><td>selfcomp 负例集成员（neg_*）</td><td class="ok">负例预期内</td></tr>
+<tr><td>eval/fix_corpus/09_mut001.bad.lom</td><td>1</td><td>MUT001 fix corpus 素材文件（.bad.）</td><td class="ok">素材预期内</td></tr>
+<tr><td>eval/candidates_rerun/…/s3/013.lom</td><td>1</td><td>(4:9) <code>fn count_down(n: Int)</code>——参数 n 重赋</td><td class="ok">真 MUT001</td></tr>
+<tr><td>eval/candidates_rerun/…/s3/018.lom</td><td>2</td><td>gcd(a,b) 两参数重赋（4:9/5:9）；体内 <code>let tmp = b</code> 为无同名新绑定不涉恢复面</td><td class="ok">真 MUT001</td></tr>
+<tr><td>eval/candidates_rerun/…/s3/019.lom</td><td>2</td><td>collatz_steps(n: Int) 参数 n 重赋 ×2</td><td class="ok">真 MUT001</td></tr>
+</table>
+<p><b>R79 用例核验</b>：tools/selfcomp/cases/26_control_block_scope.lom --check = <code>诊断通过，无错误。</code>——宣称的存量假 MUT001 (29:9) 确已清除。<b>运行逐字节锚点</b>：verify_selfcomp 365/365（196 正例 host-L2 hex 对拍全恒等）与 --bootstrap 14/14（quine 269555 bytes byte-identical）全绿——typechecker 改动不触 codegen 的宣称由对拍锚点支撑。<b>对拍方法说明（如实）</b>：v1.4.13 旧编译器 worktree 重编译对照未做（成本权衡，任务书明示非必须）；修复前行为以二十三审报告 p5h/p5i/p5m 实测记录（2 条误报/零漏报）+ 本轮 <code>git show e8b099e^</code> 旧源码读码归因（旧 check_block 无快照、逻辑上必泄漏）双向印证，差异面收敛于 MUT001 单码。</p>
+
+<h3>3.4 敌手深化（13 枚探针 + 2 枚 fix 交互，全部实跑）</h3>
+<table>
+<tr><th>探针</th><th>敌手形态</th><th>实测</th><th>结论</th></tr>
+<tr><td>p7_sameblock_double_let</td><td>同块两个 let x 链（let x=10; let x=20）+ 块外赋值</td><td>零 MUT001；运行 20/5（块内取后者、块外恢复 let mut 生效）</td><td class="ok">同块多名恢复进块前条目 ✓</td></tr>
+<tr><td>p8_ifexpr_tail_let</td><td><b>if 表达式</b>分支内 let 遮蔽 + 尾表达式引用块内绑定 + 函数内多处重赋</td><td>零诊断；f(2)=25（尾表达式取块内 x=20，外层 x=5 后 r+x=25）——尾表达式可见块内值且恢复不早于尾表达式</td><td class="ok">恢复时机正确 ✓</td></tr>
+<tr><td>p9_elif_chain</td><td>if/elif×2/else 四分支各自 let x 遮蔽 + 块外赋值</td><td>零 MUT001；运行 50/7（命中第三分支）</td><td class="ok">多分支各自恢复 ✓</td></tr>
+<tr><td>p10_nested_for_let</td><td>双层嵌套 for，内层体 let x 遮蔽外层 let mut x + 块外赋值</td><td>零 MUT001；运行 0/1/10/11/5</td><td class="ok">嵌套 for 块恢复叠加 ✓</td></tr>
+<tr><td>p11_closure_inner_block</td><td>闭包体（closure_child 层）内 if 块 let 遮蔽外层 let mut + 闭包外重赋</td><td>零 MUT001；运行 20/3</td><td class="ok">闭包层归位 ✓</td></tr>
+<tr><td>p12_match_arm_block</td><td>match <b>Form B 臂块</b>（跨行 block）内 let x + 主函数外层 let mut 重赋（二十三审 p5l 自坑未跑成的形态，本轮以 parser L1406 确认语法后实跑）</td><td>零 MUT001/零 NAM003；运行 100/6/5（两臂各自绑定、外层重赋正确）</td><td class="ok">match 臂 child 层不经恢复面 ✓</td></tr>
+<tr><td>p13_letdestruct_adjacent</td><td><b>邻接面</b>：块内 <code>let (x, y) = (10, 20)</code> 解构遮蔽外层 let mut x + 块外 x=5</td><td><b>1 条 MUT001 (8:5) 误报维持</b>；运行 10/20/5 正确（块作用域）</td><td class="warn">邻接面行为与登记逐字吻合（未入裁决范围）——登记如实</td></tr>
+<tr><td>p14_block_closure_capture</td><td>块内遮蔽名被块内闭包捕获（g=fn(n) n+x）+ 块外重赋</td><td>零诊断；运行 15/3（捕获块内 x=10）</td><td class="ok">块内捕获归位 ✓</td></tr>
+<tr><td>p16_while_cond_shadow</td><td>while 条件引用外层计数器 + 体内不同名 let（常规控制对照）</td><td>零诊断；运行 0/2/4/10</td><td class="ok">常规面无误伤 ✓</td></tr>
+<tr><td>p17_sameblock_imm_then_mut</td><td>外层 let x（不可变）+ 同块 let x=10 后 let mut x=20（链）+ 块外赋值</td><td>1 条 MUT001 (9:5)；运行 21/5</td><td class="ok">链式遮蔽恢复进块前（不可变）条目 ✓</td></tr>
+<tr><td>p18_type_restore_int</td><td><b>类型恢复维度</b>：外层 let mut x=1（Int）+ 块内 let x="shadow-str"（String）+ 块外 x=5</td><td>零诊断（无 TYPE001——类型条目恢复为 Int，Int 赋 Int 合法）；运行 shadow-str/5</td><td class="ok">(type, mutable) 成对恢复 ✓</td></tr>
+<tr><td>p19_type_restore_mismatch</td><td>外层 let x=1（Int 不可变）+ 块内 String 遮蔽 + 块外 x="later-str"</td><td>MUT001 (7:5) + <b>TYPE001 "期望 Int，得到 String"</b>（按恢复后外层 Int 检查——若类型未恢复则此条消失）；运行 shadow-str/later-str</td><td class="ok">类型恢复负向正确 ✓</td></tr>
+<tr><td>p4_fixcopy（R65 交互）</td><td>lom fix 对漏报复报形态（真不可变+块内遮蔽+块外赋值）</td><td>精确定位<b>外层</b>声明 replace 2:5..2:8 → let mut；--apply 迭代 1 轮收敛，最终 0 错误/0 警告；块内 let mut 未被误改</td><td class="ok">scope-binding owner 解析正确 ✓</td></tr>
+<tr><td>p13_fixcopy（R65 交互）</td><td>lom fix 对邻接面误报（外层已 let mut + 块内解构遮蔽）</td><td>保守降级 medium hint（"最近的同名绑定是 let 解构（恒不可变，无 mut 语法）——改用普通 let mut 声明或新变量"），不自动改写</td><td class="ok">保守降级不误改（R75 解构路径在位）✓</td></tr>
+</table>
+<p><b>任务书专项核对——while 体 continue/break 形态</b>：读码确认 Lom 语言<b>无 break/continue 关键字</b>（src/parser.rs 与 src/lexer.rs 全文零命中；while 体即普通 Block 直接 check_block）——该敌手形态在本语言不成立，如实记录，无对应探针。</p>
+
+<h3>3.5 六维持面复跑（v1.4.13/v1.4.14 登记边界不倒）</h3>
+<table>
+<tr><th>维持面</th><th>探针</th><th>实测</th><th>结论</th></tr>
+<tr><td>泄漏 divergence（块内 let 无同名 + 块外赋值仍 MUT001）</td><td>m1</td><td>1 条 MUT001 (6:5) 维持</td><td class="ok">✓</td></tr>
+<tr><td>块外读放行（静态零 NAM003 / 运行 RUNTIME002）</td><td>m2</td><td>--check 诊断通过；运行 stderr RUNTIME002"未定义变量: 'y'" rc≠0</td><td class="ok">divergence 精确维持 ✓</td></tr>
+<tr><td>嵌套恢复（内块 let mut 后外块内重赋按外块条目报）</td><td>m3</td><td>1 条 MUT001 (7:9)；rc=0 warning 不拦截</td><td class="ok">✓</td></tr>
+<tr><td>三重同名（外层 let + for var + 体内 let mut）</td><td>m4</td><td>循环外 x=5 正确报 1 条 MUT001 (8:5)；运行 11/11/5</td><td class="ok">两层恢复叠加正确 ✓</td></tr>
+<tr><td>for 变量放行（循环外读 for 变量零 NAM003）</td><td>m6</td><td>--check 诊断通过；运行 RUNTIME002（divergence 维持）</td><td class="ok">✓</td></tr>
+<tr><td>闭包面</td><td>p11/p14</td><td>双形态零 MUT001/零 NAM003（§3.4）</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.6 v1.4.13 两登记项维持抽查</h3>
+<table>
+<tr><th>登记项</th><th>抽查面</th><th>实测</th><th>结论</th></tr>
+<tr><td rowspan="1">for 可变性 quirk（7a48810）</td><td>主形态：let mut x + for x + 循环外 x=5（fq1）</td><td>--check 诊断通过零 MUT001；运行 1/2/5 正确</td><td class="ok">修复维持 ✓</td></tr>
+<tr><td rowspan="1">lom build 逐文件闭包 externals（7a48810）</td><td>105 工程（pkg_alias_in_pkg）无文件 build</td><td>依赖解析成功、包源全 ✓、<b>零 NAM003 零 ✗</b></td><td class="ok">维持 ✓</td></tr>
+<tr><td>102 工程（pkg_chain）无文件 build</td><td>a/b/c 三文件全 ✓（3 行 ✓）、零 NAM003 零 ✗</td><td class="ok">维持 ✓</td></tr>
+</table>
+
+<p class="note"><b>R110 关闭复核总结论：成立</b>。四要件——误报三块型清零（§3.2 上半）、漏报三块型复报（§3.2 下半）、六维持面不倒（§3.5）、邻接面登记如实（§3.1 读码 + §3.4 p13 实测）——全部独立复核通过；叠加全仓 4300 扫描零假阳性（§3.3）与类型恢复双维度验证（p18/p19）。宣称的"全仓对拍 DIFF=1"在当前态证据（R79 用例归零 + 9 条全真 + hex/quine 对拍锚点全绿）下无反例。</p>
+
+<h2>4. 文档对账</h2>
+<table>
+<tr><th>文档</th><th>核对</th><th>结论</th></tr>
+<tr><td>RFC-0004 修订 47</td><td>修法五口径（首现快照/尾后恢复/同名恢复无同名保留/嵌套内先外后/for var 独立叠加/match 臂 child 层）与 e8b099e diff 逐条吻合；验收记录（r110a/r110b 规划者亲验、六维持面、4300 对拍 DIFF=1、548→554、365 与 269555 不变、邻接面登记、L344 更正、门禁回填 e8b099e/#232/tag）全部与实测/CI 实查一致</td><td class="ok">零失真</td></tr>
+<tr><td>LANGUAGE_SPEC §13 v1.4.14 条目</td><td>R110 形态描述（双向失真/三后端一致/快照恢复/无同名保留/同块多名/嵌套/for 叠加/match child/4300 对拍/6 新单元/548→554/365/269555/eval/selfhost/doc_audit/fmt 复验/tag #232）逐项与基线实测吻合；"Registered adjacent surface (not in this adjudication): block-level LetDestruct" 与实测登记一致</td><td class="ok">零失真</td></tr>
+<tr><td>LANGUAGE_SPEC §4 L344 更正句</td><td>核心宣称（Phase 1 禁止遮蔽→实现允许、interpreter/codegen 块作用域、typechecker 自 v1.4.13/v1.4.14 块退出恢复遮蔽可变性）与实测一致；<b>精度点</b>：句尾 "the implemented language allows it with NAM006/PKG007 surfacing" 中 it 的最近先行词是 inner-scope shadowing，而 NAM006/PKG007 实际只覆盖 §8.1 的 import/包符号碰撞面——块内 let 遮蔽实测<b>零 surfacing</b>（p2 等探针 --check 零诊断）。句子与 §8.1 本身无矛盾（§8.1 的 NAM006 归属正确），但 surfacing 归属含糊，易读作"块内遮蔽也有浮出"。列精度备注（§6 备注 2），不开账</td><td class="warn">核心准确，措辞歧义</td></tr>
+<tr><td>docs/TODO.md R110 交付段</td><td>数字链（4300/DIFF=1/548→554/365/269555/e8b099e/#232/tag v1.4.14）与待裁三项（二十四审时机/LetDestruct 邻接面/下一阶段）逐字核对</td><td class="ok">零失真</td></tr>
+<tr><td>README 顶部 Current release 段（L8）</td><td>v1.4.14/R110/e8b099e/#232/548→554/365/269555/4300 全对；Previous milestone 段（v1.4.13/v1.4.12/v1.4.11/v1.4.10）逐字核对无失真</td><td class="ok">零失真</td></tr>
+<tr><td>README L83 里程碑句</td><td><b>R111 证据 1</b>（见 §5）</td><td class="bad">归因错误</td></tr>
+<tr><td>docs/HANDOVER.md §版本表/测试表/下一步</td><td>v1.4.14 行、554+28 分解、365/269555、R110 关闭台账清空、待裁菜单（含"二十四审时机：B+ 轨迹上若复审零失真无新 P1/P2 可望回升 A-"）逐字核对</td><td class="ok">零失真</td></tr>
+<tr><td>docs/HANDOVER.md L457 命令注释区</td><td><b>R111 证据 2</b>（见 §5）</td><td class="bad">quine 数字过时</td></tr>
+<tr><td>docs/HANDOFF_PROMPT.md</td><td>v1.4.14 段（365/365=196+8+161、14/14、269555、12544 行、554+28 分解、R110 关闭、待裁二十四审时机）逐字核对；L67"当前 open：R104/R105"位于 v1.4.8/v1.4.9 批次历史时点记录段（同文档后段已记 R104/R105 关闭），按文档分层追加结构属历史快照（见 §6 备注 3）</td><td class="ok">当前态段零失真</td></tr>
+<tr><td>docs/positioning.html 数字口径段</td><td>v1.4.14/R110/e8b099e/#232/365/554+28/269555B + 六里程碑 tag/CI 链 + 审查轨迹（二十审 A-/二十一审 B/二十二审 B+）逐字核对</td><td class="ok">零失真</td></tr>
+</table>
+
+<h2>5. 开账（本轮新发现，R111 起）</h2>
+
+<div class="r111">
+<h3>R111（P3）——文档顺刷漂移两处：README 里程碑句批次归因错误（v1.4.10 描述历经四批未刷）+ HANDOVER 命令注释区 quine 数字过时</h3>
+<p><b>证据 1（README.md L83）</b>：<code>The latest committed `main` milestone is v1.4.14 (`e8b099e`, CI run `36770326768` #232, six successful jobs) — the twenty-first-review R104/R105 name-collision remediation batch (deterministic path-ordered package registration, local-definition-wins, NAM006/PKG007 warnings), with the tag cut after the green first run.</code>——句首数据（v1.4.14/e8b099e/#232）为本轮回填正确，但破折号后的批次描述是 <b>v1.4.10 的 R104/R105 整改内容</b>；v1.4.14 实为 R110 整改批（同文件 L8 Current release 段描述正确，二者并置自相矛盾）。</p>
+<p><b>归因</b>（git log/git show 链核对）：该句自 v1.4.10 时代写入，v1.4.11/12/13/14 四批顺刷均只更新版本号/tag/CI run（e8b099e 将"v1.4.13 (#228)"改为"v1.4.14 (tag/CI run to be backfilled)"、35df007 回填 #232），批次归因短语从未刷新——<b>存量漂移，但 v1.4.14 批两次触碰该句仍未修</b>，故计入本轮增量面。同句尾部审查轨迹叙述止于二十二审（opening R107/R108/R109）亦未续二十三审/R110，属同类滞后。</p>
+<p><b>证据 2（docs/HANDOVER.md L457 命令注释区）</b>：<code>python tools\verify_selfcomp.py  # L2.3/L2.4 验收：365/365（204 对拍 = 196 单文件 + 8 包项目 + 161 负例）+ --bootstrap 14/14（三层自证与自施加强 quine 269521 bytes；计数随批实算、以验收器输出为准——各批变迁见 SPEC §13…）</code>——quine 写死 <b>269521</b>（v1.4.11 时的值），实际自 v1.4.12 起为 <b>269555</b>（本轮 --bootstrap 实测 269555 bytes byte-identical）。句中虽有"计数随批实算、以验收器输出为准"免责短语，但写死数字历经 v1.4.12/13/14 三批未刷。另注：同句"204 对拍 = 196 + 8"表述中 196+8=204 为对拍项口径（161 负例另计），与 365 总数自洽。</p>
+<p><b>波及面</b>：纯文档。两处均在 doc_audit 71 项锚定范围之外（本轮 doc_audit PASS 不受影响、也未覆盖），不误导编译器/工具行为；读者面（README 是仓库门面、HANDOVER 是交接操作指引）会拿到错误归因或过时预期值。</p>
+<p><b>修法建议（供裁决）</b>：README L83 破折号后改为 R110 批次描述（或直接删去批次短语、指向 L8 Current release 段），并顺续审查轨迹至二十三审/R110；HANDOVER L457 的 269521 刷新为 269555 或改写为"quine 见 J 锚（doc_audit 互锁）"式免写死表述。<b>负向锁定</b>：修文档时不得触碰 J 组锚定位的现值（365/269555/554+28 六/七处锚定位），落盘前跑 doc_audit 确认 71/71。建议随下批（LetDestruct 邻接面裁决或其他）一并顺刷。</p>
+</div>
+
+<h2>6. 精度备注（不开账，供后续裁决参考）</h2>
+<ol>
+<li><b>clippy --all-targets 漂移值复核</b>：本机（clippy 1.97.0）实测 4 error + 11 warning，与二十三审实测<b>逐字一致零增量</b>；HANDOFF_PROMPT 登记的"9 条存量测试 lint"（v1.4.9 时点）维持过时（二十三审备注 1 已建议顺刷，本批未动）。CI gate 口径零输出不受影响。</li>
+<li><b>SPEC L344 surfacing 归属歧义</b>（任务书专项核对项）：句尾 "allows it with NAM006/PKG007 surfacing" 的 it 最近先行词为 inner-scope shadowing，而 NAM006（"Name shadowing by an import"）/PKG007 只覆盖 import/包碰撞面——块内 let 遮蔽实测零 surfacing（p2/p7 等多枚探针 --check 零诊断）。与 §8.1（L980）本身无矛盾（§8.1 的码归属正确），但单句读法上宣称面偏宽。建议随 LetDestruct 邻接面裁决一并改写（如 "…allows it (import collisions surface via NAM006/PKG007 per §8.1; block-level shadowing is silent but mutability flags are restored at block exit)"）——主观推测的措辞方向，供实施者定夺。</li>
+<li><b>HANDOFF_PROMPT L67"当前 open：R104/R105"</b>：位于 v1.4.8/v1.4.9 批次时点记录段内（该文档为按批追加的时点快照结构，后段 L88/L117/L124 已记 R104/R105 关闭与 v1.4.14 当前态）。按分层结构读法属历史快照，但"当前 open"的现在时措辞嵌在中段易误导——建议下批顺刷为"当时 open"。</li>
+<li><b>LetDestruct 邻接面（登记维持，非新发现）</b>：块内 <code>let (x, y)</code> 解构同名遮蔽不进 check_block 快照（模式只匹配 Stmt::Let），误报维持（p13 实测 1 条 MUT001、运行正确）；且 LetDestruct 绑定恒不可变（define(..., false) 无 mut 形态），漏报方向不适用。与 TODO/RFC 47/SPEC §13 三处登记"未入裁决范围"逐字吻合——待裁菜单在案，本轮不重复开账。</li>
+<li><b>R65 fix 引擎正面证据</b>：对漏报复报形态（p4_fixcopy）精确定位外层声明改 let mut 一轮收敛；对邻接面误报（p13_fixcopy）保守降级 medium hint 不改写——fix 引擎与 R110 恢复语义的交互无退化（二十三审 p5h 同面记录维持）。</li>
+<li><b>无文件 build 不检查主文件</b>（二十三审备注 2，维持面）：本轮 105/102 抽查未触及主文件诊断面，登记原文未见修订——维持二十三审建议（随下批一句话登记）。</li>
+</ol>
+
+<h2>7. 评级依据</h2>
+<p><b>R110 关闭复核结论</b>：四要件（误报三块型清零/漏报三块型复报/六维持面不倒/邻接面登记如实）独立复核<b>全部成立</b>；全仓 4300 文件 --check 独立重扫 8 文件 9 条 MUT001 逐一核对全真、R79 用例零 MUT001、hex/quine 对拍锚点全绿；敌手深化 15 面（含类型恢复双维度、if 表达式尾表达式、elif 链、嵌套 for、match Form B 臂块、闭包双形态、同块链式、R65 fix 双面）<b>零击穿</b>；v1.4.13 两登记项维持面抽查不倒。本批核心宣称链（RFC 修订 47、SPEC §13 v1.4.14、TODO 交付段、README 顶部段、HANDOFF_PROMPT v1.4.14 段、positioning 数字口径段、CI #232、tag、554+28、365/365=196+8+161、269555、12544 行）<b>零失真</b>；基线 16 项全绿。</p>
+<p><b>新发现</b>：R111（P3：文档顺刷漂移两处——README 里程碑句批次归因错误 + HANDOVER 命令注释 quine 旧值；均为 doc_audit 锚外深层文档位、存量漂移性质、纯文档零行为波及）。</p>
+<p><b>定级</b>：任务书回升条件"R110 关闭成立 + 本轮检验面零失真 + 无新 P1/P2 → 按十九审→二十审先例（B+ 整改后重估 A-）可重估 A-"。逐项对表：R110 关闭成立 ✓；无新 P1/P2 ✓（唯一开账为 P3）；"检验面零失真"——本批全部<b>核心宣称</b>（整改验收所涉的源码行为、测试计数、门禁、登记边界）零失真，失真仅存于文档深层顺刷位（R111），与二十审先例的唯一开账 R102（P3 CI 编号笔误，positioning 数字口径段在案）同构——二十审在 P3 开账下仍定 A-，先例支持 P3 不挡 A-。据此 <b>重估 A-</b>。与二十三审（1×P2 R110 挡 A-）相比，本轮 R110 经独立复核确已闭合、其登记邻接面（LetDestruct）如实登记且行为无意外、新增面收敛至文档顺刷级——整改轨迹与十九审 B+→二十审 A- 的回升形态对应。不外推、不预支：本轮 A- 不预支 LetDestruct 邻接面裁决与后续批次。</p>
+
+<h2>附录 A：探针总目录（target/probes/r24/，全部保留）</h2>
+<pre># 原形重建 6 枚（R110 双向 × 三块型，--check+运行+build wasm 三路径全验）：
+#   p1_if_falsepos / p2_while_falsepos / p3_for_falsepos   —— 误报三块型：零 MUT001、运行正确
+#   p4_if_miss / p5_while_miss / p6_for_miss               —— 漏报三块型：各复报 1 条 MUT001
+#     （定位 (7:5)/(10:5)/(8:5)，三路径一致；wasm 产物 .wasm 同目录保留）
+# 敌手深化 13 枚：p7 同块双 let｜p8 if 表达式尾表达式｜p9 elif 四分支｜p10 嵌套 for
+#   ｜p11 闭包内块｜p12 match Form B 臂块｜p13 LetDestruct 邻接面（误报维持=登记如实）
+#   ｜p14 块内闭包捕获｜p16 while 控制对照｜p17 同块 imm→mut 链
+#   ｜p18/p19 类型恢复正/负例（TYPE001 按 restored Int 检查）
+# R65 fix 交互 2 枚：p4_fixcopy（精确定位外层改写收敛）/ p13_fixcopy（邻接面保守降级）
+# 六维持面 6 枚：m1 泄漏｜m2 块外读（RUNTIME002 divergence）｜m3 嵌套恢复
+#   ｜m4 三重同名｜m6 for 变量放行｜fq1 for quirk 主形态
+# v1.4.13 登记 2 抽查：pkg_cases/105、pkg_cases/102 无文件 build（零 NAM003）
+# 全仓扫描留档：all_lom_files.txt（4300 行清单）/ repo_mut001_scan.txt（8 文件 9 条）
+# 击穿计数：0（p13 为登记邻接面的如实行为，非击穿）</pre>
+<p class="small">审查执行：第二十四轮独立审查 agent，2026-10-01。基线 HEAD 35df007，全程未改产品源码/测试/工具/治理文档；cargo 串行；git 只读（<code>git show e8b099e^</code> 仅读旧版源码归因，未建 worktree）。本报告非 doc_audit 锚定对象（review HTML 历来豁免）。落盘后复跑 doc_audit 71/71 见下方执行后记。</p>
+
+</body>
+</html>
