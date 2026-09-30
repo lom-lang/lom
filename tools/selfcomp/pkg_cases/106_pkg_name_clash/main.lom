@@ -1,0 +1,11 @@
+# R104 批（二十一审，designs/0014）对拍 106：两包导出同名 fn（libp=11/libq=22）
+# 双 import 后调用——锁定面：撞名按包根路径序取后者（恒 22，期望输出 "22"），
+# 三侧一致（宿主解释器修复前 HashMap 随机序混跳 11/22；WASM/L2 本就路径序）。
+# L2 侧 fn 重名不拒（裁决 2 甲信任边界只锁跨包 enum 重名）。
+
+from libp import { shared }
+from libq import { shared }
+
+fn main() -> Unit ! [IO]
+    println(shared())
+end

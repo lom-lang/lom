@@ -1,0 +1,7 @@
+# R104 批（二十一审，designs/0014）：主项目清单——双依赖 libp/libq
+name = "app106"
+version = "0.1.0"
+
+[dependencies]
+libp = { path = "libp" }
+libq = { path = "libq" }

@@ -63,6 +63,27 @@ pub struct TypeChecker {
     /// 这些符号由解释器经 load_packages 注册；typechecker 不解析包，
     /// 对名单内符号跳过 NAM003（包源码在其包内已被检查过，签名此处不可知 → Unknown）
     pub(crate) external_symbols: std::collections::HashSet<String>,
+    /// R105 批（二十一审 R104/R105 整改，designs/0014 §2.3）：首遍收集的
+    /// 本地用户函数名（collect_fn_sig 填，含重复定义的每一次）。供首遍后
+    /// 统一终检判定"import 别名与本地定义同名"——顺序无关（p16/p16b 敏感收敛）。
+    pub(crate) user_fns: std::collections::HashSet<String>,
+    /// R105 批：首遍登记的 import 项（别名注册推迟到首遍后按"本地定义优先"
+    /// 语义统一处理——原地 insert 对 item 顺序敏感：import 在前时本地同名 fn
+    /// 误报 NAM002、fn 在前时别名覆盖本地签名）。
+    pub(crate) imported_aliases: Vec<ImportedAlias>,
+}
+
+/// R105 批：import 项登记（首遍收集、首遍后终检/注册）
+pub(crate) struct ImportedAlias {
+    /// 来源模块/包名（NAM006 文案用）
+    pub(crate) module: String,
+    /// 导入的真实符号名
+    pub(crate) name: String,
+    /// 本文件内的可用名（无 as 时 == name）
+    pub(crate) alias: String,
+    /// 所在 import 声明 span（NAM006 定位；AST 的 ImportItem 无独立 span，
+    /// 用 ImportDecl.span 锚到 from 行）
+    pub(crate) span: Span,
 }
 
 /// 函数签名
@@ -135,6 +156,8 @@ impl TypeChecker {
             file: file.to_string(),
             source_lines,
             external_symbols: std::collections::HashSet::new(),
+            user_fns: std::collections::HashSet::new(),
+            imported_aliases: Vec::new(),
         };
         tc.register_builtins();
         tc
@@ -149,6 +172,32 @@ impl TypeChecker {
                 Item::Fn(f) => self.collect_fn_sig(f),
                 Item::Enum(e) => self.collect_enum(e),
                 Item::Import(imp) => self.collect_import(imp),
+            }
+        }
+        // R105 批（designs/0014 §2.3）：首遍后统一终检——顺序无关。
+        // 裁决语义"本地定义优先"：import 别名与本地 fn 同名时不注册别名
+        // 签名（本地签名保留为最终生效者），并发 NAM006 warning（定位到
+        // import 项 span；不置 ok=false，照 NAM005 形态）。本地无同名定义
+        // 时按既有语义注册（真名在 functions 取签名继承；真名在
+        // external_symbols（包符号）时别名加入放行集）。
+        for ia in std::mem::take(&mut self.imported_aliases) {
+            if self.user_fns.contains(&ia.alias) {
+                self.push_diag(
+                    Severity::Warning,
+                    "NAM006".into(),
+                    format!(
+                        "import 别名 '{}' 与本地定义同名——本地定义优先（遮蔽 {}::{}）",
+                        ia.alias, ia.module, ia.name
+                    ),
+                    ia.span.line,
+                    ia.span.col,
+                );
+                continue;
+            }
+            if let Some(sig) = self.functions.get(&ia.name).cloned() {
+                self.functions.insert(ia.alias.clone(), sig);
+            } else if self.external_symbols.contains(&ia.name) {
+                self.external_symbols.insert(ia.alias.clone());
             }
         }
         // 第二遍：检查每个函数体
@@ -170,18 +219,52 @@ impl TypeChecker {
     // ===== 第一遍：签名收集 =====
 
     fn collect_fn_sig(&mut self, f: &FnDecl) {
+        // R105 批：本地用户函数名登记（含重复定义的每一次——终检按名字集
+        // 判定，与登记次序无关）
+        self.user_fns.insert(f.name.clone());
         if self.functions.contains_key(&f.name) {
-            self.push_diag(
-                Severity::Error,
-                "NAM002".into(),
-                format!("函数 '{}' 重复定义", f.name),
-                f.span.line,
-                f.span.col,
-            );
-            // B 包：与内建同名的冲突已按 NAM002 报 Error——该名字移出内建
-            // 模块映射，后续调用不再追加 NAM005 warning（病态程序单报不堆噪）
-            self.builtin_module.remove(&f.name);
-            return;
+            // R105 批（designs/0014 §2.5）NAM002 收敛：撞名 ∈ external_symbols
+            // （包符号——build 合并单元里包 item 在前、主文件 fn 在后命中此支）
+            // 时按用户裁决"撞名不拒只 warning"改发 NAM006，且本地签名覆盖
+            // 注册（本地定义优先，对齐解释器"主文件后注册恒覆盖"）。span 取
+            // 后写者（主文件侧）FnDecl.span，锚点渲染落在真实主文件源行——
+            // 顺带消除旧 NAM002 对包源片段 span 打主文件 caret 的误导。
+            // 名字 ∉ externals（同文件真重复定义）维持 NAM002 error。
+            if self.external_symbols.contains(&f.name) {
+                // 锚点治理（designs/0014 §2.5）：build 合并单元里后写者可能是
+                // 包源片段（span 指向包内文件的行号，对主文件 src 渲染 caret
+                // 会误导——p15 形态实证）——渲染行不含该 fn 签名时退回 (0,0)
+                // （无锚点渲染）；含签名时锚点即真实的本地定义行。
+                let anchor_ok = self
+                    .source_lines
+                    .get(f.span.line.saturating_sub(1))
+                    .is_some_and(|l| l.contains(&format!("fn {}", f.name)));
+                let (line, col) = if anchor_ok {
+                    (f.span.line, f.span.col)
+                } else {
+                    (0, 0)
+                };
+                self.push_diag(
+                    Severity::Warning,
+                    "NAM006".into(),
+                    format!("本地定义遮蔽包符号 '{}'——本地定义优先", f.name),
+                    line,
+                    col,
+                );
+                self.builtin_module.remove(&f.name);
+            } else {
+                self.push_diag(
+                    Severity::Error,
+                    "NAM002".into(),
+                    format!("函数 '{}' 重复定义", f.name),
+                    f.span.line,
+                    f.span.col,
+                );
+                // B 包：与内建同名的冲突已按 NAM002 报 Error——该名字移出内建
+                // 模块映射，后续调用不再追加 NAM005 warning（病态程序单报不堆噪）
+                self.builtin_module.remove(&f.name);
+                return;
+            }
         }
         let params: Vec<(String, Type)> = f
             .params
@@ -227,22 +310,23 @@ impl TypeChecker {
         // 同时把变体名注册为可调用的构造器（无独立符号表，靠 enums 表查询）
     }
 
-    /// 收集 import 声明：把别名注册到函数签名表
+    /// 收集 import 声明：登记 import 项，别名注册推迟到首遍后终检
     /// （别名继承真实函数的签名；符号是否在模块导出由解释器运行时检查，typechecker 不重复报错）
     fn collect_import(&mut self, imp: &ImportDecl) {
         for item in &imp.items {
             // B 包：导入的符号名进入可用集（NAM005 判定）。`f as g` 只加 g——
             // 真实名 f 未导入，用 f 仍属未导入（与运行时 available_builtins 同款）
             self.available_imports.insert(item.alias.clone());
-            // 仅当真实名已注册（prelude/stdlib）时，才注册别名
-            if let Some(sig) = self.functions.get(&item.name).cloned() {
-                self.functions.insert(item.alias.clone(), sig);
-            } else if self.external_symbols.contains(&item.name) {
-                // 包符号别名（D 包二期差分测试 2026-09-14 抓出）：真实名在
-                // externals 而不在 functions 表——此前包符号 + as 别名导入在
-                // --check 假报 NAM003。别名加入 external_symbols 走同款放行。
-                self.external_symbols.insert(item.alias.clone());
-            }
+            // R105 批（designs/0014 §2.3）：别名不再原地 insert 进 functions/
+            // externals——原地对 item 顺序敏感（import 在前 + 本地同名 fn →
+            // NAM002 假 error；fn 在前 → 别名覆盖本地签名）。首遍只登记，
+            // check() 首遍后按"本地定义优先"统一注册/终检（顺序无关）。
+            self.imported_aliases.push(ImportedAlias {
+                module: imp.module.clone(),
+                name: item.name.clone(),
+                alias: item.alias.clone(),
+                span: imp.span,
+            });
         }
     }
 
@@ -1586,6 +1670,7 @@ impl TypeEnv {
 fn type_hint(code: &str) -> Option<String> {
     match code {
         "NAM002" => Some("重命名重复的函数/枚举".into()),
+        "NAM006" => Some("本地定义优先；重命名 import 别名或本地函数以消除遮蔽".into()),
         "MUT001" => Some(
             "局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本"
                 .into(),

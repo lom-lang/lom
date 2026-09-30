@@ -22,6 +22,12 @@ file/env/math/io 内建）+ pkg_cases 105_pkg_alias_in_pkg（R90 包源内 as
 别名 pkg-expand 保留）+ 负例 12（校验 #1-#7 与附面）；122_env_args 经
 CASE_ARGS 向两侧 harness 透传 argv。
 
+R104/R105 批（designs/0014，二十一审）：pkg_cases 106_pkg_name_clash
+（两包同名 fn 双 import，包根路径序取后者恒 22——锁解释器确定序修复
+不回退与 L2 fn 重名不拒口径）+ 107_pkg_alias_shadow_local（import 别名
+与本地 fn 同名，本地定义优先 15/4）。pkg_cases 目录经 glob 自动发现，
+新增用例无需代码登记（计数随目录数实收）。
+
 用法：python tools/verify_selfcomp.py [--lom-bin PATH]
       python tools/verify_selfcomp.py --bootstrap [--ci-smoke] [--lom-bin PATH]
 

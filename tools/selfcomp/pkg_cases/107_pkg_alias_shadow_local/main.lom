@@ -1,0 +1,15 @@
+# R105 批（二十一审，designs/0014）对拍 107：import 别名 origin as dup 与本地
+# fn dup 同名——锁定面：本地定义优先（dup(3)=15），包真名 origin(3)=4 直调可用，
+# 期望输出 "15/4" 两行。三侧一致（宿主解释器修复前别名先行改写查表，本地 fn
+# 永不命中恒 4/4，与 WASM/L2 遮蔽方向相反）。
+
+from libr import { origin as dup }
+
+fn dup(y: Int) -> Int
+    y * 5
+end
+
+fn main() -> Unit ! [IO]
+    println(dup(3))
+    println(origin(3))
+end

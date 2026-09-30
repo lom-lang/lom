@@ -1,0 +1,6 @@
+# R105 批（二十一审，designs/0014）：主项目清单——单依赖 libr
+name = "app107"
+version = "0.1.0"
+
+[dependencies]
+libr = { path = "libr" }

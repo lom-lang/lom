@@ -19,6 +19,9 @@
 //   PKG004 — 包源码解析失败
 //   PKG005 — 未知包导入（from pkg import 但 pkg 不在 dependencies）
 //   PKG006 — 包不导出请求的符号
+//   PKG007 — 两包导出同名符号（R104 批 warning：撞名不拒，按包根路径序
+//            取后写者——用户 2026-09-30 裁决，designs/0014 §2.4；走
+//            stderr 文本，不拦截）
 
 use crate::ast::Item;
 use crate::parser::Parser;
@@ -135,6 +138,36 @@ impl DependencyGraph {
     #[allow(dead_code)]
     pub fn get_package(&self, name: &str) -> Option<&ResolvedPackage> {
         self.packages.get(name)
+    }
+}
+
+/// R104 批（二十一审 R104/R105 整改，designs/0014 §2.4）：两两 public_symbols
+/// 交集检测——命中即向 stderr 发 PKG007 warning（用户 2026-09-30 裁决：
+/// 撞名不拒只 warning；沿 PKG 族 stderr 文本先例，不拦截任何路径）。
+///
+/// 按包根路径升序两两比较（与解释器 load_packages 注册序 / 宿主 WASM
+/// merge_packages_for_wasm / L2 expand_package_unit 同键 PathBuf Ord）——
+/// "后者"即该对撞名在确定序下的实际生效包。符号按字典序输出，保证
+/// 多撞名时 stderr 确定性。调用点：main.rs collect_package_symbols
+/// （--check / 默认 run 的类型检查可见化 / build 三路径共用，各打印一次）。
+pub fn warn_public_symbol_clashes(graph: &DependencyGraph) {
+    let mut pkgs: Vec<&ResolvedPackage> = graph.packages.values().collect();
+    pkgs.sort_by(|a, b| a.root.cmp(&b.root));
+    for i in 0..pkgs.len() {
+        for j in (i + 1)..pkgs.len() {
+            let mut clash: Vec<&str> = pkgs[i]
+                .public_symbols
+                .intersection(&pkgs[j].public_symbols)
+                .map(|s| s.as_str())
+                .collect();
+            clash.sort_unstable();
+            for sym in clash {
+                eprintln!(
+                    "[PKG007] 两包导出同名符号 '{}'——按包根路径序取后者 '{}'（前者 '{}' 被遮蔽）",
+                    sym, pkgs[j].name, pkgs[i].name
+                );
+            }
+        }
     }
 }
 

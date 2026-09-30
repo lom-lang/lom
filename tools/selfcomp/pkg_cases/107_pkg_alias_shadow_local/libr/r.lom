@@ -1,0 +1,5 @@
+# R105 批（二十一审，designs/0014）：libr 源码——origin（被 as 别名导入的目标）。
+
+fn origin(x: Int) -> Int
+    x + 1
+end

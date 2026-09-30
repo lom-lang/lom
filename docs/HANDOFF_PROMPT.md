@@ -84,21 +84,24 @@
 - **交付链**：…→ v1.4.6 批1 E甲扩围+R100（`96c26b6`，#207）→
   v1.4.7 批2 R101 宿主（`22a37a6`，#210）→ 二十审 A- + R102 修正
   （`257e726`，#213）→ v1.4.8 R94 批 1（`8c86a60`，#214）→
-  v1.4.9 R94 批 2（本轮）。**已提交基线**：verify_selfcomp
-  **362/362 = 196 单文件 + 5 包 + 161 负例**、bootstrap **14/14**
+  v1.4.9 R94 批 2（`e71749e`，#216）→ 二十一审 B + R106 即修
+  （`51923b4`，#218）→ v1.4.10 R104/R105 整改（本轮）。**已提交
+  基线**：verify_selfcomp
+  **364/364 = 196 单文件 + 7 包 + 161 负例**、bootstrap **14/14**
   （强 quine 269521 bytes 双侧一致）、self_comp.lom 12529 行、
-  Rust **543 单元 + 10 集成**（r56×1 + r58×7 + r94_pkg_alias×2）、
+  Rust **543 单元 + 16 集成**（r56×1 + r58×7 + r94_pkg_alias×2 +
+  r104_dedup_order×6）、
   eval 双后端各 121/121；存量 hex 对比 198 恒等 + 2 有意变化
-  （批 2a）。Cargo.toml/lock 均为 1.4.9。
+  （批 2a，v1.4.9 起）。Cargo.toml/lock 均为 1.4.10。
 - R101 修复后**三实现短路 return 全对齐**（0/9/1/8 rc0）；
   map_remove 三侧 true/false/true 对齐；bottom 家族与 Map 家族
   均不再有已知宿主-L2 分叉。
-- 下一步：**R104/R105 整改待用户裁决**（语义选边：本地定义优先
-  vs import 优先；撞名/遮蔽是否加 warning 诊断——warning 级新
-  检查须用户裁决；非确定根源消除方式由规划者定）。其余待裁：
-  typechecker for 可变性 quirk 等登记项处置、`lom build` 逐文件
-  视图 NAM003 边界修否、R106 防复发入锚、下一阶段方向（发布线
-  继续冻结直至用户解冻）。
+- 下一步：**v1.4.10（二十一审 R104/R105 整改）已交付，台账 open
+  清空，交接就绪、无在制工作**。用户三项裁决已落实（本地定义优先
+  /加 warning/doc_audit 入锚——入锚留工具治理批）。待裁菜单：
+  工具治理批（doc_audit 入锚防复发 + D5 撞名覆盖解除）、
+  typechecker for 可变性 quirk、`lom build` 逐文件视图 NAM003、
+  二十二审发起时机、下一阶段方向（发布线继续冻结直至解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–42、SPEC §13、
   designs/0001–0013、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
@@ -115,14 +118,14 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias，×10）
+   - cargo test --release（期望 543/543；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order，×16）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 67/67）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交基线 362/362 = 196 单文件 + 5 包 + 161 负例）
+   - python tools/verify_selfcomp.py（已提交基线 364/364 = 196 单文件 + 7 包 + 161 负例）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269521 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：

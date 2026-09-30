@@ -537,9 +537,18 @@ impl Interpreter {
     ///   4. 把包名 + public_symbols 存入 self.packages，供 process_import 查找
     ///
     /// 符号冲突策略：外部包符号直接注册，与本地符号同命名空间。
-    /// 冲突时后注册者覆盖（与本地重复定义行为一致）。LLM 责任保证不同包不重名。
+    /// R104（二十一审，designs/0014 §2.1）：注册序确定化——graph.packages 是
+    /// HashMap（RandomState），遍历序每进程随机，同名符号"后 insert 者覆盖"
+    /// 的方向跨运行不确定（p15/p15b/p15c/p15x 探针实证；此前注释把"不重名"
+    /// 归为 LLM 责任、覆盖序从未被指定）。现按包根路径升序注册（与宿主 WASM
+    /// 合并 cli.rs merge_packages_for_wasm / L2 展开 expand_package_unit 同键
+    /// PathBuf Ord）——同名符号赢家恒为包根路径序靠后的包，三侧一致；主文件
+    /// 符号随后由 run() 注册，恒为最终覆盖者（本地定义优先）。撞名不拒，
+    /// 由 CLI 层发 PKG007 warning（package.rs warn_public_symbol_clashes）。
     pub fn load_packages(&mut self, graph: &crate::package::DependencyGraph) {
-        for (name, pkg) in &graph.packages {
+        let mut pkgs: Vec<&crate::package::ResolvedPackage> = graph.packages.values().collect();
+        pkgs.sort_by(|a, b| a.root.cmp(&b.root));
+        for pkg in pkgs {
             // 解析并注册包内每个 .lom 文件的 fn/enum
             for file in &pkg.source_files {
                 if let Ok(src) = std::fs::read_to_string(file) {
@@ -581,8 +590,9 @@ impl Interpreter {
                     }
                 }
             }
-            // 注册包元数据（供 process_import 查找符号）
-            self.packages.insert(name.clone(), pkg.clone());
+            // 注册包元数据（供 process_import 查找符号；键名恒等于 pkg.name
+            // ——resolve_dfs 以依赖键名双写，此处不再依赖 HashMap 键）
+            self.packages.insert(pkg.name.clone(), pkg.clone());
         }
     }
 
@@ -1157,9 +1167,17 @@ impl Interpreter {
                 if let Some(v) = self.call_builtin(name, arg_vals)? {
                     return Ok(v);
                 }
-                // 用户函数（含外部包符号）——别名导入时按 alias→本名映射查表
-                // （D 包二期 2026-09-14 修复：此前包符号的 as 别名在运行时
-                // RUNTIME002——别名解析只在 call_builtin 路径，用户函数路径漏了）
+                // 用户函数（含外部包符号）——R105（二十一审，designs/0014 §2.2）：
+                // 本地定义优先。调用点名先直查 functions（本地 fn，或经 R104
+                // 确定序注册的包 fn），miss 再走别名改写（alias→真名；D 包二期
+                // 2026-09-14 补的包符号 as 别名路径保留为兜底）。原实现别名先行，
+                // import 别名与本地 fn 同名时本地 fn 永不命中（p16/p16b 探针，
+                // 与 WASM/L2 遮蔽方向相反）——现与 WASM codegen（fn_idx orig
+                // 优先）/L2 同序。正常别名/stdlib 别名/prelude 零影响（functions
+                // 表不含内建名，含别名的 functions 命中只在真撞名时发生）。
+                if let Some(f) = self.functions.get(name).cloned() {
+                    return self.call_function(&f, arg_vals);
+                }
                 let real_name: &str = self
                     .import_aliases
                     .get(name)

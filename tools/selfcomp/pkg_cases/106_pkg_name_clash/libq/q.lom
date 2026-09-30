@@ -1,0 +1,6 @@
+# R104 批（二十一审，designs/0014）：libq 源码——与 libp 同名导出 shared（值 22，
+# 包根路径序靠后，确定序下恒生效）。
+
+fn shared() -> Int
+    22
+end

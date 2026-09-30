@@ -358,11 +358,17 @@ fn collect_package_symbols(path: &str) -> Vec<String> {
     }
     match package::load_manifest_file(&toml_path) {
         Ok(manifest) => match package::resolve_dependencies(&manifest, &file_dir) {
-            Ok(graph) => graph
-                .packages
-                .values()
-                .flat_map(|p| p.public_symbols.iter().cloned())
-                .collect(),
+            Ok(graph) => {
+                // R104 批（designs/0014 §2.4）单点接线：--check / 默认 run 的
+                // 类型检查可见化 / build 三路径都经本函数取 externals——在此
+                // 发 PKG007（stderr，不拦截），每条 CLI 路径恰打印一次。
+                package::warn_public_symbol_clashes(&graph);
+                graph
+                    .packages
+                    .values()
+                    .flat_map(|p| p.public_symbols.iter().cloned())
+                    .collect()
+            }
             Err(_) => Vec::new(),
         },
         Err(_) => Vec::new(),
@@ -483,7 +489,10 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         // 的 externals else-if 分支放行，NAM003 假阳性消失
         let externals = collect_package_symbols(file);
         typechecker::check_program_with_externals(&program, &src, file, &mut tdiags, &externals);
-        if !tdiags.ok {
+        // R105 批（designs/0014 §2.3/§2.5）：warning 亦可见（对齐默认 run 路径
+        // "诊断非空即打 stderr"形态）——NAM006 遮蔽提示在 build 路径不再被
+        // "仅 error 才打印"吞掉；error 照旧不拦截编译（渐进式承诺不变）。
+        if !tdiags.diagnostics.is_empty() {
             eprint!("{}", tdiags.to_human());
         }
     }

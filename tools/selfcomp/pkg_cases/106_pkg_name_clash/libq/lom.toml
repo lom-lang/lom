@@ -1,0 +1,3 @@
+# R104 批（二十一审，designs/0014）：libq 包清单
+name = "libq"
+version = "0.1.0"

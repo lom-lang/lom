@@ -1,5 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
+> **R104/R105 整改交付记录（2026-09-30，v1.4.10——本地定义优先 + 确定序 + NAM006/PKG007；门禁回填见段尾）**：用户三项裁决（本地定义优先/加 warning/doc_audit 入锚——入锚留工具治理批）。设计 [designs/0014](designs/0014-r104-r105-shadowing-remediation.md)。**R104**：load_packages 的 HashMap 遍历序 → 包根路径序 sort（与 cli.rs merge/expand 同键）——解释器跨运行非确定消除，三侧一致（p15 恒 22/p15x 恒 11/p15c 恒 22 各 ≥8 次，规划者亲验 p15b 八次恒 22）；**R105**：eval_call 用户函数路径 orig 优先、别名兜底——import 别名与本地 fn 同名本地赢（p16/p16b 恒 15/4 三侧一致）。**NAM006（warning）**顺序无关终检 + **NAM002 收敛**（∈ externals 降级 warning，同文件真重复维持 error 负向不倒）+ 锚点误导治理；**PKG007（warning）**包层交集检测指名赢家，run/--check/build 三路径单点接线（规划者亲验 PKG007 stderr 与 NAM006 带锚点）。连带观察登记：包 fn 真名不经 import 可用（既定设计，SPEC §8.1 补记）。测试：tests/r104_dedup_order.rs 集成 ×6（确定序硬断言）→ 集成 10→**16**；pkg_cases 106/107 → verify_selfcomp **362→364 = 196+7+161**；self_comp/codegen 零改动（quine 269521 不变、存量构造性恒等）。**R104/R105 关闭，台账 open 清空**；遗留工具治理批待呈裁（doc_audit 入锚 + D5 撞名覆盖解除）。
 > **第二十一轮独立审查登记（2026-09-30，总评 B；报告
 > [review-2026-09-30-2.html](reviews/review-2026-09-30-2.html)，基线
 > 250f0ef/v1.4.9，增量 = v1.4.8/v1.4.9 两批）**：两批交付宣称

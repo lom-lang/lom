@@ -1274,3 +1274,46 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   可变性 quirk 等既有登记维持）。语言面与发布线冻结不变。
   **门禁回填：提交 `e71749e` 推送后 CI run `36677072901`
   （#216）六 job 全绿，tag v1.4.9 已切。**
+
+- **修订 43（2026-09-30）：二十一审 R104/R105 整改交付
+  （v1.4.10；门禁回填见本修订尾部）。** 用户三项裁决：语义
+  选边**本地定义优先**、撞名/遮蔽**加 warning**（新码属 §14
+  冻结 warning 安全区）、R106 防复发 doc_audit 入锚（独立
+  治理批另做）。设计 designs/0014（执行者 E 读码供料 + 规划者
+  亲核三处代码点）。**R104**：load_packages 遍历
+  graph.packages（HashMap RandomState）致两包同名符号覆盖方向
+  跨运行非确定（p15/p15b/p15c/p15x 探针实证与值/声明序无关；
+  WASM/L2 赢家恒为包根路径序后者——p15x 值互换仍路径后者赢）
+  ——注册循环前加 sort_by(a.root.cmp(&b.root))（与 cli.rs
+  merge/expand 同键），解释器确定化三侧一致（p15 恒 22、
+  p15x 恒 11、p15c 恒 22，各 ≥8 次）；"LLM 责任保证不重名"
+  注释改确定序登记。**R105**：eval_call 用户函数路径原"别名
+  先行再查表"（查表键被 alias 改写，functions[本地名] 从未被
+  查）——改 orig 优先、别名兜底，import 别名与本地 fn 同名时
+  本地赢（p16/p16b 恒 15/4 三侧一致，与 item 序无关）。
+  **NAM006（warning）**：typechecker 首遍收集 user_fns 与
+  imported_aliases、首遍后统一终检（顺序无关——修复原
+  collect_import 顺序敏感行为：import-then-fn 曾误报 NAM002
+  error、fn-then-import 零诊断）；NAM002 收敛——重复名 ∈
+  external_symbols（包符号）降级 NAM006 warning（本地定义遮蔽
+  包符号），同文件真重复维持 NAM002 error（负向锁定不倒）；
+  锚点误导治理（span 无 fn 名时退无锚点渲染）。**PKG007
+  （warning）**：package.rs warn_public_symbol_clashes——包按
+  根路径序两两 public_symbols 交集检测，eprint 指名两包与
+  路径序赢家；接线在 collect_package_symbols 单点（run/
+  --check/build 三路径恰一次）。**连带观察登记**：包 fn 真名
+  不经 import 即可用（自动公开既定设计，三侧一致，SPEC §8.1
+  补记）。测试：tests/r104_dedup_order.rs 集成 ×6（确定序硬
+  断言禁止 ∈{11,22} 弱断言、双序本地赢、PKG007/NAM006 在位、
+  NAM002 负向）→ 集成 10→**16**；pkg_cases 106_pkg_name_
+  clash / 107_pkg_alias_shadow_local（三侧行为对拍，今日即过
+  锁不回退）→ verify_selfcomp **362→364 = 196 单文件 + 7 包
+  + 161 负例**。self_comp/codegen 零改动（quine 269521 不变、
+  存量构造性恒等）。验收（规划者亲验 verify_selfcomp 364/364
+  与 doc_audit 67/67 + p15b 八次恒 22 + PKG007 stderr + p16
+  15/4 + NAM006 带锚点）：cargo 543+16、六模式、eval 双后端
+  各 121/121、clippy/fmt 零、bootstrap 14/14、fmt gates。
+  **R104/R105 关闭；台账 open 清空**（doc_audit 入锚与 D5
+  撞名覆盖解除留工具治理批待呈裁）。--check 路径 NAM006 走
+  stdout 系既有"诊断是产品"设计（登记）。语言面与发布线
+  冻结不变。
