@@ -1462,3 +1462,24 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   静默但块退出恢复可变性标志）。语言面与发布线冻结不变。
   **门禁回填：提交 `cf73de2` 推送后 CI run `36829534116`（#238）
   六 job 全绿，tag v1.4.15 已切。**
+
+- **修订 49（2026-10-01）：repair 闭环深化首批设计方案产出（动工
+  前置，待用户裁决三个裁决点）。** 用户裁决方向 ①（repair 闭环
+  深化，③ 解冻盘点随批顺带）+ 复审时机（二十五审与本批合并发起）。
+  交付 docs/designs/0016-repair-loop-deepening.md——基于执行者供料
+  五节（fix 引擎全图/error_repair 24 题/L2 诊断面/SPEC_FOR_AI
+  修复面/manifest 与 fix_corpus）+ 规划者亲读（fix_for_diagnostic
+  分派表、fix_corpus 消费面、SPEC_FOR_AI 码表现值核验）。核心
+  结论：fix 分派表 NAM006/MUT002 落"未知错误码"兜底误导（欠账）；
+  SPEC_FOR_AI §11c 码表缺 NAM006、§11e 修复表双缺；L2 诊断无
+  结构化出口（无码/无行号/COMPILE-ERROR 恒 rc=0）——fix 引擎
+  直接吃 L2 诊断缺三层前置件，本批不做；"宿主可跑、L2 拒"形态
+  成族，是 L2 面修复题天然素材（runner 零改动 + 参考解 L2 全链
+  纪律锁定）。四个子面 + 顺带：A fix 分派表补 NAM006（认知 hint）
+  /MUT002（改写 hint）；B SPEC_FOR_AI 补齐；C fix_corpus +2 对
+  （fixed==bad 锁定）；D error_repair +6~8 题（宿主面 4~5 +
+  **L2 子集边界修复题 2~3**——双真实采集 prompt）；E 发布解冻
+  条件盘点随批顺带（TODO 检查单，不发布）。三个裁决点待用户：
+  批次范围（全包/宿主面/最小欠账）、L2 任务形态（纪律锁定/
+  runner 集成）、升版（minor v1.5.0/patch v1.4.16）。
+  **代码零改动——纯设计文档交付；动工在裁决后。**
