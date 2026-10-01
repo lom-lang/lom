@@ -2,8 +2,8 @@
 
 > **当前交接状态（2026-10-01，v1.5.0 + 二十四审 A- 后续批；交接就绪）**：
 > **台账 R1-R111 关闭；R112 开账待裁（见下方开账段）**。v1.5.0
-> （repair 闭环深化首批；tag/CI 门禁回填见下方交付段）为最新
-> 已提交基线：verify_selfcomp 365/365 = 196 单文件 + 8 包 +
+> （repair 闭环深化首批；tag `b61182f`，CI run `36841096349`
+> #242 六 job 绿）为最新已提交基线：verify_selfcomp 365/365 = 196 单文件 + 8 包 +
 > 161 负例、bootstrap 14/14（quine 269555B）、Rust **561 单元** +
 > 28 集成、eval 双后端各 128/128（error_repair 31 题含 L2 面 3）、
 > fix_corpus 13 对、doc_audit 71/71、self_comp 12544 行。审查轨迹（二十 A-→二十一 B→二十二
@@ -40,7 +40,7 @@
 > 7. **解冻本身永远是一项独立用户裁决**——本清单只是决策输入，
 >    不构成条件满足即解冻的自动判定。
 >
-> **v1.5.0 交付记录（2026-10-01——repair 闭环深化首批：fix 分派表补齐 + SPEC_FOR_AI 欠账 + fix_corpus/error_repair 扩容 + L2 面新题型；门禁回填见段尾）**：用户裁决三点均按建议项，设计 [designs/0016](designs/0016-repair-loop-deepening.md)，RFC-0004 修订 50。**A** fix 分派表 NAM006（认知 hint：行为已确定无需修复）/MUT002（改写 hint：不依赖捕获 mut 状态）——不再"未知错误码"，均不自动 apply（新单元 ×2 + apply 负向）。**B** SPEC_FOR_AI §11c/§4 补 NAM006、§11e 修复表补两行（尺寸 39,959→41,029）。**C** fix_corpus 11→13 对（12_nam006/13_mut002，fixed==bad 沿 04 先例）。**D** error_repair 24→31 题（id 123-129，全仓 121→128）：宿主面 4（NAM006 消歧/MUT002 改写——broken 双后端分歧事实（解释器 100 vs WASM 10）入 notes/TYPE001 注解/NAM002 error 级补缺）+ **L2 面新题型 3**（127 Map 算术/128 pipe 语法/129 未导入内建——宿主收而 L2 拒，prompt 双真实采集：宿主 --check --json + L2 codegen error 原文单独标注来源；参考解三链验证（宿主双后端 + self_comp→hex2wasm→run_selfcomp，128 题规划者亲验 2/COMPILED 419B/2 三链一致）；runner 零改动，L2 面生成纪律入 eval/README（L2 文本段不在 eval_prompt_check 校验面如实注明））。实采修正两处：127 宿主执行 Map 算术必 RUNTIME000——broken 放未执行分支保 rc0；129 沿 120 先例 warning 预告叙事。**E** 发布解冻条件盘点七项检查单入本文件上方（方向 ③ 顺带）。验收：cargo **561（559+2）+28**、eval 双后端 **128/128**（规划者亲跑）、eval_prompt_check **31/31**（自动遍历）、365/365 与 quine 269555 不变（self_comp 零改动双跑）、六模式全 PASS（dump 161=154+7 新任务解、--diags 坏 14、--static 坏 24）、clippy/fmt 零、4 新 .lom 过 fmt gate。**新发现 R112 随批开账（见下段）**。语言面零变化；发布线冻结不变。**门禁回填：提交后补。**
+> **v1.5.0 交付记录（2026-10-01——repair 闭环深化首批：fix 分派表补齐 + SPEC_FOR_AI 欠账 + fix_corpus/error_repair 扩容 + L2 面新题型；门禁回填见段尾）**：用户裁决三点均按建议项，设计 [designs/0016](designs/0016-repair-loop-deepening.md)，RFC-0004 修订 50。**A** fix 分派表 NAM006（认知 hint：行为已确定无需修复）/MUT002（改写 hint：不依赖捕获 mut 状态）——不再"未知错误码"，均不自动 apply（新单元 ×2 + apply 负向）。**B** SPEC_FOR_AI §11c/§4 补 NAM006、§11e 修复表补两行（尺寸 39,959→41,029）。**C** fix_corpus 11→13 对（12_nam006/13_mut002，fixed==bad 沿 04 先例）。**D** error_repair 24→31 题（id 123-129，全仓 121→128）：宿主面 4（NAM006 消歧/MUT002 改写——broken 双后端分歧事实（解释器 100 vs WASM 10）入 notes/TYPE001 注解/NAM002 error 级补缺）+ **L2 面新题型 3**（127 Map 算术/128 pipe 语法/129 未导入内建——宿主收而 L2 拒，prompt 双真实采集：宿主 --check --json + L2 codegen error 原文单独标注来源；参考解三链验证（宿主双后端 + self_comp→hex2wasm→run_selfcomp，128 题规划者亲验 2/COMPILED 419B/2 三链一致）；runner 零改动，L2 面生成纪律入 eval/README（L2 文本段不在 eval_prompt_check 校验面如实注明））。实采修正两处：127 宿主执行 Map 算术必 RUNTIME000——broken 放未执行分支保 rc0；129 沿 120 先例 warning 预告叙事。**E** 发布解冻条件盘点七项检查单入本文件上方（方向 ③ 顺带）。验收：cargo **561（559+2）+28**、eval 双后端 **128/128**（规划者亲跑）、eval_prompt_check **31/31**（自动遍历）、365/365 与 quine 269555 不变（self_comp 零改动双跑）、六模式全 PASS（dump 161=154+7 新任务解、--diags 坏 14、--static 坏 24）、clippy/fmt 零、4 新 .lom 过 fmt gate。**新发现 R112 随批开账（见下段）**。语言面零变化；发布线冻结不变。**门禁回填：提交 `b61182f` 推送后 CI run `36841096349`（#242）六 job 全绿，tag v1.5.0 已切。**
 >
 > **R112 开账（2026-10-01，P2，存量面，实施期发现，修否待用户裁决）**：闭包体内对捕获的外层 mut 绑定**赋值**（`c = c + 1` 形态）触发解释器 `RefCell already borrowed` panic——`src/interpreter.rs:336:15`（Scope::set_existing 递归 borrow_mut，闭包体执行时外层作用域已在调用栈被 borrow）。三侧唯一：宿主 WASM 编译拒绝（"WASM 编译：赋值给未定义变量 'c'"——designs/0001 §2.3 既定值拷贝语义拒绝）；L2 负例在库（neg_closure_assign_capture）拒绝。退出码 1 + "内部错误：解释器线程异常终止"兜底文案（R56 panic 传播机制在位，非静默）；读取形态不触发（13_mut002 语料即读取形态正常运行）。证据：探针 `target/probes/mut002_assign_panic.lom`（规划者亲验 panic 原文与 rc=1；宿主 WASM 侧行为亲验）。候选修法方向（待裁）：解释器对该形态显性运行时错误（对齐另两侧拒绝语义）或修复借用冲突使赋值按共享作用域语义执行——涉及三侧语义选边，须用户裁决。
 >

@@ -1,6 +1,6 @@
 # repair 闭环深化首批设计（fix 分派表补齐 + SPEC_FOR_AI 欠账 + fix_corpus/error_repair 扩容 + L2 子集边界修复题）
 
-- **状态**：**已交付（2026-10-01，RFC-0004 修订 50；仓库版本 v1.5.0，tag/CI 门禁回填后切）**——三裁决点均按建议项。双执行者并行（A+C / D）+ 规划者亲自（B/E）与验收（cargo 561+28、eval 双后端 128/128 亲跑、128 题 L2 三链亲验、fix 新 hint 亲验、R112 panic 探针亲验）。实施修正两处如实：D 的 127 题宿主执行 Map 算术必 RUNTIME000 → broken 放未执行分支；129 沿 120 先例 warning 预告叙事。新发现 R112 随批开账（P2 存量待裁）。
+- **状态**：**已交付（2026-10-01，RFC-0004 修订 50；仓库版本 v1.5.0，tag `b61182f`，CI run `36841096349` #242 六 job 绿）**——三裁决点均按建议项。双执行者并行（A+C / D）+ 规划者亲自（B/E）与验收（cargo 561+28、eval 双后端 128/128 亲跑、128 题 L2 三链亲验、fix 新 hint 亲验、R112 panic 探针亲验）。实施修正两处如实：D 的 127 题宿主执行 Map 算术必 RUNTIME000 → broken 放未执行分支；129 沿 120 先例 warning 预告叙事。新发现 R112 随批开账（P2 存量待裁）。
 - **设计基线**：HEAD `dba69d6` / v1.4.15。语言面 v1.0 冻结与外部发布线继续冻结；本批全部为宿主 fix/文档/评测资产面（零语言面变化——NAM006/MUT002 既有码仅补 fix 处理与文档，不新增诊断码）。
 - **供料来源**：执行者供料报告五节（fix 引擎全图 / error_repair 24 题 / L2 诊断面 / SPEC_FOR_AI 修复面 / manifest 与 fix_corpus）+ 规划者亲读（fix_for_diagnostic 分派表 L754-854、fix_mut001 动作族、cargo fix_corpus_end_to_end 消费面）+ 规划者补核（SPEC_FOR_AI L187/L547/L675-677 码表与修复表现值）。
 - **数字落盘前门禁**：写本文前后运行 `python tools/doc_audit.py`。
