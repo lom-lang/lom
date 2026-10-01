@@ -1483,3 +1483,54 @@ Lom 单体语料之一（L1 5703 行之上再 +5000 行级），其开发过程�
   批次范围（全包/宿主面/最小欠账）、L2 任务形态（纪律锁定/
   runner 集成）、升版（minor v1.5.0/patch v1.4.16）。
   **代码零改动——纯设计文档交付；动工在裁决后。**
+
+- **修订 50（2026-10-01）：repair 闭环深化首批交付（v1.5.0；门禁
+  回填见本修订尾部）。** 用户裁决三点均按建议项（全包 A+B+C+D+E /
+  L2 任务纪律锁定 / 升 minor）。designs/0016 实施为双执行者并行
+  （A+C fix 面 / D eval 资产面）+ 规划者亲自（B 文档 / E 检查单）：
+  - **A fix 分派表补齐**：NAM006 → 认知型 hint（"撞名告知型
+    warning——行为已确定……无需修复；如需消除歧义可重命名"，Medium）
+    与 MUT002 → 改写 hint（"不依赖捕获的 mut 状态（先 let 局部
+    副本再捕获，或改用函数参数传递新值）"，Medium）——两者此前
+    落"未知错误码"兜底误导；均 hint 级永不自动 apply（--plan 实测
+    "0 个有可应用修复"）。新单元 ×2（正断言 + apply 负向）。
+  - **B SPEC_FOR_AI 补齐**：§11c 码表与 §4 速览两处补 NAM006、
+    §11e 修复表补 NAM006/MUT002 两行；尺寸行 39,959→41,029
+    （I 锚收敛）。
+  - **C fix_corpus 扩容**：12_nam006_alias_clash / 13_mut002_
+    closure_capture 两对（fixed==bad 沿 04 先例锁定认知 warning 不
+    自动改）；六模式实跑全 PASS（--diags 坏文件 14、--static 坏
+    24——新文件入集不破坏对拍）；4 新 .lom 过 fmt gate。
+  - **D error_repair 扩容 24→31 题**（id 123-129，全仓库 121→128
+    任务）：宿主面 4（123 NAM006 消歧/124 MUT002 改写——broken
+    双后端分歧事实入 notes（解释器 100 vs WASM 10）/125 TYPE001
+    注解/126 NAM002 真重复 error 级补缺）+ **L2 面新形态 3**
+    （127 L2-Map 算术/128 L2-pipe 语法/129 L2-未导入内建——
+    prompt 内嵌宿主真实 --check --json + L2 实跑 codegen error
+    原文双真实采集，来源单独标注不与 lom-diag/v1 混排；参考解
+    经宿主双后端 + L2 全链（self_comp→hex2wasm→run_selfcomp）
+    三链验证，128 题规划者亲验 2/COMPILED 419B/2 三链一致）。
+    实采修正两处如实：127 宿主执行 Map 算术必 RUNTIME000——broken
+    放未执行分支保 rc0；129 沿 120 先例的 warning 预告叙事（宿主
+    运行时 RUNTIME002）。eval/README 增"L2-face task generation
+    discipline"段（双真实采集 + 参考解 L2 全链验证 + runner 只验
+    宿主行为 + L2 文本段不在 eval_prompt_check 校验面如实注明）；
+    manifest 24→31/121→128；prompts 经 _generate.ps1 再生成。
+  - **E 发布解冻条件盘点**（方向 ③ 顺带）：TODO 新增七项检查单
+    （审查轨迹/台账/回归基线/评测覆盖/文档门禁/安全合规/解冻恒为
+    独立用户裁决）——纯登记不发布不设时点。
+  - **验收**：cargo **561（559+2）+ 28 集成**；eval 双后端
+    **128/128**（规划者亲跑）；eval_prompt_check **31/31**（自动
+    遍历机制，新题纳入）；eval ID 唯一性过；verify_selfcomp
+    **365/365** 与 quine **269555** 不变（self_comp 零改动——
+    执行者与规划者双跑）；六模式全 PASS；clippy/fmt 零。
+  - **新发现开账 R112（P2，存量面，修否待裁）**：闭包体内对捕获的
+    外层 mut 绑定**赋值**（`c = c + 1` 形态）触发解释器
+    `RefCell already borrowed` panic（src/interpreter.rs:336，
+    rc=1 有"内部错误"兜底文案不静默——R56 传播机制在位）；三侧
+    唯一：宿主 WASM 编译拒绝（designs/0001 §2.3 既定"赋值给
+    未定义变量"）、L2 负例在库（neg_closure_assign_capture）
+    拒绝。读取形态不触发（13_mut002 语料即读取形态正常运行）。
+    探针 target/probes/mut002_assign_panic.lom（规划者亲验）。
+    本批不修（超裁决范围）。
+  语言面零变化（既有码补处理）；发布线冻结不变。**门禁回填：提交后补。**

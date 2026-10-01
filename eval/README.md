@@ -1,12 +1,12 @@
 # Lom Eval Suite (Phase 2.8)
 
-121-task benchmark for measuring **LLM generation pass-rate** on Lom code.
+128-task benchmark for measuring **LLM generation pass-rate** on Lom code.
 
 > This is the **core deliverable of Phase 2** — the hard metric that backs Lom's "AI-native" claim. An LLM is given a prompt; it generates `.lom` code; the runner executes the code and compares stdout to the expected output.
 
 ## Design goals
 
-1. **Coverage** — 121 tasks across 10 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair).
+1. **Coverage** — 128 tasks across 10 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair).
 2. **Reproducibility** — every task has a verified reference solution and expected output; the runner self-checks the eval set before any LLM run.
 3. **LLM-coding-native focus** — tasks are designed to probe Lom's AI-friendly features (tolerant parse, structured diagnostics, `|>` linearity, structural types, `Result`/`match`).
 4. **Multi-model comparability** — same prompts, same runner, same expected outputs across DeepSeek / Claude / GPT / Kimi / GLM / Gemini.
@@ -27,7 +27,7 @@ eval/
     07_records_tuples.json   # 10 tasks — records, tuples, field access
     08_effects.json          #  6 tasks — ! [IO, Clock] annotations
     09_modules.json          #  6 tasks — from ... import
-    10_error_repair.json     # 24 tasks — fix broken code / warning-guided repair
+    10_error_repair.json     # 31 tasks — fix broken code / warning-guided repair (incl. L2-subset face)
   runner/
     run.ps1                  # PowerShell runner (Windows, no deps)
     run.sh                   # Bash runner (requires jq + lom on PATH)
@@ -53,7 +53,7 @@ Each `tasks/NN_<category>.json` file is an array of task objects:
 ```
 
 Fields:
-- **`id`** — zero-padded 3-digit task id (001-122, 121 unique ids — 108 is a known, accepted gap), globally unique
+- **`id`** — zero-padded 3-digit task id (001-129, 128 unique ids — 108 is a known, accepted gap), globally unique
 - **`category`** — one of the 10 categories (matches filename suffix)
 - **`difficulty`** — `easy` / `medium` / `hard`
 - **`prompt`** — Chinese natural-language description of what the LLM should generate. Mentions required functions, expected behavior, and any constraints. **The LLM only sees this field** (plus `SPEC_FOR_AI.md`); it does not see `solution` or `expected`.
@@ -77,7 +77,7 @@ cargo build --quiet
 eval/runner/run.sh --verify
 ```
 
-This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **121/121 pass**. Use this to catch regressions in the interpreter or the eval set.
+This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **128/128 pass**. Use this to catch regressions in the interpreter or the eval set.
 
 ### Evaluate LLM-generated candidates
 
@@ -94,7 +94,7 @@ eval/runner/run.sh --candidates-dir eval/candidates
 
 The runner runs `lom eval/candidates/<id>.lom` for each task, compares stdout to `expected`, and reports pass-rate by category and overall.
 
-### Error-repair category (24)
+### Error-repair category (31)
 
 Tasks in `10_error_repair.json` have a different flow:
 1. The prompt contains **broken `.lom` code** and the **`lom-diag/v1` JSON** for that code.
@@ -104,6 +104,15 @@ Tasks in `10_error_repair.json` have a different flow:
 This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses → LLM repairs → Lom runs**.
 
 > **Audit caveat (2026-09-21, R60):** the runner validates candidate stdout + exit code; it does not validate that diagnostic JSON embedded in a prompt is still emitted by the current compiler. Tasks 089/090 claim a missing-function-`end` PARSE001, while the current parser silently accepts EOF as the block terminator. These are historical repair prompts, not a current diagnostic-conformance corpus, until R57/R60 refresh them from real `--check --json` output. New diagnostic-bearing tasks must continue to be generated from real output, never hand-written.
+
+#### L2-face task generation discipline (tasks 127-129, 2026-10-01)
+
+Tasks 127-129 add an **L2 face** on top of the host-diag flow: the broken code is also rejected by the experimental L2 subset compiler (`examples/selfhost/self_comp.lom`, run as `lom examples/selfhost/self_comp.lom -- <input.lom> <out.hex>`). Their prompts carry **two separately collected real outputs**:
+
+1. The host `lom --check --json` diagnostic (same R60 discipline as every other task; embedded as the `诊断 JSON` block, `file` normalized to `bad.lom`).
+2. The L2 rejection text, captured verbatim from the L2 compiler's real stdout (`codegen error: ...` + `COMPILE-ERROR`), introduced by an explicit source line （"实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下："）. It is never mixed into the `lom-diag/v1` JSON block.
+
+Generation rules: the reference solution must keep host behavior identical to `expected` (verified on both backends: direct run + `build --target wasm` via `node eval/runner/run_wasm.mjs`) **and** pass the full L2 chain (`self_comp` → `tools/hex2wasm.py` → `node tools/selfcomp/run_selfcomp.mjs`) with stdout matching `expected`. Note the runner (`run.ps1`) itself only exercises host behavior — the L2-chain guarantee is a task-generation-time gate, not a runner gate; likewise `tools/eval_prompt_check.py` re-validates only the embedded host diagnostic JSON (the L2 text block sits outside its extraction anchors and is out of its check face).
 
 ## Adding tasks
 

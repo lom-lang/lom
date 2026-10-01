@@ -814,6 +814,12 @@ fn fix_for_diagnostic(
         "NAM004" => fix_nam_unknown_member(d, source_lines),
         // B 包诊断的修复动作化（③ 包）：消息自带完整 import 语句，插入即修
         "NAM005" => fix_nam005_import(d),
+        // 撞名告知型 warning（v1.4.10 起）：行为已确定（本地定义优先 / 同别名
+        // 取后写声明 / 两包同名按包根路径序取后者），语义是"告知"非"待修"
+        "NAM006" => vec![hint_only(
+            "撞名告知型 warning——行为已确定（本地定义优先 / 同别名取后写声明 / 两包同名按包根路径序取后者），无需修复；如需消除歧义可重命名本地定义或 import 别名",
+            Confidence::Medium,
+        )],
 
         // ===== 效应系统（Phase 2.5）=====
         "EFF001" => fix_eff_undeclared(d, source_lines, owner),
@@ -824,6 +830,13 @@ fn fix_for_diagnostic(
         // let → let mut（High，重赋值已发生，语义忠实）；体内零命中（参数/
         // for 变量/match 绑定）或多命中 → hint（不自动改）。
         "MUT001" => fix_mut001_add_mut(d, source_lines, owner),
+        // 闭包捕获 mut 绑定（v1.1.0 起）：双后端捕获语义相反（解释器=共享
+        // 作用域 / WASM=创建时值拷贝），无法给出单一正确的自动改写——hint
+        // 指引绕开捕获状态，永不自动应用
+        "MUT002" => vec![hint_only(
+            "闭包捕获了 mut 绑定——解释器（共享作用域）与 WASM（创建时值拷贝）行为不同；修复：不依赖捕获的 mut 状态（先 let 局部副本再捕获，或改用函数参数传递新值）",
+            Confidence::Medium,
+        )],
 
         // ===== 运行时错误 =====
         "RUNTIME001" => vec![hint_only(
@@ -3294,6 +3307,123 @@ end
             result.patched_source
         );
         let _ = action_str(ActionKind::Insert);
+    }
+
+    // ===== designs/0016 子面 A：NAM006 / MUT002 分派补齐 =====
+
+    /// designs/0016 子面 A 辅助：任意码单条诊断走完整 generate_plan →
+    /// apply_plan（apply_one_diag 的泛化版，供 NAM006/MUT002 负向锁定用）。
+    fn apply_named_diag(
+        src: &str,
+        code: &str,
+        message: &str,
+        line: usize,
+        col: usize,
+    ) -> crate::apply::ApplyResult {
+        let mut diags = Diagnostics::new("test.lom");
+        diags.diagnostics.push(Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: code.to_string(),
+            message: message.to_string(),
+            file: "test.lom".to_string(),
+            line,
+            col,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        });
+        let program = crate::parser::Parser::parse_recover(src).program;
+        let fns = fn_infos(&program, src);
+        let plan = generate_plan(&diags, src, &fns);
+        crate::apply::apply_plan(&plan, src)
+    }
+
+    /// NAM006（import 别名撞本地定义）：撞名告知型 warning——行为已确定
+    /// （本地定义优先），hint 说明"无需修复"，不得再落"未知错误码"兜底；
+    /// Medium hint 永不自动应用（apply_plan 只取 High 非 Hint）。
+    /// 形态与 eval/fix_corpus/12_nam006_alias_clash.bad.lom 同源，诊断
+    /// 定位 (1,1) 为 `lom --check` 实跑坐标。
+    #[test]
+    fn nam006_alias_clash_gives_hint_not_unknown() {
+        let src = "from io import {println as log}\nfn log(msg: String) -> Unit ! [IO]\n    println(msg)\nend\nfn main() -> Unit\n    log(\"hi\")\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "NAM006",
+            "import 别名 'log' 与本地定义同名——本地定义优先（遮蔽 io::println）",
+            1,
+            1,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert!(
+            fixes[0].description.contains("撞名告知型 warning"),
+            "文案应说明这是告知型 warning: {}",
+            fixes[0].description
+        );
+        assert!(
+            !fixes[0].description.contains("未知错误码"),
+            "NAM006 不得落未知码兜底: {}",
+            fixes[0].description
+        );
+        // 负向：hint 永不自动应用——apply 后源码逐字不变
+        let result = apply_named_diag(
+            src,
+            "NAM006",
+            "import 别名 'log' 与本地定义同名——本地定义优先（遮蔽 io::println）",
+            1,
+            1,
+        );
+        assert_eq!(
+            result.applied, 0,
+            "告知型 warning 不得自动应用: {:?}",
+            result.changes
+        );
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    /// MUT002（闭包捕获外层 mut 绑定）：双后端捕获语义相反，hint 指引绕开
+    /// 捕获状态，不得再落"未知错误码"兜底；Medium hint 永不自动应用。
+    /// 形态与 eval/fix_corpus/13_mut002_closure_capture.bad.lom 同源，诊断
+    /// 定位 (5,9)（闭包体内 `c` 引用）为 `lom --check` 实跑坐标。
+    #[test]
+    fn mut002_closure_capture_gives_hint_not_unknown() {
+        let src = "from io import {println}\nfn main() -> Unit\n    let mut c = 0\n    let peek = fn() -> Int\n        c\n    end\n    println(peek())\n    c = c + 1\n    println(c)\nend\n";
+        let fixes = e2e_fixes(
+            src,
+            "MUT002",
+            "闭包捕获了可变绑定 'c'：双后端语义相反（解释器=共享作用域，WASM=创建时值拷贝），建议避免依赖",
+            5,
+            9,
+        );
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert!(
+            fixes[0].description.contains("不依赖捕获的 mut 状态"),
+            "文案应指引绕开捕获状态: {}",
+            fixes[0].description
+        );
+        assert!(
+            !fixes[0].description.contains("未知错误码"),
+            "MUT002 不得落未知码兜底: {}",
+            fixes[0].description
+        );
+        // 负向：hint 永不自动应用——apply 后源码逐字不变
+        let result = apply_named_diag(
+            src,
+            "MUT002",
+            "闭包捕获了可变绑定 'c'：双后端语义相反（解释器=共享作用域，WASM=创建时值拷贝），建议避免依赖",
+            5,
+            9,
+        );
+        assert_eq!(
+            result.applied, 0,
+            "捕获语义分歧不得自动改写: {:?}",
+            result.changes
+        );
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
     }
 
     /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan

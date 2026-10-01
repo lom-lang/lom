@@ -294,7 +294,7 @@ fn main() -> Unit
     println(x)
 
 诊断 JSON：
-{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' 结束函数体，得到 EOF","line":3,"col":1,"hint":"函数体需要以 end 闭合"}]}
+{"schema":"lom-diag/v1","file":"t089.lom","ok":false,"summary":{"total":1,"errors":1,"warnings":0,"holes":0},"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' (块闭合)，得到 文件结束","file":"t089.lom","line":4,"col":1,"source_line":null,"is_hole":false,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
 
 请输出修复后的完整代码。
 
@@ -312,7 +312,7 @@ fn main() -> Unit
     println(result)
 
 诊断 JSON：
-{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' 结束函数体，得到 EOF","line":7,"col":1,"hint":"函数体需要以 end 闭合"}]}
+{"schema":"lom-diag/v1","file":"t090.lom","ok":false,"summary":{"total":1,"errors":1,"warnings":0,"holes":0},"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' (块闭合)，得到 文件结束","file":"t090.lom","line":8,"col":1,"source_line":null,"is_hole":false,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
 
 请输出修复后的完整代码。
 
@@ -354,7 +354,7 @@ end
 
 ### Task 093
 
-以下 .lom 代码有错误。请修复使其正确输出 Monday / Tuesday / Other。
+以下 .lom 代码对 Int 的 match 缺少其余取值分支（Int match 不做穷尽性检查，--check 零警告——这是真实诊断状态）。请添加 _ 分支使其正确输出 Monday / Tuesday / Other。
 
 错误代码：
 fn day_name(n: Int) -> String
@@ -371,7 +371,7 @@ fn main() -> Unit
 end
 
 诊断 JSON（--check 模式）：
-{"schema":"lom-diag/v1","ok":true,"diagnostics":[{"severity":"warning","stage":"type","code":"MAT001","message":"match 不穷尽：缺少 _ 通配符或所有分支","line":2,"col":5,"hint":"添加 _ => ... 分支处理剩余情况"}]}
+{"schema":"lom-diag/v1","file":"t093.lom","ok":true,"summary":{"total":0,"errors":0,"warnings":0,"holes":0},"diagnostics":[]}
 
 请输出修复后的完整代码。
 
@@ -405,10 +405,9 @@ fn main() -> Unit
 end
 
 诊断 JSON：
-{"schema":"lom-diag/v1","ok":true,"diagnostics":[]}
+{"schema":"lom-diag/v1","file":"t095.lom","ok":false,"summary":{"total":1,"errors":1,"warnings":0,"holes":0},"diagnostics":[{"severity":"error","stage":"type","code":"NAM003","message":"调用未定义函数 'lenght'","file":"t095.lom","line":4,"col":13,"source_line":null,"is_hole":false,"hint":null}]}
 
-运行时错误（实际运行时）：
-未定义变量: 'lenght'（拼写错误，应为 len）
+（静态检查即报 NAM003；运行时同样未定义——拼写错误，应为 len）
 
 请输出修复后的完整代码。
 
@@ -526,10 +525,9 @@ fn main() -> Unit
 end
 
 诊断 JSON：
-{"schema":"lom-diag/v1","ok":true,"diagnostics":[]}
+{"schema":"lom-diag/v1","file":"t100.lom","ok":false,"summary":{"total":1,"errors":1,"warnings":0,"holes":0},"diagnostics":[{"severity":"error","stage":"type","code":"NAM003","message":"调用未定义函数 'int_tostring'","file":"t100.lom","line":9,"col":13,"source_line":null,"is_hole":false,"hint":null}]}
 
-运行时错误（实际运行时）：
-未定义变量: 'int_tostring'（应为 int_to_string，下划线缺失）
+（静态检查即报 NAM003；运行时同样未定义——应为 int_to_string，下划线缺失）
 
 请输出修复后的完整代码。期望输出 42。
 
@@ -612,7 +610,7 @@ fn main() -> Unit
     match x
         _ => println("x")
 诊断 JSON：
-{"schema":"lom-diag/v1","ok":false,"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' 闭合 match","line":5,"col":1,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
+{"schema":"lom-diag/v1","file":"t113.lom","ok":false,"summary":{"total":2,"errors":2,"warnings":0,"holes":0},"diagnostics":[{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' 闭合 match","file":"t113.lom","line":5,"col":1,"source_line":null,"is_hole":false,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"},{"severity":"error","stage":"parse","code":"PARSE001","message":"期望 'end' (块闭合)，得到 文件结束","file":"t113.lom","line":5,"col":1,"source_line":null,"is_hole":false,"hint":"检查语法结构是否完整，关键字/分隔符是否匹配"}]}
 
 请输出修复后的完整代码。
 
@@ -650,8 +648,6 @@ end
 
 请输出修复后的完整代码。
 
-
-
 ### Task 121
 
 以下 .lom 代码有词法错误（lom-diag/v1 诊断如下）。请修复代码使其正确运行。
@@ -684,6 +680,152 @@ end
 {"severity": "warning", "stage": "type", "code": "TYPE002", "message": "if 条件应为 Bool，得到 String", "file": "bad.lom", "line": 4, "col": 8, "source_line": "    if name", "is_hole": false, "hint": "条件表达式应为 Bool"}
 
 请输出修复后的完整代码。
+
+### Task 123
+
+以下 .lom 代码能运行（输出 hello）但有一条警告（lom-diag/v1 诊断如下）。请修复代码消除该警告，并保持输出不变。
+
+代码：
+from io import {println as log}
+
+fn log(msg: String) -> Unit ! [IO]
+    println(msg)
+end
+
+fn main() -> Unit ! [IO]
+    log("hello")
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "NAM006", "message": "import 别名 'log' 与本地定义同名——本地定义优先（遮蔽 io::println）", "file": "bad.lom", "line": 1, "col": 1, "source_line": "from io import {println as log}", "is_hole": false, "hint": "撞名不拒：别名撞本地定义时本地优先，别名重复时后写声明赢；重命名以消除遮蔽"}]}
+
+请输出修复后的完整代码。
+
+### Task 124
+
+以下 .lom 代码有一条警告（lom-diag/v1 诊断如下），指出闭包捕获了可变绑定——解释器（共享作用域，见赋值后的新值 100）与 WASM 后端（创建时值拷贝，见旧值 10）对这种代码行为相反。请修复代码消除该警告：不依赖捕获的可变状态，使程序在两个后端下都确定输出 100。
+
+代码：
+from io import {println}
+
+fn main() -> Unit
+    let mut base = 10
+    let get = fn() -> Int
+        base
+    end
+    base = 100
+    println(get())
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "MUT002", "message": "闭包捕获了可变绑定 'base'：双后端语义相反（解释器=共享作用域，WASM=创建时值拷贝），建议避免依赖", "file": "bad.lom", "line": 6, "col": 9, "source_line": "        base", "is_hole": false, "hint": null}]}
+
+请输出修复后的完整代码。
+
+### Task 125
+
+以下 .lom 代码能运行（输出 19.5）但有一条警告（lom-diag/v1 诊断如下）。请修复代码消除该警告，并保持输出不变。
+
+代码：
+from io import {println}
+
+fn main() -> Unit
+    let price: Int = 19.5
+    println(price)
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "TYPE001", "message": "let price 声明类型 Int，但值类型 Float", "file": "bad.lom", "line": 4, "col": 5, "source_line": "    let price: Int = 19.5", "is_hole": false, "hint": "检查运算符两侧类型是否一致"}]}
+
+请输出修复后的完整代码。
+
+### Task 126
+
+以下 .lom 代码静态检查报错（lom-diag/v1 诊断如下），无法运行。请修复代码使其正确运行（矩形面积与圆面积都要能算）。
+
+错误代码：
+from io import {println}
+
+fn area(w: Int, h: Int) -> Int
+    w * h
+end
+
+fn area(r: Int) -> Int
+    3 * r * r
+end
+
+fn main() -> Unit
+    println(area(4, 5))
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": false, "summary": {"total": 1, "errors": 1, "warnings": 0, "holes": 0}, "diagnostics": [{"severity": "error", "stage": "type", "code": "NAM002", "message": "函数 'area' 重复定义", "file": "bad.lom", "line": 7, "col": 1, "source_line": "fn area(r: Int) -> Int", "is_hole": false, "hint": "重命名重复的函数/枚举"}]}
+
+请输出修复后的完整代码。
+
+### Task 127
+
+以下 .lom 代码在宿主 lom 下能运行（输出 2）但有一条警告（lom-diag/v1 诊断如下）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码：消除宿主警告、保持宿主输出 2 不变，并使代码能通过 L2 子集编译（提示：Map 值要用 map_get 取出后才能参与算术）。
+
+代码：
+from io import {println}
+from map import { map_empty, map_set }
+
+fn main() -> Unit ! [IO]
+    let m = map_empty()
+    map_set(m, "a", 1)
+    if False
+        println(m + 1)
+    else
+        println(2)
+    end
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "TYPE001", "message": "'+' 不支持 Generic(\"Map\", [Named(\"_Any\")]) 和 Int", "file": "bad.lom", "line": 0, "col": 0, "source_line": null, "is_hole": false, "hint": "检查运算符两侧类型是否一致"}]}
+
+实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
+codegen error: L2.2 子集不支持: Map 参与算术（L2 子集外；仅支持 ==/!= 比较）
+COMPILE-ERROR
+
+请输出修复后的完整代码。
+
+### Task 128
+
+以下 .lom 代码在宿主 lom 下完全正确（静态检查零诊断、运行输出 2），但无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译——L2 是宿主语言的实验性子集，不支持所有表达式形态。请把管道写法改写为等价的普通函数调用，保持输出 2 不变，使代码能通过 L2 子集编译。
+
+代码：
+from io import {println}
+from list import { list_length }
+
+fn main() -> Unit
+    let xs = 1..3
+    println(xs |> list_length)
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 0, "errors": 0, "warnings": 0, "holes": 0}, "diagnostics": []}
+
+实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
+codegen error: L2.2 子集不支持: 该表达式形态
+COMPILE-ERROR
+
+请输出修复后的完整代码。
+
+### Task 129
+
+以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME002] 符号 'len' 未导入——警告正是对运行时失败的预警）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码消除该警告并使程序正常运行，且能通过 L2 子集编译。
+
+代码：
+from io import {println}
+
+fn main() -> Unit
+    let s = "hello"
+    println(len(s))
+end
+诊断 JSON：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "NAM005", "message": "内建 'len' 未导入——需在文件顶部声明：from string import {len}", "file": "bad.lom", "line": 5, "col": 13, "source_line": "    println(len(s))", "is_hole": false, "hint": null}]}
+
+实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
+codegen error: 未定义变量 'len'
+COMPILE-ERROR
+
+请输出修复后的完整代码。
+
 
 ---
 

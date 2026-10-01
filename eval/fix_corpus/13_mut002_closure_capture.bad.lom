@@ -1,0 +1,10 @@
+from io import {println}
+fn main() -> Unit
+    let mut c = 0
+    let peek = fn() -> Int
+        c
+    end
+    println(peek())
+    c = c + 1
+    println(c)
+end

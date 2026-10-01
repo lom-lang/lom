@@ -48,16 +48,17 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **交接就绪（2026-10-01）**：v1.4.15 已提交（tag `cf73de2`，CI
-  run `36829534116` #238 六 job 绿），工作区干净（回填提交除外），
-  **台账 R1-R111 全部关闭、零 open 项**，无在制工作。v1.4.15 =
-  R110 邻接面收官批（块内 LetDestruct 同名遮蔽快照/恢复，
-  designs/0015 + RFC-0004 修订 48，用户裁决"继续执行"）——
-  check_block 快照条件扩 Let/LetDestruct 两形态，二十四审 p13
-  原形误报清除（三路径 10/20/5 一致，规划者亲验）、负向与 fix
-  R75 保守降级维持、全仓 4300 文件 --check 对拍 MUT001 面
-  DIFF=0、新单元 ×5 → Rust 559；**未复审**（二十四审 A- 只评
-  v1.4.14 基线）。
+- **v1.5.0 本地完成，提交/CI/tag 门禁进行中（回填后交接就绪）**：
+  repair 闭环深化首批（designs/0016 + RFC-0004 修订 50，用户
+  裁决三点均按建议项）——fix 分派表补 NAM006/MUT002 hint（不再
+  "未知错误码"，均不自动 apply）、SPEC_FOR_AI §11c/§11e 补齐、
+  fix_corpus 13 对、**error_repair 31 题（全仓 128 任务）含 L2
+  面新题型 3**（宿主收而 L2 拒的修复题：prompt 双真实采集 +
+  参考解三链验证，runner 零改动）；发布解冻条件盘点七项检查单
+  随批入 TODO。**新发现 R112 开账待裁（P2 存量）**：闭包内对
+  捕获 mut 赋值 → 解释器 RefCell panic（interpreter.rs:336，
+  rc=1 有兜底；另两侧显性拒绝；读取形态不触发）。**未复审**
+  （二十四审 A- 只评 v1.4.14 基线；二十五审已裁与本批合并发起）。
 - **审查轮次与评级（均不外推；v1.4.15 未复审）**：二十审 A- →
   二十一审 B（开 R104/R105）→ 二十二审 B+（R104/R105 关闭
   确认，开 R107-R109）→ 二十三审 B+（三项关闭确认，开 R110）→
@@ -75,18 +76,22 @@
   + lom build 闭包 externals，`7a48810` #228）→ v1.4.14 R110
   （check_block 块级快照/恢复，`e8b099e` #232）→ v1.4.15 R110
   邻接面（块内解构快照/恢复——R110 族三步推广收官，`cf73de2`
-  #238）。
+  #238）→ v1.5.0 repair 闭环深化首批（fix 补齐 + eval 128 +
+  L2 面新题型，门禁回填后补）。
 - **已提交基线**：verify_selfcomp **365/365 = 196 单文件 + 8 包 + 161 负例**、
   bootstrap **14/14**（强 quine 269555 bytes 双侧一致）、
-  self_comp.lom 12544 行、Rust **559 单元 + 28 集成**
+  self_comp.lom 12544 行、Rust **561 单元 + 28 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
-  closure×3）、eval 双后端各 121/121、探针 8/8、doc_audit **71/71**
-  、六模式全 PASS。Cargo.toml/lock 均为 1.4.15。
+  closure×3）、eval 双后端各 128/128（error_repair 31 题含 L2
+  面 3）、fix_corpus 13 对、探针 8/8、doc_audit **71/71**、六
+  模式全 PASS（dump 161）。Cargo.toml/lock 均为 1.5.0。
 - **撞名/遮蔽族语义（用户已裁，三侧一致）**：本地定义优先（别名
   撞本地 fn）；两包同名符号按包根路径序取后者；两 import 同一
   别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
   块级/for 变量/块内解构同名遮蔽 typechecker 快照恢复
   （v1.4.13/14/15 三步推广收官）。
+- **open 项：R112（P2 存量，修否待裁）**——闭包内对捕获 mut
+  赋值触发解释器 RefCell panic（详见 TODO 开账段）。
 - **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏
   divergence（块外读放行/解释器 RUNTIME002）；循环外读 for
   变量同款 divergence；多文件包内跨文件引用在无文件 build
@@ -94,12 +99,12 @@
   检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
   工具链漂移存量（2026-10-01 实测，CI 口径 -D warnings 零输出
   不受影响）。
-- 下一步：**无在制工作，方向待用户裁决**。复审时机已裁
-  （2026-10-01）：二十五审与下一阶段方向首个批次合并发起
-  （覆盖 v1.4.15 + 新批次增量）。待裁菜单：下一阶段方向（repair
-  闭环深化/性能工程/发布解冻条件盘点——发布线继续冻结直至解冻）。
-- 交付史与机制事实源：RFC-0004 修订 1–48、SPEC §13、
-  designs/0001–0015、TODO 顶部、HANDOVER §11.6 和 selfcomp
+- 下一步：**v1.5.0 门禁回填后：R112 修否 + 二十五审发起**
+  （复审时机已裁：与本批合并发起——v1.5.0 门禁绿后即可呈请
+  发起）。后续方向菜单：R112 整改 / repair 闭环后续批 /
+  性能工程（发布线继续冻结直至解冻）。
+- 交付史与机制事实源：RFC-0004 修订 1–50、SPEC §13、
+  designs/0001–0016、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
@@ -107,14 +112,14 @@
    §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-01-2.html
    （二十四审——最新轮）及 review-2026-10-01.html（二十三审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-48 全读），docs/designs/0001~0015 十五份批次设计（含各批实施
+   1-50 全读），docs/designs/0001~0016 十六份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 559/559；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
+   - cargo test --release（期望 561/561；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）
@@ -123,7 +128,7 @@
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（已提交基线 365/365 = 196 单文件 + 8 包 + 161 负例）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269555 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
-   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（121/121；WASM 侧加 -Backend wasm 同 121）
+   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（128/128；WASM 侧加 -Backend wasm 同 128）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }

@@ -1,0 +1,7 @@
+from io import {println as log}
+fn log(msg: String) -> Unit ! [IO]
+    println(msg)
+end
+fn main() -> Unit
+    log("hi")
+end
