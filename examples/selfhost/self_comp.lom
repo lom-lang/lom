@@ -382,7 +382,7 @@ fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, e
                             rest = r2
                         end
                         None =>
-                            errs = list_cons({msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
+                            errs = list_cons({code: classify_lex_msg("无效整数: " + ip), msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
                             rest = list_tail(rest)
                             cl = cl0 + 1
                         end
@@ -395,7 +395,7 @@ fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, e
                         rest = r2
                     end
                     None =>
-                        errs = list_cons({msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
+                        errs = list_cons({code: classify_lex_msg("无效整数: " + ip), msg: "无效整数: " + ip, ln: ln0, cl: cl0}, errs)
                         rest = list_tail(rest)
                         cl = cl0 + 1
                     end
@@ -450,7 +450,7 @@ fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, e
                 else
                     "未闭合的字符串"
                 end
-                errs = list_cons({msg: unclosed_msg, ln: ln0, cl: cl0}, errs)
+                errs = list_cons({code: classify_lex_msg(unclosed_msg), msg: unclosed_msg, ln: ln0, cl: cl0}, errs)
                 rest = list_tail(rest)
                 cl += 1
             end
@@ -619,7 +619,7 @@ fn lex(src: String) -> {toks: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int, e
             cl += 1
         else
             # 意外字符（宿主 LexError "意外字符 'x'"，tokenize_recover 跳过该字节）
-            errs = list_cons({msg: "意外字符 '" + c + "'", ln: ln0, cl: cl0}, errs)
+            errs = list_cons({code: classify_lex_msg("意外字符 '" + c + "'"), msg: "意外字符 '" + c + "'", ln: ln0, cl: cl0}, errs)
             rest = list_tail(rest)
             cl += 1
         end
@@ -1237,6 +1237,34 @@ fn classify_parse_msg(msg: String) -> String
         "PARSE001"
     else
         "PARSE000"
+    end
+end
+
+# codegen 错误码分类（0017 子面 A：L2 专属前缀 7 族 + 兜底；关键字匹配表，
+# 关键字从 tools/selfcomp/negative/ 全量负例实测文案提炼——实测 161 负例
+# 141 条去重文案全落位、兜底率 0%，采集脚本与落位明细在 target/probes/l2diag）。
+# 族内共用一码（首版不细分）；elif 顺序即优先级——两条前置特例：
+#   ① L2P 在 L2V 前：命名约束文案不受值运算关键字干扰；
+#   ② "未被预扫覆盖" 先于 L2V：该文案尾部修复建议含"比较"二字，先捕归 L2S。
+fn classify_l2(msg: String) -> String
+    if contains(msg, "内部错误") or contains(msg, "请报维护者")
+        "L2E001"
+    elif contains(msg, "缺少 main") or contains(msg, "不得命名") or contains(msg, "重复变体名") or contains(msg, "重复枚举声明") or contains(msg, "重复类型参数") or contains(msg, "重名") or contains(msg, "同名") or contains(msg, "与内建类型冲突")
+        "L2P001"
+    elif contains(msg, "未被预扫覆盖")
+        "L2S001"
+    elif contains(msg, "算术") or contains(msg, "比较") or contains(msg, "一元负") or contains(msg, "拼接")
+        "L2V001"
+    elif contains(msg, "调用 '") or contains(msg, "调用闭包") or contains(msg, "调用非闭包值") or contains(msg, "实数量") or contains(msg, "实参数不符") or contains(msg, "参类型不符") or contains(msg, "期望同型") or contains(msg, "期望双参数闭包") or contains(msg, "期望单参数闭包") or contains(msg, "期望 1 个参数")
+        "L2C001"
+    elif contains(msg, "未定义变量") or contains(msg, "未知内建") or contains(msg, "未知模块") or contains(msg, "无公开符号") or contains(msg, "未知变体模式") or contains(msg, "未知或子集外枚举类型")
+        "L2U001"
+    elif contains(msg, "注解类型") or contains(msg, "类型注解") or contains(msg, "类型不符") or contains(msg, "子模式数不符") or contains(msg, "类型参数") or contains(msg, "须为 Bool") or contains(msg, "须返回 Bool") or contains(msg, "须为 Int") or contains(msg, "须为 Result") or contains(msg, "签名不符") or contains(msg, "值类型不一致") or contains(msg, "不能带值") or contains(msg, "不能为 Unit") or contains(msg, "尾表达式产值") or contains(msg, "绑定 void 值") or contains(msg, "void 函数") or contains(msg, "求值为 void") or contains(msg, "与被测类型") or contains(msg, "越界") or contains(msg, "不可推断") or contains(msg, "不可精确推断") or contains(msg, "return 无值") or contains(msg, "无字段") or contains(msg, "只能用于") or contains(msg, "未知 List 元素类型") or contains(msg, "未知 Map 值类型")
+        "L2T001"
+    elif contains(msg, "暂不支持") or contains(msg, "子集外") or contains(msg, "该表达式形态") or contains(msg, "该语句形态") or contains(msg, "留后续批次") or contains(msg, "仅支持") or contains(msg, "不可区分") or contains(msg, "留 L2") or contains(msg, "至少需要一个臂")
+        "L2S001"
+    else
+        "L2G001"
     end
 end
 
@@ -12534,7 +12562,7 @@ fn main() -> Unit ! [IO]
                         println("COMPILED " + len(hex) / 2 + " bytes -> " + outpath)
                     end
                     Err(msg) =>
-                        println("codegen error: " + msg)
+                        println("codegen error: [" + classify_l2(msg) + "] " + msg)
                         println("COMPILE-ERROR")
                     end
                 end

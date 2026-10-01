@@ -1,0 +1,6 @@
+# 0017 子面 B：lex 通道负例——源码换行前未闭合的字符串字面量（LEX001）。
+# 宿主 lex_string 容错：记录错误 + 回退跳过开头引号。
+fn main() -> Unit ! [IO]
+    let s = "abc
+    println(s)
+end

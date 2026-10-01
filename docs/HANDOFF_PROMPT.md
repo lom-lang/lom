@@ -48,8 +48,12 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **交接就绪（2026-10-01）**：v1.5.1 已提交（tag `142a118`，CI
-  run `36859203394` #246 六 job 绿），工作区干净（回填提交除外）。
+- **v1.6.0 本地完成，提交/CI/tag 门禁进行中（回填后交接就绪）**：
+  L2 诊断结构化前置件（designs/0017 + RFC-0004 修订 52，三点均
+  按甲）——codegen error 全量上码 [L2xxx]（141 文案 100% 归族、
+  兜底 0%）、lex 通道存量 bug 修复 + 2 负例、147 条断言双锁、
+  eval 三题重采；verify_selfcomp 365→367、quine 271989、
+  self_comp 12572 行；宿主 src/ 零改动；行号留后续批。
   R112 整改（RFC-0004 修订 51，用户裁决"按你的想法执行"——
   规划者读码后改选乙修法：修借用冲突兑现 MUT002"解释器=共享
   作用域"既定语义，原建议甲的偏离如实登记）。解释器闭包内赋值
@@ -87,14 +91,15 @@
   邻接面（块内解构快照/恢复——R110 族三步推广收官，`cf73de2`
   #238）→ v1.5.0 repair 闭环深化首批（fix 补齐 + eval 128 +
   L2 面新题型，`b61182f` #242）→ v1.5.1 R112 整改（修借用冲突
-  兑现共享语义，`142a118` #246）。
-- **已提交基线**：verify_selfcomp **365/365 = 196 单文件 + 8 包 + 161 负例**、
-  bootstrap **14/14**（强 quine 269555 bytes 双侧一致）、
-  self_comp.lom 12544 行、Rust **561 单元 + 31 集成**
+  兑现共享语义，`142a118` #246）→ v1.6.0 L2 诊断结构化前置件
+  （codegen error 上码 + lex 修复 + 三题重采，门禁回填后补）。
+- **已提交基线**：verify_selfcomp **367/367 = 196 单文件 + 8 包 + 163 负例**、
+  bootstrap **14/14**（强 quine 271989 bytes 双侧一致）、
+  self_comp.lom 12572 行、Rust **561 单元 + 31 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
-  closure×3）、eval 双后端各 128/128（error_repair 31 题含 L2
-  面 3）、fix_corpus 13 对、探针 8/8、doc_audit **71/71**、六
-  模式全 PASS（dump 161）。Cargo.toml/lock 均为 1.5.0。
+  closure×3 + r112×3）、eval 双后端各 128/128（error_repair 31
+  题含 L2 面 3）、fix_corpus 13 对、探针 8/8、doc_audit **71/71**、
+  六模式全 PASS（dump 161）。Cargo.toml/lock 均为 1.6.0。
 - **撞名/遮蔽族语义（用户已裁，三侧一致）**：本地定义优先（别名
   撞本地 fn）；两包同名符号按包根路径序取后者；两 import 同一
   别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
@@ -107,11 +112,12 @@
   检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
   工具链漂移存量（2026-10-01 实测，CI 口径 -D warnings 零输出
   不受影响）。
-- 下一步：**无在制工作，方向待用户裁决**。菜单：repair 闭环
-  后续批（如 L2 诊断结构化前置件）/ 性能工程 / 二十六审时机
-  （发布线继续冻结直至解冻）。
-- 交付史与机制事实源：RFC-0004 修订 1–50、SPEC §13、
-  designs/0001–0016、TODO 顶部、HANDOVER §11.6 和 selfcomp
+- 下一步：**v1.6.0 门禁回填后交接就绪，方向待用户裁决**。
+  菜单：repair 闭环续批（L2 行号主要簇 ~118 处 / 宿主 fix 吃
+  L2 码的第二前置件）/ 性能工程 / 二十六审时机（发布线继续
+  冻结直至解冻）。
+- 交付史与机制事实源：RFC-0004 修订 1–52、SPEC §13、
+  designs/0001–0017、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
@@ -119,7 +125,7 @@
    §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-01-2.html
    （二十四审——最新轮）及 review-2026-10-01.html（二十三审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-50 全读），docs/designs/0001~0016 十六份批次设计（含各批实施
+   1-52 全读），docs/designs/0001~0017 十七份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
@@ -133,8 +139,8 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 24/24）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交基线 365/365 = 196 单文件 + 8 包 + 161 负例）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 269555 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py（已提交基线 367/367 = 196 单文件 + 8 包 + 163 负例）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 271989 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（128/128；WASM 侧加 -Backend wasm 同 128）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -148,7 +154,7 @@
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
 【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
-  365 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+  367 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录；撞名/遮蔽族语义看
   SPEC §8.1 与二十四审报告）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2

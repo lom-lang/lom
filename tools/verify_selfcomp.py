@@ -91,183 +91,187 @@ CASE_ARGS = {
 
 EXPECTED_NEGATIVE_MESSAGES = {
     # ---- L2.3 Map 批（designs/0006 §7.3 校验表 #1-#10 + 裁决 2/3 甲）----
-    'neg_map_set_nonmap.lom': "调用 'map_set' 期望 Map 得 i64",
-    'neg_map_key_type.lom': "第 2 参期望 String 键（得 i64）",
-    'neg_map_val_mismatch.lom': "Map 值类型不符（期望 mp{i64} 得 f64）",
-    'neg_map_annot_mismatch.lom': "let 注解类型 'mp{i64}' 与值类型 'i64' 不符",
-    'neg_map_unknown_val.lom': '未知 Map 值类型——需注解或 set 上下文（map_get）',
-    'neg_map_call_arity.lom': "调用 'map_set' 实数量不符",
-    'neg_map_arith.lom': 'Map 参与算术',
-    'neg_map_compare.lom': 'Map 大小比较',
-    'neg_for_map.lom': 'for 迭代仅支持 Int/String/List',
-    'neg_map_eq_enum_val.lom': 'Map 值相等比较暂不支持 枚举/闭包 值',
+    'neg_map_set_nonmap.lom': ('L2C001', "调用 'map_set' 期望 Map 得 i64"),
+    'neg_map_key_type.lom': ('L2C001', "第 2 参期望 String 键（得 i64）"),
+    'neg_map_val_mismatch.lom': ('L2T001', "Map 值类型不符（期望 mp{i64} 得 f64）"),
+    'neg_map_annot_mismatch.lom': ('L2T001', "let 注解类型 'mp{i64}' 与值类型 'i64' 不符"),
+    'neg_map_unknown_val.lom': ('L2T001', '未知 Map 值类型——需注解或 set 上下文（map_get）'),
+    'neg_map_call_arity.lom': ('L2C001', "调用 'map_set' 实数量不符"),
+    'neg_map_arith.lom': ('L2V001', 'Map 参与算术'),
+    'neg_map_compare.lom': ('L2V001', 'Map 大小比较'),
+    'neg_for_map.lom': ('L2S001', 'for 迭代仅支持 Int/String/List'),
+    'neg_map_eq_enum_val.lom': ('L2V001', 'Map 值相等比较暂不支持 枚举/闭包 值'),
     # ---- L2.3 json 批（designs/0007 裁决 1 甲 + B1+B2 + 数字甲）----
-    'neg_json_alias.lom': '暂不支持 as 别名',
-    'neg_json_arith.lom': 'json 值参与算术/拼接',
-    'neg_json_compare.lom': 'json 值参与比较',
-    'neg_json_concat.lom': 'json 值参与算术/拼接',
-    'neg_json_field_nonjs.lom': '该表达式形态',
-    'neg_json_let_mismatch.lom': "let 注解类型 'js' 与值类型 'i64' 不符",
-    'neg_json_map_consume.lom': '期望 Map 得 js',
-    'neg_json_neg.lom': 'json 值参与一元负',
-    'neg_json_parse_nonstr.lom': "第 1 参类型不符（期望 st 得 i64）",
-    'neg_json_record_literal.lom': 'stringify 暂不支持 Record/Tuple 值',
-    'neg_json_stringify_enum_val.lom': 'stringify 暂不支持 枚举/闭包 值',
-    'neg_json_stringify_list_enum.lom': '暂不支持 枚举/闭包 值元素',
-    'neg_json_stringify_unit.lom': 'json_stringify 实参不能为 Unit',
-    'neg_json_unknown_builtin.lom': "未知内建 'json.json_dump'",
+    'neg_json_alias.lom': ('L2S001', '暂不支持 as 别名'),
+    'neg_json_arith.lom': ('L2V001', 'json 值参与算术/拼接'),
+    'neg_json_compare.lom': ('L2V001', 'json 值参与比较'),
+    'neg_json_concat.lom': ('L2V001', 'json 值参与算术/拼接'),
+    'neg_json_field_nonjs.lom': ('L2S001', '该表达式形态'),
+    'neg_json_let_mismatch.lom': ('L2T001', "let 注解类型 'js' 与值类型 'i64' 不符"),
+    'neg_json_map_consume.lom': ('L2C001', '期望 Map 得 js'),
+    'neg_json_neg.lom': ('L2V001', 'json 值参与一元负'),
+    'neg_json_parse_nonstr.lom': ('L2C001', "第 1 参类型不符（期望 st 得 i64）"),
+    'neg_json_record_literal.lom': ('L2S001', 'stringify 暂不支持 Record/Tuple 值'),
+    'neg_json_stringify_enum_val.lom': ('L2S001', 'stringify 暂不支持 枚举/闭包 值'),
+    'neg_json_stringify_list_enum.lom': ('L2S001', '暂不支持 枚举/闭包 值元素'),
+    'neg_json_stringify_unit.lom': ('L2T001', 'json_stringify 实参不能为 Unit'),
+    'neg_json_unknown_builtin.lom': ('L2U001', "未知内建 'json.json_dump'"),
     # ---- R89（十六审 P3）：void 实参单列诊断（不再落容器显示兜底）----
-    'neg_println_void.lom': 'println 实参求值为 void',
+    'neg_println_void.lom': ('L2T001', 'println 实参求值为 void'),
     # ---- L2.3 List 批（designs/0005 校验表 #1-#12 + 管道子集外登记）----
     # Map 批将 println/拼接提升的容器显示文案扩为 List/Map（neg_println_list
     # /neg_list_concat_promote 的锁定串随批更新）
-    'neg_list_cons_elem_type.lom': "类型不符（'f64' vs 'i64'）",
-    'neg_list_head_nonlist.lom': "调用 'list_head' 期望 List 得 i64",
-    'neg_list_get_idx_type.lom': "调用 'list_get' 第 2 参类型不符",
-    'neg_list_map_sig.lom': 'list_map 的 f 期望单参数闭包',
-    'neg_list_fold_sig.lom': 'list_fold 的 f 期望双参数闭包',
-    'neg_list_filter_pred_bool.lom': 'list_filter 谓词须返回 Bool',
-    'neg_list_assign_elem.lom': "赋值 'xs' 类型不符（期望 ls{i64} 得 ls{f64}）",
-    'neg_list_annot_mismatch.lom': "let 注解类型 'ls{i64}' 与值类型 'ls{f64}' 不符",
-    'neg_list_arith.lom': 'List 参与算术',
-    'neg_list_compare.lom': 'List 大小比较',
-    'neg_list_unknown_elem.lom': '未知 List 元素类型——需注解或构造上下文（list_head）',
-    'neg_range_not_int.lom': 'range 两端须为 Int',
-    'neg_list_eq_enum_elem.lom': 'List 元素相等比较暂不支持 枚举/闭包 元素',
-    'neg_pipe_syntax.lom': '该表达式形态',
+    'neg_list_cons_elem_type.lom': ('L2T001', "类型不符（'f64' vs 'i64'）"),
+    'neg_list_head_nonlist.lom': ('L2C001', "调用 'list_head' 期望 List 得 i64"),
+    'neg_list_get_idx_type.lom': ('L2C001', "调用 'list_get' 第 2 参类型不符"),
+    'neg_list_map_sig.lom': ('L2C001', 'list_map 的 f 期望单参数闭包'),
+    'neg_list_fold_sig.lom': ('L2C001', 'list_fold 的 f 期望双参数闭包'),
+    'neg_list_filter_pred_bool.lom': ('L2T001', 'list_filter 谓词须返回 Bool'),
+    'neg_list_assign_elem.lom': ('L2T001', "赋值 'xs' 类型不符（期望 ls{i64} 得 ls{f64}）"),
+    'neg_list_annot_mismatch.lom': ('L2T001', "let 注解类型 'ls{i64}' 与值类型 'ls{f64}' 不符"),
+    'neg_list_arith.lom': ('L2V001', 'List 参与算术'),
+    'neg_list_compare.lom': ('L2V001', 'List 大小比较'),
+    'neg_list_unknown_elem.lom': ('L2T001', '未知 List 元素类型——需注解或构造上下文（list_head）'),
+    'neg_range_not_int.lom': ('L2T001', 'range 两端须为 Int'),
+    'neg_list_eq_enum_elem.lom': ('L2V001', 'List 元素相等比较暂不支持 枚举/闭包 元素'),
+    'neg_pipe_syntax.lom': ('L2S001', '该表达式形态'),
     # ---- 第十五轮整改（R84/R85）----
-    'neg_fold_unsupported_acc.lom': 'list_fold 累加器类型子集外',
-    'neg_bool_param_flow.lom': '深层 Bool 流未被预扫覆盖',
+    'neg_fold_unsupported_acc.lom': ('L2S001', 'list_fold 累加器类型子集外'),
+    'neg_bool_param_flow.lom': ('L2S001', '深层 Bool 流未被预扫覆盖'),
     # ---- 此前批次 ----
-    'neg_bool_arith.lom': 'Bool 参与算术',
-    'neg_bool_mixed_compare.lom': 'Bool 与非 Bool 比较',
-    'neg_bool_unary.lom': 'Bool 参与一元负',
-    'neg_str_num_compare.lom': 'String 与非 String 比较',
-    'neg_str_arith.lom': 'String 只参与 + 拼接',
-    'neg_str_neg.lom': '闭包/枚举/String/Map 值参与一元负',
-    'neg_str_annot_mismatch.lom': "let 注解类型 'i64' 与值类型 'st' 不符",
-    'neg_str_call_value.lom': "调用非闭包值（得到 vt 'st'）",
-    'neg_stoi_union.lom': 'untagged 表示下运行时不可区分',
-    'neg_str_builtin_arity.lom': "调用 'contains' 实数量不符",
-    'neg_str_builtin_type.lom': "调用 'len' 第 1 参类型不符（期望 st 得 i64）",
-    'neg_str_builtin_not_imported.lom': "未定义变量 'len'",
-    'neg_match_num_str_pattern.lom': '字面量模式类型不符（被测 i64 模式 st）',
-    'neg_builtin_import_clash.lom': '与用户函数/重复导入同名',
-    'neg_str_condition.lom': 'if 条件须为 Bool',
-    'neg_str_assign_mismatch.lom': "赋值 'n' 类型不符",
-    'neg_for_block_let_leak.lom': "未定义变量 'y'",
-    'neg_if_block_let_leak.lom': "未定义变量 'y'",
-    'neg_if_branch_local_outer_leak.lom': "未定义变量 'x'",
-    'neg_if_branch_local_sibling_leak.lom': "未定义变量 'x'",
-    'neg_if_sibling_let_leak.lom': "未定义变量 'y'",
-    'neg_builtin_none_pattern.lom': "无参变体模式 'None' 与被测类型 'i64' 不符",
-    'neg_c2_assign_wrong_instance.lom': "赋值 'x' 类型不符",
-    'neg_c2_duplicate_param.lom': "重复类型参数 'T'",
-    'neg_c2_generic_arity.lom': '类型参数数不符',
-    'neg_c2_generic_conflict.lom': "变体 'Pair' 第 2 参类型不符",
-    'neg_c2_generic_naked.lom': "泛型枚举类型 'Box' 期望 1 个类型参数",
-    'neg_c2_generic_wrong_arg.lom': "调用 'take' 第 1 参类型不符",
-    'neg_c2_nested_wrong_payload.lom': "调用 'take' 第 1 参类型不符",
-    'neg_c2_nested_typevar_conflict.lom': "变体 'Both' 第 2 参类型不符",
-    'neg_c2_none_arity.lom': "变体 'None' 实参数不符",
-    'neg_c2_pattern_arity.lom': '子模式数不符',
-    'neg_c2_pattern_wrong_enum.lom': "变体模式所属枚举 'Box' 与被测类型",
-    'neg_c2_result_wrong_payload.lom': "调用 'take' 第 1 参类型不符",
-    'neg_c2_recursive_wrong_payload.lom': "变体 'Node' 第 1 参类型不符",
-    'neg_c2_some_arity.lom': "变体 'Some' 实参数不符",
-    'neg_c2_type_param_builtin.lom': "类型参数名与内建类型冲突（'Int'）",
-    'neg_c2_unbound_field_type.lom': "未知或子集外枚举类型 'U'",
-    'neg_c2_unit_type_arg.lom': "Option 类型参数暂不支持 Unit/Fn",
-    'neg_c2_unknown_payload_pattern.lom': "模式载荷类型不可推断",
-    'neg_c2_unknown_type_arg.lom': "未知或子集外枚举类型 'Ghost'",
-    'neg_closure_assign_signature.lom': '闭包签名不符',
-    'neg_enum_assign_type.lom': "赋值 'e' 类型不符",
-    'neg_enum_builtin_type_name.lom': '枚举名与内建类型冲突',
-    'neg_enum_ctor_arity.lom': "变体 'Both' 实参数不符",
-    'neg_enum_ctor_type.lom': "变体 'V' 第 1 参类型不符",
-    'neg_enum_duplicate_variant.lom': '重复变体名',
-    'neg_enum_eq.lom': '闭包/枚举值参与比较',
-    'neg_enum_pattern_arity.lom': '子模式数不符',
-    'neg_enum_pattern_unknown.lom': "未知变体模式 'Missing'",
-    'neg_enum_pattern_wrong_type.lom': "无参变体模式 'B1' 与被测类型",
-    'neg_enum_unit_payload.lom': '变体载荷不能为 Unit',
-    'neg_enum_unknown_type.lom': "未知或子集外枚举类型 'Ghost'",
-    'neg_match_arm_type.lom': 'match 臂值类型不一致',
-    'neg_match_binder_outer_leak.lom': "未定义变量 'x'",
-    'neg_match_binder_sibling_leak.lom': "未定义变量 'x'",
-    'neg_match_block_let_leak.lom': "未定义变量 'z'",
-    'neg_match_guard_type.lom': 'match guard 须为 Bool',
-    'neg_match_if_local_outer_leak.lom': "未定义变量 'z'",
-    'neg_match_no_arms.lom': 'match 至少需要一个臂',
-    'neg_match_string_pattern.lom': '字面量模式类型不符（被测 i64 模式 st）',
-    'neg_variant_shadow_call.lom': '调用非闭包值',
-    'neg_while_block_let_leak.lom': "未定义变量 'y'",
+    'neg_bool_arith.lom': ('L2V001', 'Bool 参与算术'),
+    'neg_bool_mixed_compare.lom': ('L2V001', 'Bool 与非 Bool 比较'),
+    'neg_bool_unary.lom': ('L2V001', 'Bool 参与一元负'),
+    'neg_str_num_compare.lom': ('L2V001', 'String 与非 String 比较'),
+    'neg_str_arith.lom': ('L2V001', 'String 只参与 + 拼接'),
+    'neg_str_neg.lom': ('L2V001', '闭包/枚举/String/Map 值参与一元负'),
+    'neg_str_annot_mismatch.lom': ('L2T001', "let 注解类型 'i64' 与值类型 'st' 不符"),
+    'neg_str_call_value.lom': ('L2C001', "调用非闭包值（得到 vt 'st'）"),
+    'neg_stoi_union.lom': ('L2S001', 'untagged 表示下运行时不可区分'),
+    'neg_str_builtin_arity.lom': ('L2C001', "调用 'contains' 实数量不符"),
+    'neg_str_builtin_type.lom': ('L2C001', "调用 'len' 第 1 参类型不符（期望 st 得 i64）"),
+    'neg_str_builtin_not_imported.lom': ('L2U001', "未定义变量 'len'"),
+    'neg_match_num_str_pattern.lom': ('L2T001', '字面量模式类型不符（被测 i64 模式 st）'),
+    'neg_builtin_import_clash.lom': ('L2P001', '与用户函数/重复导入同名'),
+    'neg_str_condition.lom': ('L2T001', 'if 条件须为 Bool'),
+    'neg_str_assign_mismatch.lom': ('L2T001', "赋值 'n' 类型不符"),
+    'neg_for_block_let_leak.lom': ('L2U001', "未定义变量 'y'"),
+    'neg_if_block_let_leak.lom': ('L2U001', "未定义变量 'y'"),
+    'neg_if_branch_local_outer_leak.lom': ('L2U001', "未定义变量 'x'"),
+    'neg_if_branch_local_sibling_leak.lom': ('L2U001', "未定义变量 'x'"),
+    'neg_if_sibling_let_leak.lom': ('L2U001', "未定义变量 'y'"),
+    'neg_builtin_none_pattern.lom': ('L2T001', "无参变体模式 'None' 与被测类型 'i64' 不符"),
+    'neg_c2_assign_wrong_instance.lom': ('L2T001', "赋值 'x' 类型不符"),
+    'neg_c2_duplicate_param.lom': ('L2P001', "重复类型参数 'T'"),
+    'neg_c2_generic_arity.lom': ('L2T001', '类型参数数不符'),
+    'neg_c2_generic_conflict.lom': ('L2C001', "变体 'Pair' 第 2 参类型不符"),
+    'neg_c2_generic_naked.lom': ('L2T001', "泛型枚举类型 'Box' 期望 1 个类型参数"),
+    'neg_c2_generic_wrong_arg.lom': ('L2C001', "调用 'take' 第 1 参类型不符"),
+    'neg_c2_nested_wrong_payload.lom': ('L2C001', "调用 'take' 第 1 参类型不符"),
+    'neg_c2_nested_typevar_conflict.lom': ('L2C001', "变体 'Both' 第 2 参类型不符"),
+    'neg_c2_none_arity.lom': ('L2C001', "变体 'None' 实参数不符"),
+    'neg_c2_pattern_arity.lom': ('L2T001', '子模式数不符'),
+    'neg_c2_pattern_wrong_enum.lom': ('L2T001', "变体模式所属枚举 'Box' 与被测类型"),
+    'neg_c2_result_wrong_payload.lom': ('L2C001', "调用 'take' 第 1 参类型不符"),
+    'neg_c2_recursive_wrong_payload.lom': ('L2C001', "变体 'Node' 第 1 参类型不符"),
+    'neg_c2_some_arity.lom': ('L2C001', "变体 'Some' 实参数不符"),
+    'neg_c2_type_param_builtin.lom': ('L2P001', "类型参数名与内建类型冲突（'Int'）"),
+    'neg_c2_unbound_field_type.lom': ('L2U001', "未知或子集外枚举类型 'U'"),
+    'neg_c2_unit_type_arg.lom': ('L2T001', "Option 类型参数暂不支持 Unit/Fn"),
+    'neg_c2_unknown_payload_pattern.lom': ('L2T001', "模式载荷类型不可推断"),
+    'neg_c2_unknown_type_arg.lom': ('L2U001', "未知或子集外枚举类型 'Ghost'"),
+    'neg_closure_assign_signature.lom': ('L2T001', '闭包签名不符'),
+    'neg_enum_assign_type.lom': ('L2T001', "赋值 'e' 类型不符"),
+    'neg_enum_builtin_type_name.lom': ('L2P001', '枚举名与内建类型冲突'),
+    'neg_enum_ctor_arity.lom': ('L2C001', "变体 'Both' 实参数不符"),
+    'neg_enum_ctor_type.lom': ('L2C001', "变体 'V' 第 1 参类型不符"),
+    'neg_enum_duplicate_variant.lom': ('L2P001', '重复变体名'),
+    'neg_enum_eq.lom': ('L2V001', '闭包/枚举值参与比较'),
+    'neg_enum_pattern_arity.lom': ('L2T001', '子模式数不符'),
+    'neg_enum_pattern_unknown.lom': ('L2U001', "未知变体模式 'Missing'"),
+    'neg_enum_pattern_wrong_type.lom': ('L2T001', "无参变体模式 'B1' 与被测类型"),
+    'neg_enum_unit_payload.lom': ('L2T001', '变体载荷不能为 Unit'),
+    'neg_enum_unknown_type.lom': ('L2U001', "未知或子集外枚举类型 'Ghost'"),
+    'neg_match_arm_type.lom': ('L2T001', 'match 臂值类型不一致'),
+    'neg_match_binder_outer_leak.lom': ('L2U001', "未定义变量 'x'"),
+    'neg_match_binder_sibling_leak.lom': ('L2U001', "未定义变量 'x'"),
+    'neg_match_block_let_leak.lom': ('L2U001', "未定义变量 'z'"),
+    'neg_match_guard_type.lom': ('L2T001', 'match guard 须为 Bool'),
+    'neg_match_if_local_outer_leak.lom': ('L2U001', "未定义变量 'z'"),
+    'neg_match_no_arms.lom': ('L2S001', 'match 至少需要一个臂'),
+    'neg_match_string_pattern.lom': ('L2T001', '字面量模式类型不符（被测 i64 模式 st）'),
+    'neg_variant_shadow_call.lom': ('L2C001', '调用非闭包值'),
+    'neg_while_block_let_leak.lom': ('L2U001', "未定义变量 'y'"),
     # ---- L2.3 包批（designs/0008 §6.3 校验表 #1/#2/#3 + R74 别名口径）----
-    'neg_pkg_unknown_module.lom': "未知模块 'ghost'",
-    'neg_pkg_missing_symbol.lom': "包 'mypkg' 中无公开符号 'missing_fn'",
-    'neg_pkg_enum_clash.lom': "跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名",
-    'neg_pkg_alias_arity.lom': "调用 'aliased_fn' 实数量不符",
+    'neg_pkg_unknown_module.lom': ('L2U001', "未知模块 'ghost'"),
+    'neg_pkg_missing_symbol.lom': ('L2U001', "包 'mypkg' 中无公开符号 'missing_fn'"),
+    'neg_pkg_enum_clash.lom': ('L2P001', "跨包/主文件重名——宿主静默取首个定义，L2 明确拒绝；请重命名"),
+    'neg_pkg_alias_arity.lom': ('L2C001', "调用 'aliased_fn' 实数量不符"),
     # ---- L2.3 return 收官批（designs/0009 §6.3 校验表 #1-#4 + 裁决 3 甲）----
     # neg_return_stmt/neg_c2_try_deferred 本批转正删除（Git 历史可恢复）
-    'neg_try_non_result.lom': "? 只能用于 Result/Option（得到 'i64'）",
-    'neg_try_unit_operand.lom': '? 只能用于 Result/Option',
-    'neg_try_ctx_mismatch.lom': '? 的 Err 载荷类型与所在函数返回类型不符',
-    'neg_try_in_void_fn.lom': "? 所在函数返回类型须为 Result/Option（得到 'void'）",
-    'neg_return_type_mismatch.lom': "return 值类型不符（期望 i64 得 st）",
-    'neg_return_void_with_value.lom': 'void 函数的 return 不能带值',
-    'neg_return_value_in_void_fn.lom': 'void 函数的 return 不能带值',
-    'neg_return_missing_value.lom': "return 无值但函数返回 'i64'",
+    'neg_try_non_result.lom': ('L2T001', "? 只能用于 Result/Option（得到 'i64'）"),
+    'neg_try_unit_operand.lom': ('L2T001', '? 只能用于 Result/Option'),
+    'neg_try_ctx_mismatch.lom': ('L2T001', '? 的 Err 载荷类型与所在函数返回类型不符'),
+    'neg_try_in_void_fn.lom': ('L2T001', "? 所在函数返回类型须为 Result/Option（得到 'void'）"),
+    'neg_return_type_mismatch.lom': ('L2T001', "return 值类型不符（期望 i64 得 st）"),
+    'neg_return_void_with_value.lom': ('L2T001', 'void 函数的 return 不能带值'),
+    'neg_return_value_in_void_fn.lom': ('L2T001', 'void 函数的 return 不能带值'),
+    'neg_return_missing_value.lom': ('L2T001', "return 无值但函数返回 'i64'"),
     # ---- L2.3 record/tuple 批（designs/0010 §7 校验 #1-#7 + 附面）----
-    'neg_record_field_mismatch.lom': "let 注解类型 'rc{a:i64;b:i64}' 与值类型 'rc{a:i64;c:i64}' 不符",
-    'neg_record_unknown_field.lom': "record 无字段 'y'（类型 rc{",
-    'neg_tuple_oob.lom': "tuple 索引 2 越界（tp{",
-    'neg_record_arith.lom': 'Record/Tuple 参与算术',
-    'neg_record_compare.lom': 'Record/Tuple 相等与大小比较',
-    'neg_file_arity.lom': "调用 'file_read' 实数量不符",
-    'neg_tuple_destructure.lom': '该语句形态（match/解构留后续批次）',
-    'neg_record_order.lom': "let 注解类型 'rc{x:i64;y:i64}' 与值类型 'rc{y:i64;x:i64}' 不符",
-    'neg_record_neg.lom': 'Record/Tuple 值参与一元负',
-    'neg_math_mixed.lom': "调用 'min' 期望同型 Int/Float 对",
+    'neg_record_field_mismatch.lom': ('L2T001', "let 注解类型 'rc{a:i64;b:i64}' 与值类型 'rc{a:i64;c:i64}' 不符"),
+    'neg_record_unknown_field.lom': ('L2T001', "record 无字段 'y'（类型 rc{"),
+    'neg_tuple_oob.lom': ('L2T001', "tuple 索引 2 越界（tp{"),
+    'neg_record_arith.lom': ('L2V001', 'Record/Tuple 参与算术'),
+    'neg_record_compare.lom': ('L2V001', 'Record/Tuple 相等与大小比较'),
+    'neg_file_arity.lom': ('L2C001', "调用 'file_read' 实数量不符"),
+    'neg_tuple_destructure.lom': ('L2S001', '该语句形态（match/解构留后续批次）'),
+    'neg_record_order.lom': ('L2T001', "let 注解类型 'rc{x:i64;y:i64}' 与值类型 'rc{y:i64;x:i64}' 不符"),
+    'neg_record_neg.lom': ('L2V001', 'Record/Tuple 值参与一元负'),
+    'neg_math_mixed.lom': ('L2C001', "调用 'min' 期望同型 Int/Float 对"),
     # ---- L2.3 容器显示批（designs/0011 §9）：9 枚预留负例转正删除；
     # 深层容器流（跨函数参数流转，预扫 scan_has_display 之外）锁 ibase
     # 兜底新文案（双防线乙；Map 深层流无形态——键类型 String 恒开设施）----
-    'neg_println_deep_list.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
-    'neg_println_deep_rc.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
-    'neg_println_deep_enum.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
-    'neg_println_deep_enum_ls.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
+    'neg_println_deep_list.lom': ('L2S001', 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖'),
+    'neg_println_deep_rc.lom': ('L2S001', 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖'),
+    'neg_println_deep_enum.lom': ('L2S001', 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖'),
+    'neg_println_deep_enum_ls.lom': ('L2S001', 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖'),
     # ---- R95 B甲：全终止路径转正；留下精确签名/可达路径负例 ----
-    'neg_r95_closure_mixed_returns.lom': "类型不符（'i64' vs 'f64'）",
-    'neg_r95_closure_param_leak.lom': "未定义变量 'secret'",
-    'neg_r95_closure_partial_return.lom': 'void 函数的 return 不能带值',
-    'neg_r95_closure_unknown_list_ret.lom': '全终止闭包返回类型不可精确推断',
-    'neg_r95_closure_try_mixed_return.lom': '类型不符',
-    'neg_r95_if_no_else_value.lom': 'let 绑定 void 值',
+    'neg_r95_closure_mixed_returns.lom': ('L2T001', "类型不符（'i64' vs 'f64'）"),
+    'neg_r95_closure_param_leak.lom': ('L2U001', "未定义变量 'secret'"),
+    'neg_r95_closure_partial_return.lom': ('L2T001', 'void 函数的 return 不能带值'),
+    'neg_r95_closure_unknown_list_ret.lom': ('L2T001', '全终止闭包返回类型不可精确推断'),
+    'neg_r95_closure_try_mixed_return.lom': ('L2T001', '类型不符'),
+    'neg_r95_if_no_else_value.lom': ('L2T001', 'let 绑定 void 值'),
     # ---- R96（C甲收尾）：闭包内 prelude 豁免边界负例。机制①豁免仅覆盖
     # 调用面：裸值引用仍拒（前两枚）；机制④闭包内 print 总开 String 设施
     # 仍须过 1 参 arity 校验；豁免名单外的内建（len）走捕获终审拒绝 ----
-    'neg_r96_closure_naked_println_value.lom': "未定义变量 'println'",
-    'neg_r96_closure_naked_print_value.lom': "未定义变量 'print'",
-    'neg_r96_closure_print_arity.lom': 'print 期望 1 个参数',
-    'neg_r96_closure_unimported_len.lom': "闭包捕获了未定义变量 'len'",
+    'neg_r96_closure_naked_println_value.lom': ('L2U001', "未定义变量 'println'"),
+    'neg_r96_closure_naked_print_value.lom': ('L2U001', "未定义变量 'print'"),
+    'neg_r96_closure_print_arity.lom': ('L2C001', 'print 期望 1 个参数'),
+    'neg_r96_closure_unimported_len.lom': ('L2U001', "闭包捕获了未定义变量 'len'"),
     # ---- R97（D甲）：match 臂 Binder 容器载荷批边界负例。无返回注解
     # helper 不登记 fn_ret_cont（保守 False），无注解调用点按 void 处理
     # 在 comp 侧先行被拒；容器参数不经 match Binder 直接 println（tuple
     # 变体）仍落 ibase 兜底——参数播种的 cbind 知识仅 scrut 判定读，
     # 既有跨函数容器流边界不翻转 ----
-    'neg_r97_no_ret_helper.lom': 'void 函数的尾表达式产值',
-    'neg_r97_param_direct.lom': 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖',
+    'neg_r97_no_ret_helper.lom': ('L2T001', 'void 函数的尾表达式产值'),
+    'neg_r97_param_direct.lom': ('L2S001', 'println(容器值) 需要 String 设施（data/print_str）——深层容器流未被预扫覆盖'),
     # ---- E甲扩围（Bool 家族三盲点）边界负例：无返回注解 helper 产 Bool
     # 经 match Binder println——ret_bool_fns 只收 Some(TyBool)（保守 False），
     # scrut 判定不中、臂 Binder 不播种；无注解调用点先按 void 尾表达式
     # 产值被拒（与容器版 neg_r97_no_ret_helper 同文案路径） ----
-    'neg_r97e_no_ret_bool_helper.lom': 'void 函数的尾表达式产值',
+    'neg_r97e_no_ret_bool_helper.lom': ('L2T001', 'void 函数的尾表达式产值'),
     # ---- 批1 v1.4.8（designs/0013）：二十审 §6-①② 精度备注升格负例。
     # ①用户 fn 命名 println（宿主 NAM002 error 级诊断收，双侧非法结论
     # 一致、拒绝点与文案不同）；②List 被测配 Int 字面量臂——嵌套 match
     # 臂隔离形态（宿主宽容收 [1]，同 neg_match_num_str_pattern
     # 字面量模式文案族）----
-    'neg_user_fn_named_println.lom': "用户函数不得命名 'println'",
-    'neg_match_scalar_on_list.lom': '字面量模式类型不符（被测 ls{i64} 模式 i64）',
+    'neg_user_fn_named_println.lom': ('L2P001', "用户函数不得命名 'println'"),
+    'neg_match_scalar_on_list.lom': ('L2T001', '字面量模式类型不符（被测 ls{i64} 模式 i64）'),
+    # ---- 0017 子面 B：lex 通道负例（修复 report_errors 读 e.code 的存量
+    # 崩溃 RUNTIME000；锁 lex error 行格式 + 码 + 文案三重 substring）----
+    'neg_l2_lex_badchar.lom': ('LEX005', 'lex error', '意外字符'),
+    'neg_l2_lex_unclosed.lom': ('LEX001', 'lex error', '未闭合的字符串'),
 }
 
 
@@ -530,6 +534,7 @@ def main():
 
         # 负例集：子集外构造必须 COMPILE-ERROR 且不产 hex（R66-R68 回归网）
         negatives = sorted(glob.glob(os.path.join(NEGATIVES, '*.lom')))
+        neg_l2g = 0  # 0017：L2G 兜底码命中数（观测口径，不作硬断言）
         for case in negatives:
             name = os.path.basename(case)
             hex_out = os.path.join(td, name + '.neg.hex')
@@ -542,12 +547,26 @@ def main():
                 print('FAIL-NEG %s: 期望 COMPILE-ERROR，实际: %s' % (name, rc.stdout.strip()[:200]))
                 fail += 1
                 continue
-            expected = EXPECTED_NEGATIVE_MESSAGES.get(name)
-            if expected and expected not in rc.stdout:
-                print('FAIL-NEG %s: 拒绝原因应含 %r，实际: %s' %
-                      (name, expected, rc.stdout.strip()[:300]))
+            # 0017 子面 A 断言升级：码非空（codegen error 加 [L2xxx] 前缀，
+            # lex error 通道带 [LEXxxx]）——全负例生效
+            if '[L2' not in rc.stdout and '[LEX' not in rc.stdout:
+                print('FAIL-NEG %s: 拒绝输出无 [L2xxx]/[LEXxxx] 码，实际: %s'
+                      % (name, rc.stdout.strip()[:200]))
                 fail += 1
                 continue
+            if '[L2G' in rc.stdout:
+                neg_l2g += 1
+            # 0017 双锁：str = 单 substring（未升级条目）；tuple = 多 substring
+            # 全命中（码 + 文案；lex 负例为 码+行格式+文案）
+            expected = EXPECTED_NEGATIVE_MESSAGES.get(name)
+            if expected:
+                exp_list = expected if isinstance(expected, tuple) else (expected,)
+                miss = [s for s in exp_list if s not in rc.stdout]
+                if miss:
+                    print('FAIL-NEG %s: 拒绝原因应含 %r，实际: %s' %
+                          (name, miss, rc.stdout.strip()[:300]))
+                    fail += 1
+                    continue
             if os.path.exists(hex_out):
                 print('FAIL-NEG %s: 拒绝输入仍产出 hex' % name)
                 fail += 1
@@ -555,8 +574,8 @@ def main():
             ok += 1
             print('PASS-NEG %-24s COMPILE-ERROR, no hex' % name)
 
-    print('RESULT: %s（%d/%d 项通过：正例对拍 + 负例拒绝）' %
-          ('PASS' if fail == 0 else 'FAIL', ok, ok + fail))
+    print('RESULT: %s（%d/%d 项通过：正例对拍 + 负例拒绝；负例 L2G 兜底 %d/%d）' %
+          ('PASS' if fail == 0 else 'FAIL', ok, ok + fail, neg_l2g, len(negatives)))
     return 0 if fail == 0 else 1
 
 

@@ -1,0 +1,6 @@
+# 0017 子面 B：lex 通道负例——'@' 走 tokenize_recover 的意外字符分支
+# （LEX005）。修复前该路径 report_errors 读 e.code 崩 RUNTIME000。
+fn main() -> Unit ! [IO]
+    let x = 1 @
+    println(int_to_string(x))
+end
