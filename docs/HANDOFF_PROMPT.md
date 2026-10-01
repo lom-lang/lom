@@ -48,15 +48,20 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **交接就绪（2026-10-01）**：v1.4.14 已提交（tag `e8b099e`，CI
-  run `36670326768` #232 六 job 绿；二十四审报告提交 `3a01a90`
-  CI #234 绿），工作区干净，**台账 R1-R111 全部关闭、零 open 项**，
-  无在制工作。
-- **审查轮次与评级（均不外推）**：二十审 A- → 二十一审 B（开
-  R104/R105）→ 二十二审 B+（R104/R105 关闭确认，开 R107-R109）→
-  二十三审 B+（三项关闭确认，开 R110）→ **二十四审 A-（R110
-  关闭确认 + 评级重估回升；R111 两处文档顺刷漂移开账即修）**。
-  最新报告 [review-2026-10-01-2.html](reviews/review-2026-10-01-2.html)。
+- **v1.4.15 本地完成，提交/CI/tag 门禁进行中（回填后交接就绪）**：
+  R110 邻接面收官批（块内 LetDestruct 同名遮蔽快照/恢复，
+  designs/0015 + RFC-0004 修订 48，用户裁决"继续执行"）——
+  check_block 快照条件扩 Let/LetDestruct 两形态，二十四审 p13
+  原形误报清除（三路径 10/20/5 一致，规划者亲验）、负向与 fix
+  R75 保守降级维持、全仓 4300 文件 --check 对拍 MUT001 面
+  DIFF=0、新单元 ×5 → Rust 559。tag/CI run 号回填后本段为
+  交接就绪态；工作区在 feat 提交前含本批改动。
+- **审查轮次与评级（均不外推；v1.4.15 未复审）**：二十审 A- →
+  二十一审 B（开 R104/R105）→ 二十二审 B+（R104/R105 关闭
+  确认，开 R107-R109）→ 二十三审 B+（三项关闭确认，开 R110）→
+  **二十四审 A-（R110 关闭确认 + 评级重估回升；R111 两处文档
+  顺刷漂移开账即修）**。最新报告
+  [review-2026-10-01-2.html](reviews/review-2026-10-01-2.html)。
 - **本维护周期交付链（2026-09-30~10-01，全部 CI 绿后切 tag）**：
   v1.4.8 R94 批 1（json 星面键序，`8c86a60` #214）→ v1.4.9 批 2
   （map_remove 统一 Bool + 包内 as，`e71749e` #216）→ 工具治理批
@@ -66,28 +71,32 @@
   `13a4cf4` #223）→ v1.4.12 R107（同别名后 import 赢 + NAM006
   变体，`11cdc68` #225）→ v1.4.13 登记项两枚（for quirk 快照恢复
   + lom build 闭包 externals，`7a48810` #228）→ v1.4.14 R110
-  （check_block 块级快照/恢复，`e8b099e` #232）。
+  （check_block 块级快照/恢复，`e8b099e` #232）→ v1.4.15 R110
+  邻接面（块内解构快照/恢复——R110 族三步推广收官，门禁回填后
+  补）。
 - **已提交基线**：verify_selfcomp **365/365 = 196 单文件 + 8 包 + 161 负例**、
   bootstrap **14/14**（强 quine 269555 bytes 双侧一致）、
-  self_comp.lom 12544 行、Rust **554 单元 + 28 集成**
+  self_comp.lom 12544 行、Rust **559 单元 + 28 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
   closure×3）、eval 双后端各 121/121、探针 8/8、doc_audit **71/71**
-  、六模式全 PASS。Cargo.toml/lock 均为 1.4.14。
+  、六模式全 PASS。Cargo.toml/lock 均为 1.4.15。
 - **撞名/遮蔽族语义（用户已裁，三侧一致）**：本地定义优先（别名
   撞本地 fn）；两包同名符号按包根路径序取后者；两 import 同一
   别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
-  块级/for 变量同名遮蔽 typechecker 快照恢复（v1.4.13/14）。
-- **登记在案不修边界（非 open 项）**：块内 LetDestruct 同名遮蔽
-  （R110 邻接面未裁决）；块内 let 无同名泄漏 divergence（块外读
-  放行/解释器 RUNTIME002）；循环外读 for 变量同款 divergence；
-  多文件包内跨文件引用在无文件 build 视图仍假阳性；无文件流程
-  不发 PKG007；clippy --all-targets 有 ~4 条 rust-1.97.0 工具链
-  漂移存量（今日实测，CI 口径 -D warnings 零输出不受影响）。
-- 下一步：**无在制工作，方向待用户裁决**。菜单：块内
-  LetDestruct 邻接面纳入否、二十五审时机、下一阶段方向（repair
+  块级/for 变量/块内解构同名遮蔽 typechecker 快照恢复
+  （v1.4.13/14/15 三步推广收官）。
+- **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏
+  divergence（块外读放行/解释器 RUNTIME002）；循环外读 for
+  变量同款 divergence；多文件包内跨文件引用在无文件 build
+  视图仍假阳性；无文件流程不发 PKG007；无文件 build 流程不
+  检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
+  工具链漂移存量（2026-10-01 实测，CI 口径 -D warnings 零输出
+  不受影响）。
+- 下一步：**v1.4.15 门禁回填后交接就绪，方向待用户裁决**。
+  菜单：二十五审时机（v1.4.15 后复审面）、下一阶段方向（repair
   闭环深化/性能工程/发布解冻条件盘点——发布线继续冻结直至解冻）。
-- 交付史与机制事实源：RFC-0004 修订 1–47、SPEC §13、
-  designs/0001–0014、TODO 顶部、HANDOVER §11.6 和 selfcomp
+- 交付史与机制事实源：RFC-0004 修订 1–48、SPEC §13、
+  designs/0001–0015、TODO 顶部、HANDOVER §11.6 和 selfcomp
   用例集。审查评级不外推，历史数字不回写。
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
@@ -95,14 +104,14 @@
    §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-01-2.html
    （二十四审——最新轮）及 review-2026-10-01.html（二十三审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-47 全读），docs/designs/0001~0014 十四份批次设计（含各批实施
+   1-48 全读），docs/designs/0001~0015 十五份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
    架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
    拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 554/554；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
+   - cargo test --release（期望 559/559；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

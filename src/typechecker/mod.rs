@@ -424,15 +424,27 @@ impl TypeChecker {
     /// 嵌套块各层各自快照/恢复（内层先恢复、外层后恢复，叠加正确）；
     /// match 臂走 env.child()（check_match），臂块在独立子层上定义，
     /// 同名遮蔽落子层不触外层，不经此恢复面。
+    /// R110 邻接面（v1.4.15）：Stmt::LetDestruct 的同名遮蔽同样恢复——
+    /// 解构绑定恒不可变（两个分支都 define(..., false)），块内 `let (x, y) = …`
+    /// 同名遮蔽外层 `let mut x` 后条目被覆盖且块退出不恢复，块外 `x = …`
+    /// 误报 MUT001（运行时三侧按块作用域正确）。快照条件沿 StLet 同型推广
+    /// 到解构的每个 name；"块内解构把不可变外层变可变"的漏报方向不存在
+    /// （恒 false），负向（外层 let + 块内解构 + 块外赋值）维持正确报 MUT001。
     fn check_block(&mut self, block: &Block, env: &mut TypeEnv) -> TypeOrUnknown {
         let mut saved: HashMap<String, Option<(TypeOrUnknown, bool)>> = HashMap::new();
         for stmt in &block.stmts {
-            // 块内 StLet：仅首个同名记快照（后续同名 let 遮蔽的是块内先者，
-            // 块退出时统一恢复到进块前的原条目）
-            if let Stmt::Let { name, .. } = stmt
-                && !saved.contains_key(name)
-            {
-                saved.insert(name.clone(), env.local_entry(name));
+            // 块内 StLet / StLetDestruct：仅首个同名记快照（后续同名 let 或
+            // 再解构遮蔽的是块内先者，块退出时统一恢复到进块前的原条目）；
+            // 解构按 names 逐名快照，同一解构内重复名也仅首个生效
+            let shadowed_names: Vec<&String> = match stmt {
+                Stmt::Let { name, .. } => vec![name],
+                Stmt::LetDestruct { names, .. } => names.iter().collect(),
+                _ => Vec::new(),
+            };
+            for name in shadowed_names {
+                if !saved.contains_key(name) {
+                    saved.insert(name.clone(), env.local_entry(name));
+                }
             }
             self.check_stmt(stmt, env);
         }
