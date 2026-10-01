@@ -1187,11 +1187,19 @@ impl Interpreter {
                     return self.call_function(&f, arg_vals);
                 }
                 // 闭包变量
+                // R112：先取出闭包值、释放 env 的 Ref 再调用——原实现
+                // `env.borrow()` 的 Ref 作为 if-let scrutinee 临时值存活于
+                // 整个分支块（含闭包体执行），闭包体内对捕获 mut 变量赋值
+                // （Stmt::Assign → set_existing 沿 parent 链对同一 Scope 再
+                // borrow_mut）触发 "RefCell already borrowed" panic。取到本地
+                // 值后 Ref 随上一语句结束释放，闭包体按 MUT002 登记的共享
+                // 作用域语义（解释器=Rc 共享，WASM=创建时值拷贝）执行。
+                let callee_val = env.borrow().get(name);
                 if let Some(Value::Closure {
                     params,
                     body,
                     env: closure_env,
-                }) = env.borrow().get(name)
+                }) = callee_val
                 {
                     return self.call_closure(
                         &params,

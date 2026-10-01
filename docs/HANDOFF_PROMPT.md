@@ -48,8 +48,14 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **交接就绪（2026-10-01）**：v1.5.0 已提交（tag `b61182f`，CI
-  run `36841096349` #242 六 job 绿），工作区干净（回填提交除外）。
+- **v1.5.1 本地完成，提交/CI/tag 门禁进行中（回填后交接就绪）**：
+  R112 整改（RFC-0004 修订 51，用户裁决"按你的想法执行"——
+  规划者读码后改选乙修法：修借用冲突兑现 MUT002"解释器=共享
+  作用域"既定语义，原建议甲的偏离如实登记）。解释器闭包内赋值
+  捕获 mut：panic → 共享语义执行（WASM/L2 编译拒不变，与读取
+  形态同归 MUT002 预告分歧族）；A/B 247 文件零差异；新集成 ×3
+  → 31。**R112 关闭——台账零 open**（R113 已随二十五审收官包
+  修复）。
   repair 闭环深化首批（designs/0016 + RFC-0004 修订 50，用户
   裁决三点均按建议项）——fix 分派表补 NAM006/MUT002 hint（不再
   "未知错误码"，均不自动 apply）、SPEC_FOR_AI §11c/§11e 补齐、
@@ -79,10 +85,11 @@
   （check_block 块级快照/恢复，`e8b099e` #232）→ v1.4.15 R110
   邻接面（块内解构快照/恢复——R110 族三步推广收官，`cf73de2`
   #238）→ v1.5.0 repair 闭环深化首批（fix 补齐 + eval 128 +
-  L2 面新题型，`b61182f` #242）。
+  L2 面新题型，`b61182f` #242）→ v1.5.1 R112 整改（修借用冲突
+  兑现共享语义，门禁回填后补）。
 - **已提交基线**：verify_selfcomp **365/365 = 196 单文件 + 8 包 + 161 负例**、
   bootstrap **14/14**（强 quine 269555 bytes 双侧一致）、
-  self_comp.lom 12544 行、Rust **561 单元 + 28 集成**
+  self_comp.lom 12544 行、Rust **561 单元 + 31 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
   closure×3）、eval 双后端各 128/128（error_repair 31 题含 L2
   面 3）、fix_corpus 13 对、探针 8/8、doc_audit **71/71**、六
@@ -92,8 +99,6 @@
   别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
   块级/for 变量/块内解构同名遮蔽 typechecker 快照恢复
   （v1.4.13/14/15 三步推广收官）。
-- **open 项：R112（P2 存量，修否待裁）**——闭包内对捕获 mut
-  赋值触发解释器 RefCell panic（详见 TODO 开账段）。
 - **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏
   divergence（块外读放行/解释器 RUNTIME002）；循环外读 for
   变量同款 divergence；多文件包内跨文件引用在无文件 build
@@ -101,9 +106,8 @@
   检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
   工具链漂移存量（2026-10-01 实测，CI 口径 -D warnings 零输出
   不受影响）。
-- 下一步：**二十五审已收官（A- 维持），R112 修否待裁**。
-  方向菜单：R112 整改（解释器 RefCell panic 三侧语义选边）/
-  repair 闭环后续批（如 L2 诊断结构化前置件）/ 性能工程
+- 下一步：**无在制工作，方向待用户裁决**。菜单：repair 闭环
+  后续批（如 L2 诊断结构化前置件）/ 性能工程 / 二十六审时机
   （发布线继续冻结直至解冻）。
 - 交付史与机制事实源：RFC-0004 修订 1–50、SPEC §13、
   designs/0001–0016、TODO 顶部、HANDOVER §11.6 和 selfcomp
@@ -121,7 +125,7 @@
 2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑）：
    - cargo build --release
-   - cargo test --release（期望 561/561；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals，×28）
+   - cargo test --release（期望 561/561；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign，×31）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 41,029 characters ≈ 10.1k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 41,380 characters ≈ 10.1k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -704,7 +704,7 @@ Key points:
 - Type checking runs before compilation (diagnostics on stderr, never blocking — the same gradual-typing promise as the interpreter).
 - Running the `.wasm` requires a host providing the `env.lom_*` imports (print / file / env / json); the repo ships a Node.js harness at `eval/runner/run_wasm.mjs`.
 - Known divergences (documented, each verified 2026-09-03; do not rely on either side's behavior):
-  1. **Closure capture of `mut` bindings** — value-copy at creation in WASM vs shared-scope in the interpreter (the typechecker flags this with a `MUT002` warning since v1.1.0).
+  1. **Closure capture of `mut` bindings** — value-copy at creation in WASM vs shared-scope in the interpreter (the typechecker flags this with a `MUT002` warning since v1.1.0). Reads diverge (interpreter sees the latest value, WASM the creation-time copy); assignments to a captured `mut` from inside the closure body execute in the interpreter (shared scope, since v1.5.1) but are **compile-rejected by the WASM backend** ("assignment to undefined variable") — avoid them; take a `let` local copy or pass values as parameters.
   2. **JSON numbers** — split Int/Float by the JS host value, not by source syntax.
   3. **Div/mod by zero** — interpreter reports `RUNTIME000` (整数除以零/取模零); WASM traps with a different message text (`wasm trap: divide by zero`). Exit code 1 on both.
   4. **`trim` whitespace set** — interpreter strips Unicode whitespace (e.g. U+00A0); WASM strips ASCII whitespace only.
