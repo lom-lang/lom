@@ -61,7 +61,9 @@
   捕获 mut：panic → 共享语义执行（WASM/L2 编译拒不变，与读取
   形态同归 MUT002 预告分歧族）；A/B 247 文件零差异；新集成 ×3
   → 31。**R112 关闭——台账零 open**（R113 已随二十五审收官包
-  修复）。
+  修复）。后续 l2fix 工具批（2026-10-02，RFC 修订 53）：
+  tools/l2fix.py——L2 拒绝码→七族修复建议（L2U high import/
+  模板族），--self-check 六断言锁定，纯工具不升版。
   repair 闭环深化首批（designs/0016 + RFC-0004 修订 50，用户
   裁决三点均按建议项）——fix 分派表补 NAM006/MUT002 hint（不再
   "未知错误码"，均不自动 apply）、SPEC_FOR_AI §11c/§11e 补齐、
