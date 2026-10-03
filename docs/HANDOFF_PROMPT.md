@@ -120,8 +120,8 @@
 - 维护流程、审查节奏与交接五件套规范：HANDOVER §12（含 §12.4）。
 【第一回合必须完成（规划者流程）】
 1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
-   §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-01-3.html
-   （二十五审——最新轮）及 review-2026-10-01-2.html（二十四审），
+   §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-03.html
+   （二十六审——最新轮）及 review-2026-10-01-3.html（二十五审），
    LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
    1-53 全读），docs/designs/0001~0018 十八份批次设计（含各批实施
    修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
