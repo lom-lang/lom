@@ -226,7 +226,9 @@ def suggest(code, message):
         return {"code": code, "message": message, "confidence": "n/a",
                 "action": "report",
                 "suggestion": "L2 编译器内部错误——请报维护者（附完整输出）。"}
-    if family == "L2G":  # classify_l2 兜底码（负例实测未出现，防御位）
+    if family == "L2G":  # classify_l2 兜底码（语料外构造性可达——二十六审
+        # R114：Map 键类型注解/tuple 非数字索引等约 29 条组合文案落此兜底；
+        # 码非空、文案完整，建议面低置信不误导）
         return {"code": code, "message": message, "confidence": "low",
                 "action": "hint",
                 "suggestion": ("未归类到七族的 L2 拒绝（兜底码）——按原文文案方向"
@@ -354,7 +356,7 @@ def main():
     ap.add_argument("file", nargs="?", help="待诊断的 .lom 文件（--self-check 时可省略）")
     ap.add_argument("--json", action="store_true", help="输出 l2-fix/v1 JSON")
     ap.add_argument("--self-check", action="store_true",
-                    help="质量锁定：163 负例 + eval 127/128/129 全链断言")
+                    help="质量锁定：全部负例 + eval 127/128/129 全链断言")
     ap.add_argument("--lom-bin", default=default_lom_bin(), help="宿主 lom 二进制路径")
     ap.add_argument("--l2", default=str(REPO / "examples" / "selfhost" / "self_comp.lom"),
                     help="L2 子集编译器源路径")

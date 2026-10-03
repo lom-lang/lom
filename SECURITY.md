@@ -7,7 +7,7 @@ Lom is a **tree-walking interpreter for trusted programs**. Running a `.lom` fil
 ## Supply chain
 
 - **Zero third-party Rust crate dependencies** (permanent design decision, recorded in `Cargo.toml`). The lexer, parser, interpreter, JSON, and LSP implementations are hand-written in this repository. The lockfile is in-tree and contains no third-party packages; with the Rust toolchain already installed, `cargo build` fetches no crates.
-- CI is a separate supply-chain surface: it uses GitHub-maintained `actions/checkout@v4` / `actions/cache@v4` and the third-party `dtolnay/rust-toolchain@stable`. These are floating major/channel references, not immutable commit-SHA pins. The 2026-09-21 handoff audit also observed GitHub's Node.js 20 deprecation annotations for checkout/cache. Therefore “zero dependencies” must not be expanded into “zero CI supply-chain risk.”
+- CI is a separate supply-chain surface: it uses GitHub-maintained `actions/checkout@v5` / `actions/cache@v5` and the third-party `dtolnay/rust-toolchain@stable`. These are floating major/channel references, not immutable commit-SHA pins. The actions were upgraded to `@v5` (Node 24 runtime) on 2026-09-21, resolving the earlier Node.js 20 deprecation annotations; the 2026-10-03 pre-unfreeze audit observed the remaining annotations to be Ubuntu 26 runner-migration notices only. Therefore “zero dependencies” must not be expanded into “zero CI supply-chain risk.”
 
 ## Interpreter hardening already in place
 

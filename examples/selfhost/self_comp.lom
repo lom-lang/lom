@@ -1249,7 +1249,7 @@ end
 fn classify_l2(msg: String) -> String
     if contains(msg, "内部错误") or contains(msg, "请报维护者")
         "L2E001"
-    elif contains(msg, "缺少 main") or contains(msg, "不得命名") or contains(msg, "重复变体名") or contains(msg, "重复枚举声明") or contains(msg, "重复类型参数") or contains(msg, "重名") or contains(msg, "同名") or contains(msg, "与内建类型冲突")
+    elif contains(msg, "缺少 main") or contains(msg, "不得命名") or contains(msg, "重复变体名") or contains(msg, "重复枚举声明") or contains(msg, "重复类型参数") or contains(msg, "重复定义") or contains(msg, "重名") or contains(msg, "同名") or contains(msg, "与内建类型冲突")
         "L2P001"
     elif contains(msg, "未被预扫覆盖")
         "L2S001"
@@ -11926,6 +11926,25 @@ fn collect_sigs(prg: Prg, fns: Map<String, {idx: Int, ret: String, nprm: Int, pr
                     ItFn(name, params, ret, _, _, _, _) =>
                         if name == "println"
                             return Err("用户函数不得命名 'println'")
+                        end
+                        # R115（二十六审）：同文件用户 fn 重复定义检测——此前
+                        # 零诊断静默放行且后写定义生效（宿主 NAM002 error 可见）。
+                        # 门控 pkgs 空集（单文件模式）：包展开单元的文件边界
+                        # 不可恢复，跨包同名 fn 是宿主 NAM006 确定序合法面
+                        # （pkg_cases 106/107/108 锁定），包模式不拦。判重只认
+                        # 先前用户 fn（条目 idx>=0）；import 注册项 idx=-2 哨兵
+                        # 不算——fn 后写覆盖同名 import 别名是"本地赢"既定语义。
+                        if map_size(pkgs) == 0
+                            if map_has(fns, name)
+                                match map_get(fns, name)
+                                    Some(e) =>
+                                        if e.idx >= 0
+                                            return Err(subset_err("函数 '" + name + "' 重复定义（同文件唯一命名，请重命名其一）"))
+                                        end
+                                    end
+                                    None => ()
+                                end
+                            end
                         end
                         let rv = tyopt_vt(ret, fns)?
                         # R74（十二审）：摘要携带形参 vt 逗号串——调用点

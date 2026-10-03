@@ -272,6 +272,9 @@ EXPECTED_NEGATIVE_MESSAGES = {
     # 崩溃 RUNTIME000；锁 lex error 行格式 + 码 + 文案三重 substring）----
     'neg_l2_lex_badchar.lom': ('LEX005', 'lex error', '意外字符'),
     'neg_l2_lex_unclosed.lom': ('LEX001', 'lex error', '未闭合的字符串'),
+    # ---- R115（二十六审）：同文件用户 fn 重复定义——此前零诊断静默放行
+    # 且后写定义生效（宿主 NAM002 error 可见），v1.6.1 单文件模式明确拒绝 ----
+    'neg_l2_dup_fn.lom': ('L2P001', 'codegen error', "函数 'go' 重复定义"),
 }
 
 

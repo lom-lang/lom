@@ -357,7 +357,7 @@ def main():
         ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
          r'自施加强 quine (\d+) bytes', ('quine',)),
         ('HANDOVER §1 版本行', 'docs/HANDOVER.md',
-         r'Rust \d+\+\d+、quine (\d+) 不变', ('quine',)),
+         r'Rust \d+\+\d+、quine (\d+)（v[\d.]+ 新值，J 锚现位）', ('quine',)),
         ('HANDOVER §9-3', 'docs/HANDOVER.md',
          r'--bootstrap 14/14 quine (\d+) bytes', ('quine',)),
         ('HANDOVER §9-5', 'docs/HANDOVER.md',

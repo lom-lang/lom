@@ -48,20 +48,20 @@
    呈菜单与建议，不越权动工。
 
 【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
-- **状态（2026-10-03）**：最新已提交基线 **v1.6.0**（tag
-  `6227a89`，CI #249 六 job 绿）+ l2fix 纯工具批（`d665d11`
-  #253 绿）+ 文档批至 `efaed10`（#257 绿）；**二十六审 A- 已
-  收官（覆盖 v1.5.1/v1.6.0/l2fix 三批 + 安全面针对性检查），
-  当前 open：R114/R115/R116 三笔 P3 开账待用户裁决整改**；
-  解冻前置两缺口已闭合（④评测采样 31 题重跑 + ⑥安全面检查
-  零 P1/P2）。
+- **状态（2026-10-03）**：最新已提交基线 **v1.6.1**（R114/R115/R116
+  同包整改批——二十六审三笔 P3 关闭；tag/CI 见下方基线行）；
+  二十六审 A-（覆盖 v1.5.1/v1.6.0/l2fix + 安全面针对性检查）后
+  **台账零 open**；解冻检查单七项全部 ✓（①连续两轮 A- 零 P1/P2
+  ②台账零 open ③回归基线 ④评测采样 31 题重跑闭合 ⑤文档门禁
+  ⑥安全面零 P1/P2 ⑦解冻恒为独立用户裁决）——**解冻裁决与门面/
+  发布动作待用户**。
 - **审查轮次与评级（均不外推）**：二十审 A- →
   二十一审 B（开 R104/R105）→ 二十二审 B+（R104/R105 关闭
   确认，开 R107-R109）→ 二十三审 B+（三项关闭确认，开 R110）→
   二十四审 A-（R110 关闭确认；R111 开账即修）→ 二十五审 A-
   （v1.4.15+v1.5.0 零失真；R113 开账即修）→ **二十六审 A-
   （维持：v1.5.1/v1.6.0/l2fix 三批零失真、33 探针零击穿、
-  安全面零 P1/P2；R114-R116 三笔 P3 开账待裁）**。最新报告
+  安全面零 P1/P2；R114-R116 开账 → v1.6.1 同包关闭）**。最新报告
   [review-2026-10-03.html](reviews/review-2026-10-03.html)。
 - **本维护周期交付链（2026-09-30~10-02，全部 CI 绿后切 tag）**：
   v1.4.8 R94 批 1（json 星面键序，`8c86a60` #214）→ v1.4.9 批 2
@@ -80,13 +80,13 @@
   （codegen error 上码 + lex 修复 + 三题重采，`6227a89` #249）→
   l2fix 工具批（L2 码→七族修复建议，`d665d11` #253，纯工具
   不升版）。
-- **已提交基线**：verify_selfcomp **367/367 = 196 单文件 + 8 包 + 163 负例**、
-  bootstrap **14/14**（强 quine 271989 bytes 双侧一致）、
-  self_comp.lom 12572 行、Rust **561 单元 + 31 集成**
+- **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
+  bootstrap **14/14**（强 quine 272293 bytes 双侧一致）、
+  self_comp.lom 12591 行、Rust **561 单元 + 31 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
   closure×3 + r112×3）、eval 双后端各 128/128（error_repair 31
   题含 L2 面 3）、fix_corpus 13 对、探针 8/8、doc_audit **71/71**、
-  六模式全 PASS（dump 161）。Cargo.toml/lock 均为 1.6.0。
+  六模式全 PASS（dump 161）。Cargo.toml/lock 均为 1.6.1。
 - **撞名/遮蔽族语义（用户已裁，三侧一致）**：本地定义优先（别名
   撞本地 fn）；两包同名符号按包根路径序取后者；两 import 同一
   别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
@@ -98,18 +98,16 @@
   视图仍假阳性；无文件流程不发 PKG007；无文件 build 流程不
   检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
   工具链漂移存量（2026-10-01 实测，CI 口径 -D warnings 零输出
-  不受影响）。
-- 下一步：**R114-R116 整改与解冻裁决待用户**。菜单：
-  R114-R116 整改（P3 小批：R114 关键字表补 ~29 条命中或文档
-  补语料作用域句 / R115 L2 补 fn 重复检测或登记 / R116
-  SECURITY.md 版本引用顺刷）/ **解冻裁决**（检查单仅 ②台账与
-  ⑥安全面各余一笔 P3 级待处置，其余五项 ✓；解冻后动作链=
-  README 门面→Releases→playground→宣传，届时逐项呈裁）/
-  L2 行号主要簇（~118 处 callee/StAssign 锚定，designs/0017 §4
-  既定中批——l2fix 建议可带位置）/ 性能工程 / eval 126 明确版
-  对照题与 127 提示词收紧（2026-10-03 采样发现：126=078 型
-  歧义、127 宿主面通过≠L2 面达标——见
-  eval/REPORT-2026-10-03-err-repair-31.md）。
+  不受影响）；L2 包展开单元不做同文件 fn 重复检测（v1.6.1
+  R115 门控边界——文件边界在展开文本中不可恢复，跨包同名 fn
+  走宿主 NAM006 确定序语义）。
+- 下一步：**解冻裁决与门面/发布动作待用户**（解冻检查单七项
+  全 ✓）。菜单：解冻裁决（解冻后动作链=README 门面→Releases→
+  playground→宣传，届时逐项呈裁）/ L2 行号主要簇（~118 处
+  callee/StAssign 锚定，designs/0017 §4 既定中批——l2fix 建议
+  可带位置）/ 性能工程 / eval 126 明确版对照题与 127 提示词
+  收紧（2026-10-03 采样发现：126=078 型歧义、127 宿主面通过≠
+  L2 面达标——见 eval/REPORT-2026-10-03-err-repair-31.md）。
   观察项在案：Ubuntu 26 迁移（2026-10-19）。**MoonBit Q3 复核已完成
   并关闭（2026-10-03 规划者原文核实：1.0 未发布——官方 updates 页
   最新条目 moonc v0.10.14/2026-09-21，6 月 v0.10.0 说明原文明示
@@ -139,8 +137,8 @@
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 31/31；v1.5.0 起 error_repair 31 题）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
-   - python tools/verify_selfcomp.py（已提交基线 367/367 = 196 单文件 + 8 包 + 163 负例）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 271989 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py（已提交基线 368/368 = 196 单文件 + 8 包 + 164 负例）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 272293 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（128/128；WASM 侧加 -Backend wasm 同 128）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
@@ -154,7 +152,7 @@
    CI 绿后才切 tag。新增裁决点仍由用户决定。
 
 【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
-  367 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
+  368 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
   §4 探针原文与事后勘误、designs 实施修正记录；撞名/遮蔽族语义看
   SPEC §8.1 与二十四/二十五审报告）】
 - 复现锚点：R95 原形态 `let v = if c return 1 else return 2
@@ -182,7 +180,9 @@
   起，写 L2 用例/负例前过 l2fix 七族映射）**：L2 中 println 与全部
   内建需显式 import（宿主 prelude 恒可用——口径差）；管道/解构
   语句 L2 拒（宿主收）；L2 拒绝输出带 [L2xxx] 码（tools/l2fix.py
-  可跑单文件取码与修复建议）。
+  可跑单文件取码与修复建议）；同文件用户 fn 重名 v1.6.1 起
+  单文件模式明确拒（[L2P001]——包展开单元不查，跨包同名走
+  NAM006 确定序语义）。
 - R92/R95/R99 登记链：单 return 臂历史双侧一致；双 return
   臂绑定后算术十九审 R95 误拒、绑定直尾值 R99 坏 WASM；A甲
   安全拒后 B甲在 v1.4.3 正确发射。R101 短路右侧实际 return 的宿主

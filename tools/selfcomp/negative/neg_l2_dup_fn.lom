@@ -1,0 +1,12 @@
+# R115（二十六审）：同文件用户 fn 重复定义——宿主 NAM002 error，
+# L2 v1.6.1 起单文件模式明确拒绝（此前静默 COMPILED 后写生效）。
+from io import {println}
+fn go(x: Int) -> Int
+    x + 1
+end
+fn go(x: Int) -> Int
+    x * 2
+end
+fn main() -> Unit
+    println(go(1))
+end
