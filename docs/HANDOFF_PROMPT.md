@@ -101,7 +101,11 @@
   L2 行号主要簇（~118 处 callee/StAssign 锚定，designs/0017 §4
   既定中批——l2fix 建议可带位置）/ 二十六审时机（v1.5.1/
   v1.6.0/l2fix 三批未复审）/ 性能工程 / repair 闭环续批。
-  观察项在案：Ubuntu 26 迁移（2026-10-19）、MoonBit Q3 复核。
+  观察项在案：Ubuntu 26 迁移（2026-10-19）。**MoonBit Q3 复核已完成
+  并关闭（2026-10-03 规划者原文核实：1.0 未发布——官方 updates 页
+  最新条目 moonc v0.10.14/2026-09-21，6 月 v0.10.0 说明原文明示
+  "targeting 1.0 for Q3. The final timeline may be adjusted"，
+  Q3 已过仍停 0.10.x）**。
   发布线继续冻结直至用户解冻（解冻条件七项检查单在 TODO 顶部）。
 - 交付史与机制事实源：RFC-0004 修订 1–53、SPEC §13、
   designs/0001–0018、TODO 顶部、HANDOVER §11.6 和 selfcomp
@@ -132,7 +136,7 @@
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
-   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check：历史 C甲/D甲/批1 枚已入 v1.4.4–v1.4.6，v1.6.0 复增 lex 负例 2 枚（neg_l2_lex_*）；examples 原 37 个有效文件不变。
+   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check（词法合法的用例应全过 rc=0）：历史 C甲/D甲/批1 枚已入 v1.4.4–v1.4.6；v1.6.0 复增 lex 负例 2 枚（neg_l2_lex_*）**按构造含词法错误、不适用 fmt --check**（锁点在 verify_selfcomp 的 lex error 诊断格式+码，fmt 实测以干净词法诊断拒绝 rc=1 属预期行为）；examples 原 37 个有效文件不变。
    - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
 3. 如实报告 tag 基线核验边界。撞名/遮蔽族与登记项均已交付关闭；
    新方向只呈菜单待裁。外部发布线继续冻结。
