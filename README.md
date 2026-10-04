@@ -4,6 +4,79 @@
 
 LLM-coding-native first, workloads later. Built in Rust.
 
+**Lom (Language of Machine)** — a programming language designed around the LLM repair loop: when a model writes broken Lom, the language itself is built to diagnose it precisely and fix it mechanically.
+
+[![CI](https://github.com/lom-lang/lom/actions/workflows/ci.yml/badge.svg)](https://github.com/lom-lang/lom/actions/workflows/ci.yml)
+![deps](https://img.shields.io/badge/dependencies-0-2ea44f)
+![unsafe](https://img.shields.io/badge/unsafe-0-blue)
+![license](https://img.shields.io/badge/license-Apache--2.0-9cf)
+
+## Why Lom exists
+
+Most languages treat "an AI wrote broken code" as someone else's problem. Lom inverts that: **repair is the language's reason for existing.** Every rejection carries a structured diagnostic code and, where a mechanical fix is safe, `lom fix` applies it for you — the same interface an LLM agent uses. The whole toolchain (diagnostics → `lom fix` plans → applied patches) is machine-readable by design.
+
+## The evidence
+
+| Claim | Receipt |
+|---|---|
+| **The repair loop works on real models** | On the 31 error-repair tasks (including warning-level fixes and "host accepts / L2 rejects" cross-compiler repairs), deepseek-v4-pro+thinking and glm-5.3 score 99.1–100% pass@1 (2 models × 10 samples @ t=1.0) — [reports](eval/REPORT-2026-10-03-err-repair-31.md) |
+| **The compiler compiles itself — provably** | `self_comp.lom` (12,591 lines of Lom) compiles its own source to WASM; the result is byte-identical from both sides (a 272,293-byte strong quine, re-verified on every CI run) |
+| **A trustable core** | Zero third-party crates, zero `unsafe`, 561 unit + 31 integration tests, three-OS CI; the language surface (syntax / 20 keywords / diagnostic codes / 43 builtins) is [frozen](LANGUAGE_SPEC.md#14-v10-freeze-declaration-2026-09-02) — changes require an RFC |
+
+## Feel the repair loop in 60 seconds
+
+`hello.lom` — you (or your model) forgot the import:
+
+```lom
+fn main() -> Unit
+    println(len("hello"))
+end
+```
+
+Run it, and the diagnostic tells you exactly what to do — then let the language do it:
+
+```
+$ lom hello.lom
+[runtime] error (0:0): [RUNTIME002] 符号 'len' 未导入。需在文件顶部声明：from string import {len}
+
+$ lom fix hello.lom --apply
+lom apply: hello.lom（迭代 2 轮）
+  round 1: applied 1, skipped 0
+    [1:1] insert (NAM005) — 在文件顶部插入 'from string import {len}'
+  最终诊断（修复后源码）: 0 错误 / 0 警告
+
+$ lom hello.lom
+5
+```
+
+That insert is a `high`-confidence mechanical action; ambiguous cases surface as hints instead of silent rewrites. The same `lom fix` plan format (`lom-fix/v1`) is what LLM agents consume — see [SPEC_FOR_AI.md](SPEC_FOR_AI.md).
+
+## Quick start
+
+```powershell
+cargo build --release            # builds target/release/lom (zero dependencies)
+./target/release/lom examples/fib.lom    # run a program
+```
+
+A minimal Lom program (`fn` + tail-expression return; blocks close with `end`):
+
+```lom
+fn main() -> Unit
+    println("hello, lom")
+end
+```
+
+Save as `hello.lom`, run `lom hello.lom`. New here? Read the [tutorial](docs/lom-tutorial.html) (zh) or [SPEC_FOR_AI.md](SPEC_FOR_AI.md) (the LLM-facing language spec). AI maintainers start with the [copy-ready handoff prompt](docs/HANDOFF_PROMPT.md), then [docs/HANDOVER.md](docs/HANDOVER.md). 中文读者：[README.zh-CN.md](README.zh-CN.md)。
+
+## Status & boundaries (honest version)
+
+- Current: **v1.6.1** (2026-10-03). Language surface frozen since v1.0 (2026-09-02) — zero surface changes since; every release since has been remediation/evidence work. Full numbers and the per-release log: see [Release log](#release-log) and [Milestone history](#status-milestone-history--live-numbers) below.
+- The **L2 self-hosted subset compiler** (`examples/selfhost/self_comp.lom`) is explicitly **experimental**: it compiles a strict subset of Lom to WASM, rejects some programs the host accepts (each rejection carries an `[L2xxx]` code + a repair hint via [tools/l2fix.py](tools/l2fix.py)), and self-hosts provably.
+- The 26 review rounds are **in-system adversarial reviews** (agent-run, evidence-based) — good hygiene, **not external peer review**; grades never extrapolate across baselines.
+- Online playground: planned. WASM backend + zero-dependency core make it a natural fit; link lands here when it ships.
+
+## Release log
+
 > **Status: v1.0 — language surface FROZEN (2026-09-02)**. Frozen: syntax / 20 reserved words / diagnostic codes / 43 builtins ([spec §14](LANGUAGE_SPEC.md)). Changes require a new RFC.
 > **Current release: v1.6.1 (2026-10-03; repository tag at `e6b807b`, CI run `37125504909` #259 six jobs green; not externally published)** — closes the twenty-sixth review's three P3 openings R114/R115/R116 (RFC-0004 revision 54; user-adjudicated "execute then stand by"; **host `src/` untouched**): **R115** — the experimental L2 subset compiler now rejects same-file duplicate user `fn` definitions in single-file mode (`codegen error: [L2P001] L2.2 子集不支持: 函数 'go' 重复定义（同文件唯一命名，请重命名其一）`), mirroring the host's NAM002 error face and the existing enum/variant-duplication precedent; the check is gated to single-file mode because file boundaries are unrecoverable in package-expanded units (cross-package same-name fns are the host's NAM006 deterministic-order legal surface, locked by pkg cases 106-108), and it only counts prior user fns (idx≥0) so fn-over-import-alias "local wins" semantics are preserved; `classify_l2` gains the "重复定义" keyword (L2P family). **R114** — the v1.6.0 "141 messages classify, 0% fallback" claim is scope-annotated at every claim site (corpus scope: ~29 further combination messages outside the negative corpus constructively reach the L2G fallback — code nonempty, message intact, l2fix low-confidence and non-misleading); the l2fix fallback comment and help text are corrected; the ~29 keywords are deliberately NOT added (denser keywords raise misclassification risk on unseen combinations). **R116** — SECURITY.md's CI supply-chain version references refreshed (`@v5`, Node 24; remaining annotations are Ubuntu 26 migration notices only, per the 2026-10-03 pre-unfreeze audit). New negative `neg_l2_dup_fn.lom`; verify_selfcomp **367→368** (164 negatives); quine 272293, stock hex of all positive cases identical by construction; self_comp 12572→**12591 lines**; Rust 561+31 and eval 128/128 per backend unchanged. A same-sweep fix: the status paragraph's milestone line carried a stale batch attribution (v1.6.0 tagged but v1.5.0's description — R111's recurrence type), now corrected. The frozen language surface and external publication freeze remain unchanged.
 > **Previous repository milestone: v1.6.0 (2026-10-01; repository tag at `6227a89`, CI run `36878845005` #249 six jobs green; not externally published)** — L2 diagnostic structuring prerequisite (designs/0017, RFC-0004 revision 52; user-adjudicated on all three points; **host `src/` untouched**): the L2 subset compiler's `codegen error` channel now carries a structured code on every rejection — `codegen error: [L2T001] <original message>` — via an output-layer keyword classifier (`classify_l2`, 7 families L2E/P/S/V/C/U/T + L2G fallback) modeled on the host's `classify_runtime_error`; all 263 `subset_err` call sites and every message body stay byte-identical (the 145 existing negative-lock assertions pass unchanged), all 141 distinct negative messages classify with a **0% fallback rate** (corpus scope — annotated per R114 in v1.6.1). A pre-existing latent bug in the L2 `lex error` channel is fixed on the spot (its error records lacked the `code` field the reporter reads — previously a RUNTIME000 crash; now `lex error 4:15 [LEX005] 意外字符 '@'`, with 2 new lex negatives). The negative-lock table is upgraded wholesale to code+message dual locks (147 entries) with a code-nonempty assertion; the three L2-face error_repair tasks (127-129) re-capture their embedded L2 text verbatim from the new output (solutions/expected unchanged). verify_selfcomp **365→367** (163 negatives); the quine moves to **271989 bytes** (byte-identical both sides, +2434 from the classifier code); self_comp 12544→**12572 lines**; the stock hex of all positive cases stays identical by construction; selfhost six modes unaffected; eval 128/128 per backend unchanged. Line numbers are deliberately deferred (full coverage would need AST spans, conflicting with the registered "no-span" front-end design; a ~118-site main-cluster pass is a future batch). The frozen language surface and external publication freeze remain unchanged.
@@ -28,26 +101,9 @@ LLM-coding-native first, workloads later. Built in Rust.
 >
 > **Maintenance audit status (2026-09-26): external publication remains frozen.** The sixteenth system-internal independent [review](docs/reviews/review-2026-09-26-2.html) graded its `7f71456`/v1.2.13 baseline **A-** (its own time point and test surface only) after confirming zero distortion in the R84/R85 remediation and Map-batch claims (the 79 pre-existing pairs' byte-identical hex independently re-verified in full, 79/79); it opened R86-R89 (4×P3, registry/diagnostic-message precision), all repaired in v1.2.14. This is a system-internal agent review, not external peer audit; grades never extrapolate across baselines. `lom fix --apply` reports a `final` diagnostics block and `ok` reflects the post-patch state — reviewing `--dry-run` diffs for logic-bearing edits is still recommended. See [TODO](docs/TODO.md) and the [copy-ready handoff prompt](docs/HANDOFF_PROMPT.md).
 
-## Quick Start
+## Status (milestone history & live numbers)
 
-```powershell
-cargo build --release            # builds target/release/lom (zero dependencies)
-./target/release/lom examples/fib.lom    # run a program
-```
-
-A minimal Lom program (`fn` + tail-expression return; blocks close with `end`):
-
-```lom
-fn main() -> Unit
-    println("hello, lom")
-end
-```
-
-Save as `hello.lom`, run `lom hello.lom`. New here? Read the [tutorial](docs/lom-tutorial.html) (zh) or [SPEC_FOR_AI.md](SPEC_FOR_AI.md) (the LLM-facing language spec). AI maintainers start with the [copy-ready handoff prompt](docs/HANDOFF_PROMPT.md), then [docs/HANDOVER.md](docs/HANDOVER.md).
-
-## Status
-
-✅ **Phase 1 — Minimal Interpreter** (completed; 历史里程碑快照，非现状——现状见上文 Status 段落与 [eval/README](eval/README.md))
+✅ **Phase 1 — Minimal Interpreter** (completed; 历史里程碑快照，非现状——现状见上文 Status & boundaries 段与 [eval/README](eval/README.md))
 
 - 13/13 `.lom` examples pass (`examples/*.lom`)
 - 20/20 Rust unit tests pass (`cargo test`)（Phase 1 时点快照，2026-08 初；现值见下方状态段）
