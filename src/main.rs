@@ -45,18 +45,28 @@ mod wasm;
 mod wasm_codegen;
 
 fn main() {
+    // playground（designs/0019）：wasm 目标单线程直跑——wasi p1 无线程支持，
+    // spawn 恒 Err；256MB 大栈缓解也不适用（浏览器 wasm 栈由引擎决定，深度
+    // 由解释器侧 cfg 降阈值的软件守卫结构化先报）。桌面路径保持不变。
+    #[cfg(target_family = "wasm")]
+    {
+        main_inner();
+    }
     // Phase 5.0: 用大栈线程运行解释器，缓解树遍历解释器递归深度限制
     // （自举验证发现：非尾递归的 Lom 程序在长输入时栈溢出 Rust 默认 1MB 栈）
-    let child = std::thread::Builder::new()
-        .stack_size(256 * 1024 * 1024) // 256MB
-        .spawn(main_inner)
-        .expect("failed to spawn interpreter thread");
-    // process::exit 在线程内会直接终止进程；正常路径 main_inner 已自带退出码。
-    // R56（九审）：worker 线程 panic（join 返回 Err）不得被吞成 exit 0——
-    // 默认 panic hook 已把 panic 信息打到 stderr，这里补一行结论并映射非零退出码。
-    if let Err(_panic_payload) = child.join() {
-        eprintln!("内部错误：解释器线程异常终止（见上方 panic）");
-        process::exit(1);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let child = std::thread::Builder::new()
+            .stack_size(256 * 1024 * 1024) // 256MB
+            .spawn(main_inner)
+            .expect("failed to spawn interpreter thread");
+        // process::exit 在线程内会直接终止进程；正常路径 main_inner 已自带退出码。
+        // R56（九审）：worker 线程 panic（join 返回 Err）不得被吞成 exit 0——
+        // 默认 panic hook 已把 panic 信息打到 stderr，这里补一行结论并映射非零退出码。
+        if let Err(_panic_payload) = child.join() {
+            eprintln!("内部错误：解释器线程异常终止（见上方 panic）");
+            process::exit(1);
+        }
     }
 }
 

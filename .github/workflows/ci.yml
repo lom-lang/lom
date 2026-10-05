@@ -184,3 +184,21 @@ jobs:
           python3 tools/diff_test.py --rounds 20 --seed-base 1 --ci
           python3 tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci
           python3 tools/diff_test.py --probe
+
+  # playground（designs/0019）：wasm 构建常绿 + node 冒烟——harness 全链
+  # （arithmetic/fib 与桌面逐字对拍、修复闭环四步、深度守卫、--check 面）
+  playground:
+    name: playground (wasm build + smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - name: Build desktop (smoke 对拍基准)
+        run: cargo build --release
+      - name: Build wasm (host toolchain → wasm32-wasip1)
+        run: cargo build --target wasm32-wasip1 --profile wasm-release
+      - name: Node smoke (harness 全链 vs 桌面对拍)
+        run: node playground/smoke.mjs

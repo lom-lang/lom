@@ -1,6 +1,6 @@
 [package]
 name = "lom"
-version = "1.6.1"
+version = "1.7.0"
 edition = "2024"
 description = "Lom (Language of Machine) — an AI-native programming language: LLM-repair-native toolchain (lom fix), progressive typing, explicit effects, self-hosting-verified."
 license = "Apache-2.0"
@@ -14,3 +14,10 @@ keywords = ["ai-native", "programming-language", "llm", "interpreter", "wasm"]
 
 [profile.release]
 debug = true  # keep debug info for easier debugging of the interpreter itself
+
+# playground（designs/0019）：wasm 构建专用 profile——release 的 debug=true
+# 会把调试信息带进 wasm 产物显著膨胀；仅 --profile wasm-release 使用，
+# 桌面 release 路径零影响。
+[profile.wasm-release]
+inherits = "release"
+debug = false

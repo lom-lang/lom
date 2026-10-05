@@ -41,4 +41,4 @@
 
 浏览器递归深度 < 桌面（wasm 物理栈限制，阈值 8k 结构化先报）；file 模块浏览器受限面；playground 页零第三方供应链声明；L2 自举模式（若两段制）沿用实验性口径标注。
 
-- **状态**：**设计产出（2026-10-04，动工前置待裁决六点）**。代码零改动。
+- **状态**：**复查修订后执行中（2026-10-06 用户裁决"复查一遍该方案，修改后执行"——六点按建议项：丙路线/允许两处 cfg 门/Pages 托管/repair-loop 首屏/minor v1.7.0/CI 扩面）**。复查修订五处（原文其余不动）：①§1.2 syscall 面补全——preopen 机制需 `fd_prestat_get`/`fd_prestat_dir_name`；**复查新发现两坑：`random_get`（HashMap RandomState 种子——缺则启动即 panic）与 `clock_time_get`（fix 历史时间戳 SystemTime）必须实现**；另补 fd_read/fd_close/fd_fdstat/fd_seek/proc_exit；`.lom/fix-history.jsonl` 相对路径在预开映射外 → ENOENT → 历史写失败不阻塞 apply（Phase 4.1.3 既有登记行为）；②§1.3 深度阈值 8_000 为初值，动工期以 node 实测校准（保结构化先报）；parser 嵌套深度无守卫（桌面靠大栈）→ 病态嵌套源码 wasm 侧会 trap，看门狗兜底，随批边界登记；③§1.4 尺寸以专用 `[profile.wasm-release]`（debug=false，继承 release）实测为准——release 的 debug=true 直用会带调试信息膨胀；④§3 补 backing file 模型（读写字节缓冲；页面每次调用前同步编辑器→缓冲、调用后回读——fix --apply 的文件写回语义由此闭环）与部署机制（gh-pages 分支由规划者推送、用户网页端开 Pages→deploy from gh-pages root）；⑤CI step 补 `rustup target add wasm32-wasip1`。

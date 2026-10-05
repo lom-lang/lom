@@ -378,7 +378,15 @@ impl std::error::Error for RuntimeError {}
 /// 嵌套的额外栈空间。超限返回 RUNTIME 结构化诊断而非进程崩溃。
 /// 注意：cargo test 的测试线程栈远小于 main 的 256MB 专用线程——测试经
 /// max_depth 字段注入小阈值，不可用生产值。
+/// playground（designs/0019）：wasm 目标下浏览器引擎的物理栈远低于桌面
+/// 256MB 线程——node 实测 wasm 栈仅支撑 ~500 层 Lom 调用（每层数 KB
+/// 解释器帧），阈值取跨引擎安全值 300 保"结构化诊断先于栈 trap"；
+/// 未及守卫的更深 trap 由 harness 捕获 RuntimeError 转译友好提示（双
+/// 防线）。桌面路径 80_000 不变。
+#[cfg(not(target_family = "wasm"))]
 const DEFAULT_MAX_CALL_DEPTH: usize = 80_000;
+#[cfg(target_family = "wasm")]
+const DEFAULT_MAX_CALL_DEPTH: usize = 300;
 
 /// 控制流信号（return）
 enum ControlFlow {
