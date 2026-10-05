@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question
+    url: https://github.com/lom-lang/lom/discussions
+    about: Questions about the language, tooling, or eval evidence belong in Discussions — no issue needed.

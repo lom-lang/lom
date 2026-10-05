@@ -1,0 +1,42 @@
+name: Language proposal
+description: Propose a change to the frozen v1.x language surface (syntax / keywords / diagnostic codes / builtins)
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Read this first — the v1.x language surface is FROZEN** (since 2026-09-02):
+        the grammar, the 20 reserved words, the diagnostic-code namespaces, and the 43
+        builtins ([LANGUAGE_SPEC §14](../../LANGUAGE_SPEC.md)). Any change requires a
+        numbered RFC with an LLM-impact analysis, per the governance docs
+        ([CONTRIBUTING.md](../../CONTRIBUTING.md)).
+
+        Proposals are very welcome — but expect them to be **queued for a future major
+        version** rather than shipped into v1.x. If your idea is about tooling, docs,
+        error messages, or a suspected bug, it does not need this template — open a
+        regular issue instead.
+
+        The core mission to argue against is the **LLM repair loop**: diagnostics →
+        mechanical fix → verified repair. The most persuasive proposals show how the
+        change makes that loop work better for a model writing Lom.
+  - type: textarea
+    id: change
+    attributes:
+      label: What change are you proposing?
+      description: Syntax / keyword / builtin / diagnostic — be concrete; a tiny before/after example helps.
+    validations:
+      required: true
+  - type: textarea
+    id: repair-impact
+    attributes:
+      label: Impact on the LLM repair loop
+      description: How does this affect diagnostics, `lom fix`, or a model's ability to write and repair Lom? (This is the language's reason for existing — proposals that ignore it are unlikely to proceed.)
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What did you try in current Lom that fell short? Could the same goal be reached without touching the frozen surface?
+    validations:
+      required: false

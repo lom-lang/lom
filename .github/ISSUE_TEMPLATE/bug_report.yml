@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a reproducible problem with the lom toolchain or language behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue.
+
+        Two things worth knowing before you file:
+        - **Lom runs trusted programs only** — it is an interpreter, not a sandbox (see [SECURITY.md](../../SECURITY.md)). Please don't paste untrusted code as an attachment.
+        - The **L2 self-hosted compiler** (`examples/selfhost/self_comp.lom`) is explicitly experimental — it rejects some programs the host accepts by design. Pick it in the "surface" field below if that's where you saw the problem.
+
+        The fastest route to a fix is a **minimal `.lom` reproduction plus the structured diagnostics output** — Lom's whole design goal is turning exactly that into a mechanical repair.
+  - type: input
+    id: version
+    attributes:
+      label: "`lom --version` output"
+      description: If you built from source, also mention the tag or commit.
+      placeholder: "lom 1.6.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface did the problem appear on?
+      options:
+        - Interpreter (default `lom <file>` run)
+        - Host WASM backend (`lom build --target wasm`)
+        - Static check / diagnostics (`--check` / `--json`)
+        - "`lom fix` (plan or apply)"
+        - Experimental L2 self-hosted compiler (self_comp.lom)
+        - Other tooling (fmt / lsp / repl / build / doc)
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest `.lom` file plus the exact command that shows the problem.
+      placeholder: |
+        ```lom
+        fn main() -> Unit
+            println(len("hello"))
+        end
+        ```
+
+        ```
+        $ lom bad.lom
+        ```
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: diag
+    attributes:
+      label: Structured diagnostics output
+      description: >
+        Paste the raw output of `lom <file> --check --json` (the `lom-diag/v1` schema).
+        This is the machine-readable diagnostic surface Lom is built around — it lets us
+        reproduce exactly what you saw.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected behavior vs. actual behavior
+    validations:
+      required: true
