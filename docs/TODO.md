@@ -1,42 +1,25 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-04，v1.6.1；发布线已解冻且**首个对外发布物已上线**——
-> README 门面（`de4f77e` #263 绿）+ Release v1.6.1（pre-release 标签、
-> 链接核验全通）+ About/topics/社交预览图/Releases 侧栏（用户网页端执行）；
-> 治理反思小批 `5c461a6` #261 绿。台账零 open，解冻检查单七项全 ✓**：**
-> **R114/R115/R116 已于 v1.6.1 同包关闭（用户裁决"执行（1），
-> 然后等待指令"）；R1-R116 全部关闭、零 open**。基线 v1.6.1
-> （R114/R115/R116 整改批，tag/CI 见下方 v1.6.1 交付段）：verify_selfcomp
-> **368/368 = 196+8+164**、bootstrap 14/14（quine 272293B）、
-> Rust **561+31**（合计 592）、eval 双后端各 128/128、fix_corpus
+> **当前状态（2026-10-06，v1.7.0；交接就绪——台账零 open，发布线已解冻且首批发布物上线）**：
+> **R1-R116 全部关闭、零 open、无在制工作**。最新基线 **v1.7.0**
+> （tag `7685d64`，CI #267 **七 job** 绿——含 playground job；回填
+> `8132df4` #268 绿）：在线 playground 上线（gh-pages `c767f43`，
+> https://lom-lang.github.io/lom/playground/ ——宿主全工具链
+> wasm32-wasip1 化 + 手写零依赖 WASI 绑定 + CI 第七 job；src/ 仅两处
+> cfg(target_family="wasm") 门，桌面路径逐字节不变）。发布面：README
+> 门面 + 中文导读 + Release v1.6.1（pre-release）+ topics/预览图/
+> Discussions/Issue 模板三件。基线数字：verify_selfcomp **368/368 =
+> 196+8+164**、bootstrap 14/14（quine 272293B）、Rust **561+31**、
+> eval 双后端各 128/128、playground node 冒烟 ALL PASS、fix_corpus
 > 13 对、doc_audit 71/71、self_comp 12591 行。审查轨迹（二十 A-→
-> 二十一 B→二十二 B+→二十三 B+→二十四 A-→二十五 A-→**二十六 A-
-> （v1.5.1/v1.6.0/l2fix 零失真 + 安全面零 P1/P2；R114-R116 开账→
-> v1.6.1 同包关闭）**，均不外推）。
-> **解冻检查单状态（2026-10-03，v1.6.1 后）——七项全 ✓**：
-> ①审查轨迹（二十五 A- + 二十六 A- 连续两轮零 P1/P2 开账）；②台账
-> 零 open（R114-R116 已关）；③回归基线全绿常态；④评测覆盖
-> （error_repair 31 题双模型×10 采样 2026-10-03 重跑闭合——24 题
-> 重叠子集 480/480、新题 123-129 首测，126 题 078 型歧义/127 题
-> glm 两败如实分层，见
-> [REPORT-2026-10-03-err-repair-31.md](../eval/REPORT-2026-10-03-err-repair-31.md)）；
-> ⑤文档门禁（doc_audit/spec_examples/eval_prompt_check 三件套绿）；
-> ⑥安全合规面（二十六审针对性检查零 P1/P2 + R116 已修）；⑦解冻
-> 本身恒为独立用户裁决——**解冻裁决与门面/发布动作待用户**。
-> **待裁菜单（2026-10-04 更新——门面批①已完成；②方案已产出待裁）**：
-> **②playground：[designs/0019](designs/0019-playground.md) 六裁决点待用户**
-> （路线丙两段制建议/src 两处 cfg 门 ±10 行/Pages 托管/repair-loop 首屏/
-> minor v1.7.0/CI 扩 wasm 冒烟）；
-> ③性能工程（可与 playground 并行，性能数据现停在 2026-08）；④宣传
-> 动作前全 128 任务集 pass@k 刷新（顺带覆盖 118）+ eval 126/127 题面
-> 收紧；⑤轻量二十七审（发布快照锚——建议在宣传启动前）；⑥L2 行号
-> 主要簇（~118 处）+ L2 转正判据定义；⑦divergence/build 缺口中期项。
-> 小项在案：GitHub topics 中 'wasd' 疑为 'wasm' 笔误（用户网页端可移
-> 除）；Discussions 已开启（用户选择）。观察项：Ubuntu 26 迁移
-> （2026-10-19）；MoonBit Q3 复核已完成关闭。**首个 Release：
-> https://github.com/lom-lang/lom/releases/tag/v1.6.1**（规划者发布后
-> 核验：标题/pre-release 标签/4 处链接逐个 200 或 301/零二进制附件/
-> 未建 discussion——全部符合批准方案）。
+> 二十一 B→二十二 B+→二十三 B+→二十四 A-→二十五 A-→**二十六 A-**，
+> 均不外推；**v1.6.1 后增量未复审**——轻量二十七审在菜单）。
+> **待裁菜单（交接后）**：③性能工程 / ④宣传前全 128 任务集 pass@k
+> 刷新（顺带覆盖 118）+ eval 126/127 题面收紧 / ⑤轻量二十七审
+> （发布快照锚）/ ⑥L2 行号主要簇（~118 处）+ L2 转正判据定义 /
+> ⑦divergence（typechecker 可见性分层）与 build 无文件流程缺口。
+> 观察项：Ubuntu 26 迁移（2026-10-19，盯 CI 首跑）；MoonBit Q3
+> 复核已关闭（1.0 未发布）。对外动作逐项呈批（铁律 6）。
 >
 > **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏与
 > 循环外读 for 变量两个 divergence（typechecker 放行/解释器
