@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lom Playground</title>
+<meta name="description" content="Lom language playground — run and fix Lom programs entirely in the browser.">
+<style>
+  /* GitHub dark 派生配色 —— 全部内联，零外部资源 */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --fg: #e6edf3;
+    --dim: #8b949e;
+    --green: #3fb650;
+    --red: #f85149;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ---- 页头 ---- */
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 24px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.5px; }
+  header h1 .accent { color: var(--green); }
+  header .tagline { color: var(--dim); margin: 0; flex: 1 1 240px; }
+  nav { display: flex; gap: 16px; flex-wrap: wrap; }
+  nav a { color: var(--dim); text-decoration: none; font-size: 13px; }
+  nav a:hover { color: var(--fg); text-decoration: underline; }
+
+  /* ---- 主体双栏 ---- */
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 6fr);
+    gap: 16px;
+    padding: 16px 24px;
+    flex: 1;
+    align-items: stretch;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .pane {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .pane h2 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 8px 0 0;
+  }
+  .pane h2:first-child { margin-top: 0; }
+
+  /* 工具栏 */
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar label { color: var(--dim); font-size: 13px; }
+  .toolbar .spacer { flex: 1; }
+  select {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font: inherit;
+    max-width: 46vw;
+  }
+  button {
+    font: 600 13px/1.2 inherit;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+  button:hover:not(:disabled) { background: rgba(63, 182, 80, 0.15); }
+  button.secondary { color: var(--fg); border-color: var(--border); }
+  button.secondary:hover:not(:disabled) { background: rgba(230, 237, 243, 0.08); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .note { color: var(--dim); font-size: 12px; margin: 0; }
+
+  /* 编辑器 */
+  textarea {
+    flex: 1;
+    min-height: 340px;
+    resize: vertical;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font: 13px/1.55 var(--mono);
+    tab-size: 4;
+    white-space: pre;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--green); }
+
+  /* 状态行 */
+  .statusline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--dim);
+    font-size: 12px;
+    min-height: 16px;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dim);
+    flex: none;
+  }
+  .dot.ok { background: var(--green); }
+  .dot.err { background: var(--red); }
+  .dot.running {
+    background: transparent;
+    border: 2px solid var(--border);
+    border-top-color: var(--green);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 输出区 */
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0;
+    font: 12.5px/1.55 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 280px;
+    overflow: auto;
+  }
+  #stdout-pre { color: var(--fg); }
+  #stdout-pre.dim-placeholder { color: var(--dim); font-style: italic; }
+  #diag-pre { color: var(--dim); }
+  #diag-pre .red, .red { color: var(--red); }
+  #diag-pre .dim, .dim { color: var(--dim); }
+
+  /* 行级 diff */
+  .diff { max-height: 320px; }
+  .diff-row { white-space: pre-wrap; word-break: break-word; }
+  .diff-row.add { color: var(--green); background: rgba(63, 182, 80, 0.12); }
+  .diff-row.del { color: var(--red); background: rgba(248, 81, 73, 0.12); }
+  .diff-row.ctx { color: var(--dim); }
+
+  /* 页脚边界说明 */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--dim);
+    font-size: 12px;
+    padding: 12px 24px;
+  }
+  footer h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 6px; color: var(--dim); }
+  footer ul { margin: 0; padding-left: 18px; }
+  footer li { margin: 2px 0; }
+  footer .fineprint { margin: 8px 0 0; }
+  code {
+    font-family: var(--mono);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 11.5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lom <span class="accent">Playground</span></h1>
+  <p class="tagline">在浏览器里跑 Lom —— 诊断是产品，修复是闭环。Run 看结构化诊断，Fix 看 <code>--apply</code> 自动修复并写回。</p>
+  <nav>
+    <a href="https://github.com/lom-lang/lom" target="_blank" rel="noreferrer">GitHub</a>
+    <a href="https://github.com/lom-lang/lom/blob/main/LANGUAGE_SPEC.md" target="_blank" rel="noreferrer">语言规范</a>
+    <a href="https://github.com/lom-lang/lom/blob/main/SPEC_FOR_AI.md" target="_blank" rel="noreferrer">SPEC_FOR_AI</a>
+    <a href="https://github.com/lom-lang/lom/blob/main/README.zh-CN.md" target="_blank" rel="noreferrer">中文 README</a>
+  </nav>
+</header>
+
+<main>
+  <!-- 左：编辑器 -->
+  <section class="pane">
+    <div class="toolbar">
+      <label for="example-select">示例</label>
+      <select id="example-select"></select>
+      <span class="spacer"></span>
+      <button id="run-btn" title="Ctrl/Cmd+Enter">Run ▶</button>
+      <button id="fix-btn" class="secondary" title="lom fix --apply">Fix ✎</button>
+    </div>
+    <p id="example-note" class="note"></p>
+    <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
+    <div class="statusline">
+      <span id="status-dot" class="dot"></span>
+      <span id="status-text">就绪</span>
+    </div>
+  </section>
+
+  <!-- 右：输出 -->
+  <section class="pane">
+    <h2>stdout</h2>
+    <pre id="stdout-pre"></pre>
+    <h2>diagnostics</h2>
+    <pre id="diag-pre"></pre>
+    <section id="diff-section" hidden>
+      <h2>fix diff（写回编辑器）</h2>
+      <p id="diff-summary" class="note"></p>
+      <pre id="diff-pre" class="diff"></pre>
+    </section>
+  </section>
+</main>
+
+<footer>
+  <h2>Playground boundaries (by design)</h2>
+  <ul>
+    <li><b>Recursion</b> — Lom's depth guard fires at 300 frames with structured RUNTIME diagnostics first; pathologically nested sources can still exceed the browser engine's native stack limit (a few hundred frames) and terminate as a trap.</li>
+    <li><b>Files</b> — the <code>file</code> module is a virtual single file: reads return the current editor content, <code>fix --apply</code> writes back to the editor, and any other path fails with ENOENT.</li>
+    <li><b>Arguments</b> — <code>env::args()</code> sees only the virtual script path <code>/playground.lom</code>; user arguments after <code>--</code> cannot be passed from this page.</li>
+  </ul>
+  <p class="fineprint">Experimental L2 compiler &amp; 26-round in-system reviews — see the <a href="https://github.com/lom-lang/lom/blob/main/README.md" target="_blank" rel="noreferrer">repo README</a>.</p>
+</footer>
+
+<script type="module">
+  import "./app.js";
+</script>
+
+</body>
+</html>
