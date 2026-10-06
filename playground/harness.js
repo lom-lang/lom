@@ -6,7 +6,8 @@
 //     run 每次调用都新建 wasm 实例（状态零残留）：
 //     - source: 编辑器内容，预置为虚拟文件 "/playground.lom" 的字节
 //     - args:   完整 argv（默认 ["lom", "/playground.lom"] 即运行模式；
-//               fix 模式传 ["lom", "fix", "/playground.lom", "--apply"] 等）
+//               fix 模式传 ["lom", "fix", "/playground.lom", "--apply"] 等；
+//               须至少含虚拟脚本路径——未传或空数组均回落上述默认，R118 防御）
 //     - 返回 { stdout, stderr, exitCode, sourceOut, durationMs }
 //       其中 sourceOut 是调用结束后的虚拟文件内容——`lom fix --apply`
 //       的文件写回语义由此暴露（调用方据此刷新编辑器/展示 diff）。
@@ -276,7 +277,7 @@ export async function createLomRuntime(wasmBytes) {
   return {
     async run({ source, args, env = [] }) {
       const t0 = Date.now();
-      const wasi = createWasi(args || ["lom", "/playground.lom"], env);
+      const wasi = createWasi((args && args.length) ? args : ["lom", "/playground.lom"], env);
       const encoder = new TextEncoder();
       wasi.setBacking(encoder.encode(source));
       // 注意：instantiate 以 Module 为首参时直接解析为 Instance（非 {instance,module}）
@@ -289,7 +290,7 @@ export async function createLomRuntime(wasmBytes) {
         if (e && e.__lom_wasi_exit !== undefined) {
           exitCode = e.__lom_wasi_exit;
         } else {
-          throw e; // 真 trap（如病态嵌套源码的栈溢出）——交调用方/看门狗
+          throw e; // 真 trap（如病态嵌套源码触发的 RuntimeError）——交调用方/看门狗
         }
       }
       const out = wasi.takeOutput();

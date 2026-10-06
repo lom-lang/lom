@@ -2,8 +2,9 @@
 //
 // 职责：fetch ./lom.wasm 一次、createLomRuntime 编译一次；run 消息转发给
 // harness（harness 每次 run 新建 wasm 实例，状态零残留）。真 trap
-// （典型：病态嵌套源码打爆 JS 引擎栈 → WebAssembly.RuntimeError
-// "call stack exhausted"）在这里转译为 { trap: true, message } 交 UI。
+// （典型：病态嵌套源码等触发的 WebAssembly.RuntimeError，实测形态含
+// "call stack exhausted" / "memory access out of bounds" / "unreachable"）
+// 在这里转译为 { trap: true, message } 交 UI（UI 文案中性归因引擎执行限制）。
 //
 // 消息协议（与 app.js 对偶）：
 //   入：{ id, source, args }                    运行请求（init 完成前排队的会被 await 挡住）
@@ -11,7 +12,7 @@
 //   出：{ type: "ready" }                        runtime 就绪
 //       { type: "init-error", message }          fetch/编译失败
 //       { id, ok: true, stdout, stderr, exitCode, sourceOut, durationMs }
-//       { id, ok: false, trap: true, message }   真 trap（栈上限等）
+//       { id, ok: false, trap: true, message }   真 trap（引擎执行限制等）
 //       { id, ok: false, error: "init", message } runtime 从未就绪/初始化失败
 
 import { createLomRuntime } from "./harness.js";

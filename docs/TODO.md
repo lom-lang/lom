@@ -1,8 +1,14 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-07，v1.7.0；二十七审收官 A- 维持 + 全 128 集 pass@k 首测完成——交接就绪，R117/R118 两笔 P3/P4 待裁）**：
-> 最新基线 **v1.7.0**（tag `7685d64`，CI #267 七 job 绿；回填链 #268-#272
-> 实查全绿，HEAD 以 git log 与 CI 首跑为准）。**本轮（2026-10-06~07）交付**：
+> **当前状态（2026-10-07，v1.7.1；二十七审开账 R117/R118 已同包整改关闭——发布链（gh-pages 重部署 + Release v1.7.0 pre-release）执行中）**：
+> 最新基线 **v1.7.1**（tag/CI 门禁回填随后；上一 tag v1.7.0 = `7685d64`
+> CI #267 七 job 绿，回填链 #268-#273 实查全绿，HEAD 以 git log 与 CI
+> 首跑为准）。**v1.7.1 批（2026-10-07，用户裁决"按建议执行"——R117/R118
+> 处置与 Release v1.7.0 合并收口）**：README/designs 边界句补源码嵌套
+> 深度量化登记 + app/worker trap 文案中性化"引擎执行限制" + harness
+> run() 空数组 args 回落默认 argv（R118 一行防御；A/B 探针坐实修复差异、
+> smoke 11 项 ALL PASS；负向锁定遵守——无 parser 守卫/无新诊断/不吞
+> trap）。**前置轮（2026-10-06~07）交付**：
 > ①维护规程 2.0 治理批（`b13f2d2`）+ 结构整理防腐批（`ae98d81`，记录段
 > 见下）；②eval 126/127 题面收紧（`e1702ba`，仿 078→118 先例——126
 > stdout 面明确化、127 排除常量/死分支捷径，三要素零变化）；③**二十七审**
@@ -15,29 +21,32 @@
 > 99.2%/98.8%；126 收紧后双模型 10/10 消歧成功；127 捷径清零、20 候选
 > 全走 map_get 路线、2 真修复过 L2 全链——剩余失败为真实"Option 解包
 > 一步"能力缺口；078 仍为唯一系统性失败=已知歧义锚题，其明确版 118
-> 双模型 10/10）。**当前 open：R117/R118**（二十七审开账，只开未修，
-> 见 review-2026-10-07.html 开账节）。
+> 双模型 10/10）。**台账零 open**（R117/R118 已于 v1.7.1 批整改关闭——
+> 二十七审开账→同批收口，负向边界见 review-2026-10-07.html 开账节，
+> 交付细节见 SPEC §13 v1.7.1 条目与 designs/0019 后续修订行）。
 > 基线数字：verify_selfcomp **368/368 = 196+8+164**、bootstrap 14/14
 > （quine 272293B）、Rust **561+31**、eval 双后端各 128/128、fix_corpus
 > 13 对、doc_audit 71/71、self_comp 12591 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
-> Release v1.6.1（pre-release）+ playground 线上。审查轨迹（……→
+> Release v1.6.1（pre-release）+ playground 线上（v1.7.1 源件随本链
+> 重部署执行中）+ **Release v1.7.0（pre-release）发布执行中**。审查
+> 轨迹（……→
 > 二十四 A-→二十五 A-→二十六 A-→**二十七 A-**，连续三轮 A-，均不外推）。
 > **现行维护规则唯一规范写位 = [MAINTENANCE.md](MAINTENANCE.md)**；本文件
 > 顶部状态块为**活信息唯一主写位**（版本/计数/台账/菜单/顺延号）。
-> **待裁菜单（交接后）**：① **Release v1.7.0 发布**（对外动作逐项呈批——
-> notes 草案已备：**playground 主线（链接 + 60 秒修复闭环实演 + 宿主
-> 工具链 wasm 化 + CI 第七 job + 基线数字）+ 已知边界如实标注（递归
-> 300/嵌套深度/file 单文件/args）+ 二十六/二十七审 A- 引用 + 零二进制
-> 附件沿 v1.6.1 先例**；草案全文在本机 gitignored 的
-> target/release_v170_draft.md——fresh clone 按本要点重写即可；待裁
-> pre-release 还是正式版（规划者倾向 pre-release 待外部反馈转正）、
-> v1.6.1 是否随批转正；发布命令 gh release create/edit v1.7.0，发布后
-> 核 URL/链接通断/标记并回填）/ ② **R117/R118 处置**
-> （P3：playground wasm 侧源码嵌套深度量化登记 + trap 归因文案；P4：
-> harness run 空数组 argv 防御——修 R118 需重建 wasm 重部署 gh-pages，
-> **与 ① 合并执行可省一次部署**：先修 R117/R118 文档+防御 → 重建
-> wasm → 部署 gh-pages → 发 Release 一次收口）/ ③ 性能工程 /
+> **待裁菜单（交接后；本轮用户已裁"按建议执行"——②R117/R118 处置 +
+> ①Release v1.7.0 合并收口，执行链 = 本批整改（已完成，v1.7.1）→
+> 重建 wasm → 部署 gh-pages → 发 Release v1.7.0（pre-release）→ 回填）**：
+> ①（执行中）**Release v1.7.0 发布**——notes 要点：**playground 主线
+> （链接 + 60 秒修复闭环实演 + 宿主工具链 wasm 化 + CI 第七 job + 基线
+> 数字）+ 已知边界如实标注（递归 300/嵌套深度 ≈500/file 单文件/args）+
+> 二十六/二十七审 A- 引用 + 零二进制附件沿 v1.6.1 先例**；形态已裁
+> pre-release（待外部反馈转正）、v1.6.1 不随批转正（维持 pre-release，
+> 转正另呈）；README v1.7.0 段 "not externally published" 随发布回填；
+> 发布后核 URL/链接通断/标记并回填；本机 gh 不可用——发布需 API 认证
+> 协助或安装 gh 后执行，届时如实上报；
+> ②（已完成）R117/R118 随 v1.7.1 批关闭（见状态头）；
+> ③ 性能工程 /
 > ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
 > 与 build 缺口中期项 / ⑥ 断链机检升格常驻 gate（脚本现位本机
 > gitignored 的 target/link_check/check_links.py，2026-10-06 防腐批与
@@ -78,8 +87,10 @@
 > 主文件诊断面（二十三审备注 2 维持登记）；clippy
 > --all-targets ~4 条工具链漂移存量；playground 四边界
 > （浏览器递归≪桌面、file 模块虚拟单文件、env::args() 只见
-> 虚拟脚本路径、病态嵌套源码引擎栈 trap 由看门狗兜底——**源码
-> 嵌套深度的量化数字面属 R117 open，不在本清单**）；gh-pages
+> 虚拟脚本路径、病态嵌套源码引擎栈 trap 由看门狗兜底——源码
+> 嵌套深度的量化登记已随 R117 关闭入 README/designs：node ≈500 层
+> trap、桌面 256MB 栈 3000+ 层通过，parser 路径无结构化守卫、呈现为
+> 转译 trap）；gh-pages
 > push 触发独立 Pages 构建流（非 CI 红）；归档 HTML 的
 > echarts/mermaid assets 未随档（图表不渲染属预期，archive/README
 > 登记）。
