@@ -738,7 +738,7 @@ end
 
 ### Task 126
 
-以下 .lom 代码静态检查报错（lom-diag/v1 诊断如下），无法运行。请修复代码使其正确运行（矩形面积与圆面积都要能算）。
+以下 .lom 代码静态检查报错（lom-diag/v1 诊断如下），无法运行。请修复代码使其正确运行（矩形面积与圆面积都要能算）。main 用**两次 println 各输出一行**：先打印矩形面积函数以参数 `4, 5` 调用的结果，再打印圆面积函数以参数 `2` 调用的结果。
 
 错误代码：
 from io import {println}
@@ -761,7 +761,7 @@ end
 
 ### Task 127
 
-以下 .lom 代码在宿主 lom 下能运行（输出 2）但有一条警告（lom-diag/v1 诊断如下）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码：消除宿主警告、保持宿主输出 2 不变，并使代码能通过 L2 子集编译（提示：Map 值要用 map_get 取出后才能参与算术）。
+以下 .lom 代码在宿主 lom 下能运行（输出 2）但有一条警告（lom-diag/v1 诊断如下）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码：消除宿主警告、保持宿主输出 2 不变，并使代码能通过 L2 子集编译。修复须保留对 Map 的实际读取——**通过 map_get 取出键 "a" 对应的值参与算术得到输出 2**（不得把输出写死为常量；也不得保留任何 Map 直接参与算术的代码——即使它在不会执行的分支里也会被 L2 编译器拒绝，因为 L2 对全程序做静态检查）。
 
 代码：
 from io import {println}
@@ -780,7 +780,7 @@ end
 {"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "TYPE001", "message": "'+' 不支持 Generic(\"Map\", [Named(\"_Any\")]) 和 Int", "file": "bad.lom", "line": 0, "col": 0, "source_line": null, "is_hole": false, "hint": "检查运算符两侧类型是否一致"}]}
 
 实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
-codegen error: L2.2 子集不支持: Map 参与算术（L2 子集外；仅支持 ==/!= 比较）
+codegen error: [L2V001] L2.2 子集不支持: Map 参与算术（L2 子集外；仅支持 ==/!= 比较）
 COMPILE-ERROR
 
 请输出修复后的完整代码。
@@ -801,7 +801,7 @@ end
 {"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 0, "errors": 0, "warnings": 0, "holes": 0}, "diagnostics": []}
 
 实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
-codegen error: L2.2 子集不支持: 该表达式形态
+codegen error: [L2S001] L2.2 子集不支持: 该表达式形态
 COMPILE-ERROR
 
 请输出修复后的完整代码。
@@ -821,7 +821,7 @@ end
 {"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "NAM005", "message": "内建 'len' 未导入——需在文件顶部声明：from string import {len}", "file": "bad.lom", "line": 5, "col": 13, "source_line": "    println(len(s))", "is_hole": false, "hint": null}]}
 
 实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
-codegen error: 未定义变量 'len'
+codegen error: [L2U001] 未定义变量 'len'
 COMPILE-ERROR
 
 请输出修复后的完整代码。
