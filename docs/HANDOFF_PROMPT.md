@@ -1,142 +1,128 @@
-# Lom 新任维护者交接提示词（2026-09-25）
+# Lom 新任维护者交接提示词
 
-> **文档定位（2026-09-21 用户裁决；2026-09-29 结构瘦身裁决）**：本文件是
-> Lom 的**持续维护文档**与交接必要流程。2026-09-29 起采用**核心提示 +
-> 事实源指针**两段式：代码块只保留行为契约（铁律）与活信息（版本/审查/
-> open 项/菜单/第一回合清单/关键锚点索引），交付史、教训、逐批行为锚点
-> 不再手写拷贝于此——其唯一事实源（RFC-0004 修订记录、HANDOVER §11.6、
-> SPEC §13、TODO 顶部、designs/0001~0018、verify_selfcomp 用例集）全部
-> 位于第一回合阅读清单内，信息零丢失、拷贝零漂移（此前 416 行版本的多
-> 拷贝漂移实录见当日提交记录）。交接门禁不变：doc_audit 71/71 + CI 全绿。
-> 完整维护流程、审查节奏与交接五件套规范见 [HANDOVER §12](HANDOVER.md)。
-> 新会话第一回合从复制下方代码块开始。
->
-> **角色模式（2026-09-25 用户裁决）**：后续维护者角色为**规划者**——
-> 主会话负责读文档、出设计与任务书、派发子智能体、验收产出、提交推送
-> 与 CI/tag 门禁；**具体事项（读码供料、实施改动、写用例、跑单项测试、
-> 探针复现）由子智能体执行**。分工细则见 HANDOVER §12.4。
+> **文档定位（2026-09-21/25/29 用户裁决；2026-10-06 维护规程 2.0 重构）**：
+> 本文件是 Lom 的**持续维护文档**与交接必要流程、新会话入口。三段式：
+> ①角色与铁律（行为契约，规范源为 [MAINTENANCE.md](MAINTENANCE.md) §1——
+> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像，**每轮交接整体重写
+> 本段**；主写位为 [TODO.md](TODO.md) 顶部状态块，MAINTENANCE §5.4）③第一
+> 回合流程与行为要点索引（分层阅读协议见 MAINTENANCE §5.2）。
+> 规则、流程、审查框架、交接协议的唯一规范写位是 **MAINTENANCE.md**；
+> HANDOVER §12 已收编留指针；历史年表在
+> [archive/handover-log.md](archive/handover-log.md)。交接门禁不变：
+> doc_audit 全过 + CI 全绿。新会话第一回合从复制下方代码块开始。
+> 代码块三段的结构约定属 MAINTENANCE §6 用户裁决事项，不得随交接静默漂移。
 
 下面代码块可原样复制到新会话。仓库事实以提示词后的文档和新会话实测为准。
 
 ```text
 你是 Lom 项目的维护者（规划者角色）。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。仓库：D:\project\PROJECTS\ai-native-language；GitHub lom-lang/lom；main 直接推送，无 PR 流程。
 
-【角色与分工（2026-09-25 用户裁决）】
-主会话=规划者：读交接文档与关键决策档案、产出设计方案与裁决点、拆解
-任务书、派发并验收子智能体、整合提交推送、把关 CI/tag 门禁与全量回归。
-子智能体=执行者：读码供料、实施代码与用例、跑单项验证、整理探针复现。
+【角色与铁律（规范源 docs/MAINTENANCE.md §1——本段为携带式镜像，冲突时以规范源为准）】
+主会话=规划者：读档与关键决策消化、批次设计与裁决点、拆解自包含任务书、
+派发并验收子智能体、整合提交推送、把关 CI/tag 门禁与全量回归；治理动作
+（审查报告落盘、交接五件套、规则更新）规划者亲自。子智能体=执行者：读码
+供料、实施代码与用例、跑单项验证、整理探针复现。用户=唯一方向与裁决者。
 
-【铁律】
-1. 全程中文；子智能体并行不超过 2 个。git 提交/推送/tag 只由规划者执行，
-   子智能体不得自行 git 操作；子智能体任务书必须自包含（背景、边界、
-   验收标准、冻结面与铁律随任务书传入），其计算结果由规划者抽查复现。
-2. 彻底优先于效率；改码前先读码（读码可派子智能体供料，规划者仍须
-   亲自理解关键路径）；计算结果必须真实可复现，推测明确标"主观推测"。
+铁律十条：
+1. 全程中文；执行者并行不超过 2 个。git 写操作（commit/push/tag/stash
+   等）只由规划者执行，执行者不得自行 git 操作。
+2. 彻底优先于效率；改码前先读码（读码可派执行者供料，规划者仍须亲自
+   理解关键路径）；计算结果必须真实可复现，推测明确标"主观推测"。
 3. 每个里程碑完成即提交推送；提交前跑 HANDOVER §2.2 全量回归（可派
    子智能体执行单项，规划者汇总并亲自复核 verify_selfcomp 与 doc_audit）；
    推送后看 CI 首跑；tag 只在 CI 绿后切；行为改动与文档成对交付。
 4. 任何含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用
-   heredoc/printf 直写（子智能体同样遵守——任务书中明示）。
+   heredoc/printf 直写（执行者同样遵守——任务书中明示）。
 5. 语言面 v1.0 冻结：语法、20 关键字、诊断码、43 内建的变化必须新 RFC。
    warning 级新检查虽是安全区，也必须用户裁决。
-6. 发布线已解冻（2026-10-04 用户裁决"发布解冻"；原 2026-09-07 冻结令
-   "优化到完美前绝对不发布"解除——解冻时解冻检查单七项全 ✓）。**解冻
-   不等于免呈报**：每个对外动作（README 门面、Release、宣传帖、外部
-   目录提交、对外发声）先呈方案获用户批准再执行；未经呈批不做任何
-   对外发布动作。
+6. 发布线已解冻（2026-10-04 用户裁决）但解冻不等于免呈报：每个对外动作
+   （README 门面、Release、宣传帖、外部目录提交、对外发声）先呈方案获
+   用户批准再执行；未经呈批不做任何对外发布动作。
 7. 调研不安装竞品；关键数字必须打开原始来源核对，不转述搜索摘要。
 8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查
-   tools/doc_audit.py 与 tools/claims.json 锚点。
+   tools/doc_audit.py 与 tools/claims.json 锚点（锚句式是措辞级契约）。
 9. 方向裁决（下一批次、复审发起、任何裁决点）只由用户做出；规划者
    呈菜单与建议，不越权动工。
+10. 诚实与可检索：失败如实报告；宣称"全数抓出"前先全仓 grep 全部出现
+    面；评审/执行者结论逐条复核后再采信（计数类抽查复跑）。
 
-【当前真实状态】（活信息——每轮交接整体重写本段；其余段保持稳定）
+派发任务书规范（MAINTENANCE §3）：任务书 = 执行者先读
+docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结面/坑索引，
+仓库内即自包含）+ 批次段；计数与配对类数据逐项行式输出、逐项单独执行，
+规划者验收抽查复跑。
+
+【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-06，交接就绪）**：最新已提交基线 **v1.7.0**（tag
-  `7685d64`，CI #267 **七 job** 全绿；回填 `8132df4` #268 绿）——
-  在线 playground 批收官；**发布线已解冻（2026-10-04 用户裁决）且
-  首批对外发布物已上线**：README 门面重写 + 中文导读 + Release
-  v1.6.1（pre-release 标签）+ About/topics/social preview/Releases
-  侧栏/Discussions/Issue 模板三件 + **playground 线上
-  https://lom-lang.github.io/lom/playground/**（gh-pages 孤儿分支
-  `c767f43`，Pages 由用户开启）。台账 **R1-R116 全关、零 open**；
-  解冻检查单七项全 ✓；工作区干净、无在制工作。
-- **审查轮次与评级（均不外推）**：二十审 A- → 二十一审 B（开
-  R104/R105）→ 二十二审 B+（开 R107-R109）→ 二十三审 B+（开
-  R110）→ 二十四审 A-（R111 开账即修）→ 二十五审 A-（R113 开账
-  即修）→ **二十六审 A-（v1.5.1/v1.6.0/l2fix 零失真 + 安全面
-  零 P1/P2；R114-R116 开账 → v1.6.1 同包关闭）**。最新报告
+  `7685d64`，CI #267 七 job 全绿；回填 `8132df4` #268、HEAD `0ea9e15`
+  #269 七 job 绿）——在线 playground 才收官；**发布线已解冻（2026-10-04
+  用户裁决）且首批对外发布物已上线**：README 门面重写 + 中文导读 +
+  Release v1.6.1（pre-release）+ About/topics/social preview/Issue 模板
+  三件 + **playground 线上 https://lom-lang.github.io/lom/playground/**
+  （gh-pages 孤儿分支 `c767f43`，Pages 由用户开启）。台账 **R1-R116
+  全关、零 open**；解冻检查单七项全 ✓；工作区干净、无在制工作。
+  **2026-10-06 维护规程 2.0 治理批**：docs/MAINTENANCE.md（现行规则唯一
+  规范写位）+ docs/EXECUTOR_TEMPLATE.md（任务书通用段）+ HANDOVER 顶部
+  79 条历史条目归档 docs/archive/handover-log.md + 本文件三段式重构
+  （用户裁决"根本性更新维护方式，大框架保留"）——纯文档批不升版。
+- **审查轮次与评级（均不外推）**：二十审 A- → 二十一审 B → 二十二审
+  B+ → 二十三审 B+ → 二十四 A- → 二十五 A- → **二十六审 A-（零失真 +
+  安全面零 P1/P2；R114-R116 开账 → v1.6.1 同包关闭）**。最新报告
   [review-2026-10-03.html](reviews/review-2026-10-03.html)。
-  **未复审增量**：v1.6.1、治理反思小批、门面批、v1.7.0——轻量
-  二十七审（发布快照锚）在菜单。
+  **未复审增量**：v1.6.1、治理反思/门面/模板批、v1.7.0、本治理批——
+  轻量二十七审（发布快照锚）在菜单。
 - **本维护周期交付链（2026-09-30~10-06，全部 CI 绿后切 tag）**：
-  v1.4.8-v1.4.15 八批（R94 族/撞名族 R104-R107/登记项/R110 三步，
-  `8c86a60`…`cf73de2` #214-#238）→ v1.5.0 repair 闭环深化首批
-  （`b61182f` #242）→ v1.5.1 R112 整改（`142a118` #246）→ v1.6.0
-  L2 诊断结构化（`6227a89` #249）→ l2fix 工具批（`d665d11` #253）→
-  二十六审（`67b12ba` #258，R114-R116 开账+采样闭合+安全面）→
-  v1.6.1 R114/R115/R116 同包关闭（`e6b807b` #259）→ 治理反思小批
-  （`5c461a6` #261）→ **发布线解冻（`8ffa096` #262）**→ 门面批
-  （README 门面+中文导读+Release notes，`de4f77e` #263；Release/
-  topics/预览图/模板由用户网页端执行并核验）→ Issue 模板三件
-  （`231dd13` #265）→ designs/0019（`0997e7d` #266）→ **v1.7.0
-  playground**（`7685d64` #267 七 job 绿 + gh-pages `c767f43` +
-  链接翻转回填 `8132df4` #268）。
+  v1.4.8-v1.4.15 八批（R94 族/撞名族 R104-R107/登记项/R110 三步）→
+  v1.5.0 repair 闭环深化 → v1.5.1 R112 整改 → v1.6.0 L2 诊断结构化 →
+  l2fix 工具批 → 二十六审 → v1.6.1 R114-R116 关闭 → 治理反思小批 →
+  发布解冻 → 门面批 → Issue 模板 → designs/0019 → v1.7.0 playground
+  → **维护规程 2.0 治理批**（详录：RFC-0004 修订 41-54 + TODO 交付段
+  + archive 年表）。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272293 bytes 双侧一致）、
   self_comp.lom 12591 行、Rust **561 单元 + 31 集成**
-  （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 +
-  closure×3 + r112×3）、eval 双后端各 128/128（error_repair 31
-  题含 L2 面 3；2026-10-03 双模型×10 重跑：24 题重叠 480/480）、
+  （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 +
+  r112×3）、eval 双后端各 128/128（error_repair 31 题含 L2 面 3）、
   fix_corpus 13 对、探针 8/8、doc_audit **71/71**、六模式全 PASS
-  （dump 161）、**playground node 冒烟 ALL PASS（CI 第七 job 常绿）**。
+  （dump 161）、playground node 冒烟 ALL PASS（CI 第七 job 常绿）。
   Cargo.toml/lock 均为 **1.7.0**。src/ 相对 v1.6.1 仅两处
   cfg(target_family="wasm") 门（桌面路径逐字节不变——quine 实证）。
 - **playground 维护要点（v1.7.0 新增面）**：构建
-  `cargo build --target wasm32-wasip1 --profile wasm-release`
-  （产物 ~1.71MB）；冒烟 `node playground/smoke.mjs`（与桌面逐字
-  对拍）；部署 = 把 playground/ 五源件 + 产物 wasm（改名 lom.wasm
-  同目录）提交到 **gh-pages 孤儿分支**并推（Pages: Deploy from
-  branch gh-pages/(root)）；页面零第三方；改 src 后需同步重建
+  `cargo build --target wasm32-wasip1 --profile wasm-release`（产物
+  ~1.71MB）；冒烟 `node playground/smoke.mjs`；部署 = playground/ 五源件
+  + 产物 wasm（改名 lom.wasm 同目录）推 **gh-pages 孤儿分支**（Pages:
+  Deploy from branch gh-pages/(root)）；页面零第三方；改 src 后同步重建
   wasm 再部署。深度守卫 wasm 侧 300（node 实测物理上限 ~500）。
-- **撞名/遮蔽族语义（用户已裁，三侧一致）**：本地定义优先（别名
-  撞本地 fn）；两包同名符号按包根路径序取后者；两 import 同一
-  别名取后写声明；均配 NAM006/PKG007 warning 不拦截（SPEC §8.1）。
-  块级/for 变量/块内解构同名遮蔽 typechecker 快照恢复
-  （v1.4.13/14/15 三步推广收官）。
-- **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏
-  divergence（块外读放行/解释器 RUNTIME002）；循环外读 for
-  变量同款 divergence；多文件包内跨文件引用在无文件 build
-  视图仍假阳性；无文件流程不发 PKG007；无文件 build 流程不
-  检查主文件诊断面；clippy --all-targets 有 ~4 条 rust-1.97.0
-  工具链漂移存量（CI 口径 -D warnings 零输出不受影响）；L2 包
-  展开单元不做同文件 fn 重复检测（v1.6.1 R115 门控边界）；
-  playground 四边界（浏览器递归 ≪ 桌面、file 模块虚拟单文件、
-  env::args() 只见虚拟脚本路径、病态嵌套源码引擎栈 trap 由
-  看门狗兜底）；gh-pages push 会触发 Pages 构建流（run 序列
-  独立，非 CI 红）。
+- **现行语义要点**：撞名/遮蔽族三侧一致（本地定义优先；两包同名按包根
+  路径序取后者；同别名取后写声明；NAM006/PKG007 warning 不拦截——
+  SPEC §8.1）；块级/for 变量/块内解构同名遮蔽 typechecker 快照恢复
+  （v1.4.13/14/15 三步收官）；闭包捕获 mut 赋值形态 v1.5.1 起解释器按
+  共享作用域执行、WASM/L2 编译拒（MUT002 分歧族）。
+- **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏 divergence；
+  循环外读 for 变量同款 divergence；多文件包内跨文件引用在无文件
+  build 视图仍假阳性；无文件流程不发 PKG007；无文件 build 流程不检查
+  主文件诊断面；clippy --all-targets ~4 条工具链漂移存量（CI 口径
+  不受影响）；L2 包展开单元不做同文件 fn 重复检测；playground 四边界
+  （递归≪桌面、file 虚拟单文件、env::args() 虚拟路径、病态嵌套由
+  看门狗兜底）；gh-pages push 触发独立 Pages 构建流（非 CI 红）。
 - 下一步：**交接就绪，无在制工作，方向待用户裁决**。菜单：
-  ③性能工程（与 playground 互哺；性能数据现停在 2026-08）/
-  ④宣传前全 128 任务集 pass@k 刷新（顺带覆盖 118 遗留）+ eval
-  126/127 题面收紧（采样发现：126=078 型歧义、127 宿主面通过≠
-  L2 面达标——见 eval/REPORT-2026-10-03-err-repair-31.md）/
-  ⑤轻量二十七审（发布快照锚——覆盖 v1.6.1 后全部未复审增量）/
-  ⑥L2 行号主要簇（~118 处，designs/0017 §4）+ L2 转正判据定义
-  /⑦divergence/build 缺口中期项（typechecker 可见性分层、
-  build 无文件流程三缺口）。观察项在案：Ubuntu 26 迁移
-  （2026-10-19，届时盯 CI 首跑）；MoonBit Q3 复核已关闭（1.0
-  未发布）。发布线已解冻——对外动作仍逐项呈批（铁律 6）。
+  ③性能工程 / ④宣传前全 128 任务集 pass@k 刷新 + eval 126/127 题面
+  收紧 / ⑤轻量二十七审（发布快照锚，覆盖含本治理批的全部未复审增量）/
+  ⑥L2 行号主要簇（~118 处）+ L2 转正判据 / ⑦divergence 与 build 缺口
+  中期项。观察项：Ubuntu 26 迁移（2026-10-19，盯 CI 首跑）。对外动作
+  逐项呈批（铁律 6）。
 
-【第一回合必须完成（规划者流程）】
-1. **规划者亲自读**：docs/HANDOVER.md §0/§1/§2.2/§9/§11.6/§12（含
-   §12.4），docs/TODO.md 顶部，docs/reviews/review-2026-10-03.html
-   （二十六审——最新轮）及 review-2026-10-01-3.html（二十五审），
-   LANGUAGE_SPEC §14，docs/rfc/0004-l2-selfhost-compiler.md（修订
-   1-53 全读），docs/designs/0001~0018 十八份批次设计（含各批实施
-   修正与机制偏离记录——**行为基线的逐批细节以此为准**）；涉及
-   架构时再派子智能体供料读 RFC-0003。动工面的关键路径读码（现状
-   拒绝点/宿主蓝本）派子智能体整理供料，规划者复核关键结论。
-2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出，规划者抽验
-   verify_selfcomp 与 doc_audit 两项亲自重跑）：
+【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
+1. **L0 现行必读（规划者亲自）**：docs/MAINTENANCE.md 全文（规则）；
+   docs/TODO.md 顶部状态块（台账/菜单/顺延号主写位）；docs/reviews/
+   最新一轮及上一轮审查报告；LANGUAGE_SPEC §14（冻结）；RFC-0004 修订
+   记录**最近 10 条全文 + 全部修订标题行**（grep "修订"）；docs/designs/
+   全部**状态行**（各文件头部）+ 预计动工面设计全文；docs/HANDOVER.md
+   §1/§2.2/§9 + §0/§4/§11.6 按索引入口。历史细节（RFC 早期修订全文、
+   旧报告、archive 年表）属 L2 考古层——复审宣称复核时强制下钻，冷启动
+   不必全读。动工面关键路径读码派执行者供料，规划者复核关键结论。
+2. 基线验证（可整体派 1 个子智能体执行并回报逐项输出——按
+   EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
+   verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
    - cargo test --release（期望 561/561；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign，×31）
    - cargo clippy --release -- -D warnings（零 warning）
@@ -151,50 +137,35 @@
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
-   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check（词法合法的用例应全过 rc=0）：历史 C甲/D甲/批1 枚已入 v1.4.4–v1.4.6；v1.6.0 复增 lex 负例 2 枚（neg_l2_lex_*）**按构造含词法错误、不适用 fmt --check**（锁点在 verify_selfcomp 的 lex error 诊断格式+码，fmt 实测以干净词法诊断拒绝 rc=1 属预期行为）；examples 原 37 个有效文件不变。
+   - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check（词法合法的用例应全过 rc=0）；v1.6.0 的 lex 负例 2 枚（neg_l2_lex_*）按构造含词法错误、不适用 fmt --check（锁点在 verify_selfcomp 的 lex 诊断格式+码）；examples 原 37 个有效文件不变。
    - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
-3. 如实报告 tag 基线核验边界。撞名/遮蔽族与登记项均已交付关闭；
-   新方向只呈菜单待裁；对外发布动作逐项呈批后执行（铁律 6）。
-4. 已裁批次：规划者更新方案与自包含任务书 → 派执行者实施 → 规划者
-   验收（全量回归 + 存量 hex 对比 + 抽查）→ 提交推送并看 CI 首跑；
-   CI 绿后才切 tag。新增裁决点仍由用户决定。
+3. 如实报告 tag 基线核验边界。新方向只呈菜单待裁；对外发布动作逐项
+   呈批后执行（铁律 6）。
+4. 已裁批次：规划者更新方案与自包含任务书（EXECUTOR_TEMPLATE + 批次段）
+   → 派执行者实施 → 规划者验收（全量回归 + 存量 hex 对比 + 抽查复跑）→
+   数字锚按 MAINTENANCE §2.3 SOP 同步 → 提交推送并看 CI 首跑；CI 绿后
+   才切 tag。新增裁决点仍由用户决定。
 
-【关键锚点索引（当前行为要点；已提交基线由 verify_selfcomp
-  368 项用例/负例机器锁定，不在此手写复述——抽验形态看十九审报告
-  §4 探针原文与事后勘误、designs 实施修正记录；撞名/遮蔽族语义看
-  SPEC §8.1 与二十四/二十五审报告）】
-- 复现锚点：R95 原形态 `let v = if c return 1 else return 2
-  end; v + 0` 作函数尾值，宿主 TYPE001 warning 收（运行正确
-  1/2），A甲 L2 拒；B甲已于 `a5dac74`/v1.4.3 经 CI 绿后修复
-  并关闭 R95。原 `v` 直尾旧 L2 COMPILED 121B 后栈下溢（R99），
-  A甲安全拒，B甲转为可验证且行为一致。R96——闭包体内
-  println(n)：宿主 7/7 收，v1.4.3 的 L2 拒"闭包捕获了未定义
-  变量 'println'"；C甲已在 v1.4.4 放行（父 env 优先 + 仅豁免
-  两名 prelude）并关闭 R96；裸值位引用仍拒（负例锁定）。R97——
-  无字面量程序 `match Some(xs) => println(xs)` 曾落 ibase 兜底拒
-  （带 String 字面量同形态过）；D甲已在 v1.4.5 经预扫追踪 Binder
-  三流入路放行并关闭 R97，跨函数容器不经 match 直接 println 仍拒
-  （负例锁定）。
-- 写 Lom 代码最高频坑（全档见 HANDOVER §11.6 与 §4——写探针/用例
-  前过一遍）：布尔字面量大写 True/False；无 [..] List 字面量（用
-  range/list_cons）；`not` 不是运算符（用 !x）；match Form B 每臂
-  独立 end；宿主 dangling-else 贪婪归内（嵌套 if 自带 else）；无
-  break/continue（flag 化）；Int 安全值域 ±2^59；无 0x 字面量；
-  多返回值调用点显式取 .0/.1；写完用例全文 grep "Fn" 自查（Fn
-  注解是 L2 负例形态）；裸 list_empty() 直接 println 是 ls{?} 编译
-  期拒（加注解/cons 上下文）；无注解构造的 Bool/嵌套容器迭代显示
-  保守拒（仅注解三形态播种，修订 38）；WASM hex 手写注意 eqz/sleb
-  单字节指令族与偶字符占位（容器显示批教训）。**L2 面坑（v1.6.0
-  起，写 L2 用例/负例前过 l2fix 七族映射）**：L2 中 println 与全部
-  内建需显式 import（宿主 prelude 恒可用——口径差）；管道/解构
-  语句 L2 拒（宿主收）；L2 拒绝输出带 [L2xxx] 码（tools/l2fix.py
-  可跑单文件取码与修复建议）；同文件用户 fn 重名 v1.6.1 起
-  单文件模式明确拒（[L2P001]——包展开单元不查，跨包同名走
-  NAM006 确定序语义）。
-- R92/R95/R99 登记链：单 return 臂历史双侧一致；双 return
-  臂绑定后算术十九审 R95 误拒、绑定直尾值 R99 坏 WASM；A甲
-  安全拒后 B甲在 v1.4.3 正确发射。R101 短路右侧实际 return 的宿主
-  WASM 分叉已于 v1.4.7 修复（三侧对齐 0/9/1/8）。
+【行为要点与坑索引（现行行为速查；已提交基线由 verify_selfcomp
+  368 项用例/负例机器锁定，不在提示词复述——复现形态查 designs 实施
+  修正记录与对应审查报告探针原文；完整坑索引按触发面见
+  EXECUTOR_TEMPLATE 第四节）】
+- 写 Lom 代码最高频坑（全档 HANDOVER §4/§4.5b/§11.6——写探针/用例前
+  过一遍）：布尔字面量大写 True/False；无 [..] List 字面量（用
+  range/list_cons）；`not` 不是运算符（用 !x）；match Form B 每臂独立
+  end；宿主 dangling-else 贪婪归内（嵌套 if 自带 else）；无
+  break/continue（flag 化）；Int 安全值域 ±2^59；无 0x 字面量；多返回
+  值调用点显式取 .0/.1；写完用例全文 grep "Fn" 自查；裸 list_empty()
+  直接 println 是 ls{?} 编译期拒（加注解/cons 上下文）；无注解构造的
+  Bool/嵌套容器迭代显示保守拒。
+- **L2 面坑（v1.6.0 起，写 L2 用例/负例前过 l2fix 七族映射）**：L2 中
+  println 与全部内建需显式 import（宿主 prelude 恒可用——口径差）；
+  管道/解构语句 L2 拒（宿主收）；L2 拒绝输出带 [L2xxx] 码（tools/
+  l2fix.py 可跑单文件取码与修复建议）；同文件用户 fn 重名 v1.6.1 起
+  单文件模式明确拒（[L2P001]——包展开单元不查，跨包同名走 NAM006
+  确定序语义）。
+- WASM hex 手写/对拍坑（改 self_comp 才相关）：eqz/sleb 单字节指令族、
+  偶字符占位、local 基址、section 序——全档 §11.6。
 
 现在从上手三步开始。先报告只读核验，再按已裁批次推进并呈报；
 新方向仍待用户裁决。
@@ -205,7 +176,7 @@
 - 上述路径使用 Windows 形态，是本项目当前维护环境。
 - 提示词故意不写固定 HEAD SHA；新任必须以 `git log -1`、`git status` 和最新 CI 实查。
 - 若交接提交的 CI 首跑不是绿色，先处理 CI，不得把交接状态宣称为完成。
-- 交接更新规范见 HANDOVER §12.3（五件套）；本文件**【当前真实状态】段每轮
-  交接整体重写**（铁律/第一回合/锚点索引三段保持稳定，仅在事实过时时点改）；
-  **角色与分工段（2026-09-25 用户裁决）与两段式结构（2026-09-29 用户裁决）
-  是结构约定**——改动须经用户裁决，不得随交接静默漂移。
+- 交接五件套与分层阅读协议见 MAINTENANCE §5；本文件**【当前真实状态】段
+  每轮交接整体重写**（主写位为 TODO 顶部状态块，本段为镜像，两处不一致以
+  TODO 为准并随交接批修正）；**三段式结构与铁律镜像段是 MAINTENANCE §6
+  用户裁决事项**——改动须经用户裁决，不得随交接静默漂移。

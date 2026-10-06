@@ -18,7 +18,7 @@ Thanks for your interest in Lom — an AI-native programming language. This docu
 
 ## Maintainer workflow
 
-The full maintainer loop (per-change regression gates, adversarial review cadence, and the handoff checklist centered on `docs/HANDOFF_PROMPT.md`) is codified in [`docs/HANDOVER.md` §12](docs/HANDOVER.md). Contributors proposing repeated changes will be held to the same regression trilogy above.
+The full maintainer loop (roles and iron rules, per-change regression gates, review cadence, handoff checklist, and the layered reading protocol centered on `docs/HANDOFF_PROMPT.md`) is codified in [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md). Contributors proposing repeated changes will be held to the same regression trilogy above.
 
 ## Reporting bugs
 

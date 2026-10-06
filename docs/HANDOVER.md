@@ -1,322 +1,16 @@
-> 最后更新：2026-09-29（**v1.4.3 B甲/R95 已交付，C甲/R96 本地在制，
-> 准备工作区交接**。main `a5dac74` 的 CI run `36563915297`（#201）
-> 六 job 全绿、五条环境 notice、零 warning/error 后切 tag v1.4.3；
-> R95/R99 已关。已提交基线：self_comp 11926 行、verify_selfcomp
-> 328/328、bootstrap 14/14、强 quine 262137 bytes 双侧一致。
-> C甲仅有未提交 self_comp 修改（现 11938 行，比 tag +12）与八个
-> 未跟踪正例 176–183；聚焦 `--check`、fmt 9/9、当前工作区标准
-> selfcomp 336/336 通过。负例锁、存量 hex、自举、§2.2 全量、
-> 文档/版本、CI/tag 都未验，R96 仍 open。R94/R97/R100/R101 亦 open；
-> D甲/E甲未动。当前工作区按预期不干净，ignored 探针保留。
-> 十九审 B+ 只评 v1.4.1；语言面和外部发布线继续冻结。）
-> 最后更新：2026-09-29（**R95 B甲完整 bottom 放行本地完成，拟升
-> v1.4.3，规划者全量回归、提交/CI/tag 待验**。v1.4.2 A甲/R99 已
-> 提交 8012c38，CI run 36549057031 六 job 全绿后切 tag；
-> annotations 5 notice（Ubuntu26 四 + macOS arm64 容量一），零
-> warning/error。B甲源码 SHA-256 3a1e5226fedcba0c09527b84a1e83bd430af3dbd803b518d9da9f05bdb0cf40d；
-> never 与泛型未知 ? 分离，严格求值序/if/match/guard/while/for/
-> 闭包 return 与 WASM 栈效应修正；无注解闭包形参推断既有缺口补齐，
-> 新仓库负例锁外层 `secret` 不可见（COMPILE-ERROR，无 hex）。
-> R95 d1/d3 算术误拒本地修复，正式关闭待 CI；R96/C甲、R97/D甲、
-> E甲尚未实施，R100/R101 P2 open 待用户另裁（R101 宿主 WASM
-> and/or 右侧执行 return 时 trap，B甲不模拟）。验收 **328/328 =
-> 170 单文件 + 5 包 + 153 负例**（A甲 298+33 新正例−9 转正旧
-> 负例+6 新负例=328；本批新增/迁移 .lom **39=33+6**，examples
-> fmt 有效文件 37 不变）；self_comp **11469→11926 行（+457）**；
-> bootstrap 14/14，新强 quine 262137 bytes 双侧逐字节一致；旧
-> 142 存量 hex 同宿主比较 140 相同/2 有意变化/0 缺（108 299→
-> 300B 补 unreachable，142 118→117B 裁死尾）。Rust 541+8、
-> eval 双宿主后端各 121/121 数量不变；外部发布线冻结。）
-> 最后更新：2026-09-29（**R99 A甲安全阶段交付 v1.4.2，提交
-> 8012c38 的 CI run 36549057031 六 job 全绿后已切 tag**。用户裁决顺序
-> A甲→B甲/C甲/D甲/E甲，本阶段仅 A甲实施。十九审 d2 原记
-> “COMPILED 121 bytes、双侧输出一致”中运行结论失实：旧 L2 模块
-> Node 实例化在 local.set 栈下溢，报告首页已加事后勘误，B+ 历史评级
-> 不重评。A甲用 AST 全终止判定在产 hex 前显性拒该族坏 WASM；
-> **R95 算术误拒仍 open**，B甲等后续阶段未实施。新增 R100 P2 open：
-> 空 List 只读内建无 heap 设施时可产缺 memory 段的坏模块，待用户另裁。
-> 验收目录 **298 = 137 单文件 + 5 包 + 156 负例**（旧 286 =
-> 134+5+147，新增 3 正例控制 + 9 负例）；自举 14/14，新强 quine
-> **249786 bytes**；self_comp **11321→11469 行（+148）**；存量
-> 139/139 hex 独立对拍全等（含 v1.4.0 子集 127/127）；Rust 541+8
-> 与 eval 双后端各 121/121 数量不变。外部发布线继续冻结。）
-> 最后更新：2026-09-29（**文档治理批——交接提示词结构瘦身（用户
-> 裁决）+ R98 收口 + designs 两处腐坏补正，不升版零行为变化**。
-> HANDOFF_PROMPT 444→164 行："核心提示 + 事实源指针"两段式——
-> 铁律/当前真实状态/第一回合/关键锚点索引保留，交付史/教训/逐批
-> 锚点的手写拷贝全部降级为事实源指针（RFC 修订记录/§11.6/SPEC §13/
-> designs/verify_selfcomp——均在第一回合阅读清单内，信息零丢失）；
-> 根治多拷贝漂移（旧版累计 10 处失真实录）。**R98 收口**：designs/
-> 0010 分项 127 更正（含 Form A 句的 R92/R95 更正括注——十八审
-> R92 清单漏此位）；designs/0011 状态行交付后漏刷补正（designs/
-> 0006 同型，含 disp 占位 patch 机制偏离登记）；TODO/RFC 清点口径
-> 统一（5 处=十八审时点、7 处=更正批实改）。doc_audit 67/67 复验；
-> **当前 open：R94 挂账 + R95-R97**。）
-> 最后更新：2026-09-29（**第十九轮独立审查收官（B+，基线
-> a697474/v1.4.1，报告 review-2026-09-29.html）+ 开账 R95-R98 +
-> 交接就绪**。容器显示批全部可复核宣称经独立复核零失真（286/286
-> 名实、存量 127 hex 恒等独立对拍 127/127、--bootstrap 14/14
-> quine 247009 bytes、宿主 src 零改动）；基线 14 项全绿；敌手
-> 19 正例 MATCH + 3 自举外推全等 + 8 拒绝面干净——零静默错值
-> 零坏 wasm。开账 **R95（P2，五轮来首个：值位 if 两臂全 return
-> 形态宿主 warning 收/L2 编译期拒——bottom 合流在"绑定后算术"
-> 路径不让步；证伪"无剩余分叉面"四处总括登记，已随 RFC 修订 33
-> 原位收窄）**、R96（P3：闭包体内调用内建 println 宿主收/L2 拒
-> ——内建名不在 fns 表被当自由变量，信任边界未登记）、R97（P3：
-> scan_has_display 不追踪 match 臂 Binder 容器载荷——无字面量
-> 程序自然写法落 ibase 兜底拒，"一层即覆盖"收窄）、R98（P3：
-> designs/0010 状态行 274≠279 残留 + 更正批清点口径 5/7 处不一）。
-> 规划者已亲手复现 R95 主形态/对照与 R96 逐字一致。**当前 open：
-> R94（挂账）/R95-R98；整改顺序待用户裁决；交接五件套已刷至本
-> 时点；R95 证伪的四处总括句（RFC 修订 29 尾句/README L8/
-> SPEC §13 v1.4.0/本文件 §9-5）已收窄——不留已证伪宣称给下一任。**
-> 外部发布线继续冻结。）
-> 最后更新：2026-09-28（**容器显示批交付 + v1.4.1（designs/0011，
-> RFC-0004 修订 32）+ R94 开账**。用户裁决四点全按建议项（甲/甲/
-> 甲/甲）：六类容器（ls/mp/rc/tp/en/cl）println/print/拼接三入口
-> 全解禁，宿主/L2 双侧 stdout+rc 逐字一致（List "[1, a]"、Map
-> 字节序 "{a: 1}"、record 声明序、tuple 单元素 "(a,)"、枚举
-> per-实例变体名 select 链含递归与 en↔ls 互递归、闭包 "<闭包>"
-> ——原信任边界翻转消除）；scan_has_display 预扫 + ibase 兜底
-> 双防线；负例转正删 9 + 新增 4（深层容器流）；**disp 独立区占位
-> patch 机制**（g<序号>h 偶字符占位 + 重放式长度前缀重写——
-> 互递归使设计的 inline-fidx 失效，机制偏离如实登记）；实施顺手
-> 收口 comp_binary 枚举防御臂的拼接豁免（设计缺口）。verify_
-> selfcomp 279→**286/286 = 139 对拍（134 单文件 + 5 pkg）+ 147
-> 负例**（12 新对拍 128-139）；**存量 127 对拍用例产物 hex 逐字节
-> 不变**（disp 按需发射零追加直通）；--bootstrap 14/14 保持
-> （quine 现 247009 bytes 双侧逐字节一致）；self_comp 10548→
-> **11321 行**；Rust 541+8（宿主 src 零改动）；升版 v1.4.1（纯
-> L2 patch）。**R94 开账（P3 挂账）**：设计期供料实证 json_
-> stringify 星面键序宿主双后端分叉（Map 键 U+E000 与 U+10000+
-> 并存时解释器 Rust 字节序 vs WASM JS UTF-16 码元序——显示面
-> 不受影响；run_wasm.mjs 已知差异清单漏登），修否待裁（可改
-> harness sort 比较器为字节序归一，与 map_remove 挂账同族）。
-> 十八审 A- 不评此新增范围。）
-> 最后更新：2026-09-28（**第十八轮独立审查收官（A- 维持，基线
-> 86d4d1c/v1.4.0，报告 review-2026-09-28.html）+ R92/R93 纯文档
-> 更正批——不升版、零代码、零行为变化**。十八审：record 批与
-> L2.4 收官宣称独立复核零失真——两段存量 hex 115+127=242/242
-> 全等、自施加强 quine sha256 逐字复证、39 敌手探针零行为击穿
-> （连续第四轮无 P1/P2）；开账 R92（P3：Form A 单行臂内 return
-> "宿主收、L2 拒"剩余分叉面宣称 8 变体实测不可复现——双侧同拒/
-> 无剩余分叉）与 R93（P3：交接文档时点漏刷群）。本批改动面：R92
-> 五处登记更正（RFC 修订 29/TODO 顶部/SPEC §13/HANDOVER §9-5/
-> HANDOFF_PROMPT 锚点段）；R93 五处刷新（§1 Rust 行 541/541+8
-> 与历史链、v1.3.1 段 539+8、§9-1/§9-5 审查指向、README 恒等数
-> 127）；分项笔误更正 5 处（127 对拍 = 122 单文件 + 5 pkg）；
-> HANDOFF_PROMPT 时点残留清点；§12.2 顺延指针 R94+；RFC 新增
-> 修订 30（含两条精度备注：cli.rs +124/-4、--bootstrap 396.3s
-> 机器负载差异）。doc_audit 67/67 与 spec_examples PASS 复验；
-> 十八审 A- 不评本批文档更正；提交推送与 CI 由规划者执行。）
-> 最后更新：2026-09-27（**L2.4 自举闭环收官 + v1.4.0——RFC-0004 全部
-> 目标达成，自施加强 quine**。用户裁决路线甲"继续"。三层自证：① self_comp
-> 编译自身 COMPILED 234734 bytes（10548 行源码）；② wasm self_comp
-> 编译 12 代表用例全部 hex 与宿主产逐字节一致；③ 自施加——wasm
-> self_comp 编译 self_comp.lom 1.1s 产 234734 字节与宿主产**逐字节
-> 一致（sha256 相同）——强 quine 证明**。九闸门拆除（8 源码等价改写
-> + 1 编译器补支持：值位 if/match return 终止臂 bottom 语义——
-> **R91 Form B/if 形态翻转通过**（规划者亲拍 55/14/1/2 逐字）；
-> Form A 单行臂内 return 剩余分叉新登记（十八审 R92 更正：该形态
-> 双侧同拒——宿主语法层 PARSE001，无剩余分叉面））。--bootstrap 14/14 +
-> --ci-smoke 2/2 接入 CI；存量 127 对拍 hex 逐字节不变（改写前后
-> 编译逻辑等价）；verify_selfcomp 279/279 保持；cargo 零改动。
-> Rust 541+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验
-> （升版 v1.4.0 后规划者亲跑）。**RFC-0004 闭环：L2.1 spike→L2.2
-> 子集→L2.3 十一批→L2.4 自举+强 quine——自举叙事完整落地；
-> Unresolved 5 关闭（栈深 60000 充裕，V8 JIT 远快于预算）。**
-> 十七审 A- 不评此新增范围。）
-> 最后更新：2026-09-27（**record/tuple 编译子批交付 + v1.3.2（designs/0010
-> 第一段）+ 十七审 R90/R91 收口**。用户裁决路线甲"继续"。vt rc{name:vt}/
-> tp{vt}（字段名进 vt）、[n][8B 槽] 不 pad 布局、编译期偏移字段访问、
-> file/env 四内建宿主中介导入（json 甲先例 + env_args 物化直抄）+ math
-> 内联 + io no-op；**R90 收口**：pkg-expand 对含 as 的包内 import 原位
-> 保留——三声音修复（宿主 wasm 18/L2 MATCH 18/解释器 RUNTIME002 挂账
-> 维持）+ Rust 测试 ×2（541+8）；**R91 登记面扩"if 与 match"**。
-> verify_selfcomp 255→**279/279 = 127 对拍 + 152 负例**（含 R90 用例
-> 105_pkg_alias_in_pkg；分项笔误更正：127 = 122 单文件 + 5 包）；
-> **存量 115 对拍 hex 逐字节不变**（R90 转写
-> 仅触含 as 包源，存量无此形态）；self_comp 9491→**10402 行**；宿主
-> cli.rs +125。clippy"9 错"澄清：--all-targets 存量测试 lint 不在
-> gate（§1 既有登记），CI 口径 rc=0 零输出（执行者口径误判，规划者
-> 亲验）。Rust 541+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿
-> 复验（升版 v1.3.2 后规划者亲跑）。十七审 A- 不评此新增范围。
-> **L2.4 闭环（第二段）待续——self_comp 四道闸门已拆三（record/tuple/
-> file-env import），仅余全量自举验证。**）
-> 最后更新：2026-09-27（**L2.3 return 收官批交付 + v1.3.1——L2.3 语句面
-> 收官**。用户裁决"执行"（designs/0009 三裁决点全按建议项：0x0f 直发/
-> B1+B2+B3 全批/校验甲；RFC-0004 修订 26）：return 用 wasm `return`
-> 指令（0x0f）——**零深度跟踪、零包装、存量 hex 天然不变、宿主三类
-> 深度事故（7.2/7.5/W-2）结构性免疫**（与宿主 br $ret 的有意偏离登记
-> 信任边界——宿主是历史实现选择非语义要求）；cret 经 cg.cgh 键线程化
-> （闭包体双 save/restore）；`?` = idx 复合测试 + 载荷宽度化读取 +
-> else 原值 0f，校验严于宿主（族+Err 载荷相容）；**0x0f Node 验证器
-> 全收**（else 臂 unreachable 豁免实测，113 固化）。用例 11（105-115）
-> + 负例 8 + 转正 2。verify_selfcomp 238→**255/255 = 115 对拍 + 140
-> 负例**；**存量 104 对拍用例产物 hex 逐字节不变**；self_comp
-> 9361→**9491 行**；Rust 539+8/六模式/eval 双后端 121/121/
-> doc_audit 67/67 全绿复验（升版 v1.3.1 后规划者亲跑）。**边界登记**：
-> 值语境 if 的 return 臂维持既有编译期拒（宿主-L2 分叉面）；Fn 参数
-> 注解宿主不支持（用例规避）。语言面与宿主 src 零改动。**L2.3 语句面
-> 收官——仅剩 L2.4 自举闭环。**）
-> 最后更新：2026-09-27（**L2.3 包批交付（丙+丁路线 + 裁决 2/3 甲）+ v1.3.0
-> 升 minor**。用户裁决"执行"（designs/0008 三裁决点全按建议项；RFC-0004
-> 修订 24）：**首次含宿主工具面改动**——新增 `lom pkg-expand` CLI 子命令
-> （纯工具面：复用 resolve_dependencies/collect_lom_files 单一事实源，
-> 源码层展开（包序=宿主 merge 序、剥包内 import 对齐解释器）、--list
-> 包名出口、无清单幂等退化；+297 行 Rust 含 4 测试）；L2 侧 argv 第三参
-> 包名清单 known_pkg 放行（**堵"非内建 module 静默落空"缺口**——未知
-> 模块编译错误对齐宿主 PKG005 口径；math/file/env/io import 行为同步
-> 从"静默+调用点延迟报错"变"import 行即拒"——存量零影响实证）+ 包
-> 符号延迟校验（"包 'X' 中无公开符号 'y'"）+ as 别名（摘要复制，R74
-> 校验零改动）+ enum/变体重名文案扩注（裁决 2 甲信任边界）。用例 4
-> 包项目（单包/pkg_demo 同构、三包链 C→B→A、别名+enum+match、enum
-> 载荷+双包）+ 负例 4。verify_selfcomp 230→**238/238 = 104 对拍 +
-> 134 负例**；**存量 100 对拍用例产物 hex 逐字节不变**（argv 向后
-> 兼容 100/100 identical）；self_comp 9295→**9361 行**；Rust
-> **541+8**（新增 pkg-expand ×4）/六模式/eval 双后端 121/121/
-> doc_audit 67/67 全绿复验（升版后规划者亲跑）。pkg_demo 全链路对拍
-> 双侧逐字一致。语言面/43 内建/诊断码零变化；十六审 A- 不评此新增
-> 范围。**L2.3 剩 return 一批。**）
-> 最后更新：2026-09-26（**L2.3 json 批交付（路线甲混合中介 + B1+B2 +
-> 数字切分甲）+ v1.2.15**。用户裁决"按建议执行"（designs/0007 三裁决
-> 点全按建议项；RFC-0004 修订 22）：vt **js** 不透明 JSON 节点
-> （`_Any` 归一；布局 [kind][payload 8B]，array=ls{js} cons 链、
-> object=保插入序 kv 序列——不用 Map 防键序分叉）；parse/stringify
-> 走 harness 双导入（JS 语义=对拍基准，物化经产物按需新导出的
-> alloc）；B1 消费（ExField→js_field trap 对齐宿主 / js 当 ls{js}
-> 归一+守卫 / println(js) 按 kind 分派）；B2 stringify 广参数
-> （js_of 族；en/cl 拒）；import 堵静默忽略。**实施过程（如实）**：
-> 执行者子智能体在使用限额耗尽前完成主体，规划者盘点后亲自兜底
-> （负例文案实跑 + EXPECTED 扩表 + 验收与全量回归亲跑）。
-> verify_selfcomp 206→**230/230 = 100 对拍 + 130 负例**（新对拍 10
-> + 新负例 14）；**存量 90 对拍用例 hex 逐字节不变**（90/90 全量
-> 对拍）；self_comp 8633→**9295 行**（+659）；harness +149 行；
-> Rust 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。
-> 语言面与宿主 src 零改动；十六审 A- 不评此新增范围。json 批后
-> L2.3 剩包/return 两批。）
-> 最后更新：2026-09-26（**十六审 R86-R89 整改收官 + v1.2.14**。用户裁决
-> "执行"（按十六审建议：文档登记为先、R89 顺手单列文案；RFC-0004
-> 修订 20）：R86 println(Bool) 残余拒绝面登记扩写（跨函数参数流转
-> **与 HOF 产 Bool 中转**）；R87 mp{?} 补全边界通用化（**分支/循环
-> 体内 set 均不回写外层绑定**）；R88 list_fold 结果 vt 从 init 推断
-> 与 map/filter 免注解**不对称**登记；R89 comp_println 对 void 实参
-> **单列诊断**（执行者实施 +6 行：注释 4 + void 检查 2；容器显示
-> 兜底不动，旧文案负例复验不倒）。verify_selfcomp 205→**206/206 =
-> 90 对拍 + 116 负例**（新负例 neg_println_void）；**存量 90 对拍
-> 用例产物 hex 逐字节不变**（执行者改动前后全量对拍 90/90 identical
-> + 规划者亲跑复核 + 新文案探针亲手复现）；self_comp 8627→**8633
-> 行**；Rust 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿
-> 复验。升版 v1.2.14（诊断文案修正 patch）；R1-R89 全部关闭，
-> 整改后评级待下一轮复审。**顺手修 designs/0006 头部状态行**
-> （交付后漏更新为"已交付"——文档腐坏一处，随本批收口）。）
-> 最后更新：2026-09-26（**第十六轮独立审查收官（A- 回升）+ R86-R89 开账 + git/文件夹整理**。
-> 用户裁决"执行（十六审）+ 整理 git 与文件夹结构"。审查报告
-> docs/reviews/review-2026-09-26-2.html（体系内 agent 分工，非外部
-> 同行审计；基线 7f71456/v1.2.13）：R84/R85 整改与 Map 批全部可复核
-> 宣称**零失真**——存量 79 对拍用例 hex 由本轮 git show v1.2.12 导出
-> 旧编译器**独立全量对拍 79/79 全等**；基线 14 项全绿；敌手 36 自构
-> + 11 重建形态**零行为击穿**（35 正例双侧逐字一致 + 1 例宿主侧语法
-> 无效；拒绝全部干净 COMPILE-ERROR 无 hex、零坏 wasm）——连续第二轮
-> 无 P2+ 代码发现。开账 **R86-R89（4×P3：R86 println(Bool) 残余面
-> 描述偏窄/R87 mp{?} if 分支补全未入档/R88 fold 结果细化不对称未登记/
-> R89 println(void) 文案误导）**，全部登记精度/文案类无行为级修复
-> 需求，整改顺序待用户裁决。规划者验收：亲读报告 + 亲手复现三枚
-> 探针逐字一致（pf1/pm16/pm6_eq_nested3）。**整理动作**（本地物理
-> 操作，零仓库内容变更）：drop 2026-09-03 旧 WIP stash（原待裁决项
-> 关闭）、git gc 打包（3010 松散对象→2.62 MiB）、清理 .w0/（14MB
-> 调试残留）/.lom//__pycache__；目录结构盘点健康未重组（重组只砸
-> doc_audit 67 锚与 CI 路径无收益）；candidates_rerun raw 证据档案
-> 保留。doc_audit 67/67 复验。）
-> 最后更新：2026-09-26（**交接就绪——五件套刷新（Map 批交付后状态；
-> 维护者角色维持规划者模式）**。本维护周期全链（规划者分工）：
-> 第一回合只读核验（基线 19/19 + CI 实查）→ RFC-0004 修订记录腐坏
-> 修复（R83，规划者读档发现）→ 十五审独立审查（B+，开账 R84/R85）
-> → 同包整改（v1.2.12）→ Map 批设计（designs/0006 三裁决点）→ 用户
-> 裁决"执行" → 实施（v1.2.13）。五件套刷新面：HANDOFF_PROMPT
-> 【当前真实状态】/【第一回合必须完成】/【状态锚点】（CI 轨迹如实、
-> stash 遗留告知、教训引用）、本文（顶部条目 + §1 + §2.2 + §9 +
-> §11.3 新教训条）、TODO 顶部（含待裁决菜单：json/包/return 批次或
-> 十六审；宿主 map_remove 分叉修否；stash 清理与否）；doc_audit
-> 67/67；CI 最新 run 7d8dded 六 job success。**后续维护者角色不变：
-> 规划者（规划分发验收的决策者，§12.4），不具体执行。待用户裁决：
-> json/包/return 后续批次或发起十六审。发布线维持冻结。**）
-> 最后更新：2026-09-26（**L2.3 Map 批交付（B1+B2 + 裁决 2 甲 + 严格性甲）+ v1.2.13**。
-> 用户裁决"执行"（按 designs/0006 建议项）：vt **mp{V}** 单参数（键恒
-> String 不进 vt）、mp{?} 由 set/注解补全、桶布局照宿主平移（头 12B +
-> 桶 16B，val 槽 8B 按值 vt 装载——cons 槽同型）；**8 内建全量**
-> （map_get→en:Option{V} 与 c2 变体表 idx 2/3 逐值对齐、map_keys/values
-> 键排序字节序、rehash 翻倍仅搬 state==1、map_size 内联、map_remove
-> 返回 void 对齐宿主 WASM）+ **结构相等 mp_eq|V 特化递归**（en/cl 值拒）；
-> import 注册堵"from map import 静默忽略"缺口；编译期严格包（期望 Map/
-> 键 String/值不相容/裸 mp{?} 拒）。**宿主双后端分叉挂账（设计期实证）**：
-> map_remove 返回值解释器/TC=Bool vs 宿主 WASM=Unit（println 形态
-> true/false vs ()/()），按裁决 2 甲 L2 对齐 WASM、宿主修否待用户另裁。
-> verify_selfcomp **205/205 = 90 对拍 + 115 负例**（新对拍 11：80-90 含
-> 引用语义 86/墓碑 84/rehash 85/多字节键 82；新负例 13 锁原因）；
-> **存量 79 对拍用例 hex 逐字节不变**（执行者全量对拍 + 规划者 git show
-> 导出旧编译器独立抽验 5 用例恒等）；self_comp 7813→8627 行；Rust
-> 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿复验。开发对拍
-> 修掉 4 枚发射 bug（mp_new 类型 hex 漏 01/无参 local 起点/空 local 向量
-> 计数字节/size++ 误发 6c）；RFC-0004 修订 19。CI 轨迹（如实）：feat
-> dbbb4c6+docs 28ad799 首跑 doc gates 红（git add 清单漏 Cargo 双件，
-> 提交树 1.2.12 vs 文档 1.2.13）；补提交 7d8dded 后六 job 全绿，
-> **tag v1.2.13 切于 7d8dded**。）
-> 最后更新：2026-09-26（**十五审整改收官 + v1.2.12**。第十五轮体系内
-> 独立敌手复核（review-2026-09-26.html，基线 44954e2/v1.2.11-3）总评
-> **B+**：R79-R82 整改与 c2/String/List 批核心宣称零失真（存量 62 用例
-> hex 恒等经 git show 只读导出独立对拍 62/62 全等），基线 14 项全绿；
-> 开账 R84（P2：list_fold Float/Bool acc 产不可实例化 wasm）与 R85
-> （P3：println(Bool) 预扫覆盖缺口）。用户裁决同包整改（R85 选甲）
-> 交付 **v1.2.12**：ls_fold 按 acc_vt 特化 + acc 白名单外编译期拒；
-> 预扫补值位 if/match/局部闭包产 Bool 识别（跨函数 Bool 参数流转
-> 留边界、负例锁定）。verify_selfcomp **181/181 = 79 对拍 + 102 负例**
-> （十五审探针转正 75-79 + 新负例 2）；**存量 74 对拍用例 hex 逐字节
-> 不变**（执行者全量对拍 + 规划者 git show 导出旧编译器独立抽验恒等）。
-> self_comp 7724→7813 行；Rust 535+8/六模式/eval 双后端 121/121/
-> doc_audit 67/67 全绿复验。另：R83（RFC-0004 修订记录重复与倒序，
-> 规划者第一回合读档发现）同日修复。**R1-R85 全部关闭；整改后评级
-> 待下一轮复审**；CI 首跑六 job 全绿后切 tag v1.2.12。）
-> 最后更新：2026-09-25（**交接就绪 + 维护者角色变更为规划者（用户裁决）**。
-> List 批（v1.2.11，feat 9a47caa / docs f0824ff）已全链交付：CI
-> #36004908755 六 job 全绿后切 tag，annotations 四条 Ubuntu 26 迁移
-> notice、零 warning/error；verify_selfcomp 174/174 = 74 对拍 + 100
-> 负例、存量 62 用例 hex 逐字节不变、doc_audit 67/67 复验。**本周期
-> 结构性变更**：后续维护者角色为**规划者**——主会话负责读档/设计/
-> 任务书/验收/git 门禁，具体事项（读码供料、实施、用例、单项验证）
-> 派子智能体执行；分工细则制度化于本文 **§12.4**，HANDOFF_PROMPT
-> 的角色段与铁律已同步改写（并行 ≤2、git 归规划者、任务书自包含、
-> 关键验收项规划者亲跑）。交接五件套刷新面：HANDOFF_PROMPT（角色/
-> 铁律/第一回合规划者版/底部备注）、HANDOVER（本条 + §12.1-8 +
-> §12.4 新节）、TODO 顶部；doc_audit 67/67。**待用户裁决：Map/
-> json/包/return 后续批次或发起独立复审（R79-R82 整改 + c2 +
-> String/List 批后评级均待复审）。发布线维持冻结。**）
-> 最后更新：2026-09-24（**L2.3 List 批交付（B1+B2+B3+B4 + 编译期严格性甲），仓库版本 v1.2.11**。用户裁决"按建议动工"（designs/0005 两裁决点全按建议项）：vt ls{T}（ls{?} 由 cons/注解补全——c2 ? 机制复用）、Nil=0（b 批地址 0 哨兵伏笔兑现）、cons 槽 8B 按元素 vt 存取；B1 七非 HOF 内建 + range + split 解禁 + for-in-List + 泛型载荷；B2 HOF 三件按闭包签名与元素 vt 特化去重（"|" 键）；B3 结构相等特化递归；B4 for-over-String（char_at 物化 + UTF-8 步进）；严格性包（谓词 Bool/签名/元素不相容/range 两端 Int/裸 ls{?} 拒）。**实施修正四处**（f64 槽直写弃 reinterpret、ls_get 按元素特化、B4 堆预扫经 has_str 联动防御不可达、管道语法经查 L2 从未支持——负例首登）。**顺手收口 String 批存量缺口**：无字面量程序的 println(Bool) 产不可实例化 wasm（三层预扫 scan_has_bool_display + comp_println ibase 防御修复；62 存量用例恰未踩到、hex 零影响）。verify_selfcomp **174/174 = 74 对拍 + 100 负例**（转正 2 + 新对拍 12 + 新负例 16 锁原因）；self_comp **7724 行**；**存量 62 用例 hex 逐字节不变**（HEAD 编译器 stash 对拍 + fmt 归一后复验双实证）。Rust 535+8/六模式/eval 双后端 121/121/doc_audit 67/67 全绿。开发踩坑入档 §11.6（eqz 单字节族 "5000"/"4500" 两枚、3 参 helper 声明 local 从 3 起、local 组数=组列表数、预扫消费块尾 Tail、map/filter 反转段局部号、61 名不副实）。语言面零变化；十四审 B 不评此批。**）
-> 最后更新：2026-09-24（**交接就绪——§12.3 五件套刷新（L2.3 String 批交付后状态）**。本维护周期全链：新会话首回合基线 14 项全绿复验 → 用户裁决"L2.3 后续子批"→ 按闭包批先例产出 String 批设计方案 designs/0004（三裁决点）→ 用户裁决"按建议动工"（B1+B2+B3/println(Bool) 顺带/Float display 甲）→ 交付 RFC-0004 修订 14 + 升版 v1.2.10（20a29a3，CI #165 六 job 全绿后已切 tag）。刷新面：HANDOFF_PROMPT【当前真实状态】/【第一回合必须完成】/【状态锚点】三段（148/148、6578 行、String 六坑入档、菜单首项改 List/Map 等后续批）、本文 §1 快照行 + §2.2 基线 + §9 检查单 + §11.6 六坑、TODO 顶部交接声明、README/SPEC §13/positioning 成对、doc_audit 67/67。**待用户裁决：L2.3 后续批次（List/Map/json/包/return）或发起独立复审。发布线维持冻结。**）
-> 最后更新：2026-09-24（**L2.3 String 批交付（B1+B2+B3，用户裁决"按建议动工"），仓库版本 v1.2.10**。设计 docs/designs/0004 三裁决点全按建议项：B1 值通道（字面量/类型流/println(String)/六比较/Str+Str 拼接/match String 模式/闭包与泛型载荷）+ B2 拼接提升（Int/Float/Bool/Unit 侧 to_display——Float 经平移的 env.ftoa 导入与宿主同源）+ B3 内建 10 个剥 tag 平移（len/int_to_string/starts_with/ends_with/contains/trim/upper/lower/replace/char_from_code）；println(Bool) 顺带解禁（负例转正）。string_to_int（Int|Unit 联合在 untagged 下运行时不可区分）与 split（返回 List）明确编译期拒绝。模块组装新增 data(11) 段（排 code 后）+ 按需 import（print_str/ftoa，ibase 2→4 全 idx 参数化）+ 第二 global（scratch，itoa/ftoa 共用 data 尾 64 字节）+ export memory。vt "st"=i64 裸指针，静态/动态串同布局 [len][bytes]。verify_selfcomp **148/148 = 62 对拍 + 86 负例**（负例转正 4 + 改锁 1 + 新增 14）；self_comp **6578 行**；**存量 52 用例产物 hex 逐字节不变**（HEAD 版编译器对拍实证）。Rust 535+8/六模式/eval 双后端 121/121/doc_audit 全绿复验。开发踩坑六枚入档 §11.6（load8 地址显式 +4 又给 offset=4 的双加、sleb 单字节界 64 需两字节、itoa pos 移动抄成加、concat lb 读 local4 笔误、i64 比较 opcode 区段 0x57/0x59、intern 长度按字符数推进致 data 错位）。语言面/43 内建/诊断码零变化；十四审 B 仍只评 v1.2.6，String 批后评级待独立复审。**）
-> 最后更新：2026-09-23（**交接准备复核**：工作区基线 v1.2.9；§2.2 的 Lom fmt 命令改为可执行的 PowerShell 递归检查，实跑 37 个有效示例全过、apply_test 豁免；Rust cargo fmt 本地零 diff，但现行 CI 未设置该 gate，R70 历史登记已校准。doc_audit 67/67；交接前主线 CI #162 六 job success、annotations 四条 Ubuntu 26 迁移 notice 且零 warning/error。语言面和外部发布线继续冻结；下一方向待用户裁决。）
-> 最后更新：2026-09-23（**L2.3-c2 交接五件套刷新**：v1.2.9 功能提交 e778b65 的 CI #161 六 job 全绿，annotations 四条 Ubuntu 26 迁移 notice、零 warning/error 后切 tag；HANDOFF_PROMPT 当前状态/首回合基线、本文 §1/§9、TODO 顶部、doc_audit 67/67 同步。外部发布线继续冻结；c2 评级待独立复审。）
-> 最后更新：2026-09-23（**L2.3-c2 内建 Result/Option 与泛型用户 enum 子批交付，仓库版本 v1.2.9**。实例 vt en:Name{args} + tv:T 模板 + ? 未知参数，内建四变体沿用宿主编号 0..3；构造/函数/赋值/分支/match/闭包的类型流与载荷宽度按实例校验。verify_selfcomp 128/128 = 52 双产物行为对拍 + 76 负例；self_comp 5437 行。String/List/Map 载荷、Unit/Fn 参数与 ?/return 等仍明确拒绝。语言面/外部发布线冻结，十四审 B 仍只评 v1.2.6；c2 待独立复审。**）
-> 最后更新：2026-09-23（**R79-R82 两批整改交接五件套刷新**：v1.2.7 提交 e5e3e3d 的 CI #158 六 job 全绿后切 tag，v1.2.8 提交 cd70e8a 的 CI #159 六 job 全绿后切 tag；两次首跑 annotations 均仅四条 Ubuntu 26 迁移 notice，零 warning/error。HANDOFF_PROMPT 当前状态与首回合基线、本文 §1/§9、TODO 顶部及 doc_audit 67/67 已同步；外部发布线继续冻结。）
-> 最后更新：2026-09-23（**R81/R82 两项 P2 整改收口，仓库版本 v1.2.8；R79-R82 四项全部关闭**。R81 同类型 Bool 六比较走 i32 opcode；Bool 算术、一元负与 Bool/数值混合比较编译期明确拒绝，无坏 WASM。R82 按 docs/designs/0002 在临时块环境顺序预扫 let 类型/闭包签名，值位 if、嵌套 if、Form B 与闭包尾值恢复合法。新增 5 对拍 + 6 负例，verify_selfcomp **92/92 = 35 对拍 + 57 负例**；R82 三条未定义名负例宿主 WASM 也逐项拒绝。Rust 535+8、eval 双后端 121/121、自举六模式、doc_audit 67/67 全量回归。第十四轮 B 只评旧基线 5c92f59/v1.2.6，整改后评级待独立复审；L2.3-c2 待用户下一步裁决，语言面与外部发布线继续冻结。**）
-> 最后更新：2026-09-23（**R79/R80 两项 P1 整改收口，仓库版本 v1.2.7**。用户裁决先 P1 后 P2；设计 docs/designs/0002 规定控制流子块复制引用语义 Map、共享 local 槽表，R82 类型预扫后续沿同一边界处理。修复前新增 5 个正例中 4 个穿宿主/L2 双 WASM 对拍击穿，4 个块外/兄弟分支未定义名被 L2 误放行；修复后 verify_selfcomp **81/81 = 30 对拍 + 51 负例**，宿主对 4 个负例均拒绝。R80 局部绑定先于同名全局函数/变体捕获，未遮蔽全局正例不倒。Rust 535+8、自举六模式、eval 双后端 121/121、doc_audit 67/67 全量回归；R81/R82 仍 open，L2.3-c2 暂缓。十四审 B 只评旧基线 5c92f59/v1.2.6，不外推整改后；语言面与外部发布线继续冻结。**）
-> 最后更新：2026-09-23（**第十四轮体系内独立复核收官，总评 B，仅评 5c92f59/v1.2.6 时点；R79-R82 开账待裁决**。独立 agent 报告 docs/reviews/review-2026-09-23.html：2×P1（R79 if/while/for 块内 let 泄漏，静默错值且块外未定义名可被编译；R80 闭包捕获先判同名全局函数/变体而跳过局部，静默错指向）+ 2×P2（R81 Bool 二元运算 COMPILED 后产不可实例化 WASM；R82 值位 if 分支内合法 let 尾值被误拒）。维护会话对四项主形态亲手穿 CLI→hex→WASM→Node 复核一致；报告还含 Form B、while/for、同名函数等扩展。官方 535+8、verify_selfcomp 72/72、自举六模式、eval 双后端、doc_audit 67/67、CI #156 六 job 全绿只说明既有门禁，不能覆盖新反例；四项**均未修复**。审查属体系内 agent 分工，非外部同行审计；上一轮 B+ 不外推，本轮 B 也不代表整改后。L2.3-c2 代码推进建议暂缓，先由用户裁决 R79-R82 处置与顺序；外部发布线继续冻结。交接五件套刷新中，推送后须看新 CI 首跑。**）
-> 最后更新：2026-09-22 深夜七（**L2.3-c1 非泛型用户枚举与 match 子批 + fmt guard 修复，仓库版本 v1.2.6**。用户裁决继续执行 L2.3 后，self_comp 交付用户非泛型 enum 构造、递归载荷、Int/Float/Bool/枚举 match、嵌套模式、guard、Form A/B、无匹配 trap；闭包批分配器复用，enum 无 table 时也发 memory/global，模式载荷只在 idx 命中后读。verify_selfcomp **72/72 = 25 对拍 + 47 负例拒绝**（新负例锁拒绝原因）；self_comp **5061 行**。敌手探针发现并收口：match 字面量 Int/Float 不做普通二元比较的提升；L2 harness trap 前 stdout 丢失；闭包同 vt 不同签名重赋曾产坏 wasm，现编译期拒绝且同签名正例通过；`lom fmt` 误把 guard `if` 当开块，新增 2 单测。Rust **535 单元 + 8 集成**；语言面冻结未动。内建 Result/Option、泛型用户 enum、String 模式等留 L2.3 后续子批；十三审 B+ 只属于 1418536 基线，c1 尚待独立复审。发布线维持冻结；tag 依 CI 绿后切。**）
-> 最后更新：2026-09-22 深夜六（**交接就绪——§12.3 五件套刷新（L2.3-a/b 两批交付后状态）**。本维护周期全链：新会话首回合基线 14 项全绿复验（与十三审一致）→ 用户裁决"执行"L2.3-b 闭包批（先设计方案 docs/designs/0001 四裁决点 → 用户裁决"按建议动工" → 交付 RFC-0004 修订 8）→ 交接刷新。刷新面：HANDOFF_PROMPT【当前真实状态】/【第一回合必须完成】/【状态锚点】三段整体重写（verify_selfcomp 40/40、self_comp 4665、教训四坑入档、菜单首项改 L2.3 剩余批次）；HANDOVER §1 下一步（交接就绪态）+ §9 检查单（第 1 条陈旧 R62-R63 句顺手收口 + 第 5 条 L2.3-b 后状态）；TODO 顶部交接声明。**待用户裁决：L2.3 剩余批次或下一轮独立复审。发布线维持冻结。**）
-> 最后更新：2026-09-22 深夜五（**L2.3-b 闭包与捕获批交付（RFC-0004 修订 8；设计方案 docs/designs/0001 四裁决点全按建议项：untagged+闭包 i64 指针 / B1+B2 / mut 捕获放行 / 8 字节统一槽）**。① 值类型 "cl" + env 绑定扩 {slot,vt,sig,cap}（sig 嵌套编码 "cl"+sig 递归、"@" 分隔手写扫描）；② 闭包编译主体——fv 自由变量家族（Lom Map 无 clone → add/remove 配对实现块级作用域）、compile_closure（签名 (i64 env, p:vt...)->rvt、local 0=env、捕获按宽 load/store）、调用（args 先 callee 后 + call_indirect + R74 式编译期签名校验）、具名函数当值 shim（按名去重）、递归闭包（预绑定 + env 槽位补丁）；③ 模块组装按需扩展（预扫 has_closure 定布局：无闭包路径**逐字节不变**——存量 10 用例 hex 实证；有闭包加 alloc(bump+memory.grow)/memory/global(hp=8 哨兵)/table+elem，两遍式 idx 免疫宿主"闭包挤占索引空间"坑）；④ verify_selfcomp 25→**40 项**（17 对拍 + 23 负例：neg_closure 转正删除 + 9 新负例锁定 10 条校验）；self_comp 3342→**4665 行**。**顺带修复两枚 L2.3-a 存量缺口**：bind_params 漏 TyBool（签名层支持但绑定层漏绑）；comp_ex 缺 ExIf 分支（else 块尾/值位嵌套 if 落兜底被拒——elif 链之外的形态，`let y = if...end` 值位 if 同批打通）。开发踩坑：fv_expr ExIf 臂误传 fv_if 的 (out,added) 元组（--check 查不出动态类型错，rev_str 运行时才炸）；table limits flags=01 漏 max 字节；elem(9) 误排 export(7) 前。全量回归全绿（533+8/六模式/eval 双后端/golden/fmt gate/doc_audit 67/67）。**下一步：L2.3 后续批次（enum+match / String / List / Map / json / 包 / return 语句）。发布线维持冻结。**）
-> 最后更新：2026-09-22 深夜四（**L2.3-b 闭包与捕获批设计方案产出（docs/designs/0001-l2.3-closures.md，纯文档零码改动；RFC-0004 修订 7 登记）——四个裁决点待用户：A 值表示（甲 untagged+闭包 i64 指针【建议】/ 乙 tagged 迁移）/ B 语法范围（B1 核心+B2 任意 callee【建议】，B3 Fn 注解推后负例登记——宿主 Fn 无参型信息与 untagged call_indirect 精确签名需求冲突，支持它需语言面变化）/ C 捕获 mut 绑定（放行对齐宿主 WASM【建议】）/ D env 槽位（8 字节统一【建议】）。设计基于三方读码：self_comp 3342 行现状（untagged 五 section 无堆）+ 宿主闭包五件（free_vars/compile_closure/emit_fn_value/emit_closure_call/递归预绑定补丁）+ rt_alloc/funcref 表。基础设施（bump 分配器+funcref 表+闭包值通道）是 enum/match/String/List/Map/json 全部后续批次的复用地基。信任边界预登记三条（编译期拦 vs 宿主运行时兜底；Fn 注解子集外；println(闭包) 拒——String 先例同型）。新会话首回合基线 14 项全绿复验（与十三审一致）。**动工待用户裁决。发布线维持冻结。**）
-> 最后更新：2026-09-22 深夜三（**L2.3-a 控制流批交付（RFC-0004 修订 6）+ R78 顺手收口**。用户裁决"执行"L2.3 动工后首批：① Bool 值类型（i32）+ 比较运算（i64/f64/混合提升）+ `!` + and/or 短路（if (result i32)，对齐宿主 WASM 后端）；② 语句编译——comp_one_stmt 抽出共用，if 语句（elif 链）/while（block+loop）/for x in Int（循环变量新槽 + env 编译后恢复，对齐宿主遮蔽语义）；③ 块尾 if 表达式（ExIf，(result bt) 产值；无 else 仅 void 语境）；④ verify_selfcomp 20→**25 项**（10 对拍 + 15 负例——if/while/for 语句负例转正、新增 println(Bool)/for String/非 Bool 条件/逻辑非 Bool 拒绝）；self_comp 2950→**3342 行**。R78（README 存量 "20/20 each" 算术残留）随包机械修复。**开发踩坑重要发现：宿主 dangling-else 贪婪归内**——then 块首元素是嵌套 if 时外层 else 被内层吞（AST 实证 Hole 错位，缩进不敏感的既定语法行为非 bug）——登记 §11.6。全量回归全绿（六模式/533+8/eval 双后端/golden/fmt gate/doc_audit 67/67）。**下一步：L2.3 后续批次（闭包/enum+match/String/List/Map/json/包/return 语句）。发布线维持冻结。**）
-> 最后更新：2026-09-22 深夜二（**第十三轮独立复审收官（总评 B+，基线 1418536/v1.2.5）——R73-R76 零失真 + 代码面零击穿 + L2.3 放行裁定：建议放行 + R77/R78 开账（R77 开账即修）**。用户裁决发起的 agent 独立复审确认 R73-R76 整改零失真（✓×4，报错文案逐字一致）；基线 14 项全绿（533+8/六模式/eval 双后端/verify_selfcomp 20/20/doc_audit 67/67/CI #148 六 job）；**代码面敌手探针 22 自构形态（R73 去重 6/R74 调用校验 13/R75 序建模 7）全部正确——九审以来五轮首次，MUT001 定位面四轮击穿链（R55→R62→R65→R73/R75）本轮断**；仅文档对账击穿 R77/R78 两 P3（R76 文档成对漏改 4 处已开账即修；README 存量 "20/20 each" 算术残留 R78 open）。审查轨迹 B+（十审）→B→B→**B+（十三审回升）**。**L2.3 放行动工菜单可呈现（十三审裁定：放行条件 R74 收口达成，动工授权待用户）**；发布冻结维持。当前 open：R78，事实源 TODO 顶部。）
-> 最后更新：2026-09-22 深夜（**R73-R76 整改收官，升版 v1.2.5（十二审整改包，用户裁决全量）**。① R73（P1）apply 层等价动作去重——完全等价（同类型+同起止位置+同文本）的动作只应用一次，`x=2; x=3` 单次 apply applied=1 产合法 `let mut x` final 全净（v1.2.4 同轮双 Replace 产 `let mut mut` 损坏）；同位置不同文本不合并。② R74（P2）self_comp 调用点校验——fns 摘要携带形参 vt 逗号串（prms），comp_call 校验 arity 与逐实参类型，不符即 subset_err 拒绝无 hex；2 负例进验收器（**20/20**）；信任边界登记 RFC-0004 修订 5——**十二审 L2.3 放行条件（R74 收口）达成**。③ R75（P3）MUT001 同层解构遮蔽——flat_binds 升级有序绑定表（FlatBind{name,line,kind}），赋值前最近同名绑定是解构（恒不可变无 mut 语法）即 hint；解构在后的正例不倒。④ R76（P3）doc_audit D 类补 self_comp 行数锚（README/HANDOFF_PROMPT 宣称位），65→67 项 Z 类自指同步。测试 **533 单元 + 8 集成**；六模式/20 项/eval 双后端/fmt gate/golden/clippy 全绿复验。**下一步：第十三轮独立复审（R73-R76 整改需复审重估）；L2.3 动工待用户裁决（放行条件已满足）。发布线维持冻结。**）
-> 最后更新：2026-09-22 晚（**第十二轮独立复审收官（总评 B，基线 aab6f95/v1.2.4）+ R73-R76 开账**。用户裁决发起的 agent 独立复审确认 R65-R72 八项整改**零失真（✓×8）**——三负向探针/正例/幂等/18 项/七测试全部亲手复跑一致；基线十四件全绿（529+8/六模式/eval 双后端 121+121/verify_selfcomp 18/18/doc_audit 65/65/CI 六 job）。敌手探针新开 R73（P1：fix 同轮多条 MUT001 诊断对同一声明双 Replace——`x=2; x=3` 单次 apply 即 `let mut mut x` 损坏落盘，证伪 v1.2.4 "永不可能"宣称，维护会话亲手复现 applied=2 同轮 line 2 ×2）/R74（P2：self_comp 调用点不校验实参类型与 arity——`f(1)` 传 Float 形参 COMPILED 后实例化 CompileError，维护会话复现 104 bytes + call[0] expected f64）/R75-R76（P3：同层解构遮蔽错目标不损坏、self_comp 行数宣称无 doc_audit 锚）。SPEC_FOR_AI 被证伪句已改如实口径（Known open R73）。十二审建议：R73/R74 入 v1.2.5 整改包；L2.3 暂缓条件推进为 R74 收口；发布冻结维持；v1.2.4 tag 无需撤回。当前 open：R73-R76，事实源 TODO 顶部。）
-> 最后更新：2026-09-22（**R65-R72 整改收官，升版 v1.2.4（十一审整改包，用户裁决全量）**。① R65（P1）MUT001 作用域归属解析——`FnInfo` 新增 `assign_binds`（词法作用域链遍历，镜像 typechecker env 语义：闭包/match 臂子层、for 变量循环内遮蔽、if/while/for 扁平），诊断行所在赋值的绑定解析到嵌套层时降级 hint（**即使外层存在同名 let**——v1.2.3 唯一命中即 High 错改）；`collect_let_decls` 滤出已可变声明断非幂等链（`let mut mut x` 永不可能）；+6 测试（三负向实例化 + for 循环外/闭包捕获正例 + 幂等锁定）。② R66/R67（P1/P2）self_comp 语句分派值线程化（`let frag = match ... end` + `frag?`）——if/while/for/return 语句从静默蒸发（死臂 Err）变为真实 COMPILE-ERROR 不产 hex；`tools/selfcomp/negative/` 13 负例进 verify_selfcomp（**18/18 项**：5 对拍 + 13 拒绝）。③ R68（P2）let 注解编译期一致性校验（不符即 subset_err——与宿主 TYPE001-warning 语义的信任边界差异登记 RFC-0004 修订 4）。④ R69/R70/R71/R72 顺手收口：字节锚改量级口径、§2.2 陈旧句（交接刷新时已收口本轮核实）、非 UTF-8 payload 回 -32700、双 CL 头拒绝 exit 1、exit 未经 shutdown rc=1（+3 进程测试）。测试 **529 单元 + 8 集成**；关联观察如实登记 TODO：typechecker for 变量 define 后覆盖同名外层绑定的可变性标记且不恢复（v1.2.3 既有 quirk，超 R65 范围未动）。**下一步：第十二轮独立复审（R65-R72 整改需复审重估）；L2.3 待复审后裁决。发布线维持冻结。**）
-> 最后更新：2026-09-21 深夜六（**交接就绪——第十一轮独立复审收官（总评 B，基线 65e51dc）+ R65-R72 开账**。复审确认 R62/R63 整改零失真（三探针/边界扩展/基线九件套亲手复跑全绿）+ L2.1 双载体 24 向量复证 + L2.2 验收器 5/5 复跑；敌手探针新开 R65（P1：MUT001 嵌套作用域内诊断+外层同名 let 错目标且非幂等，--apply 把源码改坏成 let mut mut x——维护会话亲手复现 applied=2）/R66（P1：self_comp 语句级子集拒绝是死臂，if/while/for/return 静默蒸发产错行为 wasm——亲手复现 host 3 / L2 0）/R67-R69（P2）/R70-R72（P3，R70 陈旧句已随本刷新收口）。十一审建议：L2.3 暂缓，先收口 R65-R72；发布冻结维持。当前 open：R65-R72，事实源 TODO 顶部。）
-> 最后更新：2026-09-21 深夜五（**L2.2 最小子集编译器完成（RFC-0004 修订 3）——双产物行为级对拍 5/5**。交付 examples/selfhost/self_comp.lom（2895 行 = self_interp 前端 A-C4 物理复用 + ~700 行新增 codegen/驱动：SLEB128/ULEB128/浮点字面量解析/类型综合/表达式与块编译/五 section 组装）+ tools/selfcomp/{run_selfcomp.mjs,cases/×5} + tools/verify_selfcomp.py。子集 fn/let/算术/调用/println，值表示 untagged i64/f64（case1：宿主 ~10KB vs L2 ~0.2KB 同 stdout——量级口径，R69 撤除时点字节锚）。验收：5 用例双产物（stdout+rc）逐字一致；self_comp --check 零诊断；fmt gate 过（先查后提交，本轮零 CI 事故）；六模式/523+5/doc_audit 65/65 复验。已知边界如实登记：Float 字面量近似解析（测试集限精确可表示值，L2.3 精度专项）、对拍避开 §11f-7 宿主值域。开发踩坑三条落档 §11.6：块尾裸表达式归 Tail（void 尾副作用首版被静默丢弃）、Form B 臂 end×5 漏补、ExBinary op 是 token 判别名。**下一步 L2.3 全语言面**；随后第十一轮独立复审（用户已裁决）。发布线维持冻结。）
-> 最后更新：2026-09-21 深夜四（**L2.1 编码器 spike 通过（RFC-0004 修订 2）+ 自举层 -0.0 符号修复**。三风险点双载体实证：① LEB128 除模编码 8 权威向量（含 u32 max）；② f64 IEEE754 位模式纯算术拆解 16 向量（规约/非规约/±0/±inf/NaN，除法构造极端值——Lom 无科学计数法字面量；纯算术链路 Sterbenz 减法 + ×2^52 缩放 + to_display 最短往返 + string_to_int）；③ hex 发射通道——39 字节最小 wasm 由 Lom 构造 → file_write 纯 ASCII hex → tools/hex2wasm.py 宿主桩 → node 实例化 answer()===42，自举层产的 hex 与宿主逐字一致。**未决问 2 关闭：无需解冻 float_bits**。副产真 bug 一枚当场修复：自举层 Float 一元负 0.0-f 丢 -0.0 符号（宿主/自举分歧，L2 复用 self_interp 会继承）——零值改经除法链构造符号翻转，self_interp 5714→5727 行，六模式全绿复验。交付件 examples/selfhost/l2_spike.lom + tools/hex2wasm.py；doc_audit 65/65（README .lom 计数 36→37、self_interp 行数锚同步）。**下一步 L2.2 最小子集编译器**（fn/let/算术/println → .wasm，与宿主 Rust 后端双产物行为级对拍）。发布线维持冻结。）
-> 最后更新：2026-09-21 深夜三（**R62/R63 整改收官 + 升版 v1.2.3 + L2 动工授权**。用户裁决"执行 1，2"：① R62（P2）MUT001 结构化定位——`FnInfo::let_decls` 携带函数体扁平作用域的 AST let 声明（if/while/for 块递归收集；闭包体/match 臂不收集——独立作用域），文本回扫彻底删除，闭包遮蔽/行内注释/字符串字面量三形态不再错改（双探针 apply 后逐字不变、applied=0、ok:false），闭包内/match 臂内诊断降级 hint（宁可不修不可错改）；+6 测试。② R63（P3）LSP 传输边界——Content-Length 上限 16 MiB（超限 stderr 说明 + exit 1，不再分配 abort）+ 畸形 JSON 回 -32700/-32600（id:null，规范形态）后服务器存活；+4 单元 +2 进程级。测试 **523 单元 + 5 集成**；fix_corpus 11 对不倒；eval 双后端 121/121。② L2 自举编译器动工（RFC-0004 方案 A：hex 文本 + 宿主解码桩，零语言面；L2.1 spike 起步——LEB128 除模/f64 位模式/hex 通道三风险点先证）。发布线维持冻结。tag v1.2.3 于 CI 绿后切。）
-> 最后更新：2026-09-21 深夜二（**交接就绪**——§12.3 五件套全过：HANDOFF_PROMPT 状态段/第一回合清单/open 项复现要点整体重写；§1 快照与 §9 检查单对齐十审后状态（R1-R61 关、R62/R63 open、fmt 零 diff 口径）；TODO 交接声明；doc_audit 65/65；CI 绿。**当前无活跃工作包；待用户裁决：R62/R63 整改包、L2 动工菜单（十审裁定可呈现）、MoonBit 月底窗口、ubuntu-26 迁移观察。发布线冻结、发布动作不出现在任何菜单。**）
-> 最后更新：2026-09-21 深夜（**第十轮独立复审收官（总评 B+）+ R62-R64 开账 + 流程规范制度化**。十审报告 docs/reviews/review-2026-09-21-2.html（agent 审查，基线 v1.2.2）：九审 R55-R61 整改**七项全部 ✓、验收宣称零失真（九轮首次）**；基线全绿复验（513+3 测试、双后端 121、六模式、doc 三件套、CI 六 job + Node 弃用 warning 确认消除）；敌手探针新击穿 R62（P2：MUT001 闭包遮蔽/行内注释残留错改，维护会话已亲手复现）/R63（P3：LSP Content-Length 无上限 OOM abort，复现 rc=0xC0000409）/R64（P3：§2.2 命令行 TAB+断行坏字节——R15 同型第四次，开账即修）。**十审裁定：九审"R55-R58 关闭并经复审"条件已满足，L2 动工菜单可重新呈现；发布冻结维持**。同日用户裁决：HANDOFF_PROMPT.md 定位为持续维护文档，维护流程/审查节奏/交接五件套制度化于 **§12**。当前 open：R62-R63（R64 已修）。）
-> 最后更新：2026-09-21 晚（**第九轮整改收官 + 升版 v1.2.2**——用户裁决 R55-R61 全量整改全部关闭：四项 P1（R55 High 修复安全性 / R56 panic exit 0 / R57 EOF 静默闭块 / R58 LSP 传输）+ P2×2（R59 RFC 8259 控制字符 / R60 gate 盲区）+ P3×1（R61 rustfmt 机械包 + action Node 24）。测试 487→**513 + 3 集成**；新增 tests/ 进程级双层（r56 CLI 退出码 / r58 LSP stdio e2e）；eval 双后端 121/121 不倒；fix_corpus 11 对不倒；doc_audit 65/65；Node 弃用 warning 6→0。**事故与教训**：CI 三连红（bd56d9b/254e16c/fb82d08）——R57 宿主 parser 修复漏自举对齐 + 维护者漏跑 --diags 模式，root cause 修复于 8178d33，教训落档 §11.6。**待办**：下一轮独立复审（九审建议 R55-R58 关闭并复审后才呈现 L2 菜单）；ubuntu-26 镜像迁移观察（2026-10-19）。**发布线继续冻结、L2 未授权不变**。tag v1.2.2 于 CI 绿后切。）
+> 最后更新：2026-10-06（**维护规程 2.0 治理批——规则收编单一事实源、
+> 历史归档、分层阅读、任务书与回报标准化（用户裁决"根本性更新维护方式，
+> 大框架保留，方式由规划者定"）**。新交付：docs/MAINTENANCE.md（现行维护
+> 规则唯一规范写位：角色与铁律十条/工作项循环与升版决策表/数字锚同步
+> SOP/执行者派发与验收细则/审查报告八节框架/交接协议与分层阅读 L0-L1-L2/
+> 规则变更协议）+ docs/EXECUTOR_TEMPLATE.md（执行者任务书通用段：输出格式
+> 硬性规范——计数配对数据逐项行式单独执行，禁合并输出推断配对）+ 本文件
+> 顶部 79 条历史条目归档至 docs/archive/handover-log.md + HANDOFF_PROMPT
+> 重构三段式 + §12 收编留指针。纯文档治理批不升版零行为变化；doc_audit
+> 71/71 与 spec_examples 复验。此前周期（v1.4.8→v1.7.0 十三行为批 + 解冻
+> + 门面/playground 上线 + 二十六审 A-、台账 R1-R116 零 open）详录见
+> archive 年表与 RFC-0004 修订 41-54。）
+
 # Lom 项目 AI 交接文档
 
 > 写给下一个接手维护的 AI。本文只写**不在其他文档里的小细节和坑**，正式内容请看：
@@ -329,58 +23,14 @@
 > - [docs/HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) — **可直接复制给下一任 AI 的交接提示词**
 > - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
 >
-> 最后更新：2026-10-06（**交接就绪——五件套刷新（v1.7.0 + 发布线解冻 + 首批发布物上线后状态；台账零 open）**。本维护周期（2026-09-30~10-06）全链：v1.4.8→v1.7.0 十三个行为批 + l2fix/治理/门面/模板/解冻批 + 二十六审 A-（R114-R116 开账→v1.6.1 同包关闭）+ 采样闭合（24 题重叠 480/480）+ 解冻裁决与门面/Release/topics/预览图/模板执行 + playground 交付上线（线上终验 Run 双诊断 9ms）。刷新面：HANDOFF_PROMPT【当前真实状态】整体重写（含 playground 维护要点与部署流）+ 第一回合清单加 playground 冒烟；本文 §1（CI 行/下一步行）+ §2.2（playground 冒烟/构建/部署行）+ §9-5；TODO 顶部交接声明重写。doc_audit 71/71 + spec_examples PASS 复验；CI 最新 #268 绿。待裁菜单见 TODO 顶部（性能/pass@k 刷新/二十七审/L2 行号+转正/divergence 与 build 缺口）；Ubuntu 26 迁移观察（2026-10-19）。对外动作逐项呈批。）
-> 最后更新：2026-10-06（**v1.7.0 在线 playground 交付——宿主工具链全量 wasm 化（designs/0019，用户裁决"复查一遍该方案，修改后执行"：六点按建议丙路线）**。核心：`cargo build --target wasm32-wasip1 --profile wasm-release`（新 profile debug=false，产物 1.71MB，零 crate 零 unsafe 口径不变——SECURITY 补 wasm 边界注）；playground/ 六文件——harness.js（手写 WASI p1 绑定：args/environ/clock_time_get/random_get/stdout+stderr 捕获/最小 preopen+path_open 单虚拟文件读写（fix --apply 写回闭环）/ENOSYS 桩/proc_exit；调试修三坑：fd_fdstat_get 命名、预开目录 fd3 特判、常规文件偏移写）、smoke.mjs（node 冒烟：arithmetic/fib 与桌面逐字对拍、修复闭环四步、深度守卫、--check 面——ALL PASS）、index.html/app.js/worker.js/examples.js（执行者实施：深色 GitHub 风单页、Web Worker+5s 看门狗、fix 行级 diff、6 示例全链验证、零第三方自检；执行者如实纠错一处——env::args() 实见虚拟脚本路径而非空表，页脚按实写）。src/ 仅两处 cfg(target_family="wasm") 门（256MB 线程跳过 + 深度守卫 300——**node 实测 wasm 栈仅 ~500 层 Lom 递归，8k 初值校准为 300**，结构化诊断先于 trap + harness 捕获转译双防线）；桌面全量回归全绿（cargo 561+31/clippy/fmt 零/verify_selfcomp 368/**bootstrap 14/14 quine 272293 逐字节一致**/六模式/eval 128×2/doc_audit 71/71/fmt 37）——cfg 门零桌面影响实证。**浏览器实测全过**（规划者亲测：Run 双诊断 NAM005+RUNTIME002、Fix 写回+diff+apply 报告、示例切换 Fib 干净运行）。CI 新增第七 job playground（rustup target add + 双构建 + node smoke）。语言面零变化。**门禁回填：提交 `7685d64` 推送后 CI run `37348863077`（#267）七 job 全绿（playground job 首跑即绿），tag v1.7.0 已切；gh-pages 孤儿分支 `c767f43` 已推（五源件+lom.wasm），用户已开 Pages——README planned 句随回填批翻转。**）
-> 最后更新：2026-10-04（**门面批收官——首个对外发布物上线**。用户批准门面方案（A/B/C）并网页端完成 B/C。A：README 30 秒门面重写（Why/Evidence 三件硬证据表/60 秒修复闭环演示——输出逐字实测/Status & boundaries 如实版/原横幅链移入 Release log，J/E/D 锚全部复验 71/71）+ README.zh-CN.md 中文导读 + docs/release-notes/v1.6.1.md（`de4f77e` CI #263 六 job 绿）。B：About 简介、15 topics、社交预览图（PowerShell 原生绘制 1280×640 占位图）、Releases 侧栏开启、Discussions 开启、Wiki/Projects 关闭——用户网页端执行。C：Release v1.6.1 "first public checkpoint" 发布（**pre-release 标签**、4 处相对链接修正后逐个通断 200/301、零二进制附件、未建 discussion——规划者 API+页面双路核验全绿；URL：releases/tag/v1.6.1）。小项在案：topics 中 'wasd' 疑为 'wasm' 笔误待用户移除。**解冻后下一项：playground 设计方案呈裁（与性能工程并行候选）**。）
-> 最后更新：2026-10-04（**发布线解冻——用户裁决"发布解冻。更新待办"**。2026-09-07 冻结令（"优化到完美前绝对不发布"）在解冻检查单七项全 ✓ 时点解除；语言面 v1.0 冻结维持不变。治理登记：HANDOFF_PROMPT 铁律 6 改写（解冻≠免呈报——每个对外动作先呈方案获批准再执行）、菜单/第一回合/交付史指针（1–53→1–54，v1.6.1 批漏刷随修）、HANDOVER §1 版本行尾注、positioning 尾注（解冻+对外使用复核口径+"体系内审查不作外部背书"边界）、TODO 状态块/盘点第 7 条注记/待裁菜单（解冻后既定路径七项，门面批为首个待呈方案项）。doc_audit 71/71 复验；纯文档批不升版。**下一步：门面批方案呈用户逐项批准**——README 门面重写/GitHub topics+social preview/Releases 页首建（v1.6.1 基于既有 tag）。）
-> 最后更新：2026-10-03（**治理反思小批——全景盘点规则/边界/规划细节后五处清理，纯文档批不升版**。用户裁决"认可，按你的想法执行"。①HANDOFF_PROMPT 第一回合阅读指向刷至二十六审；②SPEC §14 裁决 ② 工程债现状括注（wasm OOB 已根治 2026-09-07、L2 已交付——裁决原文不动）；③SPEC §14 非目标句 "no mutable closure captures" 改写为精确口径（值拷贝 + MUT002 旗标 divergence，非可变性特性；裁决意图不变）；④TODO 解冻盘点第 3 条数字刷新；⑤§12.1 固化工具批升版边界（l2fix 先例）。doc_audit 71/71 + spec_examples PASS。反思报告全貌与既定后续路径见同日 TODO 治理反思小批记录段——解冻裁决待用户。门禁回填见 TODO。）
-> 最后更新：2026-10-03（**v1.6.1 交付——R114/R115/R116 同包整改收官、台账零 open、解冻检查单七项全 ✓**。用户裁决"执行（1），然后等待指令"。**R115**：L2 单文件模式同文件用户 fn 重复定义检测（collect_sigs ItFn 分支 +19 行——map_size(pkgs)==0 门控、判重只认 idx≥0 先前用户 fn 保"本地赢"、subset_err 消息镜像 enum 重复先例；classify_l2 L2P 分支补"重复定义"关键字）；新负例 neg_l2_dup_fn；l2fix 注释/help 更正（R114 顺带）；门控边界登记（包展开单元文件边界不可恢复不查，跨包同名走 NAM006 确定序）。**R114**：归族宣称语料作用域注明于各宣称位（README/HANDOVER §1/SPEC §13/TODO/RFC 修订 52/designs/0017/positioning）——不补 ~29 关键字（加密提高未见组合误归族风险，L2G 兜底码非空文案完整不误导是更稳设计）。**R116**：SECURITY.md actions 版本引用顺刷 @v5/Node 24 + 当前注解仅余 Ubuntu 26 notice。验收（执行者全套 + 规划者亲跑 verify_selfcomp **368/368 = 196+8+164**（L2G 0/164）与 --bootstrap **14/14** quine **272293** 双侧一致）：Rust 561+31 不变、eval 128×2、六模式全 PASS、eval_prompt 31/31、l2fix --self-check 6/6（负例 164）；宿主 src/ 零改动；升版 1.6.1。顺手修正 README 里程碑句 R111 型归因漂移（v1.6.0 挂 v1.5.0 批描述）并如实登记；执行者一次 git stash 铁律偏差（核 apply_test 预存性时）无残留已核。**解冻检查单七项全 ✓——解冻裁决与门面/发布动作待用户。**门禁回填见 TODO v1.6.1 段。）
-> 最后更新：2026-10-03（**二十六审收官 A-（维持）+ 解冻前置两缺口闭合——error_repair 31 题采样重跑 + 安全面针对性检查；R114-R116 三笔 P3 开账待裁**。用户裁决"按建议执行"（二十六审先行 + 补缺口④采样/⑥安全面 → 解冻裁决 → 门面发布）。采样：双模型×10 t=1.0——24 题重叠子集 480/480、新题 123-129 首测，126=078 型歧义（ds 0/10 glm 8/10，修复全对败在欠定 stdout 面）、127 glm 两败真实宿主面（Option 未解包）、**L2 面边界发现：127 宿主面通过的 18 候选零个做出参考解 L2 修复**（13 死分支+5 常量捷径，死分支 L2 仍拒 L2V001）——报告 eval/REPORT-2026-10-03-err-repair-31.md，规划者亲验三关键结论。二十六审（review-2026-10-03.html，基线 efaed10，覆盖 v1.5.1/v1.6.0/l2fix + R113 验收 + 安全面）：三批核心宣称 33 项敌手操作零失真、16 项基线全绿、33 探针零击穿、安全面零 P1/P2；开账 R114（L2G 兜底语料外活体可达，双形态规划者亲跑）/R115（L2 对同文件重复 fn 零诊断放行——**规划者更正报告细节：宿主运行态 rc=0 照常执行（"永不拦截"既定语义）、rc=1 是 --check 口径；双侧均后写定义生效，缺口纯在 L2 诊断覆盖面**）/R116（SECURITY.md actions 版本 @v4 停写 vs 实际 @v5×9，grep 亲验）——均 P3 待裁。同日早前：文档批 `efaed10`（HANDOFF_PROMPT L135 lex 负例 fmt 口径修正 + MoonBit Q3 复核关闭——官方原文核实 1.0 未发布仍 0.10.x）。解冻检查单仅 ②台账（R114-R116）与 ⑥（R116）各余 P3 级待处置，解冻裁决在用户。）
-> 最后更新：2026-10-02（**交接就绪——本维护周期收官（v1.4.8→v1.6.0 十一个行为批 + l2fix 工具批 + 工具治理批 + 五轮审查；台账 R1-R113 全关零 open；交接五件套已刷；doc_audit 71/71；CI 最新 #254 绿**）。待裁菜单：L2 行号主要簇（~118 处）/ 二十六审时机（v1.5.1/v1.6.0/l2fix 三批未复审）/ 性能工程。发布线冻结直至解冻（七项检查单在 TODO 顶部）。）
-> 最后更新：2026-10-02（**l2fix 工具交付——L2 码进修复闭环通道（第二前置件），纯工具批不升版**。用户裁决四点均按甲（designs/0018 + RFC-0004 修订 53）。tools/l2fix.py：跑 L2 → 解析码 → 七族建议（L2U×模块表唯一 high insert；L2S 触发物清单覆盖"该表达式形态"零细节——该形态宿主 fix 零诊断、l2fix 唯一指导源）→ 人类可读/--json。--self-check 六断言全过（163 负例码解析 100%，规划者亲跑）；三题联动与设计预期吻合。零 src/零 self_comp/零 eval 改动，367/271989 不变，doc_audit 71/71。宿主 CLI 子命令留 L2 转正后。门禁回填：提交 `d665d11` 推送后 CI run `36891640634`（#253）六 job 全绿（纯工具批无 tag）。）
-> 最后更新：2026-10-01（**v1.6.0 交付——L2 诊断结构化前置件**。用户裁决三点均按甲（designs/0017 + RFC-0004 修订 52）。codegen error 通道全量上码：classify_l2 输出层关键字映射（7 族+兜底，141 条去重文案 100% 归族、L2G 兜底 0%）——263 处 subset_err 调用点零改动、文案主体逐字不动（145 存量断言天然兼容）；**lex 通道存量 bug 顺带修复**（构造点补 code 字段 + classify_lex_msg 死代码激活，负例 LEX005/LEX001 双实测）+2 新负例；147 条负例断言全量升级码+文案双锁；eval 127-129 三题 L2 原文重采（守 verbatim 纪律）。verify_selfcomp **365→367**（163 负例）、quine **269555→271989**（+2434，双侧一致保持）、self_comp 12544→**12572 行**、正例 hex 构造性恒等、六模式零影响、eval 128×2 不变。宿主 src/ 零改动。行号留后续批（全量需 AST 加 span 违反 L718 既定设计；主要簇 ~118 处为中批候选）。门禁回填：提交 `6227a89` 推送后 CI run `36878845005`（#249）六 job 全绿，tag v1.6.0 已切。）
-> 最后更新：2026-10-01（**v1.5.1 交付——R112 整改收官、台账零 open**。用户裁决"按你的想法执行"；规划者读码后改选乙修法（原建议甲的偏离如实登记 RFC 修订 51——MUT002 既定语义即"解释器=共享作用域"，panic 是实现 bug）。具名闭包调用路径先取值释放 Ref（+9/-1）；A/B 247 文件零差异；新集成 ×3 → 28→**31**（合计 592）；三侧形态：解释器共享执行（亲验探针 6/外层可见/MUT002 照发）/WASM 编译仍拒（亲验）/L2 负例在库。SPEC/SPEC_FOR_AI MUT002 语义句随批细化。**R112 关闭**。门禁回填：提交 `142a118` 推送后 CI run `36859203394`（#246）六 job 全绿，tag v1.5.1 已切。）
-> 最后更新：2026-10-01（**二十五审收官 A-（维持）——两批宣称零失真、31 探针零击穿，R113 两处文档精度开账即修（规划者亲验）**。报告 review-2026-10-01-3.html，基线 dcde571，增量 = v1.4.15 + v1.5.0 两批；审查执行中因账号限额中断一次（报告落盘前），恢复原 agent 带上下文续跑完成（二十审先例）。R112（闭包赋值捕获 mut 解释器 panic，P2 存量）证据与定性复核维持、修否待裁。轨迹：二十四审 A-→二十五审 A-（不外推）。R113：①v1.4.15 对拍口径句按文件实为 8（原记 9，二十四审"9 条"系按诊断条数少计——RFC/SPEC 已随批更正、历史报告原文保留）；②解冻盘点"五项"→"六项"。精度备注三条不开账。）
-> 最后更新：2026-10-01（**v1.5.0 交付——repair 闭环深化首批**。用户裁决三点均按建议项（全包/纪律锁定/minor），designs/0016 + RFC-0004 修订 50。fix 分派表补 NAM006 认知 hint/MUT002 改写 hint（不再"未知错误码"，均不自动 apply）；SPEC_FOR_AI §11c/§11e 补齐（尺寸 39,959→41,029）；fix_corpus 11→13 对（fixed==bad 锁定）；**error_repair 24→31 题（全仓 121→128）**——宿主面 4（NAM006 消歧/MUT002 改写含双后端分歧事实/TYPE001/NAM002 error 级）+ **L2 面新题型 3（127-129）**：宿主收而 L2 拒的代码，prompt 双真实采集（宿主 --check --json + L2 codegen error 原文），参考解三链验证（宿主双后端 + L2 全链，128 题规划者亲验 2/419B/2 一致），runner 零改动、生成纪律入 eval/README。验收：cargo **561+28**、eval 双后端 **128/128**（亲跑）、eval_prompt_check **31/31**、365/365 与 quine 269555 不变、六模式全 PASS（dump 161=154+7 新任务解）。**新发现开账 R112（P2 存量，修否待裁）**：闭包内对捕获 mut 赋值 → 解释器 RefCell panic（interpreter.rs:336，rc=1 有兜底；另两侧显性拒绝；读取形态不触发；探针 target/probes/ 亲验）。发布解冻条件盘点七项检查单随批入 TODO（纯登记）。门禁回填：提交 `b61182f` 推送后 CI run `36841096349`（#242）六 job 全绿，tag v1.5.0 已切。）
-> 最后更新：2026-10-01（**v1.4.15 交付——R110 邻接面收官**。用户裁决"继续执行"（规划者菜单建议项 1），designs/0015 + RFC-0004 修订 48。check_block 快照条件扩 Let/LetDestruct 两形态逐名快照——块内 `let (x, y)` 同名遮蔽外层 `let mut` 的 MUT001 误报清除（二十四审 p13 原形三路径 10/20/5 一致，规划者亲验）；负向（外层 let）与 fix R75 保守降级维持；解构恒不可变故漏报方向不存在。新单元 ×5 → Rust 554→**559**；全仓 4300 文件 --check 对拍 MUT001 面 **DIFF=0**（改前/改后各 10 条全为真不可变，"9 条"按文件口径随批统一按行）；365/365 与 quine 269555 不变（self_comp 零改动双跑）。SPEC §5.4 L344 surfacing 归属随批改写（二十四审备注 2）。**R110 族三步推广收官**（for quirk→块级 let→块内解构）；泄漏与循环外读两 divergence 维持登记。门禁回填：提交 `cf73de2` 推送后 CI run `36829534116`（#238）六 job 全绿，tag v1.4.15 已切。）
-> 最后更新：2026-10-01（**交接就绪——二十四审 A- 收官、台账零 open**。本维护周期（2026-09-30~10-01）全链：R94 挂账族两批（v1.4.8/v1.4.9）→ 工具治理批（doc_audit 71 项入锚 + D5 探针 8）→ 撞名族整改 v1.4.10-v1.4.12（R104-R107：确定序/本地优先/NAM006/PKG007/同别名后写赢）→ 登记项 v1.4.13（for quirk + 闭包 externals）→ 块级遮蔽 v1.4.14（R110 快照恢复）——每批全量回归 + CI 六 job 绿 + tag + 回填；四轮独立审查（二十 A-→二十一 B→二十二 B+→二十三 B+→**二十四 A- 回升**，R110 关闭确认 + R111 开账即修）。**R1-R111 全关、零 open；交接五件套已刷；下一方向待用户裁决**（LetDestruct 邻接面/二十五审/新方向；发布线冻结）。详见 RFC-0004 修订 41-47 与 designs/0013/0014。**CI 事故如实登记**：交接刷新提交 c8fff73 的 §9-5 大段重写破坏 doc_audit H/I 类四锚句式、提交前未回跑 doc_audit——CI #235 红（doc gates）；a4bb987 恢复锚句式后 #236 绿（本周期首次 CI 红；教训：大段重写后铁律 8 的 doc_audit 终检不可省——锚句式是措辞级契约）。）
-> 最后更新：2026-10-01（**二十四审收官 A-（重估回升）+ R111 开账即修**。用户裁决"继续"；报告 review-2026-10-01-2.html，基线 35df007，增量 = v1.4.13 维持 + v1.4.14 R110。**R110 关闭条件复核成立**：误报三块型清零/漏报三块型复报三路径一致；全仓 4300 文件 --check 独立重扫 9 条 MUT001 逐一核对全为真不可变（R79 假阳性确清除）；读码五口径与 diff 吻合；**27 枚探针零击穿**（类型恢复双维度/elif 链/match Form B/R65 fix 交互等）；六维持面 + v1.4.13 两登记项维持成立；基线 16 项全绿。开账 **R111（P3 两处文档顺刷漂移——README 里程碑句归因停在 v1.4.10 描述、HANDOVER §2.2 命令注释 quine 旧值）已开账即修**（规划者亲验属实）。**评级 A-**（R110 关闭 + 无新 P1/P2 + 零失真；R111 为 P3 与二十审 R102 先例同构；按十九审 B+→二十审 A- 回升先例）。轨迹：二十审 A-→二十一审 B→二十二审 B+→二十三审 B+→二十四审 A-（不外推）。）
-> 最后更新：2026-10-01（**R110 整改交付 v1.4.14——台账 open 清空**。用户裁决"执行"（块级快照/恢复方向），RFC-0004 修订 47。check_block 逐 StLet 首现快照 + 块退出恢复（复用 local_entry；同名遮蔽恢复、无同名保留——泄漏 divergence 维持 v1.4.13 先例；同块多名恢复进块前条目、嵌套内先外后、for var 恢复独立叠加、match 臂 child 层不经此面）：**双向修复**（误报三块型清零——规划者亲验 r110a"诊断通过"；漏报三块型复报——亲验 r110b 1 条 MUT001）；六维持面（泄漏/块外读/嵌套/三重同名叠加/闭包/for 变量放行）实测不倒；**全仓 4300 文件新旧 --check 对拍 DIFF=1**——26_control_block_scope（R79 用例）存量假 MUT001 (29:9) 恰被清除、运行逐字节一致（规划者亲验"诊断通过"）。新单元 ×6；MUT001 族 8/R65 族 6/for quirk 5 全绿；Rust 548→**554** 单元 + 28 集成；365/365 与 quine 269555 不变（self_comp 零改动）。邻接面登记：块内 LetDestruct 同名遮蔽未入本批裁决。SPEC L344 "shadowing disallowed" Phase 1 过时宣称顺带更正（二十三审精度备注 3）。**R110 关闭；台账 open 清空**。门禁回填：提交 `e8b099e` CI #232 六 job 绿，tag v1.4.14 已切。）
-> 最后更新：2026-10-01（**二十三审收官 B+——五项关闭复核全成立，开账 R110（P2）**。用户裁决"解决登记项后执行二十三审"；报告 review-2026-10-01.html，基线 21b3f26，增量 = R107/R108/R109 三整改 + 两登记项 + 回填。宣称零失真：基线 16 项全绿（548+28/365/365/quine 269555/探针 8/8/doc 71/71/CI #223#225#228 实查）、31 枚探针实跑；**R110（P2，存量）**：while/if/for 块内 let 遮蔽外层绑定——typechecker 无块作用域分层，误报（外层 let mut + 块内 let + 块外赋值 MUT001）与漏报（外层 let + 块内 let mut + 块外赋值零报）双向失真，运行时三侧块作用域一致（规划者亲验双向属实）；与 for quirk 同族、入口为块内 Stmt::Let。评级 B+（R110 挡 A-；无 P1）。轨迹 A-→B→B+→B+ 不外推。）
-> 最后更新：2026-10-01（**两项在案登记项整改交付 v1.4.13——登记项全关**。用户裁决"解决剩余在案登记项后执行二十三审"，RFC-0004 修订 46。**for 可变性 quirk**（v1.2.3 登记）：typechecker Stmt::For 的 env.define 覆盖同名外层 let mut 可变性且循环后不恢复（误报 MUT001 与真不可变逐字节同形）——快照/恢复修法（TypeEnv::local_entry 新方法；同名遮蔽恢复、无同名条目保留不弹出——弹出会翻"循环外读 for 变量"既有 divergence 为新 NAM003 error，执行者有据偏离经规划者认可）；负向（let x 不可变）与 MUT001/R65 族全绿，新单元 ×5 锁三形态+两维持面。**lom build 逐文件 NAM003**（v1.4.9 登记）：无文件流程逐文件 check_program 无 externals 命中一切跨包引用（105 三条/102 四条，不止别名）——按包依赖闭包 externals 修法（manifest 去 dead_code + 闭包表 DFS 环保护）——两工程清零、负向（闭包外符号仍 NAM003）锁定；新集成 ×3。Rust **543→548 单元 + 25→28 集成**；self_comp 零改动（365/365、quine 269555 不变）。残留边界登记：多文件包内跨文件引用假阳性维持、无文件流程 PKG007 不发、循环外读 for 变量 divergence 维持。**登记项全关、台账 open 清空**——二十三审随后发起。）
-> 最后更新：2026-09-30（**R107 整改交付 v1.4.12——台账 open 清空**。用户裁决"后 import 声明赢 + NAM006 变体"，RFC-0004 修订 45。L2 别名注册改后写覆盖（collect_sigs pass 2 增 alias_regs 集，翻转 designs/0008"静默保留既有摘要"口径）——b3 探针三侧 103 逐字一致（修复前 L2 恒 4；倒置变体恒后写者）；NAM006 新变体"import 别名重复——取后写声明"三路径不拦截（无别名照 R109 豁免、互不相交零误报）；r22 全探针保护面复跑三侧一致（本地优先/真名优先均保持）。tests/r107_alias_clash ×4 → 集成 21→**25**；pkg_cases 108 → verify_selfcomp **364→365 = 196+8+161**；存量对比 203 恒等 + 新用例 1 枚有意变化（fn idx 1 字节，旧 4 新 103 对齐宿主）；self_comp 12529→**12544 行**、quine **269555B**；宿主 src 零改动。**R107 关闭；R94-R109 全关，台账 open 清空**。门禁回填：提交 `11cdc68` CI #225 六 job 绿，tag v1.4.12 已切。）
-> 最后更新：2026-09-30（**二十二审 R108/R109 整改交付 v1.4.11——open 仅剩 R107**。用户裁决"继续"（R108+R109 小批先行），RFC-0004 修订 44。纯 typecheck 两处：R108 包 enum 变体 externals 放行（103 用例 --check rc=1 三错→rc=0；不并入 is_variant_constructor 避免元数假阳性；负向拼错/图外仍拒）；R109 NAM006 终检真别名限定（101 用例 build 3 条同源噪音→零；真别名 r104 测试与收敛点分支均不倒）。tests/r108_variant_externals ×5 → 集成 16→21；verify_selfcomp 364/364/quine 269521 不变（self_comp/codegen 零改动）；doc_audit 71/71（J 锚 integ 同步七处——入锚机制首次实战拦截漏刷）。**R108/R109 关闭；open 仅 R107（撞名族选边待呈裁）**。门禁回填：提交 `13a4cf4` CI #223 六 job 绿，tag v1.4.11 已切。）
-> 最后更新：2026-09-30（**第二十二轮独立审查收官 B+——R104/R105 关闭条件复核成立，开账 R107/R108/R109**。用户裁决"继续"发起；报告 review-2026-09-30-3.html，基线 92502e2，增量 = R106 即修 + v1.4.10 整改 + 回填 + 工具治理批。整改宣称零失真：R104 三原形 + 敌手深化四形态各侧 8-12 次恒定三侧一致、R105 双序 + 五扩散面、NAM006/PKG007 四路径不拦截零误报、J 锚负向锁定独立重验、基线 15 项全绿（doc_audit 71/71、探针 8/8）。22 族探针击穿 1 族开三账（规划者亲验属实）：**R107（P1 既有）两包 import 同一别名真名不同——解释器/WASM 恒声明序后者 vs L2 恒首个，跨后端静默不同值零诊断**（撞名族续账，待选边裁决）；**R108（P2 既有）包 enum 变体单文件视图 NAM003 误拒**（is_variant_constructor 不查 externals，--check rc=1，存量 103 用例中招）；**R109（P3 本批引入）build 合并单元对正常单包 import 逐符号 NAM006 噪音**（101 用例 3 条，同源静默/改文案修法）。评级 B+（整改零失真但新 P1/P2 在场不入 A；轨迹 二十审 A-→二十一审 B→二十二审 B+ 不外推）。positioning 叠句（精度备注①）顺手修复。）
-> 最后更新：2026-09-30（**二十一审 R104/R105 整改交付 v1.4.10——台账 open 清空**。用户三项裁决（本地定义优先/加 warning/doc_audit 入锚留工具批），设计 designs/0014、RFC-0004 修订 43。**R104**：load_packages 的 HashMap 遍历序（RandomState 每进程随机）致两包同名符号覆盖方向跨运行非确定——注册循环前按包根路径序 sort（与 cli.rs merge/expand 同键），解释器确定化三侧一致（p15 恒 22、p15x 恒 11、p15c 恒 22 各 ≥8 次；规划者亲验）。**R105**：eval_call 用户函数路径改 orig 优先、别名兜底——import 别名与本地 fn 同名时本地赢（p16/p16b 恒 15/4 三侧一致）。**NAM006**（warning，顺序无关终检）+ **NAM002 收敛**（包符号撞名降级 warning、同文件真重复维持 error 负向不倒）+ **PKG007**（warning，包层交集检测指名路径序赢家，三路径单点接线）。连带观察登记（包 fn 真名不经 import 可用，SPEC §8.1 补记）。测试：r104_dedup_order 集成 ×6（确定序硬断言禁止弱断言）→ 集成 10→**16**；pkg_cases 106/107 → verify_selfcomp **362→364 = 196+7+161**；self_comp/codegen 零改动（quine 269521 不变、存量构造性恒等）。**R104/R105 关闭；open 清空**——遗留工具治理批待呈裁（doc_audit 入锚防复发 + D5 撞名覆盖解除）。门禁回填：提交 `ce8c731` 推送后 CI run `36694182024`（#219）六 job 全绿，tag v1.4.10 已切。）
-> 最后更新：2026-09-30（**第二十一轮独立审查收官 B + R104/R105 开账 + R106 开账即修**。用户裁决发起；报告 review-2026-09-30-2.html，基线 250f0ef，增量 = v1.4.8/v1.4.9 两批。两批宣称零失真（存量对比独立全量重算 198+2 逐字吻合、星面键三出口取证、105 三侧、名实双核对、基线 14 项全绿）；24+4 探针中新放行面零击穿；**撞名族两枚 P1**（规划者亲手复现属实）：**R104**——两包同名符号冲突下解释器输出**同后端跨运行非确定**（p15b 亲跑 10 次 11×6/22×4；HashMap 遍历序决定覆盖方向[主观推测]，WASM/L2 恒取后写者；D5 生成器构造性规避致全库零覆盖；存量面非本批引入）；**R105**——包符号别名与主文件用户函数同名时解释器静默走别名（p16 恒 4/4）而 WASM/L2 走用户函数（恒 15/4），遮蔽方向相反零诊断（designs/0008"主文件赢"口径与解释器相悖；连带观察：包 fn 真名不经 import 即可用）。两者同根，**修法需用户语义选边裁决**（本地定义优先 vs import 优先 + 是否加 warning）。**R106**（P3：批 2 文档时点残留 5 处，R103 同族复发）开账即修；报告另建议当前值位入 doc_audit 锚防复发（待裁）。评级 B（两 P1 在场按十四审惯例；B 非本批引入所致，整改后待复审重估，不外推）。审查轨迹：二十审 A- → 二十一审 B。）
-> 最后更新：2026-09-30（**R94 挂账族批 2 交付 v1.4.9——R94 全部关闭**。用户裁决"按你的提议执行"批 2，设计 designs/0013 §1.2/§1.3，双执行者顺序实施（批 2a map_remove / 批 2b 包内 as）、规划者亲验（verify_selfcomp/doc_audit/105 三侧/map_remove 三侧探针）。**map_remove 统一 Bool**：对齐 SPEC §9.7 冻结宣称（解释器/typechecker/self_interp 本就 Bool），翻转 v1.2.13 裁决 2 甲的 L2 选边——宿主 build_map_remove 的 V_UNIT 改 probe 命中 Bool tag（蓝本 build_map_has，e2e e2e_map_remove_returns_bool 锁定）、L2 两处 "void" 裁决/R89 文案（map_remove 撤出例句）/发射签名同步 i32；三侧 println 形态 **true/false/true 逐字一致**（修复前宿主 WASM ()/()、L2 COMPILE-ERROR，旧编译器导出取证）；存量对比（同一新 lom.exe 驱动 v1.4.8 导出旧编译器）**198 恒等 + 2 有意变化**（81/84 helper 签名字节 +14/+16，各自 valid 行为一致——存量无 println(map_remove) 形态）；负例连锁（neg_map_remove_unit_bind 删/neg_println_void 改 map_set 形态/新正例 201）——verify_selfcomp 重组 **362/362 = 196+5+161**；self_comp 12525→**12529 行**、quine **269521B** 双侧一致；Rust **542→543**。**包内 as 别名**：解释器 load_packages 的 Item::Import 整体跳过改镜像 process_import 注册（import_aliases + available_builtins 两个插入都做——顺带打通包内 stdlib 别名暗坑 `from io import {println as log}`，Rust 测试锁定）；build 路径 typecheck 改传 collect_package_symbols externals（对齐默认运行/--check 先例）——105 用例**三侧一致 18/18**（解释器修复前 RUNTIME002；build 修复前 **3 条** NAM003 假阳性→零诊断——十八审登记"2 条"系笔误随批更正；WASM/L2 本就正确）；集成测试 ×2（tests/r94_pkg_alias.rs）→ 集成 8→**10**。**登记不修边界**：`lom build` 包管理流程（逐文件无 externals 视图）下包源内别名仍 NAM003（需按依赖图传公开符号，超最小面）；clippy --all-targets 有 9 条存量测试 lint（rust-1.97.0 工具链漂移、HEAD 既有非本批引入，CI 口径 -D warnings 零输出不受影响）。**R94 全部关闭（批 1 json 键序 + 批 2 两项）、当前台账无 open 项**（typechecker for 可变性 quirk 等既有登记维持）。详见 RFC-0004 修订 42。）
-> 最后更新：2026-09-30（**R94 挂账族批 1 交付 v1.4.8**——用户裁决"按你的提议执行"（统筹 R94 宿主挂账族 + 二十审三条精度备注 + 规划者只读核验新发现 R103 开账即修），设计 designs/0013、RFC-0004 修订 41。json 星面键序：run_wasm.mjs:139 比较 JS 码元序 → Buffer.compare UTF-8 字节序（Map 家族唯一 harness 排序点；map_keys/values 内联 rt_str_cmp 探针实证本就不分叉）；星面键探针（键=U+E000+U+1F600）修复前双侧分叉、修复后逐字节一致（规划者亲验）；存量用例键均 ASCII/BMP 界内零踩；SPEC §9.7 补 byte order 口径。二十审 §6-①②负例两枚 neg_user_fn_named_println / neg_match_scalar_on_list（实跑文案锁定、无 hex）+ §6-③ 信任边界清单句入 HANDOFF_PROMPT 高频坑——verify_selfcomp **360→362 = 195+5+162**，self_comp 零改动、bootstrap 14/14 quine 269510 不变。R103（交接文档时点残留四处：designs/0012 头部、HANDOVER §9-3、HANDOFF_PROMPT 锚点段 R101 陈旧句与 E甲模板句）开账即修。另顺带更正 R102 修正批漏网一处（README 横幅 "#209"→#210，二十审波及清点未含 README）。**R94 的 json 键序面关闭、R103 关闭**；宿主挂账族批 2（map_remove 统一 Bool 对齐 SPEC §9.7 冻结宣称 + 包内 as 别名解释器/typecheck 修复，designs/0013 §1.2/§1.3）随后推进；语言面与发布线冻结不变。）
-> 最后更新：2026-09-30（**二十审收官 A- + R102 开账即修，交接就绪**——第二十轮体系内独立敌手审查（review-2026-09-30.html，基线 d5ea6df）覆盖 v1.4.2→v1.4.7 六批：六批复核宣称零失真、22 枚六方向敌手探针零静默错值/零坏 wasm/零负例翻转、基线 14 项全绿（542+8/360/360/14-14 quine 269510/双后端 121/121/doc 67/67）；唯一开账 R102（P3：v1.4.7 CI run 编号 #209 应为 #210，run id 与门禁实质无误）由规划者亲验 API 后开账即修（六处文档 + positioning 叠句顺带治理），三条精度备注不开账（报告 §6）。审查轨迹：十九审 B+ → 二十审 A-（不外推）。R95-R101 全关闭，open 仅 R94。审查执行中曾因账号限额中断一次、恢复原 agent 带上下文续跑完成。当日早前交付：批1 v1.4.6（E甲扩围 bbind/match_bool_disp/严格播种 + @ec: 元素知识 + R100 开堆白名单）、批2 v1.4.7（宿主 Logical 补压 Label::If，三侧对齐，Rust 542）。详见 RFC-0004 修订 38-40。）
-> 最后更新：2026-09-30（**R101 宿主修复交付 v1.4.7**——用户裁决"继续执行 1，2，3"批 2。src/wasm_codegen.rs 的 ExprKind::Logical 短路 if 未压 Label::If：and/or 右侧**实际执行** return 时 br 深度少一层、宿主 WASM 在首项后 unreachable trap（解释器与 L2 一直正确）。修复按 compile_if 的 W-2 先例补 push/pop 两行；R101 四分支探针三侧对齐 0/9/1/8 rc0（修复前宿主 WASM 仅 0 后 trap rc1）；Rust e2e 测试 e2e_return_inside_logical_rhs 锁定（W-2 形态，**541→542**）。L2 侧零改动；eval 双后端/verify_selfcomp/六模式全量复验。**R101 关闭——裁决 1（E甲扩围）/2（R100+R101）全部完成，仅剩 3（二十审）→ 交接**；R94 宿主挂账维持，语言面与发布线冻结。）
-> 最后更新：2026-09-30（**E甲扩围 + R100 交付 v1.4.6**——用户裁决"继续执行 1，2，3"（E甲扩围/R100+R101/二十审）后批 1。Bool 显示预扫三盲点修复：**bbind 知识表**（对称 D甲 cbind 分层——知识仅供 scrut/迭代判定，放行表只由 match 臂拷贝与 for 体内播种，R85 pb5 边界零翻转）、**match_bool_disp** 提取（三枚盲点①探针全是语句级 match——StExpr/块尾原不分派，值位/语句位共用入口）、**严格形态播种** ty_seeds_bool（仅 TyBool/TyOption(TyBool)/List<[TyBool]>）；容器家族 for 迭代变量以 **@ec: 前缀元素容器知识** 播种（"元素是容器"才播——Int 元素不误播）。**实施纪律再应验**：初版全递归 ty_has_bool 被存量对拍当场拦截（43_generic_either 的 Either<Int,Bool> 参数误判 + 66_for_list 的 Int 元素误播，两枚 DIFF），停手取证收紧后 193 存量归零。R100：scan_ex 开堆白名单加发 load 的五枚只读内建（head/tail/length/get/fold），138 字节坏模块转 217 字节有效模块双侧输出 0；空表 head/tail/get 宿主运行期 trap，正例用条件保护形态。五枚 §11 缺口全转正（双侧逐字一致）；十六枚既有负例逐枚点名实测不倒。验收：verify_selfcomp **360/360 = 195+5+160**；存量 **193 hex 恒等**；self_comp **12525 行**；bootstrap **14/14**（quine 269510 bytes）；宿主 src 零改动。**R100 关闭、E甲转正**；批 2 R101 宿主修复（v1.4.7）→ 二十审 → 交接。）
-> 最后更新：2026-09-29（**D甲/R97 交付 v1.4.5**——按用户裁决顺序推进。显示预扫（scan_has_display）补追踪 match 臂 Binder 容器载荷：无字面量程序 `match Some(xs) => println(xs)` 的三流入路（直接构造链/参数注解/helper 返回签名）全通。实现保持预扫 AST-only（has_str→ibase→collect_sigs 硬序零改动）：三张 AST 直收表（enum_defs/fn_ret_cont/cbind——ret=None 保守不登记）+ scrut_is_cont 三路 + **臂内拷贝注入**（copy_bool_map + `@arm_local` 哨兵：臂内 StLet 精确覆盖、外层共享表维持只置 True）。**实施期教训一枚**：cbind 无注解分支首轮沿用 disp_cont_expr 的"变体构造=容器产"显示语义，使纯 Int 载荷枚举（22_enum_closure 的 `let b = Full(4)`）被误标、臂内 `v + n` 拼接启发式误命中多开设施（存量对拍 1 例 DIFF，行为双侧正确）；正解是**知识与放行语义分离**——load_cont_expr 按构造实参判载荷容器性，枚举显示语义留在放行表侧（规划者亲手补修，22 恢复逐字节恒等，全量 183 归零）。十正例 184–193 + 两负例（无返回注解 helper 边界拒绝点更早为 void 文案；参数不经 match 直接 println 仍拒）；既有深层流负例零翻转。验收：verify_selfcomp **352/352 = 188+5+159**；存量 v1.4.4 全部 **183 对拍 hex 恒等**；self_comp **12199 行**；bootstrap **14/14**（quine 266073 bytes 双侧一致）；宿主 src 零改动。**R97 关闭**；仅剩 E甲整理邻近证据另呈裁决；R94/R100/R101 open 待裁。）
-> 最后更新：2026-09-29（**C甲/R96 交付 v1.4.4**——按用户裁决 A甲→B甲/C甲/D甲/E甲 顺序恢复 C甲（此前因会话交接中断，工作区停点见 designs/0012 §8）。闭包自由变量终审先查父 env、再仅豁免 prelude `println`/`print`（其余内建不随同放行），哨兵键 `@closure:prelude`（含 `@` 源标识符不可拼出）使闭包内直接 `print` 综合为 void，显示预扫 `disp_scan_*` 族增 `in_closure` 参数（`ExClosure` 置 True）让闭包内直接 `print` 总开 String 设施；顶层无 import 的 `print` 仍拒。正例 176–183 八枚 + 负例 `neg_r96_*` 4 枚（裸值位两枚/零参 arity/未 import `len`；`missing`/`ghost` 与既有 `neg_closure_undef_capture` 去重）。验收：verify_selfcomp **340/340 = 178+5+157**；存量 v1.4.3 全部 **175 对拍 hex 逐字节恒等**；self_comp **11938 行（+12）**；`--bootstrap` **14/14**（quine 262552 bytes 双侧一致）；全量回归 16 项全绿、规划者亲验 verify_selfcomp 与 doc_audit 67/67。宿主 src 零改动，语言面/发布线冻结。**R96 关闭**；下一步 D甲/R97、E甲整理邻近证据；R94/R100/R101 open 待裁。）
-> 最后更新：2026-09-21（**第九轮整改第一项 R55 关闭**——用户裁决 R55-R61 全量整改。High 自动修复安全性根治：MUT001 作用域限定（`FnInfo` 结构化函数摘要，`let` 回扫收窄到所属函数体内，跨作用域错改不可能再现）/ EFF001 签名 end 行定位（多行签名不再插成 `fn helper( ! [IO]`）+ 同函数多效应聚合（` ! [IO, Clock]` 单条注解）/ `lom-apply/v1` 新增 `final` 块且 `ok` = 应用数>0 且最终零 error（错改成 PARSE001 必报 ok:false）/ fix 列基准统一字符列（LEX005/MUT001 多字节行不再错位）。+8 测试 **495/495**（九审三探针负向锁定 + cli 端到端）；fix_corpus 11 对不倒；doc_audit 65/65（锚点同步 487→495）；eval 121/121；SPEC_FOR_AI R55 caveat 改写为 hardened 口径（尺寸 38,640）。**R56-R61 继续 open，顺序整改中**。发布线冻结、L2 未授权不变。）
-> 最后更新：2026-09-21（**第九轮维护者独立敌手式审查 + 交接刷新**。基线 `ce2c71e`/v1.2.1，总评 **B**，报告 `docs/reviews/review-2026-09-21.html`；新开 R55-R61：P1×4（High 自动修复错改 / worker panic exit 0 / EOF 静默闭块 / LSP JSON-RPC 不可正常接入）+ P2×2（严格 JSON 控制字符 / 文档安全评测 gate 盲区）+ P3×1（rustfmt/Windows 编码/CI action warning）。本轮只修交接与事实口径，不改产品语义：README/SPEC_FOR_AI/LANGUAGE_SPEC/SECURITY/positioning/eval README 如实化；doc_audit 现行 eval 锚点扩为 65 项；Windows spec_examples_check 输出强制 UTF-8；新增可复制 HANDOFF_PROMPT。**当前没有已授权实施包，但有 7 项未关闭整改；L2 继续未授权，审查建议至少 R55-R58 关闭并复审前不动工；发布线继续冻结**。）
-> 最后更新：2026-09-16 晚二（**④ 文档工程小包收官——用户裁决四连包（①八审→②L2 预研→③修复闭环 v1.2.1→④文档工程）全部完成**。④ 两条线：SPEC_FOR_AI 头部新增 Context budget 行 **37,851 字符 ≈ 9.5k tokens**（字符口径，对照 Mog 3,200）+ **doc_audit 新增 I 类尺寸监控位 62→63 项**（宣称==实际 len()，自引用悖论同宽替换收敛）；Ronacher "A Language For Agents"（2026-02-09）一手深读关闭第 4 轮最后复核项——**独立收敛证据**（effect markers `needs{time,rng}`+格式化自动传播注解 ≈ Lom `![IO,Clock]`+EFF001 自动插入；Results over exceptions；无宏无 barrel）+ **repair-native 预言**（"mechanical fixing for as many linting failures as possible"）+ 两未对齐点（Go 式前缀/aliasing 存疑——挂账无动作）。验收 doc_audit **63/63**；纯文档+监控不升版。**下一状态：无活跃工作包**——待令项：L2 动工裁决（RFC-0004 方案 A/B）、MoonBit 1.0 Q3 复核（月底窗口）、差分按需、发布线维持冻结）
-> 2026-09-16 晚（**③ 修复闭环资产深化收官，升版 v1.2.1**——四连包第三项。四条线：① fix 动作面 NAM005 修复动作化（消息自带 import 语句顶部插入，High）+ MUT001 升级（声明按名回扫唯一命中 let→let mut，High；多/零命中降 Medium hint），+5 测试 **487/487**；② fix_corpus **8→11 对**（09 MUT001/10 NAM005/11 LEX005，--apply golden 逐字验收）；③ error_repair **22→24 题**（121 LEX005 全角标点、122 TYPE002 真值 warning 预告 RUNTIME001——120 同款 warning-as-prophecy 形态），eval **121/121**；④ **高温补测闭环 R46 留口：error_repair 24 题双模型 ×10 采样 t=1.0 全过 480/480**（报告 REPORT-2026-09-16-err-repair-patch.md；119/120 于 err22 轮、121/122 新题即测于 err24 轮、119/120 跨两轮 20 采样零失败）——positioning §3 两条实测句升回全量口径（118 为唯一无采样任务，Q4 单采样对照在档）。验收：doc_audit 62/62、dump 154/154、static 坏 22/干净 154（新对+新参考解入集）、clippy 零 warning。冻结面零变更（纯 lom fix 行为）。tag v1.2.1 已打（main CI 绿依据））
-> 2026-09-16（**第八轮独立审查 A-（四连）+ 整改 R46-R54 关闭**——四连包第一项。八审报告 review-2026-09-16.html 基线 554a3b1（增量 e003bab..554a3b1 共 7 提交，全 docs 无源码改动）：21 项矩阵 19✓+1△+1✗；**调研三轮约 45 个外部事实点联网原文复核 41 个逐字精确、无一数字编造——R43 纪律整改成效实证**。**头条 P1：positioning "22 任务 20/20 全过"拼接失真**——pass@k 实测只覆盖 20 任务，warning 级修复题 119/120 从未采样 → 分层如实改写 + 补测列 ③ 包候选（本日已闭环，见上）；**收官簿记病灶第四次复发、首次 P1、首次进入对外材料核心证据链——处方扩展：非登记位新文档含对账数字，落盘前先跑 doc_audit**。P2：113/116/119 三时点拧一句。附带关闭第 4 轮两处"下轮复核"（目录维护者=Alasdair Allan；Valea 在目录）。整改 R46-R54 全关闭）
-> 2026-09-16（**② L2 自举编译器预研收官——RFC-0004 draft（动工待用户裁决）**。核心新发现：file_write 实测 UTF-8 落盘（char_from_code(128) → c2 80 双字节），二进制流不可经 String 直发——spec L1433 "char_from_code 解除 L2 blocker"只对内存侧成立；RFC 方案 A（hex 文本+宿主 ~40 行解码桩，零语言面）vs B（解冻后 file_write_bytes 44 号内建）；无位运算（LEB128 除模循环，±2^59 够）、f64 位模式列 L2.1 首号 spike、前端复用 self_interp Part A-D、类型推断是 L1 未覆盖最大增量、工作量 ~4500-7000 行（2-4×L1 工期））
-> 2026-09-15 深夜（**B 包：未导入内建 --check 盲区修复收官，升版 v1.2.0**——D 四期真发现的用户裁决立项。**新 warning 级诊断 NAM005**：调用已知内建但未导入 → 静态即报 `[NAM005] 内建 'x' 未导入——需在文件顶部声明：from <module> import {x}`（模块名反查 interpreter::module_of 单一事实源；warning 不拦截=渐进式承诺不变，ok:true）。设计要点：prelude 豁免；`f as g` 别名只解锁 g（真实名仍报——对齐运行时 available_builtins）；用户 fn 与内建同名走 NAM002 单报不堆噪（collect_fn_sig 移出 builtin_module）。自举侧不动（8.2 子集不产 NAM warning，verify static 四码过滤天然排除——T3/MUT002 先例）。+5 测试 **482/482**、eval 任务 120（warning 修复题：静态预警形态，双后端 119/119）、示例/自举干净集零误报、static 对齐 152（任务 120 参考解入集，B 包扩容）。冻结 §14-③ 安全区（新 warning 码，MUT001/MUT002 先例）。tag v1.2.0 CI 绿后打）
-> 最后更新：2026-09-15 夜（**D 包四期：差分覆盖大扩展收官**——用户裁决"完整范围"连续执行。模板族 56→**101**（+45 五批：字符串/数值深水 10、容器深组合 12、enum 深水含**递归 enum AST 形态** 8、闭包/HOF/管道 8、Result/Option/效应 7）；包模式深化（五类签名 Float/String/Bool + **三包链 C→B→A** + 包内 enum/同包互助——跨包桥保持 Int 单参纪律）；程序密度 3-7→4-10。**五段对拍全部零差异：a+b 1000/c+d 1000/e 1000/包 600/全池回归 2000 = 新增 5600，累计 10000**（claims d1234 = 4400+5600 分项回加）。**真发现一枚待用户裁决：未导入内建的 --check 盲区**（typechecker 全量灌 43 内建签名、注释明示导入可用性归运行时——不导入 starts_with 静态过、运行时 RUNTIME002；自举侧同款放行；候选修复 warning 级 NAM+hint，冻结安全区内但改变 --check 输出面）；语言面限制落档：元组下标不支持链式（§4.5b）。生成器自坑四枚+变体名字符串碰撞 bug 一枚（B1_5 vs B_15 撞名——下划线式修复）全部如实落档；**新坑：diff_test 实例严禁并行**（TMP 共享，probe rmtree 咬掉并行段——§11.4）。纯工具+文档零 Rust 不升版）
-> 2026-09-15（**第六轮独立审查 A- + 整改 R31-R38 关闭——用户裁决三包序列（③V→①D三期→②六审）全部收官，当前无活跃工作包**。六审报告 review-2026-09-15.html 基线 5156ab2：工程实质全部属实（claims 七条独立复算/锁定测试亲手触发/80 次抽样对拍/§11f-8 逐点实测/CI 逐 run 对账），8 条发现（P2×4+P3×4）全部采纳——头条反讽：**"七条→八条联动七处由 I 类机制全数抓出（抓齐）"宣称失准**——实际六处登记位全同步，登记面外 SPEC_FOR_AI §11f 导语英文位"seven"漏网（R26 同型复发）；R31 seven→eight + 英文位补入 I 类监控（根治）/R32 三处"抓齐"改如实（gate 覆盖面≠全部出现面）/R33 §1 下一步行翻牌（提交信息与实际 diff 不符教训）/R34 diff_gen 头注释"无 file/env"过时改写/R35-R38 P3 四条（枚举计数/陈旧注释/覆盖面收口）。doc_audit 52→**54 项**，锁定测试双组验红。轨迹 B+→A-→A→A→A-→**A-**（止跌未回升——教训：宣称"全数抓出"类表述前先 grep 全部出现面））
-> 2026-09-15（**D 包三期：差分覆盖扩展收官**——V 包后顺序执行的第二包。模板族 45→**56**：file 三件（覆盖写先行幂等闭环：roundtrip/exists 对照/append 累积）、env args 消费（t_env_args_consume——argv[0] 结构性差异**构造性规避**）、深控制流六件（while×match×Form B 臂内 return 三层嵌套/循环内闭包捕获/两 enum 交叉嵌套 match/?-in-while/String×List 混合迭代/递归 acc+提前返回）、import 深形态（stdlib 别名单文件路径）；enum 变体名 uniq 顺手修（同名变体跨 enum 共享全局 idx 的 TYPE003 歧义形态消除，实测非 bug）。**seed 10000-10499 与 15000-15499 两段 1000 程序双后端逐字一致零差异**（三期累计 4400）。**§11f 第 8 条分歧档案化：env::args() argv[0] 路径差异**（.lom vs .wasm，只消费 args[1..]）——七条→八条口径联动六处登记位全数同步（I 类监控面内），登记面外 SPEC_FOR_AI §11f 导语英文位一处漏网由第六轮审查抓出（R31 补入 I 类监控——首战教训：gate 覆盖面 ≠ 全部出现面）；diff_test run_interp/run_wasm 固定 `-- d1 d2` 调用。纯工具+文档不升版。下一项：第六轮独立审查（队列头））
-> 2026-09-15（**V 工作包：文档自账制度化收官**——用户裁决 ③→①→② 顺序执行的第一包。doc_audit 22→**46 项**：新 **H 类宣称-证据对账**（tools/claims.json 五条 claim：3400=1000+400+1000+1000 等——算术闭合 + 出现点同步，**R22"2600 算术笔误"根治为 CI gate**）、新 **I 类源码计数**（diff_gen 模板池 45 族/diff_test 探针 6 条/SPEC §11f 分歧 7 条 → 文档现值含中文数字形态，R27/R28 型口径漂移钉死）、新 **Z 类项数自指**（R16"监控不了自身项数"盲区关闭——HANDOVER §2.2 的"46 项"宣称与脚本实产项数互锁）。锁定测试六组改错全红（含 R22/R27/R16 三场景复现）+ 恢复全绿；顺手修 diff_test run_probes docstring 内 R27 整改漏网的矛盾括注（"分歧 2 不在探针集"与 json-number 在集内的事实相反——第二段陈旧残留删除）。零 Rust/零 CLI 行为，不升版。下一包：D 包三期（差分覆盖扩展）→ 第六轮独立审查，序列见 TODO）
-> 2026-09-14 交接就绪（本维护周期全链：**第四轮独立审查 A + R15-R21** → **D 包一期 v1.1.3**（typechecker Logical NAM003 漏检修复——D 差分测试首枚真发现 + diff_gen/diff_test 基建 + 1000 程序全一致）→ **D 包二期 v1.1.4**（build 包发现 cwd→file_dir 修复 / 包符号 as 别名三处碎修复 / **§11f 第 7 条分歧：WASM Int 值域 ±2^59**（7.6a/v0.11.0 起，文档化+探针+规避）/ 包-json-递归梯度三扩展 2400——两期合计 3400 程序/项目实例双后端逐字一致）→ **第五轮独立审查 A- + R22-R30**（头条教训：2600 算术笔误——**大包收官必须自跑宣称-证据对账**）。新坑四枚落档 §11.3（heredoc 转义第三四五次咬人/`--check` 走 stdout/生成器语言面自坑五枚/闸门分离）。当前无活跃工作包，方向菜单五项待令（§1 下一步），发布线维持用户冻结裁决）
-> 2026-09-14 夜（**第五轮独立审查总评 A- + 整改 R22-R30 关闭**——报告 review-2026-09-14-2.html 基线 828560c：工程实质全属实（四枚修复亲手实测/210 次抽样对拍/种子确定性），9 条发现全采纳——R22 头条数字 2600→3400（四段之和，算术笔误）/R23 §1 版本行 v1.1.4 重写/R24 v0.7.2→7.6a-v0.11.0（不存在的版本 tag）/R25 guide 的 R15 教训句再被 0x0C 咬（第四次，引入提交即 R15 整改本身）/R26 spec §12 116→118/R27 探针口径统一/R28-R30 P3 三条。轨迹 A→A- 回落：文档纪律跟不上工程节奏，**教训：大包收官时自跑一轮宣称-证据对账再提交**）
-> 2026-09-14 深夜（**D 包二期收官，升版 v1.1.4**——用户裁决按 ③包系统→①json→②递归梯度 顺序扩展差分覆盖：**D5 包模式**（多文件包项目：扁平/链式依赖图 + 跨包导入含别名；抓出 3 枚潜伏 bug——build 包发现按 cwd 而非 main.lom 所在目录（7.8 起，同文件不同目录编译结果漂移）、包符号 as 别名三处碎（typechecker 假 NAM003/解释器 RUNTIME002/wasm arity 误报，4.4 起）；**§11f 第 7 条分歧：WASM Int 值域 ±2^59**（tagged i64 60 位载荷，2^59 翻符号/2^60 静默截断，Phase 7.6a / v0.11.0 起（R24 修正：初记 v0.7.2 为不存在的版本 tag）——文档化 + int-range 探针，tag 重构出冻结范围）+ 生成器值域规避；400 包项目全一致）；**D6 JSON**（分歧 2 边界实测：安全区=整数字面量+真小数、分歧区=30.0/1e2/-0.0；3 模板 parse 消费/构造 stringify/嵌套往返 + json-number 探针；1000 程序全一致）；**D7 递归梯度**（深度档位 ≤8000 安全带 + 相互递归/递归内提前返回；1000 程序全一致）。探针 6/6（7 条分歧中 6 条可执行验证）。合计 D 包两期：**3400 程序/项目实例双后端逐字一致**（R22 修正：初记 2600 为算术笔误，四段之和 1000+400+1000+1000）。升版 v1.1.4（package/alias patch，+2 测试 477/477）。生成器自坑再落档：宿主无 [..] List 字面量、布尔大写 True/False、heredoc 转义第三次咬人——§11.3 教训继续应验）
-> 2026-09-14 晚（**D 工作包：双后端差分测试收官，升版 v1.1.3**——用户裁决的旗舰项落地：tools/diff_gen.py 类型感知模板化随机程序生成器（39 模板族，提前返回族加权 ×3 定向覆盖 W 包 for-return 事故模式；默认避开 §11f 六条已知分歧——正常模式任何差异都是新发现）+ tools/diff_test.py 对拍器（--check 闸门分离生成器 bug 与后端差异；**1000 程序（seed 1000/5000 两段）双后端 stdout+退出码逐字一致**；--probe 探针 4/4 验证 §11f 可执行分歧仍如档案——守护白名单本身）；**真发现一枚：typechecker `and`/`or` 操作数 NAM003 漏检**（Phase 2.4 起 `ExprKind::Logical` 不递归检查子表达式；生成器 `not` 笔误意外暴露——解释器短路逃过 rc=0 而 wasm build 编译期失败的不对称；自举检查器 8.2 起就递归，宿主修复对齐；+2 测试 475/475）；CI doc-gates 加固定种子差分冒烟 step；顺手修 §11f 三处陈旧（116/118、five/six、大浮点实测形态 2e+30.0 补精度）。生成器自坑三枚如实落档：not 不是运算符（! 才是）、%= 不在复合赋值四件套、Form B 臂 end 又漏（§4.1 第 N 次应验）。详见 docs/TODO.md D 包证据区）
-> 2026-09-14 早（**第四轮独立审查总评 A + 整改 R15-R21 关闭**——报告 docs/reviews/review-2026-09-14.html，基线 c4e960a：硬指标 45 项矩阵 42✓+3△+0✗、无 P0/P1，验证深度超前三轮（三守卫亲手触发/N3 三组锁定测试/Q2 拆分纯搬运独立复算/坏提交 worktree 实证/CI 逐 run 对账）；7 条发现（P2×4+P3×3）全部复核属实采纳——R15 §2.2 fuzz 命令换页符修复（0x0C 咬字，CI #92 教训同型复发，教训入 §11.3）/R16 doc_audit 行 19→22 项/R17 §4.6 parser 守卫改口/R18 TODO Q2 翻牌+证据区/R19 N3 标号修正/R20 cli.rs 注释如实口径/R21 #96/#97 tag 时序死锁入档。同日新任维护者完成交接：基线验证 11 项全符。审查轨迹 B+→A-→A→A）
-> 上一周期 2026-09-08（**v1.1.2 交接就绪**。本维护周期收官链：**M 工作包**三线优化（示例对账三文档化——存量腐坏 7 处实测修复含 tutorial 教非法嵌套 fn；Pattern::Variant 带 name_span——NAM004 变体版离开 (0,0)；fix_corpus 4→8 对）；**第三轮独立审查 A + 整改 R9-R14**（docs/reviews/review-2026-09-07.html；轨迹 B+→A-→A）；**N 工作包**（N1 递归深度守卫 80k——深递归产结构化诊断非崩溃；N2 Latin-1 挂账调查关闭——过时认知零代码改动；N3 changelog 对账进 doc_audit）；**Q 工作包**（Q1 覆盖率测量 84.4% 下界+盲区分型+补测；Q2 main/typechecker 双拆分全文件可整读；Q3 parser 30k+json 100k 守卫——SECURITY 限制 1 关闭，全部递归入口结构化失败；Q4 任务 118/119+fuzz 常态化进 CI+doc_audit 22 项）；**AB-DE 尾巴**（Q3 性能账噪声带内；深度守卫双后端文档涟漪 §11f 第 6 条；**078/118 歧义对照实测——歧义版 1/10 vs 明确版 10/10，损失 90pp**；覆盖复测 84.44%）。升版 **v1.1.2**（稳健性 patch：崩溃→结构化诊断，零新码零语言面）。**CI #90-92 三连红事故已修复落档**（staged 复核/heredoc 转义/首跑纪律三教训，§11）。**用户裁决在案**：发布线冻结（优化到完美前不发布）、L2 自举与差分测试待令立项。）
+
 
 ---
 
 ## 0. 用户协作偏好（最重要，先读）
+
+> 2026-10-06 注：本节为用户偏好的历史档案原文；现行铁律（已合并本节要点）
+> 的唯一规范写位是 [MAINTENANCE.md](MAINTENANCE.md) §1。本节保留原文。
 
 用户是中文交流，对工作方式有明确要求，**违反会引发不满**：
 
@@ -471,7 +121,6 @@ foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFi
 powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\target\release\lom.exe   # 期望 128/128（v1.5.0 起 31 题 error_repair 含 L2 面 3 题；WASM 侧 -Backend wasm 同）
 python tools\verify_selfhost.py                         # 自举验收：dump 161/161（另 --tokens / --diags / --static / --run / --wasm 模式；--wasm 自 v1.1.1 起三段验收：layer2 全量 / layer3 golden / 自施加）
 python tools\verify_selfcomp.py                         # L2.3/L2.4 验收：368/368 = 196 单文件 + 8 包 + 164 负例（v1.6.0 起 L2 诊断带 [L2xxx] 码，断言码+文案双锁；v1.6.1 起同文件 fn 重名单文件模式拒）+ --bootstrap 14/14（三层自证与自施加强 quine 272293 bytes；计数随批实算、以验收器输出为准——各批变迁见 SPEC §13；另有 --ci-smoke 子档已入 CI）
-node playground/smoke.mjs                               # playground 冒烟（v1.7.0；与桌面逐字对拍——先构建双产物：cargo build --release 与 cargo build --target wasm32-wasip1 --profile wasm-release；CI 第七 job 同款；部署=五源件+wasm 同目录推 gh-pages 孤儿分支）
 node playground/smoke.mjs                               # playground 冒烟（v1.7.0；与桌面逐字对拍——先构建双产物：cargo build --release 与 cargo build --target wasm32-wasip1 --profile wasm-release；CI 第七 job 同款；部署=五源件+wasm 同目录推 gh-pages 孤儿分支，Pages: Deploy from branch gh-pages/(root)）
 python tools/l2fix.py <file.lom>                        # L2 码进修复闭环通道（designs/0018 裁决点 1 甲形态，零宿主改动不升版）：跑 self_comp 编译并解析 [L2xxx]/LEX 码行 → 七族修复建议（--json 出独立 l2-fix/v1；--self-check 对 selfcomp 全部负例 + eval 127/128/129 三题 broken 全链自检断言；--lom-bin/--l2 可参数化换路径）
 python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
@@ -703,7 +352,7 @@ end
 
 ## 9. 快速上手检查单（新 AI 第一天）
 
-1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再读本文 §0/§1/§9/§11.6/§12、TODO 顶部、最新十九审报告及首页事后勘误（review-2026-09-29.html）与十八审报告（review-2026-09-28.html）、designs/0012；历史架构补读 RFC-0003 全文与 lom-project-guide.html Phase 5/6
+1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再按其第一回合分层阅读（L0：MAINTENANCE.md 全文、TODO 顶部、最新两轮审查报告、SPEC §14、RFC-0004 修订链尾、designs 状态行；本文 §0/§1/§9/§11.6 与 §2.2 基线清单）；历史细节按需下钻 docs/archive/handover-log.md 与 designs/RFC 原文（MAINTENANCE §5.2 分层阅读协议）
 2. `cargo build --release && cargo test --release` 确认 561/561（另有 tests/ 集成 ×31）、零 warning、`./target/release/lom.exe --version` 显示 1.7.0
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 368/368、--bootstrap 14/14 quine 272293 bytes）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 检查 `git status`：交接提交后应基本干净（tag/CI 回填除外）；核最新已提交 main CI 六 job 与 annotations（§11 有 API 查法），不得把已提交绿灯外推到任何未提交工作区。
@@ -1069,77 +718,13 @@ end
 
 ---
 
-## 12. 维护流程与交接规范（2026-09-21 用户裁决制度化）
+## 12. 维护流程与交接规范（2026-09-21 制度化；2026-10-06 收编）
 
-> **裁决原文**：HANDOFF_PROMPT.md 作为后续持续维护的文档、交接时的必要流程。
-> 本节把日常循环、回归门禁、审查节奏、交接清单一次定清楚；环境与语言细节坑
-> 仍在 §2/§3/§4/§11，本节不重复。对外贡献者视角见 CONTRIBUTING.md。
-
-### 12.1 工作项循环（每个语义改动，顺序执行）
-
-1. **改码前先读码**；疑似 bug 先写探针复现（能复现才叫 bug，复现形态记入 TODO 证据区）。
-2. **行为改动与文档成对交付**：按牵动面同步 SPEC_FOR_AI / LANGUAGE_SPEC（§13 changelog）/ SECURITY / README / positioning——改的是"宣称"就要改文档，改不了宣称就改回实现。
-3. **提交前全量回归**（§2.2 清单逐项）：cargo test --release → golden 逐字 → eval 双后端 → **selfhost 六模式逐个跑（一个不漏，§11.6 三连红教训）** → doc_audit → spec_examples → eval_prompt_check → fuzz/diff 冒烟（CI 侧亦常驻）。
-4. **三实现一致性**：宿主 parser/诊断/内建行为改动 → 默认怀疑 WASM 与自举（self_interp.lom）的同款偏差，两侧同步修并各有测试。
-5. **数字锚点同步**：测试数/文件行数/版本/任务数变化 → doc_audit 对应锚点当轮同步，禁止"下轮再补"。
-6. **推送后看 CI 首跑**（六 job + annotations）；红了立即修根因再继续，不攒不改口。
-7. **里程碑收官**：升版（行为修复 patch / 用户可见功能 minor / 语言面变化须 RFC）→ CI 全绿后切 tag；tag 信息与 spec §13 对齐。**工具批升版边界（2026-10-03 固化，l2fix 先例）**：纯新增独立工具（不触 src/、不改任何既有命令行为）可登记为"纯工具批"不升版；一旦工具有行为变化或触 src/，即升 patch/minor（v0.5.x "加用户可见功能就升版"教训不因此豁免）。
-8. 全程纪律：中文、彻底优先于效率、子智能体并行 ≤2 且 git 操作归规划者（§12.4）、计算数据实测、推测标"主观推测"、含反斜杠转义的内容只用 Write/Edit 落盘。
-
-### 12.2 审查节奏（每轮独立审查）
-
-- **时机**：每个大包/维护周期收官后（用户裁决发起）。
-- **性质**：agent 分工的体系内独立审查，**不是外部同行审计**——报告必须如实标注该边界（九审先例）。
-- **方法**：敌手式——"绿矩阵不是证明"；从真实 CLI 进程 / LSP stdio / repair apply / 退出码 / 协议边界 / 三实现对齐构造反例；上轮整改的验收探针必须亲手复跑。
-- **纪律**：审查阶段不改产品源码；报告落 `docs/reviews/review-<date>[-N].html`（自包含 HTML）。
-- **整改开账**：新发现从下一号起（当前顺延至 **R102+**；R95-R98 为十九审开账，R99-R101 为其后新证据，R94 挂账）开入 TODO，由用户裁决整改顺序；整改项必须带"应修"+"绝不能这样修"的负向测试锁定。
-- **评级**：每轮独立评级；历史 A/A-/B 轨迹不得外推——整改后状态只能由下一轮复审重估。
-
-### 12.3 交接清单（HANDOFF_PROMPT 为必要环节）
-
-交接或周期收官时，**五件必刷**（缺一不叫交接就绪）：
-
-1. `docs/HANDOFF_PROMPT.md`——【当前真实状态】段（版本 / 审查轮次与评级 / 测试基线 / 最新教训 / 待裁决项）与铁律数字逐条复核；该文件是持续维护文档，不是一次性交接物。
-2. `docs/HANDOVER.md`——顶部"最后更新"条目 + §1 快照行（版本/测试/审查/下一步/挂账）+ §2.2 基线数字 + §9 检查单。
-3. `docs/TODO.md`——顶部交接声明（未关闭项清单）。
-4. `python tools/doc_audit.py` **67/67**——数字锚点全同步的机器证明（这是交接质量的门禁，不是可选项）。
-5. CI 最新 run 全绿——交接宣称的状态以 CI 为准，不以本机为准。
-
-新会话第一回合 = HANDOFF_PROMPT 内嵌流程（规划者版，§12.4）：规划者读
-指定文档 → 基线可派子智能体执行并验收 → 如实汇报 → 只呈现方向菜单等
-裁决，不动码。HANDOFF_PROMPT 自 2026-09-29 起为"核心提示 + 事实源
-指针"两段式（用户裁决）——只有【当前真实状态】段每轮整体重写，交付
-史/教训/逐批锚点以各事实源为准、不在提示词中复述。
-
-### 12.4 规划者-执行者分工（2026-09-25 用户裁决）
-
-> **裁决原文**：后续维护者角色为规划者——主会话做规划，需要启动子智能体
-> 来执行具体事项。此前"顺序工作，不大量并行派发 subagent"的口径自此由
-> 本节取代：派发是常态，约束不再是"不派发"，而是下述纪律。
-
-**规划者（主会话）职责**：
-1. 读交接文档、关键决策档案与审查报告；对动工面的关键路径读码结论
-   复核（读码供料可派执行者，结论须亲自消化）。
-2. 产出/更新批次设计方案与裁决点，呈用户裁决；不越权动工。
-3. 拆解任务书并派发子智能体：任务书必须**自包含**——背景与目标、
-   仓库路径与相关文件、验收标准（§2.2 相关项 + 用例/负例要求）、
-   边界与禁止事项（冻结面、铁律 4 的落盘纪律、§11.6 相关坑清单）、
-   产出物形态（改动文件清单 + 验证输出原文）。
-4. 验收：子智能体产出须复核（关键项亲自重跑——至少 verify_selfcomp
-   与 doc_audit；实施类任务加存量 hex 对比与 fmt gate）；不接受
-   "看起来对"的转述，验收以命令输出为准。
-5. 独占 git 提交/推送/tag 与 CI 首跑跟踪；文档成对与升版由规划者
-   收口；方向菜单与裁决点呈用户。
-
-**执行者（子智能体）约束**：
-1. 不做任何 git 写操作（不 add/commit/push/tag）；不修改冻结面
-   （语言面/发布线）；不引入第三方依赖。
-2. 含反斜杠转义内容一律 Write/Edit 落盘，禁 heredoc/printf 直写。
-3. 并行执行者同时不超过 2 个（规划者控制派发节奏）。
-4. 计算类结论必须附可复现命令与原始输出；推测标"主观推测"；
-   无法完成的项如实报告，不得以"应该可以"收尾。
-
-**分工不适用的场合**：用户直接指名规划者亲手做的事项；涉及裁决
-呈现、审查报告落盘、交接五件套刷新等治理动作（规划者亲自）。
+> **本节规则已收编至 [MAINTENANCE.md](MAINTENANCE.md)（维护规程 2.0，唯一
+> 现行规范写位）**：§12.1 工作项循环 → MAINTENANCE §2；§12.2 审查节奏 →
+> MAINTENANCE §4；§12.3 交接清单 → MAINTENANCE §5.1；§12.4 规划者-执行者
+> 分工 → MAINTENANCE §1/§3。本节 2026-09-21/25 原文（含两条裁决原文）整体
+> 归档于 [archive/handover-log.md](archive/handover-log.md) 附录 A，信息零
+> 丢失。执行者任务书通用段见 [EXECUTOR_TEMPLATE.md](EXECUTOR_TEMPLATE.md)。
 
 ---
