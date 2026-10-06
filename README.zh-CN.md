@@ -50,7 +50,7 @@ cargo build --release
 
 ## 状态与边界（如实）
 
-- 当前 **v1.6.1**（2026-10-03）；语言面自 2026-09-02 冻结后零变化——其后每个版本都是整改与证据工作。逐版记录见[英文 README 的 Release log](README.md#release-log)；
+- 当前 **v1.7.0**（2026-10-06）；语言面自 2026-09-02 冻结后零变化——其后每个版本都是工具与证据工作（在线 playground、结构化诊断、整改）。逐版记录见[英文 README 的 Release log](README.md#release-log)；
 - **L2 自举子集编译器**（`examples/selfhost/self_comp.lom`）明确标注**实验性**：编译 Lom 严格子集到 WASM，宿主收而 L2 拒的每个面都带 `[L2xxx]` 码与修复建议（[tools/l2fix.py](tools/l2fix.py)）；
 - 26 轮审查为**体系内敌手式审查**（agent 执行、以证据为准）——是良好的工程卫生，**不是外部同行评审**；评级不跨基线外推；
 - **[在线 playground](https://lom-lang.github.io/lom/playground/)**——浏览器里跑 Lom：结构化诊断 + `lom fix --apply` 自动修复（带行级 diff），全客户端（宿主工具链 wasm 化，零第三方 JS）。

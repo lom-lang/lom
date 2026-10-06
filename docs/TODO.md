@@ -1761,7 +1761,7 @@ warning；升版 **v1.2.1**（纯 fix 行为，冻结面零变更）。
 ## ② L2 自举编译器预研（2026-09-16，四连包第二项）✅ done——产出 RFC-0004 draft，动工待用户裁决
 
 **来源**：用户裁决（2026-09-16 四连包 ②）。**产出**：
-[rfc/0004-l2-selfhost-compiler.md](../rfc/0004-l2-selfhost-compiler.md)
+[rfc/0004-l2-selfhost-compiler.md](rfc/0004-l2-selfhost-compiler.md)
 （Status: **draft**——只立骨架与证据，不构成开工授权）。
 
 **预研实测证据（2026-09-16）**：

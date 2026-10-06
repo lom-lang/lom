@@ -38,6 +38,8 @@ _file_demo_tmp.txt
 examples/_todo_data.json
 # Lom 运行时产物（fix-history.jsonl 等）
 .lom/
+# 差分测试失败留档目录（tools/diff_test.py 运行时自建，仅遇差异时落盘）
+.diff_failures/
 
 # LLM 复测管线（2026-08-31）：密钥与复测产物
 eval/.api_keys.json

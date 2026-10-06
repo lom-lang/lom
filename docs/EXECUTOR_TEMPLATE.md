@@ -45,7 +45,7 @@
 | 改宿主 Rust（src/） | HANDOVER §2.2 全量清单 + MAINTENANCE §2.1-8 三实现一致律；clippy 以 CI 口径 `--release -- -D warnings` 为准（--all-targets 有 ~4 条存量工具链漂移，不属 gate，勿误报）；`cargo test --release` 不更新 lom.exe——CLI 验证前先 `cargo build --release` |
 | 跑 Windows 工具链 | HANDOVER §3（PowerShell 写文件显式无 BOM；终端 CLIXML 噪音；Git Bash /tmp 与 Windows 进程不通——临时 .lom 放项目目录用完即删；运行 examples 后查 git status 防运行时产物误提交） |
 | 评测/任务资产（eval/） | eval/README 生成纪律（prompt 内嵌诊断从真实 --check --json 采集 verbatim；L2 面任务参考解三链验证；runner 只验宿主 stdout+rc0） |
-| 诊断/修复引擎（fix.rs） | HANDOVER §11.6 评审方法节（`ok` 字段=应用数>0 非最终干净；新修复规则须配"应修"+"绝不能这样修"负向测试） |
+| 诊断/修复引擎（fix.rs） | HANDOVER §11.6 审查方法节（`ok` 字段=应用数>0 非最终干净；新修复规则须配"应修"+"绝不能这样修"负向测试） |
 
 ## 五、版本
 
