@@ -1,9 +1,10 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
 > **当前状态（2026-10-07，v1.7.1；二十七审开账 R117/R118 已同包整改关闭——发布链（gh-pages 重部署 + Release v1.7.0 pre-release）执行中）**：
-> 最新基线 **v1.7.1**（tag/CI 门禁回填随后；上一 tag v1.7.0 = `7685d64`
-> CI #267 七 job 绿，回填链 #268-#273 实查全绿，HEAD 以 git log 与 CI
-> 首跑为准）。**v1.7.1 批（2026-10-07，用户裁决"按建议执行"——R117/R118
+> 最新基线 **v1.7.1**（tag `7739959`，CI run `37526137995` 七 job 绿；
+> gh-pages 部署 `d0bd774`——本地构建=分支=线上三方 sha256 一致
+> （da025f03…）；上一 tag v1.7.0 = `7685d64` CI #267 七 job 绿，回填链
+> #268-#273 实查全绿，HEAD 以 git log 与 CI 首跑为准）。**v1.7.1 批（2026-10-07，用户裁决"按建议执行"——R117/R118
 > 处置与 Release v1.7.0 合并收口）**：README/designs 边界句补源码嵌套
 > 深度量化登记 + app/worker trap 文案中性化"引擎执行限制" + harness
 > run() 空数组 args 回落默认 argv（R118 一行防御；A/B 探针坐实修复差异、
@@ -28,23 +29,31 @@
 > （quine 272293B）、Rust **561+31**、eval 双后端各 128/128、fix_corpus
 > 13 对、doc_audit 71/71、self_comp 12591 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
-> Release v1.6.1（pre-release）+ playground 线上（v1.7.1 源件随本链
-> 重部署执行中）+ **Release v1.7.0（pre-release）发布执行中**。审查
+> Release v1.6.1（pre-release）+ **playground 线上已刷 v1.7.1 源件**
+> （gh-pages `d0bd774`，三方 sha256 一致）+ Release v1.7.0（pre-release）
+> **发布受阻待用户认证**（notes 终稿已备 target/release_v170_final.md；
+> GCM 的 gho_ OAuth token 被 lom-lang 组织 OAuth App 访问限制拒 403——
+> 需 PAT/gh 认证/网页端代发，三选一待用户）。审查
 > 轨迹（……→
 > 二十四 A-→二十五 A-→二十六 A-→**二十七 A-**，连续三轮 A-，均不外推）。
 > **现行维护规则唯一规范写位 = [MAINTENANCE.md](MAINTENANCE.md)**；本文件
 > 顶部状态块为**活信息唯一主写位**（版本/计数/台账/菜单/顺延号）。
 > **待裁菜单（交接后；本轮用户已裁"按建议执行"——②R117/R118 处置 +
-> ①Release v1.7.0 合并收口，执行链 = 本批整改（已完成，v1.7.1）→
-> 重建 wasm → 部署 gh-pages → 发 Release v1.7.0（pre-release）→ 回填）**：
-> ①（执行中）**Release v1.7.0 发布**——notes 要点：**playground 主线
+> ①Release v1.7.0 合并收口，执行链 = 本批整改（已完成，v1.7.1
+> tag `7739959`）→ 重建 wasm + 部署 gh-pages（已完成 `d0bd774`，三方
+> 一致）→ 发 Release v1.7.0（pre-release）→ **受阻待用户认证，见
+> 发布面行**）→ 回填（tag/CI 已回填；发布状态位待发布完成后刷）**：
+> ①（受阻待用户）**Release v1.7.0 发布**——notes 终稿已备：**playground 主线
 > （链接 + 60 秒修复闭环实演 + 宿主工具链 wasm 化 + CI 第七 job + 基线
 > 数字）+ 已知边界如实标注（递归 300/嵌套深度 ≈500/file 单文件/args）+
 > 二十六/二十七审 A- 引用 + 零二进制附件沿 v1.6.1 先例**；形态已裁
 > pre-release（待外部反馈转正）、v1.6.1 不随批转正（维持 pre-release，
 > 转正另呈）；README v1.7.0 段 "not externally published" 随发布回填；
-> 发布后核 URL/链接通断/标记并回填；本机 gh 不可用——发布需 API 认证
-> 协助或安装 gh 后执行，届时如实上报；
+> 发布后核 URL/链接通断/标记并回填；发布三路径待用户三选一：
+> a. 提供有 repo 权限的 PAT（classic 或 fine-grained）→ 规划者走
+> REST API（脚本 target/publish_release.py 已备）；b. 安装 gh CLI 并
+> 完成一次 gh auth login（设备流）→ 规划者接管；c. 用户网页端代发
+> （notes 全文在 target/release_v170_final.md，body 跳过首行 H1）；
 > ②（已完成）R117/R118 随 v1.7.1 批关闭（见状态头）；
 > ③ 性能工程 /
 > ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
