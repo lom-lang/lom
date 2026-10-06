@@ -125,8 +125,8 @@ function boot() {
     const box = document.createElement("span");
     box.className = "red";
     box.textContent =
-      "⚠ 栈上限（浏览器引擎限制）：本次运行以 trap 终止。\n" +
-      "Lom 的深度守卫 300 结构化提示优先；病态嵌套源码同受引擎栈限制。\n" +
+      "⚠ wasm 引擎执行限制：本次运行以 trap 终止。\n" +
+      "Lom 的深度守卫 300 结构化提示优先；超深/超限嵌套源码或资源越界可触发引擎 trap。\n" +
       `技术细节：${message}`;
     el.diag.appendChild(box);
   }
@@ -172,7 +172,7 @@ function boot() {
     });
     worker.addEventListener("message", (ev) => onWorkerMessage(ev.data));
     worker.addEventListener("error", (ev) => {
-      // worker 脚本级错误（如 404 / 内部异常）：按初始化失败处理，不冒充栈 trap
+      // worker 脚本级错误（如 404 / 内部异常）：按初始化失败处理，不冒充运行 trap
       readyReject(new Error(ev.message || "worker 加载失败"));
       settleButtons();
       setStatus("err", "worker 错误");
@@ -222,7 +222,7 @@ function boot() {
     } else if (data.trap) {
       renderTrap(data.message);
       renderStdout("");
-      setStatus("err", "trap（栈上限）");
+      setStatus("err", "trap（引擎限制）");
     } else if (data.error === "init") {
       renderStdout("");
       el.diag.replaceChildren();
