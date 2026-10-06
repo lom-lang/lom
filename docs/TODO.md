@@ -26,13 +26,23 @@
 > **现行维护规则唯一规范写位 = [MAINTENANCE.md](MAINTENANCE.md)**；本文件
 > 顶部状态块为**活信息唯一主写位**（版本/计数/台账/菜单/顺延号）。
 > **待裁菜单（交接后）**：① **Release v1.7.0 发布**（对外动作逐项呈批——
-> notes 草案已备：playground 主线 + 零二进制附件沿 v1.6.1 先例；待裁
-> pre-release 还是正式版、v1.6.1 是否随批转正）/ ② **R117/R118 处置**
+> notes 草案已备：**playground 主线（链接 + 60 秒修复闭环实演 + 宿主
+> 工具链 wasm 化 + CI 第七 job + 基线数字）+ 已知边界如实标注（递归
+> 300/嵌套深度/file 单文件/args）+ 二十六/二十七审 A- 引用 + 零二进制
+> 附件沿 v1.6.1 先例**；草案全文在本机 gitignored 的
+> target/release_v170_draft.md——fresh clone 按本要点重写即可；待裁
+> pre-release 还是正式版（规划者倾向 pre-release 待外部反馈转正）、
+> v1.6.1 是否随批转正；发布命令 gh release create/edit v1.7.0，发布后
+> 核 URL/链接通断/标记并回填）/ ② **R117/R118 处置**
 > （P3：playground wasm 侧源码嵌套深度量化登记 + trap 归因文案；P4：
-> harness run 空数组 argv 防御——修 R118 需重建 wasm 重部署 gh-pages）/
-> ③ 性能工程 / ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
-> 与 build 缺口中期项 / ⑥ 断链机检升格常驻 gate（二十七审已复用，升格
-> 属规则微调可随批——MAINTENANCE §6）。
+> harness run 空数组 argv 防御——修 R118 需重建 wasm 重部署 gh-pages，
+> **与 ① 合并执行可省一次部署**：先修 R117/R118 文档+防御 → 重建
+> wasm → 部署 gh-pages → 发 Release 一次收口）/ ③ 性能工程 /
+> ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
+> 与 build 缺口中期项 / ⑥ 断链机检升格常驻 gate（脚本现位本机
+> gitignored 的 target/link_check/check_links.py，2026-10-06 防腐批与
+> 二十七审两轮使用；升格=入库 tools/ + doc gates 接线，属规则微调可
+> 随批——MAINTENANCE §6）。
 > 观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑）；MoonBit Q3 复核
 > 已关闭。对外动作逐项呈批（铁律 6，规范位 MAINTENANCE §1.2）。
 >
