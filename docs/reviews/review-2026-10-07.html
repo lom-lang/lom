@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十七轮体系内独立敌手审查 — 2026-10-07</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十七轮体系内独立敌手审查报告</h1>
+
+<p><b>2026-10-07</b> —— 基线 HEAD <code>e1702ba</code>（git 只读审查，工作区干净）。审查增量 = 二十六审基线 <code>efaed10</code> 之后全部 <b>15 笔</b>提交（git log efaed10..e1702ba 逐笔清点）：<code>67b12ba</code>（二十六审收官登记）、<code>e6b807b</code>（<b>v1.6.1 feat：R114/R115/R116 同包整改——增量核心一</b>）、<code>cb2ef21</code>（v1.6.1 CI/tag 回填）、<code>5c461a6</code>（治理反思小批）、<code>8ffa096</code>（发布线解冻登记）、<code>de4f77e</code>（门面批 A：README 门面+Release notes）、<code>9a17d0b</code>（门面批收官）、<code>231dd13</code>（Issue 模板三件）、<code>0997e7d</code>（designs/0019）、<code>7685d64</code>（<b>v1.7.0 feat：在线 playground——增量核心二，本轮敌手面重点</b>）、<code>8132df4</code>（v1.7.0 CI/tag/Pages 回填）、<code>0ea9e15</code>（交接五件套）、<code>b13f2d2</code>（<b>治理 2.0：MAINTENANCE/EXECUTOR_TEMPLATE/archive 收编——增量核心三</b>）、<code>ae98d81</code>（结构整理+防腐批）、<code>e1702ba</code>（<b>126/127 题面收紧——增量核心四</b>）。本轮三件使命：①发布快照锚——增量批次核心宣称独立复核；②<b>playground 对外敌手面（首次）</b>；③发布物可复核性。审查执行者：第二十七轮体系内独立敌手审查 agent。</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：二十六审 A- 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何仓库文件；唯一写盘物 = 本报告 + <code>target/probes/r27/</code> 探针目录（gitignored，保留）；git 严格只读（无 add/commit/push/tag/stash/checkout）；cargo 串行（并行采样执行者在跑 eval，全程零冲突）；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R117</b> 起开账）。</p>
+
+<div class="verdict">
+<b>本轮评级：A-（维持成立）</b>（仅对本轮时点与查验面；历史轨迹不外推）。<br>
+<b>一行式总评</b>：四批核心交付（v1.6.1 R114/R115/R116 / v1.7.0 playground / 治理 2.0 收编 / 126-127 题面收紧）<b>核心宣称经独立敌手复核全部成立且零失真</b>，解冻/门面/模板/防腐批登记一致性抽查全过——基线矩阵 16 项 + §2.2 补充 4 项全绿（cargo <b>561 单元 + 31 集成</b>且八集成目标逐一计数 r56=1/r58=7/r94=2/r104=6/r107=4/r108=5/build_closure_externals=3/r112_closure_assign=3、verify_selfcomp <b>368/368</b>=196+8+164 且 L2G 兜底 0/164、bootstrap 14/14 且 quine <b>272293</b> 双侧逐字节、eval <b>双后端各 128/128</b>、eval_prompt 31/31、doc_audit 71/71、selfhost 六模式、spec_examples PASS、fmt 37、clippy/fmt 双 gate 零输出、fuzz 80 轮、diff 三冒烟、node smoke 11 检 ALL PASS、CI #267-#272 API 逐 run 七 job success 含 playground 首跑绿、tag v1.6.1=e6b807b / v1.7.0=7685d64 本地+远端双核）；playground 敌手面（首次）取得<b>跨机器可复现性强证据</b>——本地 wasm 构建与线上产物与 gh-pages 分支 <b>三方 sha256 逐字节一致</b>（e930ea2c…，1,710,860B），线上五源件 = gh-pages = HEAD 三方一致，页面零第三方（仅内联 script 无外链），SECURITY wasm 边界注在位；六方向 17 项敌手探针（超长源码/超深嵌套/控制字符注入/路径逃逸/args 边界/百次重跑内存）<b>零击穿</b>——路径逃逸四形态全 ENOENT、无输出放大、无内存泄漏、trap 面三层兜底（harness rethrow → worker {trap:true} 转译 → app 看门狗+terminate 重建）无静默；R115 三探针（单文件 L2P001 拒+文案逐字 / 包展开单元 COMPILED 不查 / r115_local_wins 复跑 COMPILED 307B 且 hex 与历史恒等）、治理 2.0 收编零丢失（79 条=79 条、78 条逐字节+1 条仅尾部空行差异、附录 A 逐字、铁律十条镜像一致、claims 锚迁移后 doc_audit 71/71 仍活）、126/127 三要素冻结机验零变化（31 任务 solution/expected/诊断 JSON）且 127 收紧后提示词与 L2 判据自洽（参考解 COMPILED / 死分支 L2V001 拒 / 常量捷径仅靠规则句排除——提示词无一句谎称 L2 机制）；开账 <b>R117</b>（P3 文档精度：wasm 侧 parser 嵌套深度面无量化登记——同一合法源码桌面 rc0 而浏览器 ~500 层嵌套 trap，node 实测 400 层 OK/500 层 trap，README 登记边界"browser recursion ≪ desktop"只覆盖解释器调用深度未覆盖源码嵌套深度；且 app/worker trap 文案成因"栈上限/call stack exhausted"与 node 实测错误形态"memory access out of bounds"不完全对应）与 <b>R118</b>（P4：harness run({args:[]}) 空数组绕过默认值 → 宿主 argv 越界 unreachable trap 且 UI 误标"栈上限"——页面/冒烟不可达，纯 API 契约边缘）。按任务书框架"宣称零失真 + 敌手零击穿 + 无新 P1/P2 → A- 可期"——三项条件逐条满足，R117 P3 沿 R102/R111/R113 先例不挡 A-，R118 P4 更轻，定 <b>A-</b>。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先完整阅读 docs/EXECUTOR_TEMPLATE.md（铁律摘要/输出格式/冻结面/坑索引）与 docs/MAINTENANCE.md §4（八节框架与开账纪律）；随后：(一) 基线矩阵 16 项全部亲手跑并逐项记录（含 CI GitHub API 匿名实查、tag 指向本地+远端双核、八个集成目标逐一单跑计数、golden 字节级行尾归一比对）；(二) 增量批次宣称敌手化复核——v1.6.1 三探针（自构重复 fn 单文件/自构含重复 fn 的 pkg 展开单元/复跑原探针 r115_local_wins）+ R114/R116 文档位抽查 + l2fix self-check 亲跑；v1.7.0 七项宣称（src diff 亲核 hunk + 全量基线实证桌面不变 + wasm 本地构建 + 三方 sha256 + 线上五源件 + CI job 实查 + 深度守卫探针 + 零第三方 grep + SECURITY 读文）；治理 2.0 用 python 提取器对旧 HANDOVER 79 条与 archive 79 条做全文哈希比对（含块尾边界修正重提取）+ 附录 A 逐字 diff + 铁律十条镜像通读 + claims 锚验活；结构整理批断链机检复跑 + gitignore check-ignore 零写盘验证 + README 三处门面 API/仓库双核；题面收紧批 31 任务三要素 python 机验 + 127 三形态（参考解/死分支/常量捷径）L2 与宿主双侧实跑；解冻/门面/模板批 Release API 实查（prerelease/assets/notes 链接逐个 curl）+ topics API + Issue 模板存在性；(三) playground 敌手面——harness.js 304 行全文读码（WASI 绑定面/ENOSYS Proxy 桩/proc_exit 异常转译/trap rethrow/虚拟单文件 backing）+ worker.js/app.js 看门狗与 trap 分支读码 + 六方向 17 项探针自构实跑（probe_all.mjs + probe_depth.mjs，落 target/probes/r27/）；(四) §2.2 补充项（fuzz/diff 三冒烟）；(五) 文档对账数字链；(六) 开账 R117/R118 与评级。全程 cargo 串行、git 只读。</p>
+
+<h2>2. 基线矩阵 16 项（全部亲手实跑）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测（命令/输出/退出码）</th><th>结论</th></tr>
+<tr><td>git 基线核验</td><td>HEAD e1702ba、工作区干净、增量 15 笔</td><td><code>git rev-parse HEAD</code> = e1702bab5fa4c45199bdab44dd82cd479fa935e5；<code>git status --short</code> 空输出；<code>git log --oneline efaed10..e1702ba</code> = 15 笔（清单见报告头）</td><td class="ok">✓</td></tr>
+<tr><td>cargo build --release</td><td>就绪（v1.7.0）</td><td>rc=0；<code>lom --version</code> = <code>lom 1.7.0</code>；Cargo.toml version = "1.7.0"</td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>561 单元 + 31 集成</td><td>单元 <b>561 passed; 0 failed</b>；八集成目标逐一单跑：r56_process=<b>1</b> / r58_lsp_process=<b>7</b> / r94_pkg_alias=<b>2</b> / r104_dedup_order=<b>6</b> / r107_alias_clash=<b>4</b> / r108_variant_externals=<b>5</b> / build_closure_externals=<b>3</b> / r112_closure_assign=<b>3</b> = <b>31</b>（合计 592，与 §2.2 分解逐字吻合）</td><td class="ok">✓ 配对逐字吻合</td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td><code>cargo clippy --release -- -D warnings</code> 零输出 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --check</td><td>零</td><td><code>cargo fmt --all -- --check</code> rc=0 干净</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71/71</td><td>RESULT: PASS（71/71；J quine 组 6 处互锁 272293、J Rust 计数组 7 处 561+31、Z 自指 71=71）——报告落盘前后各跑一次均 71/71（后置见 §7）</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 51 / 反例 5 / skip（json 8+diag 1+marker 10+ebnf 4+keywords 1+cli 1），RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>31/31</td><td>校验 31 / 失真 0，RESULT: PASS（收紧后 126/127 题面在列）</td><td class="ok">✓</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>dump <b>161</b>/0、tokens <b>161</b>/0（列坐标系已知差异 1）、diags <b>14</b>/0、static 坏 <b>24</b>/0 + 干净集 ALIGNED <b>161</b>、run <b>31</b>/0、wasm selfapply PASS——六模式逐个单跑 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368 = 196+8+164</td><td>RESULT: PASS（368/368）；<b>负例 L2G 兜底 0/164</b></td><td class="ok">✓</td></tr>
+<tr><td>--bootstrap + quine</td><td>14/14、272293</td><td>RESULT: PASS（14/14；L3 self-apply <b>272293 bytes; byte-identical</b>；总耗时 139.0s）；self_comp.lom = <b>12591 行</b>（wc -l，与宣称一致）</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>128/128 × 2</td><td>run.ps1 -Verify：Total 128 / Passed 128；-Backend wasm：Total 128 / Passed 128（收紧后题面双后端复验）</td><td class="ok">✓</td></tr>
+<tr><td>Lom fmt gate</td><td>37 有效文件</td><td>examples 树 38 个 .lom 排除 apply_test = <b>37</b> 全部 fmt --check rc=0</td><td class="ok">✓</td></tr>
+<tr><td>node playground 冒烟</td><td>ALL PASS</td><td><code>node playground/smoke.mjs</code>：11 检全 PASS（arithmetic/fib 桌面逐字对拍、修复闭环四步、深度守卫、depth 200 fine、--check TYPE001），输出 SMOKE: ALL PASS，rc=0</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查（GitHub API 匿名）</td><td>#267-#272 七 job 绿</td><td>#272（id 37498771852，e1702ba）/#271（ae98d81）/#270（b13f2d2）/#269（0ea9e15）/#268（8132df4）/#267（7685d64）均 completed/<b>success</b>；#272 与 #267 jobs API 实查均 <b>7/7 job success</b>（clippy/ubuntu/windows/macos/doc gates/selfhost verify/<b>playground (wasm build + smoke)</b>——第七 job 首跑即绿）；另 Pages "pages build and deployment"（c767f43）success</td><td class="ok">✓ 实查属实</td></tr>
+<tr><td>版本与 tag 链</td><td>1.7.0；v1.7.0→7685d64、v1.6.1→e6b807b</td><td>本地 <code>git rev-parse v1.7.0</code> = 7685d647…、v1.6.1 = e6b807b65…；远端 tags API 同值双核（v1.6.0=6227a89/v1.5.1=142a118 链完整）</td><td class="ok">✓</td></tr>
+</table>
+<p class="small">§2.2 补充项（顺手全跑）：fuzz_smoke 80 轮零崩溃 PASS；diff_test --probe <b>8/8</b>；diff_test --rounds 20 --seed-base 1 --ci <b>20/20</b> 双后端一致；diff_test --pkg --rounds 10 --seed-base 1 --ci <b>10/10</b>。golden stmt_interp：lom.exe 输出与 expected.txt 内容逐字一致（expected.txt 入库为 CRLF 39 行、进程输出 LF——LF 归一后 747B==747B+39 换行归一逐字节相等，Windows 已知形态，verify_selfhost run 模式已覆盖该对拍）。</p>
+
+<h2>3. 增量批次核心宣称逐批复核（敌手化）</h2>
+
+<h3>3.1 v1.6.1（e6b807b）：R114/R115/R116 关闭宣称 —— 成立，零失真</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核操作与实测</th><th>结论</th></tr>
+<tr><td>R115 单文件重复 fn L2 拒 [L2P001]</td><td>自构探针 p1_dup_fn.lom（同文件两个 fn go）：宿主运行 = NAM002 error 诊断到 stderr + <b>rc=0</b> + 后写定义生效输出 2（"永不拦截"既定语义，与二十六审更正后口径一致）；L2 = <code>codegen error: [L2P001] L2.2 子集不支持: 函数 'go' 重复定义（同文件唯一命名，请重命名其一）</code> + COMPILE-ERROR——<b>文案与宣称逐字一致</b>；仓库负例 neg_l2_dup_fn.lom 同输出</td><td class="ok">✓</td></tr>
+<tr><td>R115 包展开单元不查（门控边界）</td><td>自构包探针 p2_pkg（libp 依赖 + main.lom 含两个同名 fn go）：pkg-expand 展开 → self_comp 编译展开单元 = <b>COMPILED 125 bytes</b>（不拒、不误拦）——门控边界按登记行为执行</td><td class="ok">✓</td></tr>
+<tr><td>R115 "本地赢"不误拦（探针 r115_local_wins COMPILED 307B）</td><td>复跑原探针 target/probes/r115_local_wins.lom（from string import {len} + 本地 fn len）= <b>COMPILED 307 bytes</b>（与宣称 307B 一致）且产物 hex 614B 与 v1.6.1 时点历史 hex <b>逐字节恒等</b></td><td class="ok">✓</td></tr>
+<tr><td>R114 作用域句补于各宣称位 + l2fix 注释/help 更正</td><td>README L82 v1.6.1 条目含 "corpus scope — annotated per R114" + ~29 条 L2G 构造性说明；SPEC §13 v1.6.0 条目带 "corpus scope" 括注；l2fix.py L229 注释现为"语料外构造性可达——二十六审 R114"（如实现行）、help 动态化；<code>python tools/l2fix.py --self-check</code> = <b>6/6 断言通过</b>（负例 164、码条目 164，分布含 <b>L2P001=9</b>——与 TODO 记载一致）</td><td class="ok">✓</td></tr>
+<tr><td>R116 SECURITY 顺刷</td><td>SECURITY.md 现文：actions/checkout@v5 / actions/cache@v5 + "upgraded to @v5 (Node 24) on 2026-09-21" + "remaining annotations are Ubuntu 26 runner-migration notices only"——全部在位；grep 无 @v4 残留</td><td class="ok">✓</td></tr>
+<tr><td>宿主 src/ 零改动</td><td><code>git show e6b807b --stat -- src/</code> 空输出</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.2 v1.7.0 playground（7685d64）：七项宣称 —— 全部成立</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核操作与实测</th><th>结论</th></tr>
+<tr><td>① src/ 仅两处 cfg(target_family="wasm") 门、桌面路径不变</td><td><code>git diff 6227a89..7685d64 -- src/</code> 亲核全部 hunk = <b>2 文件 2 处</b>：interpreter.rs（<code>#[cfg(not(wasm))] const DEFAULT_MAX_CALL_DEPTH: usize = 80_000</code> 保留 + <code>#[cfg(wasm)] = 300</code> 新增）、main.rs（wasm 单线程直跑门 + 桌面 256MB 线程路径整体保留）；HEAD grep <code>target_family = "wasm"</code> 恰 4 行（2 对 cfg）零第三处；桌面行为不变由基线矩阵实证（561+31 / 368 / quine 272293 双侧 / hex 恒等 / eval 128×2）。<span class="small">措辞备注：commit 语境"桌面路径逐字节不变"指桌面编译路径行为（全量回归实证），src 文本本身有代码块移入 cfg 门内的缩进变化——语境清晰不构成失真，不开账。</span></td><td class="ok">✓</td></tr>
+<tr><td>② wasm 构建可复现 + 产物 1.71MB</td><td>本地 <code>cargo build --target wasm32-wasip1 --profile wasm-release</code> rc=0，产物 <b>1,710,860B</b>（≈1.71MB 十进制，与 README "~1.7 MB" 一致）；<b>三方 sha256 逐字节一致</b>：本地构建 = 线上 https://lom-lang.github.io/lom/playground/lom.wasm 下载 = <code>git show gh-pages:playground/lom.wasm</code>，均为 <code>e930ea2c755f4f99c16925407046c150bce1f0089c54adc97356b8c22811f02c</code>——CI 构建（gh-pages 来源）与本机构建跨机器一致，可复现性坐实</td><td class="ok">✓ 强证据</td></tr>
+<tr><td>③ node 冒烟 ALL PASS</td><td>本地复跑 11 检全 PASS（见基线矩阵行）</td><td class="ok">✓</td></tr>
+<tr><td>④ CI 第七 job</td><td>ci.yml L190 playground job（rustup target add wasm32-wasip1 + 双构建 + node smoke）在仓库；API 实查 #267（7685d64 首跑）与 #272（HEAD）均 7/7 job success 且 playground job 在列首跑即绿</td><td class="ok">✓</td></tr>
+<tr><td>⑤ 深度守卫 wasm 侧 300、结构化诊断先于 trap</td><td>探针 P2b：无终止递归 = <code>[RUNTIME000] 递归深度超过 300 层…</code> 结构化诊断 + rc=1（<b>先于栈 trap</b>）；smoke depth 200 正常输出 0（300 守卫 < ~500 物理栈的窗口成立）；守卫邻面（parser 嵌套深度）见 §4 敌手探针 P2a/R117</td><td class="ok">✓（宣称范围内）</td></tr>
+<tr><td>⑥ 页面零第三方</td><td>index.html 全部 script/link 标签 = 仅 1 个 <code>&lt;script type="module"&gt;</code> 内联；五源件 grep 无 cdn/unpkg/jsdelivr/googleapis/integrity/https 外链</td><td class="ok">✓</td></tr>
+<tr><td>⑦ SECURITY wasm 边界注在位</td><td>SECURITY.md 第 9 段：wasm32-wasip1 构建零第三方、src/ 100% unsafe-free、wasm unsafe 仅在工具链 std/WASI shim、浏览器侧 WASI 绑定为手写零依赖 JS——在位</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.3 治理 2.0（b13f2d2）："规则收编零丢失、信息零丢失" —— 成立</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核操作与实测</th><th>结论</th></tr>
+<tr><td>79 条历史条目零丢失</td><td>旧 HANDOVER（b13f2d2^）grep "最后更新：" = <b>79</b> 条；archive/handover-log.md = <b>79</b> 条；python 全文提取器（引用前缀边界）哈希比对：<b>78 条逐字节一致 + 1 条（2026-09-21 晚）仅尾部空行数差异、条目正文一字不差</b>；日期序列互为块置换（旧文件两组拼接 vs archive 单一倒序年表，与 archive 头部"两组拼接缝在 2026-09-29/30 交界"自述吻合）</td><td class="ok">✓</td></tr>
+<tr><td>附录 A = HANDOVER §12 原文逐字</td><td><code>git show b13f2d2^:docs/HANDOVER.md</code> §12（行 1072-1146）与 archive 附录 A（行 381-456）diff：<b>仅头部标题 2 行差异，§12 原文逐字一致</b></td><td class="ok">✓</td></tr>
+<tr><td>MAINTENANCE 与 HANDOFF_PROMPT 铁律镜像一致</td><td>MAINTENANCE §1.2 十条 vs HANDOFF_PROMPT 铁律十条逐条对读：十条一一对应，镜像为精简形态且明示"规范源 MAINTENANCE §1，冲突时以规范源为准"——结构契约成立</td><td class="ok">✓</td></tr>
+<tr><td>claims.json 锚迁移后校验能力不降</td><td>doc_audit 实跑 <b>71/71 PASS</b>（D 包锚路径随文本迁移至 archive 后仍被校验；J quine/Rust 互锁组与 Z 自指全活）</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.4 结构整理+防腐（ae98d81）：断链清零等 —— 成立</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核操作与实测</th><th>结论</th></tr>
+<tr><td>断链清零（现行文档类）</td><td><code>python target/link_check/check_links.py</code> 复跑（脚本在仓库 target/link_check/，未消失）：扫描 99 文件 / 219 链接，<b>现行文档类断链 = 0</b>、历史原文类 7 条全部 target∈archive（echarts/mermaid 归档资产——与 commit 记录一致）<span class="small">（链接总数 219 vs 报告期 218：e1702ba 再生成 prompts md 增一链，无碍）</span></td><td class="ok">✓</td></tr>
+<tr><td>README 三处门面刷新一致</td><td>行 73 Current: v1.7.0 ✓；行 81 Current release v1.7.0（tag 7685d64/CI #267 七 job——API 实查吻合）✓；行 103 解冻事实（2026-10-04 用户裁决）+ 二十六审 A-（报告 review-2026-10-03.html 存在且自题第二十六轮）✓；README.zh-CN 行 53 同步 v1.7.0</td><td class="ok">✓</td></tr>
+<tr><td>.gitignore 规则命中</td><td><code>git check-ignore -v .diff_failures/test.txt</code> → 命中 .gitignore:42 <code>.diff_failures/</code>，rc=0（零写盘验证）</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.5 题面收紧（e1702ba）：126/127 三要素冻结 + 自洽 —— 成立</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核操作与实测</th><th>结论</th></tr>
+<tr><td>solution/expected/诊断 JSON 三要素 31/31 零变化</td><td>python 机验 HEAD^ vs HEAD 全 31 任务：<code>changed_solution = []</code>、<code>changed_expected = []</code>、<code>changed_diag_json = []</code>；prompt/notes 变化集恰为 {126, 127}——三要素冻结坐实</td><td class="ok">✓ 机验</td></tr>
+<tr><td>127 收紧后提示词与 L2 判据自洽</td><td>三形态实跑：参考解 = L2 <b>COMPILED 1268B</b> + 宿主输出 2（收紧后要求可满足）；死分支捷径（保留 m+1 在 if False）= 宿主 rc0 输出 2 但 L2 <b>拒 [L2V001]</b>——提示词"即使它在不会执行的分支里也会被 L2 拒绝，因为 L2 对全程序做静态检查"逐句准确；常量捷径 = 宿主过 + L2 也过——提示词将其排除的机制是规则句"不得把输出写死为常量"而非谎称 L2 会拒（表述诚实无误导）</td><td class="ok">✓ 三形态</td></tr>
+<tr><td>prompts/10_error_repair.md 再生成（顺带 127/128/129 L2 文本同步）</td><td>eval_prompt_check 31/31 失真 0（prompt 内嵌文本与真实输出 verbatim 校验仍锁）；eval 双后端 128/128 复跑不倒</td><td class="ok">✓</td></tr>
+</table>
+
+<h3>3.6 解冻/门面/模板/docs 批（8ffa096/de4f77e/231dd13/0997e7d/0ea9e15 等）：登记一致性 —— 成立</h3>
+<table>
+<tr><th>宣称</th><th>敌手复核（API/仓库实查）</th><th>结论</th></tr>
+<tr><td>Release v1.6.1 pre-release 状态</td><td>GitHub API：name "v1.6.1 — first public checkpoint"、tag v1.6.1、<b>prerelease = True</b>、draft = False、<b>assets = 0</b>（零二进制附件）、published 2026-10-05</td><td class="ok">✓</td></tr>
+<tr><td>Release notes 链接通断</td><td>notes 内 5 相对链接逐个 curl：eval/REPORT-2026-10-03-err-repair-31.md → <b>200</b>；LANGUAGE_SPEC.md → <b>200</b>；docs/rfc / docs/designs / docs/reviews → <b>301</b>（目录跳转 tree 视图，正常可达）——与门面批记录"逐个通断 200/301"一致</td><td class="ok">✓</td></tr>
+<tr><td>topics</td><td>API 现状 <b>14 个</b>（含 wasm、无 wasd）——TODO 门面批时点记录"15 topics + wasd 疑笔误待移除"，现状已修正（wasd 已移除）。<span class="small">时点性陈述与现状无矛盾（记录的是当时快照），备注不开账。</span></td><td class="ok">✓</td></tr>
+<tr><td>Issue 模板三件</td><td>.github/ISSUE_TEMPLATE/ = bug_report.yml + language_proposal.yml + config.yml（blank_issues_enabled + Discussions 联系链）——三件在位</td><td class="ok">✓</td></tr>
+<tr><td>playground 线上可达与 README 链接一致</td><td>README 行 76 / README.zh-CN 行 56 均链 https://lom-lang.github.io/lom/playground/ ——线上 index.html/app.js/worker.js/harness.js/examples.js 五源件 sha256 = gh-pages 分支 = HEAD 三方逐字节一致（见 §3.2②）；gh-pages 孤儿分支单提交 c767f43</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>4. 敌手探针表（playground 对外敌手面，首次；六方向 17 项操作）</h2>
+<p>探针环境：node 24.15.0 + 本地 wasm-release 产物（与线上逐字节一致，见 §3.2②），smoke.mjs 同款 harness（target/probes/r27/probe_all.mjs / probe_depth.mjs）。"击穿"判定 = 静默错值 / 崩溃不可恢复 / 路径逃逸 / 输出放大 / 安全面突破。</p>
+<table>
+<tr><th>编号</th><th>方向/输入构造</th><th>实测输出（摘要）</th><th>退出码/形态</th><th>击穿判定</th></tr>
+<tr><td>P1a</td><td>超长源码：1MB 单行注释 + 正常 main</td><td>rc=0，16ms，stdout "1\n"，无诊断</td><td>正常终态</td><td class="ok">未击穿</td></tr>
+<tr><td>P1b</td><td>超长源码：26,000 行 println（≈1MB）</td><td>rc=0，78ms，stdout 144,890B（0..25999 逐行）</td><td>正常终态</td><td class="ok">未击穿</td></tr>
+<tr><td>P2a</td><td>3,000 层嵌套括号表达式</td><td>wasm 侧 <b>RuntimeError: memory access out of bounds</b>（trap 抛至调用方）；<b>桌面同源码 rc=0 输出 1</b>；阈值量化：400 层 OK / 500 层 trap（probe_depth.mjs）</td><td>trap（被三层兜底：harness rethrow → worker {trap:true} → app"⚠ 栈上限"文案+5s 看门狗+terminate 重建——非静默）</td><td class="warn">未击穿（trap 不静默）→ 开账 <b>R117</b>（登记面缺口）</td></tr>
+<tr><td>P2b</td><td>无终止 Lom 递归（>300 层）</td><td><code>[RUNTIME000] 递归深度超过 300 层（256MB 栈的安全上限）：函数 'r' 疑似缺少终止条件…</code> 结构化诊断 + rc=1，stdout 空</td><td>结构化诊断先于 trap</td><td class="ok">未击穿——宣称⑤实证成立</td></tr>
+<tr><td>P2c</td><td>500 层嵌套算术表达式（编译期）</td><td>同 P2a：memory access out of bounds trap（400 层以内正常）</td><td>trap（三层兜底）</td><td class="warn">未击穿 → 并入 R117</td></tr>
+<tr><td>P3a</td><td>NUL/\x01/\x02/BEL/VTB/ESC 序列注入源码</td><td><code>[LEX005] 意外字符 '\u0000'</code> 等逐字符结构化诊断（行列+hint），rc=1</td><td>结构化拒绝</td><td class="ok">未击穿<span class="small">（观察项：诊断回显 source_line 原样含 ANSI 序列——与 cat 同级的固有回显行为，浏览器 innerText 渲染不解释，终端面与既有诊断回显设计一致，不开账）</span></td></tr>
+<tr><td>P3b</td><td>控制字符注入 argv（含 \u0000/\u0001/ESC×50）</td><td>宿主 CLI 层拒绝：<code>只能指定一个文件，但收到多个: … 使用 --help 查看用法</code>，rc=1</td><td>结构化拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P3c</td><td>孤立 UTF-16 代理项注入源码尾</td><td>TextEncoder 编码后 LEX005 拒（U+FFFD 回显），rc=1</td><td>结构化拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P4a</td><td>fix --apply 路径逃逸 <code>x/../evil.lom</code></td><td><code>无法读取文件 'x/../evil.lom': No such file or directory (os error 44)</code>，rc=1，sourceOut 未变（无写回）</td><td>ENOENT 拒绝</td><td class="ok">未击穿——harness path_open 仅认 <code>path === "playground.lom"</code> 严格等值（无路径解析、无规范化），逃逸构造全部到不了 open 面</td></tr>
+<tr><td>P4b</td><td>绝对路径 <code>/evil.lom</code></td><td>同上 ENOENT，rc=1</td><td>ENOENT 拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P4c</td><td><code>../playground.lom</code></td><td>同上 ENOENT，rc=1</td><td>ENOENT 拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P4d</td><td><code>playground.lom/../../evil.lom</code></td><td>同上 ENOENT，rc=1</td><td>ENOENT 拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P5a</td><td>run({args: []}) 空参数表</td><td><b>RuntimeError: unreachable</b>（宿主读 argv[1] 越界 trap，非 proc_exit）</td><td>trap（worker catch 兜底但 UI 文案会误标"栈上限"）</td><td class="warn">未击穿（页面/冒烟恒传默认 args 不可达）→ 开账 <b>R118</b>（API 契约边缘）</td></tr>
+<tr><td>P5b</td><td>1MB 单 argv 注入</td><td>CLI 拒绝"只能指定一个文件"+回显（stderr ≈1MB，<b>1:1 回显无放大</b>），rc=1</td><td>结构化拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P5c</td><td>未知子命令</td><td><code>只能指定一个文件，但收到多个: definitely-not-a-subcommand /playground.lom</code>，rc=1</td><td>结构化拒绝</td><td class="ok">未击穿</td></tr>
+<tr><td>P6</td><td>同一 fib 程序 100 次编译+运行循环</td><td>failAt=-1（100/100 输出恒等 rc=0），GC 后 heapDelta = <b>0.03MB</b>，总 52ms</td><td>稳定无泄漏形态</td><td class="ok">未击穿（harness 每次 run 新实例+新虚拟文件，状态零残留设计实证）</td></tr>
+</table>
+<p><b>harness.js 读码结论</b>（304 行全文）：WASI 绑定面与宣称清单一致（args/environ/clock_time_get/random_get/fd_write/fd_read/fd_close/fd_seek/fd_fdstat_get/fd_filestat_get/fd_prestat_get/fd_prestat_dir_name/path_open/proc_exit），其余 syscall 经 Proxy 统一 ENOSYS 桩；proc_exit 以哨兵异常转译 exitCode；真 trap rethrow 交上层（worker 转译 {trap:true}、app 5s 看门狗 + terminate 重建）——"结构化诊断先于 trap + harness 捕获转译双防线"在码内可见且被 P2b/P2a 实测分工印证；虚拟文件系统为单 backing 字节数组，stdin 恒 EOF，path_open 严格等值匹配使路径逃逸构造性不可达（P4 四形态实证）。random_get 走 crypto.getRandomValues（宿主 HashMap 种子用途 8B 量级，未触及浏览器单次 64KB 上限——本轮未构造出越界路径，如实登记为未覆盖面）。</p>
+
+<h2>5. 发布物可复核性对账（使命三）</h2>
+<table>
+<tr><th>README 关键数字</th><th>宣称</th><th>实测</th><th>结论</th></tr>
+<tr><td>eval 任务数</td><td>128/128 双后端</td><td>run.ps1 双后端 Total 128 / Passed 128</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368</td><td>368/368（L2G 0/164）</td><td class="ok">✓</td></tr>
+<tr><td>Rust 测试</td><td>561 + 31</td><td>561 单元 + 31 集成（逐 target 配对）</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71</td><td>71/71</td><td class="ok">✓</td></tr>
+<tr><td>quine</td><td>272293</td><td>272293 bytes byte-identical（--bootstrap L3）</td><td class="ok">✓</td></tr>
+<tr><td>审查轮次</td><td>twenty-sixth review A-（行 103）</td><td>review-2026-10-03.html 存在、题第二十六轮、总评 A-（本报告为第二十七轮，落盘后 README 该句仍指二十六审——下一交接批刷新，非本轮义务）</td><td class="ok">✓</td></tr>
+<tr><td>playground 线上</td><td>https://lom-lang.github.io/lom/playground/ 可达</td><td>wasm+五源件全部 200 下载且与 gh-pages/HEAD 三方一致；Pages deployment（c767f43）success</td><td class="ok">✓</td></tr>
+<tr><td>Release v1.6.1</td><td>pre-release、notes 链接可达</td><td>prerelease=True / assets=0 / 5 链接 2×200+3×301</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>6. 开账（只开不修；从 R117 起）</h2>
+<div class="ledger">
+<p><b>R117（P3，文档精度/登记面缺口）——wasm 侧源码嵌套深度（parser 递归面）无量化登记，且 trap 归因文案与实测错误形态不完全对应</b><br>
+可复现形态：<code>node target/probes/r27/probe_depth.mjs</code>（同款 harness）——嵌套括号表达式 <b>400 层正常 / 500 层 RuntimeError: memory access out of bounds</b>；桌面同源码 3,000 层 rc=0 输出 1（256MB 栈）。即：<b>同一合法 .lom 源码，桌面通过而浏览器 trap</b>。该 trap 不静默（worker.js 转译 {trap:true} → app.js"⚠ 栈上限（浏览器引擎限制）"文案 + 5s 看门狗 + terminate 重建——三层兜底在位），且 worker.js 注释（"病态嵌套源码打爆 JS 引擎栈"）与 README 登记边界（"browser recursion ≪ desktop"）已有<b>定性</b>覆盖；缺口有三：① README registered boundaries 句与 designs/0019 登记的"recursion"仅指 Lom 程序解释器调用深度（守卫 300 结构化先报），未明确<b>源码嵌套深度（parser/编译侧递归）同受引擎栈物理约束且无结构化守卫</b>（node 实测阈值 ≈500，与解释器帧极限同量级但属另一路径）；② 无量化数字入档（400/500 分界）；③ app.js L128 与 worker.js L5 把 trap 一律归因"栈上限/call stack exhausted"，node 实测错误为 "memory access out of bounds"、P5a 形态为 "unreachable"——成因文案不精确。<br>
+候选处置（供裁决）：a) README registered boundaries 句补一句"source-code nesting depth shares the same engine-stack ceiling (~500 nested expressions trap in node; desktop's 256MB stack handles 3000+)， surfaced as a translated trap, not a structured diagnostic"；b) app.js trap 文案改中性（"wasm 引擎执行限制"）。<br>
+<b>应修</b> = 文档登记句补全 + UI 文案中性化（纯文档/文案，零行为变化）。<b>绝不能这样修</b> = ①给 parser 加深度守卫输出新诊断（新增诊断码/诊断面变化触语言面 v1.0 冻结，须新 RFC，且改变 wasm/桌面双侧行为面）；②harness/worker 吞掉 RuntimeError 谎报 exitCode=0（掩盖真实终态，违反"永不拦截"与诚实诊断设计）。</p>
+<p><b>R118（P4，harness API 契约边缘）——run({args: []}) 空数组绕过默认 argv</b><br>
+可复现形态：<code>await rt.run({ source: …, args: [] })</code>——harness.js run() 以 <code>args || ["lom", "/playground.lom"]</code> 取默认，<b>空数组为 truthy</b> 直透 wasm → 宿主 argv[1] 越界 → RuntimeError: unreachable trap（非 proc_exit，exitCode 语义丢失，UI 误标"栈上限"）。可达性：页面（app.js 恒传两元素 args）与冒烟均不可达，仅 API 直接调用方误用面。<br>
+候选处置：默认值判断改 <code>(args &amp;&amp; args.length) ? args : […默认]</code>，或 harness 头部注释注明"args 必须至少含虚拟脚本路径"。<b>应修</b> = 一行防御或一句契约注释。<b>绝不能这样修</b> = 在 wasm/宿主侧为空 argv 加新 CLI 诊断（改诊断面，触冻结且为不可达面过度设计）。</p>
+<p><b>备注三条（不开账）</b>：①"桌面路径逐字节不变"措辞语境 = 桌面编译路径行为不变（全量回归+quine/hex 实证），src 文本有 cfg 门内缩进移动——commit 语境清晰非失真；②topics 现状 14 个无 wasd（TODO 时点记录 15+wasd 待移除，用户已修正——时点快照无矛盾）；③golden expected.txt 入库 CRLF vs 进程 LF（Windows 已知形态，LF 归一逐字一致，verify_selfhost run 模式已覆盖对拍）。</p>
+</div>
+
+<h2>7. 评级依据与后置门禁</h2>
+<p><b>评级 A-（维持成立）</b>，三项条件逐条核验：①<b>宣称零失真</b>——四批核心宣称（v1.6.1 三笔整改 / v1.7.0 playground 七项 / 治理 2.0 零丢失 / 126-127 三要素冻结+自洽）全部独立复核成立，解冻/门面/模板/防腐批登记一致性抽查全过，其中 playground 可复现性取得三方 sha256 逐字节一致的强证据；②<b>敌手零击穿</b>——六方向 17 项探针无静默错值、无路径逃逸、无输出放大、无内存泄漏，trap 面三层兜底非静默；③<b>无新 P1/P2</b>——开账 R117（P3）+ R118（P4），R117 沿 R102/R111/R113"P3 文档精度不挡 A-"先例。审查轨迹：二十 A- → 二十一 B → 二十二 B+ → 二十三 B+ → 二十四 A- → 二十五 A- → 二十六 A- → <b>二十七 A-</b>（均不外推）。</p>
+<p><b>后置门禁</b>：本报告落盘后复跑 <code>python tools/doc_audit.py</code> = 71/71 PASS（落盘前后双跑，报告本身不含新数字锚宣称，不改任何锚）。审查期间仓库文件零修改（git status 干净；唯一写盘物 = 本报告 + target/probes/r27/ 探针目录，gitignored）。</p>
+
+<h2>附录：探针目录（target/probes/r27/，gitignored）</h2>
+<p class="small">p1_dup_fn.lom（R115 单文件重复 fn）/ p2_pkg/{lom.toml,main.lom,libp/} + p2_expanded.lom + p2.hex（包展开单元）/ p3_local_wins.lom（本地赢变体）/ r115_local_wins_re.hex（原探针复跑产物）/ t127_ref.lom + t127_deadbranch.lom + t127_deadbranch2.lom + t127_const.lom（127 三形态）/ probe_all.mjs（六方向 17 项探针主脚本）/ probe_depth.mjs（嵌套阈值二分 100-2000）/ online_lom.wasm + ghpages_lom.wasm + online_{五源件}（三方对比留档）/ old_handover_full.md + err_repair_old.json（git 只读快照）/ ci_runs.json（API 留档）/ golden_out.txt / p2a_desktop.lom / dummy*.hex。</p>
+
+</body>
+</html>
