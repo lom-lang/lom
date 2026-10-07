@@ -52,36 +52,33 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-07，三批闭环后交接就绪）**：最新已提交基线 **v1.7.1**
-  （tag `7739959`，CI run `37526137995` 七 job 绿；HEAD 以 git log 与
-  CI 首跑为准）——playground 线上 https://lom-lang.github.io/lom/playground/
-  已刷 v1.7.1 源件（gh-pages `d0bd774`，本地=分支=线上三方 sha256 一致
-  da025f03…）；发布面：README 门面（v1.7.1 Current release + 评测证据行
-  128 全集数据）+ 中文导读 + **Release v1.7.0（pre-release，2026-10-07
-  发布，id 405817252，零二进制附件，核验全过）** + Release v1.6.1
-  （pre-release）。**台账零 open**（R117/R118 已于 v1.7.1 批关闭）。
+- **状态（2026-10-08，v1.8.0 L2 转正批交付后交接就绪）**：最新已提交基线
+  **v1.8.0**（tag `88d91dc`，CI run `37675620476` 七 job 绿；HEAD 以 git
+  log 与 CI 首跑为准）——**L2 子集编译器已从 experimental 转正为
+  supported face**（README 边界段/playground footer/eval-README 三处
+  宣称面更新，纯文档批零代码改动）。playground 线上
+  https://lom-lang.github.io/lom/playground/ footer 已刷转正措辞
+  （gh-pages `889a43f`）；发布面：README 门面（v1.8.0 Current release）
+  + 中文导读 + Release v1.7.0（pre-release）+ Release v1.6.1
+  （pre-release）。**台账零 open**（R117/R118/R119 全关）。
   发布通道登记：用户已解除 lom-lang 组织 OAuth App 访问限制（GCM
   token 复活，REST API 可用；HTTPS push 与 gh CLI 路径亦解锁，remote
   维持 SSH）。
-- **本轮交付链（2026-10-07，用户裁决"按建议执行"×2）**：**R117/R118
-  整改 + 发布链合并收口**（`7739959` = v1.7.1：README/designs 边界句补
-  源码嵌套深度量化（node ≈500 层 trap、桌面 256MB 栈 3000+ 过；parser
-  递归路径无结构化守卫，呈现为转译 trap）+ app/worker trap 文案中性化
-  "引擎执行限制" + harness run() 空数组 args 回落默认（A/B 探针坐实）；
-  全量回归 21 项全绿 + 规划者亲验 368/14）→ gh-pages 部署 `d0bd774`
-  （三方一致）→ **Release v1.7.0 pre-release 发布**（notes：
-  playground 主线 + 边界量化 + 审查引用 + pass@k 证据行）→ 回填
-  （`4df404e` + `12bb232`）→ **断链机检升格批**（`39744fa`，菜单⑥，
-  纯工具批不升版：`tools/link_check.py` 入库 + CI doc-gates 接线——
-  A 类现行断链/大小写漂移非零退出、B 类历史原文不拦；新步骤 CI 首跑
-  success）。前置轮（2026-10-06~07）：维护规程 2.0 治理批（`b13f2d2`）
-  → 结构整理防腐批（`ae98d81`）→ eval 126/127 题面收紧（`e1702ba`）→
-  二十七审 A- 维持（`7c4ae4c`）→ 全 128 集 pass@k 首测。
-- **审查轮次与评级（均不外推）**：……→二十四审 A-→二十五审 A-→
-  二十六审 A-→**二十七审 A-（发布快照锚 + playground 敌手面首审零击穿；
-  开账 R117/R118 已于 v1.7.1 关闭——整改后状态未经复审，按纪律不自行
-  宣称回升，待下轮复审重估）**。最新报告
-  [review-2026-10-07.html](reviews/review-2026-10-07.html)。
+- **本轮交付链（2026-10-08，用户裁决"执行"×3）**：**④L2 行号批 v1.7.2**
+  （`ca31691`：token 级名字锚表 `ln:cl` 位置前缀——锚表仅 Err 通道构建，
+  204 正例 hex 恒等、语料覆盖 71/102；l2fix 正则/验证器断言/eval 129
+  重采连锁）→ **二十八审**（`047659c` 报告入库：A- 四审连平、19 项基线
+  矩阵全绿、L2 行号新面 8 项敌手探针零击穿、R117/R118/发布面复核全立；
+  开账 R119 = J quine 锚组同滞盲点）→ **R119 收口**（`67f5132`：七位
+  现值锚刷 272925 + doc_audit README 锚模式改挂 Current release 现值位）
+  → **⑤L2 转正批 v1.8.0**（`88d91dc`：三处宣称面更新，审查轮数 26→28，
+  升 minor——判据链 designs/0020 §4 五项全满足 + 二十八审 A- 四审连平）
+  → playground footer 重部署（gh-pages `889a43f`）。前置（2026-10-07）：
+  v1.7.1 R117/R118 收口 + Release v1.7.0 发布 + 断链机检升格 + 交接刷新。
+- **审查轮次与评级（均不外推）**：……→二十五审 A-→二十六审 A-→
+  二十七审 A-→**二十八审 A-（四审连平：v1.7.2 五宣称全立 + L2 行号
+  敌手零击穿 + 发布面首审；开账 R119 已随批关闭）**。最新报告
+  [review-2026-10-08.html](reviews/review-2026-10-08.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、
   self_comp.lom 12671 行、Rust **561 单元 + 31 集成**
@@ -90,14 +87,19 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   fix_corpus 13 对、doc_audit **71/71**、六模式全 PASS（dump 161）、
   playground node 冒烟 ALL PASS（CI 第七 job 常绿）、
   link_check PASS（CI doc-gates 常驻步骤）。Cargo.toml/lock
-  均为 **1.7.1**。
+  均为 **1.8.0**。
 - **评测主证据（2026-10-07 起新口径）**：全 128 任务集双模型 ×10
   采样 t=1.0——pass@1 = **98.3%（deepseek-v4-pro+thinking）/ 98.5%
   （glm-5.3）**，pass@5 = 99.2%/98.8%；126 收紧后双模型 10/10（消歧
   成功）；127 捷径清零、20 候选全走 map_get 路线、2 真修复过 L2 全链
   （剩余失败=真实 Option 解包能力缺口）；078 唯一系统性失败=已知歧义
   锚题（明确版 118 双模型 10/10）。
-- **playground 维护要点（v1.7.1 面）**：构建
+- **L2 现行面（v1.8.0 转正后）**：L2 = **supported face**（strict subset
+  语义/[L2xxx] 拒绝码/v1.7.2 起带 `ln:cl` 源位置/l2fix 修复建议闭环/
+  164 负例双锁 + 71 行号覆盖断言）；题面 127-129 保持采集时点原文
+  （"experimental"称谓——采集纪律不回写）。CLI 子命令集成
+  （designs/0018 裁决点 1 甲"宿主子命令留转正后"）现可启动。
+- **playground 维护要点（v1.8.0 面）**：构建
   `cargo build --target wasm32-wasip1 --profile wasm-release`（产物
   ~1.71MB）；冒烟 `node playground/smoke.mjs`；部署 = playground/
   五源件 + 产物 wasm（改名 lom.wasm 同目录）推 **gh-pages 孤儿分支**
@@ -118,10 +120,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   已登记入 README/designs）；gh-pages push 触发独立 Pages 构建流；
   归档 HTML 的 echarts/mermaid assets 未随档（link_check B 类 7 条
   即此形态，不拦）。
-- 下一步：**交接就绪，方向待用户裁决**。菜单：③性能工程
-  / ④L2 行号主要簇 + L2 转正判据 / ⑤divergence 与 build 缺口中期项
-  （①Release v1.7.0 已发布、②R117/R118 已关、⑥断链机检已升格——
-  Release 转正与否等外部反馈另呈）。观察项：Ubuntu 26
+- 下一步：**交接就绪，方向待用户裁决**。菜单：⑥L2 CLI 子命令集成
+  （designs/0018 裁决点 1 甲"宿主子命令留转正后"——转正已交付，
+  l2check/l2fix 进宿主 CLI 的通道已解锁）/ ⑦性能工程 / ⑧divergence
+  与 build 缺口中期项 / Release v1.7.0 转正与否（等外部反馈另呈）/
+  二十九审时机（v1.8.0 后增量足够时）。观察项：Ubuntu 26
   迁移（**2026-10-19**，盯 CI 首跑——doc-gates 自 2026-10-07 起含
   断链机检步骤）。对外动作逐项呈批（铁律 6）。
 
