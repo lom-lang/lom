@@ -30,30 +30,32 @@
 > 13 对、doc_audit 71/71、self_comp 12591 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
 > Release v1.6.1（pre-release）+ **playground 线上已刷 v1.7.1 源件**
-> （gh-pages `d0bd774`，三方 sha256 一致）+ Release v1.7.0（pre-release）
-> **发布受阻待用户认证**（notes 终稿已备 target/release_v170_final.md；
-> GCM 的 gho_ OAuth token 被 lom-lang 组织 OAuth App 访问限制拒 403——
-> 需 PAT/gh 认证/网页端代发，三选一待用户）。审查
+> （gh-pages `d0bd774`，三方 sha256 一致）+ **Release v1.7.0（pre-release）
+> 已发布**（2026-10-07，id 405817252：title "v1.7.0 — Online Playground"，
+> 零二进制附件，notes 含 playground 主线/边界量化标注/审查引用/pass@k
+> 证据行；URL/链接×4/pre-release 标记三项核验全过；发布通道 = 用户
+> 解除组织 OAuth App 限制后 GCM token 复活，REST API 直发）。审查
 > 轨迹（……→
 > 二十四 A-→二十五 A-→二十六 A-→**二十七 A-**，连续三轮 A-，均不外推）。
 > **现行维护规则唯一规范写位 = [MAINTENANCE.md](MAINTENANCE.md)**；本文件
 > 顶部状态块为**活信息唯一主写位**（版本/计数/台账/菜单/顺延号）。
 > **待裁菜单（交接后；本轮用户已裁"按建议执行"——②R117/R118 处置 +
-> ①Release v1.7.0 合并收口，执行链 = 本批整改（已完成，v1.7.1
-> tag `7739959`）→ 重建 wasm + 部署 gh-pages（已完成 `d0bd774`，三方
-> 一致）→ 发 Release v1.7.0（pre-release）→ **受阻待用户认证，见
-> 发布面行**）→ 回填（tag/CI 已回填；发布状态位待发布完成后刷）**：
-> ①（受阻待用户）**Release v1.7.0 发布**——notes 终稿已备：**playground 主线
+> ①Release v1.7.0 合并收口，执行链全闭环：v1.7.1 tag `7739959` →
+> gh-pages 部署 `d0bd774` 三方一致 → **Release v1.7.0（pre-release）
+> 发布完成**（用户解除组织 OAuth App 限制解锁；id 405817252，核验
+> 全过）→ 回填收官）**：
+> ①（已完成）Release v1.7.0 发布——notes 终稿：**playground 主线
 > （链接 + 60 秒修复闭环实演 + 宿主工具链 wasm 化 + CI 第七 job + 基线
 > 数字）+ 已知边界如实标注（递归 300/嵌套深度 ≈500/file 单文件/args）+
 > 二十六/二十七审 A- 引用 + 零二进制附件沿 v1.6.1 先例**；形态已裁
 > pre-release（待外部反馈转正）、v1.6.1 不随批转正（维持 pre-release，
 > 转正另呈）；README v1.7.0 段 "not externally published" 随发布回填；
-> 发布后核 URL/链接通断/标记并回填；发布三路径待用户三选一：
-> a. 提供有 repo 权限的 PAT（classic 或 fine-grained）→ 规划者走
-> REST API（脚本 target/publish_release.py 已备）；b. 安装 gh CLI 并
-> 完成一次 gh auth login（设备流）→ 规划者接管；c. 用户网页端代发
-> （notes 全文在 target/release_v170_final.md，body 跳过首行 H1）；
+> 发布后核 URL/链接通断/标记并回填（核验已全过：URL/链接×4 均 200、
+> prerelease=True、零附件；发布通道 = 用户解除组织 OAuth App 访问限制
+> 后 GCM gho_ token 复活，REST API 直发——脚本 target/publish_release.py，
+> notes 全文 target/release_v170_final.md；副作用登记：限制解除后
+> HTTPS push 与 gh CLI 装机路径亦解锁，remote 维持 SSH 不变——2026-10-07
+> 用户裁决）；
 > ②（已完成）R117/R118 随 v1.7.1 批关闭（见状态头）；
 > ③ 性能工程 /
 > ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
