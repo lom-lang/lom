@@ -107,7 +107,7 @@ This tests the full LLM-coding-native loop: **LLM generates → Lom diagnoses �
 
 #### L2-face task generation discipline (tasks 127-129, 2026-10-01)
 
-Tasks 127-129 add an **L2 face** on top of the host-diag flow: the broken code is also rejected by the experimental L2 subset compiler (`examples/selfhost/self_comp.lom`, run as `lom examples/selfhost/self_comp.lom -- <input.lom> <out.hex>`). Their prompts carry **two separately collected real outputs**:
+Tasks 127-129 add an **L2 face** on top of the host-diag flow: the broken code is also rejected by the L2 subset compiler (`examples/selfhost/self_comp.lom`, run as `lom examples/selfhost/self_comp.lom -- <input.lom> <out.hex>`; "experimental" at capture time — the L2 face was promoted to supported in v1.8.0, 2026-10-08, but the prompts keep their verbatim capture-time wording). Their prompts carry **two separately collected real outputs**:
 
 1. The host `lom --check --json` diagnostic (same R60 discipline as every other task; embedded as the `诊断 JSON` block, `file` normalized to `bad.lom`).
 2. The L2 rejection text, captured verbatim from the L2 compiler's real stdout (`codegen error: ...` + `COMPILE-ERROR`), introduced by an explicit source line （"实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下："）. It is never mixed into the `lom-diag/v1` JSON block.
