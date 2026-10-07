@@ -35,6 +35,7 @@ mod fmt;
 mod info;
 mod interpreter;
 mod json;
+mod l2fix;
 mod lexer;
 mod lsp;
 mod package;
@@ -138,6 +139,14 @@ fn main_inner() {
                 process::exit(1);
             }
         }
+    }
+
+    // ===== 子命令：l2fix（designs/0018 裁决点 1 甲的既定后续——L2 已于
+    // v1.8.0 转正，宿主 CLI 补桥接面）：解析已采集的 L2 拒绝文本 → 七族
+    // 修复建议（tools/l2fix.py 的 Rust 内建移植）=====
+    if cli.subcommand.as_deref() == Some("l2fix") {
+        run_l2fix(&cli);
+        return;
     }
 
     let path = match &cli.file {
@@ -567,6 +576,56 @@ fn run_pkg_expand(file: &str, list_only: bool) {
             process::exit(1);
         }
     }
+}
+
+/// designs/0018 裁决点 1 甲的既定后续（L2 已于 v1.8.0 转正）：执行
+/// `lom l2fix` 子命令——把**已采集的 L2 拒绝文本**（`codegen error: [L2xxx]`
+/// 等码行）解析为七族修复建议（l2fix.rs = tools/l2fix.py 的 Rust 内建移植，
+/// 自包含——不 shell 调 python、不依赖外部 .lom 文件与子进程链路）。
+///
+/// 文本来源三选一（--text 优先）：`--text <s>` / 文件路径 / `-`（stdin——
+/// 真实用法 `lom examples/selfhost/self_comp.lom -- bad.lom out.hex 2>&1 |
+/// lom l2fix -`，判定靠码行、COMPILE-ERROR 恒 rc=0 的管道采集面）。
+///
+/// 输出：默认人类可读；--json 输出 l2-fix/v1 轻量 schema（独立 schema，
+/// 不撞宿主 lom-fix/v1——L2 工具码不进宿主协议，designs/0018 §3 既定口径）。
+///
+/// 退出码：0 = 分析完成（有建议条目 / "L2 编译通过" / 零码行提示）；
+/// 1 = 输入读取失败 / 缺参。
+fn run_l2fix(cli: &CliArgs) {
+    use std::io::Read;
+    let (text, label) = if let Some(t) = &cli.text {
+        (t.clone(), "--text".to_string())
+    } else {
+        match &cli.file {
+            Some(f) if f == "-" => {
+                let mut buf = String::new();
+                if std::io::stdin().read_to_string(&mut buf).is_err() {
+                    eprintln!("无法读取 stdin");
+                    process::exit(1);
+                }
+                (buf, "-".to_string())
+            }
+            Some(f) => match fs::read_to_string(f) {
+                Ok(s) => (s, f.clone()),
+                Err(e) => {
+                    eprintln!("无法读取文件 '{}': {}", f, e);
+                    process::exit(1);
+                }
+            },
+            None => {
+                eprintln!("用法：lom l2fix <file|-> [--json] [--text <s>]");
+                process::exit(1);
+            }
+        }
+    };
+    let entries = l2fix::analyze(&text);
+    if cli.json {
+        println!("{}", l2fix::to_json(&entries, &label));
+    } else {
+        l2fix::print_human(&entries, &text, &label);
+    }
+    process::exit(0);
 }
 
 fn run_build(json: bool) {

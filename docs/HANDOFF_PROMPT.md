@@ -81,7 +81,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   [review-2026-10-08.html](reviews/review-2026-10-08.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、
-  self_comp.lom 12671 行、Rust **561 单元 + 31 集成**
+  self_comp.lom 12671 行、Rust **573 单元 + 31 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 +
   r112×3）、eval 双后端各 128/128（error_repair 31 题含 L2 面 3）、
   fix_corpus 13 对、doc_audit **71/71**、六模式全 PASS（dump 161）、
@@ -141,7 +141,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 561/561；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign，×31）
+   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign，×31）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

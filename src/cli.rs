@@ -47,6 +47,9 @@ pub(crate) struct CliArgs {
     /// L2.3 包批（designs/0008 §6.1）: --list 开关（lom pkg-expand 专用——
     /// 只输出包名逗号串供脚本消费，stdout 不混入展开产物）
     pub(crate) list_pkgs: bool,
+    /// designs/0018 甲后续（L2 v1.8.0 转正）: --text <s> 值选项（lom l2fix
+    /// 专用——直接给 L2 拒绝文本，与 <file>/`-` 三选一，--text 优先）
+    pub(crate) text: Option<String>,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     pub(crate) program_args: Vec<String>,
 }
@@ -78,6 +81,9 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  {prog} build <file> --target wasm [-o out.wasm]  编译为 WASM 二进制（Phase 7.2）");
     eprintln!(
         "  {prog} pkg-expand <file.lom> [--list]  展开包项目为单编译单元文本（L2.3 包批；--list 只输出包名逗号串）"
+    );
+    eprintln!(
+        "  {prog} l2fix <file|-> [--json] [--text <s>]  解析 L2 拒绝文本，输出七族修复建议（l2-fix/v1）"
     );
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
@@ -122,6 +128,15 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!(
         "              无 lom.toml 时输出主文件源码原样（单文件项目幂等退化）。--list 只输出包名逗号串"
     );
+    eprintln!(
+        "  l2fix       解析 L2 拒绝文本（码行 `codegen error: [ln:cl] [L2xxx] ...`）→ 七族修复建议"
+    );
+    eprintln!(
+        "              （designs/0018 甲后续，tools/l2fix.py 的 Rust 内建移植）。输入 = 文件 / `-`（stdin"
+    );
+    eprintln!(
+        "              管道，如 `lom self_comp.lom -- bad.lom out.hex 2>&1 | lom l2fix -`）/ --text；--json 输出 l2-fix/v1 schema"
+    );
     eprintln!();
     eprintln!("选项:");
     eprintln!(
@@ -135,6 +150,9 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  --dump-tokens 打印 token 流到 stdout（Phase 8.1 自举 lexer 对账工具）");
     eprintln!(
         "  --list      lom pkg-expand 子命令专用：只输出包名逗号串（供脚本取 L2 第三参），不输出展开产物"
+    );
+    eprintln!(
+        "  --text <s> lom l2fix 子命令专用：直接给 L2 拒绝文本（与 <file>/`-` 三选一，--text 优先）"
     );
     eprintln!("  --plan     lom fix 子命令专用：仅生成修复计划（默认）");
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
@@ -187,6 +205,10 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 out.subcommand = Some("pkg-expand".to_string());
                 iter.next();
             }
+            "l2fix" => {
+                out.subcommand = Some("l2fix".to_string());
+                iter.next();
+            }
             _ => {}
         }
     }
@@ -203,6 +225,15 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
             "--dump-ast" => out.dump_ast = true,
             "--dump-tokens" => out.dump_tokens = true,
             "--list" => out.list_pkgs = true,
+            "--text" => {
+                out.text = Some(match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("--text 需要一个值（L2 拒绝文本）");
+                        process::exit(1);
+                    }
+                });
+            }
             "--plan" => out.plan = true,
             "--apply" => out.apply = true,
             "--dry-run" => out.dry_run = true,
@@ -229,7 +260,9 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 });
             }
             _ => {
-                if a.starts_with('-') {
+                // `-` = stdin 位置参数（lom l2fix 专用；其余子命令落到文件
+                // 读取路径得"无法读取文件 '-'"，不产生歧义面）
+                if a.starts_with('-') && a != "-" {
                     eprintln!("未知选项: {}", a);
                     eprintln!("使用 --help 查看用法");
                     process::exit(1);
