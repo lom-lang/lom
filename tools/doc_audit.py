@@ -362,8 +362,13 @@ def main():
          r'--bootstrap 14/14 quine (\d+) bytes', ('quine',)),
         ('HANDOVER §9-5', 'docs/HANDOVER.md',
          r'bootstrap 14/14，强 quine (\d+) bytes 双侧一致', ('quine',)),
-        ('README 现行横幅', 'README.md',
-         r'quine (\d+), stock hex', ('quine',)),
+        # R119（二十八审）锚模式修正：旧模式 'quine (\d+), stock hex' 挂在
+        # v1.7.0 里程碑段的时点值上——该段降为 Previous 后锚随历史段走，
+        # "现行横幅"名存实亡（升版即楔死：改历史值违不回写纪律、不改则
+        # 组内不一致 FAIL）。改挂 Current release 段的加粗现值位
+        # （'quine **NNN**'，全 README 唯一）。
+        ('README Current release 现值', 'README.md',
+         r'quine \*\*(\d+)\*\*', ('quine',)),
     ])
     interlock('J Rust 计数组（单元/集成）', [
         ('HANDOFF_PROMPT 当前状态段', 'docs/HANDOFF_PROMPT.md',

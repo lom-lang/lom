@@ -228,6 +228,14 @@ doc_audit 锚约束）；两处不一致时以 TODO 为准并随交接批修正�
 
 ## §7 变更日志
 
+- **2026-10-08 R119 锚模式修正（二十八审开账随批）**：doc_audit J quine 组
+  的 README 锚从 'quine N, stock hex'（v1.7.0 批设计时挂 Current release
+  横幅；该段降为 Previous 后锚随历史段走，升版即楔死——改历史值违不回写
+  纪律、不改则组内不一致）改为挂 Current release 段加粗现值位
+  （'quine \*\*N\*\*'，全 README 唯一）。属 §6"doc_audit 锚位增补（须同步
+  claims/文档并过门禁）"类；用户裁决"执行"（R119 处置 A+B 最小面合并——
+  审查原建议先 A 后 B 分批，实际 A 单独无法过门禁，随批修正为合并执行，
+  如实登记）。
 - **2026-10-07 断链机检升格入库**：`tools/link_check.py` 入库 + CI doc-gates
   job 接线（A 类现行文档断链与大小写漂移非零退出；B 类历史原文
   archive/reviews 断链不拦——审查纪律"原文不回写"）。沿革：2026-10-06
