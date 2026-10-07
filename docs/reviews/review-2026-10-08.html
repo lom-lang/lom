@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十八轮体系内独立敌手审查 — 2026-10-08</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十八轮体系内独立敌手审查报告</h1>
+
+<p><b>2026-10-08</b> —— 基线 HEAD <code>b9ce791</code>（git 只读审查，工作区干净）。审查增量 = 二十七审基线 <code>e1702ba</code> 之后全部 <b>11 笔</b>提交（git log e1702ba..HEAD 逐笔清点）：<code>7c4ae4c</code>（二十七审报告入库）、<code>99f7e8b</code>（交接收口 + pass@k 报告入库）、<code>753a267</code>（交接前三处菜单指针）、<code>7739959</code>（<b>v1.7.1 feat：R117/R118 整改——主审面 C 前半</b>）、<code>4df404e</code>/<code>12bb232</code>（v1.7.1 门禁回填 + Release v1.7.0 收官回填——<b>发布面首审对象</b>）、<code>39744fa</code>（<b>断链机检升格 CI 常驻 gate——次审面 D</b>）、<code>508eac6</code>（交接五件套）、<code>02369ef</code>（designs/0020 设计产出）、<code>ca31691</code>（<b>v1.7.2 feat：L2 诊断行号批——主审面 A 核心</b>）、<code>b9ce791</code>（v1.7.2 门禁回填）。本轮四件使命：①v1.7.2 五项核心宣称逐条敌手复核（独立重做 hex 对拍 / 语料重扫 / 双锁推演 / 读码 / 129 行列对拍）；②L2 行号新面 8 项敌手探针；③R117/R118 整改复跑 + Release v1.7.0 发布面首审 + playground 三方 sha256 重核；④文档对账数字链。审查执行者：第二十八轮体系内独立敌手审查 agent。</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：二十七审 A- 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何仓库文件；唯一写盘物 = 本报告 + <code>target/probes/r28/</code> 探针目录（gitignored，保留）；git 严格只读（无 add/commit/push/tag/stash/checkout，本报告文件为任务书明示的唯一例外写位）；cargo 串行；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R119</b> 起开账）。验证器副本测试（B8）在 target/probes/r28/ 改副本运行，不算改仓库。</p>
+
+<div class="verdict">
+<b>本轮评级：A-（四审连平）</b>（仅对本轮时点与查验面；历史轨迹不外推）。<br>
+<b>一行式总评</b>：v1.7.2 L2 行号批<b>五项核心宣称经独立敌手复核全部成立</b>——①204 正例（196 单文件 + 8 包展开单元；任务书"122 单文件"系笔误，实际语料 196+8）新旧编译器 hex <b>逐字节恒等 204/204</b>（独立提取 ca31691~1 旧编译器全量对拍）；②语料重扫 <b>71/102 带位置精确复现</b>，31 枚豁免<b>逐枚</b>（超任务书 ≥5 枚要求）验证首引号名全部为内部类型串/点分路径，且无位置文件集与豁免集精确重合；③148 条双锁（299 子串）静态推演前缀兼容 + 368/368 实证零破坏；④build_name_pos 唯一调用点在 build_module <b>Err 分支码面坐实</b>（Ok 分支直写 hex）+ 204 hex 恒等 + 成功路径无耗时异常三重印证；⑤129 宿主 NAM005 <b>line=5 col=13 与 L2 锚位 5:13 精确一致</b>、127/128 逐字相同（git 只读 diff 唯一变化 = 129 prompt 单行）且三题内嵌文本 verbatim 对拍通过。L2 行号新面 8 项敌手探针<b>零击穿</b>：首现锚语义边界（重复 fn 指第一定义、跨作用域指他函数首现、内建调用指 import 行——全部落在 SPEC §13 登记的"first occurrence 非 span"边界内）；关键字/纯字符串字面量名构造性不可达（未定义名使用点本身即 token，位置=使用点，实为最优行为）；100K token 错误路径锚表开销仅 <b>1.4%</b> 线性无悬崖；l2fix 对带位置输出四族建议全对；验证器副本双向测试证明汇总断言<b>有牙</b>（豁免外类型串负例精确 FAIL）。R117/R118 整改在<b>部署物</b>上复跑全过（450 过/500 trap 非静默、守卫 300 先报、args:[] 正常、trap 文案中性化线上线下双核、负向锁定零 src/ 读码确认）；Release v1.7.0 发布面首审 prerelease=True/assets=0/notes 数字逐条对账零失真、3 链接全 200、README 状态位如实；playground 三方 sha256 一致（线上=gh-pages=本地产物 da025f03），且 HEAD v1.7.2 重建 wasm 与部署物 <b>code 段 1,502,751 字节逐字节相同</b>、data 段仅 2 个版本字符差、671B 差全部落在符号元数据 custom 段——"零 src/"宣称在二进制层面取得强实证。断链机检 CI step 级实查 success、126/127 三要素零变化维持。基线矩阵 19 项全绿（cargo <b>561+31</b> 逐 target 配对 r56=1/r58=7/r94=2/r104=6/r107=4/r108=5/closure=3/r112=3、verify_selfcomp <b>368/368</b>=196+8+164 且 L2G 0/164、bootstrap <b>14/14 新 quine 272925</b>、self_comp <b>12671 行</b>、eval 双后端各 128/128、eval_prompt 31/31、doc_audit 71/71、link_check A=0、六模式、smoke 11 检、CI 两 run 七 job、tag 双端双核）。开账 <b>R119</b>（P3 文档精度：quine 272293→272925 与 self_comp 12591→12671 变迁后，J quine 互锁组六个"当前值位"整组滞留旧值而 doc_audit 因互锁只查组内一致性仍绿灯——现实核对的 D 组锚（self_comp 行数）被 ca31691 更新、互锁的 J 组锚（quine）被漏更的partial传播铁证在案；J 组 README"现行横幅"模式位已漂移到 v1.7.0 带日期历史块引，形成"改五位则误报、不改则滞留"的结构楔死，修正需连 J 组模式一起改锚）。按"宣称零失真 + 敌手零击穿 + 无新 P1/P2 → A- 可期"框架三项逐条满足，R119 P3 沿 R102/R111/R113 先例不挡 A-，定 <b>A-</b>。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先完整阅读 docs/EXECUTOR_TEMPLATE.md 与 docs/MAINTENANCE.md §4（八节框架与开账纪律）及二十七审报告全文（基线矩阵样式与上轮开账复跑语境）。随后：(一) 基线矩阵 19 项全部亲手跑并逐项记录（含 CI GitHub API 匿名实查两 run 逐 job、doc-gates job <b>step 级</b>拉取、tag 本地+远端双核、八集成目标逐一单跑计数、--bootstrap 全量取新 quine 实测值）；(二) 主审面 A——v1.7.2 宣称独立重做：git show ca31691~1 提取旧 self_comp 落盘 target/probes/r28/，写探针对 196 单文件 + 8 包展开单元（宿主 pkg-expand 同一，v1.7.2 零 src/）全量新旧 hex 对拍；自写扫描器对 164 负例重扫含引号行/带位置行计数并对 31 枚豁免逐枚验证首引号名与源内 token 性质；ast 解析 EXPECTED_NEGATIVE_MESSAGES 全表做前缀兼容静态推演；读 build_name_pos/first_quoted_name/anchor_lookup 函数体与唯一调用点；写探针对 127/128/129 三题重建 broken 源、宿主 --check --json 与 L2 实跑对拍行列、嵌入文本 verbatim diff、ca31691~1↔HEAD JSON 全要素对比；(三) 主审面 B——8 项新面探针自构实跑（见 §5 探针表），验证器副本改路径测断言双向有效性；(四) 主审面 C——gh-pages 六源件实拉 + 线上六源件实拉 + 本地 wasm 重建三方哈希，段表解析器逐段对比定位二进制差异性质，wasm 部署物上复跑深度阈值/守卫/args 探针，v1.7.1 diff 读码核负向锁定，Release API 实查 + notes 全文数字逐条对账 + 链接逐个 curl；(五) 次审面 D——CI run 37652195871 doc-gates step 级 API、link_check.py 豁免逻辑读码、126/127 三要素 python 机验；(六) 文档对账数字链 + 开账 + 评级。全程 cargo 串行、git 只读。</p>
+
+<h2>2. 基线矩阵 19 项（全部亲手实跑）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测（命令/输出/退出码）</th><th>结论</th></tr>
+<tr><td>git 基线核验</td><td>HEAD b9ce791、工作区干净、增量 11 笔</td><td><code>git rev-parse HEAD</code> = b9ce79104bbf…；<code>git status --short</code> 空输出（审查写盘前）；<code>git log --oneline e1702ba..HEAD</code> = 11 笔（清单见报告头）</td><td class="ok">✓</td></tr>
+<tr><td>cargo build --release</td><td>就绪（v1.7.2）</td><td>rc=0；<code>lom --version</code> = <code>lom 1.7.2</code></td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>561 单元 + 31 集成</td><td>单元 <b>561 passed; 0 failed</b>；八集成目标逐一单跑：r56_process=<b>1</b> / r58_lsp_process=<b>7</b> / r94_pkg_alias=<b>2</b> / r104_dedup_order=<b>6</b> / r107_alias_clash=<b>4</b> / r108_variant_externals=<b>5</b> / build_closure_externals=<b>3</b> / r112_closure_assign=<b>3</b> = <b>31</b>（合计 592）</td><td class="ok">✓ 配对逐字吻合</td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td><code>cargo clippy --release -- -D warnings</code> 零输出 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --check</td><td>零</td><td><code>cargo fmt --all -- --check</code> rc=0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368 = 196+8+164（含新断言）</td><td>RESULT: PASS（368/368）；分组实测 PASS=<b>196</b>、PASS-PKG=<b>8</b>、PASS-NEG=<b>164</b>；负例 L2G 兜底 <b>0/164</b></td><td class="ok">✓</td></tr>
+<tr><td>--bootstrap</td><td>14/14、quine 272925</td><td>全量 RESULT: PASS（14/14；L3 self-apply <b>272925 bytes; byte-identical</b>；114.9s）；--ci-smoke 2/2（CI 同款子档）</td><td class="ok">✓ 新 quine 实测坐实</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>dump <b>161</b>/0、tokens <b>161</b>/0（列坐标系已知差异 1）、diags <b>14</b>/0、static 坏 <b>24</b>/0 + 干净集 ALIGNED <b>161</b>、run <b>31</b>/0、--wasm PASS（layer3 golden 39 条 + selfapply）——六模式逐个单跑 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>128/128 × 2</td><td>run.ps1 -Verify：Total <b>128</b> / Passed <b>128</b>；-Backend wasm：Total <b>128</b> / Passed <b>128</b></td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>31/31</td><td>校验 <b>31</b> / 失真 <b>0</b>，RESULT: PASS（129 重采后在列）</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 <b>51</b> / 反例 <b>5</b> / skip（json 8+diag 1+marker 10+ebnf 4+keywords 1+cli 1），RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71/71</td><td>RESULT: PASS（71/71；J quine 组 6 处互锁 <b>272293</b>——见 §7 R119；J selfcomp 组 368/196/8/164；J Rust 组 561/31；D 组 README/HANDOFF_PROMPT self_comp 行数 <b>12671</b> 现实核对过）——报告落盘前后各跑一次均 71/71（后置见 §7 尾）</td><td class="ok">✓（锚值滞后见 R119）</td></tr>
+<tr><td>link_check</td><td>A=0</td><td>RESULT: PASS（<b>A 类断链 0</b> + 大小写漂移 0；B 类历史原文 <b>7</b> 不拦）</td><td class="ok">✓</td></tr>
+<tr><td>node playground 冒烟</td><td>ALL PASS</td><td><code>node playground/smoke.mjs</code>：11 检全 PASS，SMOKE: ALL PASS，rc=0</td><td class="ok">✓</td></tr>
+<tr><td>l2fix --self-check</td><td>6/6</td><td>6/6 断言通过（负例 164、码条目 164，分布 L2C001=31 <b>L2P001=9</b> L2S001=18 L2T001=57 L2U001=26 L2V001=21 LEX001=1 LEX005=1）</td><td class="ok">✓</td></tr>
+<tr><td>Lom fmt gate</td><td>37 有效文件</td><td>examples 树 38 个 .lom 排除 apply_test = <b>37</b> 全部 fmt --check rc=0</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查（GitHub API 匿名）</td><td>ca31691 与 b9ce791 两 run 七 job 绿</td><td>run <b>37652195871</b>（ca31691，push）completed/<b>success</b>：clippy / doc gates / playground / windows / ubuntu / selfhost verify / macos 七 job 逐个 success；HEAD b9ce791 → run <b>37652960476</b> 七 check-run 全 success；doc-gates job <b>step 级</b>实查：step 7 "Broken link check (2026-10-06 anti-rot batch…)" <b>success</b>（断链机检 CI 常驻坐实，见 §4 D 面）</td><td class="ok">✓ 实查属实</td></tr>
+<tr><td>版本与 tag 链</td><td>v1.7.2→ca31691、v1.7.1→7739959</td><td>本地 rev-parse：v1.7.2=ca31691f37…、v1.7.1=7739959b46…；<code>git ls-remote --tags origin</code> 同值双核（v1.6.1=e6b807b / v1.7.0=7685d64 链完整）</td><td class="ok">✓</td></tr>
+<tr><td>golden stmt_interp</td><td>逐字一致</td><td>expected.txt 786B（CRLF 39）/进程输出 747B（LF）——LF 归一后<b>逐字节相等</b>（Windows 已知形态，verify_selfhost run 模式覆盖）</td><td class="ok">✓</td></tr>
+</table>
+<p class="small">§2.2 补充项（顺手全跑）：fuzz_smoke 80 轮零崩溃 PASS；diff_test --probe <b>8/8</b>；diff_test --rounds 20 --seed-base 1 --ci <b>20/20</b> 双后端一致；diff_test --pkg --rounds 10 --seed-base 1 --ci <b>10/10</b>。</p>
+
+<h2>3. 主审面 A：v1.7.2 L2 行号批（ca31691）五项核心宣称逐条敌手复核</h2>
+<h3>3.1 ① "204 正例新旧 hex 逐字节恒等" —— 成立（独立重做，204/204）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>旧编译器提取</td><td><code>git show ca31691~1:examples/selfhost/self_comp.lom</code> → target/probes/r28/self_comp_old.lom（<b>12591 行</b>/529,369B——与 v1.7.1 期"self_comp 12591 行"宣称互证）；宿主 lom.exe 同一（ca31691 diff 无 src/，亲核 stat：Cargo.toml/lock + self_comp.lom + tools + docs + eval 而已）</td><td class="ok">✓ 对拍基线合法</td></tr>
+<tr><td>196 单文件 + 8 包展开单元全量对拍</td><td>probe_hex204.py（独立写，非复用交付方脚本）：单文件 [lom, OLD, '--', case, out] vs [lom, NEW, …]；包先 <code>lom pkg-expand</code> 取展开单元与包名清单再双侧编译——<b>identical=204 diff=0 err=0</b>（每对比对 bytes 对象相等）</td><td class="ok">✓ 逐字节恒等</td></tr>
+<tr><td>任务书口径勘误</td><td>任务书写"122 单文件 + 8 pkg"——实际语料 tools/selfcomp/cases = <b>196</b> 单文件（ls 实数），pkg_cases = 8；README 宣称"all 204 positive-case hex outputs"与 196+8 相符。本轮按实际 204 全量对拍（超出任务书口径），任务书数字系笔误非仓库宣称问题</td><td class="ok">✓（备注）</td></tr>
+</table>
+<h3>3.2 ② "语料 71/102 带位置、31 枚豁免全为内部类型名/点分路径" —— 成立（独立重扫 + 31 枚逐枚验证）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>164 负例独立重扫</td><td>probe_scan102.py（自写扫描器）：含引号名 codegen error 行合计 <b>102</b>，其中带位置（匹配 <code>codegen error: \d+:\d+ </code> 前缀）<b>71</b>、无位置 <b>31</b>——<b>71/102 精确复现</b>（行口径与文件口径在此语料重合：每负例恰一条 codegen 行）</td><td class="ok">✓</td></tr>
+<tr><td>31 枚豁免逐枚验证（超任务书 ≥5 枚要求）</td><td>每枚提取实际输出首引号名并分类：i64×11 / st×3 / void×3 / f64 / js / mp{i64}×2 / ls{i64} / rc{…}×3 / en:…×6 / json.json_dump——<b>全部为内部类型串或点分路径，无一为源内标识符 token</b>（3 枚"源文本命中"经查为注释行文字，token 级锚表不含注释，口径自洽）</td><td class="ok">✓ 31/31</td></tr>
+<tr><td>豁免集完备性</td><td>无位置文件集 == NEG_NO_ANCHOR_EXEMPT 集（双向差集空）——豁免清单恰为无位置全集，无多列无漏列</td><td class="ok">✓</td></tr>
+</table>
+<h3>3.3 ③ "148 条双锁零破坏（substring 匹配构造性兼容）" —— 成立</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>静态推演</td><td>ast.literal_eval 解析 EXPECTED_NEGATIVE_MESSAGES 全表：<b>148 条</b>（全部 tuple 形态）、substring 合计 <b>299</b> 个、码 substring 148 个；唯一含 'codegen error' 的子串 = neg_l2_dup_fn（'L2P001', 'codegen error', "函数 'go' 重复定义"）——位置前缀插在 "codegen error: " 冒号后，该子串在新旧格式下均被包含；码 substring 均不含括号边界——<b>前缀插入零破坏构造成立</b></td><td class="ok">✓ 推演</td></tr>
+<tr><td>实证</td><td>verify_selfcomp 368/368（148 双锁全过，见基线矩阵）</td><td class="ok">✓ 实证</td></tr>
+</table>
+<h3>3.4 ④ "锚表仅 Err 通道构建、成功路径零侵入" —— 成立（码面 + 双重实证）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>读码核验调用点</td><td>grep build_name_pos 全文件唯一调用点 <b>L12658</b>，位于 <code>match build_module(prg, pkgs)</code> 的 <b>Err(msg) 分支</b>内；Ok(hex) 分支直写 file_write + COMPILED，不触锚表；build_name_pos 本体 = token 线性扫描只收 TkIdent 记首现（关键字不入表、同名只记首现）；anchor_lookup miss 返回空串（不伪造 0:0——designs/0020 §7 负向锁定②在码）</td><td class="ok">✓ 码面坐实</td></tr>
+<tr><td>实证一（成功路径零变化）</td><td>A① 204/204 hex 逐字节恒等 + bootstrap quine 272925 双侧 byte-identical</td><td class="ok">✓</td></tr>
+<tr><td>实证二（成功路径零开销）</td><td>B5 性能探针：成功路径编译耗时与错误路径同量级（锚表构建只占错误路径 ~1.4%，见 §5）</td><td class="ok">✓</td></tr>
+</table>
+<h3>3.5 ⑤ "eval 129 重采 5:13 与宿主 NAM005 行列一致 + 127/128 逐字相同" —— 成立</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>129 行列对拍</td><td>从 prompt 重建 broken 源：宿主 <code>--check --json</code> = <b>NAM005 line=5 col=13</b>；L2 self_comp 输出 = <code>codegen error: <b>5:13</b> [L2U001] 未定义变量 'len'</code>——<b>行列精确一致</b>；prompt 内嵌 L2 文本 == 实际输出（verbatim）</td><td class="ok">✓</td></tr>
+<tr><td>127/128 逐字相同（独立 diff）</td><td>git 只读取 ca31691~1:eval/tasks/10_error_repair.json 与 HEAD 全要素对比：<b>31 任务 solution/expected 零变化；prompt 变化集 = {129}</b>——127/128 三要素逐字相同坐实</td><td class="ok">✓</td></tr>
+<tr><td>127/128/129 内嵌文本活性</td><td>三题嵌入 L2 文本 vs 当前实际输出 verbatim 相等（127/128 消息无引号名 → 无位置前缀 → 与 v1.7.1 期逐字不变，"no quoted names" 宣称与实现一致）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>4. 主审面 C/D：R117/R118 整改、发布面首审、三方 sha256、断链机检</h2>
+<h3>4.1 R117/R118 整改复跑（在 gh-pages 部署物 da025f03 上，非本地 HEAD）—— 全过</h3>
+<table>
+<tr><th>项</th><th>实测</th><th>结论</th></tr>
+<tr><td>R117 嵌套深度量化</td><td>部署物 wasm + HEAD harness：350/400/450 层 OK（exit 0 输出 1）、<b>500 层 RuntimeError: memory access out of bounds</b>（trap 三层兜底非静默）——README "≈500 nested expressions trap" 量化维持（二十七审为 400 OK/500 trap，本轮加密到 450 OK 仍吻合 ≈500 表述）</td><td class="ok">✓</td></tr>
+<tr><td>守卫 300 先于 trap（不吞）</td><td>无终止递归：stderr = <code>[RUNTIME000] 递归深度超过 300 层…函数 'f' 疑似缺少终止条件…</code> 结构化诊断 + exit=1</td><td class="ok">✓</td></tr>
+<tr><td>R118 args:[] 防御</td><td><code>rt.run({source, args: []})</code> = <b>exit 0 输出 42</b>（回落默认 argv）；harness 头部契约注释在位（"未传或空数组均回落上述默认，R118 防御"）</td><td class="ok">✓</td></tr>
+<tr><td>trap 文案中性化</td><td>HEAD 与线上 app.js 同为 L128 <code>⚠ wasm 引擎执行限制：本次运行以 trap 终止</code>；playground/ 全目录 grep "栈上限" <b>零残留</b>（worker.js 注释中 "call stack exhausted" 为实测 trap 形态枚举，非用户面归因文案）</td><td class="ok">✓</td></tr>
+<tr><td>负向锁定读码</td><td>git show 7739959 --stat：仅 Cargo.toml/lock（版本）+ 文档 + playground/{app,harness,worker}.js——<b>零 src/</b>（无 parser 守卫、无新诊断码）；trap 链路 rethrow → worker {trap:true} 转译在码（不吞、不谎报 exitCode）</td><td class="ok">✓</td></tr>
+</table>
+<h3>4.2 Release v1.7.0 发布面首审 —— 数字逐条对账零失真</h3>
+<table>
+<tr><th>宣称（notes/README）</th><th>实测（API/实跑）</th><th>结论</th></tr>
+<tr><td>pre-release 形态</td><td>API：name "v1.7.0 — Online Playground"、tag v1.7.0、id <b>405817252</b>、<b>prerelease=True</b>、draft=False、<b>assets=0</b>、published <b>2026-10-07T13:52:14Z</b></td><td class="ok">✓</td></tr>
+<tr><td>README 状态位</td><td>README L83 "published as a GitHub pre-release on 2026-10-07 — the first external release checkpoint; the deployed playground carries the v1.7.1 hardening"——与 API 日期、gh-pages=v1.7.1（下条）逐项如实</td><td class="ok">✓</td></tr>
+<tr><td>notes 基线数字</td><td>368/368（=196+8+164）✓、561+31 ✓、128/128×2 ✓、doc gates 71/71 ✓、quine 272,293（v1.7.0/v1.7.1 期时点值——历史快照正确；当前 HEAD 已 272925 属 v1.7.2 演进，非失真）✓</td><td class="ok">✓</td></tr>
+<tr><td>notes 审查引用</td><td>"The 26th and 27th in-system adversarial reviews both graded A-"——review-2026-10-03.html（二十六审 A-）与 review-2026-10-07.html（二十七审 A-）在库且题注吻合；"zero penetrations" 与二十七审报告 §4 一致；"These are in-system reviews, not external audits" 边界句如实</td><td class="ok">✓</td></tr>
+<tr><td>notes pass@k 证据行</td><td>98.3%/98.5%（@1）、99.2%/98.8%（@5）、100.0%/99.2%（@10）——与 eval/REPORT-2026-10-07-passk-128.md L14-15 逐字一致（文件在库）</td><td class="ok">✓</td></tr>
+<tr><td>notes 边界量化</td><td>"guard at 300 vs 80,000"（interpreter.rs 常量对）✓；"≈500 expressions traps… 3000+"（本轮部署物复测 450 OK/500 trap）✓；"1.7 MB wasm"（1,710,858B ≈1.71MB 十进制）✓</td><td class="ok">✓</td></tr>
+<tr><td>notes 链接 ×3</td><td>playground URL / LANGUAGE_SPEC.md / REPORT-2026-10-07-passk-128.md 逐个 curl <b>全 200</b>（TODO 回填"URL/链接×4 均 200"含 release 页本身，一致）</td><td class="ok">✓</td></tr>
+<tr><td>零第三方页面</td><td>五源件自二十七审以来未变（三方一致见下），"zero third-party JavaScript" 维持</td><td class="ok">✓</td></tr>
+</table>
+<h3>4.3 playground 三方 sha256 重核 + HEAD 重建二进制定性 —— 强证据</h3>
+<table>
+<tr><th>项</th><th>实测</th><th>结论</th></tr>
+<tr><td>三方源件一致</td><td>线上实拉六件 = <code>git show gh-pages:playground/…</code> 六件逐字节（sha256：app <b>2a55a9f6…</b> / examples <b>6e66cacd…</b> / harness <b>4212b320…</b> / worker <b>2c2edff0…</b> / index <b>cc54ed0f…</b> / wasm <b>da025f03…</b>）；本地 target 既有 v1.7.1 期产物 = <b>da025f03</b> 同值——<b>三方一致坐实</b>（gh-pages 孤儿分支头 = d0bd774 部署提交，与登记一致）</td><td class="ok">✓</td></tr>
+<tr><td>HEAD 五源件内容一致</td><td>HEAD playground/ 五源件 vs gh-pages：行尾归一后 <b>零差异</b>（工作树 CRLF vs git LF 为 Windows 检出已知形态）</td><td class="ok">✓</td></tr>
+<tr><td>HEAD v1.7.2 重建 wasm vs 部署物</td><td>重建（cargo build --target wasm32-wasip1 --profile wasm-release，确定性复现同哈希 <b>126b1227…</b>，1,710,187B）vs 部署 da025f03（1,710,858B）：<b>段表级对比——code 段 1,502,751B 逐字节相同</b>；data 段同长仅 <b>2 字节差异</b>（两处版本字符 1.7.1→1.7.2，实打印上下文核对）；type/import/function/table/memory/global/export/element 八段全部逐字节相同；<b>-671B 全部落在 custom（符号名元数据）段</b>（内容为 Rust v0 mangled 符号表，随 crate 元数据哈希/符号清单漂移，零行为影响）——"v1.7.2 零 src/"在可执行代码层面取得二进制强实证</td><td class="ok">✓ 强证据</td></tr>
+</table>
+<h3>4.4 次审面 D：断链机检升格批（39744fa）+ 轻复核 —— 成立</h3>
+<table>
+<tr><th>项</th><th>实测</th><th>结论</th></tr>
+<tr><td>CI 步骤实查</td><td>run 37652195871 doc-gates job 逐 step API：step 7 <b>"Broken link check (2026-10-06 anti-rot batch, promot…)" = success</b>（与 CI yml 步骤名一致，步骤常驻坐实）</td><td class="ok">✓</td></tr>
+<tr><td>豁免逻辑读码</td><td>tools/link_check.py：B 类 = 来源为 docs/archive/*.md 或 <b>docs/reviews/*.html 不拦</b>（审查纪律"原文不回写"边界与 MAINTENANCE §7 登记一致）；A 类（现行文档）断链 + 大小写漂移非零退出</td><td class="ok">✓</td></tr>
+<tr><td>断链清零维持</td><td>本地复跑：A 类断链 <b>0</b>、大小写漂移 0、B 类 7（全部 target∈archive，归档 assets 预期形态）</td><td class="ok">✓</td></tr>
+<tr><td>126/127 三要素再机验</td><td>python 快扫 e1702ba→HEAD 全 31 任务：<b>solution/expected 变化集 = []</b>；prompt 变化集 = {129}（v1.7.2 重采）——收紧后三要素冻结维持</td><td class="ok">✓</td></tr>
+<tr><td>治理 2.0/防腐轻复核</td><td>doc_audit 71/71 + link_check PASS 双绿维持（二十七审已深核收编零丢失，本轮按任务书轻复核不重复下钻）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>5. 敌手探针表（主审面 B：L2 行号新面 8 项 + 复用部署物探针）</h2>
+<p>探针环境：本机 lom 1.7.2 + HEAD self_comp；B8 为验证器副本（target/probes/r28/verify_selfcomp_r28.py，改路径非改仓库）。"击穿"判定 = 与登记语义不符 / 静默错值 / 断言失效 / 性能悬崖。</p>
+<table>
+<tr><th>编号</th><th>方向/构造</th><th>实测</th><th>击穿判定</th></tr>
+<tr><td>B1</td><td>首现锚语义边界：同文件两个 fn go（错误=第二个定义 L7）</td><td><code>codegen error: <b>3:4</b> [L2P001] 函数 'go' 重复定义…</code>——位置指<b>第一个</b>定义（L3）非出错定义（L7）；与 SPEC §13 登记边界"same-name multi-sites point to the first"逐字吻合</td><td class="ok">未击穿（登记边界内）</td></tr>
+<tr><td>B2</td><td>跨作用域首现：fn f 内 let q（L4）、main 内用 q 未定义（L10）</td><td><code>codegen error: <b>4:9</b> [L2U001] 未定义变量 'q'</code>——位置指 fn f 的 let（跨函数首现）；锚表为 token 线性扫描、作用域无关——属"first occurrence"登记语义的跨域推论（SPEC 边界句未逐字展开此形态，见 R119 备注③之外的观察项，不开账）</td><td class="ok">未击穿（登记语义内）</td></tr>
+<tr><td>B3</td><td>引号名恰为关键字 / 名字仅在字符串字面量出现</td><td>引号关键字（'fn'/'end' 等）仅存在于 <b>parse 通道</b>消息（自带 token 位置，非 codegen 通道）；"仅字符串字面量出现"对未定义变量<b>构造性不可达</b>——使用点本身即 TkIdent，位置=使用点（探针 b3：'mystery' 虽先出现在字符串常量里，锚位仍=使用行 6:13——token 级锚表只认 TkIdent，注释/字符串不干扰）</td><td class="ok">未击穿（实为最优行为）</td></tr>
+<tr><td>B4</td><td>首引号名非出错主体："调用 'map_set' 期望 Map 得 i64"（出错=实参，首引号名=被调内建名）</td><td>位置 <b>2:19 = import 行</b>（map_set 的 token 首现）非出错调用行（L7）——designs/0020 §2 明示"内建名只出现在 import/调用点，只有 token 层有锚"，首现锚取 import 属既定设计</td><td class="ok">未击穿（设计既定）</td></tr>
+<tr><td>B5</td><td>超长源码错误路径锚表耗时（≥5000 token）</td><td>2,500 lets（≈10K token）：错误路径 5.422s vs 成功 5.329s（Δ0.093s）；10,000 lets（≈40K）：53.295 vs 52.209（Δ1.086s）；25,000 lets（≈100K）：292.234 vs 288.289（<b>Δ3.945s ≈1.4%</b>）——线性开销无悬崖；位置输出正确（25004:13）</td><td class="ok">未击穿</td></tr>
+<tr><td>B6</td><td>多引号消息的 first_quoted_name 取名：变体 'On' 第 1 参类型不符（期望 i64 得 st）</td><td>位置 <b>4:7 = On 声明处</b>（首引号名 'On' 正确提取，非后文类型串）；首对单引号配对逻辑正确</td><td class="ok">未击穿</td></tr>
+<tr><td>B7</td><td>l2fix 对带位置输出的建议质量（127/129 类实跑）</td><td>129 broken：L2U001 → "文件顶部插入 from string import {len}"（insert，<b>high</b>）；B1 重复 fn：L2P001 → 重命名方向 hint（medium）；B4/B6：L2C001 → 实参类型逐一核对 hint（medium）——位置组解析正确、七族映射不受影响、建议内容合理</td><td class="ok">未击穿</td></tr>
+<tr><td>B8</td><td>豁免清单外新造含引号名负例（验证器副本，断言有效性双向测试）</td><td>副本指向探针语料：新造可锚负例（'totally_undefined_name'）= <b>PASS-NEG</b>（带位置 5:13 断言过）；新造类型串负例（if 条件得 'i64'，<b>未入豁免清单</b>）= <b>FAIL-NEG：含引号名但无 ln:cl 位置段（0020 名字锚断言）</b>——断言双向有牙，豁免清单不可静默扩洞</td><td class="ok">未击穿（断言有效）</td></tr>
+</table>
+<p class="small">顺带勘误（探针过程中的自我修正，如实记录）：①b6 初版枚举语法写错（enum Color: …）得 parse error——按 cases/19_user_enum.lom 正确语法重写后取到 codegen 通道形态；②b8b 初版 `s + n`（String+Int）以为会拒——实测 COMPILED 且输出 "x3"，经查"拼接只支持 +"为登记语义（neg_str_arith 负例是 `-` 非 `+`），宿主同输出 rc0——非发现，是探针设计错误；③宿主直跑命令初版误用 `lom -- file`（传参形态）打出帮助页——改 `lom file` 后正常。</p>
+
+<h2>6. 文档对账数字链</h2>
+<table>
+<tr><th>锚</th><th>文档值</th><th>实际值（独立手工核）</th><th>结论</th></tr>
+<tr><td>quine（新）</td><td>README v1.7.2 条目 / SPEC §13 / TODO L14 / designs/0020 = <b>272925</b></td><td>--bootstrap L3 self-apply 实测 <b>272925 bytes; byte-identical</b>（本轮全量亲跑）</td><td class="ok">✓</td></tr>
+<tr><td>quine（J 组六"当前值位"）</td><td>HANDOFF_PROMPT L86/L149、HANDOVER §1/§9-3/§9-5、README"现行横幅"模式位 = <b>272293</b></td><td>实际 272925——<b>整组滞留旧值</b>（doc_audit 仍绿：互锁只查组内一致性）</td><td class="bad">✗ → R119</td></tr>
+<tr><td>self_comp 行数</td><td>README L147 = 12671（D 组现实锚）✓；TODO L41 = <b>12591</b>；HANDOVER §9-5 = <b>12591</b></td><td>wc -l 实测 <b>12671</b>——README 位正确；TODO/HANDOVER §9-5 两处滞留（非 D 组覆盖位）</td><td class="bad">✗ → R119</td></tr>
+<tr><td>Rust 计数</td><td>561+31（J 组七位互锁）</td><td>实测 561 单元 + 31 集成（逐 target 配对）</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368=196+8+164（J 组六位）</td><td>实测一致</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit 自指</td><td>71=71</td><td>71/71 双跑（报告落盘前后）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>7. 开账（只开不修；从 R119 起）</h2>
+<div class="ledger">
+<p><b>R119（P3，文档精度/锚传播缺口）——quine 272293→272925 与 self_comp 12591→12671 变迁后，J quine 互锁组六"当前值位"与 TODO 基线数字段整组滞留，doc_audit 全组同滞仍绿</b><br>
+可复现形态：①<code>python tools/verify_selfcomp.py --bootstrap</code> → <b>272925 bytes</b>；②<code>python tools/doc_audit.py</code> → <b>71/71 PASS</b> 且输出 "J quine 字节组 | 互锁一致（6 处当前值位：{'quine': '272293'}）"——门禁绿与现实值矛盾并存；③grep 272293：HANDOFF_PROMPT L86（当前状态段"强 quine 272293 bytes 双侧一致"）/L149（基线清单）、HANDOVER §1 版本行（"quine 272293（v1.6.1 新值，J 锚现位）"——括注如实承认锚位但数字滞后）/§2.2 L152/§9-3 L387/§9-5 L389；README"现行横幅"模式位（<code>quine (\d+), stock hex</code> 的首个匹配）已漂移至 <b>v1.7.0 带日期历史块引 L83</b>（该条目按"历史时点标注位不进组"原则本不该进组却正被锚着）；④TODO 顶部状态块<b>内部自相矛盾</b>：L14"新 quine 272925" vs L40"基线数字…（quine 272293B）"（同块无日期限定词）；L41"self_comp 12591 行" vs 实际 12671 与同文件 D 锚位 12671；⑤<b>partial 传播铁证</b>：git show ca31691 -- docs/HANDOFF_PROMPT.md = 恰改一行（self_comp 12591→12671，D 组现实核对锚），紧邻上一行 quine 272293（J 组互锁锚）未动——现实核对锚被更新、互锁锚被漏更，同批同文件新旧混写；⑥HANDOFF_PROMPT 版本镜像仍"Cargo.toml/lock 均为 1.7.1"（交接镜像随交接批刷新为登记节奏，但 J 组将其当"当前值位"用——锚制度与刷新节奏的错配）。<br>
+<b>根因三层</b>：①交付批漏更（人因）；②J 组真值源设计 = "组内宣称位互相对照"（doc_audit L309 注释明示），<b>全组同滞时绿灯</b>——互锁防"单点漂移"不防"整组滞后"，正是 R103/R106 同族问题的对偶盲点；③J 组 README 位模式随 README 演化漂进带日期历史块，形成结构楔死：若只把其余五位改 272925，README 位（v1.7.0 条目合法保留 272293）将误报 FAIL。<br>
+候选处置（供裁决）：a) 按 §2.3 SOP 六位 + TODO L40/L41 + HANDOVER §9-5"12591 行"统一刷 272925/12671；<b>必须连带</b> b) doc_audit J quine 组 README 位模式改锚真正现行位（如 README v1.7.2 条目 quine 值句式，或 README 现行横幅新增 "quine 272925, …" 句后锚之）；c) 可选根治：J 组增加一个现实核对位（运行/读取 verify_selfcomp --bootstrap 的 quine 输出比对），使"全组同滞"也能被抓（代价：doc_audit 变慢，需权衡——或登记为交接批强制人工项）。<br>
+<b>应修</b> = 数字位统一刷新 + J 组模式改锚（纯文档/对账工具，零行为变化）。<b>绝不能这样修</b> = ①只改五位留 README 历史位不动 J 模式（下一步任何一次互锁运行即误报 FAIL，逼人篡改历史原文——违反"原文不回写"审查纪律）；②把 README v1.7.0/SPEC §13 v1.6.1 等历史条目里的 272293 改成 272925（篡改历史时点记录，制造真正的失真）；③给 doc_audit 加"任意文档出现 272293 即 FAIL"式全文扫描（将命中十几处合法历史值，门禁永久红）。</p>
+<p><b>备注三条（不开账）</b>：①任务书"122 单文件"与实际语料 196 不符——任务书笔误，README"204 正例"宣称本身正确（本轮按 204 全量对拍）；②三通道前缀标点不完全一致（lex/parse 通道 "lex error L:C" 无冒号、codegen 通道 "codegen error: L:C" 有冒号）——"三通道统一"宣称指 ln:cl 置于码前的格式统一，通道关键字本身异名是通道语义，非失真；③B2 跨作用域首现锚（位置可指向另一函数内的同名绑定）未在 SPEC 边界句逐字展开——它是"first occurrence"线性 token 语义的直接推论且对修复仍有定位价值，与 R119 一并可在下次文档批顺带补一句（不单独立账）。</p>
+</div>
+
+<h2>8. 评级依据与后置门禁</h2>
+<p><b>评级 A-</b>，按任务书框架三项核验：①<b>宣称零失真</b>——v1.7.2 五项核心宣称（204 hex 逐字节恒等 / 71/102+31 豁免 / 148 双锁零破坏 / Err 通道零侵入 / 129 行列一致+127/128 逐字相同）全部独立重做成立；R117/R118 整改在部署物上复跑全过；Release v1.7.0 发布面数字逐条对账零失真、链接全通、状态位如实；断链机检 CI 常驻 step 级坐实；playground 部署物三方一致且与 HEAD 重建 code 段逐字节相同（二进制级强实证）；②<b>敌手零击穿</b>——L2 行号新面 8 项探针无一超出登记边界，首现锚语义（重复定义指首定义/跨作用域/内建指 import）全部落在 SPEC §13 与 designs/0020 的登记语义内，性能线性、l2fix 解析正确、验证器断言双向有牙；③<b>无新 P1/P2</b>——唯一开账 R119 为 P3 文档精度（quine/行数锚滞后，README 现行门面与 SPEC/TODO 主线数字均正确，无面向外部的失真宣称），沿 R102/R111/R113"P3 文档精度不挡 A-"先例。审查轨迹：二十四 A- → 二十五 A- → 二十六 A- → 二十七 A- → <b>二十八 A-</b>（均不外推）。</p>
+<p><b>后置门禁</b>：本报告落盘后复跑 <code>python tools/doc_audit.py</code> = <b>71/71 PASS</b>（落盘前后双跑；报告本身不含新增数字锚句式，不改任何锚）；<code>python tools/link_check.py</code> 复跑 PASS（本报告位于 docs/reviews/ 属 B 类历史原文位，断链不拦，实测 A=0 维持）。审查期间仓库产品源码零修改（git status 仅本报告新增与 target/probes/r28/ 探针目录，后者 gitignored）。</p>
+
+<h2>附录：探针目录（target/probes/r28/，gitignored）</h2>
+<p class="small">probe_hex204.py（A① 204 新旧 hex 全量对拍）/ self_comp_old.lom（ca31691~1 旧编译器 git 只读快照）/ probe_scan102.py（A② 164 负例重扫 + 31 豁免逐枚）/ probe_dual148.py（A③ 双锁静态推演）/ probe_eval129.py（A⑤ 129 行列对拍 + 三题 verbatim + 新旧 JSON 全要素对比）+ t127/t128/t129_broken.lom（重建 broken 源）/ b1_dup_fn_first_anchor.lom、b2_cross_scope_anchor.lom、b3_strlit_only.lom、b4_callee_first_quoted.lom、b6_two_quoted_enum.lom、b8a_anchorable_neg.lom、b8_if_nonbool_new.lom、b8b_typeonly_neg.lom（B 面探针源）/ probe_b5_perf.py + b5_{err,ok}_{2500,10000,25000}.lom（B5 性能）/ verify_selfcomp_r28.py + b8_cases/ + b8_cases_pkg_empty/ + b8_neg/（B8 验证器副本）/ probe_c_r117_r118.mjs（C1/C3 部署物复跑）/ online/{六源件} + ghpages_{六源件}（三方对比留档）/ wasm_diff_analyze.py、wasm_diff_fast.py、wasm_sections.py（二进制差异三段定性）/ release_v170_notes.md（API 留档）/ golden_out.txt / tmp_scan.hex 等运行残留。</p>
+
+</body>
+</html>
