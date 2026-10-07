@@ -145,6 +145,7 @@ python tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci   # D5 包模式�
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
 python tools/eval_prompt_check.py                        # R60：error_repair prompt 内嵌诊断 vs 真实 lom --json（24/24；--bin 可指定非默认路径的二进制，默认即 target/release/lom[.exe]）
 python tools/doc_audit.py                               # 对账：文档数字 71 项（原 63 + 九审 ×2 + R76/十二审 ×2 + 工具治理批 ×4：README latest-milestone 版本位 + 跨文档互锁组 ×3 verify_selfcomp/quine/Rust 计数——R103/R106"gate 覆盖面 ≠ 全部出现面"根治；其余为 eval/dump/.lom/行数/版本/changelog/测试数/claims/源码计数/SPEC 尺寸/自指/门面版本位）——已在 CI doc-gates job 常驻
+python tools/link_check.py                              # 断链机检（2026-10-06 防腐批一次性脚本升格入库、接线 CI doc-gates——菜单⑥；A 类现行文档断链与大小写漂移非零退出，B 类历史原文 archive/reviews 断链不拦（审查纪律"原文不回写"）；--raw 附落盘 target/link_check/broken_raw.txt）
 ```
 
 改动语言行为时如果自举输出**有意变化**：先逐字核对新输出正确，再重新生成 golden（`./target/release/lom.exe examples/bootstrap/stmt_interp.lom > examples/bootstrap/stmt_interp.expected.txt`），并在 commit message 里说明哪些输出变了、为什么。推送后**必须看一眼 CI 首跑结果**（§11 有 API 查法）再宣布完成。

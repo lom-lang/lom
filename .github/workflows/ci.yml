@@ -173,6 +173,11 @@ jobs:
         run: python3 tools/spec_examples_check.py
       - name: Doc numbers audit (R8)
         run: python3 tools/doc_audit.py
+      - name: Broken link check (2026-10-06 anti-rot batch, promoted)
+        # 仓库内相对链接断链机检（md 全部 + docs/ html；A 类现行文档断链与
+        # 大小写漂移非零退出，B 类历史原文 archive/reviews 不拦——审查纪律
+        # "报告原文不回写"）
+        run: python3 tools/link_check.py
       - name: Eval prompt diagnostic check (R60)
         # error_repair 任务 prompt 内嵌诊断与真实 lom --json 输出对账
         # （九审 R60：runner 只验 stdout+rc 掩盖了 prompt 诊断漂移）

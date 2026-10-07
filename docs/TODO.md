@@ -1,10 +1,17 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-07，v1.7.1；二十七审开账 R117/R118 已同包整改关闭——发布链（gh-pages 重部署 + Release v1.7.0 pre-release）执行中）**：
+> **当前状态（2026-10-07，v1.7.1；R117/R118 已关 + Release v1.7.0
+> pre-release 已发布 + 断链机检已升格 CI 常驻 gate——三批闭环，交接刷新中）**：
 > 最新基线 **v1.7.1**（tag `7739959`，CI run `37526137995` 七 job 绿；
 > gh-pages 部署 `d0bd774`——本地构建=分支=线上三方 sha256 一致
-> （da025f03…）；上一 tag v1.7.0 = `7685d64` CI #267 七 job 绿，回填链
-> #268-#273 实查全绿，HEAD 以 git log 与 CI 首跑为准）。**v1.7.1 批（2026-10-07，用户裁决"按建议执行"——R117/R118
+> （da025f03…）；**Release v1.7.0（pre-release）已发布**（id 405817252，
+> URL/链接×4/标记核验全过；发布通道=用户解除组织 OAuth App 限制后
+> GCM token 复活 REST API 直发；副作用登记：HTTPS push 与 gh CLI 路径
+> 亦解锁，remote 维持 SSH）；**断链机检升格批（菜单⑥，纯工具批不升版）**：
+> `tools/link_check.py` 入库 + CI doc-gates 接线（A 类现行断链/大小写漂移
+> 非零退出、B 类历史原文不拦；本地首跑 PASS——101 文件 227 链接、A=0、
+> B=7 全部为登记在案的归档 assets 未随档预期形态）；上一 tag v1.7.0 =
+> `7685d64` CI #267 七 job 绿。**v1.7.1 批（2026-10-07，用户裁决"按建议执行"——R117/R118
 > 处置与 Release v1.7.0 合并收口）**：README/designs 边界句补源码嵌套
 > 深度量化登记 + app/worker trap 文案中性化"引擎执行限制" + harness
 > run() 空数组 args 回落默认 argv（R118 一行防御；A/B 探针坐实修复差异、
@@ -59,11 +66,12 @@
 > ②（已完成）R117/R118 随 v1.7.1 批关闭（见状态头）；
 > ③ 性能工程 /
 > ④ L2 行号主要簇（~118 处）+ L2 转正判据 / ⑤ divergence
-> 与 build 缺口中期项 / ⑥ 断链机检升格常驻 gate（脚本现位本机
-> gitignored 的 target/link_check/check_links.py，2026-10-06 防腐批与
-> 二十七审两轮使用；升格=入库 tools/ + doc gates 接线，属规则微调可
-> 随批——MAINTENANCE §6）。
-> 观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑）；MoonBit Q3 复核
+> 与 build 缺口中期项。⑥（已完成，纯工具批不升版）断链机检升格
+> CI 常驻 gate——`tools/link_check.py` 入库 + doc-gates 接线
+> （MAINTENANCE §7 变更日志与 HANDOVER §2.2 已登记；本地首跑 PASS：
+> A=0、B=7 全为归档 assets 未随档预期形态）。
+> 观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑——注意 doc-gates
+> 自本批起含断链机检步骤，首跑一并盯）；MoonBit Q3 复核
 > 已关闭。对外动作逐项呈批（铁律 6，规范位 MAINTENANCE §1.2）。
 >
 > **维护规程 2.0 治理批记录（2026-10-06——复盘 26 轮审查与全维护进程后的规则体系重构，纯文档批不升版）**：
