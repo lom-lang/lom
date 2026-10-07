@@ -1,3 +1,19 @@
+> 最后更新：2026-10-07 晚（**R117/R118 收口 + Release v1.7.0 发布 + 断链机检升格 CI 常驻——三批闭环、台账零 open**。
+> 用户裁决"按建议执行"×2（合并收口链 + 菜单⑥）。①**v1.7.1**
+> （tag `7739959`，CI run `37526137995` 七 job 绿）：二十七审开账
+> R117/R118 同包整改——README/designs 补源码嵌套深度量化登记（node
+> ≈500 层 trap、桌面 256MB 栈 3000+ 过；parser 路径无结构化守卫）+
+> app/worker trap 文案中性化"引擎执行限制" + harness run() 空数组
+> args 回落默认（A/B 探针坐实）；全量回归 21 项 + 亲验 368/14 全绿；
+> 零 src/。②**发布链**：gh-pages `d0bd774`（playground 刷 v1.7.1
+> 源件，三方 sha256 一致 da025f03…）→ **Release v1.7.0 pre-release
+> 发布**（id 405817252，零二进制附件，URL/链接/标记核验全过；发布
+> 通道 = 用户解除组织 OAuth App 限制后 GCM token 复活——HTTPS push
+> 与 gh CLI 路径亦解锁，remote 维持 SSH）。③**断链机检升格批**
+> （`39744fa`，纯工具批不升版）：tools/link_check.py 入库 + CI
+> doc-gates 接线（A 类现行断链/大小写漂移非零退出、B 类历史原文不拦；
+> 新步骤 CI 首跑 success）。交接五件套按 §5 刷新。）
+>
 > 最后更新：2026-10-07（**二十七审收官 A- 维持 + 全 128 集 pass@k 首测 + 交接收口**。
 > 本轮三批：①eval 126/127 题面收紧（`e1702ba`，仿 078→118 先例，三要素
 > 零变化）；②**二十七审**（报告 reviews/review-2026-10-07.html，`7c4ae4c`
@@ -370,7 +386,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 561/561（另有 tests/ 集成 ×31）、零 warning、`./target/release/lom.exe --version` 显示 1.7.1
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 368/368、--bootstrap 14/14 quine 272293 bytes）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 检查 `git status`：交接提交后应基本干净（tag/CI 回填除外）；核最新已提交 main CI 六 job 与 annotations（§11 有 API 查法），不得把已提交绿灯外推到任何未提交工作区。
-5. **当前状态（2026-10-07，v1.7.1 已 tag）——最新基线 v1.7.1（tag `7739959`，CI run `37526137995` 七 job 绿；线上 https://lom-lang.github.io/lom/playground/ 已刷 v1.7.1 源件（gh-pages `d0bd774`，三方 sha256 一致））**：本轮（10-07）= 二十七审开账 R117/R118 同包整改（v1.7.1：嵌套深度量化登记 + trap 文案中性化 + harness 空数组 args 防御；零 src/，全量回归 21 项全绿）+ playground 重部署；**Release v1.7.0 已发布（2026-10-07，pre-release，id 405817252——首个对外发布检查点；用户解除组织 OAuth App 访问限制后 REST API 直发，核验全过；部署面含 v1.7.1 加固）**。前置轮（10-06~07）= 维护规程 2.0 治理批 + 结构整理防腐批 + eval 126/127 题面收紧 + 二十七审 A- 维持 + 全 128 集 pass@k 首测（pass@1 = 98.3%/98.5% 现行主口径，README 证据行已刷）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272293 bytes 双侧一致；self_comp 源码 12591 行；Rust 561+31、eval 双后端各 128/128、doc_audit 71 项（J 锚三组 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（Release 认证三选一/性能/L2 行号/断链机检升格）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
+5. **当前状态（2026-10-07，v1.7.1 已 tag）——最新基线 v1.7.1（tag `7739959`，CI run `37526137995` 七 job 绿；线上 https://lom-lang.github.io/lom/playground/ 已刷 v1.7.1 源件（gh-pages `d0bd774`，三方 sha256 一致））**：本轮（10-07）= 二十七审开账 R117/R118 同包整改（v1.7.1：嵌套深度量化登记 + trap 文案中性化 + harness 空数组 args 防御；零 src/，全量回归 21 项全绿）+ playground 重部署；**Release v1.7.0 已发布（2026-10-07，pre-release，id 405817252——首个对外发布检查点；用户解除组织 OAuth App 访问限制后 REST API 直发，核验全过；部署面含 v1.7.1 加固）**；断链机检已升格 CI 常驻 gate（`39744fa` 纯工具批：`python tools/link_check.py` 入 doc-gates，A 类断链/大小写漂移非零退出）。前置轮（10-06~07）= 维护规程 2.0 治理批 + 结构整理防腐批 + eval 126/127 题面收紧 + 二十七审 A- 维持 + 全 128 集 pass@k 首测（pass@1 = 98.3%/98.5% 现行主口径，README 证据行已刷）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272293 bytes 双侧一致；self_comp 源码 12591 行；Rust 561+31、eval 双后端各 128/128、doc_audit 71 项（J 锚三组 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（Release 认证三选一/性能/L2 行号/断链机检升格）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
