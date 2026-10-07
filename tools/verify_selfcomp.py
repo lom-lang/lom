@@ -44,6 +44,7 @@ R104/R105 批（designs/0014，二十一审）：pkg_cases 106_pkg_name_clash
   是否接入 CI 由规划者定）。
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,45 @@ NEG_PKGS = {
 # 是各自 wasm 路径，打印会分叉）
 CASE_ARGS = {
     '122_env_args.lom': ['alpha', 'beta'],
+}
+
+# 0020 行号批 §3.4 汇总断言的豁免清单：这些负例 codegen 消息虽含引号名，
+# 但首个引号名是编译器内部类型名/类型组合（'i64'/'st'/'void'/'mp{i64}'/
+# 'en:Color'/'rc{...}' 等）或点分内建路径（'json.json_dump'）——从未以
+# 标识符 token 出现，token 锚表必然 miss（designs/0020 §2 精度边界既定
+# 形态："名字从未以标识符出现则无行号"）。断言逻辑本身不为此放宽。
+NEG_NO_ANCHOR_EXEMPT = {
+    'neg_annot_mismatch.lom',            # 首引号名 'i64'（内部类型名）
+    'neg_call_nonclosure.lom',           # 'i64'
+    'neg_fold_unsupported_acc.lom',      # 'void'
+    'neg_for_map.lom',                   # 'mp{i64}'
+    'neg_if_nonbool_cond.lom',           # 'i64'
+    'neg_json_let_mismatch.lom',         # 'js'
+    'neg_json_record_literal.lom',       # 'rc{id:i64;done:i32}'
+    'neg_json_stringify_enum_val.lom',   # 'en:Option{i64}'
+    'neg_json_stringify_list_enum.lom',  # 'en:Option{i64}'
+    'neg_json_unknown_builtin.lom',      # 'json.json_dump'（点分路径非单标识符）
+    'neg_list_annot_mismatch.lom',       # 'ls{i64}'
+    'neg_list_cons_elem_type.lom',       # 'f64'
+    'neg_list_eq_enum_elem.lom',         # 'en:Color'
+    'neg_map_annot_mismatch.lom',        # 'mp{i64}'
+    'neg_map_eq_enum_val.lom',           # 'en:Color'
+    'neg_match_arm_type.lom',            # 'i64'
+    'neg_match_guard_type.lom',          # 'i64'
+    'neg_r95_closure_mixed_returns.lom',  # 'i64'
+    'neg_r95_closure_try_mixed_return.lom',  # 'en:Result{i64;i64}'
+    'neg_range_not_int.lom',             # 'st'
+    'neg_record_field_mismatch.lom',     # 'rc{a:i64;b:i64}'
+    'neg_record_order.lom',              # 'rc{x:i64;y:i64}'
+    'neg_return_missing_value.lom',      # 'i64'
+    'neg_str_annot_mismatch.lom',        # 'i64'
+    'neg_str_call_value.lom',            # 'st'
+    'neg_str_condition.lom',             # 'st'
+    'neg_try_ctx_mismatch.lom',          # 'en:Result{i64;st}'
+    'neg_try_in_void_fn.lom',            # 'void'
+    'neg_try_non_result.lom',            # 'i64'
+    'neg_try_unit_operand.lom',          # 'void'
+    'neg_variant_shadow_call.lom',       # 'i64'
 }
 
 EXPECTED_NEGATIVE_MESSAGES = {
@@ -538,6 +578,7 @@ def main():
         # 负例集：子集外构造必须 COMPILE-ERROR 且不产 hex（R66-R68 回归网）
         negatives = sorted(glob.glob(os.path.join(NEGATIVES, '*.lom')))
         neg_l2g = 0  # 0017：L2G 兜底码命中数（观测口径，不作硬断言）
+        no_anchor = []  # 0020：含引号名但缺 ln:cl 位置段的违例（豁免外）
         for case in negatives:
             name = os.path.basename(case)
             hex_out = os.path.join(td, name + '.neg.hex')
@@ -557,6 +598,13 @@ def main():
                       % (name, rc.stdout.strip()[:200]))
                 fail += 1
                 continue
+            # 0020 §3.4 汇总断言（采集段）：codegen 行含引号名者应带非空
+            # ln:cl 位置段（名字锚查表命中）——豁免清单外违例循环后统一报 FAIL
+            if '[L2' in rc.stdout and name not in NEG_NO_ANCHOR_EXEMPT:
+                for out_ln in rc.stdout.splitlines():
+                    if out_ln.startswith('codegen error') and "'" in out_ln \
+                            and not re.match(r'codegen error: \d+:\d+ ', out_ln):
+                        no_anchor.append('%s（%s）' % (name, out_ln.strip()[:110]))
             if '[L2G' in rc.stdout:
                 neg_l2g += 1
             # 0017 双锁：str = 单 substring（未升级条目）；tuple = 多 substring
@@ -576,6 +624,11 @@ def main():
                 continue
             ok += 1
             print('PASS-NEG %-24s COMPILE-ERROR, no hex' % name)
+
+        # 0020 §3.4 汇总断言（判定段）：含引号名无位置段 = FAIL（逐违例一行）
+        for viol in no_anchor:
+            print('FAIL-NEG %s: 含引号名但无 ln:cl 位置段（0020 名字锚断言）' % viol)
+        fail += len(no_anchor)
 
     print('RESULT: %s（%d/%d 项通过：正例对拍 + 负例拒绝；负例 L2G 兜底 %d/%d）' %
           ('PASS' if fail == 0 else 'FAIL', ok, ok + fail, neg_l2g, len(negatives)))

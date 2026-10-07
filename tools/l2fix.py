@@ -6,7 +6,8 @@
 → 解析码行 → 七族建议映射 → 输出。
 
 码行两形态（第二形态为实测补充：LEX 负例走 lex error 行而非 codegen error 行）：
-  codegen：`codegen error: [(L2[A-Z]\\d{3}|LEX\\d{3})] (.*)`
+  codegen：`codegen error: [(\\d+:\\d+ )]?\\[(L2[A-Z]\\d{3}|LEX\\d{3})\\] (.*)`
+  （0020 行号批：位置段 ln:cl 可选前缀于码前——名字锚命中才有；miss 无位置）
   词法/语法层：`lex error L:C [LEXnnn] msg` / `parse error L:C [PARSExxx] msg`
   非 L2 码（LEX/PARSE 等）透传原样，给"语法层错误，参考输出"提示——本工具的
   建议映射只覆盖 L2 codegen 码族。
@@ -113,7 +114,7 @@ L2V_TEMPLATE = (
     "- 算术要求 Int/Float 同型（Int 与 Float 混合同样拒绝——先统一类型再运算）。"
 )
 
-CODEGEN_LINE = re.compile(r"codegen error: \[(L2[A-Z]\d{3}|LEX\d{3})\] (.*)")
+CODEGEN_LINE = re.compile(r"codegen error: (?:(\d+:\d+) )?\[(L2[A-Z]\d{3}|LEX\d{3})\] (.*)")
 SYNTAX_LINE = re.compile(r"(?:lex|parse) error \d+:\d+ \[(\w+\d{3})\] (.*)")
 
 
@@ -144,12 +145,16 @@ def run_l2(lom_bin, l2_path, src):
 
 
 def parse_codes(stdout):
-    """stdout → [(code, message)]，保持输出顺序。"""
+    """stdout → [(code, message)]，保持输出顺序。
+
+    0020 行号批后 codegen 行带可选位置前缀（group1=ln:cl、group2=码、
+    group3=文案）——位置不进建议面（message 维持纯文案，七族映射零改动）。
+    """
     out = []
     for line in stdout.splitlines():
         m = CODEGEN_LINE.search(line)
         if m:
-            out.append((m.group(1), m.group(2).strip()))
+            out.append((m.group(2), m.group(3).strip()))
             continue
         m = SYNTAX_LINE.search(line)
         if m and not m.group(1).startswith("L2"):

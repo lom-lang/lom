@@ -12541,6 +12541,77 @@ fn report_errors(errs: List<{code: String, msg: String, ln: Int, cl: Int}>, em: 
     bad
 end
 
+# ---- 0020（designs/0020 §3 裁决 1 甲）：名字锚输出层查表 ----
+# 位置语义 = 标识符名在源码中的首次出现处（非出错表达式精确 span——
+# 同名多处指首现；消息无引号名或名字从未以标识符出现则无行号）。
+
+# TkIdent 载荷名（非标识符形态返回空串）
+fn ident_payload(t: Tok) -> String
+    match t
+        TkIdent(s) => s
+        _ => ""
+    end
+end
+
+# 名字锚预扫：线性扫 token 表（只扫不解析），标识符名 → 首现 "ln:cl"
+# （单串打包沿 perr 先例，值即输出格式免二次解包）。关键字 token 不入表
+# （只收 TkIdent）；同名只记首现。锚表构建仅在 Err 通道触发——成功路径
+# 编译行为零变化（正例 hex 恒等的设计保证）。
+fn build_name_pos(ts: Map<String, {t: Tok, ln: Int, cl: Int}>, n: Int) -> Map<String, String>
+    let m: Map<String, String> = map_empty()
+    let mut i = 0
+    while i < n
+        let tk = tok_at(ts, n, i)
+        if tok_disc(tk.t) == d_ident()
+            let s = ident_payload(tk.t)
+            if s != "" and map_has(m, s) == False
+                map_set(m, s, int_to_string(tk.ln) + ":" + int_to_string(tk.cl))
+            end
+        end
+        i = i + 1
+    end
+    m
+end
+
+# 提取诊断消息首个引号名 '...'（第一对单引号间内容；无成对引号返回空串）
+fn first_quoted_name(msg: String) -> String
+    let cs = split(msg, "")
+    let nn = list_length(cs)
+    let mut i = 0
+    let mut inside = False
+    let mut closed = False
+    let mut out = ""
+    while i < nn and closed == False
+        let c = list_get(cs, i)
+        if inside
+            if c == "'"
+                closed = True
+            else
+                out = out + c
+            end
+        else
+            if c == "'"
+                inside = True
+            end
+        end
+        i = i + 1
+    end
+    if closed
+        out
+    else
+        ""
+    end
+end
+
+# 锚表查名：miss 返回空串（调用方以空串判别保持原格式——查表 miss 不得
+# 伪造 0:0，谎报位置不如无位置，designs/0020 §7 负向锁定②）
+fn anchor_lookup(anc: Map<String, String>, nm: String) -> String
+    match map_get(anc, nm)
+        Some(v) => v
+        None => ""
+    end
+end
+
 fn main() -> Unit ! [IO]
     let argv = args()
     if list_length(argv) < 3
@@ -12581,7 +12652,16 @@ fn main() -> Unit ! [IO]
                         println("COMPILED " + len(hex) / 2 + " bytes -> " + outpath)
                     end
                     Err(msg) =>
-                        println("codegen error: [" + classify_l2(msg) + "] " + msg)
+                        # 0020 §3.2：首个引号名查 token 锚表——命中则前缀
+                        # ln:cl（码前，与 lex/parse 通道三通道统一）；miss
+                        # 保持原格式（不伪造 0:0）
+                        let anc = build_name_pos(r.toks, r.n)
+                        let pos = anchor_lookup(anc, first_quoted_name(msg))
+                        if pos != ""
+                            println("codegen error: " + pos + " [" + classify_l2(msg) + "] " + msg)
+                        else
+                            println("codegen error: [" + classify_l2(msg) + "] " + msg)
+                        end
                         println("COMPILE-ERROR")
                     end
                 end

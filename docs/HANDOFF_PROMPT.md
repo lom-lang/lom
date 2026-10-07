@@ -84,7 +84,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   [review-2026-10-07.html](reviews/review-2026-10-07.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272293 bytes 双侧一致）、
-  self_comp.lom 12591 行、Rust **561 单元 + 31 集成**
+  self_comp.lom 12671 行、Rust **561 单元 + 31 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 +
   r112×3）、eval 双后端各 128/128（error_repair 31 题含 L2 面 3）、
   fix_corpus 13 对、doc_audit **71/71**、六模式全 PASS（dump 161）、
