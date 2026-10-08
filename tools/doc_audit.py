@@ -387,6 +387,23 @@ def main():
          r'plus (\d+) process-level integration tests', ('integ',)),
     ])
 
+    # ---- J+ 现实核对（R131，三十一审 B 面根治——四回同族漏刷的根治）----
+    # J Rust 组互锁只查组内一致性，全组同滞即绿（R119/R122/R124/R127 四回
+    # 实证）。本项对 tests/ 目录实数 #[test] 函数，与互锁组首个 integ 位对照。
+    # 若文档全组滞留在旧值，互锁照常绿但本项红——根治"全组同滞盲区"。
+    import glob as _glob
+    actual_integ = sum(
+        open(f, encoding='utf-8', errors='replace').read().count('#[test]')
+        for f in sorted(_glob.glob('tests/*.rs'))
+    )
+    m_integ = doc_number('docs/HANDOFF_PROMPT.md',
+                         r'Rust \*\*\d+ 单元 \+ (\d+) 集成\*\*')
+    check('J+ Rust 集成现实核对（tests/ 实数）',
+          m_integ is not None and int(m_integ[0]) == actual_integ,
+          '文档集成 %s vs tests/ #[test] 实数 %d%s'
+          % (m_integ[0] if m_integ else None, actual_integ,
+             '（全组同滞即红——R131 根治）' if m_integ and int(m_integ[0]) != actual_integ else ''))
+
     # ---- Z. 自指项数（R16 盲区关闭：本工具总项数与 HANDOVER 宣称一致）----
     # R16 教训："doc_audit 监控不了自身项数的自指盲区"。本项把 §2.2 的
     # "文档数字 N 项"宣称与脚本实际产出项数互锁（len+1 计入本项自身）。
