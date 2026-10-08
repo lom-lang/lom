@@ -18,7 +18,7 @@ use cli::extract_hover_params;
 use cli::merge_packages_for_wasm;
 use cli::parse_args;
 use cli::print_help;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::process;
@@ -702,6 +702,11 @@ fn run_build(json: bool) {
     }
 
     // 人类可读输出
+    // 缺口 B（designs/0021 §1）：无文件 build 此前不发 PKG007——本流程
+    // 不经 collect_package_symbols（那是带文件三路径的单点接线），两包
+    // 撞名在依赖图解析成功后此处补发（stderr、不拦截；JSON 路径上方已
+    // 提前 return，schema 面不动）。
+    package::warn_public_symbol_clashes(&graph);
     // v1.4.13 登记项 2（v1.4.9 登记）：包级 externals 预计算——每包
     // manifest.dependencies 出发的传递闭包公开符号并集（图已过环检测，
     // DFS 安全；见 package_closure_externals）
@@ -717,50 +722,116 @@ fn run_build(json: bool) {
             println!("      源码文件: {} 个", pkg.source_files.len());
             println!("      公开符号: {} 个", pkg.public_symbols.len());
             // 对包源码执行类型检查
+            // v1.4.13 登记项 2（v1.4.9 登记）：此前逐文件 check_program
+            // （无 externals），包源内跨包符号引用（含 as 别名 t3 与
+            // 非别名真名）误报 NAM003 error。改为按包依赖闭包 externals
+            // 检查（对齐带文件路径 collect_package_symbols 的放行语义）。
+            // 缺口 A（designs/0021 §1）收口：再并上「本包 public_symbols
+            // − 当前文件自身顶层符号集」——多文件包内跨文件引用（文件 B
+            // 用同包文件 A 的 fn）不再假阳性 NAM003。减法在
+            // check_and_report_file 内做（必做——见其文档）。
             for file in &pkg.source_files {
-                let src = match fs::read_to_string(file) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("      读取 {} 失败: {}", file.display(), e);
-                        continue;
-                    }
-                };
-                let path_str = file.display().to_string();
-                let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
-                if diags.ok {
-                    let program = parser::Parser::parse_recover(&src).program;
-                    // v1.4.13 登记项 2（v1.4.9 登记）：此前逐文件 check_program
-                    // （无 externals），包源内跨包符号引用（含 as 别名 t3 与
-                    // 非别名真名）误报 NAM003 error。改为按包依赖闭包 externals
-                    // 检查（对齐带文件路径 collect_package_symbols 的合并单元
-                    // 语义）。多文件包内跨文件引用的残留假阳性维持（登记项，
-                    // 超范围）；本流程不过 collect_package_symbols，PKG007
-                    // 撞名 warning 维持不发（如实登记）。
-                    typechecker::check_program_with_externals(
-                        &program,
-                        &src,
-                        &path_str,
-                        &mut diags,
-                        &externals_map[name],
-                    );
-                }
-                if diags.diagnostics.is_empty() {
-                    println!(
-                        "      ✓ {} — 通过",
-                        file.file_name().unwrap().to_string_lossy()
-                    );
-                } else {
-                    println!(
-                        "      ✗ {} — {} 个诊断",
-                        file.file_name().unwrap().to_string_lossy(),
-                        diags.diagnostics.len()
-                    );
-                    print!("{}", diags.to_human());
-                }
+                check_and_report_file(file, &externals_map[name], Some(&pkg.public_symbols));
             }
         }
     }
+    // 缺口 C（designs/0021 §1）：主文件诊断面——resolve_dfs 只对
+    // manifest.dependencies 递归入图，根项目自身不入图，根目录源文件在
+    // 无文件 build 中此前结构性不可见。与包级对称（包查全部文件），
+    // 逐个检查根目录（lom.toml 所在目录）全部 .lom 文件；externals 传
+    // 全图并集（根的依赖闭包 = 图内全部包的 public_symbols 并集，与
+    // collect_package_symbols 返回值同构——但不经该函数，PKG007 已由
+    // 缺口 B 单独发）。主文件 fn 撞包符号经 externals 走 NAM006 语义
+    // （R105 口径）；根不在图内、无自身 public_symbols 可并，同文件
+    // 重复定义维持 NAM002 error。根目录无 .lom 文件则跳过（不报错）。
+    let root_files = package::collect_lom_files(root_path);
+    if !root_files.is_empty() {
+        println!("  主项目源码: {} 个", root_files.len());
+        let root_externals: Vec<String> = graph
+            .packages
+            .values()
+            .flat_map(|p| p.public_symbols.iter().cloned())
+            .collect();
+        for file in &root_files {
+            check_and_report_file(file, &root_externals, None);
+        }
+    }
     println!("\n依赖解析成功，共 {} 个包。", graph.packages.len());
+}
+
+/// 缺口 A/C（designs/0021 §1）：单文件「读取 + 解析 + 类型检查 +
+/// ✓/✗ 结果行」——包源文件循环与根目录主文件循环共用（输出格式一致）。
+///
+/// externals 构造：
+/// - 基底 `base_externals`：包路径 = 该包依赖闭包公开符号并集
+///   （externals_map[P]）；根路径 = 全图全部包 public_symbols 并集。
+/// - `pkg_symbols = Some(本包 public_symbols)`（缺口 A，包路径）：再并上
+///   「本包 public_symbols − 当前文件自身顶层符号集」（file_top_level_symbols）
+///   ——多文件包内兄弟文件符号放行。**减法必做**：当前文件符号若留在
+///   externals，同文件重复 fn 名会命中 typechecker 的 external_symbols
+///   分支（collect_fn_sig 收敛点），NAM002 error 降级为 NAM006 warning
+///   （翻转同文件重复定义负例）。单文件包减法后为空集，行为零变化。
+/// - `pkg_symbols = None`（缺口 C，根路径）：根不在图内，无包符号可并。
+fn check_and_report_file(
+    file: &std::path::Path,
+    base_externals: &[String],
+    pkg_symbols: Option<&HashSet<String>>,
+) {
+    let src = match fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("      读取 {} 失败: {}", file.display(), e);
+            return;
+        }
+    };
+    let path_str = file.display().to_string();
+    let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
+    if diags.ok {
+        let program = parser::Parser::parse_recover(&src).program;
+        let mut externals: Vec<String> = base_externals.to_vec();
+        if let Some(symbols) = pkg_symbols {
+            let own = file_top_level_symbols(&program);
+            externals.extend(symbols.iter().filter(|s| !own.contains(*s)).cloned());
+        }
+        typechecker::check_program_with_externals(
+            &program, &src, &path_str, &mut diags, &externals,
+        );
+    }
+    if diags.diagnostics.is_empty() {
+        println!(
+            "      ✓ {} — 通过",
+            file.file_name().unwrap().to_string_lossy()
+        );
+    } else {
+        println!(
+            "      ✗ {} — {} 个诊断",
+            file.file_name().unwrap().to_string_lossy(),
+            diags.diagnostics.len()
+        );
+        print!("{}", diags.to_human());
+    }
+}
+
+/// 缺口 A（designs/0021 §1）：单文件顶层符号集——fn 名 + enum 名 +
+/// 枚举变体名（与 package.rs collect_public_symbols 同口径），供
+/// 「本包 public_symbols − 当前文件符号」减法用。
+fn file_top_level_symbols(program: &ast::Program) -> HashSet<String> {
+    let mut syms = HashSet::new();
+    for item in &program.items {
+        match item {
+            ast::Item::Fn(f) => {
+                syms.insert(f.name.clone());
+            }
+            ast::Item::Enum(e) => {
+                syms.insert(e.name.clone());
+                for v in &e.variants {
+                    syms.insert(v.name.clone());
+                }
+            }
+            ast::Item::Import(_) => {}
+        }
+    }
+    syms
 }
 
 /// v1.4.13 登记项 2（v1.4.9 登记）：`lom build` 无文件流程的包级

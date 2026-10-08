@@ -1,6 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-08，v1.9.0；l2fix CLI 子命令批交付——二十八审 A- 判据全满足，台账零 open）**：
+> **当前状态（2026-10-09，v1.9.1；build 三缺口收口批交付——二十八审 A- 判据全满足，台账零 open）**：
 > 最新基线 **v1.8.0**（tag `88d91dc`，CI run `37675620476` 七 job 绿——L2 从 experimental
 > 转 supported face：README 边界段/playground footer/eval-README 三处宣称面更新 +
 > 审查轮数宣称 26→28；纯宣称面批零代码改动。**前置 v1.7.2 批（2026-10-08，用户裁决
@@ -115,9 +115,7 @@
 >
 > **登记在案不修边界（非 open 项）**：块内 let 无同名泄漏与
 > 循环外读 for 变量两个 divergence（typechecker 放行/解释器
-> RUNTIME002）；多文件包内跨文件引用在无文件 build 视图仍
-> 假阳性；无文件流程不发 PKG007；无文件 build 流程不检查
-> 主文件诊断面（二十三审备注 2 维持登记）；clippy
+> RUNTIME002）；~~多文件包假阳性/无文件 PKG007/主文件不检查~~（三项已于 v1.9.1 收口销账——designs/0021）；clippy
 > --all-targets ~4 条工具链漂移存量；playground 四边界
 > （浏览器递归≪桌面、file 模块虚拟单文件、env::args() 只见
 > 虚拟脚本路径、病态嵌套源码引擎栈 trap 由看门狗兜底——源码

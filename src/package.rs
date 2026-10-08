@@ -448,7 +448,9 @@ fn resolve_dfs(
 }
 
 /// 收集目录下所有 .lom 文件（不递归子目录）
-fn collect_lom_files(dir: &Path) -> Vec<PathBuf> {
+/// 缺口 C（designs/0021 §1）起 `lom build` 无文件流程也用（根目录主
+/// 文件诊断面收集），故 pub(crate)。
+pub(crate) fn collect_lom_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
