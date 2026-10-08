@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第三十轮体系内独立敌手审查 — 2026-10-09</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.verdict-b{background:#fff8e1;border:2px solid #f0ad4e;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第三十轮体系内独立敌手审查报告</h1>
+
+<p><b>2026-10-09</b> —— 基线 HEAD <code>98d0397</code>（git 只读审查，工作区干净；tag v1.9.1 = <code>7c2403c</code>，CI run 37767137349 七 job 绿实查）。审查增量 = 二十九审基线 <code>be1d314</code> 之后全部 <b>4 笔</b>提交（git log be1d314..HEAD 逐笔清点）：<code>29f34ea</code>（二十九审报告入库）、<code>7803afe</code>（<b>R120-R123 同包收口批——主审面 A</b>，CI run 37753605224 七 job 绿）、<code>7c2403c</code>（<b>v1.9.1 build 三缺口收口批——主审面 B</b>，tag 所指）、<code>98d0397</code>（README tag/CI 回填）。本轮四件使命：①R120-R123 修复面零失真复核（二十九审 B+ 的两笔宣称失真是否真的修干净）；②v1.9.1 行为面宣称逐条敌手复核 + 自构探针（多文件包/重复 fn/PKG007 分流/主文件诊断/rc）；③基线矩阵 19 项全套；④文档对账数字链 + J 锚抽 3 项手工核。审查执行者：第三十轮体系内独立敌手审查 agent。</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：二十九审 B+ 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何仓库文件；唯一写盘物 = 本报告 + <code>target/probes/r30/</code> 探针目录（gitignored，保留）；git 严格只读（无 add/commit/push/tag/stash/checkout，本报告文件为任务书明示的唯一例外写位）；cargo 串行；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R124</b> 起开账，每账带可复现形态 + 候选处置 + "应修" + "绝不能这样修"负向锁定）。</p>
+
+<div class="verdict-b">
+<b>本轮评级：B+</b>（仅对本轮时点与查验面；历史轨迹不外推；二十九审 B+ 不预支本轮）。<br>
+<b>一行式总评</b>：二十九审四笔开账的修复面<b>三笔实证修干净、一笔修后即复发</b>——<b>R120</b> 真接线实锤（ci.yml doc-gates step 8 "l2fix self-check (R120, v1.9.0 CLI parity oracle)"，CI run 37753605224 逐 step API 实查 completed/success，README L82 措辞如实）但<b>l2fix.py 头注 L20 "首次交付自验用，不入 CI 常驻" 未随接线修订</b>——R120 处置 b 明文要求的配套句漏改，宣称与工具自述仍反向矛盾（→R126）；<b>R121</b> 修复零失真——README L74 新句与登记边界逐字一致，本轮独立再实证（164 负例全跑 self_comp 重新计数）：codegen 码行 162、<b>引号名行 102、带位置 71、无位置 31，31 个无位置文件与豁免清单集合完全相等、组外违例 0、豁免内带位置 0</b>——"the registered 71/102 coverage boundary with 31 exempt type-string cases" 逐位成立；<b>R123</b> 修复成立——README Current release 段（L81）携 <code>quine **272925**</code>（grep 全文 3 处加粗、<b>首匹配 = Current 段</b>，doc_number 首匹配语义锚位正确），v1.9.1 升版批自身遵守 MAINTENANCE §2.3 4b 纪律（新 Current 句带 quine 值），4b 纪律条在册（→仅余 doc_audit.py L369 "全 README 唯一" 注释过时的备注级观察）；<b>R122 修后即复发（→R124）</b>：7803afe 把 TODO 刷至 v1.9.0/573+31/12671（时点正确），但随后 v1.9.1 批把集成 31→35（本轮逐 target 实测 1+7+2+6+4+5+3+3+4 = <b>35</b>，新增 build_gaps_remediation ×4）而<b>未刷任何计数位</b>——TODO L50 仍 573+31、TODO L4 "最新基线 v1.8.0" 连续两批未刷、README L150 "plus 31"、HANDOFF_PROMPT L84/L144、HANDOVER L83/L146（"合计 604" 实为 608）/L386 全部滞留 31，<b>doc_audit J Rust 组 7 位互锁照常 PASS——"全组同滞"盲区从 R123 候选处置 c 的预言变为实证</b>；HANDOVER §2.2 / HANDOFF 基线清单的集成命令列表现漏 build_gaps_remediation 目标。主审面 B：v1.9.1 三缺口<b>主宣称全部独立行为实证成立</b>（P1 多文件包跨文件引用过 / P2+P5+P8 同文件重复仍 NAM002 且零 NAM006——P5 多文件包内重复为批内测试未覆盖的加深面 / P3 PKG007 走 stderr 且 P3b JSON 模式 stdout 纯净 / P4 主文件 NAM003 + 结果行格式 / 全 error 场景 rc 恒 0 且 rc=1 三边界与 cli.rs 新文档一致；build_closure_externals 3/3 不翻转），main.rs 减法实现（externals_map[P] ∪ (P.public_symbols − file_top_level_symbols)）与 file_top_level_symbols 口径（fn+enum+变体，对齐 collect_public_symbols）亲读无误；但<b>缺口 C 的 NAM006 子句三写位失真（→R125）</b>：designs/0021 §1 "主文件 fn 与包符号撞名开始发 NAM006（R105 语义…此为无文件路径新增）"、commit message "main 文件撞名发 NAM006（R105 语义新路径）"、main.rs 注释 "主文件 fn 撞包符号经 externals 走 NAM006 语义…同文件重复定义维持 NAM002 error"——实测 <b>P7（根 main.lom 单一定义 fn 撞包名）：零诊断 ✓通过</b>（逐文件视图单定义不成 functions 表重复，NAM006 分支结构上不可达；同项目带文件路径 build main.lom --target wasm 发 NAM006——两路径不对称），<b>P9（根 main.lom 同文件重复 fn 且名字撞包符号）：NAM002 error 降级为 NAM006 warning（"0 错误 1 警告"）</b>——根路径 externals=全图并集<b>无减法</b>，正是 designs/0021 自身"关键约束——减法必做（否则翻转同文件重复负例）"禁止的翻转形态在根路径复现（带文件路径同形态 P9c 亦为 warning，降级与 R105 既有裁决语义跨路径一致，故非行为缺陷级）。基线矩阵 19 项全绿（cargo <b>573 单元 + 35 集成</b>逐 target 配对、verify_selfcomp <b>368/368</b>=196+8+164 且 L2G 0/164、bootstrap <b>14/14 quine 272925</b>（本轮全量亲跑 323.2s）、selfhost 六模式、eval 双后端各 128/128、eval_prompt 31/31、spec_examples 51正/5反、doc_audit 71/71、link_check A=0、l2fix self-check 6/6（本机 + CI 双通道）、smoke ALL PASS、fmt gate 37 文件、fuzz 80 轮、diff 三档 8/20/10、CI 三 run 七 job 绿（37753605224/37767137349/37767682046）、tag v1.9.1/v1.9.0 本地+远端双核、golden 逐字一致）。开账 <b>R124/R125/R126 三笔（全 P3 宣称面/计数面，零行为缺陷、零静默错值、零语言面触碰）</b>。评级依据：任务书三条件中①"宣称零失真"再次被打破——R125 是 v1.9.1 批设计文本/commit/代码注释三写位的机制子句失真（与 R121 同型：宣称一个结构上不可能按自然读法兑现的行为），R126 是 R120 修复的未完成部分（宣称与工具自述反向矛盾），R124 是 R122 的隔批同族复发（同族第三回：R119 漏刷→R122 漏刷→R124 漏刷，"修复-复发"循环未断）；②敌手零击穿——满足（P1-P12 十二项探针零行为击穿，P7/P9 为宣称精度差异且 P9 与既有 R105 裁决语义一致）；③无新 P1/P2——满足。三笔全 P3、主宣称全立、矩阵全绿——好于二十九审（彼时核心宣称⑤整体落空）；但"宣称零失真"条件连续第二轮被打破且含一笔修复残留 + 一笔立即复发，按二十九审确立的"宣称面失真权重高于数字精度漂移"口径，A- 仍不可期，定 <b>B+</b>（连续 B+，但构成不同：上轮是宣称面批的核心宣称落空，本轮是行为批的附属子句失真 + 计数面循环复发——整改后状态只能由下一轮复审重估）。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先完整阅读 docs/EXECUTOR_TEMPLATE.md、docs/MAINTENANCE.md（全文，重点 §4/§2.3 4b）与二十九审报告全文（B+ 语境与 R120-R123 开账原文）。随后：(一) git 基线核验与增量逐笔清点（be1d314..HEAD 4 笔），两批核心提交 stat/diff 亲读（7803afe 四文件、7c2403c 十二文件）；(二) 主审面 A——R120：ci.yml doc-gates 全步骤读码 + GitHub API 匿名实查 run 37753605224 逐 job 逐 step + l2fix.py 头注现值核；R121：README L74 现句摘录 + 自写 probe_r121_coverage.py 对 164 负例全跑重新计数（独立于 verify_selfcomp 断言通道）；R122：TODO 顶部状态块逐行现值 + 7803afe/7c2403c 两笔 TODO diff 对照 + 集成逐 target 实测；R123：README quine 加粗模式全文定位 + doc_audit.py J quine 组与 doc_number 首匹配语义读码 + MAINTENANCE §2.3 4b 存在性；(三) 主审面 B——designs/0021 全文读 + src/main.rs check_and_report_file / file_top_level_symbols / run_build diff 与现行码逐行亲读 + src/cli.rs 文档块措辞 vs 实测退出码 + typechecker collect_fn_sig 的 NAM002/NAM006 分支下钻；自构探针 P1-P12（target/probes/r30/，全部 Write 落盘）；(四) 基线矩阵 19 项全部亲手实跑（cargo 串行；bootstrap 后台全量；CI 三 run API 实查；tag 本地+远端双核；八→九集成目标逐一单跑）；(五) 文档对账 doc_audit 双跑 + J 锚 3 项手工核（quine 以本轮 bootstrap 实测值为源、self_comp 行数 wc、Rust 计数逐 target）；(六) 开账 + 评级。全程 git 零写、cargo 串行、探针只落 target/probes/r30/。</p>
+
+<h2>2. 基线矩阵 19 项（全部亲手实跑）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测（命令/输出/退出码）</th><th>结论</th></tr>
+<tr><td>git 基线核验</td><td>HEAD 98d0397、工作区干净、增量 4 笔</td><td><code>git rev-parse HEAD</code> = 98d03977…；<code>git status --short</code> 空输出（审查写盘前）；<code>git log --oneline be1d314..HEAD</code> = 4 笔（29f34ea/7803afe/7c2403c/98d0397）</td><td class="ok">✓</td></tr>
+<tr><td>cargo build --release</td><td>就绪（v1.9.1）</td><td>rc=0；<code>lom --version</code> = <code>lom 1.9.1</code>；Cargo.toml version = 1.9.1</td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>573 单元 + <b>35</b> 集成（v1.9.1 Current 段）</td><td><code>--bin lom</code> 单元 <b>573 passed; 0 failed</b>；九集成目标逐一单跑：r56_process=<b>1</b> / r58_lsp_process=<b>7</b> / r94_pkg_alias=<b>2</b> / r104_dedup_order=<b>6</b> / r107_alias_clash=<b>4</b> / r108_variant_externals=<b>5</b> / build_closure_externals=<b>3</b> / r112_closure_assign=<b>3</b> / <b>build_gaps_remediation=4</b> = <b>35</b>（合计 608）——<b>与 README Current 段 "31→35" 一致；与 J Rust 组 7 位现值 31 不一致 → R124</b></td><td class="ok">✓ 实测 35 / <span class="bad">文档位 31 滞留 → R124</span></td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td><code>cargo clippy --release -- -D warnings</code> 零输出 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --check</td><td>零</td><td><code>cargo fmt --all -- --check</code> rc=0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368 = 196+8+164</td><td>RESULT: PASS（368/368）；分组三次独立 grep -c：PASS=<b>196</b>、PASS-PKG=<b>8</b>、PASS-NEG=<b>164</b>；负例 L2G 兜底 <b>0/164</b></td><td class="ok">✓</td></tr>
+<tr><td>--bootstrap</td><td>14/14、quine 272925</td><td>全量 RESULT: PASS（14/14；L3 self-apply <b>272925 bytes; byte-identical</b>；总耗时 323.2s）</td><td class="ok">✓（J quine 锚 6 位现值即此值）</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>dump <b>161</b>/0、tokens <b>161</b>/0（列坐标系已知差异 1）、diags <b>14</b>/0、static 坏 <b>24</b>/0 + 干净集 ALIGNED <b>161</b>、run <b>31</b>/0、--wasm PASS（layer2 <b>158</b>/0 + layer3 golden 39 条 + selfapply 逐字一致）——六模式逐个单跑 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>128/128 × 2</td><td>run.ps1 -Verify：Total <b>128</b> / Passed <b>128</b>；-Backend wasm：Total <b>128</b> / Passed <b>128</b></td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>31/31</td><td>校验 <b>31</b> / 失真 <b>0</b>，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 <b>51</b> / 反例 <b>5</b> / skip（json 8+diag 1+marker 10+ebnf 4+keywords 1+cli 1），RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71/71</td><td>RESULT: PASS（71/71）——J quine 组 6 位 272925 互锁一致；<b>J Rust 组 7 位互锁一致于 {'unit':'573','integ':'31'}——组内一致但与现实 35 不符（全组同滞盲区实证）→ R124</b>；报告落盘前后双跑均 71/71</td><td class="ok">✓ 工具口径 / <span class="bad">J Rust 组值失真未被拦 → R124</span></td></tr>
+<tr><td>link_check</td><td>A=0</td><td>RESULT: PASS（<b>A 类断链 0</b> + 大小写漂移 0；B 类历史原文 <b>7</b> 不拦）</td><td class="ok">✓</td></tr>
+<tr><td>l2fix --self-check</td><td>6/6</td><td>6/6 断言通过（负例 164、码条目 164，分布 L2C001=31 L2P001=9 L2S001=18 L2T001=57 L2U001=26 L2V001=21 LEX001=1 LEX005=1）——<b>本机 + CI 双通道（run 37753605224 doc-gates step 8 实跑 success = R120 接线）</b></td><td class="ok">✓ 双通道</td></tr>
+<tr><td>node playground 冒烟</td><td>ALL PASS</td><td>wasm-release 构建后 <code>node playground/smoke.mjs</code>：SMOKE: ALL PASS，rc=0</td><td class="ok">✓</td></tr>
+<tr><td>Lom fmt gate</td><td>37 有效文件</td><td>examples 树 38 个 .lom 排除 apply_test = <b>37</b> 全部 fmt --check 通过（fail=0）</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查（GitHub API 匿名）</td><td>7803afe、7c2403c（tag）、98d0397 三 run 七 job 绿</td><td>run <b>37753605224</b>（head_sha=7803afe，push）completed/<b>success</b>：七 job 逐个 success，<b>doc-gates 13 步逐 step 核毕——step 8 = "l2fix self-check (R120, v1.9.0 CLI parity oracle)" completed/success</b>；tag run <b>37767137349</b>（head_sha=7c2403c）completed/success 七 job 绿；HEAD run <b>37767682046</b>（head_sha=98d0397）completed/success 七 job 绿</td><td class="ok">✓ 三 run 实查属实</td></tr>
+<tr><td>版本与 tag 链</td><td>v1.9.1→7c2403c</td><td>本地 rev-parse：v1.9.1=<b>7c2403c79…</b>、v1.9.0=97510117b…、v1.8.0=88d91dc2d…；<code>git ls-remote --tags origin</code> 同值双核（v1.9.1/v1.9.0 均对上）</td><td class="ok">✓</td></tr>
+<tr><td>golden stmt_interp</td><td>逐字一致</td><td>LF 归一后 <b>逐字节相等</b>（cmp 零输出；Windows CRLF 已知形态，CI 同款 tr -d '\r' 口径）；运行 rc=0</td><td class="ok">✓</td></tr>
+</table>
+<p class="small">§2.2 补充项（顺手全跑）：fuzz_smoke 80 轮零崩溃 PASS；diff_test --probe <b>8/8</b>；diff_test --rounds 20 --seed-base 1 --ci <b>20/20</b>；diff_test --pkg --rounds 10 --seed-base 1 --ci <b>10/10</b>。</p>
+
+<h2>3. 主审面 A：R120-R123 修复面零失真复核（7803afe）</h2>
+<table>
+<tr><th>账</th><th>修复宣称</th><th>本轮独立复核</th><th>结论</th></tr>
+<tr><td>R120（CI 真接线）</td><td>doc-gates 新增 l2fix self-check 步骤</td><td>①ci.yml 现行 doc-gates 第 8 步 <code>python3 tools/l2fix.py --self-check</code>（带 R120 注释）；②API 实查 run 37753605224（7803afe push）：doc-gates job 13 步逐 step——<b>step 8 "l2fix self-check (R120, v1.9.0 CLI parity oracle)" completed/success</b>，七 job 全 success；tag run 37767137349 与 HEAD run 37767682046 的 doc-gates 亦绿（接线随 HEAD 持续在跑）；③README L82（v1.9.0 段）"l2fix.py stays in CI as the python parity oracle (doc-gates self-check, R120)" 与事实一致；positioning L30 "保留为 CI 自检与对拍基准" 随之成真；④本机复跑 6/6。<b>但 tools/l2fix.py 头注 L20 现值仍为 "--self-check 质量锁定…首次交付自验用，不入 CI 常驻"</b>——7803afe stat 四文件不含 l2fix.py，R120 候选处置 b 明文 "同时把 l2fix.py 头注 '不入 CI 常驻' 句同步修订" 未执行 → <b>R126</b></td><td class="ok">接线成立 / <span class="bad">头注残留 → R126</span></td></tr>
+<tr><td>R121（位置宣称收敛）</td><td>README L74 收敛到 71/102 登记边界 + 工具引用双通道</td><td>①现行句逐字核对："each rejection carries an <code>[L2xxx]</code> code and a repair hint via <code>lom l2fix</code> / tools/l2fix.py; rejections whose message carries a quoted name also carry a <code>ln:cl</code> source position — the registered 71/102 coverage boundary with 31 exempt type-string cases"——与任务书预期措辞逐字一致；②<b>独立再实证</b>（probe_r121_coverage.py，164 负例全跑 self_comp 重新计数，独立于 verify_selfcomp 断言通道）：codegen 码行 <b>162</b>、引号名行 <b>102</b>、带位置 <b>71</b>、无位置 <b>31</b>；<b>31 个无位置文件与 NEG_NO_ANCHOR_EXEMPT 豁免集集合完全相等</b>（nopos_files_equals_exempt_set=True）；组外违例 <b>0</b>；豁免内带位置 <b>0</b>——71/102 + 31 豁免逐位成立，收敛措辞零失真</td><td class="ok">✓ 零失真（逐位实证）</td></tr>
+<tr><td>R122（TODO 主写位刷齐）</td><td>TODO 刷至 v1.9.0/573+31/12671（版本位+Rust 位+self_comp 位）</td><td>7803afe 时点三处全刷（diff 亲读：当前状态行 v1.8.0→v1.9.0、561+31→573+31、12591→12671）——修复本身成立。<b>但 v1.9.1 批（7c2403c）把集成 31→35 后</b>：TODO L3 已刷 v1.9.1 而 <b>L50 仍 "Rust **573+31**"</b>（实测 573+35）、<b>L4 仍 "最新基线 **v1.8.0**（tag 88d91dc…）"</b>（连续 v1.9.0/v1.9.1 两批未刷，实际 v1.9.1/7c2403c/37767137349）；commit message 宣称数字 "31→35 集成" 自身如实，但配套计数位全数未动 → <b>R124（修后隔批同族复发）</b></td><td class="bad">✗ 修后复发 → R124</td></tr>
+<tr><td>R123（quine 锚 Current 段归位 + 4b 纪律）</td><td>README v1.9.0 Current 段补 quine **272925**；MAINTENANCE §2.3 新增 4b</td><td>①现行 README <code>quine \*\*(\d+)\*\*</code> 全文 3 处：<b>L81（Current v1.9.1，首匹配）</b>、L82（v1.9.0 Previous）、L84（v1.7.2 Previous）；doc_audit doc_number 取 re.search 首匹配 → <b>锚位落在 Current release 段</b>，三处同值 272925，J quine 组 6 位互锁一致且与本轮 bootstrap 实测同值；②v1.9.1 升版批自身遵守 4b：新 Current 句（L81）内嵌 "quine **272925** unchanged (self_comp untouched)"；③MAINTENANCE §2.3 4b 纪律条在册（"升版批必含 J 锚现值…升版验收时人工核一眼锚在 Current 段"）。<b>备注级观察</b>：doc_audit.py L369 注释 "（'quine **NNN**'，全 README 唯一）" 现不成立（3 处）——首匹配语义仍正确、行为无影响，注释陈述过时</td><td class="ok">✓ 结构修复成立（一处工具注释过时，备注不立账）</td></tr>
+</table>
+
+<h2>4. 主审面 B：v1.9.1 build 三缺口收口批（7c2403c）宣称逐条敌手复核</h2>
+<h3>4.1 designs/0021 §1/§2 宣称 vs 行为（宣称主体全立）</h3>
+<table>
+<tr><th>宣称</th><th>复核操作与实测</th><th>结论</th></tr>
+<tr><td>① 单文件包减法空集行为零变化（build_closure_externals 3/3）</td><td><code>cargo test --release --test build_closure_externals</code> = <b>3 passed; 0 failed</b>（本轮独立单跑）</td><td class="ok">✓</td></tr>
+<tr><td>① 多文件包跨文件引用不再 NAM003</td><td>自构 P1：multi 包 a.lom 定义 helper / b.lom 裸调用（无 import）→ <code>lom build</code>：a.lom ✓、b.lom <b>✓ 通过</b>，零 NAM003，"公开符号: 2 个"</td><td class="ok">✓</td></tr>
+<tr><td>③ 同文件重复 fn 仍 NAM002 且无 NAM006（减法验证）</td><td>P2（单文件包 dup/a.lom 重复 foo）→ <b>NAM002 error（1 错误 0 警告）</b>、无 NAM006、rc=0；<b>P5（加深面：多文件包 multi/a.lom 同文件重复 foo + b.lom 旁证）→ NAM002 error 照常</b>（批内测试 only 覆盖单文件包，此为超出批面的加深探针）；P8（根 main.lom 同文件重复 local，不撞包名）→ NAM002 error 照常</td><td class="ok">✓（含批外加深面）</td></tr>
+<tr><td>④ PKG007 人类可读路径补发、stderr 不入 stdout</td><td>P3：两包撞名 shared → <b>stdout 零 PKG007</b>、stderr 含 "[PKG007] 两包导出同名符号 'shared'——按包根路径序取后者 'pkgb'"；P3b：<code>lom build --json</code> → stdout 纯 <code>{"schema":"lom-build/v1",…}</code> 信封、<b>stderr 空</b>（JSON 路径提前 return 码位亲读印证——schema 面不动）</td><td class="ok">✓</td></tr>
+<tr><td>⑤ 主文件诊断面 + 结果行格式</td><td>P4：根 main.lom 引 undefined_thing → <b>[NAM003] 调用未定义函数 'undefined_thing'</b> + 结果行 <b>"✗ main.lom — 1 个诊断"</b>（与包文件同格式）+ "主项目源码: 1 个"汇总行；P6 正例：main.lom import pkga 调用 → ✓ 通过；批内测试 4（main_file_diagnostics_checked）同口径 4/4</td><td class="ok">✓</td></tr>
+<tr><td>⑥ rc 恒 0（含 error 场景；设计约束）</td><td>P2/P4/P5/P8/P9 全部 error 场景 rc=<b>0</b>；P3 PKG007 warning 场景 rc=0；边界：P11 无 lom.toml → rc=<b>1</b>、P12 坏清单 → rc=1（PKG001）——与 cli.rs 修正后文档块逐字吻合（"0 — 清单与依赖解析成功即 0…1 — 当前目录无 lom.toml / 清单解析失败 / 依赖解析失败"）</td><td class="ok">✓</td></tr>
+<tr><td>减法实现正确性（diff 亲读）</td><td>main.rs <code>check_and_report_file</code>：externals = base_externals + (pkg_symbols − file_top_level_symbols(program))——减法在收集后过滤，语义正确；<code>file_top_level_symbols</code> 收 fn 名 + enum 名 + 枚举变体名（与 package.rs collect_public_symbols 同口径，注释如实）；缺口 C root_externals = 全图 public_symbols 并集、pkg_symbols=None；缺口 B warn_public_symbol_clashes 为 eprintln（stderr，package.rs L153-172 亲读）——三修法实现与设计一致。<b>唯根路径无减法 → P7/P9（见 4.2）</b></td><td class="ok">✓ 主体 / <span class="bad">根路径缺减法 → R125</span></td></tr>
+<tr><td>纯宣称面核对：cli.rs 文档块修正</td><td>diff 亲读：原 "rc 1 for package errors" 错位块改为 rc=0 如实口径（诊断不置退出码 + tests/build_closure_externals 锁定注明）——与 P2-P12 实测全部吻合</td><td class="ok">✓ 如实</td></tr>
+</table>
+<h3>4.2 击穿面：缺口 C 的 NAM006 子句三写位失真 + 根路径减法缺位（→ R125）</h3>
+<table>
+<tr><th>探针</th><th>构造</th><th>实测</th><th>判定</th></tr>
+<tr><td>P7</td><td>根 main.lom 单一定义 <code>fn pkg_fn</code>，与依赖包 pkga 导出符号 pkg_fn 撞名（无 import）</td><td><code>lom build</code>（无文件）：<b>零诊断，"✓ main.lom — 通过"</b>；同项目 <code>lom build main.lom --target wasm</code>（带文件合并单元路径）：<b>[NAM006] 本地定义遮蔽包符号 'pkg_fn'（1 警告）+ 编译产出 9724 字节 wasm</b>——两路径对同一源码形态诊断不对称</td><td class="bad">宣称失真 → R125</td></tr>
+<tr><td>P9</td><td>根 main.lom 同文件重复定义 <code>fn pkg_fn</code> 两次，名字撞包符号</td><td><code>lom build</code>（无文件）：<b>[NAM006] warning（"共 1 个诊断（0 错误，1 警告）"）——NAM002 error 被降级为 warning</b>；带文件路径同形态（P9c）同为 warning（2 警告，R105 既有裁决语义）</td><td class="bad">翻转角落 → R125（与带文件路径既有行为一致，非行为缺陷级）</td></tr>
+<tr><td>机理读码</td><td>typechecker collect_fn_sig（src/typechecker/mod.rs L259-300）</td><td>NAM006 "本地定义遮蔽包符号" 仅在 <b>functions 表已有同名</b>（重复登记）且名 ∈ external_symbols 时发射；无文件根路径逐文件视图单定义不成重复 → P7 结构上不可能触发；P9 的第二次登记成重复且 pkg_fn ∈ root_externals（全图并集无减法）→ 降级发射。包路径因减法（P.public − 自身符号）无此角落——<b>designs/0021 "关键约束——减法必做（否则翻转同文件重复负例）"的禁止形态恰在根路径复现</b></td><td class="warn">根因定位</td></tr>
+</table>
+<p class="small">涉及写位：designs/0021 §1 缺口 C（"主文件 fn 与包符号撞名开始发 NAM006（R105 语义在带文件路径既有，此为无文件路径新增）"）、commit 7c2403c message（"main 文件撞名发 NAM006（R105 语义新路径）"）、src/main.rs 注释（"主文件 fn 撞包符号经 externals 走 NAM006 语义…同文件重复定义维持 NAM002 error"）。README Current 段（L81）只宣称 "checked with full-graph externals, symmetric with package-file behavior"——<b>不含 NAM006 子句，门面未失真</b>。批内 4 集成测试亦未断言 NAM006（均为主宣称面）。</p>
+
+<h2>5. 敌手探针表（P1-P12 + R121 再实证，全部自构实跑）</h2>
+<p>探针环境：本机 lom 1.9.1（cargo build --release 后）；探针源与输入 = target/probes/r30/。"击穿"判定 = 与宣称/登记语义不符 / 静默错值 / 崩溃 / JSON 破坏。</p>
+<table>
+<tr><th>编号</th><th>方向/构造</th><th>实测</th><th>击穿判定</th></tr>
+<tr><td>P1</td><td>多文件包跨文件引用（b.lom 裸调 a.lom 的 fn）</td><td>两文件 ✓ 通过，零 NAM003，rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P2</td><td>单文件包同文件重复 fn</td><td>NAM002 error（1 错误 0 警告）、无 NAM006、rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P3</td><td>两包撞名符号（人类可读路径）</td><td>stdout 零 PKG007；stderr 含 PKG007（包根路径序取后者）；rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P3b</td><td>同上 + <code>--json</code></td><td>stdout 纯 lom-build/v1 信封（可整体 json.loads）、stderr <b>空</b>——JSON schema 面未污染</td><td class="ok">未击穿</td></tr>
+<tr><td>P4</td><td>根 main.lom 引未声明符号</td><td>NAM003 + "✗ main.lom — 1 个诊断"结果行 + "主项目源码: 1 个"；rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P5</td><td><b>多文件包内</b>同文件重复 fn（批内测试未覆盖的加深面）</td><td>a.lom NAM002 error 照常、b.lom ✓——减法在多文件包同样防降级</td><td class="ok">未击穿</td></tr>
+<tr><td>P6</td><td>根 main.lom 正例（import 包 fn 调用）</td><td>✓ 通过（root_externals 全图并集放行正确）</td><td class="ok">未击穿</td></tr>
+<tr><td>P7</td><td>根 main.lom 单一定义撞包名</td><td>无文件路径零诊断；带文件路径 NAM006——<b>与 designs/0021/commit/main.rs 注释宣称不符</b></td><td class="bad">宣称失真 → R125</td></tr>
+<tr><td>P8</td><td>根 main.lom 同文件重复（不撞包名）</td><td>NAM002 error 照常（0 警告）；rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P9</td><td>根 main.lom 同文件重复且撞包名</td><td><b>NAM006 warning（0 错误 1 警告）——NAM002 降级</b>；带文件路径同形态亦 warning（R105 既有语义）</td><td class="bad">翻转角落 → R125</td></tr>
+<tr><td>P11</td><td>无 lom.toml 目录 build</td><td>rc=1 + 引导文案（与 cli.rs 文档一致）</td><td class="ok">未击穿</td></tr>
+<tr><td>P12</td><td>坏 lom.toml</td><td>rc=1 + PKG001 清单解析失败</td><td class="ok">未击穿</td></tr>
+<tr><td>R121 再实证</td><td>164 负例全跑 self_comp 独立重新计数</td><td>引号名行 102 / 带位置 71 / 无位置 31；无位置文件集 == 豁免集（集合相等）；违例 0 / 过宽 0</td><td class="ok">未击穿（边界逐位吻合）</td></tr>
+</table>
+
+<h2>6. 基线外顺带核验</h2>
+<table>
+<tr><th>项</th><th>实测</th><th>结论</th></tr>
+<tr><td>TODO "登记在案不修边界"销账（designs/0021 §2 验收 4）</td><td>TODO 现行登记段："~~多文件包假阳性/无文件 PKG007/主文件不检查~~（三项已于 v1.9.1 收口销账——designs/0021）"——三项移出与行为实证一致（P1/P3/P4）</td><td class="ok">✓</td></tr>
+<tr><td>TODO L4 "最新基线" 行</td><td>仍为 v1.8.0（tag 88d91dc / run 37675620476）——v1.9.0 与 v1.9.1 两批均未刷（实际 v1.9.1/7c2403c/37767137349）</td><td class="bad">→ 并入 R124</td></tr>
+<tr><td>positioning.html 头部数字口径</td><td>截至 2026-10-09（v1.9.1）："build 三缺口收口…集成 31→35；零语言面"——如实</td><td class="ok">✓</td></tr>
+<tr><td>回填批（98d0397）</td><td>README 一行 v1.9.1 tag/CI 回填（7c2403c / run 37767137349）——API 实查两数字属实；HEAD 自身 run 37767682046 七 job 绿</td><td class="ok">✓</td></tr>
+<tr><td>docs/0021 状态行</td><td>"已交付（2026-10-09，仓库版本 v1.9.1…三缺口全收口：集成 4/4 全过 + 既有 build_closure_externals 3/3 不翻转 + pkg_demo 探针零假阳性）"——与本轮独立复核一致</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>7. 文档对账数字链（J 锚抽 3 项独立手工核）</h2>
+<table>
+<tr><th>锚</th><th>文档值</th><th>实际值（独立手工核）</th><th>结论</th></tr>
+<tr><td>quine</td><td>J 组 6 处当前值位 = 272925（HANDOFF_PROMPT ×2 / HANDOVER §1/§9-3/§9-5 / README Current 段 L81）</td><td>--bootstrap L3 self-apply 实测 <b>272925 bytes; byte-identical</b>（本轮全量亲跑 323.2s）</td><td class="ok">✓（锚位在 Current 段——R123 修复维持）</td></tr>
+<tr><td>self_comp 行数</td><td>J/D 位 = 12671（README/HANDOFF/HANDOVER/TODO L51）</td><td>wc -l 实测 <b>12671</b>（v1.9.1 零 self_comp 改动——stat 印证）</td><td class="ok">✓</td></tr>
+<tr><td>Rust 计数</td><td>J 组 7 处 = 573/<b>31</b>（HANDOFF ×2 / HANDOVER ×3 / README L150 / TODO L50 同值）；README Current 段 "31→35"</td><td>实测 <b>573 单元 + 35 集成</b>（九 target 逐项：1/7/2/6/4/5/3/3/4）——<b>J 组 7 位全部滞留 31</b>，doc_audit 互锁照常 PASS（全组同滞盲区）→ R124；HANDOVER §2.2 "合计 604" 实为 <b>608</b>、命令清单漏 build_gaps_remediation</td><td class="ok">✓ 主链（Release 段如实）/ <span class="bad">7 现值位失真 → R124</span></td></tr>
+<tr><td>doc_audit 自指</td><td>71=71</td><td>71/71 双跑（报告落盘前后）</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>8. 开账（只开不修；从 R124 起，三笔全 P3）+ 评级依据</h2>
+<div class="ledger">
+<p><b>R124（P3，活信息计数位全组同滞——R122 修复的隔批同族复发，同族第三回）——v1.9.1 批把集成 31→35 后未刷任何计数位：TODO 主写位（Rust 位 573+31 + "最新基线 v1.8.0" 版本行）+ README 状态行 + HANDOFF_PROMPT ×2 + HANDOVER ×3 共 7 个现行值位全部滞留 31，doc_audit J Rust 互锁组照常 PASS（全组同滞盲区实证——R123 候选处置 c 预言的形态成真）；§2.2 全量回归命令清单漏 build_gaps_remediation 目标、"合计 604" 应为 608</b><br>
+可复现形态：①逐 target 实测：<code>cargo test --release --test build_gaps_remediation</code> = <b>4 passed</b>；九目标和 = <b>35</b>（1+7+2+6+4+5+3+3+4）；②<code>grep -n '573' docs/TODO.md</code> L50 = "Rust **573+31**"；L4 = "最新基线 **v1.8.0**（tag 88d91dc…"（实际 v1.9.1/7c2403c）；③<code>grep -n 'plus 31 process-level' README.md</code> L150 命中（枚举串亦不含 build_gaps_remediation）；④HANDOFF_PROMPT L84 "Rust **573 单元 + 31 集成**"、L144 集成命令清单 ×31 漏新目标；HANDOVER L83 "+ 31 集成"、L146 "期望 573/573（…合计 604）"、L386 "另有 tests/ 集成 ×31"；⑤<code>python tools/doc_audit.py</code> 输出 "J Rust 计数组…互锁一致（7 处当前值位：{'unit': '573', 'integ': '31'}）"——组内一致、现实 35，<b>互锁组无现实核对位，全组同滞不可拦</b>；⑥同族链：R119（二十八审，修 quine 漏行数位）→ R122（二十九审，TODO 滞后一版）→ 本账（v1.9.1 批再滞）——"修复-复发"循环第三回，根因都是升版/交付批未把 §2.3 SOP 第 3 步（doc_audit FAIL 报告即清单）覆盖到"工具 PASS 但值错"的形态。<br>
+候选处置（供裁决）：a) <b>刷值</b>：7 位 31→35（含 README L150 枚举补 build_gaps_remediation、HANDOVER §2.2/HANDOFF 清单补 --test build_gaps_remediation、合计 604→608）+ TODO L4 基线行刷 v1.9.1；b) <b>根治向</b>（R123 候选处置 c 的落地）：doc_audit J Rust 组补现实核对位——从 tests/ 目录枚举集成目标数与各目标 #[test] 计数（或与 HANDOVER §2.2 清单互锁），使"全组同滞"可拦。<br>
+<b>应修</b> = a 必做（纯文档刷值）；b 建议随下个工具批。<b>绝不能这样修</b> = ①只刷 TODO 一处（R122 复发的直接对偶——J 组其余 6 位仍在）；②为过 doc_audit 把 build_gaps_remediation 挪出 tests/ 或改回 31 的口径（倒填数字/藏测试目标）；③只做 b 不做 a（工具改好前现值位继续失真）。</p>
+<p><b>R125（P3，宣称失真 + 登记边界缺失——缺口 C 的 NAM006 子句三写位与行为不符 + 根路径减法缺位）——designs/0021 §1 / commit 7c2403c / src/main.rs 注释宣称"主文件 fn 撞包符号发 NAM006（无文件路径新增）/同文件重复定义维持 NAM002"，实测：单定义撞名（P7）无文件路径零诊断（NAM006 分支在逐文件视图结构上不可达，带文件路径同形态有 NAM006——两路径不对称）；同文件重复且撞包名（P9）NAM002 error 降级 NAM006 warning（根路径 externals 全图并集无减法，正是 designs/0021 自身"减法必做"约束禁止的翻转形态在根路径复现；带文件路径同形态亦为 warning，与 R105 既有裁决语义一致）</b><br>
+可复现形态：target/probes/r30/p7（单定义撞名）：<code>cd target/probes/r30/p7 && lom build</code> → "✓ main.lom — 通过"零诊断；<code>lom build main.lom --target wasm</code> → "[NAM006] 本地定义遮蔽包符号 'pkg_fn'"。target/probes/r30/p9（同文件重复撞名）：<code>lom build</code> → "[NAM006]…共 1 个诊断（0 错误，1 警告）"（P8 对照：不撞名时 NAM002 error）；机理 = src/typechecker/mod.rs collect_fn_sig 重复分支（functions 表已有同名 ∧ 名 ∈ external_symbols）——无文件根路径单定义不成重复。<br>
+候选处置（供裁决）：a) <b>纯文档收敛（最小面）</b>：designs/0021 追加登记行 + main.rs 注释改口——"无文件路径逐文件视图下，主文件单定义撞包名不告警（合并单元重复语义仅在带文件路径存在）；主文件同文件重复且名字撞包符号时随 R105 裁决语义降级 NAM006（与带文件路径一致），不撞包名时 NAM002"；b) <b>行为补减法</b>：root_externals 并 file_top_level_symbols 差集（与包路径同型），P9 回 NAM002（P7 仍无诊断，需另行登记）——改变 v1.9.1 已交付行为，须 patch 升版 + 三实现一致律评估。<br>
+<b>应修</b> = a（一句登记 + 注释改口，零行为变化）；b 属行为选边，留用户裁决。<b>绝不能这样修</b> = ①为圆宣称在无文件路径塞合并单元（改变无文件流程结构）；②只改 P9 降级而不登记"带文件路径同形态同降级"的 R105 语义关联（单侧修制造两路径新不对称）；③删 designs/0021 的 NAM006 句让文档"自洽"（删设计宣称制造更大失真）。</p>
+<p><b>R126（P3，R120 修复残留——工具自述与 CI 事实反向矛盾）——l2fix.py 头注 L20 现值仍写 "--self-check 质量锁定（designs/0018 §2B）…首次交付自验用，不入 CI 常驻"，而 R120 真接线后该断言已 false：doc-gates job 第 8 步每个 push 都在跑它（run 37753605224/37767137349/37767682046 三 run 实查）；R120 候选处置 b 明文"同时把 l2fix.py 头注'不入 CI 常驻'句同步修订"——7803afe stat 四文件不含 tools/l2fix.py，配套句漏改</b><br>
+可复现形态：①<code>sed -n '20p' tools/l2fix.py</code> = "--self-check  质量锁定（designs/0018 §2B）：对 tools/selfcomp/negative/ 全部负例…首次交付自验用，不入 CI 常驻"；②<code>grep -n 'l2fix' .github/workflows/ci.yml</code> = doc-gates "l2fix self-check (R120…)" 步骤在档且三 run 实跑 success——同仓库宣称（README/positioning/CI）与工具自述（头注）反向矛盾，正是 R120 原账的镜像残留。<br>
+候选处置：头注一句修订为如实口径（如 "--self-check 质量锁定…自 v1.9.0 批 R120 收口起常驻 CI doc-gates job，兼本地全量回归清单项"）。<br>
+<b>应修</b> = 纯头注一句（零行为变化）。<b>绝不能这样修</b> = ①撤 CI 接线来圆头注（倒退回 R120 原状）；②只改头注不动 README/positioning 的既有如实录（那些是对的）。</p>
+<p><b>备注（不开账）</b>：①doc_audit.py L369 注释 "（'quine **NNN**'，全 README 唯一）" 在 R123 修复后不再成立（现 3 处加粗：Current/两个 Previous 段）——doc_number 首匹配语义仍锚 Current 段、行为正确，注释陈述过时，随下个工具批顺带；②二十九审备注③（B2 跨作用域首现锚文档补句）仍未见补——沿二十九审口径不单独立账；③二十九审备注②（l2fix --text 吃后续选项边角）v1.9.1 未触 CLI 面，状态不变。</p>
+</div>
+<h3>8.1 评级依据</h3>
+<p>按任务书框架三条件逐条：①<b>宣称零失真——不满足</b>：R120-R123 修复面四笔中 R121/R123 实证零失真（R121 逐位重derive 102/71/31 集合相等）、R120 主体成立但留头注残留（R126）、R122 修后隔批同族复发（R124）；v1.9.1 批三缺口主宣称全部行为实证成立、cli.rs 修正如实，但缺口 C 的 NAM006 子句在 designs/0021/commit message/main.rs 注释三写位失真（R125）——与 R121 同型（宣称一个结构上按自然读法不可兑现的行为），且根路径减法缺位是其自身"减法必做"约束的禁止形态复现（行为影响限于错误级诊断在病态角落降为警告，与带文件路径既有 R105 裁决语义一致，无静默错值）；②<b>敌手零击穿——满足</b>：P1-P12 + R121 再实证共 13 项，零行为击穿（无崩溃/无静默错值/无 JSON 破坏/无 rc 翻转）；③<b>无新 P1/P2——满足</b>：三笔开账全 P3。</p>
+<p><b>定级 B+</b>。理由：与二十九审同守 B+ 但构成不同——上轮是宣称面批的核心宣称⑤整体落空 + 门面边界句过度宣称；本轮 R120-R123 修复面复核干净度高于上轮增量质量（R121 逐位实证零失真、R123 结构修复成立），v1.9.1 行为批主宣称全立、探针零击穿、矩阵 19 项全绿；失真收窄为：一笔行为批附属机制子句失真（R125）+ 一笔计数面同族第三回复发（R124）+ 一笔修复残留头注（R126），三笔全 P3。未回 A- 的关键：任务书"宣称零失真"条件连续第二轮被打破，且 R124 表明 R122 族"修复-复发"循环未断（doc_audit 全组同滞盲区结构性存在，工具即清单防线对该组失效）、R125 表明交付批仍会在无探针覆盖的子句上写未验证的机制预告（P7 形态若在交付批内跑过即不会落账）——按二十九审确立的"宣称面失真权重高于数字精度漂移"口径，A- 的前提条件不成立。高于 B 的先例场景（二十一审 R104/R105 为 P1 行为面）；低于 A-（二十五~二十八审四连平的"宣称零失真"基线未恢复）。整改后状态只能由下一轮复审重估（§4.4）。</p>
+<p><b>后置门禁</b>：本报告落盘后复跑 <code>python tools/doc_audit.py</code> = <b>71/71 PASS</b>（落盘前后双跑；报告本身不含新增数字锚句式，不改任何锚——R124 所指 J Rust 组 31 位失真是"组内一致但与现实不符"，doc_audit 工具口径照常 PASS，已在 §2/§7 如实登记）；<code>python tools/link_check.py</code> 复跑 PASS（本报告位于 docs/reviews/ 属 B 类历史原文位，A=0 维持）。审查期间仓库产品源码零修改（git status 仅本报告新增与 target/probes/r30/ 探针目录，后者 gitignored；探针运行残留 neg_out.hex/main.wasm 均在 target/ 下）。</p>
+
+<h2>附录：探针目录（target/probes/r30/，gitignored）</h2>
+<p class="small">p1/（多文件包跨文件引用：lom.toml + multi/{lom.toml,a.lom,b.lom}）/ p2/（单文件包同文件重复）/ p3/（两包撞名 + --json 变体）/ p4/（根 main.lom NAM003）/ p5/（多文件包内同文件重复）/ p6/（根 main 正例）/ p7/（根单定义撞包名）/ p8/（根同文件重复不撞名）/ p9/（根同文件重复撞包名）/ p11/（无 lom.toml）/ p12/（坏 lom.toml）；probe_r121_coverage.py（R121 再实证：164 负例全跑重新计数）；p1_out…p9_out / p3_stdout|stderr / p3b_stdout|stderr（探针输出留档）；bootstrap_out.txt（--bootstrap 14/14 全量输出）；stmt_actual/stmt_act_lf/stmt_exp_lf（golden 比对留档）；ci_run_37753605224{,_jobs}.json / ci_tag_v191{,_jobs}.json / ci_head_runs.json / ci_head_jobs.json（CI 四组 API 留档）。</p>
+
+</body>
+</html>
