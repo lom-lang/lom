@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Lom 第二十九轮体系内独立敌手审查 — 2026-10-09</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict{background:#e8f5e9;border:2px solid #2e7d32;padding:12px 16px;margin:14px 0}
+.verdict-b{background:#fff8e1;border:2px solid #f0ad4e;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第二十九轮体系内独立敌手审查报告</h1>
+
+<p><b>2026-10-09</b> —— 基线 HEAD <code>be1d314</code>（git 只读审查，工作区干净）。审查增量 = 二十八审基线 <code>b9ce791</code> 之后全部 <b>7 笔</b>提交（git log b9ce791..HEAD 逐笔清点）：<code>047659c</code>（二十八审报告入库）、<code>67f5132</code>（<b>R119 收口批——次审面 D</b>）、<code>88d91dc</code>（<b>v1.8.0 feat：L2 转正批——主审面 B</b>）、<code>87dd190</code>（README tag/CI 回填）、<code>9cf5d0a</code>（v1.8.0 交接五件套）、<code>9751011</code>（<b>v1.9.0 feat：l2fix CLI 子命令批——主审面 C 核心</b>，tag v1.9.0 所指）、<code>be1d314</code>（v1.9.0 tag/CI 回填）。本轮五件使命：①v1.7.2 L2 行号批轻复验（主审面 A）；②v1.8.0 L2 转正批宣称面复核（主审面 B）；③v1.9.0 l2fix CLI 子命令批五条宣称逐条敌手复核 + ≥6 项敌手探针（主审面 C，本轮重点）；④R119 修复面 + 回填批核验（次审面 D）；⑤基线矩阵 19 项全套 + 文档对账数字链。审查执行者：第二十九轮体系内独立敌手审查 agent。</p>
+
+<p class="note"><b>审查边界（如实标注）</b>：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：二十八审 A- 等历史评级不外推，本轮结论不预支后续。审查阶段未改任何仓库文件；唯一写盘物 = 本报告 + <code>target/probes/r29/</code> 探针目录（gitignored，保留）；git 严格只读（无 add/commit/push/tag/stash/checkout，本报告文件为任务书明示的唯一例外写位）；cargo 串行；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R120</b> 起开账，每账带可复现形态 + 候选处置 + "应修" + "绝不能这样修"负向锁定）。</p>
+
+<div class="verdict-b">
+<b>本轮评级：B+</b>（仅对本轮时点与查验面；历史轨迹不外推；二十八审 A- 不预支本轮）。<br>
+<b>一行式总评</b>：v1.9.0 l2fix CLI 子命令批<b>四条技术宣称独立敌手复核全部成立</b>——①python↔rust 对拍独立重做（<b>12 真实负例全链 + 24 合成对</b>，超出任务书 ≥5+≥5 口径）：宿主跑 L2 采集 stdout 同一文本喂两侧，<b>逐条目五字段差异 0</b>；②JSON 信封<b>字节级一致 36/36</b>（file="-" stdin 通道，escape 层读码印证 rust escape_str 与 python json.dumps 转义集逐项相同："/\/\n\r\t\b/f/&lt;0x20→\u00xx，尾换行为 CLI println 层归一）；③43 名/8 模块查表<b>码面坐实直连</b> interpreter::module_of（src/interpreter.rs L2210，运行时零自带表，单测 l2fix_name_to_module_locks_43_names_8_modules 逐字锁死）；④<b>828 行整、零 regex、零 unsafe</b>（wc/grep 三核）；12 新单测精确（cargo test --bin lom l2fix = <b>12 passed + 561 filtered</b>，561+12=573 逐字吻合）；敌手探针 <b>32 项零击穿</b>（stdin 边界 7 项：空/BOM/110KB 超长行/CRLF/无尾换行/非 UTF-8 防御性 rc=1；畸形输入 6 项：5 万层花括号/反斜杠双引号/Unicode 名/空引号对/坏码形态全不崩；--text 与 stdin/file 竞争<b>优先级正确</b>且 label 如实显示"--text"；JSON 信封 3 项；退出码 6 项与 help 一致；python 边角 6 项——\u2028/\v 切行差异属 l2fix.rs 头注 L42 登记不移植面）。但<b>宣称⑤"l2fix.py 保留为 CI 自检"落空</b>（R120）：README L81 "l2fix.py stays (CI self-check + …)" 与 positioning 同款宣称，而 <b>ci.yml 七 job 零 l2fix 步骤</b>（grep rc=1 实证）、l2fix.py 头注 L20 反向声明"--self-check 首次交付自验用，不入 CI 常驻"——宣称的 CI 接线不存在；且 v1.8.0 转正批 README 边界段新句 "each rejection carries … <b>a source position</b>" 过度宣称（R121）：同 README v1.7.2 段登记 71/102 带位置、<b>31 枚豁免无位置</b>，本轮实测豁免负例（neg_json_unknown_builtin 等 5 枚抽查）确实无位置——同文档自相矛盾，旧文本（experimental 期）无此宣称、系转正批引入。次审面 D：<b>R119 负向锁定三条全遵守</b>（9 处 272293 全为合法历史值、无全文扫描规则、README/SPEC 历史条目未篡改），但 R119 处置宣称"统一刷 272925/<b>12671</b>"实<b>漏刷 TODO self_comp 行数位</b>（现值仍 12591 vs 实测 12671），叠加 v1.9.0 批 commit message 宣称改 TODO 而 stat 零 TODO 改动——<b>TODO 顶部状态块（活信息唯一主写位）滞后一个版本</b>（v1.8.0/561+31/12591 vs 实际 v1.9.0/573+31/12671），交接镜像 HANDOFF_PROMPT 已新、主写位旧（R122）；J quine 组 README 锚 <code>quine \*\*N\*\*</code> 在两次升版后<b>漂回 v1.7.2 Previous 历史段</b>（全 README 唯一匹配 L83，v1.8.0/v1.9.0 Current 段均无 quine 现值——R119 结构缺陷以对偶形态复发，当前靠 quine 三版同值 272925 侥幸绿灯，R123）。基线矩阵 19 项全绿（cargo <b>573+31</b> 逐 target 配对 1/7/2/6/4/5/3/3、verify_selfcomp <b>368/368</b>=196+8+164 且 L2G 0/164、bootstrap <b>14/14 quine 272925</b>、selfhost 六模式、eval 双后端各 128/128、eval_prompt 31/31、doc_audit 71/71、link_check A=0、l2fix self-check 6/6（本机——CI 零接线即 R120）、smoke 11 检、CI 两 run 七 job 绿、tag 双端双核）。开账 <b>R120/R121/R122/R123 四笔（全 P3 宣称面/文档结构，零行为缺陷）</b>。评级依据：任务书框架"宣称零失真 + 敌手零击穿 + 无新 P1/P2 → A- 可期"三条件中<b>第一条被打破</b>（R120 接线宣称落空 + R121 过度宣称——两处均在 README 门面现行段，非数字精度漂移），A- 不可期；技术面全绿、敌手零击穿、四笔全 P3 无行为影响、无 P1/P2——定 <b>B+</b>（高于二十一审 B 先例场景：彼时 R104/R105 为 P1 行为面）。
+</div>
+
+<h2>1. 审查方法</h2>
+<p>先完整阅读 docs/EXECUTOR_TEMPLATE.md 与 docs/MAINTENANCE.md §4（八节框架与开账纪律）及二十八审报告全文（基线矩阵样式与上轮开账复跑语境）。随后：(一) 基线矩阵 19 项全部亲手跑并逐项记录（CI GitHub API 匿名实查两 run 逐 job、tag 本地+远端双核、八集成目标逐一单跑计数、--bootstrap 全量取 quine 实测值）；(二) 主审面 C——v1.9.0 五条宣称独立重做：写 probe_parity.py（12 真实负例宿主全链采集 stdout + 24 合成对，python parse_codes/suggest 库调用 vs rust <code>lom l2fix - --json</code> stdin 通道，字段级 + 信封字节级双层对拍）；读码核 module_of 直连与 escape_str 转义集；grep 核 828 行/零 regex/零 unsafe；cargo test --bin lom l2fix 精确计数；CI yml 全文读码追 l2fix 接线（宣称⑤）；(三) 敌手探针 probe_adversary.py 32 项自构实跑（stdin 边界/畸形输入/双源竞争/JSON 信封/退出码/python-rust 边角六族）；(四) 主审面 B——README 边界段现行措辞 vs v1.7.2 登记边界、git log -S 追措辞引入批次、playground 线上 footer curl 实拉 + 四源件 sha256 对 HEAD、eval/README 时点注记与采集纪律比对、designs/0020 §4 五判据逐项对账；(五) 次审面 D——67f5132 diff 亲读核 R119 实刷范围、负向锁定三条 grep 核、J 组锚现值位定位、TODO 顶部状态块现值 vs 实测逐项；(六) 主审面 A 轻复验（分组计数//bootstrap/三通道格式/豁免抽查）；(七) 文档对账数字链 + 开账 + 评级。全程 cargo 串行、git 只读。</p>
+
+<h2>2. 基线矩阵 19 项（全部亲手实跑）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测（命令/输出/退出码）</th><th>结论</th></tr>
+<tr><td>git 基线核验</td><td>HEAD be1d314、工作区干净、增量 7 笔</td><td><code>git rev-parse HEAD</code> = be1d3145…；<code>git status --short</code> 空输出（审查写盘前）；<code>git log --oneline b9ce791..HEAD</code> = 7 笔（清单见报告头）</td><td class="ok">✓</td></tr>
+<tr><td>cargo build --release</td><td>就绪（v1.9.0）</td><td>rc=0；<code>lom --version</code> = <code>lom 1.9.0</code></td><td class="ok">✓</td></tr>
+<tr><td>cargo test --release</td><td>573 单元 + 31 集成</td><td><code>--bin lom</code> 单元 <b>573 passed; 0 failed</b>；八集成目标逐一单跑：r56_process=<b>1</b> / r58_lsp_process=<b>7</b> / r94_pkg_alias=<b>2</b> / r104_dedup_order=<b>6</b> / r107_alias_clash=<b>4</b> / r108_variant_externals=<b>5</b> / build_closure_externals=<b>3</b> / r112_closure_assign=<b>3</b> = <b>31</b>（合计 604）；l2fix 模块精确 <b>12 passed + 561 filtered</b>（561+12=573 逐字吻合宣称）</td><td class="ok">✓ 配对逐字吻合</td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td><code>cargo clippy --release -- -D warnings</code> 零输出 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --check</td><td>零</td><td><code>cargo fmt --all -- --check</code> rc=0</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368 = 196+8+164</td><td>RESULT: PASS（368/368）；分组实测 PASS=<b>196</b>、PASS-PKG=<b>8</b>、PASS-NEG=<b>164</b>；负例 L2G 兜底 <b>0/164</b></td><td class="ok">✓</td></tr>
+<tr><td>--bootstrap</td><td>14/14、quine 272925</td><td>全量 RESULT: PASS（14/14；L3 self-apply <b>272925 bytes; byte-identical</b>；515.8s）</td><td class="ok">✓</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>dump <b>161</b>/0、tokens <b>161</b>/0（列坐标系已知差异 1）、diags <b>14</b>/0、static 坏 <b>24</b>/0 + 干净集 ALIGNED <b>161</b>、run <b>31</b>/0、--wasm PASS（layer3 golden 39 条 + selfapply）——六模式逐个单跑 rc=0</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>128/128 × 2</td><td>run.ps1 -Verify：Total <b>128</b> / Passed <b>128</b>；-Backend wasm：Total <b>128</b> / Passed <b>128</b></td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>31/31</td><td>校验 <b>31</b> / 失真 <b>0</b>，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>spec_examples_check</td><td>PASS</td><td>正例 <b>51</b> / 反例 <b>5</b> / skip（json 8+diag 1+marker 10+ebnf 4+keywords 1+cli 1），RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td>71/71</td><td>RESULT: PASS（71/71；J quine 组 6 处当前值位 <b>272925</b>、J selfcomp 组 368/196/8/164、J Rust 组 <b>573/31</b>——README quine 锚位结构问题见 §6 R123，组值本身全对）——报告落盘前后各跑一次均 71/71</td><td class="ok">✓</td></tr>
+<tr><td>link_check</td><td>A=0</td><td>RESULT: PASS（<b>A 类断链 0</b> + 大小写漂移 0；B 类历史原文 <b>7</b> 不拦）</td><td class="ok">✓</td></tr>
+<tr><td>l2fix --self-check</td><td>6/6</td><td>6/6 断言通过（负例 164、码条目 164，分布 L2C001=31 L2P001=9 L2S001=18 L2T001=57 L2U001=26 L2V001=21 LEX001=1 LEX005=1）——<b>本机手跑；CI 零接线（七 job 逐 step 核毕无 l2fix）= R120</b></td><td class="ok">✓ 本机 / <span class="bad">CI 接线宣称落空</span></td></tr>
+<tr><td>node playground 冒烟</td><td>ALL PASS</td><td><code>node playground/smoke.mjs</code>：SMOKE: ALL PASS，rc=0</td><td class="ok">✓</td></tr>
+<tr><td>Lom fmt gate</td><td>37 有效文件</td><td>examples 树 38 个 .lom 排除 apply_test = <b>37</b> 全部 fmt --check rc=0</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查（GitHub API 匿名）</td><td>9751011 与 be1d314 两 run 七 job 绿</td><td>run <b>37680423135</b>（head_sha=9751011，push）completed/<b>success</b>：windows / ubuntu / macos / selfhost verify / clippy / doc gates / playground 七 job 逐个 success；HEAD be1d314 → run <b>37681019629</b> completed/<b>success</b> 同七 job 逐个 success</td><td class="ok">✓ 实查属实</td></tr>
+<tr><td>版本与 tag 链</td><td>v1.9.0→9751011、v1.8.0→88d91dc</td><td>本地 rev-parse：v1.9.0=97510117b…、v1.8.0=88d91dc2d…、v1.7.2=ca31691f3…；<code>git ls-remote --tags origin</code> 同值双核</td><td class="ok">✓</td></tr>
+<tr><td>golden stmt_interp</td><td>逐字一致</td><td>LF 归一后 <b>逐字节相等</b>（cmp 零输出；Windows CRLF 已知形态，CI 同款 tr -d '\r' 口径）</td><td class="ok">✓</td></tr>
+</table>
+<p class="small">§2.2 补充项（顺手全跑）：fuzz_smoke 80 轮零崩溃 PASS；diff_test --probe <b>8/8</b>；diff_test --rounds 20 --seed-base 1 --ci <b>20/20</b>；diff_test --pkg --rounds 10 --seed-base 1 --ci <b>10/10</b>。</p>
+
+<h2>3. 主审面 A：v1.7.2 L2 行号批轻复验（ca31691，二十八审已全立）——复验全过</h2>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>分组计数复跑</td><td>verify_selfcomp <b>368/368</b> = PASS 196 + PASS-PKG 8 + PASS-NEG 164；L2G 兜底 <b>0/164</b>（三计数逐 grep -c 独立取得）</td><td class="ok">✓</td></tr>
+<tr><td>bootstrap / quine</td><td>--bootstrap <b>14/14</b>，L3 self-apply <b>272925 bytes; byte-identical</b>（515.8s）</td><td class="ok">✓</td></tr>
+<tr><td>三通道格式一致性抽查</td><td>lex：<code>lex error 4:13 [LEX001] 未闭合的字符串</code>（无冒号）；parse：<code>parse error 3:1 [PARSE001] 期望 'end' (块闭合)，得到 文件结束</code>（构造缺 end 负例实测，无冒号）；codegen：<code>codegen error: 4:13 [L2U001] 闭包捕获了未定义变量 'undefined_thing'</code>（有冒号）——ln:cl 均置于码前，通道关键字异名为通道语义（二十八审备注②结论维持）</td><td class="ok">✓</td></tr>
+<tr><td>31 枚豁免清单抽查（≥3 要求，实抽 5 枚）</td><td>neg_annot_mismatch='i64' / neg_json_unknown_builtin='json.json_dump'（点分路径）/ neg_record_field_mismatch='rc{a:i64;b:i64}' / neg_range_not_int='st' / neg_for_map='mp{i64}'——<b>5/5 首引号名均为内部类型串或点分路径、均无位置前缀</b>，豁免理由成立（清单本体 31 枚在 verify_selfcomp.py L98-130）</td><td class="ok">✓ 5/5</td></tr>
+</table>
+
+<h2>4. 主审面 B：v1.8.0 L2 转正批（88d91dc）宣称面复核</h2>
+<table>
+<tr><th>复核项</th><th>实测</th><th>结论</th></tr>
+<tr><td>README 边界段现行措辞 vs 仓库实际</td><td>L74 "a <b>supported face</b> as of v1.8.0 (…promoted from experimental by user adjudication after four consecutive A- review rounds, a zero-open ledger, and the v1.7.2 line-number batch…)"——L2 CLI 子命令面（lom l2fix v1.9.0 实测可用）、审查轮数 28（二十五~二十八审 A- 连平属实）、self-hosts provably（bootstrap 272925）——转正叙述本身与仓库实际一致。<b>但同句 "each rejection carries an [L2xxx] code, a source position, and a repair hint" 的 "a source position" 过度宣称</b>（git log -S 追溯：旧 experimental 句无 position 宣称，系本批引入）——同 README v1.7.2 段登记 "71 of 102 … carry a position / 31 … keep the bare format"，本轮实测豁免负例确实无位置 → <b>R121</b></td><td class="bad">✗ 边界句一处失真 → R121</td></tr>
+<tr><td>playground footer 线上生效核</td><td>curl 实拉线上页：footer 含 <b>"L2 subset compiler (supported since v1.8.0) &amp; 28-round in-system reviews"</b>；线上四源件 sha256 vs HEAD：<b>index=122d9a607acc、app=2a55a9f69410、harness=4212b320445e、worker=2c2edff015d5 逐字节一致</b>（app/harness/worker 三哈希与二十八审登记值相同——v1.8.0/v1.9.0 仅动 index footer 一行）；gh-pages 头 = 889a43f（v1.8.0 期重部署提交）</td><td class="ok">✓</td></tr>
+<tr><td>eval/README 时点注记措辞</td><td>L110 ""experimental" at capture time — the L2 face was promoted to supported in v1.8.0, 2026-10-08, but the prompts keep their verbatim capture-time wording"——<b>与题面采集纪律不矛盾</b>：127-129 prompt 保持采集时点原文（二十八审已核 verbatim），注记如实标注时点与转正事实，非回写</td><td class="ok">✓</td></tr>
+<tr><td>designs/0020 §4 转正判据五项逐项对账</td><td>①修复闭环三件套：码（v1.6.0 已交付）+ l2fix（d665d11）+ 行号（v1.7.2，本轮 A 面复验全立）✓；②行为锁定常态绿：196 对拍 + 164 双锁 + bootstrap 14/14 本轮复验全绿 ✓；③边界登记收口：包展开不查同文件 fn 重复（登记）+ MUT002 分歧族（登记）+ 行号首现锚精度边界（0020 §2 登记 + 31 枚豁免机检）✓；④评测实证：pass@k 报告在库（eval/REPORT-2026-10-07-passk-128.md，二十八审已对账逐字一致；127 Option 解包缺口如实区分能力面）✓；⑤带 L2 面独立审查轮：二十八审（L2 行号新面 8 项探针零击穿）✓——<b>五项无一项"未满足即转正"</b></td><td class="ok">✓ 判据链成立</td></tr>
+<tr><td>纯宣称面零代码改动核验</td><td>git show 88d91dc --stat：Cargo.lock/Cargo.toml（版本）+ LANGUAGE_SPEC/README/HANDOVER/TODO/positioning/eval README/playground index——<b>零 src/、零 .lom、零 eval 任务</b> ✓；87dd190 = README 一行 tag/CI 回填 ✓</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>5. 主审面 C：v1.9.0 l2fix CLI 子命令批（9751011）五条宣称逐条敌手复核</h2>
+<h3>5.1 宣称① "python↔rust 对拍 18 合成 + 12 真实负例全链零字段差异" —— 成立（独立重做，超出宣称口径）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>12 真实负例全链（跨码族挑选）</td><td>probe_parity.py：neg_annot_mismatch(T)/neg_bool_arith(V)/neg_call_arity(C)/neg_closure_undef_capture(U)/neg_l2_dup_fn(P)/neg_str_arith(V)/neg_pipe_syntax(S)/neg_no_main(P)/neg_l2_lex_unclosed(LEX)/neg_map_key_type(G 兜底)/neg_str_annot_mismatch(T)/neg_if_nonbool_cond(T)——每枚宿主 <code>lom self_comp.lom -- neg out.hex</code> 采集 stdout（python run_l2 等价链），<b>同一文本</b>喂 python parse_codes+suggest（库调用）与 rust <code>lom l2fix - --json</code>（stdin 通道）：逐条目 code/message/confidence/action/suggestion <b>五字段差异 0</b></td><td class="ok">✓ 12/12</td></tr>
+<tr><td>24 合成对（18 基础 + 6 深边角）</td><td>18 基础覆盖七族全映射 + 位置前缀/缺空格/四位码/L2 码语法层过滤/零码行/多行混合；6 深边角：全角逗号停字符截断、关键字后无空白失配、<b>空引号对跳过续找</b>、未闭合引号、lookbehind "具得"粘连、多行混合——五字段差异 <b>0</b></td><td class="ok">✓ 24/24</td></tr>
+<tr><td>手译正确性抽查（读码层）</td><td>first_quoted 空段跳过 "x '' y 'len'" → " y "（python re.search 逐位推进语义逐字复现，含测试锁定）；keyword_capture lookbehind (?&lt;![得具]) 与 \s+ 后随停字符游程逻辑与 python 正则逐项对齐；parse_codegen_line 逐位推进重试与 re.search 对齐（P6f 双前缀形态实证同结果）</td><td class="ok">✓</td></tr>
+</table>
+<h3>5.2 宣称② "JSON 信封字节级一致" —— 成立（36/36）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>信封字节级对拍</td><td>36 组（12 真实 + 24 合成）：python <code>json.dumps({"schema":"l2-fix/v1","file":"-",entries}, ensure_ascii=False, indent=2)</code> vs rust <code>lom l2fix - --json</code> 输出（尾换行归一——rust println! 层）：<b>逐字节相等 36/36</b>，含空 entries 紧凑 <code>"entries": []</code>、多行建议 \n 转义、非 ASCII 直出</td><td class="ok">✓ 36/36</td></tr>
+<tr><td>escape 层读码印证</td><td>src/json.rs escape_str 转义集 = "、\、\n、\r、\t、\b(0x08)、\f(0x0C)、其余 &lt;0x20 → \u00xx——与 python json.dumps(ensure_ascii=False) 转义集<b>逐项相同</b>（DEL 0x7f 两侧均直出）</td><td class="ok">✓</td></tr>
+</table>
+<h3>5.3 宣称③ "43 名/8 模块查表直连 interpreter::module_of" —— 成立（码面坐实）</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>直连事实读码</td><td>src/l2fix.rs 运行时<b>零自带名字表</b>：suggest_l2u 唯一查表调用 <code>crate::interpreter::module_of(n)</code>（L245）——module_of 本体在 src/interpreter.rs <b>L2210</b>（pub(crate) fn）同 crate 直连；l2fix.rs 内的 43 名表<b>只存在于 #[cfg(test)] 测试模块</b>（l2fix_name_to_module_locks_43_names_8_modules，逐名 assert module_of(name)==Some(module)，43 名 8 模块锁死）——python 工具的双源 drift 风险在 Rust 侧确由单测锁定归零</td><td class="ok">✓ 码面坐实</td></tr>
+<tr><td>表内容核对</td><td>测试表 43 项 = io 2 + string 12 + math 4 + list 11 + json 2 + map 8 + file 4 + env 1 = <b>43 名 / 8 模块</b>（§14.4 内建冻结口径 43 一致）</td><td class="ok">✓</td></tr>
+</table>
+<h3>5.4 宣称④ "Rust 828 行零 regex" —— 成立</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>行数 / regex / unsafe 三核</td><td><code>wc -l src/l2fix.rs</code> = <b>828</b>；grep -c -i regex = <b>0</b>（rc=1）；grep REX = 0；grep unsafe = <b>0</b>（rc=1）——零 regex（python 两条正则手译为搜索循环）、零 unsafe、行数精确</td><td class="ok">✓ 三核全过</td></tr>
+<tr><td>12 新单测精确</td><td>cargo test --release --bin lom l2fix = <b>12 passed + 561 filtered out</b>——573-561=12 逐字吻合宣称"12 新单测 561→573"</td><td class="ok">✓</td></tr>
+</table>
+<h3>5.5 宣称⑤ "l2fix.py 保留为 CI 自检与对拍基准" —— <span class="bad">半失真（CI 自检部分落空）→ R120</span></h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>CI 接线实查（任务书指定：l2fix self-check 在哪个 job）</td><td><code>grep -n l2fix .github/workflows/ci.yml</code> = <b>零命中（rc=1）</b>；ci.yml 全文读码：七 job（三平台 test / selfhost / clippy / doc-gates / playground）全部步骤逐一核毕——<b>无任何 job 跑 l2fix</b>（doc-gates 六步：spec examples/doc audit/link check/eval prompt/fuzz smoke/diff test；test job 八步亦无）；而 l2fix.py 头注 L20 明文 "--self-check <b>首次交付自验用，不入 CI 常驻</b>"——README L81 "l2fix.py stays (<b>CI self-check</b> + python tool parity oracle)" 与 positioning.html "l2fix.py 保留为 <b>CI 自检</b>与对拍基准" 宣称的接线<b>不存在</b>，且与工具自述反向矛盾（v1.9.0 批文件清单不含 tools/l2fix.py，头注未被同步修订）</td><td class="bad">✗ → R120</td></tr>
+<tr><td>"对拍基准"部分</td><td>成立：python 工具在库且行为与 rust 全对拍一致（宣称①），HANDOVER §2.2 L154 已列入本地全量回归命令清单（非 CI）</td><td class="ok">✓ 半立</td></tr>
+<tr><td>commit message 与 stat 不符</td><td>9751011 message 写 "文档成对：SPEC §13 v1.9.0 + README 门面/milestone + HANDOVER/<b>TODO</b>/positioning"——stat 实际 <b>无 docs/TODO.md</b>（10 文件清单核毕；TODO 最后改动 = 9cf5d0a）——随 R122 合并登记</td><td class="bad">✗ → R122</td></tr>
+</table>
+<h3>5.6 CLI 面真实用法核验</h3>
+<table>
+<tr><th>复核操作</th><th>实测</th><th>结论</th></tr>
+<tr><td>stdin 管道真实用法（README/注释示例）</td><td><code>lom self_comp.lom -- bad.lom out.hex 2>&1 | lom l2fix -</code>：管道采集 → 建议 human 输出正确；<code>--text</code> 优先级正确（双源竞争 P3a/P3b：label 如实显示（--text），file/stdin 被忽略）</td><td class="ok">✓</td></tr>
+<tr><td>CLI 参数面改动旁通</td><td>cli.rs 改动 <code>a.starts_with('-') &amp;&amp; a != "-"</code>——<code>lom -</code>（非 l2fix 面）落文件读取路径明确报错 "无法读取文件 '-'" rc=1（P6e），无歧义面；--text 缺值 rc=1 + 提示；--help 含 l2fix/--text 全行</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>6. 次审面 D：R119 修复面 + 回填批核验</h2>
+<table>
+<tr><th>项</th><th>实测</th><th>结论</th></tr>
+<tr><td>doc_audit 71/71 + J 组现值</td><td>复跑 PASS 71/71；J quine 组 6 处当前值位 <b>272925</b> 互锁一致；J Rust 组 7 处 <b>573/31</b>；J selfcomp 组 368/196/8/164</td><td class="ok">✓</td></tr>
+<tr><td>R119 负向锁定遵守核验</td><td>①历史条目值未篡改：grep 272293 = 9 处，全部为 README v1.7.1/v1.7.0/v1.6.1 里程碑段、SPEC §13 对应历史条目、TODO 历史登记段（带日期/版本限定）——合法历史值保留 ✓；②未全文扫描：doc_audit.py 无 "272293 出现即 FAIL" 规则（grep rc=1）✓；③README v1.7.0 段 'quine 272,293' 原样 ✓</td><td class="ok">✓ 三条全遵守</td></tr>
+<tr><td>R119 处置范围 vs 实刷范围</td><td>处置登记（MAINTENANCE §7 + TODO L29-31）"七位现值锚统一 272925 + …"；而二十八审 R119 开账的候选处置 a) 原文含 "<b>TODO L40/L41</b> + HANDOVER §9-5 '12591 行' 统一刷 272925/<b>12671</b>"——67f5132 TODO diff 亲读：实刷仅 quine 272293→272925 一行 + 新增收口记录段；<b>self_comp 行数位漏刷（TODO 现行 L51 仍 "self_comp 12591 行" vs wc 实测 12671）</b>；HANDOVER §9-5 已 12671（后续批刷好）→ <b>R122</b></td><td class="bad">✗ 部分未兑现 → R122</td></tr>
+<tr><td>J quine 组 README 锚现值位（任务书预警点）</td><td>锚模式 <code>quine \*\*(\d+)\*\*</code> 全 README <b>唯一匹配在 L83 = v1.7.2 Previous 段</b>（"bootstrap 14/14 quine <b>272925</b>"）；<b>v1.9.0 Current release 段（L81）无 quine 数字</b>，v1.8.0 Current 段（升版时）亦未写——修正批内（67f5132 时 Current=v1.7.2 段）名副其实，两次升版后锚随段降级漂回历史段；当前组内绿灯靠 quine 三版未变（272925）巧合 → <b>R123</b></td><td class="bad">✗ 结构复发 → R123</td></tr>
+<tr><td>TODO 顶部状态块（活信息唯一主写位）现值</td><td>L3/L4 "当前状态（2026-10-08，<b>v1.8.0</b>）/最新基线 v1.8.0"、L50 Rust <b>561+31</b>（实际 573+31）、L51 self_comp <b>12591 行</b>（实际 12671）——滞后一个版本；交接镜像 HANDOFF_PROMPT L84 已 12671/573+31（镜像新、主写位旧，§5.4 "以 TODO 为准"会取旧值）→ <b>R122</b></td><td class="bad">✗ → R122</td></tr>
+<tr><td>回填批（be1d314）</td><td>README 一行 tag/CI 回填（v1.9.0 tag 9751011 / run 37680423135）——API 实查 run 37680423135 head_sha=9751011 七 job success，回填数字属实；HEAD 自身 run 37681019629 七 job success</td><td class="ok">✓</td></tr>
+</table>
+
+<h2>7. 敌手探针表（l2fix CLI 新面，32 项）</h2>
+<p>探针环境：本机 lom 1.9.0（cargo build --release 后）。"击穿"判定 = 与宣称/登记语义不符 / 静默错值 / 崩溃 / JSON 破坏。探针源 = target/probes/r29/probe_adversary.py。</p>
+<table>
+<tr><th>编号</th><th>方向/构造</th><th>实测</th><th>击穿判定</th></tr>
+<tr><td>P1a</td><td>stdin 空输入</td><td>rc=0、entries=[]（空信封合法）</td><td class="ok">未击穿</td></tr>
+<tr><td>P1b</td><td>仅 BOM</td><td>rc=0、"未解析到任何码行"回显（BOM 行原样列出）</td><td class="ok">未击穿</td></tr>
+<tr><td>P1c</td><td>BOM+码行</td><td>BOM 不阻 re.search 语义：entries=1 code=L2U001 正确解析</td><td class="ok">未击穿</td></tr>
+<tr><td>P1d</td><td>超长行 110KB（前部噪声+行尾码行）</td><td>rc=0、entries=1 正确；线性扫描无异常</td><td class="ok">未击穿</td></tr>
+<tr><td>P1e</td><td>CRLF 两行</td><td>entries=2，\r 正确剥离（rust lines()/python splitlines 同）</td><td class="ok">未击穿</td></tr>
+<tr><td>P1f</td><td>无 newline 尾</td><td>entries=1（末行正确处理）</td><td class="ok">未击穿</td></tr>
+<tr><td>P1g</td><td>非 UTF-8 二进制 stdin（0xff 0xfe …）</td><td>rc=1 + "无法读取 stdin"——防御性退出，无崩溃无乱输出</td><td class="ok">未击穿（防御正确）</td></tr>
+<tr><td>P2a</td><td>消息嵌套花括号 {{{}}}</td><td>JSON 合法（花括号在字符串内无需转义），entries=1</td><td class="ok">未击穿</td></tr>
+<tr><td>P2b</td><td>引号名含反斜杠与双引号 'a\b"c'</td><td>与 python 建议逐字一致（first_quoted 提取 + escape_str 转义往返正确）</td><td class="ok">未击穿</td></tr>
+<tr><td>P2c</td><td>Unicode 引号名 '中文变量'</td><td>与 python 逐字一致（字节级扫 0x27 不受多字节字符干扰）</td><td class="ok">未击穿</td></tr>
+<tr><td>P2d</td><td>空引号对 '' 后继名</td><td>空段跳过续找，与 python 逐字一致</td><td class="ok">未击穿</td></tr>
+<tr><td>P2e</td><td>三种坏形态（四位码/码后无空格/位置段非数字）</td><td>零条目、rc=0、不崩（形态拒绝面正确）</td><td class="ok">未击穿</td></tr>
+<tr><td>P2f</td><td>5 万层嵌套花括号</td><td>rc=0 正常解析（纯文本扫描无递归，无栈风险）</td><td class="ok">未击穿</td></tr>
+<tr><td>P3a</td><td>--text 与 stdin 双源（`-` 同时给）</td><td><b>--text 优先</b>：输出 label=（--text）、码条目来自 --text、stdin 被忽略——与 cli.rs 注释/help 宣称一致【初版探针检查串自误（"[LEX005]" vs human 输出 "[1] LEX005 |"），直跑诊断后修正——见顺带勘误】</td><td class="ok">未击穿</td></tr>
+<tr><td>P3b</td><td>--text 与文件双源</td><td>同上：--text 优先、file 被忽略、label 如实</td><td class="ok">未击穿</td></tr>
+<tr><td>P3c</td><td>--text --json（--text 吃掉后续选项）</td><td>"--json" 被消费为 text 值（iter.next() 不辨选项前缀）→ 零码行回显含 "--json" 文本、rc=0——<b>观察项</b>：宽于 python argparse（后者 rc=2 "expected one argument"），rust 侧无 --help 声明约束，属未定义边角非缺陷</td><td class="ok">观察（非击穿）</td></tr>
+<tr><td>P3d</td><td>--text ''（空串）</td><td>rc=0 零码行回显正常</td><td class="ok">未击穿</td></tr>
+<tr><td>P4a</td><td>空 entries 信封</td><td>schema=l2-fix/v1、file=-、entries=[] 三要素正确</td><td class="ok">未击穿</td></tr>
+<tr><td>P4b</td><td>多 entries + 消息含双引号</td><td>3 条目 JSON 合法（json.loads 回读过 = 转义完整）</td><td class="ok">未击穿</td></tr>
+<tr><td>P4c</td><td>--json stdout 纯净性</td><td>信封前零噪声、stderr 空</td><td class="ok">未击穿</td></tr>
+<tr><td>P5a</td><td>文件不存在</td><td>rc=1 + "无法读取文件 '…': 系统找不到指定的路径"（与 main.rs 注释退出码约定一致）</td><td class="ok">未击穿</td></tr>
+<tr><td>P5b</td><td>目录作输入</td><td>rc=1 + "无法读取文件 '…': 拒绝访问"（Windows 目录读 Err 防御正确）</td><td class="ok">未击穿</td></tr>
+<tr><td>P5c</td><td>--text 缺值</td><td>rc=1 + "--text 需要一个值（L2 拒绝文本）"</td><td class="ok">未击穿</td></tr>
+<tr><td>P5d</td><td>l2fix 无参数</td><td>rc=1 + 用法行 "用法：lom l2fix &lt;file|-&gt; [--json] [--text &lt;s&gt;]"</td><td class="ok">未击穿</td></tr>
+<tr><td>P5e</td><td>help 一致性</td><td>--help 含 l2fix 子命令行与 --text 选项行</td><td class="ok">未击穿</td></tr>
+<tr><td>P5f</td><td>正常分析退出码</td><td>rc=0</td><td class="ok">未击穿</td></tr>
+<tr><td>P6a</td><td>\u2028 行分隔（python 有 rust 无）</td><td>python splitlines 切 = <b>2 条</b>；rust lines() 不切 = <b>1 条</b>——<b>登记差异</b>：l2fix.rs 头注 L42-43 明示 "python str.splitlines 另切 \v/\f/\u2028 等——编译器 stdout 现实只有 \n，登记为不移植面"</td><td class="ok">登记面内（非击穿）</td></tr>
+<tr><td>P6b</td><td>\v 行分隔</td><td>同上：python 2 条 / rust 1 条——同头注登记面</td><td class="ok">登记面内（非击穿）</td></tr>
+<tr><td>P6c</td><td>python 无 --text 对应面</td><td>python l2fix.py --text → rc=2 "unrecognized arguments"——接口分工差异（python 全链工具 vs rust 文本消费器，l2fix.rs 头注 L6-8 明示分工），非移植缺陷</td><td class="ok">观察（分工既定）</td></tr>
+<tr><td>P6d</td><td>缺参退出码口径</td><td>python argparse rc=2 vs rust rc=1——工具接口差异（rust 侧 main.rs 注释自述 0/1 两态，无对齐宣称）</td><td class="ok">观察（非击穿）</td></tr>
+<tr><td>P6e</td><td>`lom -`（cli.rs `-` 放行改动的旁通面）</td><td>非 l2fix 面：落文件读取路径 "无法读取文件 '-'" rc=1——与 cli.rs 注释宣称的既定行为一致，无歧义</td><td class="ok">未击穿</td></tr>
+<tr><td>P6f</td><td>行内两处 "codegen error: "（第一处失配推进重试）</td><td>python=['L2U001'] rust=['L2U001']——手译逐位推进与 re.search 语义对齐（唯一高风险手译点实证）</td><td class="ok">未击穿</td></tr>
+</table>
+<p class="small">顺带勘误（探针自我修正，如实记录）：①P3a/P3b 初版检查串 "[LEX005]"（带方括号）而 human 输出码形如 "[1] LEX005 |"（无方括号）——初判"击穿"为探针 bug；直跑 <code>lom l2fix - --text "lex error…"</code> 诊断后确认 --text 优先级正确（输出 "L2 拒绝 1 处（--text）：[1] LEX005"），修正检查串后 PASS。②probe_parity.py 初版 6 枚负例文件名凭记忆猜错（neg_dup_fn_single_file 等不存在）——ls 修正为实际文件名后 12 枚全过。③P6d 初版 log() 调用参数错（探针异常如实记录后修复重跑）。</p>
+
+<h2>8. 文档对账数字链 + 开账（R120 起）+ 评级依据</h2>
+<h3>8.1 数字链（J 锚抽 3 项独立手工核）</h3>
+<table>
+<tr><th>锚</th><th>文档值</th><th>实际值（独立手工核）</th><th>结论</th></tr>
+<tr><td>quine</td><td>J 组 6 处当前值位 = 272925（HANDOFF_PROMPT ×2 / HANDOVER §1/§9-3/§9-5 / README 位）</td><td>--bootstrap L3 self-apply 实测 <b>272925 bytes; byte-identical</b>（本轮全量亲跑）</td><td class="ok">✓（README 位结构见 R123）</td></tr>
+<tr><td>self_comp 行数</td><td>HANDOFF_PROMPT L84 = 12671、README v1.7.2 段 = 12671（D 组现实锚，doc_audit 71/71 过）；<b>TODO L51 = 12591（非 J/D 组覆盖位）</b></td><td>wc -l 实测 <b>12671</b>——镜像/README 位正确；<b>TODO 主写位滞留 12591</b> → R122</td><td class="ok">✓ 主链 / <span class="bad">TODO 位 → R122</span></td></tr>
+<tr><td>Rust 计数</td><td>J 组 7 处 = 573/31（HANDOFF_PROMPT ×2 / HANDOVER ×2 / README / SPEC / positioning）；TODO L50 = 561+31</td><td>实测 <b>573 单元 + 31 集成</b>（逐 target 配对）；<b>TODO 位 561+31 滞留</b> → R122</td><td class="ok">✓ 主链 / <span class="bad">TODO 位 → R122</span></td></tr>
+<tr><td>doc_audit 自指</td><td>71=71</td><td>71/71 双跑（报告落盘前后）</td><td class="ok">✓</td></tr>
+</table>
+<h3>8.2 开账（只开不修；从 R120 起，四笔全 P3）</h3>
+<div class="ledger">
+<p><b>R120（P3，宣称失真/CI 接线缺失）——v1.9.0 批 "l2fix.py 保留为 CI 自检" 宣称落空：README/positioning 宣称 CI self-check，实际 ci.yml 七 job 零 l2fix 步骤，且 l2fix.py 头注反向声明"不入 CI 常驻"</b><br>
+可复现形态：①<code>grep -n l2fix .github/workflows/ci.yml</code> = <b>零命中（rc=1）</b>；ci.yml 全文七 job 逐 step 读码（test 八步/selfhost 七步/clippy/doc-gates 六步/playground 三步）无任何 l2fix 步骤；②README L81 "l2fix.py stays (<b>CI self-check</b> + python tool parity oracle)"、docs/positioning.html L30 "l2fix.py 保留为 <b>CI 自检</b>与对拍基准"、commit 9751011 message 同款；③tools/l2fix.py 头注 L20 "--self-check 首次交付自验用，<b>不入 CI 常驻</b>"（v1.6.1 期写、v1.9.0 批未触该文件）——同仓库宣称与自述反向矛盾；④HANDOVER §2.2 L154 把 l2fix 列入的是<b>本地全量回归清单</b>（规划者手跑）而非 CI；⑤二十八审报告基线矩阵 "l2fix --self-check 6/6" 行为本机手跑项（本轮同口径复跑 6/6），从未有 CI 事实。<br>
+候选处置（供裁决）：a) <b>措辞对齐（最小面）</b>：README/positioning 的 "CI self-check / CI 自检" 改为 "local self-check（HANDOVER §2.2 回归清单项）/ 本地自检"，与 l2fix.py 头注对齐；b) <b>真接线</b>：doc-gates job 加一步 <code>python tools/l2fix.py --self-check</code>（该 job 已构建 lom 且已用 python3，接线成本低）——同时把 l2fix.py 头注 "不入 CI 常驻" 句同步修订。<br>
+<b>应修</b> = a 或 b 二选一（纯文档/纯 CI 接线，零行为变化）。<b>绝不能这样修</b> = ①只改 README 一处留 positioning 与 commit message 不一致（多写位漂移复发族）；②选 b 但不在三平台验证 self-check 可跑性就宣称"CI 自检已接线"（制造新的未验证宣称——本账的镜像教训）。</p>
+<p><b>R121（P3，宣称精度/同文档自相矛盾）——v1.8.0 转正批 README 边界段引入 "each rejection carries … a source position" 过度宣称：31 枚登记豁免负例实际无位置（71/102 才是登记覆盖率）</b><br>
+可复现形态：①README L74 现行句 "(each rejection carries an [L2xxx] code, <b>a source position</b>, and a repair hint via tools/l2fix.py)"；②<code>git log -S "a source position" -- README.md</code> = <b>唯一 88d91dc</b>（v1.8.0 转正批引入；旧 experimental 句为 "carries an [L2xxx] code + a repair hint"，无 position 宣称）；③同 README L83 v1.7.2 段登记 "messages without a quoted name … keep the bare format — <b>31 such negatives</b> on the corpus … 71 of 102 quoted-name negative lines now carry a position"——同文档前后矛盾；④实测（本轮 A 面抽查）：<code>lom self_comp.lom -- neg_json_unknown_builtin.lom</code> 等五枚豁免负例输出 <b>无位置前缀</b>（"codegen error: [L2U001] …"）。<br>
+候选处置：边界句改为如实口径，如 "an [L2xxx] code, a source position <b>when the first quoted name resolves to a source identifier</b> (registered boundary: 71/102 corpus coverage; internal type strings keep the bare format), and a repair hint"。<br>
+<b>应修</b> = 措辞收敛到 designs/0020 登记边界（纯文档一句）。<b>绝不能这样修</b> = ①为圆宣称给 31 枚豁免补位置（改编译器行为——违 0020 裁决：内部类型串无 token 可锚，且 v1.7.2 批正例 hex 恒等/零 src/ 的实现基础会被打破）；②删掉或弱化 v1.7.2 段的登记边界句让文档"自洽"（删边界登记制造更大失真，违"原文不回写"精神）。</p>
+<p><b>R122（P3，活信息主写位滞后 + 两处修复/交付宣称与实况不符）——TODO 顶部状态块滞后一个版本（v1.8.0/561+31/12591 vs 实际 v1.9.0/573+31/12671）：R119 处置漏刷 self_comp 行数位 + v1.9.0 批 commit 宣称改 TODO 实零改动</b><br>
+可复现形态：①docs/TODO.md L3/L4 "当前状态（2026-10-08，<b>v1.8.0</b>）/最新基线 v1.8.0"（HEAD 实为 v1.9.0）；L50 "Rust <b>561+31</b>"（实测 573+31 逐 target 配对）；L51 "self_comp <b>12591 行</b>"（wc -l 实测 <b>12671</b>，同文件无日期限定）；②<code>git show 67f5132 -- docs/TODO.md</code>：R119 收口批 TODO 实刷 = quine 272293→272925 一行 + 收口记录段——<b>二十八审 R119 开账处置 a) 明文含 "TODO L40/L41 … 统一刷 272925/12671"，self_comp 行数位（原 L41，现 L51）漏刷</b>，而 TODO L29-31 与 MAINTENANCE §7 均登记 "R119 → 已随批关闭"；③<code>git show --stat 9751011</code> = 10 文件<b>无 docs/TODO.md</b>，而 commit message 宣称 "文档成对：…HANDOVER/<b>TODO</b>/positioning"；<code>git log b9ce791..HEAD -- docs/TODO.md</code> 最后改动 = 9cf5d0a（v1.8.0 交接批）；④交接镜像 docs/HANDOFF_PROMPT.md L84 已是 "self_comp.lom 12671 行、Rust 573 单元 + 31 集成"——<b>镜像新、主写位旧</b>，MAINTENANCE §5.4 "两处不一致时以 TODO 为准"规则下裁决会取到旧值（quine 272925 三版未变侥幸不显）。<br>
+候选处置：下个文档批（或交接批）把 TODO 顶部状态块刷至 v1.9.0 现值：状态行 v1.9.0 + 基线数字段 573+31 / self_comp 12671 行（§2.3 SOP：先主写位后跑 doc_audit 终检）；并在 TODO 交付记录为 commit message 与 stat 不符处补一句勘误登记。<br>
+<b>应修</b> = 纯文档刷值（主写位一处集中）。<b>绝不能这样修</b> = ①只刷 12591 一处不刷版本行与 Rust 计数（同族部分刷新——正是 R119 复发形态：本账即是上轮"刷五位漏一位"的直接对偶）；②为对齐主写位把 HANDOFF_PROMPT 镜像改回 561+31/12591（镜像正确、方向反了——镜像应新不应旧）。</p>
+<p><b>R123（P3，锚结构缺陷对偶复发）——J quine 组 README 锚（'quine \*\*N\*\*'）两次升版后漂回 v1.7.2 Previous 历史段：v1.8.0/v1.9.0 Current release 段均未携带 quine 现值，"挂 Current 现值位"名存实亡，当前绿灯靠 quine 三版同值（272925）巧合</b><br>
+可复现形态：①<code>grep -n 'quine \*\*' README.md</code> = <b>唯一命中 L83</b>（"Previous repository milestone: <b>v1.7.2</b> … bootstrap 14/14 quine <b>272925</b>"）——R119 处置 B 的锚模式（doc_audit.py L370-371 'quine \*\*(\d+)\*\*'）现在锚的是历史段；②README L81 v1.9.0 Current 段与 88d91dc v1.8.0 Current 段均<b>无 quine 数字</b>；③时序还原：67f5132（锚批）时 Current=v1.7.2 段（批内名副其实）→ 88d91dc 升版未在新 Current 段写 quine → 锚随段降级 → 9751011 再次升版同样未写——<b>R119 开账描述的结构（"该段降为 Previous 后锚随历史段走，升版即楔死"）原样复发，只是挂点从 v1.7.0 段换成 v1.7.2 段</b>；④doc_audit J 组当前 6 处一致 272925 全绿的原因 = quine 值 v1.7.2→v1.9.0 未变（值巧合而非结构正确）。<br>
+候选处置（供裁决）：a) 升版 SOP 明文化：MAINTENANCE §2.2 或 §2.3 补一句"升版批的 README Current release 段必带 'quine \*\*N\*\*' 现值句"（下次升版批顺带执行，锚即回 Current 段）；b) J 组 README 锚改挂 README 现行基线数字段（L149 区"573/573 …"邻近）的稳定句式（若该段无 quine 句则随批加）；c) 根治向（二十八审 R119 备注 c / TODO L32 已登记"留待后续工具批"）：J 组补现实核对位（doc_audit 实跑/实读 --bootstrap quine 输出比对），使"全组同滞"也能被抓。<br>
+<b>应修</b> = a（一句 SOP + 下次升版批执行）或 b/c（择一，属工具批）。<b>绝不能这样修</b> = ①改 v1.7.2 段历史值 272925→新值来"对齐"（篡改历史时点记录）；②给 doc_audit 加"README 匹配必须位于 Current release 段"的硬断言但不先补 Current 段 quine 句（下一次 doc_audit 立即红——当前 v1.9.0 段就没有）；③全文扫描 272925 出现次数（将来多处合法历史值会误报）。</p>
+<p><b>备注（不开账）</b>：①l2fix.rs 头注 L42 已登记的 splitlines 不移植面（\v/\f/\u2028 等）实测差异如登记（P6a/P6b）——python 2 条 vs rust 1 条，但两侧工具输入分工不同（python 吃编译器 stdout、rust 吃已采集文本，编译器 stdout 现实只有 \n），非缺陷；②--text 吃后续选项（P3c）为 rust 侧未定义边角，help 未约束、无对齐宣称，建议未来 CLI 面批顺带在 --help 里注明"值以空格分隔、不以选项前缀保护"或保持现状登记；③二十八审备注③（B2 跨作用域首现锚文档补句）仍未见补——沿二十八审口径不单独立账，留待文档批顺带。</p>
+</div>
+<h3>8.3 评级依据</h3>
+<p>按任务书框架三条件逐条：①<b>宣称零失真——不满足</b>：v1.9.0 批五条宣称中①②③④技术面全部独立复核成立（对拍零差异 36 组、信封字节级 36/36、module_of 直连码面坐实、828 行零 regex 零 unsafe、12 单测精确），但<b>⑤"CI 自检"接线落空（R120）</b>；v1.8.0 转正批边界句引入 <b>"a source position" 过度宣称（R121）</b>——两处均在 README 现行门面段，是与仓库事实相反的宣称，超出 R102/R111/R113/R119 类"数字精度漂移"范畴；②<b>敌手零击穿——满足</b>：l2fix CLI 新面 32 项探针无一击穿（stdin 边界/畸形输入/双源竞争/JSON 完整性/退出码/手译对齐六族），2 项差异属 l2fix.rs 头注登记不移植面、3 项观察项无对齐宣称；③<b>无新 P1/P2——满足</b>：开账四笔（R120-R123）全 P3 宣称面/文档结构，零行为缺陷、零静默错值、零语言面触碰。</p>
+<p><b>定级 B+</b>。理由：三条件第一条被两处实质宣称失真打破（R120 是"宣称存在一个不存在的 CI 接线"，R121 是"宣称一个登记边界明确否定的能力"），A- 档的"宣称零失真"前提不成立——虽然四笔全 P3、技术面与行为面全绿，但本轮增量恰好是两个"宣称面批"（v1.8.0 纯宣称批 + v1.9.0 宣称⑤），宣称面本身即交付物的批次里宣称失真权重高于普通批的文档精度漂移。高于二十一审 B 先例场景（彼时 R104/R105 为 P1 行为面在场）；低于 A-（二十五~二十八审四连平的"宣称零失真"基线被打破）。整改后状态只能由下一轮复审重估（§4.4）。</p>
+<p><b>后置门禁</b>：本报告落盘后复跑 <code>python tools/doc_audit.py</code> = <b>71/71 PASS</b>（落盘前后双跑；报告本身不含新增数字锚句式，不改任何锚）；<code>python tools/link_check.py</code> 复跑 PASS（本报告位于 docs/reviews/ 属 B 类历史原文位，实测 A=0 维持）。审查期间仓库产品源码零修改（git status 仅本报告新增与 target/probes/r29/ 探针目录，后者 gitignored）。</p>
+
+<h2>附录：探针目录（target/probes/r29/，gitignored）</h2>
+<p class="small">probe_parity.py（宣称①②独立对拍：12 真实负例全链 + 24 合成对，字段级 + 信封字节级）/ probe_adversary.py（敌手探针 32 项六族）/ p3b_input.txt（双源竞争输入）/ parse_neg.lom（parse 通道格式构造负例）/ o1-o4/oe/oo.hex + out_*.hex（L2 编译运行残留）/ online_index.html + online_{app,harness,worker}.js（playground 线上四源件实拉留档）/ ci_v190.json + ci_v190_jobs.json + ci_head.json + ci_head_jobs.json（CI 两 run API 留档）/ ci_l2fix_grep.txt（CI 零 l2fix 实证）/ l2fix_all_mentions.txt（l2fix 全文档提及面留档）/ stmt_actual.txt + stmt_exp_lf.txt + stmt_act_lf.txt（golden 比对留档）。</p>
+
+</body>
+</html>
