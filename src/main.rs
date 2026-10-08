@@ -739,11 +739,9 @@ fn run_build(json: bool) {
     // manifest.dependencies 递归入图，根项目自身不入图，根目录源文件在
     // 无文件 build 中此前结构性不可见。与包级对称（包查全部文件），
     // 逐个检查根目录（lom.toml 所在目录）全部 .lom 文件；externals 传
-    // 全图并集（根的依赖闭包 = 图内全部包的 public_symbols 并集，与
-    // collect_package_symbols 返回值同构——但不经该函数，PKG007 已由
-    // 缺口 B 单独发）。主文件 fn 撞包符号经 externals 走 NAM006 语义
-    // （R105 口径）；根不在图内、无自身 public_symbols 可并，同文件
-    // 重复定义维持 NAM002 error。根目录无 .lom 文件则跳过（不报错）。
+    // 全图并集减去当前文件自身符号（R125 三十审：根路径减法与缺口 A
+    // 包路径对称——防同文件重复 fn 撞包名 NAM002→NAM006 降级）。
+    // 根目录无 .lom 文件则跳过（不报错）。
     let root_files = package::collect_lom_files(root_path);
     if !root_files.is_empty() {
         println!("  主项目源码: {} 个", root_files.len());
@@ -788,10 +786,15 @@ fn check_and_report_file(
     let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
     if diags.ok {
         let program = parser::Parser::parse_recover(&src).program;
+        let own = file_top_level_symbols(&program);
         let mut externals: Vec<String> = base_externals.to_vec();
         if let Some(symbols) = pkg_symbols {
-            let own = file_top_level_symbols(&program);
             externals.extend(symbols.iter().filter(|s| !own.contains(*s)).cloned());
+        } else {
+            // R125（三十审）：根路径同样做减法——root_externals（全图包符号
+            // 并集）减去当前文件自身顶层符号，防止根文件同文件重复 fn 撞
+            // 包导出名时 NAM002 降级为 NAM006（与缺口 A 包路径减法对称）。
+            externals.retain(|s| !own.contains(s.as_str()));
         }
         typechecker::check_program_with_externals(
             &program, &src, &path_str, &mut diags, &externals,

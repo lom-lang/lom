@@ -27,7 +27,7 @@
 
 **机理**：`resolve_dfs` 只对 `manifest.dependencies` 递归入图，根项目自身不入——根目录源文件在无文件 build 中结构性不可见。
 
-**修法**：包循环之后，用 `package::collect_lom_files`（需升 `pub(crate)`）收集根目录全部 .lom 文件逐个检查（与包级行为对称：包查全部文件），externals 传全图并集（根的依赖闭包 = 图内全部包，与 `collect_package_symbols` 返回值同构）。主文件 fn 与包符号撞名开始发 NAM006（R105 语义在带文件路径既有，此为无文件路径新增——不新增诊断码）。
+**修法**：包循环之后，用 `package::collect_lom_files`（需升 `pub(crate)`）收集根目录全部 .lom 文件逐个检查（与包级行为对称：包查全部文件），externals 传全图并集（根的依赖闭包 = 图内全部包，与 `collect_package_symbols` 返回值同构）。根路径同样做减法（R125 三十审补丁：root_externals − 文件自身符号——防同文件重复 fn 撞包名 NAM002→NAM006 降级，与缺口 A 包路径减法对称；减法后根文件 fn 撞包名不再发 NAM006 遮蔽告警，NAM006 检测仅在带文件路径合并单元存在——两路径行为对齐）。
 
 ### 顺带修正：cli.rs 错位文档块
 

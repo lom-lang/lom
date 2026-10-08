@@ -17,7 +17,7 @@
 
   --json        输出 l2-fix/v1 轻量 JSON（独立 schema，不撞宿主 lom-fix/v1——L2 工具码不进宿主协议）
   --self-check  质量锁定（designs/0018 §2B）：对 tools/selfcomp/negative/ 全部负例
-                + eval 127/128/129 三题 broken（prompt 中提取）跑全链断言；首次交付自验用，不入 CI 常驻
+                + eval 127/128/129 三题 broken（prompt 中提取）跑全链断言；首次交付自验用；R120（二十九审）起入 CI doc-gates 常驻
   --lom-bin     宿主二进制（默认 target/release/lom，Windows 探测 .exe）
   --l2          L2 编译器源（默认 examples/selfhost/self_comp.lom）
 

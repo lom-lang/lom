@@ -47,7 +47,7 @@
 > 二十七审开账→同批收口，负向边界见 review-2026-10-07.html 开账节，
 > 交付细节见 SPEC §13 v1.7.1 条目与 designs/0019 后续修订行）。
 > 基线数字：verify_selfcomp **368/368 = 196+8+164**、bootstrap 14/14
-> （quine 272925B）、Rust **573+31**、eval 双后端各 128/128、fix_corpus
+> （quine 272925B）、Rust **573+35**、eval 双后端各 128/128、fix_corpus
 > 13 对、doc_audit 71/71、self_comp 12671 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
 > Release v1.6.1（pre-release）+ **playground 线上已刷 v1.7.1 源件**
