@@ -6,45 +6,45 @@
 > 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-09 深夜，v1.9.1 + R131 B 面根治后交接就绪）**：
   最新已提交基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job
-  绿；HEAD `4b1029f` 以 git log 与 CI 首跑为准）。本轮自上次交接后
-  交付**五版弧线 + 三轮审查 + 十四笔开账全关 + 一项工具根治**：
-  v1.7.2（L2 行号）→ v1.8.0（L2 转正）→ v1.9.0（l2fix CLI）→
-  v1.9.1（build 三缺口）→ R119-R130 十二笔收口 → R131 J+ 现实核对
-  （doc_audit 71→72 项）。playground 线上常绿（footer 转正措辞）；
-  发布面：README 门面 + Release v1.7.0（pre-release）+ v1.6.1
-  （pre-release）。**台账零 open。**
+  绿；HEAD 以 git log 与 CI 首跑为准）。本轮自上次交接后交付**五版弧线
+  + 三轮审查 + 十四笔开账全关 + 一项工具根治**：v1.7.2（L2 行号 `ln:cl`
+  位置前缀三通道统一）→ v1.8.0（L2 转正 experimental→supported face）
+  → v1.9.0（l2fix CLI 子命令，Rust 828 行零 regex，python↔rust 对拍
+  零差异）→ v1.9.1（build 三缺口收口：多文件包假阳性减法修法 + PKG007
+  人类可读路径 + 主文件诊断面对称补全——三项登记边界销账）→ 二十九/
+  三十/三十一审 B+ 三连 → R119-R130 十四笔收口（含 R128 统一减法行为
+  修复 + 补测试锁定）→ **R131 J+ 集成现实核对**（doc_audit 71→72 项
+  ——tests/ #[test] 实数 vs 文档互锁位，根治四回同族全组同滞盲区）。
+  playground 线上常绿（footer 转正措辞）；发布面：README 门面 +
+  Release v1.7.0（pre-release，2026-10-07 发布）+ v1.6.1（pre-release）。
+  **台账零 open。**
 - **审查轨迹（均不外推）**：……→二十七审 A-→二十八审 A-（四审连平）
   →二十九审 B+（宣称失真×2）→三十审 B+ 二连（计数同滞+根减法）
   →三十一审 B+ 三连（构成收窄——技术面三连全绿：70+ 探针零击穿、
   57 矩阵项全绿、无 P1/P2；跌档根因全为文档精度/计数纪律）。
   **三十二审若复核 R127-R130 零失真 + J+ 现实核对不红 → A- 可期**。
   最新报告 [review-2026-10-09-3.html](reviews/review-2026-10-09-3.html)。
-- **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、bootstrap
-  **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、
-  Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 + r104×6 +
-  r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、eval
-  双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含 J+
-  集成现实核对——tests/ #[test] 实数 vs 文档互锁位，根治四回同族
-  全组同滞盲区）、六模式全 PASS、link_check PASS + l2fix
-  self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.1**。
+- **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
+  bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
+  r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
+  eval 双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含
+  J+ 集成现实核对——tests/ #[test] 实数 vs 文档互锁位）、六模式全
+  PASS、link_check PASS + l2fix self-check 6/6（CI doc-gates 常驻）。
+  Cargo.toml/lock **1.9.1**。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
-  [L2xxx] 码 / ln:cl 位置 / lom l2fix CLI 子命令 / l2fix.py CI
+  [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
   对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
-- **build 现行面（v1.9.1 收口后）**：无文件 `lom build` 诊断面 =
-  包源逐文件（统一减法 externals——base ∪ pkg 整体减文件自身符号）
+- **build 现行面（v1.9.1 收口后）**：无文件 `lom build` 诊断面 = 包源
+  逐文件（统一减法 externals——base ∪ pkg 整体减文件自身符号，R128）
   + PKG007（人类可读路径 stderr）+ 根目录主文件对称检查（统一减法）。
-  登记在案不修边界**从六项减至三项**（块内 let/for 变量两 divergence
-  + clippy --all-targets 漂移；~~多文件包/无文件 PKG007/主文件~~ 已
-  v1.9.1 销账）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
   五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
   同步重建再部署。深度守卫 wasm 侧 300；源码嵌套深度 ~500 层 trap
   （parser 路径，量化登记已入 README/designs）。
 - **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
-  拦截）；build 统一减法（R128：base ∪ pkg 整体减文件自身符号——
-  包/根两路径对称，防 NAM002 降级 NAM006）；闭包捕获 mut 赋值
-  MUT002 分歧族。
+  拦截）；build 统一减法（包/根两路径对称，防 NAM002 降级 NAM006）；
+  闭包捕获 mut 赋值 MUT002 分歧族。
 - **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
   两 divergence；clippy --all-targets ~4 条漂移存量；playground
   四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
@@ -67,7 +67,7 @@
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
+   - cargo test --release（期望 573/573；另有集成（逐 target 单跑配对：r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 72/72）
