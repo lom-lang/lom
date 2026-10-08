@@ -4,60 +4,55 @@
 > 本文件是 Lom 的**持续维护文档**与交接必要流程、新会话入口。三段式：
 > ①角色与铁律（行为契约，规范源为 [MAINTENANCE.md](MAINTENANCE.md) §1——
 > 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-09，v1.9.1 build 三缺口收口 + 三十审 B+ 二连后交接就绪）**：
+- **状态（2026-10-09 深夜，v1.9.1 + R131 B 面根治后交接就绪）**：
   最新已提交基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job
-  绿；HEAD 以 git log 与 CI 首跑为准）——build 三缺口（多文件包假阳性/
-  PKG007/主文件诊断面）已收口销账（designs/0021）；**L2 已转正**
-  （v1.8.0：supported face）+ **l2fix CLI 子命令**（v1.9.0：宿主二进制
-  一等公民）+ **L2 诊断行号**（v1.7.2：`ln:cl` 位置前缀三通道统一）。
-  playground 线上常绿（footer 已刷转正措辞）；发布面：README 门面
-  （v1.9.1 Current release）+ Release v1.7.0（pre-release）+ Release
-  v1.6.1（pre-release）。**台账零 open**（R119-R126 全关）。
-- **本轮交付链（2026-10-08~09，用户裁决"执行"/"按建议执行"/"按照你的想法执行"）**：
-  **④L2 行号批 v1.7.2**（`ca31691`）→ **二十八审 A-（四审连平）**（`047659c`）
-  → R119 收口 → **⑤L2 转正批 v1.8.0**（`88d91dc`：宣称面三处更新+审查轮数
-  26→28）→ playground footer 重部署（`889a43f`）→ **⑥l2fix CLI 子命令
-  v1.9.0**（`9751011`：828 行零 regex、python↔rust 对拍零差异、12 单测
-  561→573）→ **⑧build 三缺口收口 v1.9.1**（`7c2403c`：减法修法+PKG007+
-  主文件对称补全，集成 31→35）→ **二十九审 B+**（`29f34ea`：R120 CI 接线
-  落空/R121 位置过度宣称——两笔宣称失真跌档；32 探针零击穿）→ R120-R123
-  收口（`7803afe`）→ **三十审 B+ 二连**（`82e8ed1`：R124 计数全组同滞/
-  R125 根减法缺位/R126 头注反向——技术面全绿但"宣称零失真"二连被打破）
-  → R124-R126 收口（`b614037`：含根路径减法行为修复——与缺口 A 对称）。
-- **审查轮次与评级（均不外推）**：……→二十七审 A-→二十八审 A-（四审连平）
-  →**二十九审 B+（宣称失真×2）→三十审 B+ 二连（计数同滞+根减法缺位）**
-  ——B+ 二连的根因均为文档精度/宣称纪律，非技术面缺陷（两轮 51 项探针
-  零击穿、基线矩阵 38 项全绿）。三十一审若复核 R124-R126 修复零失真，
-  技术面无新 P1/P2 → A- 可期。最新报告
-  [review-2026-10-09-2.html](reviews/review-2026-10-09-2.html)。
-- **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
-  bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、
-  self_comp.lom 12671 行、Rust **573 单元 + 37 集成**
-  （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 +
-  r112×3 + build_gaps×4）、eval 双后端各 128/128、fix_corpus 13 对、
-  doc_audit **71/71**、六模式全 PASS（dump 161）、playground node 冒烟
-  ALL PASS、link_check PASS + l2fix self-check 6/6（CI doc-gates 常驻）。
-  Cargo.toml/lock 均为 **1.9.1**。
-- **L2 现行面（v1.8.0 转正后）**：supported face（strict subset / [L2xxx]
-  码 / ln:cl 位置 / l2fix 修复闭环 / `lom l2fix` CLI 子命令 / l2fix.py
-  CI 对拍基准）。
-- **playground 维护要点（v1.9.1 面）**：构建
-  `cargo build --target wasm32-wasip1 --profile wasm-release`；冒烟
-  `node playground/smoke.mjs`；部署 = playground/ 五源件 + 产物 wasm 推
-  gh-pages 孤儿分支（worktree 方式）；改 src 后同步重建 wasm 再部署。
-- **现行语义要点**：撞名/遮蔽族三侧一致（本地定义优先；两包同名按包根
-  路径序取后者；同别名取后写声明；NAM006/PKG007 warning 不拦截）；
-  build 三缺口收口后无文件 build 诊断面 = 包源逐文件（减法 externals）
-  + PKG007 + 根目录主文件对称检查（减法 externals）；根文件 fn 撞包名
-  不发 NAM006 遮蔽告警（减法消除——NAM006 检测仅在带文件路径合并单元）。
-- **登记在案不修边界（非 open 项，已从六项减至五项）**：块内 let 无同名
-  泄漏与循环外读 for 变量两 divergence；clippy --all-targets ~4 条工具
-  链漂移存量；~~多文件包假阳性/无文件 PKG007/主文件不检查~~（v1.9.1
-  销账）；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
-- 下一步：**交接就绪，方向待用户裁决**。菜单：⑦性能工程 / 三十一审
-  （B+ 二连后复评——若 R124-R126 修复零失真可回 A-）/ Release v1.7.0
-  转正（等外部反馈）。观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
-  首跑——doc-gates 含断链+l2fix 两新步骤）。对外动作逐项呈批（铁律 6）。
+  绿；HEAD `4b1029f` 以 git log 与 CI 首跑为准）。本轮自上次交接后
+  交付**五版弧线 + 三轮审查 + 十四笔开账全关 + 一项工具根治**：
+  v1.7.2（L2 行号）→ v1.8.0（L2 转正）→ v1.9.0（l2fix CLI）→
+  v1.9.1（build 三缺口）→ R119-R130 十二笔收口 → R131 J+ 现实核对
+  （doc_audit 71→72 项）。playground 线上常绿（footer 转正措辞）；
+  发布面：README 门面 + Release v1.7.0（pre-release）+ v1.6.1
+  （pre-release）。**台账零 open。**
+- **审查轨迹（均不外推）**：……→二十七审 A-→二十八审 A-（四审连平）
+  →二十九审 B+（宣称失真×2）→三十审 B+ 二连（计数同滞+根减法）
+  →三十一审 B+ 三连（构成收窄——技术面三连全绿：70+ 探针零击穿、
+  57 矩阵项全绿、无 P1/P2；跌档根因全为文档精度/计数纪律）。
+  **三十二审若复核 R127-R130 零失真 + J+ 现实核对不红 → A- 可期**。
+  最新报告 [review-2026-10-09-3.html](reviews/review-2026-10-09-3.html)。
+- **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、bootstrap
+  **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、
+  Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 + r104×6 +
+  r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、eval
+  双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含 J+
+  集成现实核对——tests/ #[test] 实数 vs 文档互锁位，根治四回同族
+  全组同滞盲区）、六模式全 PASS、link_check PASS + l2fix
+  self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.1**。
+- **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
+  [L2xxx] 码 / ln:cl 位置 / lom l2fix CLI 子命令 / l2fix.py CI
+  对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
+- **build 现行面（v1.9.1 收口后）**：无文件 `lom build` 诊断面 =
+  包源逐文件（统一减法 externals——base ∪ pkg 整体减文件自身符号）
+  + PKG007（人类可读路径 stderr）+ 根目录主文件对称检查（统一减法）。
+  登记在案不修边界**从六项减至三项**（块内 let/for 变量两 divergence
+  + clippy --all-targets 漂移；~~多文件包/无文件 PKG007/主文件~~ 已
+  v1.9.1 销账）。
+- **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
+  --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
+  五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
+  同步重建再部署。深度守卫 wasm 侧 300；源码嵌套深度 ~500 层 trap
+  （parser 路径，量化登记已入 README/designs）。
+- **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
+  拦截）；build 统一减法（R128：base ∪ pkg 整体减文件自身符号——
+  包/根两路径对称，防 NAM002 降级 NAM006）；闭包捕获 mut 赋值
+  MUT002 分歧族。
+- **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
+  两 divergence；clippy --all-targets ~4 条漂移存量；playground
+  四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
+- 下一步：**交接就绪，方向待用户裁决**。菜单：三十二审（B+ 三连
+  后复评——若 R127-R130 + J+ 零失真可回 A-）/ ⑦性能工程（大批）/
+  Release v1.7.0 转正（等外部反馈）。观察项：Ubuntu 26 迁移
+  （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两新步骤）。
+  对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
 1. **L0 现行必读（规划者亲自）**：docs/MAINTENANCE.md 全文（规则）；
@@ -75,7 +70,7 @@
    - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
-   - python tools/doc_audit.py（期望 71/71）
+   - python tools/doc_audit.py（期望 72/72）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 31/31；v1.5.0 起 error_repair 31 题）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）

@@ -1,6 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-09，v1.9.1；build 三缺口收口 + 三十一审 B+ 三连后 R127-R130 收口，台账零 open）**：
+> **当前状态（2026-10-09 深夜，v1.9.1 + R131 J+ 现实核对根治后交接就绪，台账零 open）**：
 > 最新基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job 绿——L2 从 experimental
 > 转 supported face：README 边界段/playground footer/eval-README 三处宣称面更新 +
 > 审查轮数宣称 26→28；纯宣称面批零代码改动。**前置 v1.7.2 批（2026-10-08，用户裁决
