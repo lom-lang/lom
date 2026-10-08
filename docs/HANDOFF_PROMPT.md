@@ -32,7 +32,7 @@
   [review-2026-10-09-2.html](reviews/review-2026-10-09-2.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、
-  self_comp.lom 12671 行、Rust **573 单元 + 35 集成**
+  self_comp.lom 12671 行、Rust **573 单元 + 37 集成**
   （r56×1 + r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 +
   r112×3 + build_gaps×4）、eval 双后端各 128/128、fix_corpus 13 对、
   doc_audit **71/71**、六模式全 PASS（dump 161）、playground node 冒烟
@@ -50,7 +50,7 @@
   build 三缺口收口后无文件 build 诊断面 = 包源逐文件（减法 externals）
   + PKG007 + 根目录主文件对称检查（减法 externals）；根文件 fn 撞包名
   不发 NAM006 遮蔽告警（减法消除——NAM006 检测仅在带文件路径合并单元）。
-- **登记在案不修边界（非 open 项，已从六项减至三项）**：块内 let 无同名
+- **登记在案不修边界（非 open 项，已从六项减至五项）**：块内 let 无同名
   泄漏与循环外读 for 变量两 divergence；clippy --all-targets ~4 条工具
   链漂移存量；~~多文件包假阳性/无文件 PKG007/主文件不检查~~（v1.9.1
   销账）；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
@@ -72,7 +72,7 @@
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×35）
+   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 71/71）

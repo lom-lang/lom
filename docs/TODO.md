@@ -1,7 +1,7 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-09，v1.9.1；build 三缺口收口批交付——二十八审 A- 判据全满足，台账零 open）**：
-> 最新基线 **v1.8.0**（tag `88d91dc`，CI run `37675620476` 七 job 绿——L2 从 experimental
+> **当前状态（2026-10-09，v1.9.1；build 三缺口收口 + 三十一审 B+ 三连后 R127-R130 收口，台账零 open）**：
+> 最新基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job 绿——L2 从 experimental
 > 转 supported face：README 边界段/playground footer/eval-README 三处宣称面更新 +
 > 审查轮数宣称 26→28；纯宣称面批零代码改动。**前置 v1.7.2 批（2026-10-08，用户裁决
 > "执行"——designs/0020 四点均按建议项）**：L2 诊断行号——token 级
@@ -47,7 +47,7 @@
 > 二十七审开账→同批收口，负向边界见 review-2026-10-07.html 开账节，
 > 交付细节见 SPEC §13 v1.7.1 条目与 designs/0019 后续修订行）。
 > 基线数字：verify_selfcomp **368/368 = 196+8+164**、bootstrap 14/14
-> （quine 272925B）、Rust **573+35**、eval 双后端各 128/128、fix_corpus
+> （quine 272925B）、Rust **573+37**、eval 双后端各 128/128、fix_corpus
 > 13 对、doc_audit 71/71、self_comp 12671 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
 > Release v1.6.1（pre-release）+ **playground 线上已刷 v1.7.1 源件**

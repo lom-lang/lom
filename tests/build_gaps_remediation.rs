@@ -211,3 +211,130 @@ fn main_file_diagnostics_checked() {
     );
     std::fs::remove_dir_all(&dir).ok();
 }
+
+// ── R128（三十一审）：包路径 base 侧统一减法——包内重复 fn 撞依赖闭包
+//    符号不再 NAM006 降级（减法覆盖 base_externals 而非仅 pkg 追加部分）──
+#[test]
+fn r128_pkg_duplicate_fn_colliding_dep_symbol_still_nam002() {
+    let dir = std::env::temp_dir().join("r128_pkg_dup_dep");
+    let _ = std::fs::remove_dir_all(&dir);
+    // 三层：root -> pkg_p -> pkg_d（pkg_p 在图中，其 base_externals 含 pkg_d 符号）
+    std::fs::create_dir_all(dir.join("pkg_p")).unwrap();
+    std::fs::create_dir_all(dir.join("pkg_d")).unwrap();
+    std::fs::write(
+        dir.join("lom.toml"),
+        r#"[package]
+name = "root"
+version = "0.1.0"
+
+[dependencies]
+pkg_p = { path = "pkg_p" }
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("pkg_p/lom.toml"),
+        r#"[package]
+name = "pkg_p"
+version = "0.1.0"
+
+[dependencies]
+pkg_d = { path = "../pkg_d" }
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("pkg_d/lom.toml"),
+        r#"[package]
+name = "pkg_d"
+version = "0.1.0"
+"#,
+    )
+    .unwrap();
+    // pkg_d 导出 clash_helper
+    std::fs::write(
+        dir.join("pkg_d/lib.lom"),
+        "fn clash_helper() -> Int
+    42
+end
+",
+    )
+    .unwrap();
+    // pkg_p 内文件自身重复定义同名 fn（撞 base_externals 中的 pkg_d 符号）
+    std::fs::write(
+        dir.join("pkg_p/dup.lom"),
+        "fn clash_helper() -> Int
+    1
+end
+fn clash_helper() -> Int
+    2
+end
+",
+    )
+    .unwrap();
+    let bin = env!("CARGO_BIN_EXE_lom");
+    let (stdout, _stderr, _rc) = run_build(bin, &dir);
+    assert!(
+        stdout.contains("NAM002") || stdout.contains("重复"),
+        "包内重复 fn 撞依赖符号应为 NAM002 error（R128 统一减法覆盖 base 侧），实际: {}",
+        stdout
+    );
+    assert!(
+        !stdout.contains("NAM006"),
+        "不应降级为 NAM006 warning（R128 统一减法），实际: {}",
+        stdout
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+// ── R125 补测试（三十一审）：根路径减法——根文件同文件重复 fn 撞包
+//    导出名不再 NAM006 降级 ──
+#[test]
+fn r125_root_duplicate_fn_colliding_pkg_symbol_still_nam002() {
+    let dir = std::env::temp_dir().join("r125_root_dup_pkg");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("lib")).unwrap();
+    std::fs::write(
+        dir.join("lom.toml"),
+        r#"[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+lib = { path = "lib" }
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("lib/lom.toml"),
+        r#"[package]
+name = "lib"
+version = "0.1.0"
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("lib/lib.lom"),
+        "fn shared_fn() -> Int\n    10\nend\n",
+    )
+    .unwrap();
+    // 根 main.lom 自身重复定义同名 fn（撞包导出名）
+    std::fs::write(
+        dir.join("main.lom"),
+        "fn main() -> Unit ! [IO]\n    println(1)\nend\nfn shared_fn() -> Int\n    1\nend\nfn shared_fn() -> Int\n    2\nend\n",
+    )
+    .unwrap();
+    let bin = env!("CARGO_BIN_EXE_lom");
+    let (stdout, _stderr, _rc) = run_build(bin, &dir);
+    assert!(
+        stdout.contains("NAM002") || stdout.contains("重复"),
+        "根文件重复 fn 撞包符号应为 NAM002 error（R125 根减法），实际: {}",
+        stdout
+    );
+    assert!(
+        !stdout.contains("NAM006"),
+        "不应降级为 NAM006（R125 根减法），实际: {}",
+        stdout
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

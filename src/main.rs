@@ -789,13 +789,14 @@ fn check_and_report_file(
         let own = file_top_level_symbols(&program);
         let mut externals: Vec<String> = base_externals.to_vec();
         if let Some(symbols) = pkg_symbols {
-            externals.extend(symbols.iter().filter(|s| !own.contains(*s)).cloned());
-        } else {
-            // R125（三十审）：根路径同样做减法——root_externals（全图包符号
-            // 并集）减去当前文件自身顶层符号，防止根文件同文件重复 fn 撞
-            // 包导出名时 NAM002 降级为 NAM006（与缺口 A 包路径减法对称）。
-            externals.retain(|s| !own.contains(s.as_str()));
+            externals.extend(symbols.iter().cloned());
         }
+        // R128（三十一审）：统一减法——对最终 externals 向量（base ∪ pkg）
+        // 整体减去当前文件自身顶层符号，而非仅对 pkg 追加部分减。修复包
+        // 路径 base 侧边角：包内文件重复 fn 撞依赖闭包符号时 base_externals
+        // 含该符号（仅对 pkg 部分减法不去除）→ NAM002 降级为 NAM006。
+        // 根路径（None 分支）同受此统一减法覆盖（R125 三十审行为维持）。
+        externals.retain(|s| !own.contains(s.as_str()));
         typechecker::check_program_with_externals(
             &program, &src, &path_str, &mut diags, &externals,
         );
