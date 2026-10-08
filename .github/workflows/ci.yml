@@ -178,6 +178,11 @@ jobs:
         # 大小写漂移非零退出，B 类历史原文 archive/reviews 不拦——审查纪律
         # "报告原文不回写"）
         run: python3 tools/link_check.py
+      - name: l2fix self-check (R120, v1.9.0 CLI parity oracle)
+        # python l2fix 的六断言自检（164 负例码解析 100%/建议非空/三题
+        # 联动）——宿主 lom l2fix 子命令的对拍基准（R120：v1.9.0 宣称
+        # CI 自检而零接线，二十九审开账后真接线）
+        run: python3 tools/l2fix.py --self-check
       - name: Eval prompt diagnostic check (R60)
         # error_repair 任务 prompt 内嵌诊断与真实 lom --json 输出对账
         # （九审 R60：runner 只验 stdout+rc 掩盖了 prompt 诊断漂移）

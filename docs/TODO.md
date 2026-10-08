@@ -1,6 +1,6 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-08，v1.8.0；L2 转正批交付——二十八审 A- 判据全满足，台账零 open）**：
+> **当前状态（2026-10-08，v1.9.0；l2fix CLI 子命令批交付——二十八审 A- 判据全满足，台账零 open）**：
 > 最新基线 **v1.8.0**（tag `88d91dc`，CI run `37675620476` 七 job 绿——L2 从 experimental
 > 转 supported face：README 边界段/playground footer/eval-README 三处宣称面更新 +
 > 审查轮数宣称 26→28；纯宣称面批零代码改动。**前置 v1.7.2 批（2026-10-08，用户裁决
@@ -47,8 +47,8 @@
 > 二十七审开账→同批收口，负向边界见 review-2026-10-07.html 开账节，
 > 交付细节见 SPEC §13 v1.7.1 条目与 designs/0019 后续修订行）。
 > 基线数字：verify_selfcomp **368/368 = 196+8+164**、bootstrap 14/14
-> （quine 272925B）、Rust **561+31**、eval 双后端各 128/128、fix_corpus
-> 13 对、doc_audit 71/71、self_comp 12591 行、playground 线上常绿。
+> （quine 272925B）、Rust **573+31**、eval 双后端各 128/128、fix_corpus
+> 13 对、doc_audit 71/71、self_comp 12671 行、playground 线上常绿。
 > 发布面：README 门面（评测证据行已刷 128 全集数据）+ 中文导读 +
 > Release v1.6.1（pre-release）+ **playground 线上已刷 v1.7.1 源件**
 > （gh-pages `d0bd774`，三方 sha256 一致）+ **Release v1.7.0（pre-release）

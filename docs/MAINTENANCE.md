@@ -105,6 +105,11 @@ archive 年表。
    **工具即清单**，禁止凭记忆找位补改。
 4. 大段重写任何治理文档后，提交前必跑 doc_audit 终检（锚句式是措辞级
    契约，CI #235 红事故实录）。
+4b. **升版批必含 J 锚现值**（R123，二十九审）：README Current release
+    段升版时必含 quine 现值（`quine **N**`）——否则 J 锚模式挂回上一版
+    Previous 段（三版同值时绿灯巧合，quine 变化即楔死）。doc_audit 若
+    PASS 而锚位在 Previous 段 = 漏检面，升版验收时人工核一眼锚在
+    Current 段。
 5. 新增合计类宣称 → tools/claims.json 登记（分项附证据指针，合计由回加
    得出，不手写——R22 教训）。
 
