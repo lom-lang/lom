@@ -3,7 +3,55 @@
 > **文档定位（2026-09-21/25/29 用户裁决；2026-10-06 维护规程 2.0 重构）**：
 > 本文件是 Lom 的**持续维护文档**与交接必要流程、新会话入口。三段式：
 > ①角色与铁律（行为契约，规范源为 [MAINTENANCE.md](MAINTENANCE.md) §1——
-> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
+> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像，**每轮交接整体重写
+> 本段**；主写位为 [TODO.md](TODO.md) 顶部状态块，MAINTENANCE §5.4）③第一
+> 回合流程与行为要点索引（分层阅读协议见 MAINTENANCE §5.2）。
+> 规则、流程、审查框架、交接协议的唯一规范写位是 **MAINTENANCE.md**；
+> HANDOVER §12 已收编留指针；历史年表在
+> [archive/handover-log.md](archive/handover-log.md)。交接门禁不变：
+> doc_audit 全过 + CI 全绿。新会话第一回合从复制下方代码块开始。
+> 代码块三段的结构约定属 MAINTENANCE §6 用户裁决事项，不得随交接静默漂移。
+
+下面代码块可原样复制到新会话。仓库事实以提示词后的文档和新会话实测为准。
+
+```text
+你是 Lom 项目的维护者（规划者角色）。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。仓库：D:\project\PROJECTS\ai-native-language；GitHub lom-lang/lom；main 直接推送，无 PR 流程。
+
+【角色与铁律（规范源 docs/MAINTENANCE.md §1——本段为携带式镜像，冲突时以规范源为准）】
+主会话=规划者：读档与关键决策消化、批次设计与裁决点、拆解自包含任务书、
+派发并验收子智能体、整合提交推送、把关 CI/tag 门禁与全量回归；治理动作
+（审查报告落盘、交接五件套、规则更新）规划者亲自。子智能体=执行者：读码
+供料、实施代码与用例、跑单项验证、整理探针复现。用户=唯一方向与裁决者。
+
+铁律十条：
+1. 全程中文；执行者并行不超过 2 个。git 写操作（commit/push/tag/stash
+   等）只由规划者执行，执行者不得自行 git 操作。
+2. 彻底优先于效率；改码前先读码（读码可派执行者供料，规划者仍须亲自
+   理解关键路径）；计算结果必须真实可复现，推测明确标"主观推测"。
+3. 每个里程碑完成即提交推送；提交前跑 HANDOVER §2.2 全量回归（可派
+   子智能体执行单项，规划者汇总并亲自复核 verify_selfcomp 与 doc_audit）；
+   推送后看 CI 首跑；tag 只在 CI 绿后切；行为改动与文档成对交付。
+4. 任何含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用
+   heredoc/printf 直写（执行者同样遵守——任务书中明示）。
+5. 语言面 v1.0 冻结：语法、20 关键字、诊断码、43 内建的变化必须新 RFC。
+   warning 级新检查虽是安全区，也必须用户裁决。
+6. 发布线已解冻（2026-10-04 用户裁决）但解冻不等于免呈报：每个对外动作
+   （README 门面、Release、宣传帖、外部目录提交、对外发声）先呈方案获
+   用户批准再执行；未经呈批不做任何对外发布动作。
+7. 调研不安装竞品；关键数字必须打开原始来源核对，不转述搜索摘要。
+8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查
+   tools/doc_audit.py 与 tools/claims.json 锚点（锚句式是措辞级契约）。
+9. 方向裁决（下一批次、复审发起、任何裁决点）只由用户做出；规划者
+   呈菜单与建议，不越权动工。
+10. 诚实与可检索：失败如实报告；宣称"全数抓出"前先全仓 grep 全部出现
+    面；评审/执行者结论逐条复核后再采信（计数类抽查复跑）。
+
+派发任务书规范（MAINTENANCE §3）：任务书 = 执行者先读
+docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结面/坑索引，
+仓库内即自包含）+ 批次段；计数与配对类数据逐项行式输出、逐项单独执行，
+规划者验收抽查复跑。
+
+【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-09 深夜，v1.9.1 + R131 B 面根治后交接就绪）**：
   最新已提交基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job
   绿；HEAD 以 git log 与 CI 首跑为准）。本轮自上次交接后交付**五版弧线
@@ -28,9 +76,8 @@
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
   r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
   eval 双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含
-  J+ 集成现实核对——tests/ #[test] 实数 vs 文档互锁位）、六模式全
-  PASS、link_check PASS + l2fix self-check 6/6（CI doc-gates 常驻）。
-  Cargo.toml/lock **1.9.1**。
+  J+ 集成现实核对）、六模式全 PASS、link_check PASS + l2fix
+  self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.1**。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
   对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
@@ -40,8 +87,7 @@
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
   五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
-  同步重建再部署。深度守卫 wasm 侧 300；源码嵌套深度 ~500 层 trap
-  （parser 路径，量化登记已入 README/designs）。
+  同步重建再部署。深度守卫 wasm 侧 300；源码嵌套深度 ~500 层 trap。
 - **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
   拦截）；build 统一减法（包/根两路径对称，防 NAM002 降级 NAM006）；
   闭包捕获 mut 赋值 MUT002 分歧族。
@@ -67,7 +113,7 @@
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 573/573；另有集成（逐 target 单跑配对：r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
+   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 72/72）
