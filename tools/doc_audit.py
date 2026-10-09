@@ -404,6 +404,31 @@ def main():
           % (m_integ[0] if m_integ else None, actual_integ,
              '（全组同滞即红——R131 根治）' if m_integ and int(m_integ[0]) != actual_integ else ''))
 
+    # ---- K. 交接镜像登记枚举核对（R136 处置 b，三十三审根治——镜像盲区）----
+    # 三十三审 R136 实证：TODO"登记在案不修边界"主写位补项后，HANDOFF_PROMPT
+    # 镜像枚举漏同步（六项 vs 五项倒挂）——主写位/镜像间的 J+/J 组外又一盲区。
+    # 本位提取两文件"登记在案不修边界"段，要求 TODO 段现行项的关键词在镜像
+    # 段全部出现。**新增/销账登记项时须同步维护 LEDGER_KEYS**（清单即锚——
+    # 漏同步镜像则红"镜像缺失"，销账不维护清单则红"清单陈旧"）。
+    LEDGER_KEYS = ['divergence', 'L2 包展开', 'clippy', 'playground',
+                   'gh-pages', '归档 HTML']
+
+    def ledger_window(path):
+        t = read(path)
+        # 粗体段锚：登记段专用格式（TODO "**登记在案不修边界（非 open 项）**"、
+        # HANDOFF "- **登记在案不修边界**"）；交付记录等普通文本出现不算。
+        i = t.find('**登记在案不修边界')
+        return t[i:i + 1200] if i >= 0 else ''
+    todo_w = ledger_window('docs/TODO.md')
+    mirror_w = ledger_window('docs/HANDOFF_PROMPT.md')
+    miss_mirror = [k for k in LEDGER_KEYS if k in todo_w and k not in mirror_w]
+    stale_keys = [k for k in LEDGER_KEYS if k not in todo_w]
+    check('K 交接镜像登记枚举 ⊇ TODO 登记段',
+          bool(todo_w) and bool(mirror_w) and not miss_mirror and not stale_keys,
+          '镜像缺失项 %s；清单陈旧项（TODO 段已无）%s%s'
+          % (miss_mirror or '无', stale_keys or '无',
+             '（R136 根治——镜像盲区）' if miss_mirror else ''))
+
     # ---- Z. 自指项数（R16 盲区关闭：本工具总项数与 HANDOVER 宣称一致）----
     # R16 教训："doc_audit 监控不了自身项数的自指盲区"。本项把 §2.2 的
     # "文档数字 N 项"宣称与脚本实际产出项数互锁（len+1 计入本项自身）。

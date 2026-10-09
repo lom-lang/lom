@@ -233,6 +233,16 @@ doc_audit 锚约束）；两处不一致时以 TODO 为准并随交接批修正�
 
 ## §7 变更日志
 
+- **2026-10-10 doc_audit K 位增补（三十三审 R136 处置 b 随批）**：新增
+  "K 交接镜像登记枚举 ⊇ TODO 登记段"核对位——TODO"登记在案不修边界"
+  段现行项的关键词清单（LEDGER_KEYS：divergence / L2 包展开 / clippy /
+  playground / gh-pages / 归档 HTML）必须在 HANDOFF_PROMPT 镜像枚举段
+  全部出现；销账不维护清单则红"清单陈旧"。背景：三十三审 R136 实证
+  主写位补项后镜像漏同步（六 vs 五倒挂）——J+/J 组外的又一镜像盲区。
+  属 §6"doc_audit 锚位增补（须同步 claims/文档并过门禁）"类（无新增
+  合计类宣称，claims 无涉）；项数 72→73，Z 自指与 HANDOVER §2.2/§9-5、
+  TODO/HANDOFF 基线行随批同步。实施时先验证捕获能力（镜像未同步时
+  K 位正确红"缺失 ['L2 包展开']"）再补镜像行转绿。
 - **2026-10-08 R119 锚模式修正（二十八审开账随批）**：doc_audit J quine 组
   的 README 锚从 'quine N, stock hex'（v1.7.0 批设计时挂 Current release
   横幅；该段降为 Previous 后锚随历史段走，升版即楔死——改历史值违不回写

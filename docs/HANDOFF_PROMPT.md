@@ -52,7 +52,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-10，三十三审收官——B+ 五连，R136/R137 两笔 P3 开账待裁）**：
+- **状态（2026-10-10，三十三审收官 + R136/R137 同包收口——台账零 open，三十四审 A- 判据链恢复成立）**：
+  R136/R137 收口批（用户裁决"执行"，纯文档+工具批不升版）：镜像补项对齐 + doc_audit 新增 K 交接镜像核对位（72→**73** 项，LEDGER_KEYS 双向核对根治镜像盲区——MAINTENANCE §7 已登记）+ designs/0021 L5 回填实值。
   最新基线 **v1.9.3**（tag `22a7008`，CI run `37951486401` 七 job 绿；= 三十二审开账 R132-R135
   四笔 P3 同包收口——R132 zh-CN 两行刷现值（573+37 与 128 全集
   98.3%/98.5% 主口径）；R133 TODO 登记段补回"L2 包展开单元不做同文件
@@ -69,7 +70,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   `ec2ebf0`，CI run `37895385249` 七 job 绿。playground 线上常绿（footer
   转正措辞）；发布面：README 门面 + Release v1.7.0（pre-release，
   2026-10-07 发布）+ v1.6.1（pre-release）。
-  **台账 2 笔 open（R136/R137 全 P3 一行级，整改顺序待用户裁决）。**
+  **台账零 open（R136/R137 已随批关闭）。**
 - **审查轨迹（均不外推）**：……→二十七审 A-→二十八审 A-（四审连平）
   →二十九审 B+（宣称失真×2）→三十审 B+ 二连（计数同滞+根减法）
   →三十一审 B+ 三连（构成收窄——技术面三连全绿：70+ 探针零击穿、
@@ -83,13 +84,14 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （→R136）；判据②J+ 不红成立；矩阵全绿 + 探针零击穿（r32 十形态
   1.9.3 复跑全符）；开账 R136 镜像枚举倒挂 + R137 designs/0021 L5
   占位残留与"全仓清零"超广宣称——跌档构成收窄至两笔一行级）。
-  **R136/R137 零失真收口后三十四审 A- 判据链恢复成立**。
+  **R136/R137 已收口（含 K 位根治）——三十四审 A- 判据链恢复成立，
+  回升可期**。
   最新报告 [review-2026-10-10.html](reviews/review-2026-10-10.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
   r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
-  eval 双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含
-  J+ 集成现实核对）、六模式全 PASS、link_check PASS + l2fix
+  eval 双后端各 128/128、fix_corpus 13 对、doc_audit **73/73**（含
+  J+ 集成现实核对 + K 交接镜像核对）、六模式全 PASS、link_check PASS + l2fix
   self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.3**。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
@@ -106,12 +108,13 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   拦截）；build 统一减法（包/根两路径对称，防 NAM002 降级 NAM006）；
   闭包捕获 mut 赋值 MUT002 分歧族。
 - **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
-  两 divergence；clippy --all-targets ~4 条漂移存量；playground
-  四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
-- 下一步：**方向待用户裁决**（三十三审已交付，R136/R137 两笔 P3
-  open）。菜单：**R136/R137 同包收口（建议下一项——两笔一行级，
-  收口后三十四审 A- 判据链恢复成立）**/ 性能工程（大批）/ Release
-  v1.7.0 转正（等外部反馈）。观察项：Ubuntu 26 迁移（**2026-10-19**，
+  两 divergence；L2 包展开单元不做同文件 fn 重复检测（L2P001 单文件
+  拒/包展开单元不查，跨包走 NAM006——v1.6.1 R115，R133 补录）；
+  clippy --all-targets ~4 条漂移存量；playground 四边界；gh-pages
+  独立构建流；归档 HTML assets 未随档。
+- 下一步：**交接就绪，方向待用户裁决**（R136/R137 已收口，台账零
+  open）。菜单：**三十四审（复评，建议下一项——A- 判据链恢复成立）**/
+  性能工程（大批）/ Release v1.7.0 转正（等外部反馈）。观察项：Ubuntu 26 迁移（**2026-10-19**，
   盯 CI 首跑——doc-gates 含断链+l2fix 两新步骤）。对外动作逐项呈批
   （铁律 6）。
 
@@ -131,7 +134,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
-   - python tools/doc_audit.py（期望 72/72）
+   - python tools/doc_audit.py（期望 73/73）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 31/31；v1.5.0 起 error_repair 31 题）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
