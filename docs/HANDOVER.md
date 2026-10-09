@@ -1,3 +1,13 @@
+> 最后更新：2026-10-09 深夜二（**v1.9.2 升版记账批（小治理批①）交付——用户裁决"执行"**。
+> (a) TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行
+> 括注 v1.8.0 批描述错挂）并补 v1.9.0/v1.9.1 交付描述与现行待裁菜单；
+> (b) tag v1.9.1（`7c2403c`）后两笔行为修复（`b614037` 三十审 R125 根路径
+> 减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按
+> MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**，README Current
+> release/SPEC §13/positioning/TODO/HANDOFF/HANDOVER 六面同步（tag/CI
+> 门禁回填随后）。R127-R131 计数收口同批记账。台账零 open；Rust 573+37；
+> doc_audit 72/72。）
+>
 > 最后更新：2026-10-09 深夜（**五版弧线 + 三轮审查 + R131 B 面根治——交接就绪**。
 > 本轮交付：v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI → v1.9.1
 > build 三缺口 → 二十九/三十/三十一审 B+ 三连（技术面三连全绿，跌档全为
@@ -21,32 +31,7 @@
 > （`39744fa`，纯工具批不升版）：tools/link_check.py 入库 + CI
 > doc-gates 接线（A 类现行断链/大小写漂移非零退出、B 类历史原文不拦；
 > 新步骤 CI 首跑 success）。交接五件套按 §5 刷新。）
->
-> 最后更新：2026-10-07（**二十七审收官 A- 维持 + 全 128 集 pass@k 首测 + 交接收口**。
-> 本轮三批：①eval 126/127 题面收紧（`e1702ba`，仿 078→118 先例，三要素
-> 零变化）；②**二十七审**（报告 reviews/review-2026-10-07.html，`7c4ae4c`
-> 入库——15 笔增量核心宣称零失真 + playground 对外敌手面首审六方向 17 项
-> 零击穿 + 本地构建=线上产物=gh-pages 三方 sha256 一致；开账 R117/R118
-> P3/P4 只开未修）；③**全 128 集双模型 pass@k 首测**
-> （eval/REPORT-2026-10-07-passk-128.md：pass@1 = 98.3%（ds）/98.5%
-> （glm），pass@5 = 99.2%/98.8%；126 消歧成功双模型 10/10；127 捷径清零、
-> 剩余失败=真实 Option 解包能力缺口）。README/eval README 评测证据行已刷
-> 128 全集数据（现行主口径）。交接五件套按 MAINTENANCE §5 刷新；
-> HANDOFF_PROMPT【当前真实状态】整体重写为二十七审后状态。前日
-> 2026-10-06 维护规程 2.0 治理批详录见下一条目与 TODO 治理批记录段。）
->
-> 最后更新：2026-10-06（**维护规程 2.0 治理批——规则收编单一事实源、
-> 历史归档、分层阅读、任务书与回报标准化（用户裁决"根本性更新维护方式，
-> 大框架保留，方式由规划者定"）**。新交付：docs/MAINTENANCE.md（现行维护
-> 规则唯一规范写位：角色与铁律十条/工作项循环与升版决策表/数字锚同步
-> SOP/执行者派发与验收细则/审查报告八节框架/交接协议与分层阅读 L0-L1-L2/
-> 规则变更协议）+ docs/EXECUTOR_TEMPLATE.md（执行者任务书通用段：输出格式
-> 硬性规范——计数配对数据逐项行式单独执行，禁合并输出推断配对）+ 本文件
-> 顶部 79 条历史条目归档至 docs/archive/handover-log.md + HANDOFF_PROMPT
-> 重构三段式 + §12 收编留指针。纯文档治理批不升版零行为变化；doc_audit
-> 71/71 与 spec_examples 复验。此前周期（v1.4.8→v1.7.0 十三行为批 + 解冻
-> + 门面/playground 上线 + 二十六审 A-、台账 R1-R116 零 open）详录见
-> archive 年表与 RFC-0004 修订 41-54。）
+<!-- 2026-10-07（二十七审收官+pass@k 首测+交接收口）与 2026-10-06（维护规程 2.0 治理批）两条目已随 v1.9.2 批移入 docs/archive/handover-log.md（MAINTENANCE §5.3 ≤3 条规则），原文逐字搬运 -->
 
 # Lom 项目 AI 交接文档
 
@@ -87,7 +72,7 @@
 | 项 | 状态 |
 |---|---|
 | 仓库 | `github.com:lom-lang/lom.git`（main 分支，直接推送 main，无 PR 流程；最新 commit 见 git log） |
-| 版本 | **v1.9.1**（Cargo.toml/lock 与 tag 一致；= **build 三缺口收口批**（designs/0021：多文件包假阳性减法修法 + PKG007 人类可读路径补发 + 主文件诊断面对称补全——三项登记在案不修边界销账；集成 31→35；零语言面）。前一版本 v1.9.0 = **l2fix CLI 子命令批**（designs/0018 裁决点 1 甲既定后续：L2 拒绝文本码行解析与七族修复建议映射入宿主二进制 `lom l2fix`——Rust 零 regex，43 名/8 模块查表直连 interpreter::module_of 单一事实源；python↔rust 对拍 18 合成 + 12 真实负例全链零字段差异，JSON 信封字节级一致；单测 561→573）。前一版本 v1.8.0 = **L2 转正批**（用户裁决“执行”：L2 子集编译器从 experimental 转 supported face——README 边界段 + playground footer + eval/README 时点注记；纯宣称面批，零 src/、零 .lom、零 eval 任务改动；审查轮数宣称 26→28）。前一版本 v1.7.2 = **L2 诊断行号批**（designs/0020，RFC-0004 修订 55）：L2 codegen error 通道带 `ln:cl` 位置前缀（与 lex/parse 三通道统一）——token 级名字锚表 build_name_pos 仅 Err 通道构建（成功路径零侵入：204 正例新旧 hex 逐字节恒等），语料覆盖 71/102 含引号名负例行；精度边界=名字首现锚非精确 span（31 枚豁免清单登记）；连锁 l2fix 可选位置组 + 验证器汇总断言 + eval 129 重采（5:13 与宿主 NAM005 行列一致）；转正判据盘点 designs/0020 §4。零 src/、零语言面变化。前一版本 v1.7.1 = R117/R118 playground 边角收口——宿主工具链编译到 wasm32-wasip1（[profile.wasm-release] ~1.7MB）+ playground/ 手写零依赖 WASI harness 与页面 + CI 第七 job（wasm 构建 + node 冒烟）+ src/ 两处 cfg(target_family="wasm") 门（wasm 直跑 + 深度守卫 300，桌面路径不变）、SECURITY wasm 边界注；浏览器实测 Run/Fix/示例切换全过；见 designs/0019 与 SPEC §13 v1.7.0。前一版本 v1.6.1 = R114/R115/R116 同包整改——R115 L2 单文件模式同文件重复 fn 检测（classify_l2 补"重复定义"关键字归 L2P）+ R114 归族宣称语料作用域注明与 l2fix 注释更正（不补 ~29 关键字：加密提高未见组合误归族风险）+ R116 SECURITY.md actions 版本引用顺刷，见 RFC-0004 修订 54。verify_selfcomp 368/368 = 196+8+164、Rust 573+37、quine 272925（v1.7.2 新值，J 锚现位）、eval 128×2。历史链：v1.7.0 = 在线 playground（wasm32-wasip1 全工具链 + 手写 WASI harness + CI 第七 job）；v1.6.0 = L2 诊断结构化前置件；v1.5.1 = R112 整改；v1.5.0 = repair 闭环深化首批；v1.4.15 = R110 邻接面；v1.4.14 = R110；v1.4.13 = 登记项两枚；v1.4.12 = R107；v1.4.11 = R108/R109；v1.4.10 = R104/R105；v1.4.9/v1.4.8 = R94 批 2/批 1；v1.4.7-v1.4.2 = R101/A甲-E甲链；语言面冻结维持；外部发布线已解冻（2026-10-04 用户裁决）。） |
+| 版本 | **v1.9.2**（Cargo.toml/lock 与 tag 一致；= **三十/三十一审整改收口记账批**：R125 根路径减法（无文件 build 根目录检查 root_externals 减文件自身符号，防 NAM002 降级 NAM006）+ R128 统一减法（check_and_report_file 对最终 externals（base ∪ pkg）整体减 own——修复包路径 base 侧降级边角；集成 35→37 补测试锁定）+ R127-R131 文档收口与 doc_audit J+ 集成现实核对位（71→72 项）；零语言面、quine/self_comp 不变）。前一版本 v1.9.1 = **build 三缺口收口批**（designs/0021：多文件包假阳性减法修法 + PKG007 人类可读路径补发 + 主文件诊断面对称补全——三项登记在案不修边界销账；集成 31→35；零语言面）。前一版本 v1.9.0 = **l2fix CLI 子命令批**（designs/0018 裁决点 1 甲既定后续：L2 拒绝文本码行解析与七族修复建议映射入宿主二进制 `lom l2fix`——Rust 零 regex，43 名/8 模块查表直连 interpreter::module_of 单一事实源；python↔rust 对拍 18 合成 + 12 真实负例全链零字段差异，JSON 信封字节级一致；单测 561→573）。前一版本 v1.8.0 = **L2 转正批**（用户裁决“执行”：L2 子集编译器从 experimental 转 supported face——README 边界段 + playground footer + eval/README 时点注记；纯宣称面批，零 src/、零 .lom、零 eval 任务改动；审查轮数宣称 26→28）。前一版本 v1.7.2 = **L2 诊断行号批**（designs/0020，RFC-0004 修订 55）：L2 codegen error 通道带 `ln:cl` 位置前缀（与 lex/parse 三通道统一）——token 级名字锚表 build_name_pos 仅 Err 通道构建（成功路径零侵入：204 正例新旧 hex 逐字节恒等），语料覆盖 71/102 含引号名负例行；精度边界=名字首现锚非精确 span（31 枚豁免清单登记）；连锁 l2fix 可选位置组 + 验证器汇总断言 + eval 129 重采（5:13 与宿主 NAM005 行列一致）；转正判据盘点 designs/0020 §4。零 src/、零语言面变化。前一版本 v1.7.1 = R117/R118 playground 边角收口——宿主工具链编译到 wasm32-wasip1（[profile.wasm-release] ~1.7MB）+ playground/ 手写零依赖 WASI harness 与页面 + CI 第七 job（wasm 构建 + node 冒烟）+ src/ 两处 cfg(target_family="wasm") 门（wasm 直跑 + 深度守卫 300，桌面路径不变）、SECURITY wasm 边界注；浏览器实测 Run/Fix/示例切换全过；见 designs/0019 与 SPEC §13 v1.7.0。前一版本 v1.6.1 = R114/R115/R116 同包整改——R115 L2 单文件模式同文件重复 fn 检测（classify_l2 补"重复定义"关键字归 L2P）+ R114 归族宣称语料作用域注明与 l2fix 注释更正（不补 ~29 关键字：加密提高未见组合误归族风险）+ R116 SECURITY.md actions 版本引用顺刷，见 RFC-0004 修订 54。verify_selfcomp 368/368 = 196+8+164、Rust 573+37、quine 272925（v1.7.2 新值，J 锚现位）、eval 128×2。历史链：v1.7.0 = 在线 playground（wasm32-wasip1 全工具链 + 手写 WASI harness + CI 第七 job）；v1.6.0 = L2 诊断结构化前置件；v1.5.1 = R112 整改；v1.5.0 = repair 闭环深化首批；v1.4.15 = R110 邻接面；v1.4.14 = R110；v1.4.13 = 登记项两枚；v1.4.12 = R107；v1.4.11 = R108/R109；v1.4.10 = R104/R105；v1.4.9/v1.4.8 = R94 批 2/批 1；v1.4.7-v1.4.2 = R101/A甲-E甲链；语言面冻结维持；外部发布线已解冻（2026-10-04 用户裁决）。） |
 | Rust 测试 | **573/573 通过 + 35 集成**（v1.9.1 批：集成 35 = 31 + build_gaps_remediation ×6；l2fix 批：单元 573 = 561 + l2fix 码行解析/七族映射 ×12；v1.5.1 批：集成 31 = 28 + r112_closure_assign ×3；v1.5.0 批：单元 561 = 559 + fix NAM006/MUT002 hint ×2；v1.4.15 批：559 = 554 + LetDestruct 邻接 ×5；R110 批：554 = 548 + 块级快照/恢复 ×6；v1.4.13：548 = 543 + for quirk ×5；集成 28 = 25 + build_closure_externals×3；v1.4.12：25；v1.4.11：21；v1.4.9：543 = 542 + R94 map_remove e2e ×1；v1.4.7：542 = 541 + R101 e2e ×1）（v1.2.6 `lom fmt` match guard 两条单测；2026-09-22 v1.2.5 R73-R76 整改：533 = v1.2.4 的 529 + R73 ×2（同轮双 Replace 去重 + 等价边界锁定）+ R75 ×2（解构遮蔽 hint + 序正例）；集成 8 = r56 ×1 + r58 套件 ×7 不变；v1.2.4：529 = 523 + R65 ×6；2026-09-21 v1.2.3 R62/R63 整改：523 = v1.2.2 的 513 + R62 ×6（闭包遮蔽/行内注释/字符串字面量三负向 + if 块内 let/体内遮蔽参数两正向 + 闭包内降级）+ R63 ×4（-32700/-32600/缺 method/null-id 格式）；集成 5 = r56 ×1 + r58 套件 ×4（原 2 + R63 ×2：超限不 abort + 畸形 JSON 回错后存活）；v1.2.2：487 + R55 ×8 + R56 ×3 + R57 ×3 + R58 ×6 + R59 ×3 + R60 ×3；v1.2.1 fix 动作面 +5；v1.2.0 NAM005 +5；v1.1.3 D 包 +2；此前 N1 深度守卫 ×3 + Q1 盲区 ×6 + Q3 守卫 ×4；v1.3.0：539（pkg-expand ×4）；v1.3.2：541（R90 ×2）；行覆盖率 84.4%——cargo test 口径下界）（含 wasm 单测 + 37 个 Node e2e + fix_corpus 端到端 + eval ID 唯一性 + dump golden + 8.1 前提钉子 ×2 + 8.2 内建表导出 ×1 + char_from_code ×4 + lexer UTF-8 ×3 + T2 递归闭包 let ×2），构建零 warning、**clippy 零 warning**（CI 口径 `cargo clippy --release -- -D warnings`；`--all-targets` 含存量测试 lint 不在 gate 内） |
 | eval 评测集 | **128/128**（v1.5.0 起 error_repair 31 题含 L2 面 3 题；runner 只比对 stdout + 要求退出码 0；任务 115 = char_from_code；116 递归闭包 let / 117 浮点 inf/NaN（T5）；118 = 078 明确版对照题（Q4：量化歧义损失）/ 119 = MUT001 warning 修复题（Q4：首个 warning 级修复任务）/ 120 = NAM005 未导入内建修复题（B 包：静态预警形态）/ **121 = LEX005 全角标点修复题 + 122 = TYPE002 真值 warning 预告 RUNTIME001 修复题（③ 包：CJK 输入法形态 + warning-as-prophecy 形态）**，双后端实跑定稿；error_repair 24 题高温采样见补测报告） |
 | CI | **最新已提交 main**：`ca31691`（v1.7.2 L2 行号批，run `37652195871` **七 job 全绿**，tag v1.7.2 已切 lightweight 双端一致）、`02369ef`（designs/0020 设计产出，run `37643716163` 绿）、`7739959`（v1.7.1 R117/R118 收口批，run `37526137995` 七 job 绿，tag v1.7.1）与 `7c4ae4c`（二十七审报告入库，#273）、`e1702ba`（题面收紧批，#272）、`ae98d81`（结构整理防腐批，#271）、`b13f2d2`（维护规程 2.0，#270）与 `8132df4`（回填，#268）、`7685d64`/tag v1.7.0，run `37348863077`（#267）**——以上逐 run 实查全绿**；gh-pages `d0bd774`（playground v1.7.1 源件部署——本地构建=分支=线上三方 sha256 一致 da025f03…，Pages 构建流独立于 CI）；更早 tag 链（v1.4.x-v1.6.1）见 TODO 历史交付段与二十七审报告 §2。 |
@@ -151,7 +136,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 573/573（v1.9.1 集成 37 = r56 ×1 + r58 ×7 + r94_pkg_alias ×2 + r104_dedup_order ×6 + r108_variant_externals ×5 + r107_alias_clash ×4 + build_closure_externals ×3 + r112_closure_assign ×3 + build_gaps_remediation ×6，合计 610）
+cargo test --release                                    # 期望 573/573（v1.9.2 集成 37 = r56 ×1 + r58 ×7 + r94_pkg_alias ×2 + r104_dedup_order ×6 + r108_variant_externals ×5 + r107_alias_clash ×4 + build_closure_externals ×3 + r112_closure_assign ×3 + build_gaps_remediation ×6，合计 610）
 $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
 foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }  # CI 同覆盖：37 个有效文件，apply_test 豁免；新增/修改 .lom 提交前必查
 .\target\release\lom.exe examples\bootstrap\stmt_interp.lom   # 期望与 examples/bootstrap/stmt_interp.expected.txt 逐字一致（golden）
@@ -391,10 +376,10 @@ end
 ## 9. 快速上手检查单（新 AI 第一天）
 
 1. 先复制执行 `docs/HANDOFF_PROMPT.md`，再按其第一回合分层阅读（L0：MAINTENANCE.md 全文、TODO 顶部、最新两轮审查报告、SPEC §14、RFC-0004 修订链尾、designs 状态行；本文 §0/§1/§9/§11.6 与 §2.2 基线清单）；历史细节按需下钻 docs/archive/handover-log.md 与 designs/RFC 原文（MAINTENANCE §5.2 分层阅读协议）
-2. `cargo build --release && cargo test --release` 确认 573/573（另有 tests/ 集成 ×37）、零 warning、`./target/release/lom.exe --version` 显示 1.9.1
+2. `cargo build --release && cargo test --release` 确认 573/573（另有 tests/ 集成 ×37）、零 warning、`./target/release/lom.exe --version` 显示 1.9.2
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 368/368、--bootstrap 14/14 quine 272925 bytes）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 检查 `git status`：交接提交后应基本干净（tag/CI 回填除外）；核最新已提交 main CI 六 job 与 annotations（§11 有 API 查法），不得把已提交绿灯外推到任何未提交工作区。
-5. **当前状态（2026-10-07，v1.7.1 已 tag）——最新基线 v1.7.1（tag `7739959`，CI run `37526137995` 七 job 绿；线上 https://lom-lang.github.io/lom/playground/ 已刷 v1.7.1 源件（gh-pages `d0bd774`，三方 sha256 一致））**：本轮（10-07）= 二十七审开账 R117/R118 同包整改（v1.7.1：嵌套深度量化登记 + trap 文案中性化 + harness 空数组 args 防御；零 src/，全量回归 21 项全绿）+ playground 重部署；**Release v1.7.0 已发布（2026-10-07，pre-release，id 405817252——首个对外发布检查点；用户解除组织 OAuth App 访问限制后 REST API 直发，核验全过；部署面含 v1.7.1 加固）**；断链机检已升格 CI 常驻 gate（`39744fa` 纯工具批：`python tools/link_check.py` 入 doc-gates，A 类断链/大小写漂移非零退出）。前置轮（10-06~07）= 维护规程 2.0 治理批 + 结构整理防腐批 + eval 126/127 题面收紧 + 二十七审 A- 维持 + 全 128 集 pass@k 首测（pass@1 = 98.3%/98.5% 现行主口径，README 证据行已刷）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 573+37、eval 双后端各 128/128、doc_audit 72 项（J 锚三组 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（Release 认证三选一/性能/L2 行号/断链机检升格）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
+5. **当前状态（2026-10-09 深夜，v1.9.2 升版记账批交付——tag/CI 门禁回填随后）**：本轮 = 用户裁决"执行"小治理批①——TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行括注错挂）并补 v1.9.0/v1.9.1 交付描述；tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后落地的两笔行为修复（`b614037` 三十审 R125 根路径减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按 MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**；R127-R130 计数收口与 R131 doc_audit J+ 集成现实核对位（71→72 项）同批记账。前置轮（10-08~09）= v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI 子命令 → v1.9.1 build 三缺口收口 → 二十九/三十/三十一审 B+ 三连（R119-R130 十二笔全关 + R131 工具根治，台账零 open）。playground 线上常绿（gh-pages `d0bd774` 三方 sha256 一致）；**Release v1.7.0（pre-release）已发布**（2026-10-07，id 405817252，转正待外部反馈）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 573+37、eval 双后端各 128/128、doc_audit 72 项（J 锚三组 + J+ 现实核对 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（三十二审/性能工程/Release 转正）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）

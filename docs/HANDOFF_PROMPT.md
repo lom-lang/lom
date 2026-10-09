@@ -52,17 +52,23 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-09 深夜，v1.9.1 + R131 B 面根治后交接就绪）**：
-  最新已提交基线 **v1.9.1**（tag `7c2403c`，CI run `37767137349` 七 job
-  绿；HEAD 以 git log 与 CI 首跑为准）。本轮自上次交接后交付**五版弧线
-  + 三轮审查 + 十四笔开账全关 + 一项工具根治**：v1.7.2（L2 行号 `ln:cl`
-  位置前缀三通道统一）→ v1.8.0（L2 转正 experimental→supported face）
-  → v1.9.0（l2fix CLI 子命令，Rust 828 行零 regex，python↔rust 对拍
-  零差异）→ v1.9.1（build 三缺口收口：多文件包假阳性减法修法 + PKG007
-  人类可读路径 + 主文件诊断面对称补全——三项登记边界销账）→ 二十九/
-  三十/三十一审 B+ 三连 → R119-R130 十四笔收口（含 R128 统一减法行为
-  修复 + 补测试锁定）→ **R131 J+ 集成现实核对**（doc_audit 71→72 项
-  ——tests/ #[test] 实数 vs 文档互锁位，根治四回同族全组同滞盲区）。
+- **状态（2026-10-09 深夜，v1.9.2 升版记账批交付后交接就绪）**：
+  最新基线 **v1.9.2**（tag/CI 门禁回填随后；= 三十/三十一审整改收口
+  记账批——tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后
+  落地的两笔行为修复 `b614037`（三十审 R125 根路径减法）与 `d513894`
+  （三十一审 R128 统一减法——最终 externals（base ∪ pkg）整体减文件
+  自身符号，集成 35→37 补测试锁定）按"行为修复→patch"补升版本；
+  R127-R131 计数收口与 doc_audit J+ 集成现实核对位（71→72 项——
+  tests/ #[test] 实数 vs 文档互锁，根治四回同族全组同滞盲区）同批记账；
+  并修正 TODO 状态块两处漂移、补 v1.9.0/v1.9.1 交付描述）。本轮自上次
+  交接后交付**六版弧线 + 三轮审查 + 十二笔开账全关（R119-R130）+ 一项
+  工具根治 + 一项升版记账**：v1.7.2（L2 行号 `ln:cl` 位置前缀三通道
+  统一）→ v1.8.0（L2 转正 experimental→supported face）→ v1.9.0
+  （l2fix CLI 子命令，Rust 828 行零 regex，python↔rust 对拍零差异）
+  → v1.9.1（build 三缺口收口：多文件包假阳性减法修法 + PKG007 人类
+  可读路径 + 主文件诊断面对称补全——三项登记边界销账）→ 二十九/三十/
+  三十一审 B+ 三连 → R119-R130 十二笔收口（含 R128 统一减法行为修复
+  + 补测试锁定）→ R131 J+ → **v1.9.2 升版记账**（本批）。
   playground 线上常绿（footer 转正措辞）；发布面：README 门面 +
   Release v1.7.0（pre-release，2026-10-07 发布）+ v1.6.1（pre-release）。
   **台账零 open。**
@@ -77,13 +83,14 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
   eval 双后端各 128/128、fix_corpus 13 对、doc_audit **72/72**（含
   J+ 集成现实核对）、六模式全 PASS、link_check PASS + l2fix
-  self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.1**。
+  self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.2**。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
   对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
-- **build 现行面（v1.9.1 收口后）**：无文件 `lom build` 诊断面 = 包源
-  逐文件（统一减法 externals——base ∪ pkg 整体减文件自身符号，R128）
-  + PKG007（人类可读路径 stderr）+ 根目录主文件对称检查（统一减法）。
+- **build 现行面（v1.9.1 收口 + R125/R128 统一减法后）**：无文件
+  `lom build` 诊断面 = 包源逐文件（统一减法 externals——base ∪ pkg
+  整体减文件自身符号，R128）+ PKG007（人类可读路径 stderr）+ 根目录
+  主文件对称检查（统一减法，R125）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
   五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
@@ -94,11 +101,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 - **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
   两 divergence；clippy --all-targets ~4 条漂移存量；playground
   四边界；gh-pages 独立构建流；归档 HTML assets 未随档。
-- 下一步：**交接就绪，方向待用户裁决**。菜单：三十二审（B+ 三连
-  后复评——若 R127-R130 + J+ 零失真可回 A-）/ ⑦性能工程（大批）/
-  Release v1.7.0 转正（等外部反馈）。观察项：Ubuntu 26 迁移
-  （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两新步骤）。
-  对外动作逐项呈批（铁律 6）。
+- 下一步：**交接就绪，方向待用户裁决**（小治理批①已交付——本批）。
+  菜单：三十二审（B+ 三连后复评——若 R127-R130 + J+ 零失真可回
+  A-，建议下一项）/ 性能工程（大批）/ Release v1.7.0 转正（等外部
+  反馈）。观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑——
+  doc-gates 含断链+l2fix 两新步骤）。对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
 1. **L0 现行必读（规划者亲自）**：docs/MAINTENANCE.md 全文（规则）；
