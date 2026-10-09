@@ -13,7 +13,7 @@
 
 **机理**：`run_build` 逐文件检查时，externals 只传 `externals_map[P]`（P 的依赖传递闭包公开符号，不含 P 自身）。多文件包文件 B 引用同包文件 A 的符号时——B 的 `functions` 表只有 B 的顶层项（typechecker 首遍只扫单文件 program.items），externals 不含 A 的符号 → NAM003 假阳性。
 
-**修法（减法路线）**：检查包 P 的文件 F 时传 `externals_map[P] ∪ (P.public_symbols − F 自身顶层符号集)`。F 自身符号集从已解析的 `program.items` 收集（fn/enum/变体名）。
+**修法（减法路线）**：检查包 P 的文件 F 时传 `externals_map[P] ∪ P.public_symbols`，再对最终 externals 向量（base ∪ pkg）**整体**减去 F 自身顶层符号集（R128 三十一审收口：v1.9.1 原公式 `externals_map[P] ∪ (P.public_symbols − F 自身符号集)` 仅对 pkg 追加部分减——包内文件重复 fn 撞**依赖闭包**符号时该符号留在 base 侧仍触发 NAM002→NAM006 降级，统一减法根治；根路径同受覆盖，见 §2 R125 句）。F 自身符号集从已解析的 `program.items` 收集（fn/enum/变体名）。
 
 **关键约束——减法必做**：若朴素并上全部 `P.public_symbols`，同文件重复 fn 名会命中 typechecker 的 `external_symbols.contains` 分支 → NAM002 error 降级为 NAM006 warning → **翻转同文件重复定义负例**。减去当前文件符号后：
 - 单文件包场景：`P.public_symbols − F 符号 = ∅`，行为零变化

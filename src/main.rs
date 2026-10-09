@@ -760,16 +760,20 @@ fn run_build(json: bool) {
 /// 缺口 A/C（designs/0021 §1）：单文件「读取 + 解析 + 类型检查 +
 /// ✓/✗ 结果行」——包源文件循环与根目录主文件循环共用（输出格式一致）。
 ///
-/// externals 构造：
+/// externals 构造（R125/R128 统一减法——v1.9.1 批交付 + 三十一审收口定型）：
 /// - 基底 `base_externals`：包路径 = 该包依赖闭包公开符号并集
 ///   （externals_map[P]）；根路径 = 全图全部包 public_symbols 并集。
 /// - `pkg_symbols = Some(本包 public_symbols)`（缺口 A，包路径）：再并上
-///   「本包 public_symbols − 当前文件自身顶层符号集」（file_top_level_symbols）
-///   ——多文件包内兄弟文件符号放行。**减法必做**：当前文件符号若留在
-///   externals，同文件重复 fn 名会命中 typechecker 的 external_symbols
-///   分支（collect_fn_sig 收敛点），NAM002 error 降级为 NAM006 warning
-///   （翻转同文件重复定义负例）。单文件包减法后为空集，行为零变化。
-/// - `pkg_symbols = None`（缺口 C，根路径）：根不在图内，无包符号可并。
+///   本包 public_symbols——多文件包内兄弟文件符号放行。
+/// - **统一减法（R128）**：对最终 externals 向量（base ∪ pkg）整体减去
+///   当前文件自身顶层符号集（file_top_level_symbols）。**减法必做**：
+///   当前文件符号若留在 externals，同文件重复 fn 名会命中 typechecker
+///   的 external_symbols 分支（collect_fn_sig 收敛点），NAM002 error
+///   降级为 NAM006 warning（翻转同文件重复定义负例）——base 侧同样
+///   要减：包内文件重复 fn 撞**依赖闭包**符号时该符号恰在 base 里。
+///   单文件包减法后为空集，行为零变化；根路径（`pkg_symbols = None`，
+///   缺口 C）同受统一减法覆盖（R125：root_externals 减文件自身符号）
+///   ——包/根两路径行为口径对称。
 fn check_and_report_file(
     file: &std::path::Path,
     base_externals: &[String],
