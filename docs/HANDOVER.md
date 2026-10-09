@@ -4,9 +4,10 @@
 > (b) tag v1.9.1（`7c2403c`）后两笔行为修复（`b614037` 三十审 R125 根路径
 > 减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按
 > MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**，README Current
-> release/SPEC §13/positioning/TODO/HANDOFF/HANDOVER 六面同步（tag/CI
-> 门禁回填随后）。R127-R131 计数收口同批记账。台账零 open；Rust 573+37；
-> doc_audit 72/72。）
+> release/SPEC §13/positioning/TODO/HANDOFF/HANDOVER 六面同步。**门禁回填：
+> 提交 `ec2ebf0` 推送后 CI run `37895385249` 七 job 全绿，tag v1.9.2 已切
+> （lightweight 双端一致）。**R127-R131 计数收口同批记账。台账零 open；
+> Rust 573+37；doc_audit 72/72。）
 >
 > 最后更新：2026-10-09 深夜（**五版弧线 + 三轮审查 + R131 B 面根治——交接就绪**。
 > 本轮交付：v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI → v1.9.1
@@ -379,7 +380,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 573/573（另有 tests/ 集成 ×37）、零 warning、`./target/release/lom.exe --version` 显示 1.9.2
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 368/368、--bootstrap 14/14 quine 272925 bytes）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 检查 `git status`：交接提交后应基本干净（tag/CI 回填除外）；核最新已提交 main CI 六 job 与 annotations（§11 有 API 查法），不得把已提交绿灯外推到任何未提交工作区。
-5. **当前状态（2026-10-09 深夜，v1.9.2 升版记账批交付——tag/CI 门禁回填随后）**：本轮 = 用户裁决"执行"小治理批①——TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行括注错挂）并补 v1.9.0/v1.9.1 交付描述；tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后落地的两笔行为修复（`b614037` 三十审 R125 根路径减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按 MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**；R127-R130 计数收口与 R131 doc_audit J+ 集成现实核对位（71→72 项）同批记账。前置轮（10-08~09）= v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI 子命令 → v1.9.1 build 三缺口收口 → 二十九/三十/三十一审 B+ 三连（R119-R130 十二笔全关 + R131 工具根治，台账零 open）。playground 线上常绿（gh-pages `d0bd774` 三方 sha256 一致）；**Release v1.7.0（pre-release）已发布**（2026-10-07，id 405817252，转正待外部反馈）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 573+37、eval 双后端各 128/128、doc_audit 72 项（J 锚三组 + J+ 现实核对 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（三十二审/性能工程/Release 转正）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
+5. **当前状态（2026-10-09 深夜，v1.9.2 升版记账批交付——tag `ec2ebf0`，CI run `37895385249` 七 job 绿）**：本轮 = 用户裁决"执行"小治理批①——TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行括注错挂）并补 v1.9.0/v1.9.1 交付描述；tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后落地的两笔行为修复（`b614037` 三十审 R125 根路径减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按 MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**；R127-R130 计数收口与 R131 doc_audit J+ 集成现实核对位（71→72 项）同批记账。前置轮（10-08~09）= v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI 子命令 → v1.9.1 build 三缺口收口 → 二十九/三十/三十一审 B+ 三连（R119-R130 十二笔全关 + R131 工具根治，台账零 open）。playground 线上常绿（gh-pages `d0bd774` 三方 sha256 一致）；**Release v1.7.0（pre-release）已发布**（2026-10-07，id 405817252，转正待外部反馈）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 573+37、eval 双后端各 128/128、doc_audit 72 项（J 锚三组 + J+ 现实核对 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（三十二审/性能工程/Release 转正）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
