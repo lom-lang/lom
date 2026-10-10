@@ -396,8 +396,8 @@ enum ControlFlow {
 
 /// 解释器
 pub struct Interpreter {
-    /// 全局函数表
-    functions: HashMap<String, FnDecl>,
+    /// 全局函数表（值为 Rc 共享：FnDecl 注册后不可变，调用点取指针克隆零深拷贝）
+    functions: HashMap<String, Rc<FnDecl>>,
     /// 全局作用域（内置函数和全局变量）
     globals: ScopeRef,
     /// 所有枚举变体名（内置 Ok/Err/Some/None + 用户定义）
@@ -564,7 +564,7 @@ impl Interpreter {
                     for item in &result.program.items {
                         match item {
                             Item::Fn(f) => {
-                                self.functions.insert(f.name.clone(), f.clone());
+                                self.functions.insert(f.name.clone(), Rc::new(f.clone()));
                             }
                             Item::Enum(e) => {
                                 for v in &e.variants {
@@ -616,7 +616,7 @@ impl Interpreter {
         for item in &program.items {
             match item {
                 Item::Fn(f) => {
-                    self.functions.insert(f.name.clone(), f.clone());
+                    self.functions.insert(f.name.clone(), Rc::new(f.clone()));
                 }
                 Item::Enum(e) => {
                     for v in &e.variants {
@@ -649,7 +649,7 @@ impl Interpreter {
                 Ok(Value::Unit)
             }
             Item::Fn(f) => {
-                self.functions.insert(f.name.clone(), f.clone());
+                self.functions.insert(f.name.clone(), Rc::new(f.clone()));
                 Ok(Value::Unit)
             }
             Item::Enum(e) => {
@@ -1183,6 +1183,7 @@ impl Interpreter {
                 // 与 WASM/L2 遮蔽方向相反）——现与 WASM codegen（fn_idx orig
                 // 优先）/L2 同序。正常别名/stdlib 别名/prelude 零影响（functions
                 // 表不含内建名，含别名的 functions 命中只在真撞名时发生）。
+                // 表值为 Rc<FnDecl>：此处 .cloned() 为 Rc 指针克隆，调用不复制 AST。
                 if let Some(f) = self.functions.get(name).cloned() {
                     return self.call_function(&f, arg_vals);
                 }
@@ -2930,7 +2931,7 @@ end
         for item in &program.items {
             match item {
                 Item::Fn(f) => {
-                    interp.functions.insert(f.name.clone(), f.clone());
+                    interp.functions.insert(f.name.clone(), Rc::new(f.clone()));
                 }
                 Item::Enum(e) => {
                     for v in &e.variants {
@@ -3231,7 +3232,7 @@ end
         let mut interp = Interpreter::new();
         for item in &result.program.items {
             if let Item::Fn(f) = item {
-                interp.functions.insert(f.name.clone(), f.clone());
+                interp.functions.insert(f.name.clone(), Rc::new(f.clone()));
             }
         }
         let main = interp.functions.get("main").cloned().expect("应有 fn main");

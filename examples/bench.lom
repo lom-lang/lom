@@ -4,10 +4,16 @@
 #   bench lookup      : 建 n 条目的关联列表(模拟自举环境),查最后一个条目 n 次(最坏情况线性扫描)
 #   bench recurse     : 深度为 n 的线性递归 countdown(测 256MB 栈 + 调用开销)
 #   bench map_lookup  : 建 n 条目 Map,查同一键 n 次(Phase 5.20;对比 lookup 的 O(n²) 线性扫描)
+#   bench arith_loop  : while 循环纯 Int 算术累加 n 次(测主循环分派成本,不涉及 List)
+#   bench call_density: 循环内调用小函数 add3 n 次(与 arith_loop 同外壳,差分即调用帧成本)
+#   bench closure_loop: 循环内创建闭包并立即调用 n 次(测闭包创建+调用帧成本)
+#   bench list_get_nth: cons 建 n 元素表后取尾元素 n 次(单次 list_get O(n) 走查,总 O(n²))
+#   bench map_hit_far : 插 n 条 Map 后每键各查一次(全冷键,测哈希查找单次成本)
+#   bench str_concat  : 字符串循环拼接 n 次(每次分配新串整体复制,渐近平方)
 # 注意:Lom 无内置时钟,计时在外部做(wall-clock);本文件只负责负载
 
 from env import { args }
-from string import { string_to_int, int_to_string }
+from string import { string_to_int, int_to_string, len }
 from list import { list_cons, list_empty, list_get, list_head, list_tail, list_is_empty, list_length }
 from map import { map_empty, map_set, map_get }
 
@@ -85,10 +91,93 @@ fn bench_map_lookup(n: Int) -> Int
     total
 end
 
+# 纯 Int 算术累加深循环(while 外壳,不涉及 List,测主循环分派成本)
+fn bench_arith_loop(n: Int) -> Int
+    let mut acc = 0
+    let mut i = 0
+    while i < n
+        i += 1
+        acc = acc + ((i % 7) - ((i / 3) % 5))
+    end
+    acc
+end
+
+# 循环体内调用小函数(与 arith_loop 同 while 外壳,差分即普通调用帧成本)
+fn add3(a: Int, b: Int, c: Int) -> Int
+    a + b + c
+end
+
+fn bench_call_density(n: Int) -> Int
+    let mut acc = 0
+    let mut i = 0
+    while i < n
+        i += 1
+        acc = add3(acc, i, 1)
+    end
+    acc
+end
+
+# 循环内创建闭包并立即调用(测闭包创建+调用帧成本;闭包捕获不可变副本 j)
+fn bench_closure_loop(n: Int) -> Int
+    let mut acc = 0
+    let mut i = 0
+    while i < n
+        i += 1
+        let j = i
+        let f = fn(x: Int) -> Int
+            x + j
+        end
+        acc = f(acc)
+    end
+    acc
+end
+
+# cons 建 n 元素表后取尾元素(下标 n-1,即最先插入的 1)n 次(单次 O(n) 走查,总 O(n²))
+fn bench_list_get_nth(n: Int) -> Int
+    let mut xs = list_empty()
+    for i in 1..(n + 1)
+        xs = list_cons(i, xs)
+    end
+    let mut total = 0
+    for i in 1..(n + 1)
+        total += list_get(xs, n - 1)
+    end
+    total
+end
+
+# 插 1..n 后每键各查一次(全冷键,无缓存命中,测哈希查找单次成本)
+fn bench_map_hit_far(n: Int) -> Int
+    let m = map_empty()
+    for i in 1..(n + 1)
+        map_set(m, int_to_string(i), i * 2)
+    end
+    let mut total = 0
+    for i in 1..(n + 1)
+        match map_get(m, int_to_string(i))
+            Some(v) =>
+                total += v
+            end
+            None =>
+                total += 0
+            end
+        end
+    end
+    total
+end
+
+# 字符串循环拼接(每次 + 分配新串并整体复制,预期总 O(n²))
+fn bench_str_concat(n: Int) -> Int
+    let mut s = ""
+    for i in 1..(n + 1)
+        s = s + "x"
+    end
+    len(s)
+end
+
 fn main() -> Unit
     let argv = args()
     if list_length(argv) < 3
-        println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup> <n>")
+        println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup|arith_loop|call_density|closure_loop|list_get_nth|map_hit_far|str_concat> <n>")
     else
         let bench = list_get(argv, 1)
         let n = string_to_int(list_get(argv, 2))
@@ -100,8 +189,20 @@ fn main() -> Unit
             println(bench_recurse(n))
         elif bench == "map_lookup"
             println(bench_map_lookup(n))
+        elif bench == "arith_loop"
+            println(bench_arith_loop(n))
+        elif bench == "call_density"
+            println(bench_call_density(n))
+        elif bench == "closure_loop"
+            println(bench_closure_loop(n))
+        elif bench == "list_get_nth"
+            println(bench_list_get_nth(n))
+        elif bench == "map_hit_far"
+            println(bench_map_hit_far(n))
+        elif bench == "str_concat"
+            println(bench_str_concat(n))
         else
-            println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup> <n>")
+            println("usage: lom bench.lom -- <list_build|lookup|recurse|map_lookup|arith_loop|call_density|closure_loop|list_get_nth|map_hit_far|str_concat> <n>")
         end
     end
 end
