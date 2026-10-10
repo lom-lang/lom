@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第三十五轮体系内独立敌手审查（性能工程两刀收官复评） — 2026-10-10</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1080px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.92em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict-bp{background:#e3f2fd;border:2px solid #1565c0;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第三十五轮体系内独立敌手审查报告（性能工程两刀收官复评）</h1>
+
+<p>时点 2026-10-10（晚）—— 基线 HEAD <code>8c6f0bb</code>（git 只读审查，工作区全程干净）。审查增量 = 三十四审基线 <code>1f288be</code> 之后全部 9 笔提交（<code>git rev-list --count 1f288be..8c6f0bb</code> = 9）：<code>55e993f</code>（三十四审报告入库）/ <code>64bd894</code>（三十四审 A- 采纳 + R138 收口）/ <code>42aa292</code>（交接收口五件套刷新）/ <code>e6b5513</code>（HANDOFF_PROMPT 结构二次修复）/ <code>029ef46</code>（designs/0022 性能工程设计产出）/ <code>4c555ad</code>（<b>v1.9.4 性能工程刀 1</b>：A1 函数表 Rc 化 + A3 诚实跳过 + B 基准资产入库）/ <code>11ba6b8</code>（v1.9.4 tag/CI 回填）/ <code>973d020</code>（<b>v1.9.5 性能工程刀 2</b>：A2 值表示五族全 Rc 化）/ <code>8c6f0bb</code>（v1.9.5 tag/CI 回填——性能工程收官）。核心审面 = 两刀 src/ 改动（刀 1 = src/interpreter.rs +8/−7；刀 2 = 6 文件 +126/−102）按 designs/0022（含状态行收官句）为设计对照逐项敌手复核；外围 = 交接收口/HANDOFF 结构修复/A- 采纳批（治理文档面）。审查执行者：第三十五轮体系内独立敌手审查 agent（subagent）。</p>
+
+<h2>2. 审查边界声明</h2>
+<div class="note">如报告头所述：项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作出：三十四审 A- 与更早历史评级不外推，本轮结论不预支后续、仅评本轮时点（HEAD 8c6f0bb）与查验面。审查阶段未改任何仓库产品源码；唯一写盘物 = 本报告 + target/probes/r35/ 探针目录（gitignored）；git 严格只读（无 add/commit/push/tag/stash/checkout——对照树的取得用 <code>git archive</code> 只读打包解压到探针目录，非 worktree、不写 .git 元数据）；cargo 串行执行（本仓库主构建与 v1.9.3/v1.9.4 两对照树构建三段依次进行）；探针只落 target/probes/r35/；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R139</b> 起，TODO L3/L200 两处顺延号宣告核验未占用；每账带可复现形态 + 候选处置 + "应修" + "绝不能这样修"负向锁定；报告原文一经落盘不回写）。性能宣称复核的方法论声明：本轮全部性能对照为<b>同机同构建产物紧邻交错采样</b>（A/B/A/B…形态，每点 3-5 次取中位），对照树源码以 git archive 从 tag 提交原样取得（22a7008→v1.9.3、4c555ad→v1.9.4），与批时二进制同源码同编译器。</div>
+
+<h2>3. verdict</h2>
+<div class="verdict-bp">
+本轮评级：<b>B+</b>（仅对本轮时点与查验面；历史轨迹不外推）。<br>
+一行式总评：性能工程两刀的<b>工程实质坚实、行为零变化宣称全部独立复现成立</b>——基线矩阵全项亲手跑无失守（573+37、368/368、bootstrap 14/14 quine 272925 双侧一致 40.7s、eval 128×2、六模式、doc_audit 73/73 含 J+ 37=37 与 K 位绿、fmt gate 37、bench quick 20/20、fuzz/diff probe、CI 三 run 七 job 逐 job 逐 step、tag v1.9.4=4c555ad/v1.9.5=973d020 双端一致）；Rc 化"不可观测"宣称经 9 枚行为探针在 v1.9.3 与 v1.9.5 双二进制对照 <b>9/9 stdout+stderr+rc 逐字节 MATCH</b>（MUT002 闭包共享作用域、嵌套容器全链、变体嵌套 match、相等边界 26 断言含 record 字段顺序不敏感、显示、json 往返与 map 键序、string 12 内建、for-in String 逐字符、作用域按轮快照）；quine md5 亲算 <code>932fa21973ecb0e35c3f32745ebff735</code> 与批时登记逐字一致；+8/−7 与 +126/−102 两刀行数经 numstat 精确闭合；bench.lom 期望值独立第三实现 9 负载 18 点全 MATCH；A3 诚实跳过论证读码 + 探针双证成立（Scope::define 收 String 所有权 + p9 实证按轮快照语义）；零语言面六重源码证据（lexer/parser/ast/typechecker/wasm 零触碰、诊断码字样零增删、STDL_MODULES 43 内建零变化、内建分派名零增删、SPEC §14 冻结面零触碰）；e6b5513 结构修复的"从完好版 cf1d5d0 提取"经双段逐字 diff 验证成立；上轮 A- 判据三条（R136/R137 零失真维持、J+ 37=37、K 位绿）存续且 r34 q1 探针在 v1.9.5 复跑逐字一致。<b>但性能宣称面的测量纪律存在系统性松散，四笔开账</b>：<b>R139（P2）</b>str_concat 短档"既定代价 1.31×/1.16×"倍率写入五个现行文档位（README Current 段/SPEC §13/HANDOVER §10/TODO 状态块/designs/0022 状态行）而在本轮同机同构建紧邻交错复现下为 1.002/0.990（≈1.0，方向中性）——批时 A/B 为 base（18:43）与 post（19:32）相隔 49 分钟的全量先后跑，违反 designs/0022 §4 验收纪律明文"同一时段交错跑，避免环境漂移"，且同二进制（v1.9.4）跨时段漂移 2.02×（批时 49.8ms vs 本轮 24.6ms）实证该点位被环境噪声支配，1.31× 把时段噪声当成了版本代价（50k 长点位档 1.03× 复现成立、机理方向读码属实）；<b>R140（P3）</b>刀 1 头条 1.96× 的测量载体（供料探针 3 函数小文件）未披露——同负载函数在入库 bench.lom 载体（14 函数）上 v1.9.4 实测仅 1.27×（1277→1004ms 本轮复测），v1.9.5 两载体趋同（≈627ms）；<b>R141（P3）</b>递归物理深度边界跨两刀右移（v1.9.3 ~50k 溢出 → v1.9.4 50k 过/60k 溢出 → v1.9.5 60k 过/70k 溢出）无任何文档登记，且 HANDOVER §10"（v1.9.4）"实测段内"n=50000 栈溢出（rc=127）"句实为 v1.9.3 时点实测（bench.py 注释正确标注"实测 v1.9.3"）而 v1.9.4 稳定复测 rc=0（5/5）；<b>R142（P3）</b>TODO 顶部状态块头行时点滞后两批（"性能工程刀 1 收口中——v1.9.4 已升版待提交"与正文"刀 2 = v1.9.5 已收官 tag 973d020"直接矛盾，两回填批均未回头行）。P2 在场依 §4.4 不入 A 档——<b>B+</b>；四笔账中三笔 P3 为文档/登记精度（不挡 A-），R139 为可复核的宣称失真（跌档主因）。
+</div>
+
+<h2>4. 审查方法</h2>
+<p>先完整阅读 docs/EXECUTOR_TEMPLATE.md 与 docs/MAINTENANCE.md §4（审查节奏、八节框架、§4.3 开账纪律、§4.4 评级规则），随后通读三十四审报告（review-2026-10-10-2.html——R138 开账原文与负向锁定）、designs/0022 全文（含状态行收官句）、TODO 顶部状态块、HANDOFF_PROMPT、HANDOVER §1/§2.2/§9/§10/§11。执行序：(一) git 基线核验 + 9 笔增量提交逐笔 stat/numstat/diff 亲读（两刀 src/ 全 hunk、治理批全 hunk、回填批四面占位换实值逐位）；(二) <b>对照树构建</b>——git archive 只读提取 22a7008（v1.9.3）与 4c555ad（v1.9.4）至 target/probes/r35/tree_v193|v194 各自独立 cargo build --release（cargo 串行；主树亦清 lom 工件与 fingerprint 全量重编译取零 warning 证据）；(三) 基线矩阵全项亲手实跑（逐项三件套；CI 三个 run——38045249710/38049184858/38049521540——GitHub API 匿名实查逐 job + doc-gates 逐 step；tag v1.9.4/v1.9.5 本地 + ls-remote 双端）；(四) 敌手探针——Rc 化行为可观测性 9 枚（p1-p9）在 v1.9.3/v1.9.5 双二进制对照（stdout+stderr+rc 三流 diff）；quine md5 亲算（宿主自编译 1 次，hex 文本与解码字节双口径）；性能宣称复现族（call_density n=1M 三版双载体 A/B、str_concat 三档位 ×5 次紧邻交错、递归边界三版扫描、bootstrap 全量亲跑 40.7s）；bench.lom 期望值独立第三实现（9 负载朴素直算 ×2 档位，不抄 bench.py 周期化技巧）；上轮 r34 q1 探针在 v1.9.5 复跑与存证对照；A3 论证读码复核（Scope::define 签名/for-in 每轮建域/exec_block 不再包层）+ p9 构造性实证；(五) 零语言面六重证据（触碰面 grep、诊断码字样、STDL_MODULES 计数 43、内建分派名对称性、SPEC §14、43 内建表）；(六) 文档数字链对账（README 双段/SPEC §13 两条目/HANDOVER §1/§9/§10/TODO/designs/positioning 七面 + numstat 算术闭合 + 批时原始留档 knife1a/knife2v/base JSON 复算）+ 上轮整改验收（R136/R137 存续、R138 三写位、J+/K 实跑）+ 开账 + 评级 + 后置门禁（doc_audit/link_check 落盘后复跑）。</p>
+
+<h2>5. 基线矩阵（全项亲手实跑，逐项三件套）</h2>
+<table>
+<tr><th>项</th><th>宣称</th><th>实测（命令 / 关键输出 / 退出码）</th><th>结论</th></tr>
+<tr><td>基线 HEAD</td><td><code>8c6f0bb</code></td><td>git rev-parse HEAD = 8c6f0bb3086d195c8a06df7d4081c2ffd34525e6；git status --porcelain 空输出；增量 rev-list --count 1f288be..8c6f0bb = 9（清单见报告头）</td><td class="ok">✓</td></tr>
+<tr><td>cargo build --release</td><td>零 warning（v1.9.5）</td><td>删 target/release 下 lom 工件与 .fingerprint/lom-* 后全量重编译：rc=0，stderr 全文 2 行（"Compiling lom v1.9.5" + "Finished … in 1m 40s"），grep -ciE "warning|error" = 0（留档 target/probes/r35/r35_build_err.txt）；./target/release/lom.exe --version = <code>lom 1.9.5</code></td><td class="ok">✓</td></tr>
+<tr><td>单元测试</td><td>573</td><td>cargo test --release --bin lom：rc=0，<code>573 passed; 0 failed; 0 ignored; 0 measured</code>（1.87s）</td><td class="ok">✓</td></tr>
+<tr><td>集成 r56_process</td><td>1</td><td>单独跑：rc=0，<code>1 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r58_lsp_process</td><td>7</td><td>单独跑：rc=0，<code>7 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r94_pkg_alias</td><td>2</td><td>单独跑：rc=0，<code>2 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r104_dedup_order</td><td>6</td><td>单独跑：rc=0，<code>6 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r107_alias_clash</td><td>4</td><td>单独跑：rc=0，<code>4 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r108_variant_externals</td><td>5</td><td>单独跑：rc=0，<code>5 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 build_closure_externals</td><td>3</td><td>单独跑：rc=0，<code>3 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 r112_closure_assign</td><td>3</td><td>单独跑：rc=0，<code>3 passed; 0 failed</code></td><td class="ok">✓</td></tr>
+<tr><td>集成 build_gaps_remediation</td><td>6</td><td>单独跑：rc=0，<code>6 passed; 0 failed</code>（逐项 cargo_rc=0 两轮复核）—— 九 target 合计 1+7+2+6+4+5+3+3+6 = <b>37</b>（+573 = 610），与任务书期望分布逐位吻合</td><td class="ok">✓ 逐位吻合</td></tr>
+<tr><td>cargo clippy（CI 口径）</td><td>零</td><td>cargo clippy --release -- -D warnings：rc=0，warning/error 计数 0（fingerprint 已清的真实 lint pass）</td><td class="ok">✓</td></tr>
+<tr><td>cargo fmt --check</td><td>零 diff</td><td>cargo fmt --all -- --check：rc=0，输出 0 字节</td><td class="ok">✓</td></tr>
+<tr><td>doc_audit</td><td><b>73/73</b></td><td>python tools/doc_audit.py：rc=0，RESULT: PASS（<b>73/73</b>）；<b>J+ Rust 集成现实核对：文档集成 37 vs tests/ #[test] 实数 37 绿</b>；<b>K 交接镜像登记枚举：镜像缺失项 无；清单陈旧项（TODO 段已无）无</b>（R138 整改后新句式）；Z 自指"HANDOVER 宣称 73 vs 本脚本总项数 73"；J 三组互锁 {'total':'368','single':'196','pkg':'8','neg':'164'} / {'quine':'272925'} / {'unit':'573','integ':'37'}（留档 doc_audit_out.txt）</td><td class="ok">✓（J+/K/Z 三锁同绿）</td></tr>
+<tr><td>spec_examples</td><td>PASS</td><td>python tools/spec_examples_check.py：rc=0，正例 51 / 反例 5 / skip（json 8 + diag 1 + marker 10 + ebnf 4 + keywords 1 + cli 1），RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>eval_prompt_check</td><td>31/31</td><td>python tools/eval_prompt_check.py：rc=0，<code>RESULT: PASS（校验 31 / 失真 0）</code></td><td class="ok">✓</td></tr>
+<tr><td>l2fix --self-check</td><td>6/6</td><td>python tools/l2fix.py --self-check：rc=0，<code>self-check：6/6 断言通过</code>（负例 164 枚、码条目 164 条）</td><td class="ok">✓</td></tr>
+<tr><td>link_check</td><td>PASS</td><td>python tools/link_check.py：rc=0，RESULT: PASS（A 类断链 0 + 大小写漂移 0；B 类历史原文 7 不拦）</td><td class="ok">✓</td></tr>
+<tr><td>selfhost 六模式</td><td>全 PASS</td><td>六模式逐个单跑全 rc=0 且 RESULT: PASS：默认 / --tokens / --diags / --static / --run / --wasm（六输出留档 selfhost_*.txt）</td><td class="ok">✓</td></tr>
+<tr><td>verify_selfcomp</td><td>368/368</td><td>python tools/verify_selfcomp.py：rc=0，RESULT: PASS（<b>368/368</b>；负例 L2G 兜底 0/164）</td><td class="ok">✓</td></tr>
+<tr><td>--bootstrap</td><td>14/14、quine 272925（v1.9.5 后约 43s）</td><td>python tools/verify_selfcomp.py --bootstrap：rc=0，RESULT: PASS（<b>14/14</b>；L3 self-apply <b>272925 bytes; byte-identical</b> 1.5s；L1 wasm compiles 169 bytes hex byte-identical host-self 32.3s）；总耗时 <b>40.7s</b>（全量亲跑等毕——与登记 43.1s 同量级，任务书 43s 预期吻合）</td><td class="ok">✓</td></tr>
+<tr><td>eval 双后端</td><td>各 128/128</td><td>powershell run.ps1 -Verify -LomBin target/release/lom.exe：Passed <b>128</b> / Failed 0（rc=0，error_repair 31/31，十分类全 100%）；-Backend wasm：Passed <b>128</b> / Failed 0（rc=0）</td><td class="ok">✓</td></tr>
+<tr><td>examples fmt gate</td><td>37 文件</td><td>find examples -name "*.lom" 排除 apply_test = 37 个，逐文件 lom fmt --check：<code>checked=37 fail=0</code></td><td class="ok">✓</td></tr>
+<tr><td>bench.py --quick</td><td>20 点全过（v1.9.4 起入库）</td><td>python tools/bench.py --quick：rc=0，十负载 ×2 档 <b>20/20 点输出比对通过</b>（call_density n=250000 中位 158.2ms out=31250375000✓ 等，全表留档 bench_quick_out.txt）</td><td class="ok">✓</td></tr>
+<tr><td>fuzz_smoke</td><td>PASS</td><td>python tools/fuzz_smoke.py：rc=0，80 轮冲击零崩溃，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>diff_test --probe</td><td>PASS</td><td>python tools/diff_test.py --probe：rc=0，<code>probe: 8/8 验证通过</code>，RESULT: PASS</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查 run 38045249710（4c555ad / v1.9.4）</td><td>七 job 绿</td><td>GitHub API 匿名实查：head_sha=4c555ad…、completed/<b>success</b>（push）；七 job 逐个 success（playground / doc gates / windows / selfhost / ubuntu / macos / clippy）；doc-gates 13 步逐 step completed/success（step 5 SPEC examples / <b>step 6 Doc numbers audit</b> / step 7 断链 / step 8 l2fix / step 9 Eval prompt / step 10 Fuzz / step 11 Diff test）（JSON 留档 ci_run_38045249710*.json）</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查 run 38049184858（973d020 / v1.9.5）</td><td>七 job 绿</td><td>同法实查：head_sha=973d020…、completed/<b>success</b>；七 job 逐个 success；doc-gates 13 步逐 step success（JSON 留档）</td><td class="ok">✓</td></tr>
+<tr><td>CI 实查 run 38049521540（8c6f0bb / HEAD）</td><td>绿（任务书点名回填批 run）</td><td>同法实查：head_sha=8c6f0bb…、completed/<b>success</b>；七 job 逐个 success；doc-gates 13 步逐 step success（JSON 留档）</td><td class="ok">✓</td></tr>
+<tr><td>tag v1.9.4 双端</td><td>= 4c555ad</td><td>git rev-parse v1.9.4 = 4c555adde1599e825493bab1cb07b37e56826f69；git ls-remote origin refs/tags/v1.9.4 = 同值 —— 双端一致且指向提交本体</td><td class="ok">✓</td></tr>
+<tr><td>tag v1.9.5 双端</td><td>= 973d020</td><td>git rev-parse v1.9.5 = 973d0202ccec8bd4d9a3abb96747678a80ab12a8；git ls-remote origin refs/tags/v1.9.5 = 同值 —— 双端一致</td><td class="ok">✓</td></tr>
+<tr><td>顺延号占用核验</td><td>R139 起可用</td><td>grep TODO.md："R139" 仅 2 处命中 = L3 头行与 L200 菜单的"顺延号 R139 起"宣告；R139-R142 账号零占用</td><td class="ok">✓</td></tr>
+</table>
+<p class="small">矩阵补充：cargo test --release --bin lom 零 ignored；矩阵执行期间探针全部落 target/probes/r35/（gitignored），git status 终检空输出。</p>
+
+<h2>6. 增量批次核心宣称逐批复核（敌手化，每条独立证据）</h2>
+<table>
+<tr><th>批次/宣称</th><th>宣称原文要点</th><th>本轮独立复评（独立证据）</th><th>结论</th></tr>
+<tr><td><b>刀 1 · A1</b>（4c555ad）</td><td>functions 表 HashMap&lt;String, FnDecl&gt; → HashMap&lt;String, Rc&lt;FnDecl&gt;，src/interpreter.rs +8/−7，五处注册点包 Rc、eval_call 两处 .cloned() 自动变指针克隆</td><td>numstat 精确核：4c555ad src/ = <b>+8/−7</b>（仅 interpreter.rs）逐字吻合；diff 亲读五处 `Rc::new(f.clone())`（load/load_repl/exec_item/两测试辅助）+ struct 声明 + 两行注释；eval_call :1186 一处加注释（另一处 .cloned() 同型自动变 Rc 克隆，读码确认）——表值类型变更后 `.cloned()` 即 Rc 指针克隆，语义零变化论证成立（FnDecl 注册后不可变，全仓无 functions 表可变路径）</td><td class="ok">✓ 零失真（行数/机制/五注册点逐项对上）</td></tr>
+<tr><td><b>刀 1 · A3 诚实跳过</b></td><td>"读码核实无可实施零风险收益项（每轮新作用域的键必然新 String 分配；Scope 提出循环复用会改闭包捕获可观测性——禁止），诚实跳过零改动"</td><td>读码三证：①Scope::define 签名 <code>fn define(&amp;mut self, name: String, val: Value)</code>——键收 String 所有权，for-in 每轮 var.clone() 的分配不可避免（改 &amp;str 仅挪位置）；②for 三分支每轮 <code>Scope::new(Some(env.clone()))</code> 新子作用域、exec_block 直接用传入 env 不再包层——闭包捕获的就是每轮 block_env；③<b>p9 探针构造性实证</b>（target/probes/r35/p9_scope_semantics.lom，v1.9.3/v1.9.5 双二进制 MATCH）：轮 1 闭包 f1 与轮 2 闭包 f2 各自捕获当轮作用域，f1()="a" ≠ f2()="b"（按轮快照）——若 Scope 提出循环复用，两闭包共享同表，f1() 将读到最终覆盖值 "b"，可观测性改变为真。两刀 diff 中 Stmt::For 分支零逻辑改动（刀 1 零触碰；刀 2 仅 Value::Str(Rc::from(ch.to_string())) 机械适配）——"零改动"成立</td><td class="ok">✓ 论证读码 + 探针双证成立</td></tr>
+<tr><td><b>刀 1 · B 基准资产</b></td><td>bench.lom 107→208 行（六新负载，四旧负载与函数体零改动）+ tools/bench.py 入库（十负载 quick 20 点/full 30 点、期望值 Python 独立双源、--baseline 对照、不进 CI）</td><td>①行数核：git show 22a7008:examples/bench.lom = 107 行 → 当前 208 行 ✓；②4c555ad 对 bench.lom 为 +104/−3，3 行删除逐行核 = import 行扩（+len）与两处 usage 提示串扩——<b>四旧负载函数体零改动成立</b>（main 分派新增 elif 与新函数全为纯新增）；③bench.py 结构核：LEVELS_QUICK 10×2=20 点、LEVELS_FULL 10×3=30 点、EXPECTED 表 Python 独立实现（arith_loop 周期化 + 0..399 自检互锁）；④quick 档实跑 20/20；⑤<b>期望值独立第三实现</b>（target/probes/r35/bench_expected_indep.py，朴素直算不抄周期化技巧）：9 负载 ×2 档位 18 点 lom 实跑输出全 MATCH（arith_loop 朴素 Σ 与 lom 逐轮一致 200004/500005 等）；⑥CI 实查三 run 的 job 清单确认 bench 不在 CI（纯工具批形态）</td><td class="ok">✓ 零失真（含独立第三实现 18/18）</td></tr>
+<tr><td><b>刀 2 · A2 五族 Rc 化</b>（973d020）</td><td>6 文件 +126/−102，Str(Rc&lt;str&gt;)/Closure{Rc,Rc}/Enum{Rc,Rc}/Record{Rc}/Tuple{Rc}，零回退零绕开（get_mut/make_mut 五族路径零命中）、结构相等语义保持（Rc PartialEq 按内容）、生产机械适配 ~45 处 + 测试 12 处零新增测试</td><td>①numstat 精确核：973d020 src/ = <b>+126/−102</b> 六文件（interpreter 99/80 + json 19/14 + cli 1/1 + l2fix 1/1 + lsp 3/3 + main 3/3）逐字吻合；两刀合计 +134/−109 = 8+126/7+102 算术闭合；②grep 全 src/：get_mut/make_mut <b>零命中</b>——"零回退零绕开"成立（Rc 化后原地修改无法编译，编译器兜底全绿）；③消费点适配 diff 亲读：lsp.rs `for (k,val) in fields.iter()` 借用化、map 键比较 `&**k` 解引用形态、json.rs 构造点 Rc::from——纯机械；④结构相等：p4 探针 26 断言（含 record 字段顺序不敏感 {a:1,b:"s"}=={b:"s",a:1} = true、Ok==Err false、"Ok"==Ok(1) false、嵌套容器含 Str/Enum 混合）双二进制 MATCH 且值语义正确；⑤测试适配处：json.rs 2 hunk + interpreter.rs 尾部 4 hunk ≈ 12 处测试行（宣称带 ~ 号粗核相符）；⑥cargo test 573 全绿印证"零新增测试"</td><td class="ok">✓ 零失真（numstat 闭合 + 零命中 + 值语义探针）</td></tr>
+<tr><td><b>两刀 · 行为零变化三路锁定</b></td><td>quine 272925 md5 逐字节一致 + 探针全 MATCH（刀 1：5 程序×3 = 15/15；刀 2：10 程序×3）+ 全量回归 16 项全绿</td><td>①<b>quine md5 亲算</b>：宿主自编译 1 次（lom self_comp.lom -- self_comp.lom → hex），COMPILED <b>272925 bytes</b>，hex 文本 md5 = <b>932fa21973ecb0e35c3f32745ebff735</b>——与任务书期望及批时 knife1a/knife2 留档逐字一致（解码字节口径 272925 字节另核）；②刀 2 探针留档 knife2/probe_manifest.txt：10 程序 ×3 base vs post 逐对 md5 全 MATCH + 自编译红线同 md5——批时宣称属实；③本轮独立加码：<b>9 枚自构行为探针（p1-p9）在 v1.9.3 与 v1.9.5 双二进制对照 9/9 三流（stdout/stderr/rc）逐字节 MATCH</b>（§7）；④全量回归 16 项 = 本矩阵全部亲手跑绿</td><td class="ok">✓ 三路锁定全部独立复现</td></tr>
+<tr><td><b>两刀 · 性能数字</b></td><td>刀 1：call_density 1.96×（1263.9→644.7ms @n=1M）、L2 自编译 515.3→123.5s（4.17×）、bootstrap 471.5→108.8s；刀 2（vs 刀 1 full 30 点 A/B）：call_density 0.69-0.83×、map_lookup 0.72-0.88×、closure_loop 0.84-0.94×、lookup/recurse 全 &lt;0.94×、bootstrap 108.8→43.1s（两刀累积 471.5→43.1s ≈ 10.9×）、既定代价 str_concat 1.31×/1.16×@10k/25k</td><td>算术全部复核：1.96×=1263.9/644.7 ✓、4.17×=515.3/123.5 ✓、10.9×=471.5/43.1=10.94 ✓、358×=515.3/1.44 ✓；批时原始留档复算：knife1a/post_perf.txt（651.3/640.1/644.7 中位 644.7 ✓；自编译 123531.3ms=123.5s ✓）、knife2v/bench_full_cmp.txt（0.826/0.694/0.770 与"0.69-0.83×"区间 ✓、map_lookup 0.718/0.882/0.827 ✓、closure_loop 0.838/0.941/0.940 ✓、lookup/recurse 最大 0.936&lt;0.94 ✓、str_concat 65.0/49.8=1.306 ✓ 中位算术正确）；<b>本轮同机复现分流</b>：call_density n=1M 探针载体三版 A/B 复现（v1.9.3=1277.2/v1.9.4=636.7/v1.9.5=625.8ms——1.96× 与刀 2 后趋同均复现）；bootstrap 本轮全量亲跑 40.7s（与 43.1s 同量级 ✓）；<b>str_concat 短档交错复现 ≈1.0 → R139（P2）；bench.lom 载体上刀 1 仅 1.27× → R140（P3）</b></td><td class="warn">△ 算术与留档全自洽；两处复现性缺口开账（R139/R140）</td></tr>
+<tr><td><b>两刀 · 零语言面</b></td><td>纯实现优化，语言面零变化（语法/20 关键字/诊断码/43 内建）</td><td>六重源码证据：①git diff 22a7008..973d020 -- src/ = 6 文件（interpreter/cli/json/l2fix/lsp/main），<b>lexer.rs/parser.rs/ast.rs/typechecker/wasm*.rs/dump.rs/fix.rs/apply.rs 零触碰</b>；②diff 内诊断码字样（LEX/PARSE/TYPE/NAM/MAT/EFF/RUNTIME/MUT/PKG/L2x）零增删；③STDL_MODULES 常量表零变化，43 内建计数复核（io 2 + string 12 + math 4 + list 10 + json 2 + map 8 + file 4 + env 1 = 43）；④call_builtin 分派名字面量增删对称性核（无新增/删除的分派臂）；⑤SPEC 冻结面：4c555ad 与 973d020 对 LANGUAGE_SPEC.md 各仅 +1 行 = §13 changelog 条目，<b>§14 冻结面零触碰</b>；⑥spec_examples/eval_prompt/l2fix 三 gate 全绿</td><td class="ok">✓ 零语言面六重证据闭合</td></tr>
+<tr><td><b>回填批 ×2</b>（11ba6b8 / 8c6f0bb）</td><td>README/TODO/HANDOVER/designs 四面占位换实值（先例 c01c1eb 模式）；tag/CI 实值登记</td><td>两批 diff 亲读：11ba6b8 四文件各 1-2 行（占位句"tag 随 CI 绿后切、实值随后续回填批登记"→ 实值 4c555ad/run 38045249710）；8c6f0bb 同型四文件（→ 973d020/38049184858）——四面刷到位；tag 与 CI 实值经本地/ls-remote/API 三方独立复核全对上（§5 矩阵）；<b>唯 TODO 顶部状态块头行（L3）两批均未刷</b> → R142</td><td class="warn">△ 四面刷值零失真；头行滞后开账 R142</td></tr>
+<tr><td><b>HANDOFF 结构二次修复</b>（e6b5513）</td><td>"恢复代码块开始+角色铁律段（从完好版 cf1d5d0 提取，唯一锚）+ 观察项去重"；四段结构完整、观察项唯一、doc_audit 73/73 与 link_check PASS</td><td>镜像完整性双段逐字 diff：①头部定位段（L3-16）与 cf1d5d0 <b>逐字一致</b>；②角色铁律段（L18-53，代码块开始行至【当前真实状态】前）与 cf1d5d0 <b>逐字一致</b>（e6b5513 时点与当前 HEAD 双重验证，SEGMENTS_IDENTICAL）——"从完好版 cf1d5d0 提取"宣称属实且存续；③观察项去重：Ubuntu 26 观察项当前全文唯一 1 处（L107）；④当前 HEAD 三段式结构完整（角色铁律/当前真实状态/第一回合）+ 代码块闭合——结构修复零回退；⑤三十四审报告原文零触碰（git log 该文件仅 55e993f 一笔）</td><td class="ok">✓ 零失真（双段逐字 + 唯一性 + 存续）</td></tr>
+<tr><td><b>交接收口 + A- 采纳批</b>（42aa292 / 64bd894 / 55e993f）</td><td>五件套刷新（三十四审 A- 定格 + 台账零 open R1-R138 + 发布面裁决登记）；R138 处置 a 三写位（doc_audit 注释收窄/MAINTENANCE §7 括注/TODO 描述句）；报告入库不回写</td><td>①42aa292 diff 亲读：HANDOFF【当前真实状态】整体重写（时点正确写 v1.9.3/tag 22a7008/CI 37951486401——交接时点镜像）；②64bd894 三写位现状核：doc_audit.py K 位注释已收窄为实然边界（"仅当键词不再出现于 TODO 窗内任何位置时触发……销账时以人工核对 LEDGER_KEYS 为准，勿依赖本红"——与 R138 处置 a 句式一致）、MAINTENANCE §7 R138 条目在（R113 手法括注）、K 位输出新句式"清单陈旧项（TODO 段已无）"；③55e993f 报告入库后三十四审报告零再触碰；④"台账零 open（R1-R138 全关）"与 TODO 开账区核对（R139 零占用）✓；⑤HANDOFF 登记枚举六项现行在位（R136 整改存续）；⑥上轮 A- 判据三条全存续（§8.1）</td><td class="ok">✓ 逐条兑现</td></tr>
+<tr><td><b>designs/0022 状态行收官句</b>（029ef46 + 两刀回填）</td><td>状态行含两刀交付 + tag/CI 门禁回填实值 + 收官定性</td><td>状态行逐句读：刀 1/刀 2 交付描述、4c555ad/38045249710、973d020/38049184858、"性能工程收官"、既定代价（str_concat 构造密集 +1 次 Rc 拷贝）——与 README/SPEC/HANDOVER/TODO/positioning 六面数字互证一致（唯一例外 = str_concat 量化倍率本身 → R139）；设计文档 §4 验收纪律原文在册（"同一时段交错跑，避免环境漂移"）——R139 的纪律违反以此为准绳</td><td class="warn">△ 状态行与六面一致；倍率数字本身入 R139</td></tr>
+</table>
+
+<h2>7. 敌手探针表（行为族 9 枚双二进制 + 性能复现族 4 + 独立实现 1 + 上轮复验 1）</h2>
+<p>探针环境：主树 lom 1.9.5（HEAD 8c6f0bb 构建）+ 对照树 v1.9.3（git archive 22a7008 构建）+ v1.9.4（git archive 4c555ad 构建）。"击穿"判定 = 与宣称/登记语义不符 / 双版本输出分歧 / 静默错值 / 崩溃 / 诊断降级。Rc 化可观测性期望口径 = designs/0022 §2.2 语义论证（值语义克隆与共享不可变数据对外不可观测；显示走手写 Debug、相等走结构比较）。</p>
+<table>
+<tr><th>编号</th><th>方向/构造</th><th>实测（输出摘录/rc）</th><th>击穿判定</th></tr>
+<tr><td>p1（MUT002 闭包捕获语义）</td><td>闭包创建后修改被捕获变量（Rc 共享作用域登记语义）+ 嵌套闭包链</td><td>输出 20/20/200（f() 读到修改后值 20；g() = h()+y = 100+100）——v1.9.3 与 v1.9.5 stdout/stderr/rc 三流逐字节 MATCH</td><td class="ok">未击穿（共享作用域语义保持）</td></tr>
+<tr><td>p2（嵌套容器全链）</td><td>List&lt;Record&gt; 构造-读取 / Record 内嵌 Tuple/Map / Map&lt;String,Tuple&gt; 构造-改写-删-查 / map_values / 嵌套 record-map</td><td>16 行输出（h.x=1、deep.inner.1.1 经中间变量=3、map 改写 t1=9、remove 后 has=false、map_values=[(9, nine)]、嵌套 outer.m 查 k=7）；双二进制 MATCH</td><td class="ok">未击穿</td></tr>
+<tr><td>p3（变体嵌套 match）</td><td>Ok(Some((1,"x"))) 嵌套构造与双层 match / Err 载荷携带 Some / 用户 enum 三形态 match / 枚举值相等</td><td>9 行输出（n=1、s=x、payload、rad=5、Rect 3*4=12、point、Circle(5)==Circle(5)=true、r==Circle(3)=false、Point==Point=true）；双二进制 MATCH</td><td class="ok">未击穿</td></tr>
+<tr><td>p4（相等比较边界）</td><td>自反/对称/record 字段顺序不敏感/Str 与 Enum 混合/Ok vs Err/嵌套容器含 Str 与 Enum/Unit/跨类型</td><td>26 行输出逐值核：{a:1,b:"s"}=={b:"s",a:1}=<b>true</b>（顺序不敏感宣称实证）、"Ok"==Ok(1)=false、Ok("e")==Err("e")=false、() == ()=true、1=="1"=false——值语义全正确；双二进制 MATCH</td><td class="ok">未击穿（结构相等语义保持）</td></tr>
+<tr><td>p5（显示输出）</td><td>嵌套 Tuple/Record/Some/None/Unit/Ok/Err/闭包/List 显示</td><td>14 行：<code>(1, x, (2, 3))</code>、<code>{a: 1, b: (true, t)}</code>、<code>Some((1, x))</code>、<code>()</code>、<code>&lt;闭包&gt;</code>、<code>[1, 2]</code>、<code>[(1, a)]</code>、<code>[{k: 1}]</code>——显示形态与 v1.9.3 逐字一致；双二进制 MATCH</td><td class="ok">未击穿</td></tr>
+<tr><td>p6（json 往返与键序）</td><td>json_parse→stringify 双往返（嵌套/bool/null/浮点/转义）+ map_keys 键序确定性 + Map stringify</td><td>7 行：往返两次输出恒等、转义往返 <code>"quote\"back\\slash"</code>、map_keys=[Banana, apple, banana, mango, zebra]（按键排序确定性）、map_values 与键对应、[1,2.5,0,-3]；双二进制 MATCH</td><td class="ok">未击穿</td></tr>
+<tr><td>p7（string 12 内建 + 拼接提升）</td><td>len/int_to_string/string_to_int（成功裸 Int/失败 Unit 判定）/trim/upper/lower/split（含空串空分隔）/contains/replace/starts_with/ends_with/char_from_code（ASCII+CJK）+ "s"+Int/Float/Bool 拼接提升</td><td>29 行输出逐值核（string_to_int("123")=123、失败 Unit 判定 true、split("a,b,,c",",") 长 4 且空段、replace("aaa","aa","b")="ba"、char_from_code(20013)="中"、"n = 42"/"7 天"/"f = 2.5"/"b = true"）；双二进制 MATCH</td><td class="ok">未击穿（12 内建逐个过）</td></tr>
+<tr><td>p8（for-in String 逐字符）</td><td>for ch in "héllo"（UTF-8 多字节逐字符）+ 空串零迭代 + for-in Int（0..n）+ for-in List</td><td>5 行：héllo 逐字符 len 累计 = 5（é 按单字符）、"ab" 逐轮打印、空串零迭代、0..3 求和=3、List 求和=11；双二进制 MATCH</td><td class="ok">未击穿</td></tr>
+<tr><td><b>p9（作用域按轮快照——A3 实证）</b></td><td>循环两轮各创建闭包捕获当轮迭代变量；跨轮 let 不可见性</td><td>f1()=<b>"a"</b>、f2()=<b>"b"</b>（按轮快照——若 for 作用域提出循环复用，f1 将读到覆盖值 "b"）、首轮 let marker=99 正常、seen=1；双二进制 MATCH——<b>A3"Scope 提出循环会改闭包捕获可观测性"论证构造性实证</b></td><td class="ok">未击穿（论证为真）</td></tr>
+<tr><td><b>perf-1（quine md5 亲算）</b></td><td>宿主自编译 1 次：lom self_comp.lom -- self_comp.lom → hex，md5 双口径</td><td>COMPILED 272925 bytes；hex 文本 md5 = <b>932fa21973ecb0e35c3f32745ebff735</b>（与登记逐字一致）；解码 272925 字节（bytes md5=0ba8651b… 为另一口径，登记采用 hex 文本口径——批时 knife2 留档同值互证）；rc=0</td><td class="ok">未击穿（自编译红线亲验一致）</td></tr>
+<tr><td><b>perf-2（call_density n=1M 三版双载体 A/B）</b></td><td>探针载体（perf_supply/call_density.lom 3 函数）vs 入库载体（bench.lom 14 函数），三版二进制紧邻交错</td><td>探针载体：v1.9.3=1277.2 / v1.9.4=636.7 / v1.9.5=625.8ms——<b>1.96× 在探针载体复现成立</b>（636.7 vs 批时 644.7 吻合）；入库载体：v1.9.3=1277.2 / <b>v1.9.4=1004.0</b> / v1.9.5=627.1ms——<b>v1.9.4 在 bench.lom 载体仅 1.27×</b>，v1.9.5 两载体趋同 ≈627ms（两刀累积入库口径 2.04×）</td><td class="bad">击穿宣称面（载体口径未披露）→ <b>R140</b>（P3；1.96× 数字本身在探针载体复现成立，未造假）</td></tr>
+<tr><td><b>perf-3（str_concat 三档交错 A/B）</b></td><td>n=10k/25k/50k 各 5 次 A/B 紧邻交错（v1.9.4 树 vs v1.9.5 主）</td><td>n=10k：24.6 vs 24.6 = <b>1.002</b>（登记 1.31×）；n=25k：47.1 vs 46.7 = <b>0.990</b>（登记 1.16×）；n=50k：103.1 vs 103.8 = <b>1.007</b>（登记 1.03× 相符）——短档两点的"既定代价"倍率在受控复现下不成立（方向中性）</td><td class="bad">击穿宣称面（倍率不可复现）→ <b>R139</b>（P2）</td></tr>
+<tr><td><b>perf-4（递归深度边界三版扫描）</b></td><td>recurse n=50000/60000/70000 三版对照（多次复跑验稳定性）</td><td>v1.9.3：n=50000 rc=127（3/3 稳定，与登记一致）；v1.9.4：n=50000 rc=0（<b>5/5</b>）、n=60000 rc=127；v1.9.5：n=60000 rc=0、n=70000 rc=127——物理边界跨两刀右移（~50k→~55-60k→~65-70k）；N1 软件守卫 80000 不变（读码 DEFAULT_MAX_CALL_DEPTH=80_000）；bench full 档 30000 三版均安全</td><td class="bad">击穿登记面（边界漂移未登记 + HANDOVER §10 版本归属）→ <b>R141</b>（P3；良性漂移无行为影响）</td></tr>
+<tr><td>bench-indep（期望值独立第三实现）</td><td>9 负载 ×2 档位朴素直算（不用 bench.py 周期化）vs lom 1.9.5 实跑</td><td><b>18/18 MATCH</b>（含 arith_loop n=500000 朴素 Σ=500005 与 lom 逐轮一致）——bench.lom 期望值正确性与 bench.py 双源互证之外的第三源</td><td class="ok">未击穿</td></tr>
+<tr><td>r34-q1（上轮探针复验）</td><td>三十四审 q1（build 统一减法族 pD 形态：NAM002 不降级 NAM006 + PKG007 stderr）在 v1.9.5 二进制复跑</td><td>cwd=探针目录 lom build：rc=0，stdout 18 行与 r34 存证<b>逐字一致</b>（NAM002 'q_fn' 1 错误 0 警告零 NAM006），stderr PKG007 逐字一致——上轮行为锁定面在两刀后无漂移</td><td class="ok">未击穿（R125/R128 行为在 v1.9.5 保持）</td></tr>
+</table>
+<p><b>行为族汇总</b>：p1-p9 九枚双二进制 9/9 三流逐字节 MATCH——"值语义的克隆与共享不可变数据对外不可观测"宣称在全部语言层出口（显示/相等/json/map 键/闭包/迭代）经双版本对照验证成立；性能复现族 4 枚中 2 枚击穿宣称面（R139/R140）、1 枚击穿登记面（R141）、1 枚（quine）亲验一致；独立第三实现与上轮复验均未击穿。</p>
+
+<h2>8. 文档对账数字链 + 开账（R139-R142）+ 评级依据</h2>
+
+<h3>8.1 J/K 锚与文档数字链（独立手工核）</h3>
+<table>
+<tr><th>锚/链</th><th>文档值</th><th>实际值（独立手工核）</th><th>结论</th></tr>
+<tr><td>quine</td><td>J 组 = 272925</td><td>本轮自编译亲算 272925 bytes + md5 932fa219…ff735（与批时留档同值）；bootstrap 全量亲跑 L3 byte-identical</td><td class="ok">✓</td></tr>
+<tr><td>Rust 计数</td><td>573/37（J 组 + J+）</td><td>实测 573 单元 + 37 集成（九 target 逐项 1/7/2/6/4/5/3/3/6）；J+ "文档集成 37 vs tests/ #[test] 实数 37" 实跑绿——双源同值</td><td class="ok">✓</td></tr>
+<tr><td>K 交接镜像</td><td>K 位绿（R138 整改后句式）</td><td>实跑"镜像缺失项 无；清单陈旧项（TODO 段已无）无"；六键两窗在位；R138 三写位（doc_audit 注释收窄/MAINTENANCE §7/TODO）现状存续</td><td class="ok">✓</td></tr>
+<tr><td>版本三元组</td><td>v1.9.5 / tag 973d020 / CI 38049184858</td><td>Cargo.toml=1.9.5、--version=1.9.5、tag 双端一致、CI run 七 job 逐 step success——HANDOVER §1 / README Current / TODO 正文 / designs 状态行 / positioning 五面同值</td><td class="ok">✓</td></tr>
+<tr><td>性能数字链（七面）</td><td>1.96×/4.17×/10.9×/0.69-0.83×/1.31× 等</td><td>算术全闭合 + 批时留档复算全对上；本轮复现：10.9× 分子分母独立复现（471.5 供料期/43.1 vs 本轮 40.7 同量级）、1.96× 探针载体复现成立（→R140 载体披露）、<b>1.31×/1.16× 交错复现不成立（→R139）</b></td><td class="warn">△ 5/7 面全对上，2 面入账</td></tr>
+<tr><td>行数宣称</td><td>刀 1 +8/−7；刀 2 六文件 +126/−102；bench.lom 107→208</td><td>numstat 三组精确闭合（8/7、126/102、两刀合计 134/109=8+126/7+102；107→208 亲数）</td><td class="ok">✓</td></tr>
+<tr><td>上轮 A- 判据三条存续</td><td>①R136/R137 零失真维持 ②J+ 37=37 ③K 位绿</td><td>①HANDOFF 登记枚举六项现行在位 + designs/0021 L5 实值未触碰（本轮增量 diff 零涉及）；②③doc_audit 实跑双绿 + r34-q1 行为复验逐字一致</td><td class="ok">✓ 三条全存续</td></tr>
+</table>
+
+<h3>8.2 开账（只开不修；从 R139 起，一笔 P2 + 三笔 P3）</h3>
+
+<div class="ledger">
+<p><b>R139（P2，str_concat 短档"既定代价 1.31×/1.16×"倍率宣称不可复现——测量纪律违反 + 五现行位写入）</b>——973d020/8c6f0bb 两刀批将"既定代价如实登记：字符串构造密集负载多一次向 Rc 的拷贝（str_concat n=10k/25k 1.31×/1.16×、50k 档 1.03×）"写入五个现行文档位（README Current release 段 / LANGUAGE_SPEC §13 v1.9.5 条目 / HANDOVER §10 A2 段 / TODO 顶部状态块 / designs/0022 状态行）。本轮同机同构建（git archive 4c555ad/973d020 各自独立构建）<b>紧邻交错 5 次</b>中位复现：n=10k = 24.6 vs 24.6ms = <b>1.002</b>、n=25k = 47.1 vs 46.7ms = <b>0.990</b>（两点方向中性，与登记 1.31×/1.16× 方向幅度均不符）；n=50k = 1.007（与登记 1.03× 在带内相符）。批时留档复算（target/probes/knife2v/bench_full_cmp.txt + knife2_base_full.json）：倍率算术本身正确（65.0/49.8=1.306、79.4/68.5=1.160），但 A/B 形态为 base 全量 30 点（18:43）→ post 全量 30 点（19:32）<b>相隔 49 分钟的先后跑，违反 designs/0022 §4 验收纪律明文"性能对照：……同一时段交错跑，避免环境漂移"</b>；同二进制（v1.9.4）跨时段漂移 2.02×（批时 base 49.8ms vs 本轮 24.6ms）实证该点位（净计算 ~10ms）wall time 被环境状态支配，批时 post 三次极差 36%（68.0/65.0/50.0）——1.31× 把时段噪声当成了版本代价。机理方向（构造位多一次向 Rc 的分配拷贝）读码属实（Value::Str(Rc::from(format!(…)))），50k 长点位档倍率成立——本账仅涉短档量化倍率的可复现性，非机理否定、非行为缺陷。</p>
+<p><b>可复现形态</b>：①python 交错脚本（本轮形态，A/B 紧邻交替 ×5 取中位，target/probes/r35/ 下两对照树二进制）；②批时证据链：ls -la target/probes/knife2_base_full.json（18:43）/ knife2v/bench_full_cmp.txt（19:32）+ cat 两文件（str_concat 段 base 49.8/68.5/120.6、post 65.0/79.4/124.1）；③同二进制跨时段对照：批时 base 49.8 vs 本轮 v1.9.4 树 24.6ms（同源码同机）。</p>
+<p><b>候选处置（供裁决）</b>：a) 按 §4 纪律重跑同时段交错 A/B（v1.9.4 树 vs v1.9.5 主），五写位倍率刷新为可复现口径（预计 ≈1.0，或改定性表述"构造位多一次 Rc 分配拷贝——50k 档 1.03× 可测，10k/25k 短档位在启动+平方复制噪声带内不可测"）；b) 保留登记但补环境敏感注记（弱处置，倍率数字仍不可复现）。</p>
+<p><b>应修 = a</b>。<b>绝不能这样修</b>：①调大 str_concat 档位 n 或修改负载函数凑出 1.3×（负载语义漂移、基准资产失信）；②删除或修改 knife2v/knife2_base 原始留档圆宣称（证据不回写）；③把 50k 档的 1.03× 抄到 10k/25k 位冒充全档成立（口径错挂）；④给 bench.py 的 str_concat 加特殊计时豁免或剔点（工具面迁就宣称——R15"gate 迁就内容"同型教训）。</p>
+</div>
+
+<div class="ledger">
+<p><b>R140（P3，刀 1 头条 1.96× 的测量载体口径未披露——入库 bench.lom 载体上 v1.9.4 实测仅 1.27×）</b>——README Previous v1.9.4 段"call_density <b>1.96×</b> (1263.9→644.7 ms @ n=1M — the probe that exercises exactly this path)"与 SPEC §13 v1.9.4 条目、HANDOVER §10、designs/0022 状态行、positioning 同数。批时原始留档（target/probes/knife1a/post_perf.txt）显示该数字的测量载体是<b>供料探针文件</b>（perf_supply/call_density.lom——3 函数小文件，命令形态 probe.lom -- x n），非同批入库的基准资产 bench.lom（14 函数文件）。本轮三版双载体交错复现：探针载体 v1.9.3=1277.2 / v1.9.4=636.7 / v1.9.5=625.8ms——<b>1.96×（1.98×）在探针载体复现成立、数字不假</b>；但同一负载函数在 bench.lom 载体上 v1.9.3=1277.2 / <b>v1.9.4=1004.0</b> / v1.9.5=627.1ms——v1.9.4 时点入库载体仅 <b>1.27×</b>（A1 的收益在多函数文件上大幅缩水，v1.9.5 两刀后两载体才趋同 ≈627ms、两刀累积入库口径 2.04×）。全部现行文档位未披露 1.96× 的载体口径（README 的"the probe"一词未说明是探针文件而非 bench.lom 负载）；B 件宣称"后续批性能验收以 --out/--baseline 对照为标准形态"（即 bench.lom 载体）而头条数字并非在该载体上取得——读者对 bench.lom 复现 1.96× 会得到 1.27×（v1.9.4 时点）。附带登记（观察，不开账）：A1 收益的载体依赖现象（多函数文件 1.27× vs 小文件 1.96×、A2 后趋同）本身是有价值的性能学事实，供未来性能批参考。</p>
+<p><b>可复现形态</b>：①target/probes/perf_supply/call_density.lom（3 函数探针）与 examples/bench.lom 同负载函数双载体各跑 v1.9.4 树二进制 n=1M；②批时留档 cat target/probes/knife1a/post_perf.txt（calldens_1M_post 651.3/640.1/644.7——探针形态）与 baseline_perf.txt（1263.9——探针形态）。</p>
+<p><b>候选处置（供裁决）</b>：a) 五写位的 1.96× 补载体口径括注（"供料探针载体实测；入库 bench.lom 载体同负载 v1.9.4 为 1.27×、两刀后趋同"）——一句式精度修正；b) 随下个性能批在 HANDOVER §10 补双载体对照实测行。</p>
+<p><b>应修 = a</b>。<b>绝不能这样修</b>：①把 README"the probe"改成"bench.lom"伪装载体一致（改词不改实、数字依然对不上）；②从 bench.lom 删除其余负载函数使两载体一致迁就头条（基准资产缩水）；③重写历史段落数字（Previous 段是时点档案，只加注不改值）。</p>
+</div>
+
+<div class="ledger">
+<p><b>R141（P3，递归物理深度边界跨两刀右移未登记 + HANDOVER §10 实测句版本归属错挂）</b>——实测扫描（每点多次复跑验稳定）：recurse n=50000 在 v1.9.3 = rc=127（3/3 稳定）、<b>v1.9.4 = rc=0（5/5 稳定）</b>、v1.9.5 n=60000 = rc=0 / n=70000 = rc=127——物理栈溢出边界从 ~50k（v1.9.3）右移至 ~55-60k（v1.9.4）再至 ~65-70k（v1.9.5），机制 = A1 消除 FnDecl 深克隆的栈上临时、A2 缩小 Value 枚举栈尺寸使每帧变小。两重登记缺口：①HANDOVER §10"A1 函数表 Rc 化实测（v1.9.4）"段内"recurse 边界中间点实测：n=50000 栈溢出（rc=127）、n=30000 正常"——该实测实为 <b>v1.9.3 时点</b>（bench.py L50 注释正确标注"实测 v1.9.3 在 n=50000 栈溢出"），HANDOVER 转写未标版本置于 v1.9.4 段内，而 v1.9.4 稳定复测 n=50000 rc=0——R134"算术句归因错挂"同族时点错挂；②v1.9.5 边界再右移完全无登记。影响面良性：N1 软件守卫 80000 不变（读码 DEFAULT_MAX_CALL_DEPTH=80_000）、bench full 档 30000 三版均安全、"安全深度 ~10⁴"的登记语义（写自举程序避免超万层递归）不受影响——登记缺失非行为缺陷。</p>
+<p><b>可复现形态</b>：三树二进制各跑 lom examples/bench.lom -- recurse 50000/60000/70000（本轮多次复跑 rc 稳定）；grep -n "80000\|80_000" src/interpreter.rs（守卫值未动）。</p>
+<p><b>候选处置（供裁决）</b>：a) HANDOVER §10 该句补"（v1.9.3 时点实测）"版本标注 + 随批登记 v1.9.5 边界漂移实测一行（~70k，A1/A2 帧缩小所致、N1 守卫与 bench 档位不变）。</p>
+<p><b>应修 = a</b>。<b>绝不能这样修</b>：①改 bench.py 注释的"实测 v1.9.3"标注（那是正确时点——改它反而制造新错挂）；②顺手调 N1 守卫 80000 或 bench full 档 30000（漂移不构成调整理由，守卫语义是登记在案行为）；③把 rc=127 形态当回归修（物理边界非承诺语义，帧缩小是良性）。</p>
+</div>
+
+<div class="ledger">
+<p><b>R142（P3，TODO 顶部状态块头行时点滞后两批）</b>——docs/TODO.md L3 头行"当前状态（2026-10-10 夜，<b>性能工程刀 1 收口中——v1.9.4 已升版待提交</b>；台账零 open（R1-R138 全关），顺延号 R139 起）"与正文 L4"本批（性能工程刀 2 = v1.9.5，已裁方案收尾件；<b>tag 973d020，CI run 38049184858 七 job 绿——回填批登记</b>）"直接矛盾——头行停留在 v1.9.4 交付前时点，两轮回填批（11ba6b8/8c6f0bb）刷正文行均未回头行（8c6f0bb 的 TODO diff 仅 L4 两行）。TODO 顶部状态块是"版本、全部基线计数、台账状态"的<b>活信息唯一主写位</b>（MAINTENANCE §5.4）——主写位自身头行与正文矛盾，属 R134"计数位漏刷"族的时点句变体（HANDOFF_PROMPT 镜像滞后 v1.9.3 与 HANDOVER 顶部弧线条目滞后均为 §5.3/§5.4 明示容忍的镜像/摘要位，本账不涉）。</p>
+<p><b>可复现形态</b>：sed -n '3,4p' docs/TODO.md（头行"刀 1 收口中——v1.9.4 已升版待提交" vs 正文"刀 2 = v1.9.5……tag 973d020"）；git show 8c6f0bb -- docs/TODO.md（diff 仅 L4，头行未动）。</p>
+<p><b>候选处置（供裁决）</b>：a) 随下批把头行刷为当前时点（"性能工程两刀收官——v1.9.5 已提交 tag 已切"句式，正文已正确无需动）。</p>
+<p><b>应修 = a</b>。<b>绝不能这样修</b>：①删除头行时点括注结构（时点锚是快照语义的一部分）；②把头行改成无时点的恒真句规避刷新义务；③重写正文段迁就头行旧时点（倒置主从——正文是对的）。</p>
+</div>
+
+<h3>8.3 评级依据（对照 §4.4）</h3>
+<p><b>技术面全绿</b>：基线矩阵全项亲手跑无失守（含 CI 三 run 逐 job 逐 step、tag 双端、bootstrap 40.7s 全量亲跑）；行为零变化宣称全部独立复现（9 探针双二进制 9/9 三流 MATCH、quine md5 亲算一致、368/368、128×2、六模式、r34-q1 上轮锁定面复验一致）；零语言面六重源码证据；两刀行数 numstat 精确闭合；基准资产期望值独立第三实现 18/18；A3 论证读码+探针双证；e6b5513 镜像完整性双段逐字验证；上轮 A- 判据三条全存续。<b>开账四笔：R139（P2）+ R140/R141/R142（P3×3）</b>。R139 定 P2 的依据：①量化倍率宣称写入五个现行位（含 README 门面 Current 段）作为"既定代价"登记；②本轮按 designs/0022 §4 明文验收方法（同一时段交错跑）受控复现下不成立（1.002/0.990 vs 登记 1.31×/1.16×，方向中性）；③批时产出过程违反该验收纪律（base 18:43 → post 19:32 相隔 49 分钟先后全量跑，非交错）；④同二进制跨时段 2.02× 漂移实证短档点位被环境支配、1.31× 无法归因版本差——满足"P2 = 可复核的宣称失真"。批时操作诚实（原始留档齐全、中位算术正确）不改变宣称现状失真的定性（与 R134 计数笔误同构：过程无欺、结果失真）。R140/R141/R142 为 P3：R140 数字本身在其实测载体复现成立（1.96× 探针载体 636.7ms 吻合 644.7），失真点仅为载体口径披露缺失；R141/R142 为登记缺失与时点错挂（R134/R137 同族），均无行为影响。<b>定级 B+（P2 在场不入 A 档，§4.4 十四审惯例）</b>。每轮独立评级：三十四审 A- 不外推、本轮 B+ 不预支后续；整改后状态只能由下一轮复审重估。对照读法如实登记：若依"P3 文档精度不挡 A-"的编码把 R139 降读为 P3（性能数字时点性论），则本轮为 A-——本报告不取该读法，因 str_concat 倍率是<b>两版本间的相对比较结论</b>而非单点绝对值，其有效性依赖同时段控制（正是 §4 交错纪律存在的理由），且 50k 档可复现而短档不可复现证明该倍率原即噪声读数；两读法并呈供用户/规划者复核。</p>
+
+<h3>8.4 后置门禁</h3>
+<p>本报告落盘后复跑 python tools/doc_audit.py = 73/73 PASS（本报告不含新增数字锚句式、不改任何锚——报告位于 docs/reviews/ B 类历史原文位）；python tools/link_check.py 复跑 PASS。审查期间仓库产品源码零修改（git status 全程干净，终检空输出；探针、留档与两对照树均在 target/probes/r35/ 与 target/ 下，gitignored；r32/r33/r34 探针证据完整保留）。</p>
+
+<h3>8.5 备注（不开账）</h3>
+<p>①HANDOFF_PROMPT【当前真实状态】镜像仍为 v1.9.3 交接时点（42aa292 写入）——MAINTENANCE §5.4"每轮交接整体重写本段"明示镜像随交接批刷新，性能工程批与回填批均非交接批、回填宣称四面不含 HANDOFF，属规则容忍的镜像滞后，随下个交接批修正（与 R142 主写位头行滞后性质不同）。②HANDOVER 顶部"最后更新"弧线条目（"七版（v1.7.2→v1.9.3）+五轮审查"）同为交接时点摘要（§5.3 当前周期摘要级），性能工程批未刷顶部属同类容忍。③"生产机械适配 ~45 处 + 测试 12 处"宣称带 ~ 号，本轮按 hunk 粗核（生产 hunk ~30、测试 hunk 6，一处可含多行）量级相符，不作精确计数复核（~ 号宣称先例允许）。④knife2v 中 str_concat@50k 的 1.029 与本轮 1.007 相符、call_density 各点跨时段复现吻合（183.1 vs 本轮 170.6 @250k，7%）——刀 2 的 bench.lom 载体 A/B 除 str_concat 短档外均可复现，R139 的影响面严格限于 10k/25k 两点。⑤358×（树遍历 vs WASM）与"bootstrap 97.4% 单步"为 designs/0022 供料期数字，算术复核成立（515.3/1.44=357.85；471.5×0.974≈459.3 与总账减三层对拍/自施加吻合），本轮不重测 WASM 侧。⑥两对照树（tree_v193/tree_v194）与全部 A/B 脚本留档 target/probes/r35/，供规划者复跑与 R139/R140 处置 a 的重跑基线。</p>
+
+<h2>附录：探针目录（target/probes/r35/，gitignored）</h2>
+<p>p1_mut002_closure.lom … p9_scope_semantics.lom（Rc 化行为可观测性九枚源文件）+ out/（各探针 v1.9.3/v1.9.5 双二进制 stdout/stderr/check 留档，三流 diff 全 MATCH）；bench_expected_indep.py（期望值独立第三实现，9 负载 18 点全 MATCH 输出）；quine_self.hex + quine_run_out.txt（自编译 1 次产物与 COMPILED 行，hex md5 = 932fa219…ff735）；r35_build_err.txt / r35_unittest_err.txt / r35_clippy_err.txt / r35_fmt_out.txt（cargo 三件+fmt 证据）；integration_targets.txt（九集成 target 逐项计数与 cargo_rc=0）；doc_audit_out.txt（73/73 含 J+/K/Z 三行）/ spec_examples_out.txt / eval_prompt_out.txt / l2fix_out.txt / link_check_out.txt / selfhost_default|--tokens|--diags|--static|--run|--wasm.txt（六模式）/ selfcomp_out.txt（368/368）/ bootstrap_out.txt（14/14 quine 272925、40.7s）/ eval_host_out.txt + eval_wasm_out.txt（双后端 128/128）/ bench_quick_out.txt（20/20 全表）/ fuzz_out.txt / diff_probe_out.txt（8/8）/ recurse_50k_err.txt；ci_run_38045249710.json + _jobs.json / ci_run_38049184858.json + _jobs.json / ci_run_38049521540.json + _jobs.json（三 run 逐 job + doc-gates 逐 step）；handoff_cf1d5d0_full.txt + handoff_cf_seg.txt / handoff_head_seg.txt / handoff_e6_seg.txt / handoff_cf_head.txt / handoff_head_head.txt（e6b5513 镜像完整性双段对照，SEGMENTS_IDENTICAL）；tree_v193/ + tree_v194/（git archive 22a7008/4c555ad 对照树与各自构建产物——R139/R140 复现与处置 a 重跑的基线）；r34q1_run195.txt / r34q1_err195.txt（上轮 q1 探针 v1.9.5 复跑，与 r34 存证逐字一致）。另：r32/r33/r34 探针证据完整保留；批时原始留档 target/probes/knife1a/（刀 1 前后性能原始值）/ knife2/ + knife2v/ + knife2_base_full.json（刀 2 A/B 原始数据——R139/R140 证据链）本轮只读取证未改动。</p>
+
+</body>
+</html>
