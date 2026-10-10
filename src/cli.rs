@@ -502,7 +502,7 @@ fn vfield<'a>(
     let crate::interpreter::Value::Record { fields } = v else {
         return None;
     };
-    fields.iter().find(|(k, _)| k == key).map(|(_, val)| val)
+    fields.iter().find(|(k, _)| &**k == key).map(|(_, val)| val)
 }
 
 /// Value 树取字符串

@@ -764,7 +764,7 @@ mod tests {
         let crate::interpreter::Value::Record { fields } = v else {
             return None;
         };
-        fields.iter().find(|(k, _)| k == key).map(|(_, val)| val)
+        fields.iter().find(|(k, _)| &**k == key).map(|(_, val)| val)
     }
 
     fn as_str(v: &crate::interpreter::Value) -> &str {

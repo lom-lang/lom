@@ -2,7 +2,7 @@
 //
 // 手写 JSON 解析器 + 序列化器（零依赖，与 lexer 风格一致）。
 // 将 JSON 值映射到 Lom Value：
-//   JSON object  → Value::Record { fields: Vec<(String, Value)> }
+//   JSON object  → Value::Record { fields: Rc<Vec<(Rc<str>, Value)>> }（0022 刀 2 Rc 化）
 //   JSON array   → Value::List(ListVal)（v0.5.0 起 cons 单元表示）
 //   JSON string  → Value::Str
 //   JSON number  → Value::Int（整数）或 Value::Float（含小数/指数）
@@ -16,6 +16,7 @@
 //   - 不支持注释（严格 JSON）
 
 use crate::interpreter::{ListVal, Value};
+use std::rc::Rc;
 
 /// JSON 解析错误
 #[derive(Debug)]
@@ -94,7 +95,7 @@ impl<'a> JsonParser<'a> {
         match self.src[self.pos] {
             b'{' => self.parse_object(),
             b'[' => self.parse_array(),
-            b'"' => Ok(Value::Str(self.parse_string()?)),
+            b'"' => Ok(Value::Str(Rc::from(self.parse_string()?))),
             b't' | b'f' => self.parse_bool(),
             b'n' => self.parse_null(),
             b'-' | b'0'..=b'9' => self.parse_number(),
@@ -112,7 +113,9 @@ impl<'a> JsonParser<'a> {
         self.skip_ws();
         if self.peek() == Some(b'}') {
             self.advance();
-            return Ok(Value::Record { fields });
+            return Ok(Value::Record {
+                fields: Rc::new(fields),
+            });
         }
         loop {
             self.skip_ws();
@@ -127,7 +130,7 @@ impl<'a> JsonParser<'a> {
             self.advance(); // :
             self.skip_ws();
             let v = self.parse_value_inner()?;
-            fields.push((key, v));
+            fields.push((Rc::from(key.as_str()), v));
             self.skip_ws();
             match self.peek() {
                 Some(b',') => {
@@ -136,7 +139,9 @@ impl<'a> JsonParser<'a> {
                 }
                 Some(b'}') => {
                     self.advance();
-                    return Ok(Value::Record { fields });
+                    return Ok(Value::Record {
+                        fields: Rc::new(fields),
+                    });
                 }
                 _ => {
                     return Err(JsonError {
@@ -729,12 +734,12 @@ mod tests {
         match v {
             Value::Record { fields } => {
                 assert_eq!(fields.len(), 2);
-                assert_eq!(fields[0].0, "name");
+                assert_eq!(&*fields[0].0, "name");
                 match &fields[0].1 {
-                    Value::Str(s) => assert_eq!(s, "Alice"),
+                    Value::Str(s) => assert_eq!(&**s, "Alice"),
                     other => panic!("期望 Str，得到 {:?}", other),
                 }
-                assert_eq!(fields[1].0, "age");
+                assert_eq!(&*fields[1].0, "age");
                 match &fields[1].1 {
                     Value::Int(n) => assert_eq!(*n, 30),
                     other => panic!("期望 Int，得到 {:?}", other),
@@ -798,7 +803,7 @@ mod tests {
     fn parse_unicode_escape() {
         let v = parse(r#""\u0041\u0042""#).unwrap();
         match v {
-            Value::Str(s) => assert_eq!(s, "AB"),
+            Value::Str(s) => assert_eq!(&*s, "AB"),
             _ => panic!(),
         }
     }
@@ -808,7 +813,7 @@ mod tests {
         // U+1F600 (😀) = \uD83D\uDE00
         let v = parse(r#""\uD83D\uDE00""#).unwrap();
         match v {
-            Value::Str(s) => assert_eq!(s, "😀"),
+            Value::Str(s) => assert_eq!(&*s, "😀"),
             _ => panic!(),
         }
     }
@@ -852,7 +857,7 @@ mod tests {
         // 直接 UTF-8 字符（非 \u 转义）
         let v = parse(r#""你好""#).unwrap();
         match v {
-            Value::Str(s) => assert_eq!(s, "你好"),
+            Value::Str(s) => assert_eq!(&*s, "你好"),
             _ => panic!(),
         }
     }
@@ -870,7 +875,7 @@ mod tests {
 
     #[test]
     fn stringify_special_chars() {
-        let v = Value::Str("hello\n\"world\"\t".to_string());
+        let v = Value::Str(Rc::from("hello\n\"world\"\t"));
         let s = stringify(&v);
         assert_eq!(s, r#""hello\n\"world\"\t""#);
     }
@@ -885,7 +890,7 @@ mod tests {
     #[test]
     fn stringify_tuple_as_array() {
         let v = Value::Tuple {
-            elems: vec![Value::Int(1), Value::Str("two".to_string())],
+            elems: Rc::new(vec![Value::Int(1), Value::Str(Rc::from("two"))]),
         };
         assert_eq!(stringify(&v), r#"[1,"two"]"#);
     }
@@ -924,7 +929,7 @@ mod tests {
         assert!(super::parse(r#""a\u000Ab""#).is_ok());
         let v = super::parse(r#""a\nb""#).unwrap();
         assert!(
-            matches!(v, Value::Str(ref s) if s == "a\nb"),
+            matches!(v, Value::Str(ref s) if &**s == "a\nb"),
             "转义换行应解码为真实换行: {:?}",
             v
         );

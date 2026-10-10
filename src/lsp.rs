@@ -374,8 +374,8 @@ pub fn parse_rpc_message(json: &str) -> Result<(Option<u64>, String, String), Rp
     let mut id = None;
     let mut method = None;
     let mut params = String::new();
-    for (k, val) in fields {
-        match k.as_str() {
+    for (k, val) in fields.iter() {
+        match &**k {
             "id" => {
                 if let crate::interpreter::Value::Int(n) = val {
                     id = Some(*n as u64);
@@ -383,7 +383,7 @@ pub fn parse_rpc_message(json: &str) -> Result<(Option<u64>, String, String), Rp
             }
             "method" => {
                 if let crate::interpreter::Value::Str(s) = val {
-                    method = Some(s.clone());
+                    method = Some(s.to_string());
                 }
             }
             "params" => params = crate::json::stringify(val),

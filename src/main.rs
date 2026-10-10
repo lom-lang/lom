@@ -1327,9 +1327,9 @@ mod tests {
                 };
                 let id = fields
                     .iter()
-                    .find(|(k, _)| k == "id")
+                    .find(|(k, _)| &**k == "id")
                     .and_then(|(_, v)| match v {
-                        crate::interpreter::Value::Str(s) => Some(s.clone()),
+                        crate::interpreter::Value::Str(s) => Some(s.to_string()),
                         _ => None,
                     })
                     .expect("任务缺 id 字段");
@@ -1349,7 +1349,7 @@ mod tests {
         };
         let declared = fields
             .iter()
-            .find(|(k, _)| k == "total_tasks")
+            .find(|(k, _)| &**k == "total_tasks")
             .and_then(|(_, v)| match v {
                 crate::interpreter::Value::Int(n) => Some(*n as usize),
                 _ => None,
