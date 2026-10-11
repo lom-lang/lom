@@ -2,7 +2,7 @@
 
 > **当前状态（2026-10-12，β-2 工程批收官——Lom 达成 ACRI L1-conformant；台账零 open
 > （R1-R142 全关），顺延号 R143 起）**：
-> **本批（用户裁决"按序执行"——β-2 = designs/0023 §5 工程批，升 minor v1.10.0）**：
+> **本批（用户裁决"按序执行"——β-2 = designs/0023 §5 工程批，升 minor v1.10.0；tag `b3bb9f5`，CI run `38168342829` 七 job 绿——回填批登记）**：
 > ① `lom codes [--json]`（ACRI §2.1 REQUIRED——lom-codes/v1 信封 **46 条** =
 > 宿主九命名空间 38 码 + L2 八族；severity 与运行时分类器单测锁定；盘点表
 > target/probes/beta2/codes_inventory.md 为登记依据）；② `l2-fix/v1→v2`
