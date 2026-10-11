@@ -1,3 +1,60 @@
+# RepairLoopBench — the Lom 128-task repair-suite benchmark card
+
+> **Asset name: RepairLoopBench** (adjudicated 2026-10-12). The name names what the
+> suite measures — the repair loop — not the language that hosts it. Lom is the
+> reference implementation and host; the benchmark's methodology (contamination-safe
+> task synthesis, dual-backend verification, advisory-loop scoring) is designed to be
+> reusable by any language/toolchain that exposes structured diagnostics to agents.
+
+## How to re-run (no dependencies beyond the toolchain)
+
+```powershell
+cargo build --release
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe           # 128/128 expected, native backend
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm  # 128/128 expected, WASM backend
+python tools/eval_prompt_check.py    # 31/31: error_repair prompts embed real host --check --json output, machine-checked against the live binary
+```
+
+The suite self-checks (reference solutions verified, eval IDs unique) before any LLM
+run. Headline LLM results: [full-set pass@k, 2026-10-07](REPORT-2026-10-07-passk-128.md)
+(pass@1 = 98.3% / 98.5% across two frontier models, 10 samples each, unbiased estimator).
+
+## How this benchmark differs from SWE-bench-family suites (scope statement)
+
+Scope honesty first: this is a **small, purpose-built suite (128 tasks; 31 repair
+tasks)** anchored to one language's toolchain. It does not compete with SWE-bench-class
+repo-scale leaderboards on scale or realism, and its numbers are not comparable to
+them. It occupies a different, complementary slot, with three deliberate differences:
+
+1. **Advisory repair loop vs generative patching.** SWE-bench-family tasks give an
+   issue and ask for a patch against a real repo. RepairLoopBench's error_repair tasks
+   hand the model **real structured diagnostics** (verbatim `--check --json` output
+   captured from the live compiler, plus the L2 cross-compiler's `[L2xxx]` channel for
+   3 tasks) and ask it to converge on a passing program through the repair loop. This
+   measures the loop the language exists to serve, not repo archaeology.
+2. **Contamination-safe by construction.** Tasks are synthetically authored (plus
+   verbatim diagnostic captures), reference solutions are verified on three chains
+   (host interpreter / host WASM / the L2 self-hosted compiler chain), and expected
+   outputs are locked. The suite was never scraped from public issue trackers. This is
+   a direct answer to the contamination and test-defect findings that led OpenAI to
+   stop reporting SWE-bench Verified ([why we no longer evaluate SWE-bench
+   Verified](https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/),
+   2026-02-23: controlled SOTA 80.9%, 59.4% of 138 unsolved problems had substantive
+   test defects).
+3. **Dual-backend determinism.** Every reference solution passes identically on two
+   independent backends (tree-walking interpreter and WASM) before entering the set —
+   the suite measures model behavior, not backend drift.
+
+The problem this suite is built for is externally documented: on repo-level compilation
+error repair, GPT-5 reaches 73% syntactic correctness but only 41% semantically valid
+patches (ComBench, [arXiv:2603.27333](https://arxiv.org/abs/2603.27333)) — the gap
+between "compiles" and "correct" is exactly what a repair-native language surface
+targets. Agent-tooling practice is converging on the same thesis: error responses are
+prompt-engineering objects for agents (Anthropic,
+[Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents), 2025-09).
+
+---
+
 # Lom Eval Suite (Phase 2.8)
 
 128-task benchmark for measuring **LLM generation pass-rate** on Lom code.
