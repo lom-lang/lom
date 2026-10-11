@@ -52,36 +52,49 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-10 深夜，三十四审 A- 定格 + R138 收口后——交接就绪，台账零 open）**：
-  最新已提交基线 **v1.9.3**（tag `22a7008`，CI run `37951486401` 七 job
-  绿；HEAD 以 git log 与 CI 首跑为准）。本轮自上次交接后交付**七版弧线
-  + 五轮审查（B+ 五连 → 三十四审 A- 回升）+ 二十笔开账全关（R119-R138）
-  + 两项工具根治 + 一项升版记账**：v1.7.2（L2 行号 `ln:cl` 三通道统一）
-  → v1.8.0（L2 转正 experimental→supported face）→ v1.9.0（l2fix CLI
-  子命令，Rust 828 行零 regex，python↔rust 对拍零差异）→ v1.9.1（build
-  三缺口收口——三项登记边界销账）→ 二十九/三十/三十一审 B+ 三连 →
-  R119-R131 十二笔收口 + J+ 集成现实核对位（doc_audit 71→72 项）→
-  v1.9.2（tag 后两笔行为修复 R125/R128 补升版本）→ 三十二审 B+ 四连 →
-  v1.9.3（R132-R135 收口）→ 三十三审 B+ 五连 → R136/R137 收口 + **K
-  交接镜像核对位**（doc_audit 72→73 项——镜像盲区根治）→ 三十四审
-  **A-**（判据三条全成立；R138 收口 + A- 经用户裁决采纳，B+ 五连终结）。
-  **发布面裁决（2026-10-10 用户裁决）：Release v1.7.0 不转正、正式发布
-  后面再说**——v1.7.0/v1.6.1 维持 pre-release；playground 线上常绿。
-  **台账零 open（R1-R138 全关）；顺延号 R139 起。**
-- **审查轨迹（均不外推）**：……→二十七审 A-→二十八审 A-（四审连平）
-  →二十九审 B+（宣称失真×2）→三十审 B+ 二连（计数同滞+根减法）
-  →三十一审 B+ 三连（构成收窄——技术面三连全绿、无 P1/P2）→三十二审
-  B+ 四连（跌档首次收敛为纯文档计数面）→三十三审 B+ 五连（收窄至两笔
-  一行级）→**三十四审 A-**（判据三条全成立：R136/R137 零失真 + J+
-  37=37 + K 位绿与构造性红证；开账仅 R138 一笔 P3 且已收口；A- 张力
-  两读法经用户裁决采纳 A-）。最新报告
-  [review-2026-10-10-2.html](reviews/review-2026-10-10-2.html)。
+- **状态（2026-10-12，γ-甲 收口后——交接就绪，台账零 open（R1-R142 全关））**：
+  最新已提交基线 **v1.9.5**（tag `973d020`，CI run `38049184858` 七 job 绿；
+  HEAD `595548f` CI run `38156549503` 七 job 绿——以 git log 与 CI 首跑为准）。
+  本轮自上次交接后交付**性能工程两刀 + 三十五审 + 战略转折三步**：designs/0022
+  性能工程（用户三点裁决：乙分刀/全 Rc 化五族/基准入库手动验收）——刀 1 =
+  **v1.9.4**（A1 函数表 Rc 化 +8/−7：调用不再深克隆 FnDecl AST；A3 读码核实
+  零风险收益项不存在诚实跳过；bench.lom +6 负载与 tools/bench.py 入库）→
+  刀 2 = **v1.9.5**（A2 值表示五族 Rc 化 +126/−102 零回退：变量读/传参/闭包
+  创建 O(1)）——实测 bootstrap **471.5→43.1s（两刀累积 ≈10.9×）**、
+  call_density 0.69-0.83×、quine 272925 与全部行为逐字节零变化（三路验收）；
+  既定代价登记（str_concat 构造 +1 次 Rc 拷贝——机理属实，短档批时数字经
+  R139 交错复现判为时段噪声）→ **三十五审 B+**（工程实质全复现成立：9 探针
+  双二进制 MATCH、quine md5 亲算一致；跌档全在性能宣称面测量纪律——
+  R139-R142 开账）→ **战略转折（用户裁决）**：审查循环分析定论（行为面
+  33 轮零失守、循环主体为宣称精度面且边际递减——**审查降频为事件驱动**）
+  + 第五/六轮大调查（四报告归档 docs/archive/research-2026-10-11-*；
+  关键修正：Zero 诊断层已建成 Repair Contract 体系——修复闭环 P3 =
+  Zero/Vera/Lom 三强；使用侧全赛道零真实用户；三死结）+ **生态位裁决：
+  γ 评测资产先行试点 + β 规范升维中期主轴** → **γ-甲 落地**（评测资产
+  命名 **RepairLoopBench**——中性名论证（LSP/MCP 先例）；eval/README 升格
+  基准卡含与 SWE-bench 系口径区隔声明与外部证据链；README 证据段升头牌）
+  + R139-R142 全收口（14 写位）。**台账零 open（R1-R142 全关）；顺延号
+  R143 起。发布面维持已裁（v1.7.0/v1.6.1 pre-release，正式发布后议）。**
+- **审查轨迹（均不外推）**：……→三十三审 B+ 五连→三十四审 A-（判据三条
+  全成立）→**三十五审 B+**（性能工程两刀复评：工程实质与行为零变化全部
+  独立复现成立；P2×1+P3×3 全在宣称面——str_concat 短档噪声当代价【R139】/
+  1.96× 载体口径未披露【R140】/递归边界漂移未登记【R141】/TODO 头行滞后
+  【R142】，四账已全收口）。最新报告
+  [review-2026-10-10-3.html](reviews/review-2026-10-10-3.html)。**审查节奏
+  已裁降频：事件驱动（大节点/对外发布前触发），不再每批收官即审。**
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
-  bootstrap **14/14**（强 quine 272925 bytes 双侧一致）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
+  bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
+  ~40-45s）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
   r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
   eval 双后端各 128/128、fix_corpus 13 对、doc_audit **73/73**（含
   J+ 集成现实核对 + K 交接镜像核对）、六模式全 PASS、link_check PASS
-  + l2fix self-check 6/6（CI doc-gates 常驻）。Cargo.toml/lock **1.9.3**。
+  + l2fix self-check 6/6 + bench.py quick 20 点（CI doc-gates 常驻；
+  bench 为手动验收形态不进 CI）。Cargo.toml/lock **1.9.5**。
+- **战略面现行态（2026-10-12 裁决后）**：① 审查事件驱动（见上）；②
+  生态位 γ 已落地（RepairLoopBench 基准卡 = eval/README.md）、β 待启动
+  （"agent-编译器修复接口"开放规范——涉规范文档面，启动时出设计方案
+  呈裁决点）；③ 对外动作逐项呈批不变（目录站提交/Release 转正等均未
+  重开）。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
   对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
@@ -89,6 +102,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   `lom build` 诊断面 = 包源逐文件（统一减法 externals——base ∪ pkg
   整体减文件自身符号，R128）+ PKG007（人类可读路径 stderr）+ 根目录
   主文件对称检查（统一减法，R125）。
+- **性能现行面（designs/0022 两刀后）**：函数表 HashMap<String,
+  Rc<FnDecl>>；Value 五族 Rc 共享（Str(Rc<str>)/Closure/Enum/Record/
+  Tuple）——Map/List 原样；bench.lom 十负载 + tools/bench.py（--quick/
+  --full/--baseline 对照，同机纪律——交错 A/B 为标准形态【R139 教训】）；
+  递归物理边界 v1.9.5 实测 60k 过/70k 溢出（N1 软件守卫 80000 不变）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
   五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
@@ -100,13 +118,13 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   两 divergence；L2 包展开单元不做同文件 fn 重复检测（L2P001 单文件
   拒/包展开单元不查，跨包走 NAM006——v1.6.1 R115，R133 补录）；
   clippy --all-targets ~4 条漂移存量；playground 四边界；gh-pages
-  独立构建流；归档 HTML assets 未随档。
-- 下一步：**交接就绪，方向待用户裁决**（台账零 open，顺延号 R139 起；
-  发布面已裁——v1.7.0 不转正、正式发布后议）。菜单：**性能工程（大批，
-  建议下一项——涉发射层/值表示须先出 designs/0022 呈裁决点）**/
-  三十五审（建议性能工程收官或大节点后再发起）。观察项：Ubuntu 26
-  迁移（**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两步骤）。
-  对外动作逐项呈批（铁律 6）。
+  独立构建流；归档 HTML assets 未随档；str_concat 构造密集 +1 次
+  Rc 拷贝（机理属实、50k 档 1.03×，量值以长档为准——R139 口径）。
+- 下一步：**交接就绪，方向待用户裁决**（台账零 open，顺延号 R143 起）。
+  菜单：**β 规范升维主轴（"agent-编译器修复接口"开放规范——出设计方案
+  呈裁决点后动工）**/ 其他方向（性能工程后续小项已收口无 open 项）。
+  观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑——doc-gates 含
+  断链+l2fix 两步骤）。对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
 1. **L0 现行必读（规划者亲自）**：docs/MAINTENANCE.md 全文（规则）；
@@ -129,7 +147,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    - python tools/eval_prompt_check.py（期望 31/31；v1.5.0 起 error_repair 31 题）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（已提交基线 368/368 = 196 单文件 + 8 包 + 164 负例）
-   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 272925 bytes；耗时随机器负载 ~100s-500s；另有 --ci-smoke 子档已入 CI）
+   - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 272925 bytes；耗时 v1.9.5 性能工程后 ~40-45s，随机器负载；另有 --ci-smoke 子档已入 CI）
    - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（128/128；WASM 侧加 -Backend wasm 同 128）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
