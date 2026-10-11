@@ -12,7 +12,8 @@
 | 文件 | 内容 |
 |---|---|
 | [acri-v0.1.md](acri-v0.1.md) | 规范本体（英文，面向外部实现者）：L0 对象模型（Diagnostic/RepairSuggestion + 三条安全性公理）→ L1 CLI 协议（命令集/退出码矩阵/符合性级别）→ L2 修复基准方法论附录 → 参考消费器 → 变更协议与治理 |
-| [lom-conformance.md](lom-conformance.md) | Lom 参考实现符合性映射：规范条款 ↔ 现状（lom-diag/v1 等）↔ 状态与整改批次（β-2 工程项清单） |
+| [lom-conformance.md](lom-conformance.md) | Lom 参考实现符合性映射：规范条款 ↔ 现状 ↔ 状态（β-2 后 L0/L1 conformant、L2 documented，两登记偏差） |
+| [consumer.py](consumer.py) | **ACRI 参考消费器**（规范 §4 的可运行实装，~90 行纯标准库）：码表引导 → check 消费 → 公理 1 客户侧过滤 → plan/apply 闭环——证明规范可被对实现语言一无所知的第三方程序消费（β-3 交付，三闭环实跑通过） |
 
 ## 一分钟了解
 
