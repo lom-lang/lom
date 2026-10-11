@@ -7,15 +7,18 @@
 
 码行两形态（第二形态为实测补充：LEX 负例走 lex error 行而非 codegen error 行）：
   codegen：`codegen error: [(\\d+:\\d+ )]?\\[(L2[A-Z]\\d{3}|LEX\\d{3})\\] (.*)`
-  （0020 行号批：位置段 ln:cl 可选前缀于码前——名字锚命中才有；miss 无位置）
+  （0020 行号批：位置段 ln:cl 可选前缀于码前——名字锚命中才有；miss 无位置。
+  β-2 起 schema v2：位置前缀提级为结构化字段 position: {"line": L, "col": C}——
+  无位置时字段缺省（不伪造 0:0）；message 维持 v1 纯文案，append-only）
   词法/语法层：`lex error L:C [LEXnnn] msg` / `parse error L:C [PARSExxx] msg`
   非 L2 码（LEX/PARSE 等）透传原样，给"语法层错误，参考输出"提示——本工具的
-  建议映射只覆盖 L2 codegen 码族。
+  建议映射只覆盖 L2 codegen 码族（语法层行列在原始输出行内，不另提字段）。
 
 用法：
   python tools/l2fix.py <file.lom> [--json] [--self-check] [--lom-bin PATH] [--l2 PATH]
 
-  --json        输出 l2-fix/v1 轻量 JSON（独立 schema，不撞宿主 lom-fix/v1——L2 工具码不进宿主协议）
+  --json        输出 l2-fix/v2 轻量 JSON（独立 schema，不撞宿主 lom-fix/v1——L2 工具码不进宿主协议；
+                entries 条目新增可选 position 字段，与宿主 `lom l2fix` 同步）
   --self-check  质量锁定（designs/0018 §2B）：对 tools/selfcomp/negative/ 全部负例
                 + eval 127/128/129 三题 broken（prompt 中提取）跑全链断言；首次交付自验用；R120（二十九审）起入 CI doc-gates 常驻
   --lom-bin     宿主二进制（默认 target/release/lom，Windows 探测 .exe）
@@ -145,20 +148,26 @@ def run_l2(lom_bin, l2_path, src):
 
 
 def parse_codes(stdout):
-    """stdout → [(code, message)]，保持输出顺序。
+    """stdout → [(code, message, position)]，保持输出顺序。
 
     0020 行号批后 codegen 行带可选位置前缀（group1=ln:cl、group2=码、
-    group3=文案）——位置不进建议面（message 维持纯文案，七族映射零改动）。
+    group3=文案）。β-2 起 schema v2：位置前缀提值为 position =
+    {"line": L, "col": C}（dict，仅 codegen 行携带；无前缀/语法层透传
+    条目为 None——JSON 中字段缺省，不伪造 0:0）；message 维持 v1 纯文案。
     """
     out = []
     for line in stdout.splitlines():
         m = CODEGEN_LINE.search(line)
         if m:
-            out.append((m.group(2), m.group(3).strip()))
+            pos = None
+            if m.group(1):
+                l_str, _, c_str = m.group(1).partition(":")
+                pos = {"line": int(l_str), "col": int(c_str)}
+            out.append((m.group(2), m.group(3).strip(), pos))
             continue
         m = SYNTAX_LINE.search(line)
         if m and not m.group(1).startswith("L2"):
-            out.append((m.group(1), m.group(2).strip()))
+            out.append((m.group(1), m.group(2).strip(), None))
     return out
 
 
@@ -246,6 +255,21 @@ def suggest(code, message):
                            "后重试。")}
 
 
+def entries_from_stdout(stdout):
+    """stdout → entries 列表（含 β-2 v2 的 position 字段组装）。
+
+    position 挂 dict 尾部（插入序 = JSON 输出序，对齐宿主 src/l2fix.rs
+    to_json 的字段序 code/message/confidence/action/suggestion/position）。
+    """
+    entries = []
+    for c, m, pos in parse_codes(stdout):
+        e = suggest(c, m)
+        if pos is not None:
+            e["position"] = pos
+        entries.append(e)
+    return entries
+
+
 def analyze(path, lom_bin, l2_path):
     """全链：返回 (entries, passed, stdout)。passed = 无码条目且 stdout 含 COMPILED。"""
     src = Path(path)
@@ -254,7 +278,7 @@ def analyze(path, lom_bin, l2_path):
     if not Path(l2_path).is_file():
         sys.exit("错误：L2 编译器源不存在：%s（用 --l2 指定）" % l2_path)
     stdout = run_l2(lom_bin, l2_path, src)
-    entries = [suggest(c, m) for c, m in parse_codes(stdout)]
+    entries = entries_from_stdout(stdout)
     return entries, (not entries and "COMPILED" in stdout), stdout
 
 
@@ -359,7 +383,7 @@ def main():
     ap = argparse.ArgumentParser(
         description="L2 码进修复闭环通道（designs/0018 甲形态：L2 码→七族修复建议）")
     ap.add_argument("file", nargs="?", help="待诊断的 .lom 文件（--self-check 时可省略）")
-    ap.add_argument("--json", action="store_true", help="输出 l2-fix/v1 JSON")
+    ap.add_argument("--json", action="store_true", help="输出 l2-fix/v2 JSON")
     ap.add_argument("--self-check", action="store_true",
                     help="质量锁定：全部负例 + eval 127/128/129 全链断言")
     ap.add_argument("--lom-bin", default=default_lom_bin(), help="宿主 lom 二进制路径")
@@ -373,7 +397,7 @@ def main():
         ap.error("缺少 <file.lom>（或改用 --self-check）")
     entries, passed, stdout = analyze(args.file, args.lom_bin, args.l2)
     if args.json:
-        print(json.dumps({"schema": "l2-fix/v1", "file": str(args.file),
+        print(json.dumps({"schema": "l2-fix/v2", "file": str(args.file),
                           "entries": entries}, ensure_ascii=False, indent=2))
     else:
         print_human(entries, passed, stdout, args.file)

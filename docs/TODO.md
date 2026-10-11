@@ -1,7 +1,21 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-12，β-1 规范本体批——ACRI v0.1 Draft 落地；台账零 open
+> **当前状态（2026-10-12，β-2 工程批收官——Lom 达成 ACRI L1-conformant；台账零 open
 > （R1-R142 全关），顺延号 R143 起）**：
+> **本批（用户裁决"按序执行"——β-2 = designs/0023 §5 工程批，升 minor v1.10.0）**：
+> ① `lom codes [--json]`（ACRI §2.1 REQUIRED——lom-codes/v1 信封 **46 条** =
+> 宿主九命名空间 38 码 + L2 八族；severity 与运行时分类器单测锁定；盘点表
+> target/probes/beta2/codes_inventory.md 为登记依据）；② `l2-fix/v1→v2`
+> （append-only 位置字段——ln:cl 提结构化 position，rust/python 双实现同步，
+> **对拍 30/30 零字段差异**、self-check 6/6）；③ 退出码带（ACRI §2.2——工具
+> 自身失败 20 路径 1→**≥2**，诊断 error 保持 1；**两处登记偏差**：pkg-expand
+> 混合路径保持 1（带 PKG 码=诊断语义）、LSP 协议带 r58 锁定不动）。
+> Rust **573→578 + 37→40**（beta2_exit_codes ×3）；quine 272925 逐字节不变、
+> 368/368、eval 128×2、六模式、fuzz/diff/fmt gate 全绿（执行者全套 + 验证
+> 执行者 22 项 + 规划者亲验四项）。零语言面。specs/acri/lom-conformance.md
+> 随批更新（L1-conformant + 两偏差登记）。**后续：β-3 验证批（参考消费器
+> 实装 + 实跑闭环）待执行（既裁"按序"）。**
+> **前置 · β-1**：
 > **本批（用户裁决"执行"——designs/0023 三裁决点均按建议项：三层全包 /
 > 命名 ACRI / 顶层 specs/）**：**specs/acri/ 三件套落成**——① acri-v0.1.md
 > 规范本体（英文，面向外部实现者：L0 对象模型【Diagnostic position 锚

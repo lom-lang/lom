@@ -84,8 +84,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   已裁降频：事件驱动（大节点/对外发布前触发），不再每批收官即审。**
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
-  ~40-45s）、self_comp.lom 12671 行、Rust **573 单元 + 37 集成**（r56×1 + r58×7 + r94×2 +
-  r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6）、
+  ~40-45s）、self_comp.lom 12671 行、Rust **578 单元 + 40 集成**（r56×1 + r58×7 + r94×2 +
+  r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6 + beta2_exit×3）、
   eval 双后端各 128/128、fix_corpus 13 对、doc_audit **73/73**（含
   J+ 集成现实核对 + K 交接镜像核对）、六模式全 PASS、link_check PASS
   + l2fix self-check 6/6 + bench.py quick 20 点（CI doc-gates 常驻；
@@ -139,7 +139,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 573/573；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation，×37）
+   - cargo test --release（期望 578/578；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 73/73）

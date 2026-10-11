@@ -3,7 +3,7 @@
 - **文档**：docs/designs/0023-agent-compiler-repair-interface.md
 - **性质**：动工前置设计（MAINTENANCE §2.1 第 2 条——涉宿主工具面与规范文档面；先例 0001-0022）
 - **基线**：HEAD `6d46162` / v1.9.5（交接就绪态，台账零 open）
-- **状态**：**设计产出（2026-10-12，用户裁决"执行"β 主轴启动后的动工前置件）——三个裁决点待用户**（范围分层 / 命名 / 落位与治理）。
+- **状态**：**β-1 与 β-2 已交付（2026-10-12，三裁决点均按建议项：三层全包 / ACRI / 顶层 specs/）。β-1 = specs/acri/ 三件套（规范本体 v0.1 Draft + Lom 符合性映射 + 中文导读，提交 `936a37b` CI 七 job 绿）；β-2 = v1.10.0 工程批（用户裁决"按序执行"：`lom codes [--json]` 码表出口 46 条 + l2-fix/v2 位置字段双实现同步对拍 30/30 + 退出码带 20 路径 1→≥2——Rust 573→578+37→40，quine 272925 逐字节不变，**Lom 达成 ACRI L1-conformant**；specs/acri/lom-conformance.md 随批更新含两登记偏差）。β-3（参考消费器实装 + 实跑闭环）既裁按序待执行。**
 - **供料来源**：执行者供料五节（A lom-diag/v1 对象模型 / B 修复建议对象与安全性模型 / C CLI 交互约定 / D RepairLoopBench 方法论 / E 外部对照提取自归档调查）+ 规划者亲验三处关键行号（Diagnostic 结构体 diagnostics.rs:86-98 十字段逐字、fix_for_diagnostic fix.rs:754 起按码分派、--apply 只 High 非 Hint 的安全性注释 :12/:3344）。供料留存 target/probes/beta_supply/report.md（gitignored）。
 - **数字落盘前门禁**：写本文前后运行 `python tools/doc_audit.py`，结果 `RESULT: PASS（73/73 项通过）`（本文档不含 doc_audit 锚位新增）。
 

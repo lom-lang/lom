@@ -26,6 +26,7 @@ use std::process;
 mod apply;
 mod ast;
 mod cli;
+mod codes;
 mod diagnostics;
 mod doc;
 mod dump;
@@ -66,7 +67,9 @@ fn main() {
         // 默认 panic hook 已把 panic 信息打到 stderr，这里补一行结论并映射非零退出码。
         if let Err(_panic_payload) = child.join() {
             eprintln!("内部错误：解释器线程异常终止（见上方 panic）");
-            process::exit(1);
+            // β-2（ACRI v0.1 §2.2）：工具自身失败带（内部错误）≥2——与
+            // check 的诊断 error=1 区分（此前 1）。
+            process::exit(2);
         }
     }
 }
@@ -99,7 +102,8 @@ fn main_inner() {
             }
             Err(e) => {
                 eprintln!("读取修复历史失败: {}", e);
-                process::exit(1);
+                // β-2（ACRI v0.1 §2.2）：IO 错误 = 工具自身失败带 rc 2（此前 1）
+                process::exit(2);
             }
         }
         return;
@@ -136,9 +140,23 @@ fn main_inner() {
             Some(f) => run_pkg_expand(f, cli.list_pkgs),
             None => {
                 eprintln!("用法：lom pkg-expand <main.lom> [--list]");
-                process::exit(1);
+                // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                process::exit(2);
             }
         }
+    }
+
+    // ===== 子命令：codes（designs/0023 §5 β-2 / ACRI v0.1 §2.1 REQUIRED）=====
+    // 机器可读码表出口：宿主九命名空间 + L2 八族的静态注册表
+    // （src/codes.rs；登记依据 target/probes/beta2/codes_inventory.md）。
+    // 不需要文件参数；rc 恒 0。
+    if cli.subcommand.as_deref() == Some("codes") {
+        if cli.json {
+            println!("{}", codes::to_json());
+        } else {
+            codes::print_human();
+        }
+        return;
     }
 
     // ===== 子命令：l2fix（designs/0018 裁决点 1 甲的既定后续——L2 已于
@@ -153,7 +171,8 @@ fn main_inner() {
         Some(p) => p,
         None => {
             print_help(&args[0]);
-            process::exit(1);
+            // β-2（ACRI v0.1 §2.2）：用法错误（缺输入文件）= 工具失败带 rc 2（此前 1）
+            process::exit(2);
         }
     };
 
@@ -161,6 +180,7 @@ fn main_inner() {
         Ok(s) => s,
         Err(e) => {
             // 文件读取错误也输出 JSON 诊断（如果 --json），保持输出一致性
+            // （信封内容不变——LEX000 输入错误借用面维持 v1 形态）
             if cli.json {
                 let mut diags = diagnostics::Diagnostics::new(path);
                 diags.ok = false;
@@ -180,7 +200,9 @@ fn main_inner() {
             } else {
                 eprintln!("无法读取文件 '{}': {}", path, e);
             }
-            process::exit(1);
+            // β-2（ACRI v0.1 §2.2）：输入不可读 = 工具自身失败带 rc 2（此前 1）
+            // ——与 check 的诊断 error=1 区分（诊断信封照常输出，仅退出码进带）
+            process::exit(2);
         }
     };
 
@@ -445,7 +467,8 @@ fn run_fmt(src: &str, path: &str, cli: &CliArgs) {
                         Ok(_) => println!("{}: 已格式化并写入。", path),
                         Err(e) => {
                             eprintln!("写入文件 '{}': {}", path, e);
-                            process::exit(1);
+                            // β-2：IO 错误 = 工具失败带 rc 2（此前 1）
+                            process::exit(2);
                         }
                     }
                 }
@@ -471,11 +494,13 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         Some("wasm") => {}
         Some(t) => {
             eprintln!("未知编译目标 '{}'（当前仅支持 --target wasm）", t);
-            process::exit(1);
+            // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+            process::exit(2);
         }
         None => {
             eprintln!("lom build <file> 需要 --target wasm（不带文件的 lom build 是包管理流程）");
-            process::exit(1);
+            // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+            process::exit(2);
         }
     }
     // 2. 读源文件
@@ -483,7 +508,8 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         Ok(s) => s,
         Err(e) => {
             eprintln!("无法读取文件 '{}': {}", file, e);
-            process::exit(1);
+            // β-2：输入不可读 = 工具失败带 rc 2（此前 1）
+            process::exit(2);
         }
     };
     // 3. 解析（容错模式收集全部诊断；有 error 则不编译）
@@ -544,7 +570,8 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         }
         Err(e) => {
             eprintln!("无法写入 '{}': {}", out_path, e);
-            process::exit(1);
+            // β-2：IO 错误 = 工具失败带 rc 2（此前 1）
+            process::exit(2);
         }
     }
 }
@@ -587,11 +614,13 @@ fn run_pkg_expand(file: &str, list_only: bool) {
 /// 真实用法 `lom examples/selfhost/self_comp.lom -- bad.lom out.hex 2>&1 |
 /// lom l2fix -`，判定靠码行、COMPILE-ERROR 恒 rc=0 的管道采集面）。
 ///
-/// 输出：默认人类可读；--json 输出 l2-fix/v1 轻量 schema（独立 schema，
-/// 不撞宿主 lom-fix/v1——L2 工具码不进宿主协议，designs/0018 §3 既定口径）。
+/// 输出：默认人类可读；--json 输出 l2-fix/v2 轻量 schema（独立 schema，
+/// 不撞宿主 lom-fix/v1——L2 工具码不进宿主协议，designs/0018 §3 既定口径；
+/// β-2 起 v2：entries 条目新增可选 position 字段——codegen 行 ln:cl 位置
+/// 前缀提级为结构化字段，无位置时字段缺省，message 维持 v1 原文）。
 ///
 /// 退出码：0 = 分析完成（有建议条目 / "L2 编译通过" / 零码行提示）；
-/// 1 = 输入读取失败 / 缺参。
+/// 2 = 输入读取失败 / 缺参（β-2 起：工具自身失败带，此前 1）。
 fn run_l2fix(cli: &CliArgs) {
     use std::io::Read;
     let (text, label) = if let Some(t) = &cli.text {
@@ -602,7 +631,8 @@ fn run_l2fix(cli: &CliArgs) {
                 let mut buf = String::new();
                 if std::io::stdin().read_to_string(&mut buf).is_err() {
                     eprintln!("无法读取 stdin");
-                    process::exit(1);
+                    // β-2：IO 错误 = 工具失败带 rc 2（此前 1）
+                    process::exit(2);
                 }
                 (buf, "-".to_string())
             }
@@ -610,12 +640,14 @@ fn run_l2fix(cli: &CliArgs) {
                 Ok(s) => (s, f.clone()),
                 Err(e) => {
                     eprintln!("无法读取文件 '{}': {}", f, e);
-                    process::exit(1);
+                    // β-2：输入不可读 = 工具失败带 rc 2（此前 1）
+                    process::exit(2);
                 }
             },
             None => {
                 eprintln!("用法：lom l2fix <file|-> [--json] [--text <s>]");
-                process::exit(1);
+                // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                process::exit(2);
             }
         }
     };
@@ -642,7 +674,8 @@ fn run_build(json: bool) {
             eprintln!("  [dependencies]");
             eprintln!("  lib = {{ path = \"../lib\" }}");
         }
-        process::exit(1);
+        // β-2：输入缺失（未编码用法错误）= 工具失败带 rc 2（此前 1）
+        process::exit(2);
     }
 
     let manifest = match package::load_manifest_file(toml_path) {
@@ -899,7 +932,8 @@ fn closure_symbols(
 ///
 /// 退出码：
 ///   0 — 计划生成成功 / apply 应用成功（含 0 个修复应用）
-///   1 — 文件读取错误 / apply 写文件失败
+///   2 — apply 写文件失败（β-2 起：工具自身失败带，此前 1；
+///       文件读取错误在 main 入口统一 rc 2）
 fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     // 收集全部诊断：词法 + 语法
     let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
@@ -938,7 +972,8 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
         if !cli.dry_run && total_applied > 0 {
             if let Err(e) = fs::write(path, &current) {
                 eprintln!("apply 写文件失败: {}", e);
-                process::exit(1);
+                // β-2：IO 错误 = 工具失败带 rc 2（此前 1）
+                process::exit(2);
             }
 
             // Phase 4.1.3: 追加修复历史记录到 .lom/fix-history.jsonl

@@ -11,10 +11,11 @@
 // LEX 负例走 lex error 行而非 codegen error 行）：
 //   codegen：`codegen error: [(ln:cl) ][L2X###|LEX###] message`
 //   （0020 行号批：位置段 ln:cl 可选前缀于码前——名字锚命中才有；miss 无位置。
-//   位置不进建议面，message 维持纯文案，七族映射零依赖位置）
+//   β-2 起 v2：位置前缀提级为结构化字段 position: {"line": L, "col": C}——
+//   无位置时字段缺省（不伪造 0:0，0020 纪律不变）；message 维持 v1 纯文案）
 //   词法/语法层：`lex error L:C [LEXnnn] msg` / `parse error L:C [PARSExxx] msg`
 //   非 L2 码（LEX/PARSE 等）透传原样，给"语法层错误，参考输出"提示——建议
-//   映射只覆盖 L2 codegen 码族。
+//   映射只覆盖 L2 codegen 码族（语法层行列在原始输出行内，不另提字段）。
 //
 // 名字→模块查表运行时走 interpreter::module_of（单一事实源——python 工具因
 // 跨语言只能双源自带表并在表头登记源指针；Rust 同 crate 直连，漂移风险归零。
@@ -23,36 +24,46 @@
 
 use crate::json::escape_str;
 
-/// 一条 L2 拒绝的修复建议（l2-fix/v1 schema 的 entries 元素）。
+/// 一条 L2 拒绝的修复建议（l2-fix/v2 schema 的 entries 元素）。
 /// 字段序 = JSON 输出序（对齐 python json.dumps 的插入序）：
-/// code / message / confidence / action / suggestion。
+/// code / message / confidence / action / suggestion / position（可选——
+/// β-2 v2 新增，append-only：codegen 行 ln:cl 位置前缀提级为结构化字段，
+/// 无位置时字段缺省；既有五字段语义零变化）。
 pub(crate) struct L2FixEntry {
     pub(crate) code: String,
     pub(crate) message: String,
     pub(crate) confidence: &'static str,
     pub(crate) action: &'static str,
     pub(crate) suggestion: String,
+    /// (line, col)——None = 原始码行无位置前缀（miss 不伪造，0020 纪律）。
+    pub(crate) position: Option<(usize, usize)>,
 }
 
 // ---------------------------------------------------------------------------
 // 码行解析（python 正则的手译，零依赖）
 // ---------------------------------------------------------------------------
 
-/// 文本 → `[(code, message)]`，保持输出顺序（对齐 tools/l2fix.py parse_codes）。
+/// 码行解析产物：(code, message, position)——position = codegen 行 ln:cl
+/// 前缀的 (line, col)，无前缀/语法层透传条目为 None（β-2 v2）。
+type ParsedCode = (String, String, Option<(usize, usize)>);
+
+/// 文本 → `[(code, message, position)]`，保持输出顺序（对齐 tools/l2fix.py
+/// parse_codes）。position 仅 codegen 行携带（ln:cl 前缀提级，β-2 v2）；
+/// 语法层透传条目无 position 字段。
 /// 边界：按 `\n` 切行（python str.splitlines 另切 \v/\f/\u2028 等——编译器
 /// stdout 现实只有 \n，登记为不移植面）。
-pub(crate) fn parse_codes(text: &str) -> Vec<(String, String)> {
+pub(crate) fn parse_codes(text: &str) -> Vec<ParsedCode> {
     let mut out = Vec::new();
     for line in text.lines() {
-        if let Some((code, msg)) = parse_codegen_line(line) {
-            out.push((code.to_string(), msg.to_string()));
+        if let Some((code, msg, pos)) = parse_codegen_line(line) {
+            out.push((code.to_string(), msg.to_string(), pos));
             continue;
         }
         if let Some((code, msg)) = parse_syntax_line(line) {
             // L2 族码不经语法层通道（codegen 行已 continue；这里防
             // "parse error L:C [L2Xnnn]" 形态把 L2 码降级成语法层建议）
             if !code.starts_with("L2") {
-                out.push((code.to_string(), msg.to_string()));
+                out.push((code.to_string(), msg.to_string(), None));
             }
         }
     }
@@ -60,22 +71,25 @@ pub(crate) fn parse_codes(text: &str) -> Vec<(String, String)> {
 }
 
 /// `codegen error: [(ln:cl) ][CODE] message` 行（CODE = L2X### 或 LEX###）。
+/// 返回 (码, 文案, 位置)——位置 = ln:cl 前缀的 (line, col)，无前缀时 None。
 /// re.search 语义：最左 "codegen error: " 命中处解析；该处失配则推进重试
 /// （对齐逐位推进——现实输出每行至多一处，重试面是病态输入的板面对齐）。
-fn parse_codegen_line(line: &str) -> Option<(String, String)> {
+fn parse_codegen_line(line: &str) -> Option<ParsedCode> {
     const PREFIX: &str = "codegen error: ";
     let mut search_from = 0;
     while let Some(rel) = line[search_from..].find(PREFIX) {
         let start = search_from + rel;
         let mut rest = &line[start + PREFIX.len()..];
-        // 可选位置前缀 `\d+:\d+ `（0020 行号批）
-        if let Some(n) = position_prefix_len(rest) {
+        // 可选位置前缀 `\d+:\d+ `（0020 行号批；β-2 v2 提值为结构化字段）
+        let mut pos = None;
+        if let Some((n, l, c)) = position_prefix_len(rest) {
             rest = &rest[n..];
+            pos = Some((l, c));
         }
         if let Some((code, bracket)) = parse_code_bracket(rest) {
             // `\] (.*)`：']' 后恰一个空格再取文案（多余空白由 trim 收敛）
             if let Some(message) = rest[bracket + 1..].strip_prefix(' ') {
-                return Some((code.to_string(), message.trim().to_string()));
+                return Some((code.to_string(), message.trim().to_string(), pos));
             }
         }
         search_from = start + 1;
@@ -83,8 +97,8 @@ fn parse_codegen_line(line: &str) -> Option<(String, String)> {
     None
 }
 
-/// `\d+:\d+ ` 前缀的字节长度（含尾随空格）；不匹配返回 None。
-fn position_prefix_len(s: &str) -> Option<usize> {
+/// `\d+:\d+ ` 前缀的字节长度（含尾随空格）与 (line, col) 值；不匹配返回 None。
+fn position_prefix_len(s: &str) -> Option<(usize, usize, usize)> {
     let b = s.as_bytes();
     let mut i = 0;
     let d1 = i;
@@ -94,6 +108,7 @@ fn position_prefix_len(s: &str) -> Option<usize> {
     if i == d1 || b.get(i) != Some(&b':') {
         return None;
     }
+    let line = ascii_digits_to_usize(&b[d1..i]);
     i += 1;
     let d2 = i;
     while i < b.len() && b[i].is_ascii_digit() {
@@ -102,7 +117,18 @@ fn position_prefix_len(s: &str) -> Option<usize> {
     if i == d2 || b.get(i) != Some(&b' ') {
         return None;
     }
-    Some(i + 1)
+    let col = ascii_digits_to_usize(&b[d2..i]);
+    Some((i + 1, line, col))
+}
+
+/// ASCII 数字字节段 → usize（调用方保证非空全数字；溢出面 = 病态超长数字，
+/// 饱和收敛不 panic——与 python int() 的无界语义在现实行号量级下等价）。
+fn ascii_digits_to_usize(digits: &[u8]) -> usize {
+    let mut v: usize = 0;
+    for d in digits {
+        v = v.saturating_mul(10).saturating_add((*d - b'0') as usize);
+    }
+    v
 }
 
 /// `[L2X###]` / `[LEX###]` 码括号：s 须以 '[' 开头，返回 (码, ']' 下标)。
@@ -133,7 +159,7 @@ fn parse_syntax_line(line: &str) -> Option<(String, String)> {
         } else {
             continue;
         };
-        let Some(n) = position_prefix_len(after) else {
+        let Some((n, _, _)) = position_prefix_len(after) else {
             continue;
         };
         let rest = &after[n..];
@@ -195,6 +221,7 @@ pub(crate) fn suggest(code: &str, message: &str) -> L2FixEntry {
             confidence: "medium",
             action: "hint",
             suggestion: L2V_TEMPLATE.into(),
+            position: None,
         },
         "L2S" => L2FixEntry {
             code: code.into(),
@@ -202,6 +229,7 @@ pub(crate) fn suggest(code: &str, message: &str) -> L2FixEntry {
             confidence: "medium",
             action: "hint",
             suggestion: L2S_TEMPLATE.into(),
+            position: None,
         },
         "L2E" => L2FixEntry {
             code: code.into(),
@@ -209,6 +237,7 @@ pub(crate) fn suggest(code: &str, message: &str) -> L2FixEntry {
             confidence: "n/a",
             action: "report",
             suggestion: "L2 编译器内部错误——请报维护者（附完整输出）。".into(),
+            position: None,
         },
         // classify_l2 兜底码（语料外构造性可达——二十六审 R114：Map 键类型
         // 注解/tuple 非数字索引等约 29 条组合文案落此兜底；码非空、文案完整，
@@ -221,6 +250,7 @@ pub(crate) fn suggest(code: &str, message: &str) -> L2FixEntry {
             suggestion: "未归类到七族的 L2 拒绝（兜底码）——按原文文案方向\
 修改；如认为归类有误，请连同完整输出反馈维护者。"
                 .into(),
+            position: None,
         },
         // LEX/PARSE 等语法层码：透传原样
         _ => L2FixEntry {
@@ -231,6 +261,7 @@ pub(crate) fn suggest(code: &str, message: &str) -> L2FixEntry {
             suggestion: "语法层错误（词法/解析阶段）——l2fix 的建议映射只覆盖 \
 L2 codegen 码族；请参考原始输出的行列号与文案修复语法后重试。"
                 .into(),
+            position: None,
         },
     }
 }
@@ -254,6 +285,7 @@ fn suggest_l2u(code: &str, message: &str) -> L2FixEntry {
 确认后手动应用，或经宿主 `lom fix` 的 NAM005 通道自动应用——宿主侧同形态\
 （内建未导入）会被 NAM005 捕获。"
             ),
+            position: None,
         };
     }
     let label = match name {
@@ -270,6 +302,7 @@ fn suggest_l2u(code: &str, message: &str) -> L2FixEntry {
 不建议盲补 import：核对拼写、let/参数作用域（块内与分支内 let 不外泄）、\
 闭包捕获，以及 import 的模块名与符号名（含 as 别名限制）。"
         ),
+        position: None,
     }
 }
 
@@ -283,6 +316,7 @@ fn suggest_l2p(code: &str, message: &str) -> L2FixEntry {
             action: "hint",
             suggestion: "补 main 骨架（L2 程序入口必需）：\nfn main() -> Unit\n    println(0)\nend"
                 .into(),
+            position: None,
         };
     }
     let name = first_quoted(message);
@@ -298,6 +332,7 @@ fn suggest_l2p(code: &str, message: &str) -> L2FixEntry {
 内建）——换一个函数名。",
                 name.unwrap_or("None")
             ),
+            position: None,
         };
     }
     let label = name
@@ -312,6 +347,7 @@ fn suggest_l2p(code: &str, message: &str) -> L2FixEntry {
             "重命名方向：{label} 与既有声明/内建重名（重复变体/枚举/\
 类型参数/导入，或与内建类型冲突）——为其换名，或删除重复的声明/导入。"
         ),
+        position: None,
     }
 }
 
@@ -339,6 +375,7 @@ list_fold 的 f 双参 (acc, elem)；print/println 单参）。"
         confidence: "medium",
         action: "hint",
         suggestion: format!("{head}{tail}"),
+        position: None,
     }
 }
 
@@ -416,22 +453,30 @@ fn capture_run(s: &str) -> Option<&str> {
 // 输出
 // ---------------------------------------------------------------------------
 
-/// 全链：文本 → 建议条目列表（保持码行顺序）。
+/// 全链：文本 → 建议条目列表（保持码行顺序）。position 由 parse_codes 的
+/// codegen 行 ln:cl 前缀提供（β-2 v2）；无前缀/语法层透传条目保持 None
+/// （JSON 中字段缺省）。
 pub(crate) fn analyze(text: &str) -> Vec<L2FixEntry> {
     parse_codes(text)
         .into_iter()
-        .map(|(c, m)| suggest(&c, &m))
+        .map(|(c, m, pos)| {
+            let mut e = suggest(&c, &m);
+            e.position = pos;
+            e
+        })
         .collect()
 }
 
-/// l2-fix/v1 轻量 JSON（独立 schema，不撞宿主 lom-fix/v1——L2 工具码不进
-/// 宿主协议，designs/0018 §3 既定口径）。形态对齐 python
-/// `json.dumps(..., ensure_ascii=False, indent=2)`：2 空格缩进、空 entries
-/// 紧凑 `[]`、字段序 code/message/confidence/action/suggestion。
+/// l2-fix/v2 轻量 JSON（独立 schema，不撞宿主 lom-fix/v1——L2 工具码不进
+/// 宿主协议，designs/0018 §3 既定口径；β-2 起 v2：entries 条目新增可选
+/// position 字段——append-only，既有五字段语义与输出序零变化）。
+/// 形态对齐 python `json.dumps(..., ensure_ascii=False, indent=2)`：2 空格
+/// 缩进、空 entries 紧凑 `[]`、字段序 code/message/confidence/action/
+/// suggestion/position（无位置时字段缺省——不伪造 0:0）。
 pub(crate) fn to_json(entries: &[L2FixEntry], source: &str) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"schema\": \"l2-fix/v1\",\n");
+    out.push_str("  \"schema\": \"l2-fix/v2\",\n");
     out.push_str(&format!("  \"file\": \"{}\",\n", escape_str(source)));
     if entries.is_empty() {
         out.push_str("  \"entries\": []\n}");
@@ -453,10 +498,26 @@ pub(crate) fn to_json(entries: &[L2FixEntry], source: &str) -> String {
             "      \"action\": \"{}\",\n",
             escape_str(e.action)
         ));
-        out.push_str(&format!(
-            "      \"suggestion\": \"{}\"\n",
-            escape_str(&e.suggestion)
-        ));
+        match e.position {
+            // position 在场时为末字段：suggestion 行带逗号（对齐 python
+            // json.dumps 的插入序——position 追加在 dict 尾部）
+            Some((line, col)) => {
+                out.push_str(&format!(
+                    "      \"suggestion\": \"{}\",\n",
+                    escape_str(&e.suggestion)
+                ));
+                out.push_str(&format!(
+                    "      \"position\": {{\"line\": {}, \"col\": {}}}\n",
+                    line, col
+                ));
+            }
+            None => {
+                out.push_str(&format!(
+                    "      \"suggestion\": \"{}\"\n",
+                    escape_str(&e.suggestion)
+                ));
+            }
+        }
         out.push_str(if i + 1 == entries.len() {
             "    }\n"
         } else {
@@ -511,15 +572,20 @@ mod tests {
         assert_eq!(
             codes,
             vec![
-                ("L2U001".to_string(), "未定义变量 'len'".to_string()),
+                (
+                    "L2U001".to_string(),
+                    "未定义变量 'len'".to_string(),
+                    Some((5, 13))
+                ),
                 (
                     "L2S001".to_string(),
-                    "L2.2 子集不支持: 该表达式形态".to_string()
+                    "L2.2 子集不支持: 该表达式形态".to_string(),
+                    None
                 ),
-                ("LEX005".to_string(), "未闭合字符串".to_string()),
-                ("PARSE003".to_string(), "缺少 end".to_string()),
+                ("LEX005".to_string(), "未闭合字符串".to_string(), None),
+                ("PARSE003".to_string(), "缺少 end".to_string(), None),
             ],
-            "位置前缀应剥离、坏形态两行应失配、噪声行应跳过"
+            "位置前缀应剥离并提值为 position、坏形态两行应失配、噪声行应跳过"
         );
         // 负例：纯噪声文本零码行（验收第 3 题的解析层形态）
         assert!(parse_codes("随便文本\n另一行").is_empty());
@@ -530,12 +596,17 @@ mod tests {
         // re.search 语义：行内任意位置命中（前缀噪音不碍事）
         assert_eq!(
             parse_codegen_line("运行输出：codegen error: [L2V001] 值域错"),
-            Some(("L2V001".to_string(), "值域错".to_string()))
+            Some(("L2V001".to_string(), "值域错".to_string(), None))
         );
-        // 位置前缀剥离（0020 行号批形态）；message 不含位置
+        // 位置前缀剥离（0020 行号批形态）+ 提值为 position（β-2 v2）；
+        // message 不含位置
         assert_eq!(
             parse_codegen_line("codegen error: 12:7 [L2P001] 函数 'go' 重复定义"),
-            Some(("L2P001".to_string(), "函数 'go' 重复定义".to_string()))
+            Some((
+                "L2P001".to_string(),
+                "函数 'go' 重复定义".to_string(),
+                Some((12, 7))
+            ))
         );
         // 形似前缀但非 d:d（数字后随字母）→ 整行失配（对齐正则可选组的唯一性）
         assert_eq!(parse_codegen_line("codegen error: 5 x [L2U001] m"), None);
@@ -554,7 +625,7 @@ mod tests {
         // L2 族码不经语法层通道（parse_codes 层过滤）
         assert_eq!(
             parse_codes("parse error 4:8 [L2U001] 形态异常"),
-            Vec::<(String, String)>::new()
+            Vec::<ParsedCode>::new()
         );
     }
 
@@ -776,15 +847,15 @@ mod tests {
 
     #[test]
     fn to_json_valid_schema_and_roundtrip() {
-        // 验收第 2 题的输出层形态：L2S001 → 合法 l2-fix/v1 JSON
+        // 验收第 2 题的输出层形态：L2S001 → 合法 l2-fix/v2 JSON
         let entries = analyze("codegen error: [L2S001] L2.2 子集不支持: 该表达式形态\n");
         assert_eq!(entries.len(), 1);
         let json = to_json(&entries, "bad.lom");
-        assert!(json.contains("\"schema\": \"l2-fix/v1\""));
+        assert!(json.contains("\"schema\": \"l2-fix/v2\""));
         assert!(json.contains("\"code\": \"L2S001\""));
         // 自产 JSON 用本 crate 解析器回读：结构合法 + 关键字段往返
-        let v = crate::json::parse(&json).expect("l2-fix/v1 输出应是合法 JSON");
-        assert_eq!(as_str(field(&v, "schema").unwrap()), "l2-fix/v1");
+        let v = crate::json::parse(&json).expect("l2-fix/v2 输出应是合法 JSON");
+        assert_eq!(as_str(field(&v, "schema").unwrap()), "l2-fix/v2");
         assert_eq!(as_str(field(&v, "file").unwrap()), "bad.lom");
         let list = match field(&v, "entries").unwrap() {
             crate::interpreter::Value::List(items) => items.iter().collect::<Vec<_>>(),
@@ -796,6 +867,38 @@ mod tests {
         assert_eq!(as_str(field(e0, "confidence").unwrap()), "medium");
         assert_eq!(as_str(field(e0, "action").unwrap()), "hint");
         assert!(as_str(field(e0, "suggestion").unwrap()).contains("管道"));
+        // 无位置条目：position 字段缺省（不伪造 0:0）
+        assert!(field(e0, "position").is_none());
+        // 有位置条目（β-2 v2）：position = {"line": L, "col": C} 结构化往返
+        let entries_p = analyze("codegen error: 5:13 [L2U001] 未定义变量 'len'\n");
+        let json_p = to_json(&entries_p, "bad2.lom");
+        assert!(json_p.contains("\"position\": {\"line\": 5, \"col\": 13}"));
+        let vp = crate::json::parse(&json_p).unwrap();
+        let list_p = match field(&vp, "entries").unwrap() {
+            crate::interpreter::Value::List(items) => items.iter().collect::<Vec<_>>(),
+            _ => panic!("entries 应为数组"),
+        };
+        let pos = field(list_p[0], "position").expect("有位置条目应带 position");
+        let crate::interpreter::Value::Record { fields } = pos else {
+            panic!("position 应为对象");
+        };
+        let pl = fields
+            .iter()
+            .find(|(k, _)| &**k == "line")
+            .and_then(|(_, v)| match v {
+                crate::interpreter::Value::Int(n) => Some(*n),
+                _ => None,
+            })
+            .unwrap();
+        let pc = fields
+            .iter()
+            .find(|(k, _)| &**k == "col")
+            .and_then(|(_, v)| match v {
+                crate::interpreter::Value::Int(n) => Some(*n),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!((pl, pc), (5, 13));
         // 多行建议（\n）经 escape_str 转义后回读还原
         let entries2 = analyze("codegen error: [L2V001] 值域\n");
         let json2 = to_json(&entries2, "x");
@@ -821,8 +924,10 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].code, "L2U001");
         assert_eq!(entries[0].confidence, "high");
+        assert_eq!(entries[0].position, Some((5, 13)));
         assert!(entries[0].suggestion.contains("from string import {len}"));
         assert_eq!(entries[1].code, "L2P001");
+        assert_eq!(entries[1].position, None);
         assert!(entries[1].suggestion.contains("fn main() -> Unit"));
     }
 }

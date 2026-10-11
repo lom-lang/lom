@@ -83,7 +83,10 @@ pub(crate) fn print_help(prog: &str) {
         "  {prog} pkg-expand <file.lom> [--list]  展开包项目为单编译单元文本（L2.3 包批；--list 只输出包名逗号串）"
     );
     eprintln!(
-        "  {prog} l2fix <file|-> [--json] [--text <s>]  解析 L2 拒绝文本，输出七族修复建议（l2-fix/v1）"
+        "  {prog} l2fix <file|-> [--json] [--text <s>]  解析 L2 拒绝文本，输出七族修复建议（l2-fix/v2）"
+    );
+    eprintln!(
+        "  {prog} codes [--json]               导出诊断码表（lom-codes/v1：九命名空间 + L2 八族）"
     );
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
@@ -135,7 +138,13 @@ pub(crate) fn print_help(prog: &str) {
         "              （designs/0018 甲后续，tools/l2fix.py 的 Rust 内建移植）。输入 = 文件 / `-`（stdin"
     );
     eprintln!(
-        "              管道，如 `lom self_comp.lom -- bad.lom out.hex 2>&1 | lom l2fix -`）/ --text；--json 输出 l2-fix/v1 schema"
+        "              管道，如 `lom self_comp.lom -- bad.lom out.hex 2>&1 | lom l2fix -`）/ --text；--json 输出 l2-fix/v2 schema"
+    );
+    eprintln!(
+        "  codes       导出诊断码表（designs/0023 β-2 / ACRI v0.1 §2.1）。默认人类可读表格；"
+    );
+    eprintln!(
+        "              --json 输出 lom-codes/v1 信封（code/severity/category/summary）——agent 的码表引导出口"
     );
     eprintln!();
     eprintln!("选项:");
@@ -162,8 +171,15 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  --version, -V 显示版本号（Phase 6.1）");
     eprintln!();
     eprintln!("退出码:");
-    eprintln!("  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功 / apply 应用成功");
-    eprintln!("  1  读取/词法/语法/运行时错误 / apply 应用失败");
+    eprintln!(
+        "  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功 / apply 应用成功 / codes 导出成功"
+    );
+    eprintln!(
+        "  1  词法/语法/类型/运行时等诊断 error（渐进式 warning 不拦截，rc 0；含带 PKG 码的包诊断）"
+    );
+    eprintln!(
+        "  2  工具自身失败：文件不存在 / IO 错误 / 用法错误 / 内部错误（ACRI v0.1 §2.2 工具失败带，β-2 起）"
+    );
 }
 
 pub(crate) fn parse_args(args: &[String]) -> CliArgs {
@@ -209,6 +225,10 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 out.subcommand = Some("l2fix".to_string());
                 iter.next();
             }
+            "codes" => {
+                out.subcommand = Some("codes".to_string());
+                iter.next();
+            }
             _ => {}
         }
     }
@@ -230,7 +250,8 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                     Some(v) => v.clone(),
                     None => {
                         eprintln!("--text 需要一个值（L2 拒绝文本）");
-                        process::exit(1);
+                        // β-2（ACRI v0.1 §2.2）：用法错误 = 工具失败带 rc 2（此前 1）
+                        process::exit(2);
                     }
                 });
             }
@@ -246,7 +267,8 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                     Some(v) => v.clone(),
                     None => {
                         eprintln!("--target 需要一个值（如 --target wasm）");
-                        process::exit(1);
+                        // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                        process::exit(2);
                     }
                 });
             }
@@ -255,7 +277,8 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                     Some(v) => v.clone(),
                     None => {
                         eprintln!("-o/--output 需要一个路径值");
-                        process::exit(1);
+                        // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                        process::exit(2);
                     }
                 });
             }
@@ -265,12 +288,14 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 if a.starts_with('-') && a != "-" {
                     eprintln!("未知选项: {}", a);
                     eprintln!("使用 --help 查看用法");
-                    process::exit(1);
+                    // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                    process::exit(2);
                 }
                 if let Some(f) = &out.file {
                     eprintln!("只能指定一个文件，但收到多个: {} {}", f, a);
                     eprintln!("使用 --help 查看用法");
-                    process::exit(1);
+                    // β-2：用法错误 = 工具失败带 rc 2（此前 1）
+                    process::exit(2);
                 }
                 out.file = Some(a.clone());
             }
