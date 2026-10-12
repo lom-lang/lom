@@ -3,128 +3,77 @@
 > **文档定位（2026-09-21/25/29 用户裁决；2026-10-06 维护规程 2.0 重构）**：
 > 本文件是 Lom 的**持续维护文档**与交接必要流程、新会话入口。三段式：
 > ①角色与铁律（行为契约，规范源为 [MAINTENANCE.md](MAINTENANCE.md) §1——
-> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像，**每轮交接整体重写
-> 本段**；主写位为 [TODO.md](TODO.md) 顶部状态块，MAINTENANCE §5.4）③第一
-> 回合流程与行为要点索引（分层阅读协议见 MAINTENANCE §5.2）。
-> 规则、流程、审查框架、交接协议的唯一规范写位是 **MAINTENANCE.md**；
-> HANDOVER §12 已收编留指针；历史年表在
-> [archive/handover-log.md](archive/handover-log.md)。交接门禁不变：
-> doc_audit 全过 + CI 全绿。新会话第一回合从复制下方代码块开始。
-> 代码块三段的结构约定属 MAINTENANCE §6 用户裁决事项，不得随交接静默漂移。
-
-下面代码块可原样复制到新会话。仓库事实以提示词后的文档和新会话实测为准。
-
-```text
-你是 Lom 项目的维护者（规划者角色）。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。仓库：D:\project\PROJECTS\ai-native-language；GitHub lom-lang/lom；main 直接推送，无 PR 流程。
-
-【角色与铁律（规范源 docs/MAINTENANCE.md §1——本段为携带式镜像，冲突时以规范源为准）】
-主会话=规划者：读档与关键决策消化、批次设计与裁决点、拆解自包含任务书、
-派发并验收子智能体、整合提交推送、把关 CI/tag 门禁与全量回归；治理动作
-（审查报告落盘、交接五件套、规则更新）规划者亲自。子智能体=执行者：读码
-供料、实施代码与用例、跑单项验证、整理探针复现。用户=唯一方向与裁决者。
-
-铁律十条：
-1. 全程中文；执行者并行不超过 2 个。git 写操作（commit/push/tag/stash
-   等）只由规划者执行，执行者不得自行 git 操作。
-2. 彻底优先于效率；改码前先读码（读码可派执行者供料，规划者仍须亲自
-   理解关键路径）；计算结果必须真实可复现，推测明确标"主观推测"。
-3. 每个里程碑完成即提交推送；提交前跑 HANDOVER §2.2 全量回归（可派
-   子智能体执行单项，规划者汇总并亲自复核 verify_selfcomp 与 doc_audit）；
-   推送后看 CI 首跑；tag 只在 CI 绿后切；行为改动与文档成对交付。
-4. 任何含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用
-   heredoc/printf 直写（执行者同样遵守——任务书中明示）。
-5. 语言面 v1.0 冻结：语法、20 关键字、诊断码、43 内建的变化必须新 RFC。
-   warning 级新检查虽是安全区，也必须用户裁决。
-6. 发布线已解冻（2026-10-04 用户裁决）但解冻不等于免呈报：每个对外动作
-   （README 门面、Release、宣传帖、外部目录提交、对外发声）先呈方案获
-   用户批准再执行；未经呈批不做任何对外发布动作。
-7. 调研不安装竞品；关键数字必须打开原始来源核对，不转述搜索摘要。
-8. 新文档含数字落盘前先跑 doc_audit；改既有登记措辞前先查
-   tools/doc_audit.py 与 tools/claims.json 锚点（锚句式是措辞级契约）。
-9. 方向裁决（下一批次、复审发起、任何裁决点）只由用户做出；规划者
-   呈菜单与建议，不越权动工。
-10. 诚实与可检索：失败如实报告；宣称"全数抓出"前先全仓 grep 全部出现
-    面；评审/执行者结论逐条复核后再采信（计数类抽查复跑）。
-
-派发任务书规范（MAINTENANCE §3）：任务书 = 执行者先读
-docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结面/坑索引，
-仓库内即自包含）+ 批次段；计数与配对类数据逐项行式输出、逐项单独执行，
-规划者验收抽查复跑。
-
-【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-12，γ-甲 收口后——交接就绪，台账零 open（R1-R142 全关））**：
-  最新已提交基线 **v1.9.5**（tag `973d020`，CI run `38049184858` 七 job 绿；
-  HEAD `595548f` CI run `38156549503` 七 job 绿——以 git log 与 CI 首跑为准）。
-  本轮自上次交接后交付**性能工程两刀 + 三十五审 + 战略转折三步**：designs/0022
-  性能工程（用户三点裁决：乙分刀/全 Rc 化五族/基准入库手动验收）——刀 1 =
-  **v1.9.4**（A1 函数表 Rc 化 +8/−7：调用不再深克隆 FnDecl AST；A3 读码核实
-  零风险收益项不存在诚实跳过；bench.lom +6 负载与 tools/bench.py 入库）→
-  刀 2 = **v1.9.5**（A2 值表示五族 Rc 化 +126/−102 零回退：变量读/传参/闭包
-  创建 O(1)）——实测 bootstrap **471.5→43.1s（两刀累积 ≈10.9×）**、
-  call_density 0.69-0.83×、quine 272925 与全部行为逐字节零变化（三路验收）；
-  既定代价登记（str_concat 构造 +1 次 Rc 拷贝——机理属实，短档批时数字经
-  R139 交错复现判为时段噪声）→ **三十五审 B+**（工程实质全复现成立：9 探针
-  双二进制 MATCH、quine md5 亲算一致；跌档全在性能宣称面测量纪律——
-  R139-R142 开账）→ **战略转折（用户裁决）**：审查循环分析定论（行为面
-  33 轮零失守、循环主体为宣称精度面且边际递减——**审查降频为事件驱动**）
-  + 第五/六轮大调查（四报告归档 docs/archive/research-2026-10-11-*；
-  关键修正：Zero 诊断层已建成 Repair Contract 体系——修复闭环 P3 =
-  Zero/Vera/Lom 三强；使用侧全赛道零真实用户；三死结）+ **生态位裁决：
-  γ 评测资产先行试点 + β 规范升维中期主轴** → **γ-甲 落地**（评测资产
-  命名 **RepairLoopBench**——中性名论证（LSP/MCP 先例）；eval/README 升格
-  基准卡含与 SWE-bench 系口径区隔声明与外部证据链；README 证据段升头牌）
-  + R139-R142 全收口（14 写位）。**台账零 open（R1-R142 全关）；顺延号
-  R143 起。发布面维持已裁（v1.7.0/v1.6.1 pre-release，正式发布后议）。**
-- **审查轨迹（均不外推）**：……→三十三审 B+ 五连→三十四审 A-（判据三条
-  全成立）→**三十五审 B+**（性能工程两刀复评：工程实质与行为零变化全部
-  独立复现成立；P2×1+P3×3 全在宣称面——str_concat 短档噪声当代价【R139】/
-  1.96× 载体口径未披露【R140】/递归边界漂移未登记【R141】/TODO 头行滞后
-  【R142】，四账已全收口）。最新报告
-  [review-2026-10-10-3.html](reviews/review-2026-10-10-3.html)。**审查节奏
-  已裁降频：事件驱动（大节点/对外发布前触发），不再每批收官即审。**
+> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
+- **状态（2026-10-12 深夜，目录 PR 备毕 + 隐私收口后——交接就绪，台账零 open（R1-R142 全关））**：
+  最新已提交基线 **v1.10.0**（tag `b3bb9f5`，CI run `38168342829` 七 job 绿；
+  HEAD `6a7fed2` CI run `38217745584` 亦绿——以 git log 与 CI 首跑为准）。
+  本轮自上次交接后交付 **β 主轴三批 + 目录 PR 准备 + 隐私收口**：β-1
+  = specs/acri/ 三件套（**ACRI v0.1 Draft** 规范本体：L0 对象模型 + 三条
+  安全性公理 / L1 CLI 协议 / L2 评测方法论，实现方中立——三裁决点均按
+  建议项：三层全包/命名 ACRI/顶层 specs/）；β-2 = **v1.10.0 工程批**
+  （`lom codes [--json]` 46 条码表出口 + l2-fix/v2 位置字段双实现同步
+  对拍 30/30 + 退出码带 20 路径 1→≥2——Rust **573→578 + 37→40**，
+  quine 272925 逐字节不变，**Lom 达成 ACRI L1-conformant**；两登记
+  偏差：pkg-expand 混合路径 rc=1、LSP 协议带不动）；β-3 = specs/acri/
+  consumer.py 参考消费器（三闭环实跑——公理 1 在第三方消费侧成立实证）。
+  **目录 PR 准备（用户裁决链）**：agentlanguages.dev 42 家全量对比（修复
+  闭环无营/benchmark 仅 4 家/production_ready 0 家）→ 条目终稿 v3 +
+  PR 描述 + 手动指引（target/probes/agentlanguages/lom-entry-draft.md，
+  gitignored）→ 敌手自审（6 必修失实全修——含 code-sample 换真实
+  transcript；tone 7 处降调）→ 门面批（AGENTS.md + README Verify-the-
+  claims 五命令小节，`2eb5a90` CI 绿）。**PR 由用户手动提交（fork 账号
+  届时定），建议 10-19 前完成；PR 线程回复逐条呈批**。**隐私收口
+  （2026-10-12 用户裁决）**：全仓个人信息扫描（报告 target/probes/
+  privacy_scan/report.md——文件内容面唯一命中 = lom-tutorial.html 读者
+  画像；git 元数据按用户口径不算泄露）；**tutorial 已 git rm --cached +
+  .gitignore 收录、本地保留**（`6a7fed2` CI 绿；spec_examples 对账面
+  收窄两文档、README 双语链接移除、HANDOVER 同步；历史 blob 仍在——
+  彻底清除需历史改写 force push，未裁不做）。git user.email 已换
+  noreply（新提交干净）。**台账零 open（R1-R142 全关）；顺延号 R143 起。**
+- **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+（性能宣称面）。
+  **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
+  即审）。最新报告 [review-2026-10-10-3.html](reviews/review-2026-10-10-3.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
-  ~40-45s）、self_comp.lom 12671 行、Rust **578 单元 + 40 集成**（r56×1 + r58×7 + r94×2 +
-  r104×6 + r107×4 + r108×5 + closure×3 + r112×3 + build_gaps×6 + beta2_exit×3）、
-  eval 双后端各 128/128、fix_corpus 13 对、doc_audit **73/73**（含
-  J+ 集成现实核对 + K 交接镜像核对）、六模式全 PASS、link_check PASS
-  + l2fix self-check 6/6 + bench.py quick 20 点（CI doc-gates 常驻；
-  bench 为手动验收形态不进 CI）。Cargo.toml/lock **1.9.5**。
-- **战略面现行态（2026-10-12 裁决后）**：① 审查事件驱动（见上）；②
-  生态位 γ 已落地（RepairLoopBench 基准卡 = eval/README.md）、β 待启动
-  （"agent-编译器修复接口"开放规范——涉规范文档面，启动时出设计方案
-  呈裁决点）；③ 对外动作逐项呈批不变（目录站提交/Release 转正等均未
-  重开）。
+  ~20-45s）、self_comp.lom 12671 行、Rust **578 单元 + 40 集成**（r56×1 +
+  r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
+  build_gaps×6 + beta2_exit×3）、eval 双后端各 128/128、fix_corpus 13 对
+  （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
+  **73/73**（J 锚组现值 578+40）、六模式全 PASS、link_check PASS、
+  spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.10.0**。
+- **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
+  Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
+  lom-conformance.md）；benchmark 字段 = RepairLoopBench。
+- **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
+  README）；β 三批已落地；**待办：用户手动提目录 PR**（材料 gitignored
+  路径见上）；对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
-  [L2xxx] 码 / ln:cl 位置 / `lom l2fix` CLI 子命令 / l2fix.py CI
-  对拍基准）。CLI 子命令已交付（designs/0018 裁决点 1 甲闭环）。
+  [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
+  l2fix.py CI 对拍基准）。
 - **build 现行面（v1.9.1 收口 + R125/R128 统一减法后）**：无文件
-  `lom build` 诊断面 = 包源逐文件（统一减法 externals——base ∪ pkg
-  整体减文件自身符号，R128）+ PKG007（人类可读路径 stderr）+ 根目录
-  主文件对称检查（统一减法，R125）。
-- **性能现行面（designs/0022 两刀后）**：函数表 HashMap<String,
-  Rc<FnDecl>>；Value 五族 Rc 共享（Str(Rc<str>)/Closure/Enum/Record/
-  Tuple）——Map/List 原样；bench.lom 十负载 + tools/bench.py（--quick/
-  --full/--baseline 对照，同机纪律——交错 A/B 为标准形态【R139 教训】）；
+  `lom build` 诊断面 = 包源逐文件（统一减法 externals）+ PKG007（人类
+  可读路径 stderr）+ 根目录主文件对称检查。
+- **性能现行面（designs/0022 两刀后）**：函数表 Rc 化 + Value 五族 Rc
+  共享；bench.lom 十负载 + tools/bench.py（交错 A/B 为标准纪律【R139】）；
   递归物理边界 v1.9.5 实测 60k 过/70k 溢出（N1 软件守卫 80000 不变）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
-  五源件 + wasm 推 gh-pages 孤儿分支（worktree 方式）；改 src 后
-  同步重建再部署。深度守卫 wasm 侧 300；源码嵌套深度 ~500 层 trap。
+  五源件 + wasm 推 gh-pages 孤儿分支；深度守卫 wasm 侧 300。
 - **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
-  拦截）；build 统一减法（包/根两路径对称，防 NAM002 降级 NAM006）；
-  闭包捕获 mut 赋值 MUT002 分歧族。
+  拦截）；build 统一减法；闭包捕获 mut 赋值 MUT002 分歧族；退出码
+  三带（check err=1/warn=0、fix 恒 0、工具失败 ≥2——pkg-expand 混合
+  路径与 LSP 带两登记例外）。
 - **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
   两 divergence；L2 包展开单元不做同文件 fn 重复检测（L2P001 单文件
-  拒/包展开单元不查，跨包走 NAM006——v1.6.1 R115，R133 补录）；
-  clippy --all-targets ~4 条漂移存量；playground 四边界；gh-pages
-  独立构建流；归档 HTML assets 未随档；str_concat 构造密集 +1 次
-  Rc 拷贝（机理属实、50k 档 1.03×，量值以长档为准——R139 口径）。
-- 下一步：**交接就绪，方向待用户裁决**（台账零 open，顺延号 R143 起）。
-  菜单：**β 规范升维主轴（"agent-编译器修复接口"开放规范——出设计方案
-  呈裁决点后动工）**/ 其他方向（性能工程后续小项已收口无 open 项）。
-  观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI 首跑——doc-gates 含
-  断链+l2fix 两步骤）。对外动作逐项呈批（铁律 6）。
+  拒/包展开单元不查，跨包走 NAM006）；clippy --all-targets ~4 条漂移
+  存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
+  随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
+  R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
+- 下一步：**交接就绪，方向待用户裁决**。最近待办 = **用户手动提目录
+  PR（10-19 前；PR 线程回复逐条呈批）**；观察项：Ubuntu 26 迁移
+  （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两步骤）。
+  对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
 1. **L0 现行必读（规划者亲自）**：docs/MAINTENANCE.md 全文（规则）；

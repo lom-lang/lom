@@ -1,7 +1,13 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-12，β-2 工程批收官——Lom 达成 ACRI L1-conformant；台账零 open
-> （R1-R142 全关），顺延号 R143 起）**：
+> **当前状态（2026-10-12 深夜，交接收口——β 三批 + 目录 PR 备毕 + 隐私收口；台账零 open（R1-R142 全关），顺延号 R143 起；交接就绪）**：
+> **最近待办 = 用户手动提目录 PR**（材料 target/probes/agentlanguages/
+> lom-entry-draft.md v3 终稿 + 操作指引；10-19 前完成；PR 线程回复
+> 逐条呈批）。观察项：Ubuntu 26 迁移 2026-10-19 盯 CI。
+> **隐私裁决（2026-10-12 用户裁定边界）**：文件内容面清查（唯一命中 =
+> tutorial 读者画像，已移出跟踪+gitignore 本地保留，`6a7fed2` CI 绿；
+> spec_examples 收窄两文档）；git 提交元数据不算泄露（不改写历史）；
+> git user.email 已换 noreply（新提交起）。
 > **本批（用户裁决"按序执行"——β-2 = designs/0023 §5 工程批，升 minor v1.10.0；tag `b3bb9f5`，CI run `38168342829` 七 job 绿——回填批登记）**：
 > ① `lom codes [--json]`（ACRI §2.1 REQUIRED——lom-codes/v1 信封 **46 条** =
 > 宿主九命名空间 38 码 + L2 八族；severity 与运行时分类器单测锁定；盘点表
