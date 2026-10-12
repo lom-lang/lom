@@ -6,7 +6,7 @@
 #
 # 2026-09-07 M 工作包扩展：覆盖面从 SPEC_FOR_AI 一份扩到三份（+ LANGUAGE_SPEC.md
 # + docs/lom-tutorial.html）——历史上 type alias/字段赋值/pub 都是双文档同病，只修了
-# SPEC_FOR_AI 侧进工具锁定，其余文档侧从未机器对账。HTML 教程的 <pre> 块同样提取
+# SPEC_FOR_AI 侧进工具锁定，其余文档侧从未机器对账。 2026-10-12 隐私裁决：tutorial 移出跟踪，对账面收窄为两文档（见 DEFAULT_DOCS 注释）。HTML 教程的 <pre> 块同样提取
 # （实体反转 + 剥内嵌标签）。新增三条机械 skip 规则（EBNF 产生式 / 关键字表 / CLI
 # 用法列表——它们不是 Lom 代码，skip 仅限此类"非代码块"，不用于吞断言失败）。
 #
@@ -56,7 +56,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-DEFAULT_DOCS = ['SPEC_FOR_AI.md', 'LANGUAGE_SPEC.md', 'docs/lom-tutorial.html']
+DEFAULT_DOCS = ['SPEC_FOR_AI.md', 'LANGUAGE_SPEC.md']  # 2026-10-12 起 tutorial 移出跟踪（隐私裁决），对账面收窄为两文档
 TMP_DIR = '.spec_check_tmp'
 TIMEOUT_RUN = 10          # 正例实跑超时（秒）——文档示例不应有长循环
 TOPLEVEL_RE = re.compile(r'^(fn |enum |from )')

@@ -66,7 +66,7 @@ fn main() -> Unit
 end
 ```
 
-Save as `hello.lom`, run `lom hello.lom`. New here? Read the [tutorial](docs/lom-tutorial.html) (zh) or [SPEC_FOR_AI.md](SPEC_FOR_AI.md) (the LLM-facing language spec). AI maintainers start with the [copy-ready handoff prompt](docs/HANDOFF_PROMPT.md), the [maintenance protocol](docs/MAINTENANCE.md), then [docs/HANDOVER.md](docs/HANDOVER.md). 中文读者：[README.zh-CN.md](README.zh-CN.md)。
+Save as `hello.lom`, run `lom hello.lom`. New here? Read [SPEC_FOR_AI.md](SPEC_FOR_AI.md) (the LLM-facing language spec). AI maintainers start with the [copy-ready handoff prompt](docs/HANDOFF_PROMPT.md), the [maintenance protocol](docs/MAINTENANCE.md), then [docs/HANDOVER.md](docs/HANDOVER.md). 中文读者：[README.zh-CN.md](README.zh-CN.md)。
 
 ## Status & boundaries (honest version)
 

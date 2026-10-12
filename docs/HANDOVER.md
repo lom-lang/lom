@@ -151,7 +151,7 @@ node playground/smoke.mjs                               # playground 冒烟（v1
 python tools/l2fix.py <file.lom>                        # L2 码进修复闭环通道（designs/0018 裁决点 1 甲形态，零宿主改动不升版）：跑 self_comp 编译并解析 [L2xxx]/LEX 码行 → 七族修复建议（--json 出独立 l2-fix/v1；--self-check 对 selfcomp 全部负例 + eval 127/128/129 三题 broken 全链自检断言；--lom-bin/--l2 可参数化换路径）
 ./target/release/lom.exe codes [--json]                # 诊断码表机器可读出口（v1.10.0 起，ACRI §2.1：lom-codes/v1 信封 46 条 = 宿主 38 码 + L2 八族；severity/分类/一句话——agent 与规范消费方的引导文件）
 python tools/bench.py                                   # 性能基准批量计时（v1.9.4 起，designs/0022 B 件）：bench.lom 十负载 quick 档矩阵，每点 3 次中位 + 期望值自检；--full 大档 / --bench <名> [--n N] 单负载 / --out r.json + --baseline r.json 前后对照；同机实测纪律（不进 CI，手动批验收形态——裁决点 3 已裁）
-python tools\spec_examples_check.py                     # 示例对账（M1 起三文档：SPEC_FOR_AI + LANGUAGE_SPEC + tutorial；skip 附块首行摘要可人审）
+python tools\spec_examples_check.py                     # 示例对账（SPEC_FOR_AI + LANGUAGE_SPEC 两文档——2026-10-12 隐私裁决 tutorial 移出跟踪后收窄；skip 附块首行摘要可人审）
 python tools/fuzz_smoke.py                             # Q4 随机冲击冒烟（固定种子 80 轮正常终态断言；CI doc-gates 常驻）
 python tools/diff_test.py --probe                      # D 包探针：验证 §11f 八条中六条可执行分歧仍如档案（trim Unicode 需非 ASCII 不在探针集；守护白名单）；另有 R104/R105 撞名定向探针 ×2（v1.4.10 修复后须双后端同值，差异即回退）
 python tools/diff_test.py --rounds 20 --seed-base 1 --ci   # D 包差分冒烟（CI 同款；全量口径 --rounds 500 ×多 seed 段）
@@ -367,12 +367,12 @@ end
 ## 8. 杂项备忘
 
 - `.lom/` 目录（fix-history.jsonl）是运行时产物，已 gitignore。
-- docs/ 分类（2026-08-31 整理）：根目录=lom-project-guide.html/lom-tutorial.html（用户读）+ HANDOVER.md（AI 读）；`docs/positioning.html`=差异化定位一页纸（2026-09-15 Ⓒ 产出：三范式对照/修复执行层独有性/证据链——发布解冻的对外弹药，数字为时点快照口径、版本位由 doc_audit E 类钉住）；`docs/archive/`=调研档案（启动期四份 2026-07/08 不再更新——DESIGN_RATIONALE 有 3 处引用作决策证据，别删；**继任调研轮 2026-09-15 起持续更新**：research-YYYY-MM-DD[-topic].html 命名规范见该目录 README——第 1 轮 research-2026-09-15.html 抓到竞品重大变化：Vercel Zero 定位重合/Mojo 1.0 开源/MoonBit 推迟 Q3，认知以最新轮为准）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**；0004 L2 自举编译器 **draft**——2026-09-16 预研产出，动工待裁决）。
+- docs/ 分类（2026-08-31 整理；2026-10-12 隐私裁决 lom-tutorial.html 移出 git 跟踪、本地保留）：根目录=lom-project-guide.html（用户读）+ HANDOVER.md（AI 读）；`docs/positioning.html`=差异化定位一页纸（2026-09-15 Ⓒ 产出：三范式对照/修复执行层独有性/证据链——发布解冻的对外弹药，数字为时点快照口径、版本位由 doc_audit E 类钉住）；`docs/archive/`=调研档案（启动期四份 2026-07/08 不再更新——DESIGN_RATIONALE 有 3 处引用作决策证据，别删；**继任调研轮 2026-09-15 起持续更新**：research-YYYY-MM-DD[-topic].html 命名规范见该目录 README——第 1 轮 research-2026-09-15.html 抓到竞品重大变化：Vercel Zero 定位重合/Mojo 1.0 开源/MoonBit 推迟 Q3，认知以最新轮为准）；`docs/rfc/`=决策档案（0000 模板/0001 已关闭/0002 已落地/0003 全量自举——**accepted 已入库，2026-08-31 用户裁决启动 Phase 8**；0004 L2 自举编译器 **draft**——2026-09-16 预研产出，动工待裁决）。
 - eval/candidates/ 里的 001-100.lom 是 LLM 实测的原始产物（99/100 那批），**保留作证据**，别清理。
 - eval/prompts/_generate.ps1 从 tasks JSON 生成 prompts，改任务后记得重跑。
 - examples/todo.lom 是 Phase 3 退出标准的标志 demo（185 行 CLI），回归时可顺带跑。
 - 文档 lom-project-guide.html 是**单文件 HTML 手写进度文档**，Phase 完成后在其对应小节加 ✅ 标签和日期，惯例是 `<span class="tag" style="background:#16a34a;color:white;">✅ xxx</span>`。
-- lom-tutorial.html 是零基础教程（v0.3.0 加的），新语言特性落地后要同步教程章节。
+- lom-tutorial.html（2026-10-12 隐私裁决移出 git 跟踪、本地保留——含读者画像信息；spec_examples 对账面收窄为两文档；恢复跟踪须先清画像）是零基础教程。
 - 用户偶尔说"继续"——意思是按当前 todo list 往下推进，不是新任务。
 - 交接时若发现本文与代码不符，**以代码和 lom-project-guide.html 为准**，然后更新本文。
 - **CI 事故记录（2026-08-22）**：ci.yml 首版上线后 Unix 两连败，两个坑都源于"本机是 Windows"：① run.sh 在 git 里无执行位（100644）→ 已用 `git update-index --chmod=+x` 补上；② macOS runner 自带 bash 3.2，而 run.sh 用了 bash4 关联数组（`declare -A`）→ CI 已统一走 pwsh + run.ps1（三平台预装，run.ps1 是一等维护对象）。**教训：CI 脚本不能只在本机验，推上去看首跑结果再宣布完成。**

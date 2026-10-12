@@ -57,7 +57,7 @@ cargo build --release
 
 ## 延伸阅读
 
-- [中文教程](docs/lom-tutorial.html) · [语言规范 LANGUAGE_SPEC](LANGUAGE_SPEC.md) · [面向 LLM 的精简规范 SPEC_FOR_AI](SPEC_FOR_AI.md)
+- [语言规范 LANGUAGE_SPEC](LANGUAGE_SPEC.md) · [面向 LLM 的精简规范 SPEC_FOR_AI](SPEC_FOR_AI.md)
 - [设计取舍 DESIGN_RATIONALE](DESIGN_RATIONALE.md) · [定位叙事 positioning](docs/positioning.html)
 - [英文 README](README.md)（含完整里程碑史与逐版横幅）
 
