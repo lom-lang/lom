@@ -11,7 +11,7 @@ maintained in **Chinese**.
 | [LANGUAGE_SPEC.md](../LANGUAGE_SPEC.md) | The language spec. §14 is the v1.0 freeze declaration (syntax / 20 keywords / diagnostic codes / 43 builtins). |
 | [SPEC_FOR_AI.md](../SPEC_FOR_AI.md) | The condensed spec written for LLM consumption — start here to write Lom. |
 | [AGENTS.md](../AGENTS.md) | The first entry point for coding agents (build/verify commands, asset index, frozen surface, probe discipline). |
-| [specs/acri/](acri/) | ACRI v0.1 — the open agent-compiler repair-interface spec; this repo is its reference implementation. |
+| [specs/acri/](../specs/acri/) | ACRI v0.1 — the open agent-compiler repair-interface spec; this repo is its reference implementation. |
 | [eval/README.md](../eval/README.md) | The RepairLoopBench benchmark card (how to re-run, scope statement, SWE-bench-family differentiation). |
 | eval/REPORT*.md | The LLM evaluation reports — each opens with an English TL;DR block; bodies are Chinese. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) / [SECURITY.md](../SECURITY.md) / [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) / [DESIGN_RATIONALE.md](../DESIGN_RATIONALE.md) | Governance and design rationale. |
