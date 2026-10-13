@@ -1,5 +1,12 @@
 # Lom 多模型复测报告 — 2026-08-31
 
+> **English TL;DR** *(appended 2026-10-13; the Chinese body below is unchanged)* —
+> Four models × 113 tasks, one sample each (2026-08-31): deepseek-v4-pro with
+> thinking **113/113 (100%)**; deepseek-v4-flash, glm-4.7, and glm-5.3 each
+> **112/113 (99.1%)** — the sole failure for all three is task 078, the same
+> prompt-ambiguity task as the 2026-08-03 baseline. Meets the project's own
+> "at least 3 LLMs" bar; tasks 101-113 got their first LLM sampling here.
+
 **测试日期**: 2026-08-31（UTC 17:04–17:44；glm-5.3 补跑 18:13–18:16，Coding Plan 端点）
 **评测集版本**: lom-eval/v1（113 tasks, 10 categories —— 含 101-113 后加任务，本次为它们的首次 LLM 实测）
 **触发**: 第四轮独立评审（docs/reviews/review-2026-08-31.html）指出核心宣称超出证据——本报告是补齐行动

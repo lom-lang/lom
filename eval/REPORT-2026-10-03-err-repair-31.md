@@ -1,5 +1,14 @@
 # Lom error_repair 31 题扩容基线重跑报告 — 2026-10-03
 
+> **English TL;DR** *(appended 2026-10-13; the Chinese body below is unchanged)* —
+> error_repair expanded to 31 tasks including three L2-face tasks (2026-10-03),
+> two models × 10 samples × temperature=1.0: deepseek-v4-pro **300/310**,
+> glm-5.3 **306/310** passing units (pass@1 96.77% / 98.71%; glm pass@5 =
+> pass@10 = 100%). The only systematic failure, task 126, is 078-type
+> prompt-output ambiguity — the failing candidates still compile and run; the
+> repairs themselves are correct. The 24-task overlap subset re-tests
+> 480/480, identical across 17 days.
+
 **测试日期**: 2026-10-03（v1.6.0 @ efaed10，发布解冻检查单第 4 项）
 **触发**: error_repair 类目在 v1.5.0（2026-10-01，b61182f）从 24 题扩到 31 题（新增 123-129，含 127-129 三道 L2 面题）。检查单要求"任务集扩容后重跑基线采样"——本报告按 [REPORT-2026-09-16-err-repair-patch.md](REPORT-2026-09-16-err-repair-patch.md) 的同一方法论对 **31 题全集**完成双模型 ×10 采样 t=1.0，闭合该缺口。
 **管线**: `eval/llm_eval.py --samples 10 --temperature 1.0 --only 10_error_repair`（采集）+ `eval/runner/run.ps1 -CandidatesDir`（评分事实源不二设：stdout 比对 + 退出码 0）+ `eval/passk_summarize.py`（汇总，内嵌同口径复评）；候选与原始回复留档 `eval/candidates_rerun/deepseek-v4-pro_err31/`、`eval/candidates_rerun/glm-5.3_err31/`（本地，.gitignore 惯例）。

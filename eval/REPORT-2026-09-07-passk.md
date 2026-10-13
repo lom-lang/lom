@@ -1,5 +1,13 @@
 # Lom 多采样 pass@k 复测报告 — 2026-09-07
 
+> **English TL;DR** *(appended 2026-10-13; the Chinese body below is unchanged)* —
+> Two models × 10 samples × temperature=1.0 on the 116-task set (2026-09-07):
+> pass@1 = pass@5 = pass@10 = **99.1%** for both models (precise: pass@1
+> 99.05% = 1149/1160 passing units; pass@5/10 99.14% = 115/116 tasks;
+> unbiased HumanEval-style estimator). The single systematic failure is task
+> 078 (0/10 on both models) — the single-sample 99% was not luck: failures do
+> not collapse under resampling.
+
 **测试日期**: 2026-09-07（L 工作包，docs/TODO.md 立项）
 **评测集版本**: lom-eval/v1（116 tasks, 10 categories——任务 115-117 的首次 LLM 实测）
 **触发**: 上轮多模型复测（REPORT-2026-08-31-multimodel.md）诚实挂账第一条「每模型仍是单采样（无 pass@k 多次采样）」

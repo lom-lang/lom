@@ -1,5 +1,13 @@
 # Lom Eval Report — Phase 2.8 LLM 实测结果
 
+> **English TL;DR** *(appended 2026-10-13; the Chinese body below is unchanged)* —
+> First LLM evaluation of Lom (2026-08-03): a single web-hosted expert model
+> with thinking mode solved **99/100 tasks (99%)** on the 100-task suite
+> (v0.1.3-era toolchain) — far above the 60% baseline expectation — with 9/10
+> categories perfect and exactly one failure (task 078, effects; later shown
+> to be prompt ambiguity, stable across models and resampling). Superseded by
+> the larger runs below; kept as the original baseline.
+
 **测试日期**: 2026-08-03
 **评测集版本**: lom-eval/v1 (100 tasks, 10 categories)
 **被测 LLM**: 网页版专家模型 + 思考模式

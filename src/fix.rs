@@ -6,6 +6,17 @@
 //   3. `lom fix <file> --apply` 自动应用高置信度修复（Phase 3.1，见 apply.rs）
 //   4. 零依赖手写 JSON 序列化（与 diagnostics/info 一致风格）
 //
+// English note (appended v1.10.1, for external readers): this module is
+// Lom's graded fix engine. `--plan` emits the full lom-fix/v1 plan (all
+// confidence levels); `--apply` enforces the written safety axiom — only
+// confidence == High and action != Hint suggestions are auto-applied, and
+// cognitive notices (the deterministic NAM006 name-collision and MUT002
+// closure-capture warnings) are never auto-rewritten, because rewriting them
+// is a correctness regression, not a fix. The boundary is locked end-to-end
+// by the fix corpus under eval/fix_corpus (thirteen pairs, five asserting
+// fixed == bad). The agent-facing interface is specified in specs/acri/
+// (ACRI v0.1); README "Verify the claims" lists fresh-clone check commands.
+//
 // 设计取舍 — --plan 与 --apply 的分工：
 //   - --plan（默认）：生成完整计划，包含所有置信度的修复（hint/insert/delete/replace）
 //     LLM 可读 plan 后自己修复，也可选择性地应用高置信度动作

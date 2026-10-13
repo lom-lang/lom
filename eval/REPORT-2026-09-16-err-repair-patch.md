@@ -1,5 +1,12 @@
 # Lom error_repair 高温补测报告 — 2026-09-16（③ 包）
 
+> **English TL;DR** *(appended 2026-10-13; the Chinese body below is unchanged)* —
+> error_repair category, high-temperature double run (22-task then 24-task
+> versions; 2026-09-16), two models × 10 samples × temperature=1.0 each
+> round: **920/920 passing units** — the warning-level repair tasks 119/120
+> and the new 121/122 all pass 10/10 per model. Closes the eighth review's
+> R46 sampling gap (warning-level repair tasks had never been LLM-sampled).
+
 **测试日期**: 2026-09-16（③ 修复闭环资产包，docs/TODO.md 四连包第三项）
 **触发**: 八审 R46（P1）留口——positioning 宣称分层如实化时，任务 119/120（warning 级修复题）被记录为"LLM 采样实测待补"；本包顺带把新增的 121/122 一并覆盖。
 **管线**: `eval/llm_eval.py --samples 10 --temperature 1.0 --only 10_error_repair`（采集）+ `eval/runner/run.ps1`（评分，事实源不二设）+ `eval/passk_summarize.py`（汇总）；原始回复留档 `eval/candidates_rerun/<model>_err22|err24/`（本地，.gitignore 惯例）。
