@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 41,380 characters ≈ 10.1k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 42,017 characters ≈ 10.1k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -677,6 +677,8 @@ Key points:
 | `MUT001` | `let` → `let mut`, located **structurally from the AST** (the enclosing function's flat-scope `let` declarations; unique same-name declaration → replace); declarations inside closures/match arms, or param/loop/match rebinding → hint with local-copy advice | `replace` or `hint` | high (unique in-scope hit) / medium |
 | `NAM006` | Informative collision notice — behavior is already deterministic (the local definition wins / the later same-alias import wins / the path-later package wins); rename the local definition or the import alias only to remove ambiguity | `hint` | medium (v1.5.0) |
 | `MUT002` | Closure captured a `mut` binding — the interpreter (shared scope) and WASM (value copy at creation) disagree; fix: don't rely on captured `mut` state (take a `let` local copy before capture, or pass the new value as a parameter) | `hint` | medium (v1.5.0) |
+| `PKG001`-`PKG006` | Package-face guidance: manifest syntax (`PKG001`), dependency path vs disk (`PKG002`), break the dependency cycle (`PKG003`), run `lom fix` on the named package file (`PKG004`), package name vs manifest (`PKG005`), missing export (`PKG006`) — package errors have no single correct mechanical rewrite, so all are advisory | `hint` | medium (v1.10.2) |
+| `PKG007` | Informative collision notice (same family as NAM006) — two packages export the same symbol; behavior is already deterministic (the path-later package wins); rename one or use an `import as` alias only to remove ambiguity | `hint` | medium (v1.10.2) |
 | Other | Code-specific guidance | `hint` | low/medium |
 
 **Recommended workflow** when you (the LLM) are writing Lom code:

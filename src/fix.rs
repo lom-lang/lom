@@ -869,6 +869,40 @@ fn fix_for_diagnostic(
         )],
         "RUNTIME000" => vec![hint_only("运行时错误，检查程序逻辑", Confidence::Low)],
 
+        // ===== 包系统（v1.10.2 补齐——v1.5.0 补 NAM006/MUT002 时的同款
+        // 兜底欠账收口）：包面错误根因在清单/依赖图/跨文件结构，无单一
+        // 正确的机械改写，全部为认知指引 hint，永不自动应用 =====
+        "PKG001" => vec![hint_only(
+            "lom.toml 清单读取/解析失败：检查清单文件存在且 TOML 语法合法（键名、引号、表头）",
+            Confidence::Medium,
+        )],
+        "PKG002" => vec![hint_only(
+            "依赖路径不存在：核对 lom.toml dependencies 中的路径与磁盘实际位置（相对清单文件解析）",
+            Confidence::Medium,
+        )],
+        "PKG003" => vec![hint_only(
+            "循环依赖：重构依赖图打破环——把共享部分提为独立包，或合并为同一个包",
+            Confidence::Medium,
+        )],
+        "PKG004" => vec![hint_only(
+            "包源码解析失败：定位诊断消息中的包文件，单独运行 lom fix <该文件> 修复其语法错误后重试",
+            Confidence::Medium,
+        )],
+        "PKG005" => vec![hint_only(
+            "未知包导入：核对 import 的包名与 lom.toml dependencies 声明的包名一致",
+            Confidence::Medium,
+        )],
+        "PKG006" => vec![hint_only(
+            "包不导出请求的符号：检查该包顶层 fn/enum 定义是否包含此名，或在包内补充公开定义",
+            Confidence::Medium,
+        )],
+        // 撞名告知型 warning（与 NAM006 同族）：行为已确定（包根路径序取
+        // 后者），语义是"告知"非"待修"，永不自动改写
+        "PKG007" => vec![hint_only(
+            "两包导出同名符号（告知型 warning）——行为已确定（按包根路径序取后者），无需修复；如需消除歧义可重命名其一或用 import as 别名",
+            Confidence::Medium,
+        )],
+
         // ===== 未知错误码 =====
         _ => vec![hint_only(
             "未知错误码，参考诊断消息手动修复",
@@ -3435,6 +3469,63 @@ end
             result.changes
         );
         assert_eq!(result.patched_source, src, "源码必须逐字不变");
+    }
+
+    // ===== v1.10.2：PKG 族分派补齐（v1.5.0 补 NAM006/MUT002 的同款兜底
+    // 欠账收口）=====
+
+    /// PKG001-007 全族不再落"未知错误码"兜底：每码恰一条 Medium hint。
+    /// 包面错误根因在清单/依赖图/跨文件结构，无单一正确的机械改写——
+    /// 全 hint 永不自动应用（apply 只取 High 非 Hint，安全公理无涉）。
+    #[test]
+    fn pkg_family_codes_give_hints_not_unknown() {
+        let src = "fn main() -> Unit\n    println(1)\nend\n";
+        let cases = [
+            ("PKG001", "lom.toml 读取失败: 无效 TOML", "清单"),
+            ("PKG002", "依赖路径不存在: missing/pkg", "依赖路径"),
+            ("PKG003", "循环依赖: a -> b -> a", "循环依赖"),
+            ("PKG004", "包源码解析失败: pkg/lib.lom", "lom fix"),
+            ("PKG005", "未知包导入: nope", "未知包导入"),
+            ("PKG006", "包不导出请求的符号: no_sym", "不导出"),
+            ("PKG007", "两包导出同名符号 'dup'", "告知型"),
+        ];
+        for (code, msg, keyword) in cases {
+            let fixes = e2e_fixes(src, code, msg, 1, 1);
+            assert_eq!(fixes.len(), 1, "{code} 应恰一条建议");
+            assert_eq!(fixes[0].action, ActionKind::Hint, "{code} 应为 hint");
+            assert_eq!(
+                fixes[0].confidence,
+                Confidence::Medium,
+                "{code} 应为 Medium"
+            );
+            assert!(
+                fixes[0].description.contains(keyword),
+                "{code} 文案应含 '{keyword}': {}",
+                fixes[0].description
+            );
+            assert!(
+                !fixes[0].description.contains("未知错误码"),
+                "{code} 不得落未知码兜底: {}",
+                fixes[0].description
+            );
+        }
+    }
+
+    /// 负向：PKG 族 hint 永不自动应用——apply 后源码逐字不变（七码全循环）。
+    #[test]
+    fn pkg_family_hints_never_applied() {
+        let src = "fn main() -> Unit\n    println(1)\nend\n";
+        for code in [
+            "PKG001", "PKG002", "PKG003", "PKG004", "PKG005", "PKG006", "PKG007",
+        ] {
+            let result = apply_named_diag(src, code, "包系统诊断（测试注入）", 1, 1);
+            assert_eq!(
+                result.applied, 0,
+                "{code} 不得自动应用: {:?}",
+                result.changes
+            );
+            assert_eq!(result.patched_source, src, "{code} 源码必须逐字不变");
+        }
     }
 
     /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan
