@@ -1,9 +1,35 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-12 深夜，交接收口——β 三批 + 目录 PR 备毕 + 隐私收口；台账零 open（R1-R142 全关），顺延号 R143 起；交接就绪）**：
-> **最近待办 = 用户手动提目录 PR**（材料 target/probes/agentlanguages/
-> lom-entry-draft.md v3 终稿 + 操作指引；10-19 前完成；PR 线程回复
-> 逐条呈批）。观察项：Ubuntu 26 迁移 2026-10-19 盯 CI。
+> **当前状态（2026-10-13，v1.10.1 收尾小批后；台账零 open（R1-R143 全关），顺延号 R144 起）**：
+> **目录 PR 已落地**：[aallan/agentlanguages#68](https://github.com/aallan/agentlanguages/pull/68)
+> （2026-10-13 提交，标题/描述/条目与终稿探针逐字核验一致——条目 127 行逐行同、
+> 唯末尾换行为 POSIX 形态；open 非 draft、Able to merge、上游无 CI check、零评论；
+> 维护者反馈逐条呈批后回复，回复用英文）。
+> **本批（2026-10-13，v1.10.1 收尾小批 + R143，纯文档+CI 工具批不升版；用户裁决"执行"）**：
+> ① v1.10.1 批主写位补登（批时漏刷 TODO 状态块——流程债如实登记，§2.3 SOP
+> 顺序瑕疵同批纠正）；② tag `a2ed68f` / CI run `38379975886` 七 job 绿回填三处
+> （HANDOVER §1 / positioning / README Current 段）；③ **R143 开账即收口**：
+> link_check 扫描源盲区——扫描源=git 索引、未 add 新文件不被扫（v1.10.1 首跑
+> run `38378861239` doc-gates 断链红实录：docs/README.md 未 add 时本地 PASS、
+> CI 红）；处置 b = 扫描源扩至未跟踪 md/html（ls-files --others
+> --exclude-standard），**构造性红证过**（未跟踪断链文件 FAIL A 类 1 → 删除
+> PASS）。MAINTENANCE §7 随批登记。
+> **前置 · v1.10.1 批（2026-10-13，用户裁决"按你的想法执行"——对外英文门面收口；tag `a2ed68f`，CI run `38379975886` 七 job 绿）**：
+> 六份 eval 报告英文 TL;DR 追加框（中文正文零改动，数字取自各报告原文）+
+> fix.rs 英文公理模块注（中文注释保留）+ docs/README.md 英文导览（英/中文档面
+> 地图）+ guide.html 英文指针 + README Current 行陈旧 v1.8.0 刷新 + 升版联动位
+> 四处（HANDOVER §1/§9、positioning、SPEC §13）与 Cargo 1.10.1；触 src/ 注释按
+> R135 先例升 patch。**首跑红一次如实登记**：doc-gates 断链红（docs/README.md
+> 的 specs/acri 相对链接误写为 acri/→解析 docs/acri；本地未 add 不被扫故 PASS）
+> → 修复提交 `a2ed68f` 后绿——即 R143 根因。行为零变化：quine 272925 逐字节
+> 不变、368/368、578+40、doc_audit 73/73。证据链六链接第一屏全英文（对外收口
+> 目标达成；README/eval"中文残留"经改前读码定性为产品输出/原文引用/双语导航，
+> 不清除）。commit message 本批起切英文（对外可见面）。
+> **观察项**：Ubuntu 26 迁移 2026-10-19 盯 CI 首跑（doc-gates 含断链+l2fix 两步骤）。
+> **前置（2026-10-12 深夜，交接收口——β 三批 + 目录 PR 备毕 + 隐私收口；台账零 open（R1-R142 全关），顺延号 R143 起；交接就绪）**：
+> ~~最近待办 = 用户手动提目录 PR~~（已于 2026-10-13 完成，PR #68）。材料
+> target/probes/agentlanguages/ lom-entry-draft.md v3 终稿 + 操作指引；
+> PR 线程回复逐条呈批。
 > **隐私裁决（2026-10-12 用户裁定边界）**：文件内容面清查（唯一命中 =
 > tutorial 读者画像，已移出跟踪+gitignore 本地保留，`6a7fed2` CI 绿；
 > spec_examples 收窄两文档）；git 提交元数据不算泄露（不改写历史）；

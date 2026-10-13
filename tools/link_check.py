@@ -41,6 +41,19 @@ md_files = sorted(f for f in tracked_files if f.endswith(".md"))
 html_files = sorted(
     f for f in tracked_files if f.startswith("docs/") and f.endswith(".html")
 )
+
+# R143：未跟踪但磁盘存在的新 md/html（排除 gitignored）也纳入扫描源——
+# 修复前本地未 add 的新文件不被扫描、CI（已提交入库）才红（v1.10.1 批首跑
+# run 38378861239 实录：docs/README.md 未 add 时本地 PASS、CI 断链红），
+# 本地/CI 两侧口径对齐。大小写比对集合仍只含跟踪文件（未跟踪者无索引记录可比）。
+untracked_files = set(subprocess.run(
+    ["git", "-C", REPO, "ls-files", "--others", "--exclude-standard"],
+    capture_output=True, text=True, encoding="utf-8", check=True,
+).stdout.splitlines())
+md_files += sorted(f for f in untracked_files if f.endswith(".md"))
+html_files += sorted(
+    f for f in untracked_files if f.startswith("docs/") and f.endswith(".html")
+)
 scan_files = md_files + html_files
 
 # git 索引内路径集合（用于大小写精确比对）
