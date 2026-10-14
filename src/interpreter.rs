@@ -381,19 +381,30 @@ impl std::error::Error for RuntimeError {}
 
 /// 默认递归深度上限（N1：栈溢出结构化诊断）。
 /// 校准依据：256MB 栈线程下实测每 Lom 调用帧约 2.6KB Rust 栈（HANDOVER §10），
-/// 理论极限 ~100,000 层（recurse n=100000 实测溢出）；取 80% 留表达式求值
-/// 嵌套的额外栈空间。超限返回 RUNTIME 结构化诊断而非进程崩溃。
+/// 理论极限 ~100,000 层（recurse n=100000 实测溢出）。**v1.10.3 复标**：帧
+/// 大小随函数形态变化——深帧形态（if/else + 算术的 countdown）物理溢出实测
+/// ~67,000-68,000 层（探针 target/probes/n1_countdown.lom：n=68000 改前
+/// exit 127 零结构化），原 80,000 守卫在该形态下不可达；取 60,000 留 ~10%
+/// 形态余量，保"结构化诊断先于物理溢出"对实测形态成立。超限返回 RUNTIME
+/// 结构化诊断而非进程崩溃。
 /// 注意：cargo test 的测试线程栈远小于 main 的 256MB 专用线程——测试经
 /// max_depth 字段注入小阈值，不可用生产值。
 /// playground（designs/0019）：wasm 目标下浏览器引擎的物理栈远低于桌面
 /// 256MB 线程——node 实测 wasm 栈仅支撑 ~500 层 Lom 调用（每层数 KB
 /// 解释器帧），阈值取跨引擎安全值 300 保"结构化诊断先于栈 trap"；
 /// 未及守卫的更深 trap 由 harness 捕获 RuntimeError 转译友好提示（双
-/// 防线）。桌面路径 80_000 不变。
+/// 防线）。
 #[cfg(not(target_family = "wasm"))]
-const DEFAULT_MAX_CALL_DEPTH: usize = 80_000;
+const DEFAULT_MAX_CALL_DEPTH: usize = 60_000;
 #[cfg(target_family = "wasm")]
 const DEFAULT_MAX_CALL_DEPTH: usize = 300;
+
+/// 深度守卫文案的栈语境括注：桌面是 256MB 专用栈线程；wasm（playground）
+/// 是引擎栈——300 版文案此前写死"256MB 栈"与语境不符（v1.10.3 参数化修正）。
+#[cfg(not(target_family = "wasm"))]
+const DEPTH_GUARD_STACK_NOTE: &str = "256MB 栈的安全上限";
+#[cfg(target_family = "wasm")]
+const DEPTH_GUARD_STACK_NOTE: &str = "引擎栈的安全上限";
 
 /// 控制流信号（return）
 enum ControlFlow {
@@ -1499,8 +1510,8 @@ impl Interpreter {
             self.call_depth -= 1;
             return Err(RuntimeError::DepthLimit {
                 msg: format!(
-                    "递归深度超过 {} 层（256MB 栈的安全上限）：函数 '{}' 疑似缺少终止条件——检查递归出口或改写为 while 循环",
-                    self.max_depth, f.name
+                    "递归深度超过 {} 层（{}）：函数 '{}' 疑似缺少终止条件——检查递归出口或改写为 while 循环",
+                    self.max_depth, DEPTH_GUARD_STACK_NOTE, f.name
                 ),
                 line: f.span.line,
                 col: f.span.col,
@@ -1542,8 +1553,8 @@ impl Interpreter {
             self.call_depth -= 1;
             return Err(RuntimeError::DepthLimit {
                 msg: format!(
-                    "递归深度超过 {} 层（256MB 栈的安全上限）：闭包疑似缺少终止条件——检查递归出口或改写为 while 循环",
-                    self.max_depth
+                    "递归深度超过 {} 层（{}）：闭包疑似缺少终止条件——检查递归出口或改写为 while 循环",
+                    self.max_depth, DEPTH_GUARD_STACK_NOTE
                 ),
                 line: site.line,
                 col: site.col,

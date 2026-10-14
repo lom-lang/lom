@@ -867,7 +867,19 @@ fn fix_for_diagnostic(
             "模块/符号不存在：标准库模块为 io/string/math，检查 import 声明",
             Confidence::Medium,
         )],
-        "RUNTIME000" => vec![hint_only("运行时错误，检查程序逻辑", Confidence::Low)],
+        // v1.10.3 消息感知细化：深度超限形态（N1 守卫文案）升 Medium 专属
+        // hint——把诊断内嵌的修复指引送进 fix 建议面（此前只有 Low 通用
+        // hint，守卫文案里的建议对 fix 消费方不可见）；其余保持通用 hint
+        "RUNTIME000" => {
+            if d.message.contains("递归深度超过") {
+                vec![hint_only(
+                    "递归缺少终止条件：给递归分支加基准情形（base case），或改写为 while 循环——Lom 无尾调用优化，深递归会耗尽调用栈（超限返回结构化 RUNTIME000）",
+                    Confidence::Medium,
+                )]
+            } else {
+                vec![hint_only("运行时错误，检查程序逻辑", Confidence::Low)]
+            }
+        }
 
         // ===== 包系统（v1.10.2 补齐——v1.5.0 补 NAM006/MUT002 时的同款
         // 兜底欠账收口）：包面错误根因在清单/依赖图/跨文件结构，无单一
@@ -3526,6 +3538,42 @@ end
             );
             assert_eq!(result.patched_source, src, "{code} 源码必须逐字不变");
         }
+    }
+
+    /// v1.10.3 消息感知细化：RUNTIME000 携带深度超限文案时升 Medium 专属
+    /// hint（把 N1 守卫内嵌的修复指引送进 fix 建议面）；其余消息维持
+    /// Low 通用 hint。hint 永不自动应用。
+    #[test]
+    fn runtime000_depth_message_gets_specific_hint() {
+        let src = "fn down(n: Int) -> Int\n    down(n + 1)\nend\nfn main() -> Unit\n    println(down(0))\nend\n";
+        let depth_msg = "递归深度超过 60000 层（256MB 栈的安全上限）：函数 'down' 疑似缺少终止条件——检查递归出口或改写为 while 循环";
+        // 深度形态 → Medium 专属 hint，含 while 改写指引
+        let fixes = e2e_fixes(src, "RUNTIME000", depth_msg, 1, 1);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].action, ActionKind::Hint);
+        assert_eq!(fixes[0].confidence, Confidence::Medium);
+        assert!(
+            fixes[0].description.contains("while"),
+            "应含改写指引: {}",
+            fixes[0].description
+        );
+        // 其他运行时消息 → Low 通用 hint（形态不变）
+        let generic = e2e_fixes(src, "RUNTIME000", "整数除以零", 2, 9);
+        assert_eq!(generic.len(), 1);
+        assert_eq!(generic[0].confidence, Confidence::Low);
+        assert!(
+            generic[0].description.contains("运行时错误"),
+            "通用形态文案不变: {}",
+            generic[0].description
+        );
+        // 负向：深度 hint 永不自动应用
+        let result = apply_named_diag(src, "RUNTIME000", depth_msg, 1, 1);
+        assert_eq!(
+            result.applied, 0,
+            "深度 hint 不得自动应用: {:?}",
+            result.changes
+        );
+        assert_eq!(result.patched_source, src, "源码必须逐字不变");
     }
 
     /// R62 端到端辅助：单条 MUT001 诊断走完整 generate_plan → apply_plan
