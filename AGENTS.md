@@ -32,6 +32,7 @@ emits diagnostics; `lom fix <file> --plan|--apply`; `lom l2fix`; `lom codes
 | **Spec written for LLM consumption** | `SPEC_FOR_AI.md` |
 | Maintenance rules & workflow | `docs/MAINTENANCE.md` |
 | Executor (subagent) instructions | `docs/EXECUTOR_TEMPLATE.md` |
+| Map of English vs Chinese document surfaces | `docs/README.md` |
 | ACRI — agent-compiler repair interface spec (this repo is the reference implementation) | `specs/acri/` |
 | RepairLoopBench benchmark card | `eval/README.md` |
 | L2 self-hosted compiler source | `examples/selfhost/self_comp.lom` |
