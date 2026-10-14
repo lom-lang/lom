@@ -277,5 +277,14 @@
     "solution": "from io import {println}\nfrom string import {len}\n\nfn main() -> Unit\n    let s = \"hello\"\n    println(len(s))\nend\n",
     "expected": "5\n",
     "notes": "L2 面·未导入内建题（子面 D）——与 120 的 NAM005 修复同构（补 from string import {len}），额外叠 L2 面：L2 在编译期以『未定义变量』拒绝（宿主仅 warning、运行时才 RUNTIME002）；宿主诊断与 L2 拒绝文本均为真实输出采集（L2 文本单独标注来源，不与 lom-diag/v1 混排）；参考解经 L2 全链（self_comp → hex2wasm → run_selfcomp）实跑输出 5 与 expected 一致，宿主双后端均 5。"
+  },
+  {
+    "id": "130",
+    "category": "error_repair",
+    "difficulty": "medium",
+    "prompt": "以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（[RUNTIME000] 递归深度超限：函数缺少终止条件）。请修复代码使程序正常运行并输出正确结果。\n\n代码：\nfn sum_to(n: Int) -> Int\n    n + sum_to(n - 1)\nend\n\nfn main() -> Unit\n    println(sum_to(10))\nend\n诊断 JSON（--check 模式，零诊断）：\n{\"schema\": \"lom-diag/v1\", \"file\": \"bad.lom\", \"ok\": true, \"summary\": {\"total\": 0, \"errors\": 0, \"warnings\": 0, \"holes\": 0}, \"diagnostics\": []}\n\n运行时输出（lom bad.lom，stderr，退出码 1）：\n[runtime] error (1:1): [RUNTIME000] 递归深度超过 60000 层（256MB 栈的安全上限）：函数 'sum_to' 疑似缺少终止条件——检查递归出口或改写为 while 循环\n    | fn sum_to(n: Int) -> Int\n    | ^\n共 1 个诊断（1 错误，0 警告，0 代码洞）。\n\n期望输出：55（sum_to(10) = 10+9+…+1）。修复须真实计算（不得直接输出常量 55）。\n\n请输出修复后的完整代码。",
+    "solution": "fn sum_to(n: Int) -> Int\n    if n <= 0\n        0\n    else\n        n + sum_to(n - 1)\n    end\nend\n\nfn main() -> Unit\n    println(sum_to(10))\nend\n",
+    "expected": "55\n",
+    "notes": "运行时诊断题（题源形态新增：运行时 stderr 通道双真实采集——静态 --check --json 零诊断与运行时 [RUNTIME000] stderr 均为真实输出 verbatim，运行时文本置于诊断 JSON 块之后、在 eval_prompt_check 提取锚之外，探针实证该排序零误报）；修复 = 补基准情形（if n <= 0 分支返回 0）；参考解宿主双后端均输出 55。产品边界如实登记：fix --plan 对本题 broken 无诊断输出（fix 管线静态驱动，运行时诊断不进 fix）——运行时错误的 fix 通道是登记边界非承诺。"
   }
 ]

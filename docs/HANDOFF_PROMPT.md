@@ -77,7 +77,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
   ~20-45s）、self_comp.lom 12671 行、Rust **581 单元 + 40 集成**（r56×1 +
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
-  build_gaps×6 + beta2_exit×3）、eval 双后端各 128/128、fix_corpus 13 对
+  build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
   **73/73**（J 锚组现值 578+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
@@ -137,7 +137,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（已提交基线 368/368 = 196 单文件 + 8 包 + 164 负例）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 272925 bytes；耗时 v1.9.5 性能工程后 ~40-45s，随机器负载；另有 --ci-smoke 子档已入 CI）
-   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（128/128；WASM 侧加 -Backend wasm 同 128）
+   - powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe（129/129；WASM 侧加 -Backend wasm 同 129）
    - Lom fmt（PowerShell 递归覆盖 examples/：37 个有效文件；apply_test 豁免）：
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }

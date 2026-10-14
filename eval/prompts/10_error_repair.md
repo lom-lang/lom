@@ -821,8 +821,33 @@ end
 {"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 1, "errors": 0, "warnings": 1, "holes": 0}, "diagnostics": [{"severity": "warning", "stage": "type", "code": "NAM005", "message": "内建 'len' 未导入——需在文件顶部声明：from string import {len}", "file": "bad.lom", "line": 5, "col": 13, "source_line": "    println(len(s))", "is_hole": false, "hint": null}]}
 
 实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：
-codegen error: [L2U001] 未定义变量 'len'
+codegen error: 5:13 [L2U001] 未定义变量 'len'
 COMPILE-ERROR
+
+请输出修复后的完整代码。
+
+### Task 130
+
+以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（[RUNTIME000] 递归深度超限：函数缺少终止条件）。请修复代码使程序正常运行并输出正确结果。
+
+代码：
+fn sum_to(n: Int) -> Int
+    n + sum_to(n - 1)
+end
+
+fn main() -> Unit
+    println(sum_to(10))
+end
+诊断 JSON（--check 模式，零诊断）：
+{"schema": "lom-diag/v1", "file": "bad.lom", "ok": true, "summary": {"total": 0, "errors": 0, "warnings": 0, "holes": 0}, "diagnostics": []}
+
+运行时输出（lom bad.lom，stderr，退出码 1）：
+[runtime] error (1:1): [RUNTIME000] 递归深度超过 60000 层（256MB 栈的安全上限）：函数 'sum_to' 疑似缺少终止条件——检查递归出口或改写为 while 循环
+    | fn sum_to(n: Int) -> Int
+    | ^
+共 1 个诊断（1 错误，0 警告，0 代码洞）。
+
+期望输出：55（sum_to(10) = 10+9+…+1）。修复须真实计算（不得直接输出常量 55）。
 
 请输出修复后的完整代码。
 
