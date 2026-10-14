@@ -44,32 +44,30 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-12 深夜，目录 PR 备毕 + 隐私收口后——交接就绪，台账零 open（R1-R142 全关））**：
-  最新已提交基线 **v1.10.0**（tag `b3bb9f5`，CI run `38168342829` 七 job 绿；
-  HEAD `6a7fed2` CI run `38217745584` 亦绿——以 git log 与 CI 首跑为准）。
-  本轮自上次交接后交付 **β 主轴三批 + 目录 PR 准备 + 隐私收口**：β-1
-  = specs/acri/ 三件套（**ACRI v0.1 Draft** 规范本体：L0 对象模型 + 三条
-  安全性公理 / L1 CLI 协议 / L2 评测方法论，实现方中立——三裁决点均按
-  建议项：三层全包/命名 ACRI/顶层 specs/）；β-2 = **v1.10.0 工程批**
-  （`lom codes [--json]` 46 条码表出口 + l2-fix/v2 位置字段双实现同步
-  对拍 30/30 + 退出码带 20 路径 1→≥2——Rust **573→578 + 37→40**，
-  quine 272925 逐字节不变，**Lom 达成 ACRI L1-conformant**；两登记
-  偏差：pkg-expand 混合路径 rc=1、LSP 协议带不动）；β-3 = specs/acri/
-  consumer.py 参考消费器（三闭环实跑——公理 1 在第三方消费侧成立实证）。
-  **目录 PR 准备（用户裁决链）**：agentlanguages.dev 42 家全量对比（修复
-  闭环无营/benchmark 仅 4 家/production_ready 0 家）→ 条目终稿 v3 +
-  PR 描述 + 手动指引（target/probes/agentlanguages/lom-entry-draft.md，
-  gitignored）→ 敌手自审（6 必修失实全修——含 code-sample 换真实
-  transcript；tone 7 处降调）→ 门面批（AGENTS.md + README Verify-the-
-  claims 五命令小节，`2eb5a90` CI 绿）。**PR 由用户手动提交（fork 账号
-  届时定），建议 10-19 前完成；PR 线程回复逐条呈批**。**隐私收口
-  （2026-10-12 用户裁决）**：全仓个人信息扫描（报告 target/probes/
-  privacy_scan/report.md——文件内容面唯一命中 = lom-tutorial.html 读者
-  画像；git 元数据按用户口径不算泄露）；**tutorial 已 git rm --cached +
-  .gitignore 收录、本地保留**（`6a7fed2` CI 绿；spec_examples 对账面
-  收窄两文档、README 双语链接移除、HANDOVER 同步；历史 blob 仍在——
-  彻底清除需历史改写 force push，未裁不做）。git user.email 已换
-  noreply（新提交干净）。**台账零 open（R1-R142 全关）；顺延号 R143 起。**
+- **状态（2026-10-14，v1.11.0 后等待期推进中；台账零 open（R1-R143 全关），顺延号 R144 起——三十六审进行中可能新开账）**：
+  最新已提交基线 **v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job
+  绿；其后纯文档批至 `320bdcd` 亦绿）。**目录 PR #68 已提交**
+  （aallan/agentlanguages#68，2026-10-13，fork lom-lang/agentlanguages
+  add-lom 分支——标题/描述/条目与终稿逐字核验一致；open 待审，维护者
+  反馈逐条呈批后回复，英文；邮箱裁决 A=Gmail 接受）。**v1.10.0→v1.11.0
+  六批弧线（用户逐批裁决）**：v1.10.1 对外英文门面（六报告 TL;DR +
+  fix.rs 英文注 + docs/README.md 英/中文档地图）→ 收尾批（R143 link_check
+  扫描源含未跟踪文件根治）→ v1.10.2 fix 引擎 PKG 族覆盖（分派表自此
+  全 38 码）→ v1.10.3 运行时修复闭环（守卫 80000→60000 复标兑现"结构化
+  先于中止"+ RUNTIME000 消息感知 hint + 文案参数化）→ v1.11.0 评测题
+  130（第三题源形态：静态零诊断+运行时双真实采集）+ v1.10.3 宣称五处
+  修正（fix 管线静态驱动、运行时诊断不进 fix——hint 无 CLI 到达路径）
+  → lookup 观察项 bisect 收口（12 版定位：倍率主体跨环境伪影、真退化
+  12% 已被刀 1 反超为净快 1.8-4×、不修）+ Citing 段（④ 裁决 C 先行）。
+  **等待期三主动项**：④ 已交付 C 部分（A=Zenodo DOI **裁 PR 合并后**开
+  通；B 独立仓不做）；⑥ 三十六审进行中（范围 v1.10.0→HEAD 六批 + PR
+  材料，报告 reviews/review-2026-10-15.html）；⑤ playground L2 二期调研
+  进行中。**下一档规划（用户已裁"按建议规划"）**：⑥ 开账整改 + ⑤ 设计
+  呈批 → 发帖材料起草批（HN/r/PL 草稿，gitignored，发布逐项呈批）→
+  第三档择一（规划者倾向 ζ 容错 parser 深化）。**观察：Ubuntu 26 迁移
+  2026-10-19 盯 CI 首跑**（预演结论：全 ubuntu-latest 无固定引用、
+  doc-gates 依赖 python3 标准库——低风险）。
+
 - **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+（性能宣称面）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
   即审）。最新报告 [review-2026-10-10-3.html](reviews/review-2026-10-10-3.html)。
@@ -79,9 +77,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
   build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
-  **73/73**（J 锚组现值 578+40）、六模式全 PASS、link_check PASS、
+  **73/73**（J 锚组现值 581+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.10.0**。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.11.0**。
 - **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
@@ -96,7 +94,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   可读路径 stderr）+ 根目录主文件对称检查。
 - **性能现行面（designs/0022 两刀后）**：函数表 Rc 化 + Value 五族 Rc
   共享；bench.lom 十负载 + tools/bench.py（交错 A/B 为标准纪律【R139】）；
-  递归物理边界 v1.9.5 实测 60k 过/70k 溢出（N1 软件守卫 80000 不变）。
+  递归物理边界：深帧形态实测 ~67k 溢出；N1 软件守卫 v1.10.3 复标 **60000**（深帧形态下结构化先于物理溢出；浅帧物理 ~100k）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
   五源件 + wasm 推 gh-pages 孤儿分支；深度守卫 wasm 侧 300。
