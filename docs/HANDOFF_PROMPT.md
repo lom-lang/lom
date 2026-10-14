@@ -78,8 +78,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
-  README）；β 三批已落地；**待办：用户手动提目录 PR**（材料 gitignored
-  路径见上）；对外动作逐项呈批不变。
+  README）；β 三批已落地；**目录 PR #68 已提交待审**（反馈逐条呈批；R147
+  条目数字处置待裁）；发帖材料三件套已备（发布触发 = PR 合并）；
+  对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
@@ -102,8 +103,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**交接就绪，方向待用户裁决**。最近待办 = **用户手动提目录
-  PR（10-19 前；PR 线程回复逐条呈批）**；观察项：Ubuntu 26 迁移
+- 下一步：**交接就绪，待裁菜单四项**（⑤ playground B-only 方案 /
+  R147 处置 / 发帖发布（触发 = PR #68 合并）/ Zenodo 开通（同触发））
+  ——细节见状态段与 TODO 顶部；观察项：Ubuntu 26 迁移
   （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两步骤）。
   对外动作逐项呈批（铁律 6）。
 
@@ -125,7 +127,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 73/73）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
-   - python tools/eval_prompt_check.py（期望 31/31；v1.5.0 起 error_repair 31 题）
+   - python tools/eval_prompt_check.py（期望 32/32；v1.11.0 起 error_repair 32 题 = 宿主面 28 + L2 面 3 + 运行时面 1）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）
    - python tools/verify_selfcomp.py（已提交基线 368/368 = 196 单文件 + 8 包 + 164 负例）
    - python tools/verify_selfcomp.py --bootstrap（期望 14/14——三层自证与自施加强 quine 272925 bytes；耗时 v1.9.5 性能工程后 ~40-45s，随机器负载；另有 --ci-smoke 子档已入 CI）
