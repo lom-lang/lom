@@ -19,7 +19,7 @@ Most languages treat "an AI wrote broken code" as someone else's problem. Lom in
 
 | Claim | Receipt |
 |---|---|
-| **The repair loop works on real models** | On the **full 128-task set** (10 categories), deepseek-v4-pro+thinking and glm-5.3 score **98.3% / 98.5% pass@1** (2 models × 10 samples @ t=1.0; pass@5 99.2% / 98.8%) — the only sub-100 tasks are a known prompt-ambiguity anchor and one deliberately hard cross-compiler repair — [report](eval/REPORT-2026-10-07-passk-128.md) |
+| **The repair loop works on real models** | On the then-full **128-task set** (10 categories; the suite has since grown to 129 via task 130), deepseek-v4-pro+thinking and glm-5.3 score **98.3% / 98.5% pass@1** (2 models × 10 samples @ t=1.0; pass@5 99.2% / 98.8%) — the only sub-100 tasks are a known prompt-ambiguity anchor and one deliberately hard cross-compiler repair — [report](eval/REPORT-2026-10-07-passk-128.md) |
 | **The compiler compiles itself — provably** | `self_comp.lom` (12,671 lines of Lom) compiles its own source to WASM; the result is byte-identical from both sides (a 272,925-byte strong quine, re-verified on every CI run) |
 | **A trustable core** | Zero third-party crates, zero `unsafe`, 573 unit + 37 integration tests, three-OS CI; the language surface (syntax / 20 keywords / diagnostic codes / 43 builtins) is [frozen](LANGUAGE_SPEC.md#14-v10-freeze-declaration-2026-09-02) — changes require an RFC |
 
@@ -161,11 +161,11 @@ Save as `hello.lom`, run `lom hello.lom`. New here? Read [SPEC_FOR_AI.md](SPEC_F
 **Verify the claims** (from a fresh clone; ~5 minutes):
 
 ```bash
-cargo build --release && cargo test --release     # 578 unit + 40 integration tests
+cargo build --release && cargo test --release     # 581 unit + 40 integration tests
 python tools/verify_selfcomp.py                   # L2 self-compilation: 368/368
 python tools/verify_selfcomp.py --bootstrap       # three-layer bootstrap 14/14; the self-hosted
                                                    # compiler regenerates a byte-identical 272,925-byte quine
-powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe   # eval 128/128
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe   # eval 129/129
 ./target/release/lom.exe codes --json | python -c "import json,sys; print(json.load(sys.stdin)['total'])"  # 46
 ```
 

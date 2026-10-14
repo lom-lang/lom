@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第三十六审体系内独立敌手审查（v1.10.0→v1.11.0 六批增量 + 目录 PR 材料） — 2026-10-15</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.9em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.88em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad4e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict-bp{background:#e3f2fd;border:2px solid #1565c0;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第三十六审体系内独立敌手审查报告（六批增量：v1.10.1 英文门面 → v1.11.0 题 130 + tag 回填/lookup 收口）</h1>
+
+<h2>1. 报告头</h2>
+<p>时点 2026-10-15（凌晨）。基线 HEAD <code>a625014</code>（本地 git 只读审查，工作区全程干净——唯一例外为 R143 构造性探针临时未跟踪文件，验证后即删，终态 <code>git status</code> 干净）。审查增量 = <code>b3bb9f5</code>（v1.10.0 tag）→ <code>a625014</code> 共 <b>16 笔提交</b>（<code>git rev-list --count b3bb9f5..a625014</code> = 16），任务书口径归并为六批：</p>
+<table>
+<tr><th>批次</th><th>提交</th><th>性质</th></tr>
+<tr><td>β 收尾/交接/隐私（前置串）</td><td><code>5523248</code> <code>0b278d5</code> <code>2eb5a90</code> <code>6a7fed2</code> <code>d926602</code> <code>e33719c</code></td><td>纯文档（tag 回填 / β-3 消费器 / AGENTS.md+Verify-the-claims / 隐私 / 交接五件套×2）</td></tr>
+<tr><td>① v1.10.1 对外英文门面</td><td><code>ec0064e</code> <code>a2ed68f</code></td><td>六报告 TL;DR + fix.rs 英文注 + docs/README（升 patch，断链修红一次如实登记）</td></tr>
+<tr><td>② v1.10.1 收尾 + R143</td><td><code>2f1fb42</code> <code>33388cb</code></td><td>TODO 补登 / link_check 扫描源扩展 / 陈旧快照行刷新（纯文档不升版）</td></tr>
+<tr><td>③ v1.10.2 PKG 族 fix 覆盖</td><td><code>22d60fa</code>（tag）</td><td>PKG001-007 Medium hint，分派表覆盖 38 宿主码</td></tr>
+<tr><td>④ v1.10.3 运行时守卫复标</td><td><code>6854cad</code>（tag）<code>5e05143</code></td><td>守卫 80000→60000 + RUNTIME000 消息感知 hint + wasm 文案参数化</td></tr>
+<tr><td>⑤ v1.11.0 评测题 130</td><td><code>dc754ef</code>（tag）</td><td>运行时诊断题 + v1.10.3 宣称修正五处</td></tr>
+<tr><td>⑥ tag 回填 + lookup 收口</td><td><code>78d7734</code> <code>a625014</code></td><td>回填四版本行 / 十二版本 bisect 观察项收口</td></tr>
+</table>
+<p>另含目录 PR 材料审查（<code>target/probes/agentlanguages/</code>，gitignored 磁盘件 + aallan/agentlanguages#68 API 实查）。审查执行者：第三十六审体系内独立敌手审查 agent（subagent，全程单执行者，cargo 串行）。</p>
+<div class="note"><b>审查期间远端状态披露</b>：审查窗口内远端 main 已前进至 <code>320bdcd</code>（2026-10-14T16:46Z，"README evidence row … stale 128-task count refreshes to 129" + RepairLoopBench Citing 段）。该提交<b>不在本审增量内</b>；本报告一切结论针对基线 <code>a625014</code>，仅在各发现项中披露远端是否已顺手修复（§8 逐账注明）。</div>
+
+<h2>2. 审查边界声明</h2>
+<div class="note">如报告头所载：本审查是项目体系内 agent 分工的独立敌手审查，<b>非外部同行审计</b>。本轮评级独立作成：三十五审评级与更早历史级别不外推，本轮结论不预设后续、仅评本审时点（HEAD a625014）与查验证面。审查阶段未改任何仓库产品源码；唯一写盘 = 本报告 + target/probes/r36/ 探针目录（gitignored）+ CI wasm 构建产物（target/ 下常规构建输出）；git 严格只读（无 add/commit/push/tag/stash/checkout——对照旧树的取得用 <code>git archive v1.10.2</code> 只读打包解压到探针目录、独立 <code>--target-dir</code> 构建，非 worktree、不写 .git 元数据）；cargo 串行执行；含反斜杠转义内容一律 Write/Edit 落盘；只开账不修码（新发现从 <b>R144</b> 起——TODO L3 顺延号"R144 起"核验未占用；每账带可复现形态 + 候选处置 + "应修" + "绝不能这样修"负向锁定；报告原文一经落盘不回写）。性能宣称复核的方法学声明：lookup 两点复核采用"磁盘 bisect 构建产物直接重跑 + 输出值精确比对 + 时段漂移带内判定"（README 自登记同二进制跨时段漂移最高 ~2×，见 target/probes/bisect/README.md）。</div>
+
+<h2>3. Verdict</h2>
+<div class="verdict-bp">
+<p><b>评级：A-</b>（P1/P2 零在场；开账四笔全为 P3 文档精度/外部材料陈旧，按 §4.4 不挡 A-）。</p>
+<p><b>一行式总评</b>：六批增量的全部核心宣称——守卫 60000 的旧树红/新树结构化括号、题 130 双真实采集与排序硬约束、宣称修正五处、PKG 38 码覆盖、六报告 TL;DR 数字、lookup 数据链、R143 构造性——逐条敌手复核全部亲手复现成立、零宣称失守；唯一失分面是"Verify the claims"五命令块与 AGENTS.md 在 v1.10.2→v1.11.0 三连计数变化中的成片陈旧（578→581、128→129 共三处，外加目录 PR 条目 618 已被同日后继版本越过的外部材料陈旧一处），全部为锚覆盖机制外的写位漂移，无行为面、无测量造假。</p>
+</div>
+
+<h2>4. 审查方法</h2>
+<p>① 先完整阅读 docs/EXECUTOR_TEMPLATE.md 与 docs/MAINTENANCE.md §4（审查框架/纪律/评级规则），一切输出遵守其规范。② 基线矩阵 16 项全部亲手跑（含逐 target 配对单独执行——模板 §3.2 禁止从合并输出推断配对）；CI 与 tag 走 GitHub API 实查（本机无 gh，用 api.github.com 匿名端点）。③ 增量宣称逐批敌手化复核：凡"探针实证"宣称一律自建探针复跑；凡"改前/改后"对照宣称用 git archive 取旧树独立构建亲手复现括号两端；凡 prompt"verbatim"宣称自采真实输出逐字比对；凡"构造性红证"宣称自构造反例复演。④ 旧树构建（v1.10.2）与 wasm-release 重建均在独立 target 目录串行进行，未污染主构建。⑤ 开账四笔（R144-R147）逐账带负向锁定。⑥ 目录 PR 材料以 GitHub API 取 PR 实文件与本地 v3 终稿双对照。</p>
+
+<h2>5. 基线矩阵（全部亲手跑；命令 / 关键输出 / 退出码）</h2>
+<table>
+<tr><th>#</th><th>项</th><th>命令</th><th>关键输出</th><th>退出码</th></tr>
+<tr><td>1</td><td>release 构建</td><td><code>cargo build --release</code></td><td>Finished release in 0.32s，零 warning</td><td>0</td></tr>
+<tr><td>2</td><td>单元测试（单跑）</td><td><code>cargo test --release --bin lom</code></td><td>test result: ok. <b>581 passed</b>; 0 failed</td><td>0</td></tr>
+<tr><td>3</td><td>集成逐 target（10 个单独跑）</td><td><code>cargo test --release --test &lt;t&gt;</code> ×10</td><td>beta2_exit_codes = 3 / build_closure_externals = 3 / build_gaps_remediation = 6 / r104_dedup_order = 6 / r107_alias_clash = 4 / r108_variant_externals = 5 / r112_closure_assign = 3 / r56_process = 1 / r58_lsp_process = 7 / r94_pkg_alias = 2（合计 40，逐项配对如左，非合并推断）</td><td>0 ×10</td></tr>
+<tr><td>4</td><td>clippy（CI 口径）</td><td><code>cargo clippy --release -- -D warnings</code></td><td>Finished，零输出</td><td>0</td></tr>
+<tr><td>5</td><td>rustfmt</td><td><code>cargo fmt -- --check</code></td><td>零输出</td><td>0</td></tr>
+<tr><td>6</td><td>doc_audit</td><td><code>python tools/doc_audit.py</code></td><td>RESULT: PASS（<b>73/73</b> 项通过；J quine 组 6 处 272925、J Rust 组 7 处 581/40、J+ 集成现实核对 40=40）</td><td>0</td></tr>
+<tr><td>7</td><td>spec_examples</td><td><code>python tools/spec_examples_check.py</code></td><td>RESULT: PASS（正例 49 / 反例 5 / skip 若干——隐私收窄后两文档口径）</td><td>0</td></tr>
+<tr><td>8</td><td>eval_prompt_check</td><td><code>python tools/eval_prompt_check.py</code></td><td>RESULT: PASS（校验 <b>32 / 失真 0</b>；130 = 零诊断行）</td><td>0</td></tr>
+<tr><td>9</td><td>link_check</td><td><code>python tools/link_check.py</code></td><td>RESULT: PASS（A 类断链 0 + 大小写漂移 0；B 类历史 7 不拦）</td><td>0</td></tr>
+<tr><td>10</td><td>lom fmt gate</td><td>37 文件逐一 <code>lom fmt --check</code></td><td><code>find examples -name '*.lom'</code> 38 个、剔 apply_test 后 37，全 PASS（FMT_GATE_ALL_37_PASS）</td><td>0</td></tr>
+<tr><td>11</td><td>bootstrap golden</td><td><code>lom examples/bootstrap/stmt_interp.lom</code> vs expected.txt</td><td>rc=0；diff 仅 CRLF（expected 文件 Windows 检出 CRLF、运行输出 LF），<code>tr -d '\r'</code> 后逐字 MATCH</td><td>0</td></tr>
+<tr><td>12</td><td>selfhost 六模式</td><td><code>python tools/verify_selfhost.py [--tokens|--diags|--static|--run|--wasm]</code></td><td>dump <b>162/162</b> / tokens 162/162（已知列坐标差异 1）/ diags 14/14 / static 坏 24 + ALIGNED 162 / run <b>31/31</b> / <b>--wasm</b>：layer2 159 + layer3 39 golden 逐字 + selfapply 逐字一致，六模式 RESULT: PASS ×6</td><td>0 ×6</td></tr>
+<tr><td>13</td><td>verify_selfcomp</td><td><code>python tools/verify_selfcomp.py</code></td><td>RESULT: PASS（<b>368/368</b>；负例 L2G 兜底 0/164）</td><td>0</td></tr>
+<tr><td>14</td><td>三层自举</td><td><code>python tools/verify_selfcomp.py --bootstrap</code></td><td>RESULT: PASS（<b>14/14</b>；L3 self-apply (quine) <b>272925 bytes; byte-identical</b>; 21.7s）——quine 双侧一致（宿主字节 = wasm 层字节）</td><td>0</td></tr>
+<tr><td>15</td><td>eval 双后端</td><td><code>run.ps1 -Verify -LomBin ...</code> 与 <code>-Backend wasm</code></td><td>两轮各自 Total: 129 / Passed: 129 / Failed: 0（native 与 wasm 分跑）</td><td>0 ×2</td></tr>
+<tr><td>16</td><td>CI 实查（API）</td><td><code>api.github.com/repos/lom-lang/lom/actions/runs/…</code></td><td>run <b>38587540695</b>（a625014）七 job 全 success（selfhost verify / windows / macos / ubuntu / playground wasm / doc gates / clippy）；审查期间新 run <b>38600910983</b>（320bdcd，范围外）七 job 全 success；v1.11.0 run <b>38576018355</b>（dc754ef）七 job 全 success——三 run 逐 job 实查如左</td><td>—</td></tr>
+<tr><td>17</td><td>tag 双端实核</td><td><code>git rev-parse</code> vs <code>api.github.com .../git/ref/tags/…</code></td><td>v1.11.0 = <code>dc754ef77b…</code>（lightweight，本地=远端，类型 commit）；顺核 v1.10.3 = 6854cad、v1.10.2 = 22d60fa、v1.10.1 = a2ed68f 均双端一致</td><td>—</td></tr>
+</table>
+<p class="small">偏差说明：与任务书期望完全一致的项 = 1-15、17；第 16 项含任务书指定 run 38587540695（绿）+ 审查期间新 run 38600910983（绿，但 head 为范围外新提交 320bdcd，已披露）。无任何基线矩阵失败项。</p>
+
+<h2>6. 增量批次核心宣称逐批复核（敌手化）</h2>
+
+<h3>6.1 v1.10.3 守卫复标（最高优先）——全部亲手证实</h3>
+<p><b>宣称</b>（HANDOVER §1 v1.10.3 行）：深帧 countdown 型物理溢出实测 ~67000-68000 层；原 80000 守卫该形态不可达（exit 127 零结构化）；60000 留形态余量；探针 n=68000 改前 exit 127 / 改后结构化 exit 1；n=50000 不误伤；浅帧正常；wasm 侧不受影响（15700 trap 现状）；文案括注参数化。</p>
+<p><b>敌手复核</b>：</p>
+<ul>
+<li><b>旧树括号亲手复现</b>：git archive v1.10.2（守卫 80000 源码位核实）→ 独立 target 构建 → countdown n=67000 → <span class="ok">rc=0 输出 "0"</span>；n=68000 → <span class="bad">rc=127，stderr "thread has overflowed its stack"，零结构化</span>。与批次供料件（target/probes/n1_int_67/68000.txt）一致，且为本审独立复现非转述。</li>
+<li><b>新树行为</b>：现构建 countdown n=68000 → <span class="ok">rc=1，[RUNTIME000] 递归深度超过 60000 层（256MB 栈的安全上限）…共 1 个诊断（1 错误…）</span>——结构化先于物理溢出（物理点 ~67500±500 vs 守卫 60000，余量 ~11%，"留形态余量"成立）。n=50000 → <span class="ok">rc=0 输出 "0"</span>（合法深递归不误伤）。</li>
+<li><b>边界精确性</b>：n=59999 → rc=0；n=60000 → rc=1 文案"超过 60000 层"（countdown(60000) 实际 60001 帧，60001&gt;60000，文案与判定严格一致，无 off-by-one 失真）。</li>
+<li><b>浅帧形态</b>：spin(0)（无 if/else 小帧无限递归）→ 现构建 <span class="ok">rc=1 结构化 RUNTIME000</span>（守卫在小帧形态同样先于物理溢出——该形态物理点远深于 60000，v1.10.2 时代会是 exit 127；复标同时把该形态从无结构化崩塌转为结构化，是宣称的正确推广方向）。</li>
+<li><b>--check 零诊断</b>：countdown 与题 130 bad 形态 <code>--check</code> 均 rc=0"诊断通过，无错误"（运行时诊断无静态存在——题 130 题源形态与 §6.2 修正宣称的前提双双成立）。</li>
+<li><b>wasm 侧不受影响</b>：两轴分证——(a) 编译轴（Rust 后端 build --target wasm 的原生 wasm 递归，无解释器守卫）：n=15600 → rc=0 "0"，n=15800 → rc=1 "wasm trap: Maximum call stack size exceeded"——<b>15700 trap 现状亲手复现</b>（与批次件 n1_wasm_156/15800.txt 一致）；(b) 解释器轴（playground wasm，守卫 300）：本审重建 wasm-release（旧产物停在 10-8、早于文案参数化，重建必要）后跑 harness 探针 → stderr <span class="ok">"[RUNTIME000] 递归深度超过 300 层（<b>引擎栈</b>的安全上限）"</span> rc=1——文案参数化（256MB 栈→引擎栈）wasm 侧亲手证实；代码位双 cfg 常量（60000/300 + DEPTH_GUARD_STACK_NOTE 两态）核对在位。</li>
+</ul>
+<p><b>判定：v1.10.3 全部核心宣称零失守。</b></p>
+
+<h3>6.2 v1.11.0 题 130——逐字比对与排序约束均亲手复现</h3>
+<ul>
+<li><b>双真实采集逐字比对</b>：自写 bad 形态（sum_to 无基准情形，与 prompt 代码块逐字同）→ <code>--check --json</code> 实采 = 零诊断 schema 对象（与 prompt 内嵌 JSON 除 file 路径规范化 "bad.lom" 外逐字段一致——README 明示 file 规范化）；运行时 stderr 实采与 prompt 内嵌运行时块<b>逐字一致</b>（[RUNTIME000] 60000 层/256MB 栈/sum_to/(1:1)/三段式 + 汇总行，rc=1）。</li>
+<li><b>排序硬约束构造性红证复现</b>：import 工具自身提取函数对反向排序 prompt（运行时块置于诊断 JSON 块前）复演——extract_code 吞入运行时文本 → 实测诊断 = LEX005×71 + PARSE001×3 vs 内嵌 [] → <span class="bad">FAIL（误报红）</span>；正序（现行）→ 提取代码块 == 任务原始代码块、embedded=[] == real=[] <span class="ok">OK</span>。宣称的机理与红形态均亲手复现。</li>
+<li><b>manifest/prompts 一致性</b>：manifest total_tasks=129、10_error_repair 32 题（130 在列，notes 含边界登记）；eval/prompts/10_error_repair.md 含 manifest 130 prompt 全文（CONTAINS 关系 True）。</li>
+<li><b>eval_prompt_check 32/32 + 双后端 129/129</b>：基线矩阵 #8/#15（两后端分跑各自 129/129）。</li>
+<li><b>参考解双后端 55</b>：eval Verify 双后端 129/129 内含任务 130 通过（runner 按 expected "55\n" 比对），与宣称一致。</li>
+</ul>
+
+<h3>6.3 宣称修正五处 + fix 静态驱动——修正准确且自洽</h3>
+<ul>
+<li><b>五处写位清点</b>：v1.10.3 时点（5e05143）携带"消息感知 hint"宣称的文件恰为五份——README / LANGUAGE_SPEC / docs/HANDOVER / docs/TODO / docs/positioning（git grep 计数 1×5）；HEAD 处五份全部带原位收窄文本（README v1.10.3 前版条目 italic 括注、LANGUAGE_SPEC §13 括注、HANDOVER/TODO 批次条目"（v1.11.0 批修正：…）"、positioning "v1.11.0 修正：…"）——五处宣称数与修正落地数双向对上；eval/README 新增运行时题纪律段为边界登记位（第六写位，非修正位）。</li>
+<li><b>修正内容实测</b>：<code>lom fix &lt;check-clean 运行时炸程序&gt; --plan</code> → <span class="ok">rc=0"无需修复：无诊断。"</span>——"fix 管线静态驱动、运行时诊断不进 fix、hint 无 CLI 到达路径"实测成立；v1.10.3 原句"now surfaces in lom fix --plan"确属过宽，收窄是必要且如实的。</li>
+<li><b>分派表条目真实存在</b>：fix.rs:873 RUNTIME000 消息感知分派（深度文案→Medium 专属 hint，其余 Low）在位；单测 runtime000_depth_message_gets_specific_hint（Medium 断言）+ apply_named_diag 负向（不自动应用）锁定——"单测锁定真实存在"属实。</li>
+</ul>
+
+<h3>6.4 v1.10.2 PKG 族覆盖——38 码全同集合</h3>
+<ul>
+<li>fix.rs 分派字面码集（grep "PKG|MAT|NAM|TYPE|MUT|EFF|LEX|PARSE|RUNTIME|STMT"\d+）= <b>38 个</b>；<code>lom codes --json</code> 宿主族码集 = <b>38 个</b>（46 总条 = 38 宿主 + 8 L2 族——本审重分口径核验 MAT001 归宿主族）；两集合 <code>diff</code> <span class="ok">IDENTICAL / ALL_38_COVERED</span>。此前 PKG001-007 落"未知错误码"兜底的欠账收口成立。</li>
+<li>七码 hint 形态：PKG001-007 各恰一条 Medium hint_only（PKG007 告知型文案"行为已确定…无需修复"）；单测 pkg_family_codes_give_hints_not_unknown（七码循环断言 Medium+关键词）+ pkg_family_hints_never_applied（applied=0、源码逐字不变循环）在位——"永不自动应用"双锁（公理路径 + 负向单测）。</li>
+</ul>
+
+<h3>6.5 v1.10.1 英文门面——六报告 TL;DR 数字逐份对上，fix.rs 英文注准确</h3>
+<table>
+<tr><th>报告</th><th>TL;DR 数字</th><th>中文正文对照</th><th>判定</th></tr>
+<tr><td>REPORT.md</td><td>99/100 (99%)，9/10 categories perfect，task 078</td><td>L22 总通过率 99/100 (99%)；L25 完全通过分类 9/10 (90%)</td><td class="ok">一致</td></tr>
+<tr><td>2026-08-31 multimodel</td><td>v4-pro 113/113 (100%)；其余三模型各 112/113 (99.1%)；唯一失败 078</td><td>正文同值（113/113 与 112/113 三模型、078 同锚）</td><td class="ok">一致</td></tr>
+<tr><td>2026-09-07 pass@k</td><td>99.1% 双模型 @1/@5/@10；精确 99.05%=1149/1160；99.14%=115/116</td><td>L22-23 双模型 99.1%×3</td><td class="ok">一致</td></tr>
+<tr><td>2026-09-16 patch</td><td>920/920 passing units（22 题两轮 + 24 题两轮）</td><td>正文 220/220×2 + 240/240×2，L25 合计 920/920——加法回验 220+220+240+240=920 ✓</td><td class="ok">一致</td></tr>
+<tr><td>2026-10-03 err31</td><td>ds 300/310、glm 306/310；pass@1 96.77%/98.71%；glm pass@5=pass@10=100%；24 题子集 480/480</td><td>L22-23 同值；108 行 pass@k 同值</td><td class="ok">一致</td></tr>
+<tr><td>2026-10-07 passk-128</td><td>98.3%/98.5%；pass@5 99.2%/98.8%；pass@10 100.0%/99.2%；078+127 归因</td><td>L24-25 精确值行（98.28%/98.52%、99.22%、100.0%、99.22%）；L31 归因段同</td><td class="ok">一致</td></tr>
+</table>
+<p>fix.rs 英文模块注（v1.10.1 追加）：安全公理表述（仅 High 非 Hint 自动应用；NAM006/MUT002 认知告知永不改写）与中文段/实现一致；"thirteen pairs, five asserting fixed == bad" 本审亲验——eval/fix_corpus 13 对 bad/fixed，逐对 diff 恰 5 对逐字相同（04/07/08/12/13，其中 12/13 正是 NAM006/MUT002 认知 warning 对）。docs/README.md 英文导览与 guide.html 英文指针在位。中文正文零改动的追加框形态核对（TL;DR 均在文件首、带 "appended 2026-10-13" 标注）。</p>
+
+<h3>6.6 lookup 收口（a625014）——数据链两点复核 + 独立复测</h3>
+<ul>
+<li><b>HEAD n=800 数据链</b>：lookup_round1_full.tsv HEAD n=800 = 1361/1422/1366 → 中位 <b>1366</b> = 提交信息"reported 1366"；规划者抽验 1342（提交信息原文）在时段噪声带内。本审独立复测（bisect/HEAD 构建产物直接重跑，调用形态按 measure.sh 复原 <code>-- lookup 800</code>）：1022/998/1106 → 中位 <b>1022ms</b>，输出值 1600 与 tsv output 列<b>精确一致</b>；1022 vs 1366 = 1.33×，在 bisect README 自登记的同二进制跨时段漂移带（最高 ~2×，v1.9.3 n=800 实录 2743→5384）内。</li>
+<li><b>v1.9.3 n=1000 数据链</b>：lookup_n1000_strict.tsv = 11792/12202/12410/11616/11521 → 中位 <b>11792</b> = 提交信息"reported 11792"；规划者抽验 11842。本审独立复测：10953/9744/10175 → 中位 <b>10175ms</b>，输出 2000 精确一致；1.16× 偏差同在漂移带内。</li>
+<li><b>结论方向独立印证</b>："HEAD vs 2026-08 基线净快 1.8-4×（n=800 中位 5384ms → ~1.4s）"——本测 ~1.0-1.1s 比登记还快，方向与量级成立；"无现存退化可修、lookup 为合成压力位"的定性有数据支撑（12 版本锚点法、交错测量纪律在 README 留档完整）。</li>
+</ul>
+
+<h3>6.7 R143（link_check 扫描源扩展）——构造性红绿双向复现</h3>
+<p>代码位：tools/link_check.py:50 扫描源含 <code>git ls-files --others --exclude-standard</code>（未跟踪且非 ignored）。构造性验证：在仓库根临时创建未跟踪 <code>r36_linkcheck_probe.md</code>（含断链 ./no-such-target-file-r36.md）→ <code>python tools/link_check.py</code> → <span class="bad">rc=1，RESULT: FAIL（A 类断链 1），断链行正确归因到探针文件第 3 行</span>；删除 → <span class="ok">rc=0 PASS（A 类断链 0）</span>；终态 git status 干净。捕获能力构造性成立（未跟踪断链不再漏扫）。</p>
+
+<h3>6.8 目录 PR 材料（aallan/agentlanguages#68）——任务书重点项逐一核</h3>
+<ul>
+<li><b>PR 现状（API 实查）</b>：open、非 draft、comments=0、review_comments=0、mergeable_state=clean、head = lom-lang/agentlanguages add-lom @ d9c99d8——与 TODO 宣称一致。</li>
+<li><b>任务书警示项"条目是否写 128-task"</b>：<b>未写</b>。条目正文与 PR 描述均无任何任务数现值宣称；PR 描述唯一 "128" 是历史报告文件名 REPORT-2026-10-07-passk-128.md（测量锚定名，不失实）；98.3%/98.5% 头牌数字带报告锚与"raw outputs 不归档"限定。128→129 变化<b>不影响条目宣称</b>——该担忧排除。</li>
+<li><b>条目数字 vs 现实</b>：272,925 quine ✓（基线 #14 复现）/ 368 ✓ / 14 ✓ / 46 codes ✓ / 12,671 行 ✓（wc -l 亲测）/ 20 关键字 43 内建 ✓（冻结面）/ 98.3%/98.5% ✓（报告锚定）；<b>"618 Rust tests" 陈旧</b>——条目提交时点（2026-10-13，v1.10.1 基线 578+40=618）准确，同日后继 v1.10.2（+2）/v1.10.3（+1）已使现值 621；PR open 未合并，条目指向的仓库现实与条目数字脱钩 → <b>开账 R147</b>。</li>
+<li><b>v3 终稿对照清单自检项</b>（文件内"618=578+40 ✓"等）为 2026-10-12 时点快照，同上陈旧（材料性，非仓库文件）。</li>
+</ul>
+
+<h2>7. 敌手探针表</h2>
+<table>
+<tr><th>编号</th><th>方向</th><th>实测（命令/形态/输出）</th><th>结论 / 击穿判定</th></tr>
+<tr><td>P36-01</td><td>守卫·深帧·新树上限</td><td>countdown n=68000（现构建）</td><td>rc=1 结构化 RUNTIME000（60000 层/256MB 栈）——<b>未击穿</b>（宣称结构化 exit 1 成立）</td></tr>
+<tr><td>P36-02</td><td>守卫·合法深递归</td><td>countdown n=50000</td><td>rc=0 输出 "0"——<b>未击穿</b>（不误伤成立）</td></tr>
+<tr><td>P36-03</td><td>守卫·边界精确</td><td>n=59999/60000/60001</td><td>rc=0 / rc=1 / rc=1，文案"超过 60000 层"与 60001 帧严格一致——<b>未击穿</b></td></tr>
+<tr><td>P36-04</td><td>守卫·浅帧形态</td><td>spin(0) 小帧无限递归</td><td>rc=1 结构化（守卫先于小帧物理溢出）——<b>未击穿</b></td></tr>
+<tr><td>P36-05</td><td>守卫·静态面</td><td>countdown / t130 bad --check</td><td>rc=0 零诊断——<b>未击穿</b>（运行时诊断无静态存在，题 130 前提成立）</td></tr>
+<tr><td>P36-06</td><td>守卫·旧树括号（git archive v1.10.2 独立构建）</td><td>n=67000 / n=68000</td><td>rc=0 "0" / rc=127 栈溢出零结构化——<b>未击穿</b>（"原守卫不可达 exit 127"亲手复现；~67000-68000 物理点成立）</td></tr>
+<tr><td>P36-07</td><td>守卫·wasm 编译轴</td><td>build --target wasm 后 node 跑 15600/15800</td><td>rc=0 "0" / rc=1 wasm trap——<b>未击穿</b>（"15700 trap 现状"复现；守卫复标不影响编译轴）</td></tr>
+<tr><td>P36-08</td><td>守卫·wasm 解释器文案</td><td>重建 wasm-release + playground harness spin 探针</td><td>"超过 300 层（引擎栈的安全上限）" rc=1——<b>未击穿</b>（文案参数化 wasm 侧亲证；旧磁盘 wasm 产物停在参数化前，重建后证实）</td></tr>
+<tr><td>P36-09</td><td>题 130·verbatim</td><td>自采 --check --json 与运行时 stderr vs prompt 内嵌</td><td>零诊断 JSON 除 file 规范化外逐字段一致；运行时块逐字一致——<b>未击穿</b></td></tr>
+<tr><td>P36-10</td><td>题 130·排序约束</td><td>反向排序 prompt 复演提取/比对</td><td>代码块吞运行时文本 → LEX005×71+PARSE001×3 vs [] → 误报红——<b>未击穿</b>（硬约束构造性红证复现）</td></tr>
+<tr><td>P36-11</td><td>修正宣称·fix 静态驱动</td><td>lom fix &lt;t130 bad&gt; --plan</td><td>rc=0"无需修复：无诊断。"——<b>未击穿</b>（"无 CLI 到达路径"实测成立，v1.10.3 原句确过宽）</td></tr>
+<tr><td>P36-12</td><td>PKG·38 码覆盖</td><td>fix.rs 分派字面集 vs lom codes 宿主集 diff</td><td>38 = 38 IDENTICAL——<b>未击穿</b>（含 MAT001 归位；七码 Medium hint + apply 负向单测在位）</td></tr>
+<tr><td>P36-13</td><td>门面·fix.rs 英文注</td><td>fix_corpus 13 对逐对 diff</td><td>恰 5 对 fixed==bad（04/07/08/12/13；12/13 为认知 warning 对）——<b>未击穿</b></td></tr>
+<tr><td>P36-14</td><td>门面·六报告 TL;DR</td><td>TL;DR 数字 vs 中文正文逐份</td><td>六份全一致（920 加法回验 220×2+240×2 成立）——<b>未击穿</b></td></tr>
+<tr><td>P36-15</td><td>lookup·数据链两点+独立复测</td><td>tsv 中位复算 + bisect 产物重跑（-- lookup 800 / 1000）</td><td>1366/11792 中位对上；独立复测 1022/10175ms，输出值 1600/2000 精确一致，偏差 1.33×/1.16× 在自登记漂移带内——<b>未击穿</b></td></tr>
+<tr><td>P36-16</td><td>R143·构造性</td><td>未跟踪断链文件 → link_check → 删除 → 复跑</td><td>rc=1 FAIL A 类 1（归因探针 3 行）/ 删后 rc=0 PASS——<b>未击穿</b></td></tr>
+<tr><td>P36-17</td><td>PR #68·API 实查 + 条目数字</td><td>pulls/68 + pulls/68/files</td><td>open/clean/0 评论；条目无 128-task 宣称；618 陈旧（→R147）——<b>材料面击穿一处（数字陈旧），宣称面未击穿</b></td></tr>
+<tr><td>P36-18</td><td>CI/tag·双端</td><td>actions API 三 run 逐 job + tags API 四枚</td><td>38587540695 / 38600910983 / 38576018355 七 job 绿；v1.11.0/v1.10.3/v1.10.2/v1.10.1 本地=远端——<b>未击穿</b></td></tr>
+</table>
+<p><b>击穿判定汇总：18 项敌手探针，宣称面零击穿；唯一"击穿"为 P36-17 的外部材料数字陈旧（材料非仓库宣称）——对应开账 R147。</b></p>
+
+<h2>8. 文档对账数字链 + 开账 + 评级依据</h2>
+
+<h3>8.1 文档对账数字链（doc_audit 73/73 之外的独立抽查）</h3>
+<p>quine 272925（基线 #14 byte-identical）↔ J 锚 6 处现值位一致；Rust 581/40（基线 #2/#3 逐 target）↔ J 组 7 处一致 ↔ README 正文 L172（581/581 + 40）一致；eval 129/129 双后端 ↔ README L172"129/129"↔ HANDOFF_PROMPT 镜像"129/129"一致；manifest 129/32 ↔ HANDOVER §1"128→129/31→32"一致；46=38+8（codes --json 本审重数）↔ README/AGENTS/条目一致；12671 行 ↔ README L172 与条目一致；五处修正文本（§6.3）↔ 机制实测一致；<b>对账发现的链外漂移位如下开账</b>（全部位于 doc_audit 锚集之外——README 代码围栏注释与 AGENTS.md 不属任何锚组，这是本族漂移的共同机制）。</p>
+
+<h3>8.2 开账（R144-R147，四笔全 P3；从 TODO 顺延号 R144 起核验未占用）</h3>
+<div class="ledger">
+<p><b>R144（P3）README "Verify the claims" 五命令块两处计数陈旧</b><br>
+可复现形态：基线 a625014 README.md L164 注释 <code># 578 unit + 40 integration tests</code>（现值 581+40，cargo test 亲测）；L168 注释 <code># eval 128/128</code>（现值 129/129，双后端亲测）。机制：该块为 2eb5a90（v1.10.1 前置批）硬编码，代码围栏注释不属 doc_audit J 锚组；v1.10.2（+2）、v1.10.3（+1）、v1.11.0（+1 题）四次计数变化均漏刷（正文 L172 已是 581/129 正确值，同文件内部自相矛盾）。远端 320bdcd 修了 L159（基准卡 129-task 行）但未修此两处（远端 README 实查确认）。<br>
+候选处置：随下批刷两处注释为现值，并把"Verify the claims"块纳入 doc_audit 锚（新锚位须过门禁登记）或改写为不含绝对计数的表述（"计数见正文 Status 段"）。<br>
+<b>应修</b>：对外复现入口的期望值必须与正文同源同步。<br>
+<b>绝不能这样修</b>：只改 README 两处注释而不建立锚/指针机制（下一批计数再变即同族复发——本账正是三次漏刷的复发实录）；也不能顺手改动 L172 正文（该行现值正确）。</p>
+
+<p><b>R145（P3）AGENTS.md 构建行计数陈旧</b><br>
+可复现形态：AGENTS.md L15 <code>cargo build --release && cargo test --release # 578 unit + 40 integration, zero warnings expected</code>（现值 581+40）；本地与远端 320bdcd（API 取文件实查）均未修。机制：与 R144 同批同源（2eb5a90 硬编码、无锚覆盖）；AGENTS.md 是 agent 进仓第一入口（本审任务书亦以它为规范源），复现指引带错数。同文件 "73/73 expected"（doc_audit）与 "368/368"（selfcomp）为现值正确——仅 Rust 计数漂移。<br>
+候选处置：随 R144 同批刷 581+40，并同样入锚或改指针化表述。<br>
+<b>应修</b>：与 R144 成对处置（同一漂移家族、同一机制缺口）。<br>
+<b>绝不能这样修</b>：单独手改一处 AGENTS.md 而 README 块不动（两处同源，单修必再漂）；或为省锚把 AGENTS.md 计数句删掉验证命令语义（命令与期望语义必须保留）。</p>
+
+<p><b>R146（P3）README L22 证据行 "full 128-task set" 描述词失准</b><br>
+可复现形态：README.md L22 "On the <b>full 128-task set</b> (10 categories), … 98.3% / 98.5% pass@1"——套件 v1.11.0 起 129 题（manifest 亲测），"full"描述词不再指 full set；98.3/98.5 测量本身带 2026-10-07 报告锚（该时点 128 题集），数字不失实，失实的是"full … set"作为现值描述。远端 320bdcd 修的是 L159 而非本行（远端实查仍 128）。<br>
+候选处置：L22 改为 "on the 128-task set as of the 2026-10-07 report (the suite is now 129 tasks)" 一类时点化表述，或随下次全量评测刷 129 集新数。<br>
+<b>应修</b>：证据行的集合描述与测量时点解耦。<br>
+<b>绝不能这样修</b>：把 98.3/98.5 平移宣称到 129 题集上（130 题从未进入该测量，平移即造假）；也不能删 pass@k 归因限定（078/127 归因句是证据链一部分）。</p>
+
+<p><b>R147（P3，外部材料）目录 PR #68 条目 "618 Rust tests" 已被同日后继版本越过</b><br>
+可复现形态：aallan/agentlanguages#68（open/clean/0 评论，head d9c99d8）条目 Maturity 段 "…a 14-case three-layer bootstrap check, <b>618 Rust tests</b>"——提交时点（2026-10-13，v1.10.1 基线 578+40=618）准确；同日 v1.10.2（22d60fa →580）/v1.10.3（6854cad →581）使条目指向的仓库现值 621=581+40。任务书警示的"条目 128-task 表述"经查<b>不存在</b>（条目与 PR 描述无任务数现值宣称，唯一 "128" 是历史报告文件名）——该担忧排除，唯一失真即 618。v3 终稿对照清单"618=578+40 ✓"（target/probes/agentlanguages/lom-entry-draft.md L198）同步陈旧。<br>
+候选处置：在 PR 线程维护者反馈的回复中顺带更正（英文、呈批后发——TODO 既定流程），或 merge 前在 fork 分支追加 commit 修条目数字；修数时以可核查现值为准（621=581+40）。<br>
+<b>应修</b>：对外目录条目的可核查数字须与被指仓库同步。<br>
+<b>绝不能这样修</b>：为对齐数字撤 PR 重开（open/clean 零评论状态无损，追加更正成本远低）；也不能含糊化（"over 600 tests"）——目录条目以精确可核查数字立信。</p>
+</div>
+
+<h3>8.3 评级依据</h3>
+<p>① <b>宣称面</b>：六批全部核心宣称（§6.1-6.8）逐条敌手复核亲手复现，18 项探针宣称面零击穿——包括最高优先的守卫复标（旧树括号独立重建复现）与题 130（verbatim 逐字 + 排序红证复演）。② <b>开账面</b>：四笔全 P3（R144-R147），无 P1/P2；按 §4.4 P3 文档精度不挡 A-。③ <b>扣分理由（不入 A 的说明）</b>：R144/R145/R146 构成同一机制的成片漂移（对外复现入口"Verify the claims"块 + AGENTS.md + 证据行在四次计数变化中连续漏刷，且远端新提交只修了三处之一），说明锚覆盖对"新增对外写位"存在系统性盲区——虽每笔单独为 P3，机制性重于孤立笔误，故 A- 而非上探。④ <b>行为面</b>：基线矩阵 16 项全绿（581+40 逐 target 配对、quine 272925 双侧、六模式、129×2、CI 三 run 逐 job、四 tag 双端），冻结面零触碰（v1.10.2/3 均零语言面，v1.11.0 零 src/）。⑤ 历史评级不外推：本评级仅对本审时点与查验证面成立。</p>
+
+<h2>附录：探针目录（target/probes/r36/，gitignored）</h2>
+<table>
+<tr><th>文件</th><th>内容</th></tr>
+<tr><td>countdown.lom / spin.lom / t130_bad.lom</td><td>守卫与题 130 探针源（countdown 复用 n1 形态）</td></tr>
+<tr><td>tn68000.{out,err} / tn50000.{out,err} / bnd_59999|60000|60001.err / spin.{out,err}</td><td>现树守卫探针输出（P36-01..05）</td></tr>
+<tr><td>tn_check.{out,err} / t130_check.{json,err} / t130_run.{out,err} / t130_fixplan.{out,err}</td><td>题 130 静态/运行时/fix 管线实采（P36-05/09/11）</td></tr>
+<tr><td>oldtree/（git archive v1.10.2 解压）+ oldtarget/（独立构建）+ old67000/old68000.{out,err}</td><td>旧树括号复现全套（P36-06）</td></tr>
+<tr><td>cd{15600,15800,68000,70000}_fixed.lom + cd{15600,15800,68000}.wasm + wcd*.{out,err}</td><td>wasm 编译轴 trap 括号（P36-07）</td></tr>
+<tr><td>wasm_msg_probe.mjs + lom_v1110.wasm（副本）</td><td>wasm 解释器文案探针（P36-08；wasm-release 重建于主 target）</td></tr>
+<tr><td>t130_reverse_order_test.py + t130_reverse_result.txt</td><td>排序约束构造性红证（P36-10）</td></tr>
+<tr><td>fix_codes.txt / fix_codes_full.txt / host_codes_full.txt / codes_codes.txt</td><td>38 码集合比对原料（P36-12）</td></tr>
+<tr><td>pkg_hint_demo.lom</td><td>fix --plan sanity 件</td></tr>
+<tr><td>r143_red.txt / r143_green.txt</td><td>R143 红绿构造输出（P36-16；探针 md 已删）</td></tr>
+<tr><td>golden_run.txt</td><td>bootstrap golden 运行输出（CRLF 归一后逐字一致）</td></tr>
+</table>
+<p class="small">审查报告落盘即终稿（不回写纪律）；探针证据以本目录 + 本报告双档为准。审查执行者：第三十六审独立敌手审查 agent，2026-10-15。</p>
+
+</body>
+</html>

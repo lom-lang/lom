@@ -12,7 +12,7 @@ require a new RFC (see `LANGUAGE_SPEC.md` §14).
 ## Build & verify (Windows-friendly; Git Bash or PowerShell)
 
 ```bash
-cargo build --release && cargo test --release   # 578 unit + 40 integration, zero warnings expected
+cargo build --release && cargo test --release   # 581 unit + 40 integration, zero warnings expected
 python tools/doc_audit.py                       # document-number interlock, 73/73 expected
 python tools/verify_selfcomp.py                 # L2 self-compilation: 368/368 expected
 python tools/verify_selfcomp.py --bootstrap     # three-layer bootstrap: 14/14, byte-identical
