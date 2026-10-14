@@ -200,3 +200,21 @@ Framework + reference solutions ship in-tree. The 2026-08-03 LLM baseline (99/10
 **2026-10-07 full-set pass@k — the current headline evidence** (`REPORT-2026-10-07-passk-128.md`): both models × 10 samples @ t=1.0 on the **full 128-task set** (first multi-sample measurement for the v1.5.0 additions; 126/127 tightened the same day at `e1702ba`). **pass@1 = 98.3% (deepseek-v4-pro+thinking) / 98.5% (glm-5.3)**, pass@5 = 99.2% / 98.8%, pass@10 = 100.0% / 99.2%. Sub-100 tasks fully attributed: 078 (prompt-ambiguity anchor; its explicit twin 118 passes 10/10 both models) and 127 (deliberately hard L2 cross-compiler repair: after tightening, all 20 candidates take the `map_get` route — zero shortcut solutions — but only 2 add the required Option-unwrapping step). The tightened 126 passes 10/10 on both models (was 0/10 and 8/10 under the ambiguous wording). Candidates + matrices: `eval/candidates_rerun/<model>_passk10_128/`.
 
 The multi-sample `candidates_rerun/` raw replies and summaries are intentionally gitignored. On the handoff machine they were present and the ninth review independently recomputed 1149/1160 for each pass@k model and 240/240 per model for the 24-task repair patch. A fresh clone cannot verify raw provenance from the repository alone; published claims must retain that qualification or archive a privacy-reviewed evidence bundle later.
+
+## Citing
+
+RepairLoopBench is version-anchored to the repository's tags — **cite the tag,
+not `main`** (`main` drifts with each task-set change; e.g. the 129-task form
+first exists at `v1.11.0`).
+
+Recommended citation form:
+
+> wyty. (2026). *RepairLoopBench: a purpose-built repair-loop benchmark for
+> an LLM-repair-native language* (129 tasks; contamination-safe task
+> synthesis, dual-backend verification). GitHub repository, version anchored
+> at tag v1.11.0+. https://github.com/lom-lang/lom
+
+Notes: authored under sustained LLM co-authorship (as is the whole repository);
+licensed Apache-2.0 with the rest of the repository. A DOI (automated
+archive-per-tag) is planned once the external-catalogue submission settles —
+until then the tag anchor above is the stable reference.
