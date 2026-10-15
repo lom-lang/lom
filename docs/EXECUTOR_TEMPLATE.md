@@ -7,7 +7,9 @@
 
 ## 一、通用铁律摘要（随任何任务生效；规范源 MAINTENANCE §1.2）
 
-1. 全程中文；**不做任何 git 写操作**（不 add/commit/push/tag/stash/checkout）。
+1. 全程中文；**不做任何 git 写操作**（不 add/commit/push/tag/stash/checkout），
+   **也不得改动 git 身份配置（git config 的 user.name/user.email 等）**——
+   身份配置漂移曾致 21 笔提交归因漂移到无关账号（2026-10-15 身份修复批）。
 2. 计算结果真实可复现；推测标"主观推测"；失败如实报告，禁止"应该可以"收尾。
 3. **含反斜杠转义的内容一律用 Write/Edit/apply_patch 落盘，禁用
    heredoc/printf 直写**。

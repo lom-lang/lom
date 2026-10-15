@@ -3,7 +3,7 @@
 > **文档定位（2026-09-21/25/29 用户裁决；2026-10-06 维护规程 2.0 重构）**：
 > 本文件是 Lom 的**持续维护文档**与交接必要流程、新会话入口。三段式：
 > ①角色与铁律（行为契约，规范源为 [MAINTENANCE.md](MAINTENANCE.md) §1——
-> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
+> 本代码块为携带式镜像）②【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
 > ③第一回合必读清单与行为坑索引（流程契约）。三段装于一个代码块，复制即用。
 
 ```
@@ -43,7 +43,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 仓库内即自包含）+ 批次段；计数与配对类数据逐项行式输出、逐项单独执行，
 规划者验收抽查复跑。】
 
-【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
+【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推 + R147 已收口；台账零 open；顺延号 R148 起）**：
   本批基线 **v1.12.0**（tag `4a64471`，CI run `38688935472` 七 job 绿——
   含扩展后 playground job；playground
@@ -148,6 +148,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
      $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
      foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }
    - 新增/迁移的 tools/selfcomp 用例逐个 fmt --check（词法合法的用例应全过 rc=0）；v1.6.0 的 lex 负例 2 枚（neg_l2_lex_*）按构造含词法错误、不适用 fmt --check（锁点在 verify_selfcomp 的 lex 诊断格式+码）；examples 原 37 个有效文件不变。
+   - **git 身份核验（2026-10-15 治理批新增）**：`git config user.name/email` 实查应为 `wytyKen <204019711+wytyKen@users.noreply.github.com>`（全局与仓库级），且 `curl -s https://api.github.com/repos/lom-lang/lom/commits/<HEAD>` 的 `author.login` 应为 `wytyKen`——配置漂移曾致 21 笔归因漂移（身份修复批教训）；账号改名/换邮箱/换机为裁决点事件，触发提交身份盘点。
    - `git status` 应基本干净（交接刷新的文档回填除外）；实查最新已提交 main CI 与 annotations，不能外推至未提交工作区。
 3. 如实报告 tag 基线核验边界。新方向只呈菜单待裁；对外发布动作逐项
    呈批后执行（铁律 6）。
