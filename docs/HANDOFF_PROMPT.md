@@ -49,8 +49,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   含扩展后 playground job；playground
   自举演示二期，designs/0024 五裁决点均按建议项：浏览器四步链 **QUINE
   272925 byte-identical 亲测达成**（~26.5s，60s 独立看门狗）；零 src/ 零
-  .lom 零语言面，基线构造性不变；**gh-pages 部署待呈批**——含 Chrome/Edge
-  线上复测）。前一基线 **v1.11.0**（tag `e83177b`，CI run `38576018355`
+  .lom 零语言面，基线构造性不变；**gh-pages 已部署（`45fb8dd`，2026-10-15 用户
+  裁决执行）——线上实测 QUINE 272925 达成（~11s）+ 一期 Run 修复闭环过）。前一基线 **v1.11.0**（tag `e83177b`，CI run `38576018355`
   七 job 绿；R147 销账批 `ff2881f` run `38671865630` 七 job 绿实查）。
   **目录 PR #68 open 待审**（零评论；head 已更新 `5ae7cff`——R147 处置 a
   2026-10-15 收口：fork 追 commit 条目 618→621；反馈逐条呈批后英文回复）。
