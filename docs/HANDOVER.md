@@ -1,57 +1,6 @@
+> 最后更新：2026-10-15 晚（**一日全弧线收官——v1.12.0 playground 自举演示二期（浏览器四步链 QUINE 272925 线上实测 ~11s）+ gh-pages 部署上线（`45fb8dd`）+ R147 处置 a 收口（PR #68 head `5ae7cff`）+ 身份修复批（21 笔归因改写 wytyKen、五 tag 重切、force push；治理规则四件落盘 `f25eefb`：身份核验入基线/交接、部署三一致性、镜像时机、执行者防呆）+ XERJ Corpus Hub 收录获批（归因已澄清）；台账零 open（顺延号 R148 起）；待触发：发帖（PR 合并）/ 三十七审（发帖前，已裁）/ Zenodo；观察：Ubuntu 26 迁移 10-19、contributors 侧栏 Wyty 缓存残影待自刷**）。
 > 最后更新：2026-10-15（**v1.10.0→v1.11.0 一日十三批弧线收官 + 三十六审 A-（review-2026-10-15.html，R144-R146 已收口/R147 open）+ 发帖材料三件套备毕（target/probes/outreach/，发布触发 = PR #68 合并）；待裁菜单见 TODO 顶部（⑤ playground B-only 方案 / R147 处置 / Zenodo 时机）**）。
 > 最后更新：2026-10-13（等待期三向推进：① 文档欠账清理 `88b011b` + ② v1.10.2 PKG 族覆盖 + **PR #68 已提交** + R143 扫描源修复 `66312d1`；同日续：v1.10.3 运行时闭环（守卫 60000）→ v1.11.0 题 130+宣称修正 → lookup 收口 `710c1f0` → Citing `47397a0`）。
-> 最后更新：2026-10-12 深夜（**交接收口——β 主轴三批（ACRI 规范 + v1.10.0 工程 + 消费器）+ 目录 PR 准备（42 家对比/条目 v3/敌手自审/门面批）+ 隐私收口（tutorial 移出跟踪）；台账零 open（R1-R142 全关）**。
-> 本轮弧线：β-1 specs/acri/ ACRI v0.1 Draft（三裁决点按建议项）→ β-2
-> v1.10.0（codes 码表 46 条 + l2-fix/v2 位置 + 退出码带——**L1-conformant**，
-> Rust 578+40，quine 272925 不变）→ β-3 参考消费器三闭环 → agentlanguages.dev
-> 42 家全量对比（修复闭环无营/benchmark 4/42）+ 条目终稿 v3（敌手自审 6
-> 必修全修）+ 门面批（AGENTS.md + Verify 小节）→ 隐私扫描与 tutorial 移出
-> 跟踪（spec_examples 收窄两文档）。**待用户：手动提目录 PR（10-19 前）**。
-> 基线：368/368、quine 272925、Rust 581+40、eval 129×2、doc_audit 73/73。
-> 五件套按 MAINTENANCE §5 刷新。）
-
-> 最后更新：2026-10-12（**交接收口——性能工程两刀（v1.9.4/v1.9.5）+ 三十五审 B+ + 战略转折（审查降频/大调查/γ-β 生态位裁决）+ γ-甲 RepairLoopBench 落地；台账零 open（R1-R142 全关）**。
-> 本轮弧线：designs/0022 性能工程两刀（A1 函数表 Rc 化 + A2 值表示五族
-> Rc 化——bootstrap 471.5→43.1s ≈10.9×、quine/行为逐字节零变化三路锁定；
-> 基准资产入库 bench.lom 十负载 + bench.py）→ 三十五审 B+（工程实质全
-> 复现成立，开账 R139-R142 全在宣称面）→ 五/六轮大调查（四报告归档
-> archive/research-2026-10-11-*；修复闭环 P3 = Zero/Vera/Lom 三强、
-> 使用侧全赛道零真实用户、三死结）→ 生态位裁决（γ 评测资产先行 + β
-> 规范升维主轴；审查降频事件驱动）→ γ-甲 落地（评测资产命名
-> **RepairLoopBench**，基准卡 = eval/README 含口径区隔声明；R139-R142
-> 四账 14 写位全收口）。基线：368/368、quine 272925、Rust 573+37、
-> eval 129×2、doc_audit 73/73 全不变（v1.11.0 加题后 129×2；128 为 v1.10.3 时点）。待裁菜单：β 规范升维主轴
-> （设计方案呈裁决点后动工）。观察项：Ubuntu 26 迁移 2026-10-19。
-> 五件套按 MAINTENANCE §5 刷新。）
-
-> 最后更新：2026-10-10 深夜（**交接收口——三十四审 A- 定格 + R138 收口 + 发布面裁决（v1.7.0 不转正、正式发布后议）；台账零 open（R1-R138 全关）**。
-> 本轮维护弧线（自上次交接）：七版（v1.7.2→v1.9.3）+ 五轮审查（B+
-> 五连→三十四审 A- 回升，判据三条全成立、A- 张力经用户裁决采纳）
-> + 二十笔开账全关（R119-R138）+ 两项工具根治（doc_audit J+ 集成
-> 现实核对位 71→72、K 交接镜像核对位 72→73）+ 一项升版记账（v1.9.2）。
-> 基线：verify_selfcomp 368/368、quine 272925、Rust 573+37、eval
-> 128×2、doc_audit 73/73、self_comp 12671 行。待裁菜单：性能工程
-> （大批，须先 designs/0022 呈裁决点）/ 三十五审（大节点后再发起）；
-> Ubuntu 26 迁移观察（2026-10-19）。五件套按 MAINTENANCE §5 刷新。）
->
-<!-- 历史条目归档记录（MAINTENANCE §5.3 ≤3 条；原文均逐字搬运至 docs/archive/handover-log.md）：
-     2026-10-10 深夜交接收口批移入"三十二审收官"条目；同日三十三审批移入"v1.9.2 升版记账批"条目、
-     v1.9.3 批移入"五版弧线+三轮审查+R131"条目；三十二审批移入"2026-10-07 晚 R117/R118 收口"条目 -->
-
-# Lom 项目 AI 交接文档
-
-> 写给下一个接手维护的 AI。本文只写**不在其他文档里的小细节和坑**，正式内容请看：
-> - [README.md](../README.md) — 项目门面
-> - [LANGUAGE_SPEC.md](../LANGUAGE_SPEC.md) — 语言规范
-> - [SPEC_FOR_AI.md](../SPEC_FOR_AI.md) — 喂给 LLM 的精简规范
-> - [DESIGN_RATIONALE.md](../DESIGN_RATIONALE.md) — 设计取舍
-> - [docs/lom-project-guide.html](lom-project-guide.html) — **主进度文档**，所有 Phase 的详细记录
-> - [docs/TODO.md](TODO.md) — **整改待办台账**（跨会话待办唯一事实源；含审查裁决的驳回/挂起登记）
-> - [docs/HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) — **可直接复制给下一任 AI 的交接提示词**
-> - [eval/REPORT.md](../eval/REPORT.md) — LLM 实测 99/100 报告
->
-
-
 ---
 
 ## 0. 用户协作偏好（最重要，先读）
@@ -386,7 +335,7 @@ end
 2. `cargo build --release && cargo test --release` 确认 581/581（另有 tests/ 集成 ×40）、零 warning、`./target/release/lom.exe --version` 显示 1.12.0
 3. 跑 §2.2 全量回归确认基线（含 selfhost 六模式逐个 + verify_selfcomp 368/368、--bootstrap 14/14 quine 272925 bytes）；`cargo fmt --all -- --check` 自 R61 起零 diff——若 rustfmt 版本更替出现新 diff，单独机械包处理，不混语义修复
 4. 检查 `git status`：交接提交后应基本干净（tag/CI 回填除外）；核最新已提交 main CI 六 job 与 annotations（§11 有 API 查法），不得把已提交绿灯外推到任何未提交工作区。**git 身份核验（2026-10-15 治理批新增）**：`git config user.name/email` 应为 `wytyKen <204019711+wytyKen@users.noreply.github.com>`，commits API 归因 `author.login = wytyKen`（配置漂移曾致 21 笔归因漂移）。
-5. **当前状态（2026-10-15，交接收口——v1.10.0→v1.11.0 一日弧线 + 三十六审 A- + 发帖材料备毕；台账 open = R147（PR 面）；最新 v1.11.0 tag `e83177b`，CI run `38576018355` 七 job 绿，HEAD `5af5d93` run `38605545988` 亦绿）**：本轮弧线与待裁菜单详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（PR #68 open 待审/⑤ playground B-only 方案待裁/R147 处置待裁/发帖材料 gitignored 备毕/Ubuntu 26 迁移 10-19 观察）。历史轮次摘要：本轮弧线与裁决链详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（ACRI v0.1 + L1-conformant + RepairLoopBench + 目录 PR 材料 v3 待用户手动提交 + tutorial 隐私移出跟踪）。历史轮次摘要：2026-10-12 早 = β-1/2/3 落地；本轮弧线与裁决链详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（性能工程 designs/0022 两刀 bootstrap 累积 10.9× 行为零变化；三十五审 B+ 四账全收口；审查降频事件驱动 + γ/β 生态位战略；RepairLoopBench 基准卡 = eval/README）。历史轮次摘要：10-10 深夜 = 三十四审 A- 定格 + R138 收口；当日 = 三十二审开账 R132-R135 四笔 P3 同包收口（R132 zh-CN 两行刷现值；R133 TODO 登记段补回"L2 包展开单元不做同文件 fn 重复检测"项（R115 宣告入册未入册补录）；R134 本表 §1 Rust 行算术矛盾句修正 35→37 与归因拆分；R135 designs/0021 §1 公式与 main.rs check_and_report_file doc 注释同步 R128 统一减法口径——触 src/ 注释按 §2.2 决策表升 patch v1.9.3，零行为变化）。前置轮 = 三十二审 B+ 四连（报告 reviews/review-2026-10-09-4.html，R132-R135 开账→本批收口，台账零 open）+ v1.9.2 升版记账批（tag `ec2ebf0`，CI run `37895385249` 七 job 绿：TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行括注错挂）并补 v1.9.0/v1.9.1 交付描述；tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后落地的两笔行为修复（`b614037` 三十审 R125 根路径减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按 MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**；R127-R130 计数收口与 R131 doc_audit J+ 集成现实核对位（71→72 项）同批记账）。更早轮（10-08~09）= v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI 子命令 → v1.9.1 build 三缺口收口 → 二十九/三十/三十一审 B+ 三连（R119-R130 十二笔全关 + R131 工具根治，台账零 open）。playground 线上常绿（gh-pages `d0bd774` 三方 sha256 一致）；**Release v1.7.0（pre-release）已发布**（2026-10-07，id 405817252，转正待外部反馈）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 581+40、eval 双后端各 129/129、doc_audit 73 项（J 锚三组 + J+ 现实核对 + K 交接镜像核对 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（三十二审/性能工程/Release 转正）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
+5. **当前状态（2026-10-15 晚，一日全弧线收官 + 治理批落盘——交接就绪；台账零 open（顺延号 R148 起）；最新 v1.12.0 tag `4a64471`，CI run `38688935472` 七 job 绿，其后登记/治理批至 HEAD `f25eefb` CI 绿；gh-pages `45fb8dd` 线上 v1.12.0）**：本轮弧线（v1.12.0 二期 + 部署 + R147 + 身份修复 + XERJ + 治理批）与待触发项（发帖/三十七审发帖前/Zenodo）详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（Ubuntu 26 迁移 10-19 观察；contributors 侧栏 Wyty 缓存残影待自刷）。历史轮次摘要：本轮弧线与裁决链详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（ACRI v0.1 + L1-conformant + RepairLoopBench + 目录 PR 材料 v3 待用户手动提交 + tutorial 隐私移出跟踪）。历史轮次摘要：2026-10-12 早 = β-1/2/3 落地；本轮弧线与裁决链详见 TODO 顶部状态块与 HANDOFF_PROMPT 镜像（性能工程 designs/0022 两刀 bootstrap 累积 10.9× 行为零变化；三十五审 B+ 四账全收口；审查降频事件驱动 + γ/β 生态位战略；RepairLoopBench 基准卡 = eval/README）。历史轮次摘要：10-10 深夜 = 三十四审 A- 定格 + R138 收口；当日 = 三十二审开账 R132-R135 四笔 P3 同包收口（R132 zh-CN 两行刷现值；R133 TODO 登记段补回"L2 包展开单元不做同文件 fn 重复检测"项（R115 宣告入册未入册补录）；R134 本表 §1 Rust 行算术矛盾句修正 35→37 与归因拆分；R135 designs/0021 §1 公式与 main.rs check_and_report_file doc 注释同步 R128 统一减法口径——触 src/ 注释按 §2.2 决策表升 patch v1.9.3，零行为变化）。前置轮 = 三十二审 B+ 四连（报告 reviews/review-2026-10-09-4.html，R132-R135 开账→本批收口，台账零 open）+ v1.9.2 升版记账批（tag `ec2ebf0`，CI run `37895385249` 七 job 绿：TODO 状态块两处漂移修正（基线数字行 doc_audit 71/71→72/72 + 版本行括注错挂）并补 v1.9.0/v1.9.1 交付描述；tag v1.9.1（`7c2403c`，CI run `37767137349` 七 job 绿）之后落地的两笔行为修复（`b614037` 三十审 R125 根路径减法 + `d513894` 三十一审 R128 统一减法——集成 35→37 补测试锁定）按 MAINTENANCE §2.2"行为修复→patch"补升 **v1.9.2**；R127-R130 计数收口与 R131 doc_audit J+ 集成现实核对位（71→72 项）同批记账）。更早轮（10-08~09）= v1.7.2 L2 行号 → v1.8.0 L2 转正 → v1.9.0 l2fix CLI 子命令 → v1.9.1 build 三缺口收口 → 二十九/三十/三十一审 B+ 三连（R119-R130 十二笔全关 + R131 工具根治，台账零 open）。playground 线上常绿（gh-pages `d0bd774` 三方 sha256 一致）；**Release v1.7.0（pre-release）已发布**（2026-10-07，id 405817252，转正待外部反馈）。已提交基线 verify_selfcomp 368/368 = 196 单文件 + 8 包 + 164 负例，bootstrap 14/14，强 quine 272925 bytes 双侧一致；self_comp 源码 12671 行；Rust 581+40、eval 双后端各 129/129、doc_audit 73 项（J 锚三组 + J+ 现实核对 + K 交接镜像核对 + E 类 milestone 版本锚）。撞名/遮蔽族语义已冻结（SPEC §8.1）。登记在案不修边界与待裁菜单（三十二审/性能工程/Release 转正）见 TODO 顶部交接状态块。历史资产：D 包两期 2026-09-14：3400 程序/项目实例双后端全一致；三期 2026-09-15：4400 程序/项目实例双后端全一致；四期 2026-09-15：10000 程序/项目实例双后端全一致（模板族 101）；§11f 八条分歧全档案，探针 6/6（另有 R104/R105 撞名定向探针 ×2 同走 --probe）；self_interp.lom（5727 行）、selfhost 六模式。维护流程见 MAINTENANCE.md（§12 已收编留指针）；CI/tag 只评已提交树。
 6. 记住：**改动前先读代码，提交前跑回归，推送后看 CI 首跑，里程碑 feat+docs 成对提交并推送**
 
 ## 10. 性能实测数据（Phase 5.18，2026-08-18）
