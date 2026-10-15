@@ -87,9 +87,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
-  README）；β 三批已落地；**目录 PR #68 已提交待审**（反馈逐条呈批；R147
-  条目数字处置待裁）；发帖材料三件套已备（发布触发 = PR 合并）；
-  对外动作逐项呈批不变。
+  README）；β 三批已落地；**目录 PR #68 open 待审**（反馈逐条呈批；
+  R147 已处置 a 收口——head `5ae7cff`，条目数字已更 621）；发帖材料
+  三件套已备（发布触发 = PR 合并）；对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
@@ -117,11 +117,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**v1.12.0 提交推送看 CI → 绿后切 tag + 回填（README Current
-  段 tag/CI 待回填位/HANDOVER/positioning/TODO）→ gh-pages 部署呈批**
-  （含 Chrome/Edge 线上复测）；待触发：发帖（PR #68 合并）/ Zenodo
-  （同触发）——细节见状态段与 TODO 顶部；观察项：Ubuntu 26 迁移
-  （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两步骤）。
+- 下一步：**交接就绪（无待裁项）**；待触发三件（详见状态段）：发帖
+  （PR #68 合并触发，每帖单独呈批）→ 前置三十七审（发帖前，已裁）→
+  Zenodo（PR 合并后）；观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
+  首跑——doc-gates 含断链+l2fix 两步骤）+ contributors 侧栏 "Wyty"
+  缓存残影待 GitHub 自刷（底层已归一）。
   对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
