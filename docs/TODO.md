@@ -1,19 +1,10 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-15，交接收口后动工——R147 处置 a 已执行 + ⑤ playground 二期 B-only 批进行中；台账零 open；顺延号 R148 起）**：
-> **最新基线 v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job 绿；其后纯文档批至 HEAD `5576e7c`（三十六审入库）run `38605545988` 亦绿）。
-> **用户裁决"执行可立即动工项"（2026-10-15）**：① **⑤ playground L2 二期
-> 批动工**（五裁决点均按建议项：B-only 自举演示 / quine 预置 hex 基准 /
-> L2 看门狗 60s / 实验性口径标注 / CI 冒烟扩展；调研结论：栈关切解除——
-> self_comp 编译型 wasm 默认栈全过、256KB 下界余量 ≥3.8×；
-> **新登记面**：宿主 wasm 内建 file_read/file_exists 全形态不可用（一期
-> 未暴露，根因 harness path_open 链未定位，独立修复批候选）；**② R147
-> 已处置 a 收口（2026-10-15）**：fork 追 commit `a2ae48c`（条目 618→621，
-> 英文说明含 v1.10.2/3 三测增量），PR #68 head 实查已更新（commits=2、
-> 仍 open/clean/零评论）；v3 终稿对照清单同步更正（材料面）；③ 发帖
-> 材料三件套已备（target/probes/outreach/，gitignored：Show HN + r/PL 草稿
-> + 时机备忘；**发布触发 = PR #68 合并**，每帖发布前单独呈批）；④ Zenodo
-> DOI（A 项）排 PR 合并后开通（Citing 段已就位）。
+> **当前状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推；台账零 open；顺延号 R148 起）**：
+> **本批基线 v1.12.0**（Cargo.toml/lock 已升；tag/CI 待提交推送后回填。= **playground 自举演示二期**（designs/0024，用户裁决"执行可立即动工项"，五裁决点均按建议：B-only / quine 预置 hex 基准 / L2 看门狗 60s / 口径标注 strict-subset / CI 冒烟扩展）：页面新增 "Self-hosting demo" 区块——浏览器内四步链（selfcomp.wasm 编译 self_comp.lom → JS hex2wasm 解码 → self-apply → 与预置基准逐字符比对）**QUINE 272925 bytes byte-identical 浏览器亲测达成**（Chromium 本地 ~26.5s，60s 看门狗余量充足）；新增 playground/selfboot.js（414 行，env 契约逐项镜像 run_selfcomp.mjs）+ selfboot-worker.js（72）+ tools/build_selfboot.py（110，COMPILED 272925 硬门）+ smoke 自举段（6/6）+ ci.yml 第七 job 前插构建 step + .gitignore（dist-selfboot/）；一期六文件零删改（app.js/index.html/smoke.mjs 纯追加）。零 src/、零 .lom、零语言面——**Rust 581+40、368/368、quine 272925 构造性不变**（执行者全套 + 规划者亲跑 smoke 全链/doc_audit/verify_selfcomp/build_selfboot + 浏览器手测）。**部署 gh-pages 待呈批**（对外动作，铁律 6；Chrome/Edge 线上复测随部署）。**登记面**：宿主 wasm 内建 file_read/file_exists 全形态不可用（一期未暴露，根因 harness path_open 链未定位，独立修复批候选）。
+> **前一基线 v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job 绿；其后纯文档批至 `9f58430`（R147 销账）CI run `38671865630` 七 job 绿实查）。
+> **R147 处置 a 已收口（2026-10-15，`9f58430`）**：fork 追 commit `a2ae48c`（条目 618→621，英文说明含 v1.10.2/3 三测增量），PR #68 head 实查已更新（commits=2、仍 open/clean/零评论）；v3 终稿对照清单同步更正（材料面）。
+> **待裁/待触发**：③ 发帖材料三件套已备（target/probes/outreach/，gitignored：Show HN + r/PL 草稿 + 时机备忘；**发布触发 = PR #68 合并**，每帖发布前单独呈批）；④ Zenodo DOI（A 项）排 PR 合并后开通（Citing 段已就位）；⑤ 部署 gh-pages（本批收尾件，呈批后执行）。
 > **三十六审（2026-10-15，[review-2026-10-15.html](reviews/review-2026-10-15.html)，基线 `a625014`，用户裁决"执行主动项"发起）**：**A-**——六批增量核心宣称敌手复核全部成立（旧树独立构建复现修复前 exit-127、边界 59999/60001、题 130 反向排序误报红证复演、fix 边界实测、38 码 diff、六报告 TL;DR、lookup 数据链独立复测），18 探针零击穿、P1/P2 零在场；**R144-R146 三笔 P3 计数陈旧已同包收口**（README Verify 块/AGENTS.md/full-suite 措辞，`5576e7c`）。
 > **本日弧线（2026-10-13~15，用户逐批裁决）**：v1.10.1 英文门面（六报告
 > TL;DR+fix.rs 英文注+docs/README.md 地图）→ 收尾+R143（link_check 扫描源

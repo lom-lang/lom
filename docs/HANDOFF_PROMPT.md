@@ -44,25 +44,22 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-15，交接收口——v1.10.0→v1.11.0 一日弧线收官 + 三十六审 A-；台账 open = R147；顺延号 R148 起）**：
-  最新已提交基线 **v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job
-  绿；HEAD `5576e7c`（三十六审入库）run `38605545988` 亦绿）。**目录
-  PR #68 open 待审**（aallan/agentlanguages#68，fork lom-lang/
-  agentlanguages add-lom；零评论；反馈逐条呈批后英文回复；邮箱裁决
-  A=Gmail 接受）。**待裁菜单（用户）**：⑤ playground 二期方案（调研
-  结论栈关切解除——self_comp 编译型 wasm 默认栈全过、256KB 下界余量
-  ≥3.8×；建议 B-only 自举演示；新登记面 = 宿主 wasm file_read/
-  file_exists 不可用待独立修复批）/ R147（PR 条目 618→621，建议 fork
-  追 commit）/ 发帖材料三件套已备（target/probes/outreach/，发布触发
-  = PR 合并，每帖单独呈批）/ Zenodo A 项排 PR 合并后。**三十六审
-  A-**（review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零
-  击穿、P1/P2 零在场；R144-R146 计数陈旧已收口）。**本日十三批弧线**：
-  v1.10.1 英文门面 → R143 收尾 → v1.10.2 PKG fix 覆盖（全 38 码）→
-  v1.10.3 运行时闭环（守卫 60000 复标+消息感知 hint）→ v1.11.0 题
-  130（第三题源形态）+ 宣称五处修正 → lookup 收口（不修）→ Citing →
-  三十六审。**观察：Ubuntu 26 迁移 2026-10-19 盯 CI**。
+- **状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推 + R147 已收口；台账零 open；顺延号 R148 起）**：
+  本批基线 **v1.12.0**（Cargo.toml/lock 已升；tag/CI 回填待推送——playground
+  自举演示二期，designs/0024 五裁决点均按建议项：浏览器四步链 **QUINE
+  272925 byte-identical 亲测达成**（~26.5s，60s 独立看门狗）；零 src/ 零
+  .lom 零语言面，基线构造性不变；**gh-pages 部署待呈批**——含 Chrome/Edge
+  线上复测）。前一基线 **v1.11.0**（tag `dc754ef`，CI run `38576018355`
+  七 job 绿；R147 销账批 `9f58430` run `38671865630` 七 job 绿实查）。
+  **目录 PR #68 open 待审**（零评论；head 已更新 `a2ae48c`——R147 处置 a
+  2026-10-15 收口：fork 追 commit 条目 618→621；反馈逐条呈批后英文回复）。
+  **待裁/待触发**：gh-pages 部署呈批（⑤ 收尾件）/ 发帖材料三件套已备
+  （target/probes/outreach/，发布触发 = PR 合并，每帖单独呈批）/ Zenodo
+  A 项排 PR 合并后。**三十六审 A-**（review-2026-10-15.html：六批宣称
+  敌手复核全成立、18 探针零击穿、P1/P2 零在场；R144-R146 计数陈旧已
+  收口、R147 已处置）。**观察：Ubuntu 26 迁移 2026-10-19 盯 CI**。
 
-- **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→**三十六审 A-**（v1.10.0→v1.11.0 六批增量；R147 open）。
+- **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→**三十六审 A-**（v1.10.0→v1.11.0 六批增量；R144-R147 四账全收口）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
   即审）。最新报告 [review-2026-10-15.html](reviews/review-2026-10-15.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
@@ -73,7 +70,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
   **73/73**（J 锚组现值 581+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.11.0**。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.12.0**。
 - **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
@@ -91,8 +88,13 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   共享；bench.lom 十负载 + tools/bench.py（交错 A/B 为标准纪律【R139】）；
   递归物理边界：深帧形态实测 ~67k 溢出；N1 软件守卫 v1.10.3 复标 **60000**（深帧形态下结构化先于物理溢出；浅帧物理 ~100k）。
 - **playground 维护要点**：构建 `cargo build --target wasm32-wasip1
-  --profile wasm-release`；冒烟 `node playground/smoke.mjs`；部署 =
-  五源件 + wasm 推 gh-pages 孤儿分支；深度守卫 wasm 侧 300。
+  --profile wasm-release`；冒烟 `node playground/smoke.mjs`（**v1.12.0 起
+  先跑 `python tools/build_selfboot.py` 生成分发三件**——playground/
+  dist-selfboot/ gitignored：selfcomp.wasm / selfboot-baseline.hex /
+  self_comp.lom 副本，COMPILED 272925 硬门；smoke 含自举段 6 断言）；
+  部署 = 五源件 + wasm + 分发三件推 gh-pages 孤儿分支；深度守卫 wasm 侧
+  300；**二期自举演示 = "Self-hosting demo" 区块**（selfboot.js env 契约
+  镜像 run_selfcomp.mjs / 独立 60s 看门狗 / strict-subset 口径标注）。
 - **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
   拦截）；build 统一减法；闭包捕获 mut 赋值 MUT002 分歧族；退出码
   三带（check err=1/warn=0、fix 恒 0、工具失败 ≥2——pkg-expand 混合
@@ -103,9 +105,10 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**交接就绪，待裁菜单四项**（⑤ playground B-only 方案 /
-  R147 处置 / 发帖发布（触发 = PR #68 合并）/ Zenodo 开通（同触发））
-  ——细节见状态段与 TODO 顶部；观察项：Ubuntu 26 迁移
+- 下一步：**v1.12.0 提交推送看 CI → 绿后切 tag + 回填（README Current
+  段 tag/CI 待回填位/HANDOVER/positioning/TODO）→ gh-pages 部署呈批**
+  （含 Chrome/Edge 线上复测）；待触发：发帖（PR #68 合并）/ Zenodo
+  （同触发）——细节见状态段与 TODO 顶部；观察项：Ubuntu 26 迁移
   （**2026-10-19**，盯 CI 首跑——doc-gates 含断链+l2fix 两步骤）。
   对外动作逐项呈批（铁律 6）。
 

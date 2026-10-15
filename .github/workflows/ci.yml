@@ -210,5 +210,9 @@ jobs:
         run: cargo build --release
       - name: Build wasm (host toolchain → wasm32-wasip1)
         run: cargo build --target wasm32-wasip1 --profile wasm-release
+      - name: Build selfboot distribution (self-hosting demo, designs/0024)
+        # 宿主 lom 自编译 self_comp → 基准 hex → hex2wasm 解码 selfcomp.wasm；
+        # 下方 smoke 的二期自举段依赖 playground/dist-selfboot/ 三件分发物
+        run: python3 tools/build_selfboot.py
       - name: Node smoke (harness 全链 vs 桌面对拍)
         run: node playground/smoke.mjs

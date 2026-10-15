@@ -1,8 +1,11 @@
 // playground node 冒烟（designs/0019 §4.1）：同一 harness 在 node 跑
 // hello / fib / 修复闭环四步 / 深度守卫，与桌面语义逐字比对。
+// 二期追加（designs/0024 B-only）：⑥ 自举链段——分发物在位检查 + node 跑
+// 四步链 + 基准比对 + quine 字节数断言 272925 + 各步耗时报表。
 // 用法：node playground/smoke.mjs [lom.wasm 路径]
 import { createLomRuntime } from "./harness.js";
-import { readFileSync } from "node:fs";
+import { runSelfbootChain } from "./selfboot.js";
+import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const wasmPath = process.argv[2] || "target/wasm32-wasip1/wasm-release/lom.wasm";
@@ -68,6 +71,39 @@ function check(name, actual, expected) {
   const bad = "fn main() -> Unit\n    let x: Int = 1.5\n    println(x)\nend\n";
   const wasm = await rt.run({ source: bad, args: ["lom", "/playground.lom", "--check"] });
   check("check TYPE001 warning on stdout", wasm.stdout.includes("TYPE001"), true);
+}
+
+// ---- ⑥ 二期自举链段（designs/0024 B-only）：node 跑四步链 + 基准比对 ----
+{
+  const dist = "playground/dist-selfboot";
+  const paths = {
+    wasm: dist + "/selfcomp.wasm",
+    src: dist + "/self_comp.lom",
+    baseline: dist + "/selfboot-baseline.hex",
+  };
+  const missing = Object.values(paths).filter((p) => !existsSync(p));
+  if (missing.length > 0) {
+    console.error("缺自举分发物: " + missing.join(", "));
+    console.error("先构建: python tools/build_selfboot.py");
+    check("selfboot assets present", false, true);
+  } else {
+    const result = await runSelfbootChain({
+      wasmBytes: new Uint8Array(readFileSync(paths.wasm)),
+      sourceBytes: new Uint8Array(readFileSync(paths.src)),
+      baselineHex: readFileSync(paths.baseline, "utf8"),
+    });
+    console.log("-- selfboot demo（各步耗时）--");
+    for (const s of result.steps) {
+      console.log("  STEP" + s.n + "  " + String(s.durationMs).padStart(6) + " ms   " + s.detail);
+    }
+    console.log("  total  " + String(result.totalMs).padStart(6) + " ms");
+    check("selfboot STEP1 compiled bytes", result.step1.compiledBytes, 272925);
+    check("selfboot STEP2 decoded bytes", result.step2.bytes, 272925);
+    check("selfboot STEP3 compiled bytes", result.step3.compiledBytes, 272925);
+    check("selfboot STEP4 quine byte-identical", result.quine.identical, true);
+    check("selfboot quine bytes 272925", result.quine.bytes, 272925);
+    check("selfboot baseline bytes 272925", result.quine.baselineBytes, 272925);
+  }
 }
 
 console.log(failures === 0 ? "\nSMOKE: ALL PASS" : `\nSMOKE: ${failures} FAIL`);

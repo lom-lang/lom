@@ -54,3 +54,7 @@ __pycache__/
 
 # 2026-10-12 隐私裁决：教程含读者画像信息，移出跟踪、本地保留
 docs/lom-tutorial.html
+
+# playground 二期自举演示分发物（tools/build_selfboot.py 产物，不入库；
+# *.wasm 已有全局忽略，此处覆盖 hex/lom 副本）
+playground/dist-selfboot/

@@ -195,6 +195,49 @@
     padding: 0 4px;
     font-size: 11.5px;
   }
+
+  /* ---- Self-hosting demo 区块（二期 B-only, designs/0024；只追加，不动一期规则） ---- */
+  #selfhost-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin: 0 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  #selfhost-section > h2 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0;
+  }
+  #selfboot-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #selfboot-steps li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font: 12.5px/1.5 var(--mono);
+    color: var(--dim);
+    padding: 2px 8px;
+    border-left: 2px solid var(--border);
+  }
+  #selfboot-steps li[data-state="run"] { color: var(--fg); }
+  #selfboot-steps li[data-state="done"] { color: var(--fg); border-left-color: var(--green); }
+  #selfboot-steps li[data-state="fail"] { color: var(--red); border-left-color: var(--red); }
+  #selfboot-steps .selfboot-step-status { white-space: nowrap; }
+  #selfboot-out { color: var(--fg); }
 </style>
 </head>
 <body>
@@ -241,6 +284,25 @@
     </section>
   </section>
 </main>
+
+<!-- Self-hosting demo（二期 B-only, designs/0024）：L2 子集编译器——自身已被编译为
+     wasm——在浏览器里编译自己的源码，再让产物编译自己一次，与预置基准逐字符比对，
+     现场演示 272,925 字节强 quine。全程在本页的 Web Worker 内完成。 -->
+<section id="selfhost-section">
+  <h2>Self-hosting demo</h2>
+  <div class="toolbar">
+    <button id="selfboot-btn" title="Lom compiled by Lom, inside this page">Compile Lom with Lom ▶</button>
+    <span class="note">Runs entirely in this page (a Web Worker); the four-step chain takes a few seconds.</span>
+  </div>
+  <ol id="selfboot-steps">
+    <li id="selfboot-step-1" data-state="idle"><span>STEP 1 · selfcomp.wasm compiles self_comp.lom → hex A</span><span class="selfboot-step-status">—</span></li>
+    <li id="selfboot-step-2" data-state="idle"><span>STEP 2 · hex A decoded → wasm bytes B</span><span class="selfboot-step-status">—</span></li>
+    <li id="selfboot-step-3" data-state="idle"><span>STEP 3 · wasm B compiles self_comp.lom again → hex Q</span><span class="selfboot-step-status">—</span></li>
+    <li id="selfboot-step-4" data-state="idle"><span>STEP 4 · hex Q vs preset baseline, char by char</span><span class="selfboot-step-status">—</span></li>
+  </ol>
+  <pre id="selfboot-out"></pre>
+  <p class="note">Scope note: the self-hosting engine is the <b>L2 subset</b> — a strict subset of the supported language face. Full-language programs belong in the main engine above. The quine figure (272,925 bytes) matches the repo <a href="https://github.com/lom-lang/lom" target="_blank" rel="noreferrer">README</a>.</p>
+</section>
 
 <footer>
   <h2>Playground boundaries (by design)</h2>
