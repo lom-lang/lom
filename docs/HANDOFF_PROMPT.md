@@ -45,7 +45,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推 + R147 已收口；台账零 open；顺延号 R148 起）**：
-  本批基线 **v1.12.0**（Cargo.toml/lock 已升；tag/CI 回填待推送——playground
+  本批基线 **v1.12.0**（tag `61ff36e`，CI run `38688935472` 七 job 绿——
+  含扩展后 playground job；playground
   自举演示二期，designs/0024 五裁决点均按建议项：浏览器四步链 **QUINE
   272925 byte-identical 亲测达成**（~26.5s，60s 独立看门狗）；零 src/ 零
   .lom 零语言面，基线构造性不变；**gh-pages 部署待呈批**——含 Chrome/Edge
