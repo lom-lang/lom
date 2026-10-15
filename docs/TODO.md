@@ -1,11 +1,12 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
 > **当前状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推；台账零 open；顺延号 R148 起）**：
-> **本批基线 v1.12.0**（tag `61ff36e`，CI run `38688935472` 七 job 绿——含扩展后 playground job（自举构建 + 冒烟 6 断言）。= **playground 自举演示二期**（designs/0024，用户裁决"执行可立即动工项"，五裁决点均按建议：B-only / quine 预置 hex 基准 / L2 看门狗 60s / 口径标注 strict-subset / CI 冒烟扩展）：页面新增 "Self-hosting demo" 区块——浏览器内四步链（selfcomp.wasm 编译 self_comp.lom → JS hex2wasm 解码 → self-apply → 与预置基准逐字符比对）**QUINE 272925 bytes byte-identical 浏览器亲测达成**（Chromium 本地 ~26.5s，60s 看门狗余量充足）；新增 playground/selfboot.js（414 行，env 契约逐项镜像 run_selfcomp.mjs）+ selfboot-worker.js（72）+ tools/build_selfboot.py（110，COMPILED 272925 硬门）+ smoke 自举段（6/6）+ ci.yml 第七 job 前插构建 step + .gitignore（dist-selfboot/）；一期六文件零删改（app.js/index.html/smoke.mjs 纯追加）。零 src/、零 .lom、零语言面——**Rust 581+40、368/368、quine 272925 构造性不变**（执行者全套 + 规划者亲跑 smoke 全链/doc_audit/verify_selfcomp/build_selfboot + 浏览器手测）。**部署 gh-pages 待呈批**（对外动作，铁律 6；Chrome/Edge 线上复测随部署）。**登记面**：宿主 wasm 内建 file_read/file_exists 全形态不可用（一期未暴露，根因 harness path_open 链未定位，独立修复批候选）。
-> **前一基线 v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job 绿；其后纯文档批至 `9f58430`（R147 销账）CI run `38671865630` 七 job 绿实查）。
-> **R147 处置 a 已收口（2026-10-15，`9f58430`）**：fork 追 commit `a2ae48c`（条目 618→621，英文说明含 v1.10.2/3 三测增量），PR #68 head 实查已更新（commits=2、仍 open/clean/零评论）；v3 终稿对照清单同步更正（材料面）。
+> **本批基线 v1.12.0**（tag `4a64471`，CI run `38688935472` 七 job 绿——含扩展后 playground job（自举构建 + 冒烟 6 断言）。= **playground 自举演示二期**（designs/0024，用户裁决"执行可立即动工项"，五裁决点均按建议：B-only / quine 预置 hex 基准 / L2 看门狗 60s / 口径标注 strict-subset / CI 冒烟扩展）：页面新增 "Self-hosting demo" 区块——浏览器内四步链（selfcomp.wasm 编译 self_comp.lom → JS hex2wasm 解码 → self-apply → 与预置基准逐字符比对）**QUINE 272925 bytes byte-identical 浏览器亲测达成**（Chromium 本地 ~26.5s，60s 看门狗余量充足）；新增 playground/selfboot.js（414 行，env 契约逐项镜像 run_selfcomp.mjs）+ selfboot-worker.js（72）+ tools/build_selfboot.py（110，COMPILED 272925 硬门）+ smoke 自举段（6/6）+ ci.yml 第七 job 前插构建 step + .gitignore（dist-selfboot/）；一期六文件零删改（app.js/index.html/smoke.mjs 纯追加）。零 src/、零 .lom、零语言面——**Rust 581+40、368/368、quine 272925 构造性不变**（执行者全套 + 规划者亲跑 smoke 全链/doc_audit/verify_selfcomp/build_selfboot + 浏览器手测）。**部署 gh-pages 待呈批**（对外动作，铁律 6；Chrome/Edge 线上复测随部署）。**登记面**：宿主 wasm 内建 file_read/file_exists 全形态不可用（一期未暴露，根因 harness path_open 链未定位，独立修复批候选）。
+> **前一基线 v1.11.0**（tag `e83177b`，CI run `38576018355` 七 job 绿；其后纯文档批至 `ff2881f`（R147 销账）CI run `38671865630` 七 job 绿实查）。
+> **R147 处置 a 已收口（2026-10-15，`ff2881f`）**：fork 追 commit `5ae7cff`（条目 618→621，英文说明含 v1.10.2/3 三测增量），PR #68 head 实查已更新（commits=2、仍 open/clean/零评论）；v3 终稿对照清单同步更正（材料面）。
 > **待裁/待触发**：③ 发帖材料三件套已备（target/probes/outreach/，gitignored：Show HN + r/PL 草稿 + 时机备忘；**发布触发 = PR #68 合并**，每帖发布前单独呈批）；④ Zenodo DOI（A 项）排 PR 合并后开通（Citing 段已就位）；⑤ 部署 gh-pages（本批收尾件，呈批后执行）。
-> **三十六审（2026-10-15，[review-2026-10-15.html](reviews/review-2026-10-15.html)，基线 `a625014`，用户裁决"执行主动项"发起）**：**A-**——六批增量核心宣称敌手复核全部成立（旧树独立构建复现修复前 exit-127、边界 59999/60001、题 130 反向排序误报红证复演、fix 边界实测、38 码 diff、六报告 TL;DR、lookup 数据链独立复测），18 探针零击穿、P1/P2 零在场；**R144-R146 三笔 P3 计数陈旧已同包收口**（README Verify 块/AGENTS.md/full-suite 措辞，`5576e7c`）。
+> **身份修复批（2026-10-15，用户裁决"执行，邮箱选 noreply 新格式"；git 历史元数据批，零内容改动、不升版）**：背景——10-12 起仓库级 email 为 `wyty@users.noreply.github.com`（旧式无 ID noreply，按本地 name 拼模板的错型；GitHub 用户名改回 wytyKen 后 "wyty" 被陌生账号 id 24763508 抢注，**21 笔提交归因漂移到陌生账号**）。修复四件：① 本地配置（全局+主仓+fork 副本）刷为 `wytyKen <204019711+wytyKen@users.noreply.github.com>`（新式带 ID，永不受改名影响）；② filter-branch 改写 `6a7fed2^..HEAD` **21 笔** author+committer（树对象零差异验证 = 内容零变化；全历史身份现 = 460 wyty<南科大> + 21 wytyKen<noreply>）；③ 五 tag 重切（v1.10.1 `aeb38da`/v1.10.2 `664be97`/v1.10.3 `838b5f0`/v1.11.0 `e83177b`/v1.12.0 `4a64471`）+ 文档 sha 替换 43 处 + fork sha 2 处（`a2ae48c`→`5ae7cff`）；④ force push main（`779917a`→`30371a8`）+ fork force push。验收：**commits API 新 HEAD author/committer.login = wytyKen 实查**；五 tag 双端一致；PR #68 head 实查更新。**边界如实登记**：① 460 笔南科大邮箱提交靠账号保留该验证邮箱关联——**南科大邮箱不得从 GitHub 账号移除**（可不为主邮箱）；② 旧 CI run（`38576018355`/`38688935472` 等锚定旧 sha）与 force push 后历史脱钩——Actions 留档但 head_sha 为孤儿提交，以新 HEAD run 为准；③ contributors 列表 GitHub 缓存刷新时滞（数小时~几天）后 "Wyty" 条目消失归并 wytyKen；④ reviews/archive 历史文档中旧 sha 引用按"原文不回写"纪律不动（成为历史孤儿引用）；⑤ force push 前旧 commit 对象在 GitHub 服务器短期仍可按旧 sha 访问（gc 后自然消失）。**推翻先例**：2026-10-12 隐私裁决"不改写历史"经用户 2026-10-15 新裁决推翻（归因污染性质，非隐私泄露）。
+> **三十六审（2026-10-15，[review-2026-10-15.html](reviews/review-2026-10-15.html)，基线 `710c1f0`，用户裁决"执行主动项"发起）**：**A-**——六批增量核心宣称敌手复核全部成立（旧树独立构建复现修复前 exit-127、边界 59999/60001、题 130 反向排序误报红证复演、fix 边界实测、38 码 diff、六报告 TL;DR、lookup 数据链独立复测），18 探针零击穿、P1/P2 零在场；**R144-R146 三笔 P3 计数陈旧已同包收口**（README Verify 块/AGENTS.md/full-suite 措辞，`5af5d93`）。
 > **本日弧线（2026-10-13~15，用户逐批裁决）**：v1.10.1 英文门面（六报告
 > TL;DR+fix.rs 英文注+docs/README.md 地图）→ 收尾+R143（link_check 扫描源
 > 含未跟踪根治）→ v1.10.2 PKG 族 fix 覆盖（分派表全 38 码）→ v1.10.3
@@ -18,7 +19,7 @@
 > **观察项**：Ubuntu 26 迁移 2026-10-19 盯 CI 首跑（预演：全 ubuntu-latest
 > 无固定引用、doc-gates 依赖 python3 标准库——低风险）。
 
-> **前置 · ① 文档欠账小批（`33388cb`，纯文档不升版）**：HANDOVER §1 CI 行（停在 v1.7.2 落后五版）与"下一步"行（停在 10-10）刷新；README.zh-CN 四处陈旧（v1.7.0→现版 / 573+37→580+40 / L2 实验性→supported / 26→35 轮事件驱动）。
+> **前置 · ① 文档欠账小批（`88b011b`，纯文档不升版）**：HANDOVER §1 CI 行（停在 v1.7.2 落后五版）与"下一步"行（停在 10-10）刷新；README.zh-CN 四处陈旧（v1.7.0→现版 / 573+37→580+40 / L2 实验性→supported / 26→35 轮事件驱动）。
 > **目录 PR 已落地**：[aallan/agentlanguages#68](https://github.com/aallan/agentlanguages/pull/68)
 > （2026-10-13 提交，标题/描述/条目与终稿探针逐字核验一致——条目 127 行逐行同、
 > 唯末尾换行为 POSIX 形态；open 非 draft、Able to merge、上游无 CI check、零评论；
@@ -26,21 +27,21 @@
 > **观察项**：Ubuntu 26 迁移 2026-10-19 盯 CI 首跑（doc-gates 含断链+l2fix 两步骤）。
 > **前置（2026-10-13，v1.10.1 收尾小批 + R143，纯文档+CI 工具批不升版；用户裁决"执行"）**：
 > ① v1.10.1 批主写位补登（批时漏刷 TODO 状态块——流程债如实登记，§2.3 SOP
-> 顺序瑕疵同批纠正）；② tag `a2ed68f` / CI run `38379975886` 七 job 绿回填三处
+> 顺序瑕疵同批纠正）；② tag `aeb38da` / CI run `38379975886` 七 job 绿回填三处
 > （HANDOVER §1 / positioning / README Current 段）；③ **R143 开账即收口**：
 > link_check 扫描源盲区——扫描源=git 索引、未 add 新文件不被扫（v1.10.1 首跑
 > run `38378861239` doc-gates 断链红实录：docs/README.md 未 add 时本地 PASS、
 > CI 红）；处置 b = 扫描源扩至未跟踪 md/html（ls-files --others
 > --exclude-standard），**构造性红证过**（未跟踪断链文件 FAIL A 类 1 → 删除
 > PASS）。MAINTENANCE §7 随批登记。
-> **前置 · v1.10.1 批（2026-10-13，用户裁决"按你的想法执行"——对外英文门面收口；tag `a2ed68f`，CI run `38379975886` 七 job 绿）**：
+> **前置 · v1.10.1 批（2026-10-13，用户裁决"按你的想法执行"——对外英文门面收口；tag `aeb38da`，CI run `38379975886` 七 job 绿）**：
 > 六份 eval 报告英文 TL;DR 追加框（中文正文零改动，数字取自各报告原文）+
 > fix.rs 英文公理模块注（中文注释保留）+ docs/README.md 英文导览（英/中文档面
 > 地图）+ guide.html 英文指针 + README Current 行陈旧 v1.8.0 刷新 + 升版联动位
 > 四处（HANDOVER §1/§9、positioning、SPEC §13）与 Cargo 1.10.1；触 src/ 注释按
 > R135 先例升 patch。**首跑红一次如实登记**：doc-gates 断链红（docs/README.md
 > 的 specs/acri 相对链接误写为 acri/→解析 docs/acri；本地未 add 不被扫故 PASS）
-> → 修复提交 `a2ed68f` 后绿——即 R143 根因。行为零变化：quine 272925 逐字节
+> → 修复提交 `aeb38da` 后绿——即 R143 根因。行为零变化：quine 272925 逐字节
 > 不变、368/368、578+40、doc_audit 73/73。证据链六链接第一屏全英文（对外收口
 > 目标达成；README/eval"中文残留"经改前读码定性为产品输出/原文引用/双语导航，
 > 不清除）。commit message 本批起切英文（对外可见面）。
@@ -50,7 +51,7 @@
 > target/probes/agentlanguages/ lom-entry-draft.md v3 终稿 + 操作指引；
 > PR 线程回复逐条呈批。
 > **隐私裁决（2026-10-12 用户裁定边界）**：文件内容面清查（唯一命中 =
-> tutorial 读者画像，已移出跟踪+gitignore 本地保留，`6a7fed2` CI 绿；
+> tutorial 读者画像，已移出跟踪+gitignore 本地保留，`95468fa` CI 绿；
 > spec_examples 收窄两文档）；git 提交元数据不算泄露（不改写历史）；
 > git user.email 已换 noreply（新提交起）。
 > **本批（用户裁决"按序执行"——β-2 = designs/0023 §5 工程批，升 minor v1.10.0；tag `b3bb9f5`，CI run `38168342829` 七 job 绿——回填批登记）**：

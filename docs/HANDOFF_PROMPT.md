@@ -45,20 +45,28 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 
 【当前真实状态】（活信息镜像——每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-15，⑤ playground 二期 B-only 批（v1.12.0）交付待推 + R147 已收口；台账零 open；顺延号 R148 起）**：
-  本批基线 **v1.12.0**（tag `61ff36e`，CI run `38688935472` 七 job 绿——
+  本批基线 **v1.12.0**（tag `4a64471`，CI run `38688935472` 七 job 绿——
   含扩展后 playground job；playground
   自举演示二期，designs/0024 五裁决点均按建议项：浏览器四步链 **QUINE
   272925 byte-identical 亲测达成**（~26.5s，60s 独立看门狗）；零 src/ 零
   .lom 零语言面，基线构造性不变；**gh-pages 部署待呈批**——含 Chrome/Edge
-  线上复测）。前一基线 **v1.11.0**（tag `dc754ef`，CI run `38576018355`
-  七 job 绿；R147 销账批 `9f58430` run `38671865630` 七 job 绿实查）。
-  **目录 PR #68 open 待审**（零评论；head 已更新 `a2ae48c`——R147 处置 a
+  线上复测）。前一基线 **v1.11.0**（tag `e83177b`，CI run `38576018355`
+  七 job 绿；R147 销账批 `ff2881f` run `38671865630` 七 job 绿实查）。
+  **目录 PR #68 open 待审**（零评论；head 已更新 `5ae7cff`——R147 处置 a
   2026-10-15 收口：fork 追 commit 条目 618→621；反馈逐条呈批后英文回复）。
   **待裁/待触发**：gh-pages 部署呈批（⑤ 收尾件）/ 发帖材料三件套已备
   （target/probes/outreach/，发布触发 = PR 合并，每帖单独呈批）/ Zenodo
   A 项排 PR 合并后。**三十六审 A-**（review-2026-10-15.html：六批宣称
   敌手复核全成立、18 探针零击穿、P1/P2 零在场；R144-R146 计数陈旧已
   收口、R147 已处置）。**观察：Ubuntu 26 迁移 2026-10-19 盯 CI**。
+  **身份修复批（2026-10-15，用户裁决）**：21 笔提交归因漂移到抢注
+  "wyty" 的陌生账号——filter-branch 改写 `6a7fed2^..HEAD`（author+
+  committer → wytyKen <204019711+wytyKen@noreply>，树零差异）+ 五 tag
+  重切 + force push（main `779917a`→`30371a8`）+ fork 同步；commits
+  API 归因 login=wytyKen 实查恢复；**本地 git 身份已刷 wytyKen+新式
+  noreply（全局+仓库级+fork）**；460 笔南科大邮箱提交依赖账号保留该
+  验证邮箱；旧 CI run 与旧 sha 脱钩（以新 HEAD run 为准）；contributors
+  缓存刷新时滞数小时~几天。细节与边界见 TODO 身份修复批段。
 
 - **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→**三十六审 A-**（v1.10.0→v1.11.0 六批增量；R144-R147 四账全收口）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官

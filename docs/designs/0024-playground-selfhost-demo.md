@@ -2,9 +2,9 @@
 
 - **文档**：docs/designs/0024-playground-selfhost-demo.md
 - **性质**：动工前置设计（designs/0019 丙路线既定的二期增量；先例 0001-0023）
-- **设计基线**：HEAD `9f58430` / v1.11.0（CI run 38671865630 推送后首跑进行中；台账零 open，顺延号 R148 起）
+- **设计基线**：HEAD `ff2881f` / v1.11.0（CI run 38671865630 推送后首跑进行中；台账零 open，顺延号 R148 起）
 - **裁决**：2026-10-15 用户裁决"执行可立即动工项"——本批即交接菜单①⑤，五个裁决点均按建议项：**范围 B-only**（只做自举演示，不做访客任意代码走 L2 编译的 A 面）/ **quine 基准 = 预置 hex** / **L2 独立看门狗 60s** / **口径标注**（L2 子集承载自举叙事，主引擎仍为全语言面）/ **CI 冒烟扩展**。前置调研结论（交接状态块登记）：栈关切解除——self_comp 编译型 wasm 默认栈全过、256KB 下界余量 ≥3.8×；单趟编译默认栈约 3s。
-- **状态**：**已交付（2026-10-15，仓库版本 v1.12.0；tag `61ff36e`，CI run `38688935472` 七 job 绿——含扩展后 playground job）——执行者实施 + 规划者验收（selfboot.js env 契约/app.js 看门狗/ci.yml 追加段亲读；smoke 全链 11/11+6/6、doc_audit 73/73、verify_selfcomp 368/368、build_selfboot 三件亲跑；浏览器（Chromium）手测四步链 QUINE 272925 byte-identical ~26.5s、四行 done、按钮复位）。实施偏差如实登记四项：① .gitignore 追加 playground/dist-selfboot/（设计称 gitignored 但 hex/lom 副本不在既有 *.wasm 覆盖内——必要面）；② smoke.mjs import 行扩展（readFileSync,+existsSync，一期输出形态逐字不变）；③ 本机链总耗时 ~24-30s（node 默认栈），高于设计预估 ~10s——60s 看门狗余量充足，慢机器如实登记；④ worker 分发物查找次序 ./name → ./dist-selfboot/name（本地手测回退，生产平铺一次命中）。gh-pages 部署为独立呈批件（Chrome/Edge 线上复测随部署）。**
+- **状态**：**已交付（2026-10-15，仓库版本 v1.12.0；tag `4a64471`，CI run `38688935472` 七 job 绿——含扩展后 playground job）——执行者实施 + 规划者验收（selfboot.js env 契约/app.js 看门狗/ci.yml 追加段亲读；smoke 全链 11/11+6/6、doc_audit 73/73、verify_selfcomp 368/368、build_selfboot 三件亲跑；浏览器（Chromium）手测四步链 QUINE 272925 byte-identical ~26.5s、四行 done、按钮复位）。实施偏差如实登记四项：① .gitignore 追加 playground/dist-selfboot/（设计称 gitignored 但 hex/lom 副本不在既有 *.wasm 覆盖内——必要面）；② smoke.mjs import 行扩展（readFileSync,+existsSync，一期输出形态逐字不变）；③ 本机链总耗时 ~24-30s（node 默认栈），高于设计预估 ~10s——60s 看门狗余量充足，慢机器如实登记；④ worker 分发物查找次序 ./name → ./dist-selfboot/name（本地手测回退，生产平铺一次命中）。gh-pages 部署为独立呈批件（Chrome/Edge 线上复测随部署）。**
 - **语言面**：v1.0 冻结维持——本批**零 src/ 改动、零 .lom 改动、零语言面变化**（纯 playground/ 前端 + 构建脚本 + 文档批）。
 - **目标**：playground 页面加"self-hosting demo"模式——访客按一个按钮，在浏览器里亲眼看到 272925 字节强 quine 的产生与逐字节验证：Lom 的 L2 子集编译器（自身已被编译为 wasm）现场编译 self_comp.lom，产物再解码为 wasm，再让它编译自己一次，输出与预置基准逐字节一致。自举叙事的交互化（0019 §1.5 既定素材位）。
 
