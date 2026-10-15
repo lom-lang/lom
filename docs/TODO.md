@@ -1,16 +1,16 @@
 # docs/TODO.md — post-1.0 整改待办台账
 
-> **当前状态（2026-10-15，交接收口——v1.10.0→v1.11.0 一日十三批弧线 + 三十六审 A-；台账 open = R147（PR 面，处置待裁）；顺延号 R148 起）**：
+> **当前状态（2026-10-15，交接收口后动工——R147 处置 a 已执行 + ⑤ playground 二期 B-only 批进行中；台账零 open；顺延号 R148 起）**：
 > **最新基线 v1.11.0**（tag `dc754ef`，CI run `38576018355` 七 job 绿；其后纯文档批至 HEAD `5576e7c`（三十六审入库）run `38605545988` 亦绿）。
-> **待裁菜单（交接后由用户裁决）**：① **⑤ playground L2 二期方案已呈待裁**
-> （调研结论：栈关切解除——self_comp 编译型 wasm 默认栈全过、256KB 下界余量
-> ≥3.8×；建议 **B-only 自举演示**（~300-400 行 JS + 分发 selfcomp.wasm/
-> self_comp.lom，默认栈 3s 实证、quine 逐字节）；裁决点：范围 B-only/B+A/
-> 三层自证、quine 基准形态（建议预置 hex）、L2 独立看门狗（建议 60s）、
-> 实验性口径标注、CI 冒烟扩展；**新登记面**：宿主 wasm 内建 file_read/
-> file_exists 全形态不可用（一期未暴露，根因 harness path_open 链未定位，
-> 独立修复批候选）；② **R147（P3）**：目录 PR #68 条目 "618 Rust tests"
-> 被越至 621——处置 a（fork 追 commit 更新，建议）/ b（线程说明）；③ 发帖
+> **用户裁决"执行可立即动工项"（2026-10-15）**：① **⑤ playground L2 二期
+> 批动工**（五裁决点均按建议项：B-only 自举演示 / quine 预置 hex 基准 /
+> L2 看门狗 60s / 实验性口径标注 / CI 冒烟扩展；调研结论：栈关切解除——
+> self_comp 编译型 wasm 默认栈全过、256KB 下界余量 ≥3.8×；
+> **新登记面**：宿主 wasm 内建 file_read/file_exists 全形态不可用（一期
+> 未暴露，根因 harness path_open 链未定位，独立修复批候选）；**② R147
+> 已处置 a 收口（2026-10-15）**：fork 追 commit `a2ae48c`（条目 618→621，
+> 英文说明含 v1.10.2/3 三测增量），PR #68 head 实查已更新（commits=2、
+> 仍 open/clean/零评论）；v3 终稿对照清单同步更正（材料面）；③ 发帖
 > 材料三件套已备（target/probes/outreach/，gitignored：Show HN + r/PL 草稿
 > + 时机备忘；**发布触发 = PR #68 合并**，每帖发布前单独呈批）；④ Zenodo
 > DOI（A 项）排 PR 合并后开通（Citing 段已就位）。
