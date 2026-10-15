@@ -335,3 +335,125 @@ function boot() {
   spawnWorker();
   setStatus("ready", "就绪（加载 wasm…）");
 }
+
+// ---------- ③ 二期 B-only：Self-hosting demo 区块接线（designs/0024） ----------
+// 纯追加段——一期逻辑零改动。独立 worker + 独立 60s 看门狗（自举链合法耗时
+// 远超一期主引擎 5s；刻意不共用）。消息协议见 selfboot-worker.js 头注释。
+
+const SELFBOOT_WATCHDOG_MS = 60000;
+
+function bootSelfbootDemo() {
+  const $ = (id) => document.getElementById(id);
+  const btn = $("selfboot-btn");
+  const out = $("selfboot-out");
+  const rows = [1, 2, 3, 4].map((n) => $("selfboot-step-" + n));
+  if (!btn || !out || rows.some((r) => !r)) return; // 区块不在位（防御，不冒错）
+
+  let running = false;
+
+  function setRow(n, state, text) {
+    const row = rows[n - 1];
+    row.dataset.state = state;
+    row.querySelector(".selfboot-step-status").textContent = text;
+  }
+
+  function resetRows() {
+    for (let n = 1; n <= 4; n++) setRow(n, "idle", "—");
+  }
+
+  function settle() {
+    running = false;
+    btn.disabled = false;
+    btn.textContent = "Compile Lom with Lom ▶";
+  }
+
+  function compiledLine(stdout) {
+    return stdout.split("\n").find((l) => l.startsWith("COMPILED")) || "(no COMPILED line)";
+  }
+
+  btn.addEventListener("click", () => {
+    if (running) return; // 串行：一次只允许一条在途链
+    running = true;
+    btn.disabled = true;
+    btn.textContent = "Running…";
+    resetRows();
+    out.textContent = "";
+    setRow(1, "run", "…");
+
+    let finished = false;
+    let current = 1; // 看门狗/错误归因行（当前正在跑的步）
+    const worker = new Worker("./selfboot-worker.js", { type: "module" });
+
+    // L2 独立看门狗 60s（正常链 ~10s；慢机器浏览器 wasm 层可能数倍）
+    const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      worker.terminate();
+      setRow(current, "fail", "timeout");
+      out.textContent =
+        "⏱ Self-hosting chain exceeded the 60 s watchdog and was terminated.\n" +
+        "The chain normally finishes in ~10 s; a very slow machine may need a retry.";
+      settle();
+    }, SELFBOOT_WATCHDOG_MS);
+
+    worker.addEventListener("message", (ev) => {
+      const data = ev.data || {};
+      if (data.type === "step") {
+        setRow(data.n, "done", data.detail + " · " + data.durationMs + " ms");
+        if (data.n < 4) setRow(data.n + 1, "run", "…");
+        current = data.n + 1;
+        return;
+      }
+      if (data.type === "done") {
+        finished = true;
+        clearTimeout(timer);
+        worker.terminate();
+        const q = data.quine;
+        const lines = [
+          "[STEP 1] " + compiledLine(data.stdout1),
+          "[STEP 2] hex A decoded -> wasm bytes B",
+          "[STEP 3] " + compiledLine(data.stdout3),
+          "[STEP 4] " + (q.identical
+            ? "QUINE achieved: " + q.bytes + " bytes, byte-identical with the preset baseline"
+            : "MISMATCH — first differing character at index " + q.firstDiff +
+              " (Q " + q.bytes + " vs baseline " + q.baselineBytes + " bytes)"),
+          "total: " + data.totalMs + " ms — the wasm that produced this output compiled itself.",
+        ];
+        out.textContent = lines.join("\n");
+        settle();
+        return;
+      }
+      if (data.type === "error") {
+        finished = true;
+        clearTimeout(timer);
+        worker.terminate();
+        setRow(current, "fail", "failed");
+        out.textContent = data.trap
+          ? "⚠ wasm trap during the self-hosting chain.\n" +
+            "L2 compilation should stay within engine limits; a trap here indicates an execution-limit hit.\n" +
+            "Technical detail: " + data.message
+          : "demo error: " + data.message;
+        settle();
+      }
+    });
+
+    worker.addEventListener("error", (ev) => {
+      // worker 脚本级错误（如 selfboot-worker.js 404）：与一期同判——不冒充运行 trap
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      worker.terminate();
+      setRow(current, "fail", "worker error");
+      out.textContent = "worker error: " + (ev.message || "(no detail)") +
+        (ev.filename ? " @ " + ev.filename + ":" + ev.lineno : "");
+      settle();
+    });
+
+    worker.postMessage({ type: "run" });
+  });
+}
+
+// 纯追加启动位：与一期 boot() 并列（同一 DOM 守卫形态，不动既有调用行）
+if (typeof document !== "undefined") {
+  bootSelfbootDemo();
+}
