@@ -2,6 +2,8 @@
 // hello / fib / 修复闭环四步 / 深度守卫，与桌面语义逐字比对。
 // 二期追加（designs/0024 B-only）：⑥ 自举链段——分发物在位检查 + node 跑
 // 四步链 + 基准比对 + quine 字节数断言 272925 + 各步耗时报表。
+// 三期追加（designs/0025）：⑦ file 内建段——exists 真/假二值 + read/write/
+// append 的映射形态与新建边界断言（append 追加至尾 = 缺陷 B 机器锁）。
 // 用法：node playground/smoke.mjs [lom.wasm 路径]
 import { createLomRuntime } from "./harness.js";
 import { runSelfbootChain } from "./selfboot.js";
@@ -104,6 +106,86 @@ function check(name, actual, expected) {
     check("selfboot quine bytes 272925", result.quine.bytes, 272925);
     check("selfboot baseline bytes 272925", result.quine.baselineBytes, 272925);
   }
+}
+
+// ---- ⑦ file 内建段（designs/0025）：file 族四内建在 wasm 侧的行为锁 ----
+// exists 真/假二值正确（缺陷 A）+ append 追加至尾（缺陷 B）；write/append
+// 新建路径 = 虚拟单文件 FS 登记边界 → 结构化 [RUNTIME000] rc 1。
+{
+  const srcExists = `from file import { file_exists }
+from io import { println }
+fn main() -> Unit
+    println(file_exists("playground.lom"))
+    println(file_exists("__no_such_file__.txt"))
+end
+`;
+  const exists = await rt.run({ source: srcExists });
+  check("file exists mapped true + missing false", exists.stdout, "true\nfalse\n");
+  check("file exists exit 0", exists.exitCode, 0);
+
+  const srcReadOk = `from file import { file_read }
+from io import { println }
+fn main() -> Unit
+    println(file_read("playground.lom"))
+end
+`;
+  const readOk = await rt.run({ source: srcReadOk });
+  check("file read mapped stdout starts with source head", readOk.stdout.startsWith("from file import"), true);
+  check("file read mapped exit 0", readOk.exitCode, 0);
+
+  const srcReadMissing = `from file import { file_read }
+from io import { println }
+fn main() -> Unit
+    println(file_read("__no_such_file__.txt"))
+end
+`;
+  const readMissing = await rt.run({ source: srcReadMissing });
+  check("file read missing rc 1", readMissing.exitCode, 1);
+  check("file read missing stderr RUNTIME000", readMissing.stderr.includes("[RUNTIME000]"), true);
+
+  const srcWriteMapped = `from file import { file_write, file_read }
+from io import { println }
+fn main() -> Unit
+    file_write("playground.lom", "OVERWRITTEN")
+    println(file_read("playground.lom"))
+end
+`;
+  const writeMapped = await rt.run({ source: srcWriteMapped });
+  check("file write mapped + read back", writeMapped.stdout, "OVERWRITTEN\n");
+  check("file write mapped exit 0", writeMapped.exitCode, 0);
+
+  const srcWriteNew = `from file import { file_write }
+from io import { println }
+fn main() -> Unit
+    file_write("out_new.txt", "DATA")
+end
+`;
+  const writeNew = await rt.run({ source: srcWriteNew });
+  check("file write new rc 1", writeNew.exitCode, 1);
+  check("file write new stderr RUNTIME000", writeNew.stderr.includes("[RUNTIME000]"), true);
+
+  const srcAppendMapped = `from file import { file_append, file_read }
+from io import { println }
+fn main() -> Unit
+    file_append("playground.lom", "APPENDED")
+    println(file_read("playground.lom"))
+end
+`;
+  const appendMapped = await rt.run({ source: srcAppendMapped });
+  // 读回以 stdout 为准（rt.run 的 sourceOut 是写后源）：
+  // 追加至尾 = 源文本尾接 "APPENDED" + println 换行（缺陷 B 的机器锁）
+  check("file append mapped appends at tail", appendMapped.stdout, srcAppendMapped + "APPENDED\n");
+  check("file append mapped exit 0", appendMapped.exitCode, 0);
+
+  const srcAppendNew = `from file import { file_append }
+from io import { println }
+fn main() -> Unit
+    file_append("out_append.txt", "FRESH")
+end
+`;
+  const appendNew = await rt.run({ source: srcAppendNew });
+  check("file append new rc 1", appendNew.exitCode, 1);
+  check("file append new stderr RUNTIME000", appendNew.stderr.includes("[RUNTIME000]"), true);
 }
 
 console.log(failures === 0 ? "\nSMOKE: ALL PASS" : `\nSMOKE: ${failures} FAIL`);

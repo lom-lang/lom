@@ -44,8 +44,13 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-15 晚，一日全弧线收官 + 治理批落盘 + 交接核验批 R148 开账即收口——交接就绪；台账零 open；顺延号 R149 起）**：
-  最新基线 **v1.12.0**（tag `4a64471`，CI run `38688935472` 七 job 绿；其后
+- **状态（2026-10-16，v1.12.1 wasm file 内建修复批收官（designs/0025）+ 此前一日全弧线/治理/交接核验链——交接就绪；台账零 open；顺延号 R149 起）**：
+  最新基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
+  均按建议项；tag/CI 门禁回填随后）：harness 侧双 stub 修 file_exists
+  真形态静默 false 与 file_append 映射态写头破坏两缺陷 + smoke ⑦ file 段
+  14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine 272925、368/368
+  构造性不变；gh-pages 部署独立呈批件）。前一基线 **v1.12.0**（tag `4a64471`，
+  CI run `38688935472` 七 job 绿；其后
   登记/治理/交接批 CI 实查绿（至 `adb3572` run `38733000315`；最新 HEAD/run
   以 Actions 实查为准））。**v1.12.0 = playground 自举演示
   二期 B-only**（designs/0024 五裁决点均按建议项）：浏览器四步链 **QUINE
@@ -57,7 +62,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
   防呆；**三十七审触发点已裁：发帖前**（覆盖 v1.10.0→v1.12.0 增量）。
   **目录 PR #68 open 待审**（零评论；head `5ae7cff`——R147 已处置 a 收口）。
-  **待触发（designs/0025 四裁决点待裁 2026-10-16，其余无待裁项）**：发帖（触发 = PR #68 合并，每帖单独呈批）/
+  **待触发（无待裁项）**：发帖（触发 = PR #68 合并，每帖单独呈批）/
   三十七审（触发 = 发帖前）/ Zenodo（排 PR 合并后）。**三十六审 A-**
   （review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零击穿、
   P1/P2 零在场；R144-R147 四账全收口）。**观察**：Ubuntu 26 迁移
@@ -104,7 +109,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   --profile wasm-release`；冒烟 `node playground/smoke.mjs`（**v1.12.0 起
   先跑 `python tools/build_selfboot.py` 生成分发三件**——playground/
   dist-selfboot/ gitignored：selfcomp.wasm / selfboot-baseline.hex /
-  self_comp.lom 副本，COMPILED 272925 硬门；smoke 含自举段 6 断言）；
+  self_comp.lom 副本，COMPILED 272925 硬门；smoke 含自举段 6 断言 +
+  v1.12.1 ⑦ file 段 14 断言）；
   部署 = 五源件 + wasm + 分发三件推 gh-pages 孤儿分支；深度守卫 wasm 侧
   300；**二期自举演示 = "Self-hosting demo" 区块**（selfboot.js env 契约
   镜像 run_selfcomp.mjs / 独立 60s 看门狗 / strict-subset 口径标注）。
@@ -118,7 +124,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**designs/0025 四裁决点待裁（2026-10-16，wasm file 内建修复批）；其余交接就绪无待裁**；待触发三件（详见状态段）：发帖
+- 下一步：**交接就绪（无待裁项；gh-pages 部署 = v1.12.1 批独立呈批件，待用户触发呈批）**；待触发三件（详见状态段）：发帖
   （PR #68 合并触发，每帖单独呈批）→ 前置三十七审（发帖前，已裁）→
   Zenodo（PR 合并后）；观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
   首跑——doc-gates 含断链+l2fix 两步骤）+ contributors 侧栏 "Wyty"

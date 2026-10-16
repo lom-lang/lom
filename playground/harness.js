@@ -15,6 +15,7 @@
 // WASI 面与理由（designs/0019 §1.2 复查修订版）：
 //   args/environ/clock_time_get（fix 历史时间戳）/random_get（HashMap 种子）
 //   /fd_write（stdout+stderr 捕获）/fd_read+fd_close+fd_seek+fd_fdstat+fd_filestat_get
+//   /path_filestat_get（file_exists 的 metadata 探测；映射外 ENOENT，designs/0025）
 //   /fd_prestat_get+fd_prestat_dir_name（预开目录 "/" → 仅映射 playground.lom）
 //   /path_open（backing 读写字节缓冲）/proc_exit；其余一律 ENOSYS。
 //   ".lom/fix-history.jsonl" 等相对路径在映射外 → ENOENT →
@@ -117,6 +118,9 @@ function createWasi(args, env) {
           outBufs[fd].push(chunk);
         } else {
           // 常规文件：按偏移写入，必要时扩容 backing（fix --apply 的写回）
+          // 严格 WASI p1 APPEND 语义：append 打开的 fd 每次写前把偏移置尾
+          // （同一 fd 多笔写 / write_all 分段写均落到文件尾，designs/0025 §6.1-3）
+          if (st.append) st.offset = backing.length;
           const end = st.offset + chunk.length;
           if (end > backing.length) {
             const grown = new Uint8Array(end);
@@ -192,6 +196,21 @@ function createWasi(args, env) {
       dvv.setBigUint64(ptr + 8, BigInt(backing.length), true);
       return ESUCCESS;
     },
+    path_filestat_get(fd, flags, pathPtr, pathLen, bufPtr) {
+      if (fd !== 3) return EBADF; // 仅预开目录 "/" 可作基座
+      const path = decoder.decode(new Uint8Array(mem(), pathPtr, pathLen));
+      // 地雷门：映射外一律 ENOENT——/lom.toml 清单发现门（main.rs）每 run
+      // 被探测，若此处对任意路径回成功，该门将翻真 → 走 load_manifest_file
+      // → path_open ENOENT → "清单解析失败" exit 1 打断主链；必须保持暗
+      // （designs/0025 §8.1）。
+      if (path !== "playground.lom") return ENOENT;
+      const dvv = dv();
+      // 64B wasi_filestat 布局镜像 fd_filestat_get：filetype=REGULAR_FILE、size=backing.length
+      new Uint8Array(mem(), bufPtr, 64).fill(0);
+      dvv.setUint8(bufPtr, WASI_FILETYPE_REGULAR_FILE);
+      dvv.setBigUint64(bufPtr + 8, BigInt(backing.length), true);
+      return ESUCCESS;
+    },
 
     // ---- 预开目录（fd 3 = "/"）----
     fd_prestat_get(fd, ptr) {
@@ -213,8 +232,11 @@ function createWasi(args, env) {
       const path = decoder.decode(new Uint8Array(mem(), pathPtr, pathLen));
       if (path !== "playground.lom") return ENOENT;
       if (oflags & OFLAGS_TRUNC) backing = new Uint8Array(0);
+      // FDFLAGS_APPEND（WASI p1 位 0）：按 fd 记 append 标志，fd_write 写前置尾
+      // （designs/0025 §6.1-2）
+      const append = !!(fdflags & 1);
       const fd = nextFd++;
-      openFds.set(fd, { offset: 0 });
+      openFds.set(fd, { offset: 0, append });
       dv().setUint32(openedFdPtr, fd, true);
       return ESUCCESS;
     },
