@@ -68,7 +68,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零击穿、
   P1/P2 零在场；R144-R147 四账全收口）。**观察**：Ubuntu 26 迁移
   2026-10-19 盯 CI；contributors 侧栏 "Wyty" 缓存残影待 GitHub 自刷
-  （底层已归一：API = wytyKen/484 笔）。
+  （底层已归一：API = wytyKen/484 笔）；**MoonBit 1.0 正式发布 → delta
+  复核**（事件触发；2026-10-16 官方双源核实仍未发布——详见 TODO 观察项）。
   **身份修复批（2026-10-15，用户裁决）**：21 笔提交归因漂移到抢注
   "wyty" 的陌生账号——filter-branch 改写 `6a7fed2^..HEAD`（author+
   committer → wytyKen <204019711+wytyKen@noreply>，树零差异）+ 五 tag
@@ -129,7 +130,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （PR #68 合并触发，每帖单独呈批）→ 前置三十七审（发帖前，已裁）→
   Zenodo（PR 合并后）；观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
   首跑——doc-gates 含断链+l2fix 两步骤）+ contributors 侧栏 "Wyty"
-  缓存残影待 GitHub 自刷（底层已归一）。
+  缓存残影待 GitHub 自刷（底层已归一）+ **MoonBit 1.0 正式发布 →
+  delta 复核**（事件触发；2026-10-16 双源核实仍未发布，详见 TODO）。
   对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
