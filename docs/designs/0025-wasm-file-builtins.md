@@ -3,8 +3,8 @@
 - **文档**：docs/designs/0025-wasm-file-builtins.md
 - **性质**：动工前置设计（MAINTENANCE §2.1 第 2 条——涉宿主工具面（playground 引擎行为面）；先例 0001-0024）
 - **设计基线**：HEAD `8de6dde` / v1.12.0（CI run `38741919353` 七 job 绿；台账零 open，顺延号 R149 起）
-- **裁决**：待用户裁决（§5 四裁决点，均附建议项）
-- **状态**：设计产出（2026-10-16）——读码供料完成（执行者报告 + 规划者亲核 interpreter.rs:2103-2172 / harness.js:185-235 两关键位 + 8 形态探针复跑逐字吻合；探针与参数级日志在 target/probes/wasm_file/），待裁决后动工
+- **裁决**：2026-10-16 用户裁决"执行"——四裁决点均按建议项（① 方向 b harness 侧双 stub 零 src/ ② 严格 WASI p1 APPEND 语义 ③ 映射外维持 ENOENT 登记边界 ④ patch v1.12.1 + gh-pages 部署独立呈批件）
+- **状态**：**已交付（2026-10-16，仓库版本 v1.12.1；tag `bdfd187`，CI run `38893522801` 七 job 绿——首跑即绿）**——执行者实施（harness 三改点 + smoke ⑦ 段）+ 规划者验收（diff 亲读；smoke 31 PASS / 8 形态探针 / 地雷直探 / verify_selfcomp 368 / doc_audit 73 亲跑复跑；执行者全套 14 项全量回归全绿）；登记面挂账销账；gh-pages 部署待用户呈批（部署后回填线上验证）
 - **语言面**：v1.0 冻结维持——本批零 src/、零 .lom、零语言面（方向 b）；四内建签名、诊断码（复用既有 RUNTIME000）、SPEC §9.2 冻结语义句（LANGUAGE_SPEC.md L1117-1120）零触碰
 
 ## 1. 登记项精确化（8 形态分类账）
@@ -91,6 +91,7 @@ Cargo.toml/lock 1.12.0 → **1.12.1**。
 4. `fd_readdir` / `path_create_directory` 两缺口本批不补（43 内建冻结面无 read_dir/mkdir 内建，无触达面）；随批在 0019 修订节登记为 harness 已知缺口，供未来批参考。
 5. 改动面全在 playground/ 两跟踪文件（harness.js / smoke.mjs）与文档——零 src/、零 .lom、零语言面；eval/compiled 后端（run_wasm.mjs 的 lom_file_* 直通真 fs）与 selfboot 链（selfboot.js 独立虚拟 FS）零牵动（供料 §6 逐项排除核验）。
 
-## 9. 状态行（动工后回填）
+## 9. 状态行（回填）
 
-- 待回填：实施提交 / tag / CI run / 部署 gh-pages sha 与线上验证结果。
+- 已回填（2026-10-16）：实施提交 `bdfd187`（v1.12.1 主批，11 文件）；tag `bdfd187`；CI run `38893522801` 七 job 绿（首跑即绿，含扩展后 smoke 的 playground job）；登记面挂账销账（TODO 原位括注）。
+- 待回填：gh-pages 部署 sha 与线上验证（file 探针在线复测两形态）——独立呈批件，部署后回填。

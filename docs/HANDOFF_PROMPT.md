@@ -46,7 +46,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-16，v1.12.1 wasm file 内建修复批收官（designs/0025）+ 此前一日全弧线/治理/交接核验链——交接就绪；台账零 open；顺延号 R149 起）**：
   最新基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
-  均按建议项；tag/CI 门禁回填随后）：harness 侧双 stub 修 file_exists
+  均按建议项；tag `bdfd187`，CI run `38893522801` 七 job 绿）：harness 侧双 stub 修 file_exists
   真形态静默 false 与 file_append 映射态写头破坏两缺陷 + smoke ⑦ file 段
   14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine 272925、368/368
   构造性不变；gh-pages 部署独立呈批件）。前一基线 **v1.12.0**（tag `4a64471`，
