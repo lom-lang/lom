@@ -49,7 +49,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   均按建议项；tag `bdfd187`，CI run `38893522801` 七 job 绿）：harness 侧双 stub 修 file_exists
   真形态静默 false 与 file_append 映射态写头破坏两缺陷 + smoke ⑦ file 段
   14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine 272925、368/368
-  构造性不变；gh-pages 部署独立呈批件）。前一基线 **v1.12.0**（tag `4a64471`，
+  构造性不变；gh-pages 已部署 `bbd031d`——线上 v1.12.1 三项实测全过
+  （一期 Run / file 探针 / 四步链 QUINE 272925））。前一基线 **v1.12.0**（tag `4a64471`，
   CI run `38688935472` 七 job 绿；其后
   登记/治理/交接批 CI 实查绿（至 `adb3572` run `38733000315`；最新 HEAD/run
   以 Actions 实查为准））。**v1.12.0 = playground 自举演示
@@ -124,7 +125,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**交接就绪（无待裁项；gh-pages 部署 = v1.12.1 批独立呈批件，待用户触发呈批）**；待触发三件（详见状态段）：发帖
+- 下一步：**交接就绪（无待裁项）**；待触发三件（详见状态段）：发帖
   （PR #68 合并触发，每帖单独呈批）→ 前置三十七审（发帖前，已裁）→
   Zenodo（PR 合并后）；观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
   首跑——doc-gates 含断链+l2fix 两步骤）+ contributors 侧栏 "Wyty"

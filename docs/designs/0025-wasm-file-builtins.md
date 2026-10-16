@@ -94,4 +94,4 @@ Cargo.toml/lock 1.12.0 → **1.12.1**。
 ## 9. 状态行（回填）
 
 - 已回填（2026-10-16）：实施提交 `bdfd187`（v1.12.1 主批，11 文件）；tag `bdfd187`；CI run `38893522801` 七 job 绿（首跑即绿，含扩展后 smoke 的 playground job）；登记面挂账销账（TODO 原位括注）。
-- 待回填：gh-pages 部署 sha 与线上验证（file 探针在线复测两形态）——独立呈批件，部署后回填。
+- 已回填（2026-10-16）：gh-pages 部署 `bbd031d`（用户裁决"执行"）——部署集恰两文件（harness.js + lom.wasm，后者从 v1.12.1 tag 树重建、版本串 1.12.1、tag-vs-HEAD 编译输入零差异实证）；分发三件与 selfboot 两源 sha256 逐字节一致（selfcomp.wasm 9edb64a2…/baseline hex 26ba1a97…/self_comp.lom 线上 LF 形态 = tag blob 8a515dd0…），未重提交。**线上验证 2026-10-16 三项全过**（浏览器实测）：一期 Run（NAM005+RUNTIME002，退出码 1）；file 探针（exists 映射 true / 缺失 false / append 追加至尾读回，退出码 0——两缺陷修复线上生效）；四步链 QUINE achieved 272925 bytes byte-identical（总 9816ms）。资产层：harness.js（LF 形态）与 lom.wasm 线上 sha256 与本地构建逐字节一致。**本批全链闭环。**
