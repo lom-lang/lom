@@ -44,34 +44,34 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-16，v1.12.1 wasm file 内建修复批收官（designs/0025）+ 此前一日全弧线/治理/交接核验链——交接就绪；台账零 open；顺延号 R149 起）**：
+- **状态（2026-10-18 晚，v1.12.1 弧线收官（file 修复→部署→PR #68 最佳等审→模拟复核→发帖前置就绪）——交接就绪；台账零 open；顺延号 R149 起）**：
   最新基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
-  均按建议项；tag `bdfd187`，CI run `38893522801` 七 job 绿）：harness 侧双 stub 修 file_exists
-  真形态静默 false 与 file_append 映射态写头破坏两缺陷 + smoke ⑦ file 段
-  14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine 272925、368/368
-  构造性不变；gh-pages 已部署 `bbd031d`——线上 v1.12.1 三项实测全过
-  （一期 Run / file 探针 / 四步链 QUINE 272925））。前一基线 **v1.12.0**（tag `4a64471`，
-  CI run `38688935472` 七 job 绿；其后
-  登记/治理/交接批 CI 实查绿（至 `adb3572` run `38733000315`；最新 HEAD/run
-  以 Actions 实查为准））。**v1.12.0 = playground 自举演示
-  二期 B-only**（designs/0024 五裁决点均按建议项）：浏览器四步链 **QUINE
-  272925 byte-identical**（本地 ~26.5s / **线上 ~11s**）；零 src/ 零 .lom 零
-  语言面，**Rust 581+40、368/368、quine 272925 构造性不变**。**gh-pages 已
-  部署上线（`45fb8dd`）**：线上实测 demo QUINE + 一期 Run 修复闭环
-  （NAM005+RUNTIME002）；部署三一致性已固化为规则。**治理批（`f25eefb`，
-  用户裁决"认可"）**：git 身份核验入基线与交接检查单（账号改名/换邮箱/
+  均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
+  stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
+  + smoke ⑦ file 段 14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine
+  272925、368/368 构造性不变；**gh-pages `bbd031d` 线上 v1.12.1**——三项
+  浏览器实测全过（一期 Run / file 探针 / 四步链 QUINE 272925 总 9816ms）；
+  其后主仓弧线 14 笔 `8de6dde`→`0545c25` 逐 run 七 job 绿（最新以 Actions
+  实查为准））。前一基线 **v1.12.0**（tag `4a64471`；= playground 自举演示
+  二期：浏览器四步链 QUINE 272925，线上 ~11s；gh-pages 前一版 `45fb8dd`）。
+  **治理批（`f25eefb`）**：身份核验入基线与交接检查单（账号改名/换邮箱/
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
-  防呆；**三十七审触发点已裁：发帖前**（覆盖 v1.10.0→v1.12.0 增量）。
-  **目录 PR #68 open 待审**（零评论；head `de465b6`——R147 处置 a +
-  2026-10-17 归因修正批：author wyty→wytyKen（身份批对外延续面）、补
-  spans_camps；PR body 清单已粘贴生效（10-18 实查 6/6 徽标上线））。
-  **待触发（无待裁项）**：发帖（触发 = PR #68 合并，每帖单独呈批）/
-  三十七审（触发 = 发帖前）/ Zenodo（排 PR 合并后）。**三十六审 A-**
+  防呆；**三十七审触发点已裁：发帖前**。
+  **目录 PR #68 open 待审——最佳等审状态**（head `de465b6`：R147 处置 a
+  修条目计数 + 归因修正批 author wyty→wytyKen + 补 spans_camps；body 提交
+  清单 6/6 生效；**模拟收录复核 16 项全 PASS、预测 merge as-is**——执行者
+  按目录维护者实测方法论逐声明验证，条目与仓库数字双侧全准；三问应答
+  口径备档 TODO；ACRI 陈旧注已随弧线修正）。**待触发（无待裁项）**：
+  发帖（触发 = PR #68 合并，每帖单独呈批；**发帖前持续更新规则**生效含
+  日落条款——随里程碑批刷新材料、发帖前一日终检、发帖后随收官批删除）/
+  三十七审（触发 = 发帖前，已裁）/ Zenodo（排 PR 合并后）。**三十六审 A-**
   （review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零击穿、
   P1/P2 零在场；R144-R147 四账全收口）。**观察**：Ubuntu 26 迁移
-  2026-10-19 盯 CI；contributors 侧栏 "Wyty" 缓存残影待 GitHub 自刷
-  （底层已归一：API = wytyKen/484 笔）；**MoonBit 1.0 正式发布 → delta
-  复核**（事件触发；2026-10-16 官方双源核实仍未发布——详见 TODO 观察项）。
+  **2026-10-19（首回合值守：盯当日 CI 首跑，doc-gates 断链+l2fix 为重点）**；
+  contributors 侧栏 "Wyty" 缓存残影待 GitHub 自刷（底层已归一：API =
+  wytyKen/484 笔）；**MoonBit 1.0 正式发布 → delta 复核**（事件触发；
+  2026-10-16 双源核实仍未发布——跟踪源 = moonbitlang/moonbit-compiler
+  release 页【v0.10.15/2026-10-12】，官网 updates 页滞后仓库）。
   **身份修复批（2026-10-15，用户裁决）**：21 笔提交归因漂移到抢注
   "wyty" 的陌生账号——filter-branch 改写 `6a7fed2^..HEAD`（author+
   committer → wytyKen <204019711+wytyKen@noreply>，树零差异）+ 五 tag
@@ -92,15 +92,16 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
   **73/73**（J 锚组现值 581+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.12.0**。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.12.1**。
 - **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
-  README）；β 三批已落地；**目录 PR #68 open 待审**（反馈逐条呈批；
-  R147 处置 a + 2026-10-17 归因修正批收口——head `de465b6`，条目数字已更
-  621、author 归因已正）；发帖材料
-  三件套已备（发布触发 = PR 合并）；对外动作逐项呈批不变。
+  README）；β 三批已落地；**目录 PR #68 open 待审、最佳等审状态**（head
+  `de465b6`、body 6/6、模拟复核 16 项全 PASS 预测 merge as-is、三问应答
+  口径备档——反馈逐条呈批）；发帖材料三件套已备 + 首轮预检零漂移 +
+  **持续更新规则**（发布触发 = PR 合并；每帖单独呈批）；对外动作逐项
+  呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
@@ -130,11 +131,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
 - 下一步：**交接就绪（无待裁项）**；待触发三件（详见状态段）：发帖
-  （PR #68 合并触发，每帖单独呈批）→ 前置三十七审（发帖前，已裁）→
-  Zenodo（PR 合并后）；观察项：Ubuntu 26 迁移（**2026-10-19**，盯 CI
-  首跑——doc-gates 含断链+l2fix 两步骤）+ contributors 侧栏 "Wyty"
-  缓存残影待 GitHub 自刷（底层已归一）+ **MoonBit 1.0 正式发布 →
-  delta 复核**（事件触发；2026-10-16 双源核实仍未发布，详见 TODO）。
+  （PR #68 合并触发，每帖单独呈批；材料持续更新规则生效）→ 前置三十七审
+  （发帖前，已裁）→ Zenodo（PR 合并后）；观察项：**Ubuntu 26 迁移
+  2026-10-19（首回合值守——盯当日 CI 首跑，doc-gates 含断链+l2fix）** +
+  contributors 侧栏 "Wyty" 缓存残影待自刷（底层已归一）+ MoonBit 1.0
+  正式发布 → delta 复核（事件触发，跟踪源 = 仓库 release 页，详见 TODO）。
   对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
