@@ -24,7 +24,7 @@
 | 资产 | 形态 | 关键事实 |
 |---|---|---|
 | lom-diag/v1 | `--check --json` 信封 | Diagnostic 10 字段（severity/stage/code/message/file/line/col/source_line/is_hole/hint，diagnostics.rs:86-98）；信封 schema/file/ok/summary/diagnostics（:365-419）；**位置为单点 line+col 非 range** |
-| lom-fix/v1 | `fix --plan/--apply` | FixAction = 4 动作（insert/replace/delete/hint）× 3 置信度（fix.rs:540/:562）；分派按码 match（:754-867）；**--apply 只自动应用 High 且非 hint**（:12/:3344 安全性注释）——安全性模型有 corpus 锁定（fix_corpus 13 对端到端，其中 04/12/13 三对 fixed==bad 锁"认知型 warning 不自动改"先例） |
+| lom-fix/v1 | `fix --plan/--apply` | FixAction = 4 动作（insert/replace/delete/hint）× 3 置信度（fix.rs:540/:562）；分派按码 match（:754-867）；**--apply 只自动应用 High 且非 hint**（:12/:3344 安全性注释）——安全性模型有 corpus 锁定（fix_corpus 13 对端到端，其中 04/12/13 三对 fixed==bad 锁"认知型 warning 不自动改"先例）【勘误（2026-10-18，模拟收录复核批发现）：实况为 5 对 fixed==bad（04/07/08/12/13），其中认知型 warning 对为 12/13 两对，04/07/08 三对系 medium 置信度低于自动应用阈值形态；原"04/12/13 三对"为 v1.5.0 扩容前旧口径错型——specs/acri 两处同款已随批直改】 |
 | l2-fix/v1 | `l2fix --json` | 五字段（code/message/confidence/action/suggestion）；**无位置字段**（位置在 message 前缀） |
 | RepairLoopBench | 基准卡 + 机器 gate | 双真实采集纪律（诊断 verbatim 采集 never hand-written）、三链参考解验证、期望锁定、stdout+rc 评分、eval_prompt_check 码多重集比对 gate |
 

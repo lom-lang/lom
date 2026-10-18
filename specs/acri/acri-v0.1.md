@@ -89,9 +89,11 @@ ACRI `position` object — `anchor` reflecting each channel's semantics — is i
   be side-effect-free; applying is always an explicit, distinct invocation.
 
 Provenance: these axioms generalize the reference implementation's empirically
-locked corpus (13 end-to-end fix pairs, including three pairs asserting
-`fixed == bad` for cognitive warnings — auto-rewriting them is a correctness
-regression, not a fix).
+locked corpus (13 end-to-end fix pairs, five of which assert `fixed == bad`:
+the two cognitive-warning pairs — a deterministic name-collision notice and a
+closure-capture notice, whose auto-rewriting is a correctness regression
+rather than a fix — and three medium-confidence suggestion pairs below the
+auto-apply threshold).
 
 ## 2. L1 — CLI interaction protocol (normative)
 

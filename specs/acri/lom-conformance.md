@@ -19,7 +19,7 @@ remediation batch from designs/0023 §5.
 | §1.1 extension fields | `source_line`, `is_hole` — extensions under §1.1's open-field axiom | **Conformant** |
 | §1.2 `RepairSuggestion` unified enums | Host fix engine: 4 actions (insert/replace/delete/hint) × 3 confidences (High/Medium/Low) — matches after enum-name normalization; `l2-fix/v1`→`v2` uses `confidence`/`action` with the same vocabulary and (v2, β-2) a structured `position` field | **Conformant by mapping** (case normalization documented here; position delivered in v2) |
 | §1.3 AXIOM 1 (auto-apply only high non-hint) | `fix --apply` applies only `confidence == High && action != Hint` (src/fix.rs:12, :3344) | **Conformant** |
-| §1.3 AXIOM 2 (cognitive → hint, never auto) | fix_corpus pairs 04/12/13 assert `fixed == bad` for cognitive warnings (NAM006 alias notice, MUT002 closure capture) | **Conformant** |
+| §1.3 AXIOM 2 (cognitive → hint, never auto) | fix_corpus: five pairs (04/07/08/12/13) assert `fixed == bad`; the two cognitive-warning pairs among them (12 = NAM006 alias notice, 13 = MUT002 closure capture) are never auto-rewritten — the other three are medium-confidence suggestions below the auto-apply threshold | **Conformant** |
 | §1.3 AXIOM 3 (plan/apply separate) | `--plan` side-effect-free; `--apply` explicit | **Conformant** |
 
 ## L1 — CLI protocol
