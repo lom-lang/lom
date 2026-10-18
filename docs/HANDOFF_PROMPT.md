@@ -62,7 +62,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   用户裁决"认可"）**：git 身份核验入基线与交接检查单（账号改名/换邮箱/
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
   防呆；**三十七审触发点已裁：发帖前**（覆盖 v1.10.0→v1.12.0 增量）。
-  **目录 PR #68 open 待审**（零评论；head `5ae7cff`——R147 已处置 a 收口）。
+  **目录 PR #68 open 待审**（零评论；head `de465b6`——R147 处置 a +
+  2026-10-17 归因修正批：author wyty→wytyKen（身份批对外延续面）、补
+  spans_camps；PR body 清单草稿交用户网页面粘贴）。
   **待触发（无待裁项）**：发帖（触发 = PR #68 合并，每帖单独呈批）/
   三十七审（触发 = 发帖前）/ Zenodo（排 PR 合并后）。**三十六审 A-**
   （review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零击穿、
@@ -96,7 +98,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
   README）；β 三批已落地；**目录 PR #68 open 待审**（反馈逐条呈批；
-  R147 已处置 a 收口——head `5ae7cff`，条目数字已更 621）；发帖材料
+  R147 处置 a + 2026-10-17 归因修正批收口——head `de465b6`，条目数字已更
+  621、author 归因已正）；发帖材料
   三件套已备（发布触发 = PR 合并）；对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
