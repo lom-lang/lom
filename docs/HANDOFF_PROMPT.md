@@ -51,8 +51,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   + smoke ⑦ file 段 14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine
   272925、368/368 构造性不变；**gh-pages `bbd031d` 线上 v1.12.1**——三项
   浏览器实测全过（一期 Run / file 探针 / 四步链 QUINE 272925 总 9816ms）；
-  其后主仓弧线 14 笔 `8de6dde`→`0545c25` 逐 run 七 job 绿（最新以 Actions
-  实查为准））。前一基线 **v1.12.0**（tag `4a64471`；= playground 自举演示
+  其后主仓弧线 12 笔 `8de6dde`→`54e5d5d`（含交接批）逐 run 七 job 绿实查
+  （最新以 Actions 实查为准））。前一基线 **v1.12.0**（tag `4a64471`；= playground 自举演示
   二期：浏览器四步链 QUINE 272925，线上 ~11s；gh-pages 前一版 `45fb8dd`）。
   **治理批（`f25eefb`）**：身份核验入基线与交接检查单（账号改名/换邮箱/
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
