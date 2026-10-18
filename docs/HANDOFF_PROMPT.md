@@ -68,8 +68,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （review-2026-10-15.html：六批宣称敌手复核全成立、18 探针零击穿、
   P1/P2 零在场；R144-R147 四账全收口）。**观察**：Ubuntu 26 迁移
   **2026-10-19（首回合值守：盯当日 CI 首跑，doc-gates 断链+l2fix 为重点）**；
-  contributors 侧栏 "Wyty" 缓存残影待 GitHub 自刷（底层已归一：API =
-  wytyKen/484 笔）；**MoonBit 1.0 正式发布 → delta 复核**（事件触发；
+  **contributors 残影已收口（2026-10-19：API 实查仅 wytyKen/502 一条，
+  "Wyty" 残影已被 GitHub 自刷消失）**；**MoonBit 1.0 正式发布 → delta 复核**（事件触发；
   2026-10-16 双源核实仍未发布——跟踪源 = moonbitlang/moonbit-compiler
   release 页【v0.10.15/2026-10-12】，官网 updates 页滞后仓库）。
   **身份修复批（2026-10-15，用户裁决）**：21 笔提交归因漂移到抢注
@@ -79,7 +79,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   API 归因 login=wytyKen 实查恢复；**本地 git 身份已刷 wytyKen+新式
   noreply（全局+仓库级+fork）**；460 笔南科大邮箱提交依赖账号保留该
   验证邮箱；旧 CI run 与旧 sha 脱钩（以新 HEAD run 为准）；contributors
-  缓存刷新时滞数小时~几天。细节与边界见 TODO 身份修复批段。
+  缓存刷新时滞数小时~几天（2026-10-19 实查兑现：API 仅 wytyKen/502 一条）。细节与边界见 TODO 身份修复批段。
 
 - **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→**三十六审 A-**（v1.10.0→v1.11.0 六批增量；R144-R147 四账全收口）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
@@ -134,7 +134,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （PR #68 合并触发，每帖单独呈批；材料持续更新规则生效）→ 前置三十七审
   （发帖前，已裁）→ Zenodo（PR 合并后）；观察项：**Ubuntu 26 迁移
   2026-10-19（首回合值守——盯当日 CI 首跑，doc-gates 含断链+l2fix）** +
-  contributors 侧栏 "Wyty" 缓存残影待自刷（底层已归一）+ MoonBit 1.0
+  contributors 残影已收口（2026-10-19 API 实查仅 wytyKen/502 一条）+ MoonBit 1.0
   正式发布 → delta 复核（事件触发，跟踪源 = 仓库 release 页，详见 TODO）。
   对外动作逐项呈批（铁律 6）。
 
