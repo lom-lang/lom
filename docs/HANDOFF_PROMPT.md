@@ -45,7 +45,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-20，v1.13.0 playground 分享链接批交付（用户裁决同意）；前夜 v1.12.1 弧线收官（file 修复→部署→PR #68 最佳等审→模拟复核→发帖前置就绪）——交接就绪；台账零 open；顺延号 R189 起）**：
-  最新基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag/CI run 随批提交回填）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；gh-pages 不随本批部署——独立呈批件）。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
+  最新基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag `e171488`，CI run `39431280200` 七 job 绿——首跑即绿）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；gh-pages 不随本批部署——独立呈批件）。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
   均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
   stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
   + smoke ⑦ file 段 14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine
