@@ -155,8 +155,9 @@ A contamination-safe repair-loop benchmark SHOULD:
    leaderboards.
 
 Reference instance: **RepairLoopBench** (`eval/README.md` in this repository)
-— 128 tasks, 31 repair tasks with verbatim host and cross-compiler diagnostics;
-full-set pass@1 = 98.3% / 98.5% across two frontier models.
+— 129 tasks, 32 repair tasks with verbatim host and cross-compiler diagnostics;
+full-set pass@1 = 98.3% / 98.5% across two frontier models (measured on the
+then-full 128-task set, 2026-10-07; the suite has since grown to 129).
 
 ## 4. Reference consumer (informative)
 

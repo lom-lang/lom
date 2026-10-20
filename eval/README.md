@@ -10,8 +10,8 @@
 
 ```powershell
 cargo build --release
-powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe           # 129/128 expected, native backend
-powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm  # 128/128 expected, WASM backend
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe           # 129/129 expected, native backend
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm  # 129/129 expected, WASM backend
 python tools/eval_prompt_check.py    # 32/32: error_repair prompts embed real host output (--check --json; task 130 embeds the runtime stderr channel), machine-checked against the live binary
 ```
 
@@ -84,7 +84,7 @@ eval/
     07_records_tuples.json   # 10 tasks — records, tuples, field access
     08_effects.json          #  6 tasks — ! [IO, Clock] annotations
     09_modules.json          #  6 tasks — from ... import
-    10_error_repair.json     # 31 tasks — fix broken code / warning-guided repair (incl. L2-subset face)
+    10_error_repair.json     # 32 tasks — fix broken code / warning-guided repair (incl. L2-subset face)
   runner/
     run.ps1                  # PowerShell runner (Windows, no deps)
     run.sh                   # Bash runner (requires jq + lom on PATH)
@@ -209,7 +209,7 @@ first exists at `v1.11.0`).
 
 Recommended citation form:
 
-> wyty. (2026). *RepairLoopBench: a purpose-built repair-loop benchmark for
+> wytyKen (2026). *RepairLoopBench: a purpose-built repair-loop benchmark for
 > an LLM-repair-native language* (129 tasks; contamination-safe task
 > synthesis, dual-backend verification). GitHub repository, version anchored
 > at tag v1.11.0+. https://github.com/lom-lang/lom

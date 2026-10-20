@@ -21,7 +21,7 @@ Most languages treat "an AI wrote broken code" as someone else's problem. Lom in
 |---|---|
 | **The repair loop works on real models** | On the then-full **128-task set** (10 categories; the suite has since grown to 129 via task 130), deepseek-v4-pro+thinking and glm-5.3 score **98.3% / 98.5% pass@1** (2 models × 10 samples @ t=1.0; pass@5 99.2% / 98.8%) — the only sub-100 tasks are a known prompt-ambiguity anchor and one deliberately hard cross-compiler repair — [report](eval/REPORT-2026-10-07-passk-128.md) |
 | **The compiler compiles itself — provably** | `self_comp.lom` (12,671 lines of Lom) compiles its own source to WASM; the result is byte-identical from both sides (a 272,925-byte strong quine, re-verified on every CI run) |
-| **A trustable core** | Zero third-party crates, zero `unsafe`, 573 unit + 37 integration tests, three-OS CI; the language surface (syntax / 20 keywords / diagnostic codes / 43 builtins) is [frozen](LANGUAGE_SPEC.md#14-v10-freeze-declaration-2026-09-02) — changes require an RFC |
+| **A trustable core** | Zero third-party crates, zero `unsafe`, 581 unit + 40 integration tests, three-OS CI; the language surface (syntax / 20 keywords / diagnostic codes / 43 builtins) is [frozen](LANGUAGE_SPEC.md#14-v10-freeze-declaration-2026-09-02) — changes require an RFC |
 
 ## Feel the repair loop in 60 seconds
 
@@ -70,9 +70,9 @@ Save as `hello.lom`, run `lom hello.lom`. New here? Read [SPEC_FOR_AI.md](SPEC_F
 
 ## Status & boundaries (honest version)
 
-- Current: **v1.12.0** (2026-10-15). Language surface frozen since v1.0 (2026-09-02) — zero surface changes since; every release since has been tooling/evidence work (online playground incl. the in-browser self-hosting demo, structured diagnostics, remediation). Full numbers and the per-release log: see [Release log](#release-log) and [Milestone history](#status-milestone-history--live-numbers) below.
+- Current: **v1.12.1** (2026-10-16). Language surface frozen since v1.0 (2026-09-02) — zero surface changes since; every release since has been tooling/evidence work (online playground incl. the in-browser self-hosting demo, structured diagnostics, remediation). Full numbers and the per-release log: see [Release log](#release-log) and [Milestone history](#status-milestone-history--live-numbers) below.
 - The **L2 self-hosted subset compiler** (`examples/selfhost/self_comp.lom`) is a **supported face** as of **v1.8.0** (2026-10-08; promoted from experimental by user adjudication after four consecutive A- review rounds, a zero-open ledger, and the v1.7.2 line-number batch completing its repair loop): it compiles a strict subset of Lom to WASM, rejects some programs the host accepts (each rejection carries an `[L2xxx]` code and a repair hint via `lom l2fix` / [tools/l2fix.py](tools/l2fix.py); rejections whose message carries a quoted name also carry a `ln:cl` source position — the registered 71/102 coverage boundary with 31 exempt type-string cases), and self-hosts provably.
-- The 28 review rounds are **in-system adversarial reviews** (agent-run, evidence-based) — good hygiene, **not external peer review**; grades never extrapolate across baselines.
+- The 37 review rounds are **in-system adversarial reviews** (agent-run, evidence-based) — good hygiene, **not external peer review**; grades never extrapolate across baselines.
 - **[Online playground](https://lom-lang.github.io/lom/playground/)** — run Lom, see structured diagnostics, and apply `lom fix --apply` with a line diff, entirely in your browser (the full host toolchain compiled to `wasm32-wasip1`, zero third-party JS).
 
 ## Release log
