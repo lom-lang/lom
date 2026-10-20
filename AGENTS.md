@@ -12,11 +12,10 @@ require a new RFC (see `LANGUAGE_SPEC.md` §14).
 ## Build & verify (Windows-friendly; Git Bash or PowerShell)
 
 ```bash
-cargo build --release && cargo test --release   # 581 unit + 40 integration, zero warnings expected
-python tools/doc_audit.py                       # document-number interlock, 73/73 expected
-python tools/verify_selfcomp.py                 # L2 self-compilation: 368/368 expected
-python tools/verify_selfcomp.py --bootstrap     # three-layer bootstrap: 14/14, byte-identical
-                                                # 272,925-byte quine (~20-45 s)
+cargo build --release && cargo test --release   # zero warnings; expected counts: docs/HANDOVER.md §2.2 (single source, R160 pointerized)
+python tools/doc_audit.py                       # document-number interlock (item count: HANDOVER §2.2)
+python tools/verify_selfcomp.py                 # L2 self-compilation gate (count: HANDOVER §2.2)
+python tools/verify_selfcomp.py --bootstrap     # three-layer bootstrap gate (counts & quine bytes: HANDOVER §2.2; ~20-45 s)
 ```
 
 The full regression suite is `docs/HANDOVER.md` §2.2. `target/release/lom.exe`

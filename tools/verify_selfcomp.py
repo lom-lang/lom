@@ -442,16 +442,25 @@ def run_bootstrap(lom, ci_smoke=False):
         # ---------- ③ 自施加（加分项；全量档） ----------
         t3s = time.time()
         if not ci_smoke:
+            # R162 现实核对：quine 实际字节数 vs 宣称值——quine 变化批此断言红，
+            # 提醒同步 tools/build_selfboot.py 的 QUINE_BYTES 与文档 J 锚六位
+            EXPECTED_QUINE_BYTES = 272925
             quine_hex = os.path.join(td, 'selfcomp.quine.hex')
             rq = run(node_base + [self_wasm, SELF_COMP, quine_hex], timeout=1200)
             if 'COMPILED' not in rq.stdout or not os.path.exists(quine_hex):
                 note(False, 'L3 self-apply', rq.stdout.strip()[:150])
             else:
                 ident = _read(quine_hex) == _read(self_hex)
-                note(ident, 'L3 self-apply (quine)',
-                     '%d bytes; %s; %.1fs' % (os.path.getsize(quine_hex) // 2,
-                                              'byte-identical' if ident else 'DIFFERS',
-                                              time.time() - t3s))
+                qbytes = os.path.getsize(quine_hex) // 2
+                size_ok = qbytes == EXPECTED_QUINE_BYTES
+                note(ident and size_ok, 'L3 self-apply (quine)',
+                     '%d bytes%s; %s; %.1fs' % (
+                         qbytes,
+                         '' if size_ok else
+                         ' (EXPECTED %d — sync QUINE_BYTES in tools/build_selfboot.py '
+                         'and the doc J anchors)' % EXPECTED_QUINE_BYTES,
+                         'byte-identical' if ident else 'DIFFERS',
+                         time.time() - t3s))
 
     print('RESULT: %s（--bootstrap%s：%d/%d 项通过；总耗时 %.1fs）' %
           ('PASS' if fail == 0 else 'FAIL', ' --ci-smoke' if ci_smoke else '',
