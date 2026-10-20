@@ -11,7 +11,7 @@
 
 1. **修复闭环经真实模型验证**：全 128 任务集（10 大类，2026-10-07 测量时点；现集 129 题），deepseek-v4-pro+thinking 与 glm-5.3 双模型 ×10 采样（t=1.0）**pass@1 = 98.3% / 98.5%**（pass@5 99.2% / 98.8%）——唯二未满分任务是已知提示词歧义锚题与一道刻意高难的跨编译器修复题——[报告](eval/REPORT-2026-10-07-passk-128.md)；
 2. **编译器自举可证明**：`self_comp.lom`（12,671 行 Lom）把自身源码编译为 WASM，双侧产物逐字节一致（272,925 字节强 quine，CI 每次运行复核）；
-3. **可信内核**：零第三方 crate、零 `unsafe`、581 单元 + 40 集成测试、三平台 CI；语言面（语法 / 20 关键字 / 诊断码 / 43 内建）自 v1.0 [冻结](LANGUAGE_SPEC.md)，变化须 RFC。
+3. **可信内核**：零第三方 crate、零 `unsafe`、三平台 CI；测试与门禁基线计数见 [docs/HANDOVER.md §2.2](docs/HANDOVER.md)（单一源，本文件不复写）；语言面（语法 / 20 关键字 / 诊断码 / 43 内建）自 v1.0 [冻结](LANGUAGE_SPEC.md)，变化须 RFC。
 
 ## 60 秒体验修复闭环
 
@@ -50,9 +50,9 @@ cargo build --release
 
 ## 状态与边界（如实）
 
-- 当前 **v1.12.1**（2026-10-16）；语言面自 2026-09-02 冻结后零变化——其后每个版本都是工具与证据工作（在线 playground、结构化诊断、ACRI 规范、整改）。逐版记录见[英文 README 的 Release log](README.md#release-log)；
+- 当前版本与逐版记录以[英文 README 的 Release log](README.md#release-log)为准（单一源，本文件不复写版本号——R159 指针化）；语言面自 2026-09-02 冻结后零变化——其后每个版本都是工具与证据工作（在线 playground、结构化诊断、ACRI 规范、整改）。
 - **L2 自举子集编译器**（`examples/selfhost/self_comp.lom`）为 **supported face**（v1.8.0 起自 experimental 转正）：编译 Lom 严格子集到 WASM，宿主收而 L2 拒的每个面都带 `[L2xxx]` 码与修复建议（[tools/l2fix.py](tools/l2fix.py)）；
-- 37 轮审查为**体系内敌手式审查**（agent 执行、以证据为准；节奏现为事件驱动）——是良好的工程卫生，**不是外部同行评审**；评级不跨基线外推；
+- 历轮审查均为**体系内敌手式审查**（agent 执行、以证据为准；节奏现为事件驱动；轮数以[英文 README](README.md)状态段为准——本文件不复写）；是良好的工程卫生，**不是外部同行评审**；评级不跨基线外推；
 - **[在线 playground](https://lom-lang.github.io/lom/playground/)**——浏览器里跑 Lom：结构化诊断 + `lom fix --apply` 自动修复（带行级 diff），全客户端（宿主工具链 wasm 化，零第三方 JS）。
 
 ## 延伸阅读

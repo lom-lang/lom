@@ -195,8 +195,8 @@ print(f"{len(applicable)} applicable of {len(plan['plans'])}")
 - Current steward: the Lom project. The specification is
   **implementation-neutral** (§0); stewardship of the language and of the
   specification are separable, and a future transfer to a neutral foundation
-  (precedents: MCP and AGENTS.md → Linux Foundation-hosted Agentic AI
-  Foundation, 2025-12) is an explicit non-goal to preclude.
+  is explicitly not precluded (precedents: MCP and AGENTS.md → Linux
+  Foundation-hosted Agentic AI Foundation, 2025-12).
 - Reference implementation: Lom (`specs/acri/lom-conformance.md` maps current
   behavior to this specification, including known gaps and their remediation
   batches).

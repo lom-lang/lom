@@ -5,6 +5,28 @@
 > 禁止事项 / 产出物形态）。本文件在仓库内——任务书自包含由此成立，通用段
 > 零重复手写。规范源：[MAINTENANCE.md](MAINTENANCE.md) §1/§3。
 
+## 零、批次段样例与坑索引对齐字段（R175 成文，2026-10-19）
+
+任务书批次段五要素 + 对齐字段的填写样例（迷你形态，实际批次按需扩展）：
+
+> 【批次段 · 样例】
+> - 背景与目标：R162 整改——verify_selfcomp --bootstrap 的 quine 字节数
+>   与宣称值对照并 FAIL 化（R131 型现实核对）。
+> - 仓库相关文件：tools/verify_selfcomp.py（自施加段）；tools/
+>   build_selfboot.py（QUINE_BYTES 常量）。
+> - 验收标准含期望值：python tools/verify_selfcomp.py --bootstrap 期望
+>   14/14 且 L3 self-apply (quine) 272925 bytes byte-identical；若字节
+>   不符须 FAIL（红路径逻辑说明）。
+> - 边界与禁止事项：仅改 tools/verify_selfcomp.py；禁 git 写；探针只进
+>   target/probes/。
+> - 产出物形态：diff + 验证输出原文 + 探针路径。
+> - 坑索引对齐：本批无 .lom / L2 触发面（纯 python 工具改动）——对照
+>   第四节触发表"无匹配项"，如实声明而非省略。
+
+**坑索引对齐字段（强制）**：任务书批次段须含"坑索引对齐"一项，指明当批
+触发面对应第四节哪一行（或如实声明无匹配）——规划者拟任务书时填写，
+执行者开工前对照（R175）。
+
 ## 一、通用铁律摘要（随任何任务生效；规范源 MAINTENANCE §1.2）
 
 1. 全程中文；**不做任何 git 写操作**（不 add/commit/push/tag/stash/checkout），
