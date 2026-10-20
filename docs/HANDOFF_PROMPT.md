@@ -70,8 +70,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   4 并行授权例外——并行 ≤2 纪律首次显式例外）：产品面/治理面/对外面
   三 A-（增量 29 笔零击穿 / 进程合规 86% / 竞合时效零失真）+ 模式
   实质运转成立；开账 25 笔全 P3 级以下待裁（R149-R188 号段预分配、
-  顺延号 R189 起；重点 R185 Citing 旧 handle / R187 / R188）。****观察**：Ubuntu 26 迁移
-  **2026-10-19（首回合值守：盯当日 CI 首跑，doc-gates 断链+l2fix 为重点）**；
+  顺延号 R189 起；重点 R185 Citing 旧 handle / R187 / R188）。**
+  **观察**：Ubuntu 26 渐进期常驻监控（R187 已裁收窄——渐进期 CI 红即排查；首跑已绿）；
   **contributors 残影已收口（2026-10-19：API 实查仅 wytyKen/502 一条，
   "Wyty" 残影已被 GitHub 自刷消失）**；**MoonBit 1.0 正式发布 → delta 复核**（事件触发；
   2026-10-16 双源核实仍未发布——跟踪源 = moonbitlang/moonbit-compiler
@@ -138,7 +138,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   TODO）；待触发：发帖（PR #68 合并触发，每帖单独呈批；材料持续更新
   规则生效；发帖前轻量时效复检届时裁）→ Zenodo（PR 合并后；R185
   Citing 旧 handle 先修）；观察项：Ubuntu 26 渐进期常驻监控（R187
-  收窄建议待裁；首跑已绿）+ contributors 残影已收口（2026-10-19
+  已收窄——渐进期 CI 红即排查；首跑已绿）+ contributors 残影已收口（2026-10-19
   API 实查仅 wytyKen/502 一条）+ MoonBit 1.0 正式发布 → delta 复核
   （事件触发，跟踪源 = 仓库 release 页，详见 TODO）。
   对外动作逐项呈批（铁律 6）。
