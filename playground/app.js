@@ -4,7 +4,9 @@
 //   ① 纯函数区（diffLines）—— 顶部导出，node 侧可单测
 //      （node --input-type=module import 本文件时走 DOM 守卫，不触浏览器 API）；
 //   ② DOM 引导区 boot() —— worker 生命周期 + 5s 看门狗、Run/Fix 双模式、
-//      fix --apply 行级 diff 与编辑器写回、示例切换、输出双栏与状态行。
+//      fix --apply 行级 diff 与编辑器写回、示例切换、输出双栏与状态行；
+//      内含分享链接段（v1.13.0）——Run 后静默写 URL hash、加载时恢复
+//      （编解码纯函数在 sharelink.js，node 冒烟同源锁定）。
 //
 // harness 契约（playground/harness.js 头注）：
 //   run({ source, args }) -> { stdout, stderr, exitCode, sourceOut, durationMs }
@@ -12,6 +14,12 @@
 //   sourceOut 是调用结束后的虚拟文件内容 —— fix 写回由此暴露。
 
 import { EXAMPLES } from "./examples.js";
+import {
+  SHARE_MAX_CHARS,
+  encodeShareText,
+  decodeShareText,
+  shareTextAllowed,
+} from "./sharelink.js";
 
 const WATCHDOG_MS = 5000;
 const ARGS_RUN = ["lom", "/playground.lom"];
@@ -257,12 +265,49 @@ function boot() {
     el.runBtn.textContent = busy && pending ? "运行中…" : "Run ▶";
   }
 
+  // ---- 分享链接（v1.13.0）：Run 后静默把编辑器内容写入 URL hash ----
+  // 时机 = runRequest（Run 按钮 / Fix 按钮 / Ctrl+Enter 三入口共用），零新增按钮；
+  // replaceState 不产生历史记录——每次 Run 静默刷新，返回键不堆积。
+  function updateShareHash(source) {
+    if (!shareTextAllowed(source)) {
+      // 超长跳过：URL 长度安全边界（阈值理由见 sharelink.js 头注），轻提示不打断
+      console.info(
+        `[share] 程序超过 ${SHARE_MAX_CHARS} 字符，已跳过分享链接更新（URL 长度安全边界）`,
+      );
+      return;
+    }
+    try {
+      history.replaceState(
+        null,
+        "",
+        location.pathname + location.search + "#" + encodeShareText(source),
+      );
+    } catch (e) {
+      // file:// 等受限环境 replaceState 可能抛安全错——回落 hash 赋值（功能优先）
+      location.hash = encodeShareText(source);
+    }
+  }
+
+  // 页面加载：hash 非空则解码恢复编辑器（非法载荷回落默认示例，不冒错）
+  function restoreFromShareHash() {
+    const encoded = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+    if (encoded === "") return;
+    try {
+      el.editor.value = decodeShareText(encoded);
+      el.note.textContent = "（已从分享链接恢复——点 Run 复现）";
+      clearOutputs();
+    } catch (e) {
+      console.info("[share] URL hash 不是有效分享载荷，已忽略：" + e.message);
+    }
+  }
+
   // ---- Run / Fix ----
   async function runRequest(kind) {
     if (pending) return; // 串行：一次只允许一个在途请求
     if (!worker) return;
     const id = ++msgId;
     const source = el.editor.value;
+    updateShareHash(source); // 主交互后的静默分享更新（超长自动跳过）
     pending = { id, kind, timer: setTimeout(onWatchdog, WATCHDOG_MS) };
     settleButtons();
     setStatus("running", kind === "fix" ? "fix --apply 运行中…" : "运行中…");
@@ -332,6 +377,7 @@ function boot() {
     el.select.appendChild(opt);
   }
   loadExample(EXAMPLES[0].id);
+  restoreFromShareHash(); // 分享链接恢复后置：默认示例先就位，hash 有效则覆写编辑器
   spawnWorker();
   setStatus("ready", "就绪（加载 wasm…）");
 }

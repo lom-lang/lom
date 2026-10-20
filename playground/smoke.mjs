@@ -4,9 +4,17 @@
 // 四步链 + 基准比对 + quine 字节数断言 272925 + 各步耗时报表。
 // 三期追加（designs/0025）：⑦ file 内建段——exists 真/假二值 + read/write/
 // append 的映射形态与新建边界断言（append 追加至尾 = 缺陷 B 机器锁）。
+// 四期追加（v1.13.0）：⑧ 分享链接段——sharelink.js 编解码纯函数的往返一致性
+// （中文/CRLF/空程序/超长跳过四形态 + base64url 字母表纯净性 + 非法输入报错）。
 // 用法：node playground/smoke.mjs [lom.wasm 路径]
 import { createLomRuntime } from "./harness.js";
 import { runSelfbootChain } from "./selfboot.js";
+import {
+  SHARE_MAX_CHARS,
+  encodeShareText,
+  decodeShareText,
+  shareTextAllowed,
+} from "./sharelink.js";
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
@@ -186,6 +194,37 @@ end
   const appendNew = await rt.run({ source: srcAppendNew });
   check("file append new rc 1", appendNew.exitCode, 1);
   check("file append new stderr RUNTIME000", appendNew.stderr.includes("[RUNTIME000]"), true);
+}
+
+// ---- ⑧ 分享链接段（v1.13.0）：URL hash 编解码纯函数的往返一致性 ----
+// 四形态：中文（多字节 + astral emoji）/ CRLF / 空程序 / 超长跳过（app 闸门函数）。
+// 实现在 playground/sharelink.js——浏览器 app.js 与本冒烟同源，CI 即机器锁。
+{
+  // ① 中文 + emoji（多字节与 astral 面——btoa 会崩的形态正是分享链接的目标场景）
+  const zh = 'fn main() -> Unit\n    println("你好，Lom 世界 🌊")\nend\n';
+  check("share roundtrip CJK+emoji", decodeShareText(encodeShareText(zh)), zh);
+  check("share base64url alphabet clean", /^[A-Za-z0-9_-]*$/.test(encodeShareText(zh)), true);
+
+  // ② CRLF（Windows 形态逐字保留——分享链接不得静默改行尾）
+  const crlf = "fn main() -> Unit\r\n    println(1)\r\nend\r\n";
+  check("share roundtrip CRLF", decodeShareText(encodeShareText(crlf)), crlf);
+
+  // ③ 空程序（空文本 ↔ 空 hash——app 加载侧以空 hash 判"无分享载荷"）
+  check("share empty encodes to empty", encodeShareText(""), "");
+  check("share roundtrip empty", decodeShareText(encodeShareText("")), "");
+
+  // ④ 超长跳过（app 侧闸门：>6000 拒写 hash；恰好 6000 放行——边界双侧锁定）
+  check("share overlong rejected", shareTextAllowed("x".repeat(SHARE_MAX_CHARS + 1)), false);
+  check("share at-limit allowed", shareTextAllowed("x".repeat(SHARE_MAX_CHARS)), true);
+
+  // ⑤ 非法输入解码报错（app 加载侧回落默认示例的依据——不吞错不产出坏文本）
+  let threw = false;
+  try {
+    decodeShareText("含中文的非法载荷");
+  } catch {
+    threw = true;
+  }
+  check("share invalid input throws", threw, true);
 }
 
 console.log(failures === 0 ? "\nSMOKE: ALL PASS" : `\nSMOKE: ${failures} FAIL`);

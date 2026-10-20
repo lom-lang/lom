@@ -44,8 +44,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-18 晚，v1.12.1 弧线收官（file 修复→部署→PR #68 最佳等审→模拟复核→发帖前置就绪）——交接就绪；台账零 open；顺延号 R149 起）**：
-  最新基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
+- **状态（2026-10-20，v1.13.0 playground 分享链接批交付（用户裁决同意）；前夜 v1.12.1 弧线收官（file 修复→部署→PR #68 最佳等审→模拟复核→发帖前置就绪）——交接就绪；台账零 open；顺延号 R189 起）**：
+  最新基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag/CI run 随批提交回填）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；gh-pages 不随本批部署——独立呈批件）。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
   均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
   stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
   + smoke ⑦ file 段 14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine
@@ -99,7 +99,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
   **73/73**（J 锚组现值 581+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.12.1**。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.13.0**（v1.13.0
+  分享链接批起）。
 - **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
@@ -123,7 +124,8 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   先跑 `python tools/build_selfboot.py` 生成分发三件**——playground/
   dist-selfboot/ gitignored：selfcomp.wasm / selfboot-baseline.hex /
   self_comp.lom 副本，COMPILED 272925 硬门；smoke 含自举段 6 断言 +
-  v1.12.1 ⑦ file 段 14 断言）；
+  v1.12.1 ⑦ file 段 14 断言 + v1.13.0 ⑧ 分享链接段 8 断言
+  （playground/sharelink.js 编解码纯函数——浏览器/node 双侧同源））；
   部署 = 五源件 + wasm + 分发三件推 gh-pages 孤儿分支；深度守卫 wasm 侧
   300；**二期自举演示 = "Self-hosting demo" 区块**（selfboot.js env 契约
   镜像 run_selfcomp.mjs / 独立 60s 看门狗 / strict-subset 口径标注）。
