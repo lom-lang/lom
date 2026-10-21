@@ -44,7 +44,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-20，v1.13.0 playground 分享链接批交付（用户裁决同意）；前夜 v1.12.1 弧线收官（file 修复→部署→PR #68 最佳等审→模拟复核→发帖前置就绪）——交接就绪；台账零 open；顺延号 R189 起）**：
+- **状态（2026-10-20，交接就绪——本会话弧线：三十七审（首次元层面扩容，三 A- + 元面成立）+ 整改三批 25 笔全收口 + 审查执行模式制度化（§4.5）+ 头脑风暴与三份调研档 + R188 用户驱动 + v1.13.0 分享链接批全链（tag/CI 七 job 绿/gh-pages `7af30ef` 三一致性全过）；台账零 open；顺延号 R189 起）**：
   最新基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag `e171488`，CI run `39431280200` 七 job 绿——首跑即绿）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；**gh-pages 已部署 `7af30ef` 线上 v1.13.0**（三一致性全过 + 三项浏览器实测：Run 修复闭环 / demo QUINE 272925 总 2339ms / 分享链接 hash 更新+重载逐字恢复严格验证））。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
   均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
   stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
@@ -78,7 +78,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   **contributors 残影已收口（2026-10-19：API 实查仅 wytyKen/502 一条，
   "Wyty" 残影已被 GitHub 自刷消失）**；**MoonBit 1.0 正式发布 → delta 复核**（事件触发；
   2026-10-16 双源核实仍未发布——跟踪源 = moonbitlang/moonbit-compiler
-  release 页【v0.10.15/2026-10-12】，官网 updates 页滞后仓库）。
+  release 页【v0.10.16/2026-10-19（0.10.x 线持续小步，2026-10-20 实查）】，官网 updates 页滞后仓库）。
   **身份修复批（2026-10-15，用户裁决）**：21 笔提交归因漂移到抢注
   "wyty" 的陌生账号——filter-branch 改写 `6a7fed2^..HEAD`（author+
   committer → wytyKen <204019711+wytyKen@noreply>，树零差异）+ 五 tag
@@ -139,13 +139,17 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**台账零 open（三十七审 25 笔三批全收口，2026-10-19）；交接就绪**；
-  待触发：发帖（PR #68 合并触发，每帖单独呈批；材料持续更新规则生效；
-  发帖前轻量时效复检届时裁）→ Zenodo（PR 合并后；R185 Citing 作者名已
-  修正 wytyKen）；观察项：Ubuntu 26 渐进期常驻监控（R187 已收窄）+
-  PR #68 观察点（R188 已改用户驱动——不设日程不预置催审，见 TODO）+
-  contributors 残影已收口（2026-10-19）+ MoonBit 1.0 正式发布 → delta
-  复核（事件触发，跟踪源 = 仓库 release 页）。
+- 下一步：**交接就绪（台账零 open，顺延号 R189 起）**；**待办六项（2026-10-20
+  交接时点，详见 TODO）**：① 发帖（近期目标）——用户已裁发帖前临时重写/
+  大改两帖 + 评论区预演同批；"发帖不再等 PR #68"待用户明示确认；渠道清单
+  已备（channels.md 16 条目，HN 人写要求与 Reddit 反 AI-slop 高压两风险
+  在案）；② 第三模型 pass@k 搁置（API key 待解决；$5 全量跑 gpt-5.1 的
+  调研结论在档）；③ 外部观察协议草案待批（observations/PROTOCOL-DRAFT.md
+  ——批后成常设能力，"启动外部观察"即按协议执行）；④ ACRI conformance
+  suite 待用户消化后定；⑤ Zenodo DOI 排发帖后（R185 已修正）；⑥ 头脑
+  风暴其余项用户主动提起才动。观察项：Ubuntu 26 渐进期常驻监控（R187
+  已收窄）+ PR #68（用户驱动，见 TODO）+ MoonBit 1.0 → delta 复核（事件
+  触发，跟踪源 = 仓库 release 页，现值 v0.10.16）。
   对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
