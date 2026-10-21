@@ -92,11 +92,12 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   即审）。最新报告 [review-2026-10-15.html](reviews/review-2026-10-15.html)。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
-  ~20-45s）、self_comp.lom 12671 行、Rust **581 单元 + 40 集成**（r56×1 +
+  ~20-45s）、self_comp.lom 12671 行、Rust **593 单元 + 40 集成**（v1.14.0 批：
+  581→593 = designs/0026 执行 trace ×12；r56×1 +
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
   build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
-  **73/73**（J 锚组现值 581+40）、六模式全 PASS、link_check PASS、
+  **73/73**（J 锚组现值 593+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
   6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.13.0**（v1.13.0
   分享链接批起）。
@@ -179,7 +180,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 581/581；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
+   - cargo test --release（期望 593/593；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 73/73）

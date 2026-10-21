@@ -406,6 +406,359 @@ const DEPTH_GUARD_STACK_NOTE: &str = "256MB 栈的安全上限";
 #[cfg(target_family = "wasm")]
 const DEPTH_GUARD_STACK_NOTE: &str = "引擎栈的安全上限";
 
+// ===== 执行 trace（designs/0026，v1.14.0）=====
+//
+// 调用级 JSONL 事件流：--trace 开启后，用户函数/闭包的入口（call）与
+// 出口（return / call-error）逐事件写出口（缺省 stderr；--trace-out 文件
+// NDJSON 追加写——fix_history::append_history 先例）。事件模型 lom-trace/v1
+// （设计 §3.2，字段序固定可 diff）：
+//   首行 header   {"schema":"lom-trace/v1","file":"...","max_events":N}
+//   事件行        {"seq":N,"kind":"call"|"return"|"call-error",...}
+//   尾行 summary  {"seq":N,"kind":"summary","events":E,"truncated":B}
+// 四裁决点已裁（2026-10-22）：1 乙 = 内建开关 --trace-builtins 默认关 /
+// 2 丙 = 缺省 stderr + 可选 --trace-out 文件 / 3 甲 = 值截断 120 字符·
+// 深度 3 + 形状标注 / 4 甲 = --trace-max-events 默认 10000。
+// 不含耗时字段（跨平台非确定，设计 §3.2 登记后续候选）。
+// main 入口不出 call 事件（run 直接 exec_block，不走 call_function——
+// 既定边界，设计 §2/§7）。
+
+/// --trace-max-events 缺省值（裁决点 4 甲；0 = 无限由显式参数表达）
+pub const TRACE_DEFAULT_MAX_EVENTS: usize = 10_000;
+
+/// trace 单值序列化字符上限（裁决点 3 甲）
+const TRACE_VALUE_MAX_CHARS: usize = 120;
+
+/// trace 嵌套深度上限（裁决点 3 甲：第 4 层容器以形状标注替代展开）
+const TRACE_MAX_DEPTH: usize = 3;
+
+/// trace 出口（裁决点 2 丙：缺省 stderr + 可选 --trace-out 文件）
+enum TraceSink {
+    Stderr,
+    File(std::fs::File),
+}
+
+impl TraceSink {
+    /// 写一行（line 已含尾 \n）。文件侧逐行 flush：运行时错误路径
+    /// process::exit(1) 不丢已产事件（流式消费友好）。
+    fn write_line(&mut self, line: &str) {
+        match self {
+            // stderr 与类型检查可见化/运行时错误同流（stdout 是程序产品，
+            // 不占用）；trace 行以 {"schema"/{"seq" 开头可机器区分
+            TraceSink::Stderr => eprint!("{}", line),
+            TraceSink::File(f) => {
+                use std::io::Write as _;
+                let _ = f.write_all(line.as_bytes());
+                let _ = f.flush();
+            }
+        }
+    }
+}
+
+/// trace 上下文（--trace 开启时挂 Interpreter.trace）
+struct TraceCtx {
+    sink: TraceSink,
+    /// 已发事件行数（不含 header 与 summary；上限判据与 summary 的 events 字段）
+    events: usize,
+    /// 事件上限（0 = 无限）
+    max_events: usize,
+    /// 因达上限停止记录（summary 的 truncated 位）
+    truncated: bool,
+    /// 内建调用入 trace（--trace-builtins；裁决点 1 乙，默认关）
+    builtins: bool,
+    /// 下一行序号（含 summary 自身；首事件 seq=1）
+    next_seq: usize,
+}
+
+impl TraceCtx {
+    /// 构造并写 header 行（run 之前——零事件的运行也有 header+summary 骨架，
+    /// 消费侧按 header 定版流）
+    fn new(
+        file: &str,
+        out_path: Option<&str>,
+        max_events: usize,
+        builtins: bool,
+    ) -> std::io::Result<Self> {
+        let sink = match out_path {
+            // 追加写先例：fix_history::append_history（create+append、父目录自动建）
+            Some(p) => {
+                let path = Path::new(p);
+                if let Some(parent) = path.parent()
+                    && !parent.as_os_str().is_empty()
+                {
+                    fs::create_dir_all(parent)?;
+                }
+                TraceSink::File(
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(path)?,
+                )
+            }
+            None => TraceSink::Stderr,
+        };
+        let mut ctx = TraceCtx {
+            sink,
+            events: 0,
+            max_events,
+            truncated: false,
+            builtins,
+            next_seq: 1,
+        };
+        let header = format!(
+            "{{\"schema\":\"lom-trace/v1\",\"file\":\"{}\",\"max_events\":{}}}\n",
+            crate::json::escape_str(file),
+            max_events
+        );
+        ctx.sink.write_line(&header);
+        Ok(ctx)
+    }
+
+    /// 是否还可记录事件（上限判定：0 = 无限）
+    fn room(&self) -> bool {
+        self.max_events == 0 || self.events < self.max_events
+    }
+
+    /// 尾行 summary（run 结束调用：events = 事件行数（不含 summary 自身），
+    /// truncated = 是否因上限停止记录；seq 续接事件行序号）
+    fn finish(&mut self) {
+        let line = format!(
+            "{{\"seq\":{},\"kind\":\"summary\",\"events\":{},\"truncated\":{}}}\n",
+            self.next_seq, self.events, self.truncated
+        );
+        self.sink.write_line(&line);
+    }
+}
+
+/// site 字段形态："ln:cl"（与 l2fix 码行 ln:cl 前缀同形）
+fn trace_site(span: &crate::ast::Span) -> String {
+    format!("{}:{}", span.line, span.col)
+}
+
+/// 标量超限截断：保留前 TRACE_VALUE_MAX_CHARS-1 字符 + 省略号
+/// （字符级截断，不劈 UTF-8 多字节）
+fn trace_cap_chars(s: &str) -> String {
+    if s.chars().count() <= TRACE_VALUE_MAX_CHARS {
+        s.to_string()
+    } else {
+        let cut: String = s.chars().take(TRACE_VALUE_MAX_CHARS - 1).collect();
+        format!("{}…", cut)
+    }
+}
+
+/// trace 专属值序列化（designs/0026 §3.3，裁决点 3 甲）
+///
+/// 基底 = to_display 语义（Lom 使用者看到的形态：Str 不带引号、Float 整值
+/// 补 .0、Map 键排序）+ trace 专属截断：单值 120 字符 / 嵌套深度 3，容器
+/// 超限整值降为省略号 + 形状标注（[List len=N …] / [Map keys=N …] /
+/// [Record fields=N …] / [Tuple len=N …] / [Enum <变体> …]）。
+/// **只作用于 trace 输出——to_display 本体零触碰，println 行为零变化。**
+/// 深度语义：顶层值 depth=0；depth 0/1/2 的容器正常展开子元素（子元素
+/// 以 depth+1 渲染），depth>=3 的容器（即第 4 层嵌套）直接形状标注。
+fn trace_render(v: &Value, depth: usize) -> String {
+    match v {
+        // 标量（含无参变体名/闭包占位）：to_display 语义 + 120 字符截断
+        Value::Int(_)
+        | Value::Float(_)
+        | Value::Bool(_)
+        | Value::Str(_)
+        | Value::Unit
+        | Value::Closure { .. } => trace_cap_chars(&v.to_display()),
+        Value::Enum { variant, args } => {
+            if args.is_empty() {
+                return trace_cap_chars(variant);
+            }
+            if depth >= TRACE_MAX_DEPTH {
+                return format!("[Enum {} …]", variant);
+            }
+            let mut out = format!("{}(", variant);
+            for (i, a) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&trace_render(a, depth + 1));
+                if out.chars().count() + 1 > TRACE_VALUE_MAX_CHARS {
+                    return format!("[Enum {} …]", variant);
+                }
+            }
+            out.push(')');
+            if out.chars().count() > TRACE_VALUE_MAX_CHARS {
+                return format!("[Enum {} …]", variant);
+            }
+            out
+        }
+        Value::Record { fields } => {
+            if depth >= TRACE_MAX_DEPTH {
+                return format!("[Record fields={} …]", fields.len());
+            }
+            let mut out = String::from("{");
+            for (i, (k, val)) in fields.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&format!("{}: {}", k, trace_render(val, depth + 1)));
+                if out.chars().count() + 1 > TRACE_VALUE_MAX_CHARS {
+                    return format!("[Record fields={} …]", fields.len());
+                }
+            }
+            out.push('}');
+            if out.chars().count() > TRACE_VALUE_MAX_CHARS {
+                return format!("[Record fields={} …]", fields.len());
+            }
+            out
+        }
+        Value::Tuple { elems } => {
+            if depth >= TRACE_MAX_DEPTH {
+                return format!("[Tuple len={} …]", elems.len());
+            }
+            let mut out = String::from("(");
+            for (i, e) in elems.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&trace_render(e, depth + 1));
+                if out.chars().count() + 2 > TRACE_VALUE_MAX_CHARS {
+                    return format!("[Tuple len={} …]", elems.len());
+                }
+            }
+            // 单元素尾逗号语义与 to_display 一致：(1,)
+            if elems.len() == 1 {
+                out.push(',');
+            }
+            out.push(')');
+            if out.chars().count() > TRACE_VALUE_MAX_CHARS {
+                return format!("[Tuple len={} …]", elems.len());
+            }
+            out
+        }
+        Value::List(l) => {
+            if depth >= TRACE_MAX_DEPTH {
+                return format!("[List len={} …]", l.len());
+            }
+            let mut out = String::from("[");
+            for (i, e) in l.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&trace_render(e, depth + 1));
+                // +1 = 闭括号预算；超限整值降为形状标注（不做部分内容截断
+                // ——省略号 + 形状标注是既定形态，行可 diff）
+                if out.chars().count() + 1 > TRACE_VALUE_MAX_CHARS {
+                    return format!("[List len={} …]", l.len());
+                }
+            }
+            out.push(']');
+            if out.chars().count() > TRACE_VALUE_MAX_CHARS {
+                return format!("[List len={} …]", l.len());
+            }
+            out
+        }
+        Value::Map(m) => {
+            let m = m.borrow();
+            if depth >= TRACE_MAX_DEPTH {
+                return format!("[Map keys={} …]", m.len());
+            }
+            // 键排序保确定性（与 to_display/Debug 同纪律）
+            let mut keys: Vec<&String> = m.keys().collect();
+            keys.sort();
+            let mut out = String::from("{");
+            for (i, k) in keys.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&format!(
+                    "{}: {}",
+                    k,
+                    trace_render(m.get(*k).unwrap(), depth + 1)
+                ));
+                if out.chars().count() + 1 > TRACE_VALUE_MAX_CHARS {
+                    return format!("[Map keys={} …]", m.len());
+                }
+            }
+            out.push('}');
+            if out.chars().count() > TRACE_VALUE_MAX_CHARS {
+                return format!("[Map keys={} …]", m.len());
+            }
+            out
+        }
+    }
+}
+
+/// args 数组序列化（事件行内嵌形态：["...","..."]，逐元素 JSON 转义）
+fn trace_args_json(args: &[Value]) -> String {
+    let mut s = String::from("[");
+    for (i, a) in args.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push('"');
+        s.push_str(&crate::json::escape_str(&trace_render(a, 0)));
+        s.push('"');
+    }
+    s.push(']');
+    s
+}
+
+/// call 事件行（字段序固定：seq,kind,name,site,depth,args）
+fn trace_line_call(seq: usize, name: &str, site: &str, depth: usize, args: &[Value]) -> String {
+    format!(
+        "{{\"seq\":{},\"kind\":\"call\",\"name\":\"{}\",\"site\":\"{}\",\"depth\":{},\"args\":{}}}\n",
+        seq,
+        crate::json::escape_str(name),
+        crate::json::escape_str(site),
+        depth,
+        trace_args_json(args)
+    )
+}
+
+/// return 事件行（字段序固定：seq,kind,name,depth,ret）
+fn trace_line_return(seq: usize, name: &str, depth: usize, ret: &Value) -> String {
+    format!(
+        "{{\"seq\":{},\"kind\":\"return\",\"name\":\"{}\",\"depth\":{},\"ret\":\"{}\"}}\n",
+        seq,
+        crate::json::escape_str(name),
+        depth,
+        crate::json::escape_str(&trace_render(ret, 0))
+    )
+}
+
+/// call-error 事件行（字段序固定：seq,kind,name,site,depth,args,err；
+/// err = [RUNTIMExxx] 码原文 + 消息——码分类复用诊断出口同一分类器）
+fn trace_line_call_error(
+    seq: usize,
+    name: &str,
+    site: &str,
+    depth: usize,
+    args: &[Value],
+    err: &str,
+) -> String {
+    format!(
+        "{{\"seq\":{},\"kind\":\"call-error\",\"name\":\"{}\",\"site\":\"{}\",\"depth\":{},\"args\":{},\"err\":\"{}\"}}\n",
+        seq,
+        crate::json::escape_str(name),
+        crate::json::escape_str(site),
+        depth,
+        trace_args_json(args),
+        crate::json::escape_str(err)
+    )
+}
+
+/// call-error 的 err 文本：[RUNTIMExxx] 码 + 消息原文（与 --check/--json
+/// 诊断出口同码——diagnostics::classify_runtime_error 单一事实源）
+fn trace_err_text(e: &RuntimeError) -> String {
+    let msg = match e {
+        RuntimeError::Msg(s) => s.clone(),
+        RuntimeError::DepthLimit { msg, .. } => msg.clone(),
+        // EarlyReturn 在 exec_block 边界已转 ControlFlow::Return，不会以
+        // Err 形态到达调用出口；防御性取 Display 文本
+        RuntimeError::EarlyReturn(v) => format!("提前返回: {}", v.to_display()),
+    };
+    format!(
+        "[{}] {}",
+        crate::diagnostics::classify_runtime_error(&msg),
+        msg
+    )
+}
+
 /// 控制流信号（return）
 enum ControlFlow {
     Normal(Value),
@@ -442,6 +795,9 @@ pub struct Interpreter {
     call_depth: usize,
     /// 递归深度上限（测试注入小阈值用；生产 = DEFAULT_MAX_CALL_DEPTH）
     max_depth: usize,
+    /// designs/0026（v1.14.0）：执行 trace 上下文（--trace 开启时 Some；
+    /// 关闭 = None，插桩点单次 Option 检查，零事件产出）
+    trace: Option<TraceCtx>,
 }
 
 /// 内置变体
@@ -545,6 +901,7 @@ impl Interpreter {
             program_args: Vec::new(),
             call_depth: 0,
             max_depth: DEFAULT_MAX_CALL_DEPTH,
+            trace: None,
         }
     }
 
@@ -552,6 +909,125 @@ impl Interpreter {
     /// argv[0] 约定为 .lom 文件路径，argv[1..] 为用户参数
     pub fn set_program_args(&mut self, args: Vec<String>) {
         self.program_args = args;
+    }
+
+    /// designs/0026（v1.14.0）§3.4：开启执行 trace（--trace；main.rs 运行
+    /// 模式注入——set_program_args 先例）。构造 TraceCtx 并写 header 行；
+    /// --trace-out 文件打不开 → io::Err（调用方按工具失败带 rc 2 处理）。
+    /// max_events 语义：0 = 无限（缺省值由调用方用 TRACE_DEFAULT_MAX_EVENTS）。
+    pub fn set_trace(
+        &mut self,
+        file: &str,
+        out_path: Option<&str>,
+        max_events: usize,
+        builtins: bool,
+    ) -> std::io::Result<()> {
+        self.trace = Some(TraceCtx::new(file, out_path, max_events, builtins)?);
+        Ok(())
+    }
+
+    /// designs/0026：尾行 summary（run 结束后调用——Ok/运行时错误两路都写；
+    /// 运行时错误路径随后的 process::exit(1) 不丢已产事件：文件侧逐行
+    /// flush、stderr 侧无缓冲）
+    pub fn trace_finish(&mut self) {
+        if let Some(t) = self.trace.as_mut() {
+            t.finish();
+        }
+    }
+
+    /// 入口事件（call；call_function/call_closure 外壳调用）。
+    /// depth = 被调帧深度 = 当前栈深 + 1（顶层 main 调用 = 1，与设计 §3.2
+    /// 事件例的 depth 语义一致）；上限满则置 truncated 并跳过。
+    fn trace_enter(&mut self, name: &str, site: &str, args: &[Value]) {
+        let Some(t) = self.trace.as_mut() else { return };
+        if !t.room() {
+            t.truncated = true;
+            return;
+        }
+        let depth = self.call_depth + 1;
+        let line = trace_line_call(t.next_seq, name, site, depth, args);
+        t.sink.write_line(&line);
+        t.events += 1;
+        t.next_seq += 1;
+    }
+
+    /// 出口事件（return / call-error——result 为 Err 时）。depth 与入口同值
+    /// （出口时 call_depth 已还原到调用方层，+1 即被调帧深度——arity 失败/
+    /// 深度守卫早退路径同样成立）。EarlyReturn 不会到达（exec_block 边界
+    /// 已转 Return）——Err 必为真实运行时错误。
+    fn trace_exit(
+        &mut self,
+        name: &str,
+        site: &str,
+        args: &[Value],
+        result: &Result<Value, RuntimeError>,
+    ) {
+        let Some(t) = self.trace.as_mut() else { return };
+        if !t.room() {
+            t.truncated = true;
+            return;
+        }
+        let depth = self.call_depth + 1;
+        let line = match result {
+            Ok(v) => trace_line_return(t.next_seq, name, depth, v),
+            Err(e) => {
+                trace_line_call_error(t.next_seq, name, site, depth, args, &trace_err_text(e))
+            }
+        };
+        t.sink.write_line(&line);
+        t.events += 1;
+        t.next_seq += 1;
+    }
+
+    /// 内建调用事件（仅 --trace-builtins 开启时产生；eval_call 内建位调用）。
+    /// name 解析到真名（别名→本名，与 call_builtin 同一查表——设计 §3.2
+    /// "内建名即内建名"）；Ok(None) = 不是内建，无事件。
+    fn trace_builtin(
+        &mut self,
+        name: &str,
+        site: &str,
+        args: &[Value],
+        res: &Result<Option<Value>, RuntimeError>,
+    ) {
+        // 不是内建（让上层当用户函数/闭包处理）——零事件，其调用事件由
+        // call_function/call_closure 外壳产生
+        if matches!(res, Ok(None)) {
+            return;
+        }
+        let Some(t) = self.trace.as_mut() else { return };
+        if !t.builtins {
+            return;
+        }
+        // 真名解析（import_aliases 查表；与 call_builtin 第 1 步同一逻辑）
+        let real_name: &str = self
+            .import_aliases
+            .get(name)
+            .map(|s| s.as_str())
+            .unwrap_or(name);
+        let depth = self.call_depth + 1;
+        if !t.room() {
+            t.truncated = true;
+            return;
+        }
+        let call = trace_line_call(t.next_seq, real_name, site, depth, args);
+        t.sink.write_line(&call);
+        t.events += 1;
+        t.next_seq += 1;
+        if !t.room() {
+            t.truncated = true;
+            return;
+        }
+        let line = match res {
+            Ok(Some(v)) => trace_line_return(t.next_seq, real_name, depth, v),
+            // Ok(None) 已在函数入口排除
+            Ok(None) => unreachable!("内建 Ok(None) 已提前返回"),
+            Err(e) => {
+                trace_line_call_error(t.next_seq, real_name, site, depth, args, &trace_err_text(e))
+            }
+        };
+        t.sink.write_line(&line);
+        t.events += 1;
+        t.next_seq += 1;
     }
 
     /// Phase 4.4: 加载依赖图中的所有外部包
@@ -1193,8 +1669,15 @@ impl Interpreter {
                         args: Rc::new(arg_vals.to_vec()),
                     });
                 }
-                // 内置函数
-                if let Some(v) = self.call_builtin(name, arg_vals)? {
+                // 内置函数（designs/0026：--trace-builtins 开启时内建调用入
+                // trace——裁决点 1 乙默认关，关闭态本位点仅一次 Option 检查；
+                // Err 同样入事件（call-error），call_builtin 返回后再判）
+                let builtin_res = self.call_builtin(name, arg_vals);
+                if self.trace.is_some() {
+                    let site = trace_site(&callee.span);
+                    self.trace_builtin(name, &site, arg_vals, &builtin_res);
+                }
+                if let Some(v) = builtin_res? {
                     return Ok(v);
                 }
                 // 用户函数（含外部包符号）——R105（二十一审，designs/0014 §2.2）：
@@ -1491,7 +1974,27 @@ impl Interpreter {
     }
 
     /// 调用用户函数
+    ///
+    /// designs/0026（v1.14.0）：本函数是 trace 入口/出口插桩外壳——关闭态
+    /// 每次调用恰两次 Option 检查（入口 + 出口），零事件产出；原调用逻辑
+    /// （参数绑定/深度守卫/函数体执行）逐字移入 call_function_inner，行为
+    /// 不变。call-error 事件覆盖全部 Err 路径（arity 失败/深度守卫/体内
+    /// 运行时错误——Err 逐帧上抛时每层各发一条，直接可判"第几层炸"）。
     fn call_function(&mut self, f: &FnDecl, args: &[Value]) -> Result<Value, RuntimeError> {
+        if self.trace.is_some() {
+            let site = trace_site(&f.span);
+            self.trace_enter(&f.name, &site, args);
+        }
+        let result = self.call_function_inner(f, args);
+        if self.trace.is_some() {
+            let site = trace_site(&f.span);
+            self.trace_exit(&f.name, &site, args, &result);
+        }
+        result
+    }
+
+    /// call_function 的原调用逻辑体（designs/0026 拆出——外壳插桩零侵入）
+    fn call_function_inner(&mut self, f: &FnDecl, args: &[Value]) -> Result<Value, RuntimeError> {
         if args.len() != f.params.len() {
             return Err(RuntimeError::Msg(format!(
                 "函数 '{}' 期望 {} 个参数，得到 {} 个",
@@ -1528,7 +2031,34 @@ impl Interpreter {
     }
 
     /// 调用闭包
+    ///
+    /// designs/0026（v1.14.0）：同 call_function 的 trace 插桩外壳。闭包
+    /// 无名——事件用合成名 `<closure@ln:cl>`（site = 调用点 span，与错误
+    /// 报位同源；设计 §3.2）。
     fn call_closure(
+        &mut self,
+        params: &[Param],
+        body: &Block,
+        closure_env: ScopeRef,
+        args: &[Value],
+        site: &crate::ast::Span,
+    ) -> Result<Value, RuntimeError> {
+        if self.trace.is_some() {
+            let site_s = trace_site(site);
+            let name = format!("<closure@{}>", site_s);
+            self.trace_enter(&name, &site_s, args);
+        }
+        let result = self.call_closure_inner(params, body, closure_env, args, site);
+        if self.trace.is_some() {
+            let site_s = trace_site(site);
+            let name = format!("<closure@{}>", site_s);
+            self.trace_exit(&name, &site_s, args, &result);
+        }
+        result
+    }
+
+    /// call_closure 的原调用逻辑体（designs/0026 拆出——外壳插桩零侵入）
+    fn call_closure_inner(
         &mut self,
         params: &[Param],
         body: &Block,
@@ -3829,5 +4359,354 @@ end
         let src = "fn main() -> Unit\n    let max = 9223372036854775807\n    println((max + 1) - 1 == max)\nend\n";
         let result = run_src(src);
         assert!(result.is_ok(), "回绕算术不应报错: {:?}", result.err());
+    }
+
+    // ===== designs/0026（v1.14.0）：执行 trace 单测 =====
+    //
+    // 出口策略：统一走 --trace-out 同款文件出口（stderr 无法进程内捕获；
+    // 行构造两出口同源——sink 只决定写哪，事件行由 trace_line_* 纯函数
+    // 拼装）。限流以小数测（默认 10000 同一 room() 逻辑路径）。
+
+    /// 助手：开 trace 跑 src，返回 trace 文件全部行（每次唯一文件名，跑前清残档）
+    fn trace_run(src: &str, name: &str, max_events: usize, builtins: bool) -> Vec<String> {
+        let dir = std::env::temp_dir().join("lom_trace_tests");
+        std::fs::create_dir_all(&dir).expect("建 trace 测试目录失败");
+        let out = dir.join(format!("{}.jsonl", name));
+        let _ = std::fs::remove_file(&out);
+        let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
+        let mut interp = Interpreter::new();
+        interp
+            .set_trace(
+                "test.lom",
+                Some(&out.to_string_lossy()),
+                max_events,
+                builtins,
+            )
+            .expect("开 trace 失败");
+        let _ = interp.run(&program);
+        interp.trace_finish();
+        std::fs::read_to_string(&out)
+            .expect("读 trace 文件失败")
+            .lines()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// 助手：JSONL 行 → 已解析 Record 的标量字段（复用 crate::json::parse
+    /// ——trace 行的逐行合法性由真实解析器背书）
+    fn jfield(v: &Value, key: &str) -> String {
+        let Value::Record { fields } = v else {
+            panic!("trace 行应解析为 Record");
+        };
+        let (_, val) = fields
+            .iter()
+            .find(|(k, _)| &**k == key)
+            .unwrap_or_else(|| panic!("字段 {} 缺失: {:?}", key, v));
+        match val {
+            Value::Str(s) => s.to_string(),
+            Value::Int(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            other => panic!("字段 {} 非标量: {:?}", key, other),
+        }
+    }
+
+    /// 开关两态·关闭态：默认 Interpreter.trace = None，程序照常执行
+    /// （关闭 = 零事件产出；插桩点单次 Option 检查路径）
+    #[test]
+    fn trace_off_by_default_runs_untraced() {
+        let src = "fn add(a: Int, b: Int) -> Int\n    a + b\nend\nfn main() -> Unit\n    println(add(1, 2))\nend\n";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        assert!(interp.trace.is_none(), "默认 trace 必须关闭");
+        assert!(interp.run(&program).is_ok(), "关闭态程序应正常执行");
+    }
+
+    /// 零事件运行：header + summary 骨架仍在（println 是内建，默认不入 trace）
+    #[test]
+    fn trace_zero_event_skeleton_header_and_summary() {
+        let src = "fn main() -> Unit\n    println(7)\nend\n";
+        let lines = trace_run(src, "zero_event", TRACE_DEFAULT_MAX_EVENTS, false);
+        assert_eq!(
+            lines.len(),
+            2,
+            "零事件 = header + summary 两行: {:?}",
+            lines
+        );
+        assert!(
+            lines[0].starts_with(
+                "{\"schema\":\"lom-trace/v1\",\"file\":\"test.lom\",\"max_events\":10000}"
+            ),
+            "header 形态: {}",
+            lines[0]
+        );
+        let parsed = crate::json::parse(&lines[1]).expect("summary 应可解析");
+        assert_eq!(jfield(&parsed, "kind"), "summary");
+        assert_eq!(jfield(&parsed, "events"), "0");
+        assert_eq!(jfield(&parsed, "truncated"), "false");
+        assert_eq!(jfield(&parsed, "seq"), "1", "零事件时 summary 续接 seq=1");
+    }
+
+    /// fib(3)：call/return 事件配对、args/ret/depth 语义、JSONL 逐行可 parse、
+    /// summary 计数（5 次调用 = 10 事件）
+    #[test]
+    fn trace_call_return_events_fib() {
+        let src = "fn fib(n: Int) -> Int\n    if n < 2\n        n\n    else\n        fib(n - 1) + fib(n - 2)\n    end\nend\nfn main() -> Unit\n    println(fib(3))\nend\n";
+        let lines = trace_run(src, "fib", TRACE_DEFAULT_MAX_EVENTS, false);
+        // JSONL 逐行可 parse（真实解析器）
+        let parsed: Vec<Value> = lines
+            .iter()
+            .map(|l| crate::json::parse(l).expect("逐行应可 parse"))
+            .collect();
+        assert_eq!(jfield(&parsed[0], "schema"), "lom-trace/v1", "首行 header");
+        // 事件区 = 除 header/summary 外全部
+        let events = &lines[1..lines.len() - 1];
+        assert_eq!(
+            events.len(),
+            10,
+            "fib(3) 共 5 次调用 = 10 事件: {:?}",
+            events
+        );
+        let first_call = &parsed[1];
+        assert_eq!(jfield(first_call, "kind"), "call");
+        assert_eq!(jfield(first_call, "name"), "fib");
+        assert_eq!(jfield(first_call, "site"), "1:1", "site = fn 签名位 ln:cl");
+        assert_eq!(jfield(first_call, "depth"), "1", "顶层调用 depth=1");
+        // args 是字符串数组 ["3"]（Value::List of Str）
+        match &parsed[1] {
+            Value::Record { fields } => {
+                let (_, args) = fields.iter().find(|(k, _)| &**k == "args").unwrap();
+                match args {
+                    Value::List(items) => {
+                        assert_eq!(items.iter().collect::<Vec<_>>().len(), 1);
+                        assert!(
+                            matches!(items.iter().collect::<Vec<_>>()[0], Value::Str(s) if &**s == "3"),
+                            "args[0] 应为字符串 \"3\""
+                        );
+                    }
+                    other => panic!("args 应为 List: {:?}", other),
+                }
+            }
+            other => panic!("call 行应为 Record: {:?}", other),
+        }
+        // 第 4 事件 = fib(1) 叶 return 1（depth 3；事件序：call(3),call(2),call(1),ret(1)）
+        assert_eq!(jfield(&parsed[4], "kind"), "return");
+        assert_eq!(jfield(&parsed[4], "ret"), "1");
+        assert_eq!(jfield(&parsed[4], "depth"), "3");
+        // 尾行 summary：events=10（不含 summary 自身）、truncated=false
+        let summary = parsed.last().unwrap();
+        assert_eq!(jfield(summary, "kind"), "summary");
+        assert_eq!(jfield(summary, "events"), "10");
+        assert_eq!(jfield(summary, "truncated"), "false");
+        assert_eq!(jfield(summary, "seq"), "11");
+    }
+
+    /// 截断·长容器：20000 元素 List 参数 → 形状标注 [List len=20000 …]，
+    /// 事件行不超宽（<300 字符）。构建走 while 迭代（cargo test 测试线程
+    /// 栈远小于 main 的 256MB 专用线程——20000 层递归会爆栈，
+    /// HANDOVER §2.2 既有警告的镜像）
+    #[test]
+    fn trace_truncates_long_list_to_shape_annotation() {
+        let src = "from list import { list_cons, list_empty }\nfn eat(l: List) -> Int\n    0\nend\nfn main() -> Unit\n    let mut acc = list_empty()\n    let mut i = 0\n    while i < 20000\n        acc = list_cons(i, acc)\n        i = i + 1\n    end\n    println(eat(acc))\nend\n";
+        let lines = trace_run(src, "big_list", 0, false);
+        let eat_line = lines
+            .iter()
+            .find(|l| l.contains("\"name\":\"eat\"") && l.contains("\"kind\":\"call\""))
+            .expect("应有 eat 调用事件");
+        assert!(
+            eat_line.contains("\"args\":[\"[List len=20000 …]\"]"),
+            "20000 元素 List 应形状标注: {}",
+            eat_line
+        );
+        assert!(
+            eat_line.chars().count() < 300,
+            "事件行应远小于全量渲染: {}",
+            eat_line
+        );
+    }
+
+    /// 截断·深嵌套：5 层嵌套 List → 第 4 层（depth 3）起形状标注，
+    /// 内层不再展开
+    #[test]
+    fn trace_truncates_deep_nesting_at_depth_3() {
+        let src = "from list import { list_cons, list_empty }\nfn eat(l: List) -> Int\n    0\nend\nfn nest(n: Int, acc: List) -> List\n    if n == 0\n        acc\n    else\n        nest(n - 1, list_cons(acc, list_empty()))\n    end\nend\nfn main() -> Unit\n    let deep = nest(5, list_cons(0, list_empty()))\n    println(eat(deep))\nend\n";
+        let lines = trace_run(src, "deep_nest", 0, false);
+        let eat_line = lines
+            .iter()
+            .find(|l| l.contains("\"name\":\"eat\"") && l.contains("\"kind\":\"call\""))
+            .expect("应有 eat 调用事件");
+        assert!(
+            eat_line.contains("[[[[List len=1 …]]]]"),
+            "5 层嵌套在第 4 层降形状标注: {}",
+            eat_line
+        );
+        assert!(!eat_line.contains("[[[[["), "第 5 层不得展开: {}", eat_line);
+    }
+
+    /// 限流（小数测默认 10000 同一路径）：max_events=3 → 恰 3 事件行 +
+    /// summary events:3 truncated:true（seq 续接 =4）
+    #[test]
+    fn trace_max_events_limits_and_marks_truncated() {
+        let src = "fn step(x: Int) -> Int\n    x + 1\nend\nfn main() -> Unit\n    let mut i = 0\n    let mut acc = 0\n    while i < 4\n        acc = step(i)\n        i = i + 1\n    end\n    println(acc)\nend\n";
+        let lines = trace_run(src, "limit3", 3, false);
+        assert_eq!(lines.len(), 5, "header + 3 事件 + summary: {:?}", lines);
+        let events = &lines[1..4];
+        for (i, l) in events.iter().enumerate() {
+            let p = crate::json::parse(l).expect("事件行可 parse");
+            assert_eq!(jfield(&p, "seq"), format!("{}", i + 1), "seq 连续: {}", l);
+        }
+        let summary = crate::json::parse(lines.last().unwrap()).unwrap();
+        assert_eq!(jfield(&summary, "events"), "3");
+        assert_eq!(jfield(&summary, "truncated"), "true");
+        assert_eq!(jfield(&summary, "seq"), "4");
+    }
+
+    /// 限流 0 = 无限：同一程序 8 事件全量、truncated:false
+    #[test]
+    fn trace_max_events_zero_is_unlimited() {
+        let src = "fn step(x: Int) -> Int\n    x + 1\nend\nfn main() -> Unit\n    let mut i = 0\n    let mut acc = 0\n    while i < 4\n        acc = step(i)\n        i = i + 1\n    end\n    println(acc)\nend\n";
+        let lines = trace_run(src, "unlimited", 0, false);
+        let summary = crate::json::parse(lines.last().unwrap()).unwrap();
+        assert_eq!(
+            jfield(&summary, "events"),
+            "8",
+            "4 次 step = 8 事件: {:?}",
+            lines
+        );
+        assert_eq!(jfield(&summary, "truncated"), "false");
+    }
+
+    /// 闭包合成名：`<closure@ln:cl>`（site = 调用点）
+    #[test]
+    fn trace_closure_synthetic_name() {
+        let src = "fn apply(f: Fn, x: Int) -> Int\n    f(x)\nend\nfn main() -> Unit\n    let double = fn(x: Int) -> Int\n        x * 2\n    end\n    println(apply(double, 21))\nend\n";
+        let lines = trace_run(src, "closure_name", TRACE_DEFAULT_MAX_EVENTS, false);
+        let closure_line = lines
+            .iter()
+            .find(|l| l.contains("<closure@"))
+            .expect("应有闭包合成名事件");
+        let p = crate::json::parse(closure_line).expect("闭包事件行可 parse");
+        let name = jfield(&p, "name");
+        assert!(
+            name.starts_with("<closure@") && name.ends_with(">"),
+            "合成名形态 <closure@ln:cl>: {}",
+            name
+        );
+        let site = name.trim_start_matches("<closure@").trim_end_matches('>');
+        assert!(
+            site.contains(':')
+                && site
+                    .split(':')
+                    .all(|p| p.chars().all(|c| c.is_ascii_digit())),
+            "site 应为 ln:cl 数字对: {}",
+            site
+        );
+    }
+
+    /// call-error 事件：err 含 [RUNTIMExxx] 码原文（与诊断出口同分类器）；
+    /// Err 逐帧上抛时每层各一条（直接可判第几层炸）
+    #[test]
+    fn trace_call_error_event_carries_code() {
+        let src = "fn boom() -> Int\n    missing_var\nend\nfn wrapper(x: Int) -> Int\n    boom() + x\nend\nfn main() -> Unit\n    println(wrapper(1))\nend\n";
+        let lines = trace_run(src, "call_error", TRACE_DEFAULT_MAX_EVENTS, false);
+        let errors: Vec<&String> = lines
+            .iter()
+            .filter(|l| l.contains("\"kind\":\"call-error\""))
+            .collect();
+        assert_eq!(errors.len(), 2, "boom + wrapper 两层各一条: {:?}", errors);
+        assert!(
+            errors[0].contains("\"err\":\"[RUNTIME002] 未定义变量: 'missing_var'\""),
+            "err 含码原文: {}",
+            errors[0]
+        );
+        let p0 = crate::json::parse(errors[0]).unwrap();
+        assert_eq!(jfield(&p0, "name"), "boom");
+        assert_eq!(jfield(&p0, "depth"), "2");
+        let p1 = crate::json::parse(errors[1]).unwrap();
+        assert_eq!(jfield(&p1, "name"), "wrapper");
+        assert_eq!(jfield(&p1, "depth"), "1", "上抛层 depth 递减");
+    }
+
+    /// 内建开关两态：默认无内建事件；--trace-builtins 开后有 map_get 事件
+    /// （裁决点 1 乙：默认关——内建噪声大）
+    #[test]
+    fn trace_builtins_flag_two_states() {
+        let src = "from map import { map_empty, map_set, map_get }\nfn get(m: Map, k: String) -> Int\n    match map_get(m, k)\n        Some(v) => v\n        None => 0\n    end\nend\nfn main() -> Unit\n    let m = map_empty()\n    let u = map_set(m, \"answer\", 42)\n    println(get(m, \"answer\"))\nend\n";
+        let off = trace_run(src, "builtin_off", TRACE_DEFAULT_MAX_EVENTS, false);
+        assert!(
+            off.iter().all(|l| !l.contains("\"name\":\"map_get\"")),
+            "默认态不得有内建事件: {:?}",
+            off
+        );
+        let on = trace_run(src, "builtin_on", TRACE_DEFAULT_MAX_EVENTS, true);
+        assert!(
+            on.iter().any(|l| l.contains("\"name\":\"map_get\"")),
+            "--trace-builtins 应有 map_get 事件: {:?}",
+            on
+        );
+    }
+
+    /// --trace-out 文件出口 = NDJSON 追加写：同文件两次运行 → 两份
+    /// header+summary（fix_history::append_history 同款追加语义）
+    #[test]
+    fn trace_out_file_appends_across_runs() {
+        let src = "fn f(x: Int) -> Int\n    x\nend\nfn main() -> Unit\n    println(f(1))\nend\n";
+        let dir = std::env::temp_dir().join("lom_trace_tests");
+        std::fs::create_dir_all(&dir).expect("建目录失败");
+        let out = dir.join("append.jsonl");
+        let _ = std::fs::remove_file(&out);
+        for _ in 0..2 {
+            let program = Parser::parse(src).unwrap();
+            let mut interp = Interpreter::new();
+            interp
+                .set_trace("test.lom", Some(&out.to_string_lossy()), 0, false)
+                .expect("开 trace 失败");
+            let _ = interp.run(&program);
+            interp.trace_finish();
+        }
+        let content = std::fs::read_to_string(&out).expect("读回失败");
+        let schema_count = content.matches("\"schema\":\"lom-trace/v1\"").count();
+        let summary_count = content.matches("\"kind\":\"summary\"").count();
+        assert_eq!(schema_count, 2, "两次运行两份 header: {}", content);
+        assert_eq!(summary_count, 2, "两次运行两份 summary");
+    }
+
+    /// 值序列化纯函数单测：标量截断 120 / to_display 语义基底 / 形状标注 /
+    /// call-error err 文本（不跑程序——直接构造 Value）
+    #[test]
+    fn trace_render_pure_shapes() {
+        // 标量超 120 字符：119 字符 + 省略号 = 120
+        let long_str: String = std::iter::repeat('x').take(500).collect();
+        let rendered = trace_render(&Value::Str(std::rc::Rc::from(long_str.as_str())), 0);
+        assert_eq!(rendered.chars().count(), 120, "截断后恰 120 字符");
+        assert!(rendered.ends_with('…'), "省略号收尾: {}", rendered);
+        // to_display 语义基底：Float 整值补 .0、Str 不带引号、Bool 小写
+        // （源码字面量大写 True/False，显示语义随 to_display = Rust 小写）
+        assert_eq!(trace_render(&Value::Int(42), 0), "42");
+        assert_eq!(trace_render(&Value::Float(1.0), 0), "1.0");
+        assert_eq!(trace_render(&Value::Str(std::rc::Rc::from("hi")), 0), "hi");
+        assert_eq!(trace_render(&Value::Bool(true), 0), "true");
+        assert_eq!(trace_render(&Value::Unit, 0), "()");
+        // 空容器全量
+        assert_eq!(trace_render(&Value::List(ListVal::Nil), 0), "[]");
+        // Map 键排序确定性
+        let mut m = std::collections::HashMap::new();
+        m.insert("b".to_string(), Value::Int(2));
+        m.insert("a".to_string(), Value::Int(1));
+        let rendered = trace_render(&Value::Map(std::rc::Rc::new(std::cell::RefCell::new(m))), 0);
+        assert_eq!(rendered, "{a: 1, b: 2}");
+        // call-error err 文本：码 + 消息原文
+        assert_eq!(
+            trace_err_text(&RuntimeError::Msg("未定义变量: 'x'".to_string())),
+            "[RUNTIME002] 未定义变量: 'x'"
+        );
+        // 深度守卫文案 → RUNTIME000（与诊断分类一致）
+        assert_eq!(
+            trace_err_text(&RuntimeError::DepthLimit {
+                msg: "递归深度超过 60 层".to_string(),
+                line: 1,
+                col: 1
+            }),
+            "[RUNTIME000] 递归深度超过 60 层"
+        );
     }
 }

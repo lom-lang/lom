@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 42,159 characters ≈ 10.1k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 46,774 characters ≈ 11.7k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -716,6 +716,59 @@ Key points:
   8. **`env::args()` `argv[0]`** (since 2026-09-15, documented during the D-3 differential expansion) — `argv[0]` is the program path and therefore differs structurally between backends: the interpreter passes the `.lom` source path, the WASM harness passes the `.wasm` binary path (different lengths and contents). User arguments after the CLI `--` separator are byte-identical on both backends. Guidance: never print, hash, or branch on `args()[0]`; consume `args()[1..]` only. Not a bug — "the program path" is inherently a different artifact per backend; recorded so LLM-generated argument-parsing code does not rely on `argv[0]`'s content. Covered by the `t_env_args_consume` template family of `tools/diff_gen.py` (which deliberately never touches `args[0]`).
 
 ---
+
+## 11g. Execution Trace (`--trace`, v1.14.0)
+
+The interpreter's run mode can emit a **call-level JSONL event stream** — your window into what the program actually did at run time (which calls happened, with what arguments, how deep, what each returned, and exactly which call layer raised a runtime error). Diagnostics (`--check --json`) tell you *that* a run failed; the trace tells you *the call chain that failed*.
+
+### Flags
+
+```
+lom <file.lom> --trace [--trace-out <file>] [--trace-max-events <n>] [--trace-builtins]
+```
+
+| Flag | Meaning |
+|---|---|
+| `--trace` | Enable the trace (default **off**; off = zero events, zero output) |
+| `--trace-out <file>` | Redirect the trace to a file (NDJSON, **append**-write across runs). Default sink = **stderr** (stdout stays the program's product stream) |
+| `--trace-max-events <n>` | Cap on event lines. Default **10000**; `0` = unlimited. When the cap hits, recording stops and the trailing summary reports `truncated:true` |
+| `--trace-builtins` | Include builtin calls (e.g. `map_get`, `list_head`) in the trace. Default **off** — builtins are noisy; turn this on when a builtin's arguments are the missing clue |
+
+### Stream shape (`lom-trace/v1`)
+
+Line 1 is the header, then one event per line, and the last line is always the summary:
+
+```json
+{"schema":"lom-trace/v1","file":"prog.lom","max_events":10000}
+{"seq":1,"kind":"call","name":"fib","site":"1:1","depth":1,"args":["5"]}
+{"seq":2,"kind":"return","name":"fib","depth":1,"ret":"5"}
+{"seq":3,"kind":"call-error","name":"head","site":"7:5","depth":3,"args":["[]"],"err":"[RUNTIME000] list_head 空列表无首元素"}
+{"seq":4,"kind":"summary","events":3,"truncated":false}
+```
+
+Field semantics (field order is fixed — streams are diffable):
+
+- `seq` — 1-based line number of the event (the summary's `seq` continues the sequence; `events` counts event lines **excluding** the summary itself).
+- `kind` — `call` (function/closure entry), `return` (exit with a value), `call-error` (exit with `Err`), `summary` (always last).
+- `name` — the function name; closures have no name, so they appear as the synthetic `<closure@ln:cl>` (the call site); with `--trace-builtins`, the builtin's real (alias-resolved) name.
+- `site` — `ln:cl` of the callee's `fn` signature (user functions) or the call site (closures and builtins).
+- `depth` — **the callee's frame depth**: a call from `main` is depth 1, each nested call +1. For recursion this is the layer index — read the deepest `call` (or `call-error`) to see how deep the recursion had gone.
+- `args` / `ret` — values as `to_display`-shaped strings (what `println` would show; strings unquoted), each capped at **120 chars** with nesting expanded to **depth 3**; beyond the cap the whole value degrades to a shape annotation like `[List len=20000 …]`, `[Map keys=512 …]`. Scalar overflow is cut at 119 chars + `…`.
+- `err` — the verbatim `[RUNTIMExxx]` code + original message, **the same code the diagnostic exits emit** (single classifier).
+
+### Typical repair usage
+
+1. **Runtime error localization** — run `lom prog.lom --trace 2>trace.jsonl`, then read the **last `call-error` chain bottom-up**: the deepest `call-error` is the frame that raised it (its `args` show the offending values, its `depth` the recursion layer); the `call-error`s above it are the propagating frames — the call chain you must reason about to fix the bug. The `err` field carries the `[RUNTIMExxx]` code verbatim, so it joins directly with `lom codes --json` and the fix suggestions.
+2. **Recursion-depth diagnosis** (`[RUNTIME000]` depth guard): max `depth` across `call` events tells you how deep the recursion actually went before the guard fired; the `args` sequence shows whether the recursion argument is converging.
+3. **Diff two runs**: fixed field order makes `--trace-out` files from before/after a fix diffable line-by-line (add `--trace-max-events 0` for full streams; the default 10000 cap keeps wide-call programs from producing ~100 MB traces).
+
+### Boundaries (registered)
+
+- `main` itself emits **no** `call` event (the entry point runs via `exec_block`, not `call_function`).
+- AOT `lom build` artifacts never pass through the interpreter — `--trace` does not apply to them.
+- Trace lines interleave on stderr *after* the always-on type-check diagnostics; distinguish streams by line shape (trace lines start with `{"schema"` / `{"seq"`).
+- Builtin events render their `args` at event-construction time — for in-place mutation builtins (`map_set`) the map shows its post-mutation state.
+- No timing fields (cross-platform nondeterminism — registered as a future candidate).
 
 ## 12. Quick Reference
 

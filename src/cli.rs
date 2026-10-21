@@ -50,6 +50,18 @@ pub(crate) struct CliArgs {
     /// designs/0018 甲后续（L2 v1.8.0 转正）: --text <s> 值选项（lom l2fix
     /// 专用——直接给 L2 拒绝文本，与 <file>/`-` 三选一，--text 优先）
     pub(crate) text: Option<String>,
+    /// designs/0026（v1.14.0）: --trace 开关——运行模式执行 trace
+    /// （调用级 JSONL 事件流，lom-trace/v1；默认关 = 零事件产出）
+    pub(crate) trace: bool,
+    /// designs/0026: --trace-out <file> —— trace 出口重定向到文件
+    /// （NDJSON 追加写；缺省 = stderr）
+    pub(crate) trace_out: Option<String>,
+    /// designs/0026: --trace-max-events <n> —— 事件上限（缺省 10000；
+    /// 0 = 无限；达上限停止记录并输出尾行 summary truncated:true）
+    pub(crate) trace_max_events: Option<usize>,
+    /// designs/0026 裁决点 1 乙: --trace-builtins —— 内建调用入 trace
+    /// （默认关——内建噪声大，缺线索时再开）
+    pub(crate) trace_builtins: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     pub(crate) program_args: Vec<String>,
 }
@@ -87,6 +99,9 @@ pub(crate) fn print_help(prog: &str) {
     );
     eprintln!(
         "  {prog} codes [--json]               导出诊断码表（lom-codes/v1：九命名空间 + L2 八族）"
+    );
+    eprintln!(
+        "  {prog} <file.lom> --trace [--trace-out <f>] [--trace-max-events <n>] [--trace-builtins]  运行并输出调用级执行 trace（JSONL）"
     );
     eprintln!("  {prog} --help | -h               显示帮助");
     eprintln!("  {prog} --version | -V            显示版本");
@@ -167,6 +182,14 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!("  --apply    lom fix 子命令专用：应用修复到源文件（Phase 3.1；M2 起迭代至收敛）");
     eprintln!("  --dry-run  lom fix --apply 子命令专用：只预览不写文件");
     eprintln!("  --history  lom fix 子命令专用：查看修复历史记录（Phase 4.1.3）");
+    eprintln!(
+        "  --trace    运行模式执行 trace：调用级 JSONL 事件流（lom-trace/v1 首行 header + call/return/call-error 事件 + 尾行 summary），默认出到 stderr（designs/0026）"
+    );
+    eprintln!("  --trace-out <file>  trace 出口重定向到文件（NDJSON 追加写；缺省 stderr）");
+    eprintln!(
+        "  --trace-max-events <n>  trace 事件上限（默认 10000；0 = 无限；达上限停止记录，尾行 summary truncated:true）"
+    );
+    eprintln!("  --trace-builtins   内建调用入 trace（默认关——内建调用噪声大，缺线索时再开）");
     eprintln!("  --help, -h 显示本帮助");
     eprintln!("  --version, -V 显示版本号（Phase 6.1）");
     eprintln!();
@@ -281,6 +304,41 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                         process::exit(2);
                     }
                 });
+            }
+            // ===== designs/0026（v1.14.0）：--trace 族四 flag（带值形态照
+            // --target/-o 先例；纯 CLI flag，不触语言冻结面）=====
+            "--trace" => out.trace = true,
+            "--trace-builtins" => out.trace_builtins = true,
+            "--trace-out" => {
+                out.trace_out = Some(match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("--trace-out 需要一个路径值");
+                        // β-2：用法错误 = 工具失败带 rc 2
+                        process::exit(2);
+                    }
+                });
+            }
+            "--trace-max-events" => {
+                let raw = match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("--trace-max-events 需要一个非负整数值（0 = 无限）");
+                        // β-2：用法错误 = 工具失败带 rc 2
+                        process::exit(2);
+                    }
+                };
+                match raw.parse::<usize>() {
+                    Ok(n) => out.trace_max_events = Some(n),
+                    Err(_) => {
+                        eprintln!(
+                            "--trace-max-events 需要一个非负整数值（0 = 无限），得到 '{}'",
+                            raw
+                        );
+                        // β-2：用法错误 = 工具失败带 rc 2
+                        process::exit(2);
+                    }
+                }
             }
             _ => {
                 // `-` = stdin 位置参数（lom l2fix 专用；其余子命令落到文件

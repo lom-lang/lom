@@ -243,7 +243,10 @@ fn classify_parse_error(msg: &str) -> String {
 }
 
 /// 运行时错误码分类
-fn classify_runtime_error(msg: &str) -> String {
+/// designs/0026（v1.14.0）：pub(crate) 化——执行 trace 的 call-error 事件
+/// err 字段复用同一分类器（单一事实源：trace 码与 --check/--json 诊断码
+/// 一致）；分类逻辑零改动。
+pub(crate) fn classify_runtime_error(msg: &str) -> String {
     if msg.contains("代码洞") || msg.contains("hole") {
         "RUNTIME003".into()
     } else if msg.contains("未定义") || msg.contains("未找到") || msg.contains("未导入") {

@@ -345,7 +345,32 @@ fn main_inner() {
     let mut full_args = vec![path.to_string()];
     full_args.extend(cli.program_args.iter().cloned());
     interp.set_program_args(full_args);
-    if let Err(e) = interp.run(&program) {
+    // ===== designs/0026（v1.14.0）：执行 trace 注入（--trace 族；运行模式
+    // 专用——--check/--json/子命令路径不经此处。set_program_args 同款公开
+    // setter 先例）。--trace-out 打不开 = 工具失败带 rc 2（β-2 口径）=====
+    if cli.trace {
+        let max_events = cli
+            .trace_max_events
+            .unwrap_or(interpreter::TRACE_DEFAULT_MAX_EVENTS);
+        if let Err(e) = interp.set_trace(
+            path,
+            cli.trace_out.as_deref(),
+            max_events,
+            cli.trace_builtins,
+        ) {
+            eprintln!(
+                "无法打开 trace 出口 '{}': {}",
+                cli.trace_out.as_deref().unwrap_or("<stderr>"),
+                e
+            );
+            process::exit(2);
+        }
+    }
+    let run_result = interp.run(&program);
+    // designs/0026：尾行 summary——Ok/运行时错误两路都写（错误路径随后的
+    // process::exit(1) 不丢事件：文件侧逐行 flush）
+    interp.trace_finish();
+    if let Err(e) = run_result {
         // 运行时错误：构造诊断输出
         // 注：Phase 2.3 阶段 AST 节点尚未携带位置信息（Phase 3 改造），
         // 因此运行时错误暂以 (0, 0) 报告位置；消息本身已包含足够上下文。
