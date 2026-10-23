@@ -172,7 +172,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   同阵营）、author 裁短、英式英语、pre 修复；维护者验证中文串宣称属实、
   评价"基准卡说明不是什么比头条数字更建立信心"；线上已收录）——观察点
   收口，详 TODO** + MoonBit 1.0 → delta 复核（事件触发，跟踪源 = 仓库
-  release 页，现值 v0.10.16）。
+  release 页，现值 v0.10.16）；awesome-wasm-langs PR #186 open 待审
+  （2026-10-23 提交，head lom-lang:add-lom，author wytyKen，+7 行
+  mergeable clean——等审不催）。
   对外动作逐项呈批（铁律 6）。
 
 【第一回合必须完成（规划者流程；分层阅读协议 MAINTENANCE §5.2）】
