@@ -6,6 +6,8 @@
 > 修订记录 + TODO 交付段 + 本年表。条目原文逐字搬运，未作改写。
 > 最新条目在前；两组拼接缝在 2026-09-29/30 交界。
 
+> 最后更新：2026-10-18 晚（**v1.12.1 弧线收官——wasm file 内建修复批全链（designs/0025：harness 双 stub 修 file_exists 静默错值与 file_append 写头破坏两缺陷，零 src/；tag `bdfd187` CI 首跑即绿）+ gh-pages 部署 `bbd031d`（线上 v1.12.1，三项浏览器实测全过：一期 Run / file 探针 / 四步链 QUINE 272925 总 9816ms）+ PR #68 最佳等审化（head `de465b6` 归因修正 wyty→wytyKen + body 清单 6/6 + 模拟收录复核 16 项全 PASS 预测 merge as-is）+ ACRI 陈旧注修正（three→five/two cognitive，`c852cae`）+ MoonBit 1.0 事件触发观察项补登（考古 + 双源核实仍未发布）+ 发帖前置就绪（首轮预检零漂移 + 持续更新规则含日落条款，`0545c25`）；台账零 open（顺延号 R149 起）；待触发：发帖（PR 合并）/ 三十七审（发帖前，已裁）/ Zenodo；观察：Ubuntu 26 迁移 **10-19（首回合值守：盯当日 CI 首跑）**、contributors 侧栏缓存残影待自刷、MoonBit 1.0 事件触发（跟踪源 = moonbitlang/moonbit-compiler release 页）**）。
+
 > 最后更新：2026-10-16（**v1.12.1 wasm file 内建修复批收官（designs/0025，四裁决点均按建议项：harness 侧双 stub 零 src/ / 严格 WASI p1 APPEND 语义 / 映射外维持 ENOENT 登记边界 / patch 升版）——harness `path_filestat_get` stub（映射外 ENOENT 地雷门双锁）+ APPEND 写前置尾，file_exists 真形态静默 false→true、file_append 映射态写头破坏→追加至尾；smoke +⑦ file 段 14 断言（CI 门）；零 src/ 零语言面，581+40/quine 272925/368/368 构造性不变；tag `bdfd187`、CI run `38893522801` 七 job 绿；登记面挂账销账；gh-pages 已部署 `bbd031d`（线上 v1.12.1 三项验证全过）**）。〔2026-10-20 随交接收批移入（§5.3 ≤3 条：顶部新增 10-20 条目）；原文逐字搬运〕
 
 > 最后更新：2026-10-15 晚（**一日全弧线收官——v1.12.0 playground 自举演示二期（浏览器四步链 QUINE 272925 线上实测 ~11s）+ gh-pages 部署上线（`45fb8dd`）+ R147 处置 a 收口（PR #68 head `5ae7cff`）+ 身份修复批（21 笔归因改写 wytyKen、五 tag 重切、force push；治理规则四件落盘 `f25eefb`：身份核验入基线/交接、部署三一致性、镜像时机、执行者防呆）+ XERJ Corpus Hub 收录获批（归因已澄清）+ 交接核验批 R148 开账即收口（HANDOVER §1 CI/下一步行与 §9-4 三处锚外陈旧刷现值 + 指针化注记）；台账零 open（顺延号 R149 起）；待触发：发帖（PR 合并）/ 三十七审（发帖前，已裁）/ Zenodo；观察：Ubuntu 26 迁移 10-19、contributors 侧栏 Wyty 缓存残影待自刷**）。〔2026-10-19 随三十七审批移入（§5.3 ≤3 条：顶部新增 10-19 条目）；原文逐字搬运〕
