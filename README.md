@@ -1,10 +1,8 @@
 # Lom
 
-**Lom (Language of Machine)** — an AI-native programming language.
+**Lom (Language of Machine)** — an AI-native programming language designed around the LLM repair loop: when a model writes broken Lom, the language itself is built to diagnose it precisely and fix it mechanically.
 
 LLM-coding-native first, workloads later. Built in Rust.
-
-**Lom (Language of Machine)** — a programming language designed around the LLM repair loop: when a model writes broken Lom, the language itself is built to diagnose it precisely and fix it mechanically.
 
 [![CI](https://github.com/lom-lang/lom/actions/workflows/ci.yml/badge.svg)](https://github.com/lom-lang/lom/actions/workflows/ci.yml)
 ![deps](https://img.shields.io/badge/dependencies-0-2ea44f)
@@ -72,7 +70,7 @@ Save as `hello.lom`, run `lom hello.lom`. When a run fails at run time, `lom hel
 
 - Current: **v1.14.0** (2026-10-21). Language surface frozen since v1.0 (2026-09-02) — zero surface changes since; every release since has been tooling/evidence work (the agent execution trace `--trace`, online playground incl. the in-browser self-hosting demo and share links, structured diagnostics, remediation). Full numbers and the per-release log: see [Release log](#release-log) and [Milestone history](#status-milestone-history--live-numbers) below.
 - The **L2 self-hosted subset compiler** (`examples/selfhost/self_comp.lom`) is a **supported face** as of **v1.8.0** (2026-10-08; promoted from experimental by user adjudication after four consecutive A- review rounds, a zero-open ledger, and the v1.7.2 line-number batch completing its repair loop): it compiles a strict subset of Lom to WASM, rejects some programs the host accepts (each rejection carries an `[L2xxx]` code and a repair hint via `lom l2fix` / [tools/l2fix.py](tools/l2fix.py); rejections whose message carries a quoted name also carry a `ln:cl` source position — the registered 71/102 coverage boundary with 31 exempt type-string cases), and self-hosts provably.
-- The 37 review rounds are **in-system adversarial reviews** (agent-run, evidence-based) — good hygiene, **not external peer review**; grades never extrapolate across baselines.
+- The 38 review rounds are **in-system adversarial reviews** (agent-run, evidence-based) — good hygiene, **not external peer review**; grades never extrapolate across baselines.
 - **[Online playground](https://lom-lang.github.io/lom/playground/)** — run Lom, see structured diagnostics, and apply `lom fix --apply` with a line diff, entirely in your browser (the full host toolchain compiled to `wasm32-wasip1`, zero third-party JS). Pressing Run quietly folds your program into the URL hash (UTF-8-safe), so opening the shared link restores your exact editor content.
 
 ## Release log

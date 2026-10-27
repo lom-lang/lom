@@ -58,7 +58,7 @@
 <li><strong>双后端语义对齐</strong>：树遍历解释器 + 手写零依赖 WASM 后端，<span class="num">10000</span> 个随机生成程序/项目实例 stdout+退出码<strong>逐字一致</strong>（差分测试四期，含递归 enum、三包依赖链、file/env 深形态）；已知分歧全部文档化（§11f 八条）并有探针守护白名单不腐坏。</li>
 <li><strong>自举自证</strong>：用 Lom 写的 <span class="num">5727</span> 行解释器（lexer/parser/checker/evaluator/json）三层自证——WASM 载体上的自举解释器解析自身源码，dump 与宿主原生<strong>逐字一致</strong>。</li>
 <li><strong>LLM 实测</strong>：评测集现值 <span class="num">129</span> 任务，实测分层带时点——113 任务集四模型单采样（2026-08-31）、116 任务集双模型 × 10 采样（2026-09-07）<strong>pass@1 = pass@5 = pass@10 = 99.1%</strong>（无偏估计）、全 128 题集双模型 × 10 采样 <strong>pass@1 = 98.3% / 98.5%</strong>（2026-10-07 现行主口径——现集 129 题含运行时面新题 130）；唯一系统性失败是刻意的 prompt 歧义锚点题 078（明确版对照题 118 双模型 10/10）与跨编译器能力缺口题 127。</li>
-<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；三十七轮体系内审查（节奏现为事件驱动；评级不跨基线外推），台账未决项见 docs/TODO.md。宣称数字由 CI 机器对账（doc_audit <span class="num">73</span> 项 + claims.json 分项回加），但登记锚点不等于全文无漂移。</li>
+<li><strong>治理与审查</strong>：语言面 v1.0 冻结（变更须 RFC）；三十八轮体系内审查（节奏现为事件驱动；评级不跨基线外推），台账未决项见 docs/TODO.md。宣称数字由 CI 机器对账（doc_audit <span class="num">73</span> 项 + claims.json 分项回加），但登记锚点不等于全文无漂移。</li>
 <li><strong>供应链</strong>：Rust crate <strong>零第三方依赖、零 unsafe</strong>；CI 仍依赖 GitHub Actions 与第三方 rust-toolchain action，不能把 crate 零依赖扩大成“全部供应链风险为零”。手写 JSON/LSP 的可审计性真实存在，其协议正确性缺口也已由 R58/R59 证明。</li>
 </ul>
 
@@ -78,7 +78,7 @@
 
 <h2>6. 当前状态（如实）</h2>
 <ul>
-<li>仓库版本 v1.12.1（tag `bdfd187`，CI 七 job 绿）；在线 playground（gh-pages）与 Release v1.7.0（pre-release）已公开，外部目录 PR 待审；语言面冻结维持（v1.0 起零变化），对外动作按用户逐项裁决执行。</li>
+<li>仓库版本 v1.14.0（tag `b07c6d1`，CI 七 job 绿）；在线 playground（gh-pages，v1.13.0）与 Release v1.7.0（pre-release）已公开，外部目录已收录（agentlanguages.dev verification 类目，2026-10-22 合并）；语言面冻结维持（v1.0 起零变化），对外动作按用户逐项裁决执行。</li>
 <li>本页不是发布材料：竞品描述来自其官方一手文档；自家仓库数字可由 CI/本地档案复算，但历史 LLM raw 默认被 Git 忽略，外部克隆不能单独验证模型来源。发布线已解冻（2026-10-04），对外动作逐项呈批执行；本页数字随里程碑批刷新。</li>
 </ul>
 
