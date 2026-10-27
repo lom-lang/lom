@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lom 第三十八审体系内独立敌手审查（产品面 + 元面双覆盖·标准化模式第二实例） — 2026-10-27</title>
+<style>
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:24px;line-height:1.65;color:#1a1a1a;background:#fafafa}
+h1{font-size:1.5em;border-bottom:3px solid #333;padding-bottom:8px}
+h2{font-size:1.22em;border-left:5px solid #333;padding-left:10px;margin-top:2.2em}
+h3{font-size:1.05em;margin-top:1.6em;color:#222}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.9em;background:#fff}
+th,td{border:1px solid #bbb;padding:5px 8px;vertical-align:top;text-align:left}
+th{background:#e8e8e8}
+code,pre{font-family:Consolas,"Courier New",monospace;font-size:.88em}
+pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.note{background:#fff8e1;border-left:4px solid #f0ad5e;padding:8px 12px;margin:10px 0}
+.ok{color:#1b5e20;font-weight:bold}
+.bad{color:#b71c1c;font-weight:bold}
+.warn{color:#e65100;font-weight:bold}
+.small{font-size:.88em;color:#555}
+.verdict-bp{background:#e3f2fd;border:2px solid #1565c0;padding:12px 16px;margin:14px 0}
+.ledger{background:#fff3e0;border:2px solid #ef6c00;padding:12px 16px;margin:14px 0}
+.meta{background:#f3e5f5;border:2px solid #7b1fa2;padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<h1>Lom 第三十八审体系内独立敌手审查报告（产品面 + 元面双覆盖——§4.5 标准化模式第二实例）</h1>
+
+<h2>0. 报告头与编成（规划者撰写段）</h2>
+<p>时点 2026-10-27。基线 HEAD <code>2695fef</code>（本地 git 只读审查；冷启动只读核验 22/22 全绿 + 规划者亲验四项 + HEAD CI 7 check-runs 实查全 success 为审查前置）。审查增量 = <code>075978c..2695fef</code> 共 <b>27 笔提交</b>（三十七审基线 <code>075978c</code> 之后全部提交），含两 tag：v1.13.0 <code>e171488</code>（playground 分享链接批 + gh-pages 部署 <code>660c1cf</code>）、v1.14.0 <code>b07c6d1</code>（agent 执行 trace 批，触 src/）；其余为治理批群（三十七审批落盘 + 整改三批 25 笔收口、审查模式制度化 <code>c245dec</code>、治理五连、F2 分级表入册 + [F2-L1] 三笔、发帖启动登记、交接批×4）。触发与范围：用户 2026-10-27 指令"<b>开启独立审查和外部观察</b>"——独立审查按 MAINTENANCE §4.5 标准化模式（2026-10-19 用户裁决"以后的独立审查也遵循这个模式"的第二实例）；同日外部观察（§4.6）单执行者档并行执行（观察报告与本审互不隶属，摘要见附录 B）。</p>
+<p>编成 = 四执行者并行（§4.5 审查者编成豁免铁律 1 的 ≤2 限制；外部观察单执行者为 §4.6 编成，与审查同指令并行）：</p>
+<table>
+<tr><th>执行者</th><th>审面</th><th>开账号段（预分配，未用即空）</th><th>执行者耗时行（subagent usage 实测）</th></tr>
+<tr><td>A</td><td>产品面：增量批次宣称敌手复核 + 基线矩阵 + 敌手探针 + 文档对账</td><td>R189-R198</td><td>39.2 分钟 / 145 次工具调用</td></tr>
+<tr><td>B1</td><td>元面·内部治理一：三十七审整改收口真实性 + 治理五连落地质量 + F2-L1 运行合规</td><td>R199-R208</td><td>12.3 分钟 / 81 次工具调用</td></tr>
+<tr><td>B2</td><td>元面·内部治理二：§4.5 模式运转 + 审查体系自身 + 交接五件套 + 新常设机制档案完备性 + 呈报制衡</td><td>R209-R218</td><td>15.5 分钟 / 39 次工具调用</td></tr>
+<tr><td>C</td><td>元面·对外面：发帖启动链 + 目录/铺底现状 + 竞合时效 + 对外门面数字时效</td><td>R219-R228</td><td>14.0 分钟 / 55 次工具调用</td></tr>
+</table>
+
+<h2>0b. 边界声明（含自指披露）</h2>
+<div class="meta">
+<p>① 本审查仍是<b>项目体系内 agent 分工的独立敌手审查，非外部同行审计</b>——元面章节的自指性同三十七审：<b>审查"规划者-执行者模式"与"审查体系"的审查者本身由被审的规划者派出并撰写任务书</b>。结构性缓解措施（已执行）：元面各维度的问题清单不由规划者提供（各执行者自主拟题，拟题权在各章节内声明）；规划者对四执行者章节<b>零内容编辑权</b>（机械拼接，规划者仅撰写本头部与附录）；被审规划者不参与任何审查结论。不能消除的根本边界如实声明：维度划分与红线约束仍由规划者划定，独立性以此为上限。本审新增一层自指对象：三十八审任务书自身（B2 章下钻，属 §4.5 模式的自校验）。</p>
+<p>② 两级红线（四执行者任务书置顶、要求开工前复述——四执行者最终回复首行均已复述）：<b>一级（绝对）</b>零对外交互——任何 push、任何写语义网络请求（GitHub API 写/评论/PR/issue/star/fork/release/邮件/外部平台动作）均禁止，联网仅限只读 GET；<b>二级</b>本地 git 严格只读、仓库既有文件零修改、探针与章节片段只落 target/probes/review38/、构造性验证限"未跟踪临时文件→验证→即删→终态 git status 干净披露"形态。cargo 由执行者 A 独占（B1/B2/C 用 python 纯工具与只读 lom.exe）。</p>
+<p>③ 硬约束：被审对象的历史裁决不重开（审执行一致性与过程质量，不替用户重裁方向）；审查阶段只开账不修码、不改任何治理规则；开账统一走 TODO 顺延号（号段预分配制，未用号段如实留空）；审查报告原文落盘后不回写（事后勘误以追加框登记，历史评级不重评）。</p>
+<p>④ 裁决链：本次审查（含编成与维度划分 = §4.5 标准化形态、外部观察同指令并行）均为用户 2026-10-27 明示指令；任务书随审落档 <code>target/probes/review38/task.md</code>（§4.2 档案落位制度）。</p>
+</div>
+
+<h2>0c. 拼接说明（规划者撰写段）</h2>
+<p>以下四章节由四执行者各自独立产出（target/probes/review38/section_A.html / section_B1.html / section_B2.html / section_C.html），规划者按 A → B1 → B2 → C 顺序机械拼接（含各章 verdict 框），未作任何内容增删改；各章内的主张、评级与开账由署名执行者独立负责。探针证据目录索引见附录 A（规划者按四执行者回报的清单登记）。</p>
+
+<h2>三十八审 · 执行者 A（产品面独立敌手审查）</h2>
+
+<div class="meta">
+<p><b>红线执行披露</b>：一级（零对外交互）——全部联网动作均为只读 GET（api.github.com 匿名端点 9 次：rate_limit ×1、runs 列表 ×1、jobs/runs 详情 ×4、tag ref ×2、gh-pages ref ×1；raw.githubusercontent.com ×4 属另一主机），零写语义请求、零账号动作。二级——本地 git 严格只读（status/log/diff-tree/rev-parse/cat-file/ls-tree/show）；仓库既有文件零修改；探针与本章只落 target/probes/review38/；两枚 .lom 探针载体按"未跟踪临时文件→验证→即删"形态在仓库根用毕即删（内容归档回 target/probes/review38/ 供复现，探针脚本路径已同步）；终态 git status 干净（见 A.6）。</p>
+<p><b>自指披露</b>：本审查者由被审规划者派出（任务书 §3 编成），审面边界与号段由任务书预分配；缓解 = 探针清单自主设计、结论独立作出、规划者零编辑拼接。cargo 为本执行者独占（任务书 §2.5）。</p>
+<p><b>基线</b>：HEAD <code>2695fef</code>，工作树干净；增量区间 <code>075978c..2695fef</code> 27 笔（git rev-list 实数，与任务书 §0 一致）。</p>
+</div>
+
+<h3>A.1 基线矩阵全套亲跑（逐项三件套：命令 / 关键输出 / 退出码）</h3>
+<table>
+<tr><th>#</th><th>项</th><th>命令</th><th>关键输出摘录</th><th>期望</th><th>rc</th></tr>
+<tr><td>1</td><td>构建</td><td><code>cargo build --release</code></td><td>Finished release [optimized+debuginfo]；lom --version = <b>1.14.0</b></td><td>零告警</td><td>0</td></tr>
+<tr><td>2</td><td>单元测试</td><td><code>cargo test --release</code></td><td>running 593 tests … <b>593 passed; 0 failed</b></td><td>593</td><td>0</td></tr>
+<tr><td>3</td><td>集成 r56_process</td><td><code>cargo test --release --test r56_process</code></td><td>1 passed</td><td>1</td><td>0</td></tr>
+<tr><td>4</td><td>集成 r58_lsp_process</td><td>同上单跑</td><td>7 passed</td><td>7</td><td>0</td></tr>
+<tr><td>5</td><td>集成 r94_pkg_alias</td><td>同上单跑</td><td>2 passed</td><td>2</td><td>0</td></tr>
+<tr><td>6</td><td>集成 r104_dedup_order</td><td>同上单跑</td><td>6 passed</td><td>6</td><td>0</td></tr>
+<tr><td>7</td><td>集成 r108_variant_externals</td><td>同上单跑</td><td>5 passed</td><td>5</td><td>0</td></tr>
+<tr><td>8</td><td>集成 r107_alias_clash</td><td>同上单跑</td><td>4 passed</td><td>4</td><td>0</td></tr>
+<tr><td>9</td><td>集成 build_closure_externals</td><td>同上单跑</td><td>3 passed</td><td>3</td><td>0</td></tr>
+<tr><td>10</td><td>集成 r112_closure_assign</td><td>同上单跑</td><td>3 passed</td><td>3</td><td>0</td></tr>
+<tr><td>11</td><td>集成 build_gaps_remediation</td><td>同上单跑</td><td>6 passed</td><td>6</td><td>0</td></tr>
+<tr><td>12</td><td>集成 beta2_exit_codes</td><td>同上单跑</td><td>3 passed</td><td>3</td><td>0</td></tr>
+<tr><td>13</td><td>clippy</td><td><code>cargo clippy --release -- -D warnings</code></td><td>Finished，零输出</td><td>零</td><td>0</td></tr>
+<tr><td>14</td><td>rustfmt</td><td><code>cargo fmt --check</code></td><td>零 diff</td><td>零</td><td>0</td></tr>
+<tr><td>15</td><td>文档互锁</td><td><code>python tools/doc_audit.py</code></td><td><b>RESULT: PASS（73/73 项通过）</b>（J quine 组 6 位当前值 272925 一致；J Rust 组 unit 593/integ 40；J+ tests/ 实数 40=40；K 镜像零缺失）</td><td>73</td><td>0</td></tr>
+<tr><td>16</td><td>spec 示例</td><td><code>python tools/spec_examples_check.py</code></td><td>RESULT: PASS（正例 49 / 反例 5 / skip 22）</td><td>PASS</td><td>0</td></tr>
+<tr><td>17</td><td>eval prompt</td><td><code>python tools/eval_prompt_check.py</code></td><td>RESULT: PASS（校验 <b>32</b> / 失真 0）</td><td>32</td><td>0</td></tr>
+<tr><td>18</td><td>selfhost dump</td><td><code>python tools/verify_selfhost.py</code></td><td>PASS <b>162</b>/162（Latin-1 折叠 0）</td><td>162</td><td>0</td></tr>
+<tr><td>19</td><td>selfhost tokens</td><td><code>--tokens</code></td><td>PASS 162/162（列坐标系已知差异 1）</td><td>162</td><td>0</td></tr>
+<tr><td>20</td><td>selfhost diags</td><td><code>--diags</code></td><td>PASS <b>14</b>/14（坏文件 14 个）</td><td>14</td><td>0</td></tr>
+<tr><td>21</td><td>selfhost static</td><td><code>--static</code></td><td>坏文件 PASS <b>24</b> / 干净集 ALIGNED <b>162</b></td><td>24+162</td><td>0</td></tr>
+<tr><td>22</td><td>selfhost run</td><td><code>--run</code></td><td>PASS <b>31</b>/31</td><td>31</td><td>0</td></tr>
+<tr><td>23</td><td>selfhost wasm</td><td><code>--wasm</code></td><td>layer2 PASS <b>159</b>/159 + layer3 golden 39 条 + 自施加 PASS</td><td>159+L3+自施加</td><td>0</td></tr>
+<tr><td>24</td><td>L2 对拍</td><td><code>python tools/verify_selfcomp.py</code></td><td>RESULT: PASS（<b>368/368</b>；负例 L2G 兜底 0/164）</td><td>368（L2G 0）</td><td>0</td></tr>
+<tr><td>25</td><td>三层自举</td><td><code>python tools/verify_selfcomp.py --bootstrap</code>（timeout 180s）</td><td>RESULT: PASS（<b>14/14</b>；L3 self-apply (quine) <b>272925 bytes byte-identical</b>；总耗时 17.0s）</td><td>14/14 quine 272925</td><td>0</td></tr>
+<tr><td>26</td><td>eval 原生后端</td><td><code>run.ps1 -Verify -LomBin ./target/release/lom.exe</code>（timeout 300s）</td><td>Total: 129 / Passed: <b>129</b>（七类目全 100%）</td><td>129</td><td>0</td></tr>
+<tr><td>27</td><td>eval wasm 后端</td><td>同上 <code>-Backend wasm</code></td><td>Total: 129 / Passed: <b>129</b></td><td>129</td><td>0</td></tr>
+<tr><td>28</td><td>lom fmt 递归</td><td>find examples -name *.lom（apply_test 豁免）逐个 <code>lom fmt --check</code></td><td>checked=<b>37</b> fail=0</td><td>37 文件</td><td>0</td></tr>
+<tr><td>29</td><td>自举分发构建</td><td><code>python tools/build_selfboot.py</code></td><td>build_selfboot: <b>COMPILED 272925 bytes</b>（硬门过；selfboot-baseline.hex 545850 chars）</td><td>COMPILED 272925</td><td>0</td></tr>
+<tr><td>30</td><td>playground 冒烟</td><td><code>node playground/smoke.mjs</code></td><td>SMOKE: ALL PASS（<b>PASS 计 39 / FAIL 0</b>；⑧ 分享段恰 8 断言全过）</td><td>39</td><td>0</td></tr>
+</table>
+<p><b>偏差说明</b>：30 行零偏差——集成十 target 逐项配对值 1/7/2/6/5/4/3/3/6/3 与任务书 §0 逐项一致，合计 40。</p>
+
+<h3>A.2 CI 与 tag 实查（联网只读 GET）</h3>
+<p><b>方法</b>：GET /repos/lom-lang/lom/actions/runs?per_page=100（快照存 target/probes/review38/api_runs_list.json），与 git rev-list 27 笔逐一程序化配对（脚本内联于探针记录）；f43ed83 另取 jobs 与 run 详情；两 tag 取 /git/ref/tags/*。</p>
+<ul>
+<li><b>27/27 笔全部有 push run，孤儿 sha = 0</b>；26 笔 run 级 success。</li>
+<li><b>1 笔 run 级 failure：f43ed83（run 39648682386）</b>——jobs 实查：doc-gates/clippy/windows/selfhost/playground/ubuntu 六 job success + <b>macos-latest = cancelled</b>；run_attempt=1（无重跑记录），created 17:59:30Z、updated 18:14:33Z，次笔 f734303 的 run（39648832244，18:00:29Z 起跑）全绿。ci.yml 无 concurrency 配置（grep 零命中），故该 cancel 非"同组自动取代"机制，手动/基础设施取消无法以只读 API 区分——如实登记边界。台账影响见开账 R189。</li>
+<li><b>v1.13.0 双端一致</b>：本地 tag sha = e17148809bb5f828792f2b2a8e2581746bfc9eb2 = 远端 ref（轻量 tag 直指 commit）；其 run 39431280200 七 job 逐一 success（7/7）。</li>
+<li><b>v1.14.0 双端一致</b>：本地 = b07c6d11b6c1d4cfcbfed6c066dcf9b70bfadb86 = 远端 ref；其 run 39646107026 七 job 7/7 success——与登记"首跑即绿"一致。</li>
+<li>gh-pages 远端 HEAD = 7af30ef（与登记部署 sha 一致）；其 Pages 构建流 run 39470156993（event=dynamic）success。</li>
+</ul>
+
+<h3>A.3a v1.13.0 分享链接批（e171488 + 部署 660c1cf）宣称敌手复核</h3>
+<table>
+<tr><th>宣称</th><th>敌手验证</th><th>结论</th></tr>
+<tr><td>base64url 自实现合 RFC 4648 §5</td><td>探针 PA-1：RFC §3 七测试向量按字母表替换+去 padding 逐向量核（""/f/fo/foo/foob/fooba/foobar → ""/Zg/Zm8/Zm9v/Zm9vYg/Zm9vYmE/Zm9vYmFy），另与 Node 原生 base64url 逐向量三向对照</td><td class="ok">实证吻合（7/7 向量 + 三向对照 7/7）</td></tr>
+<tr><td>编解码正确性（CJK/emoji/CRLF/空）</td><td>PA-1 fuzz 2000 轮 vs Node 原生（CJK/emoji/拉丁/NFC-NFD/控制字符池按码点构造）零Mismatch 零往返失败；字母表纯净性（无 + / =）过</td><td class="ok">零击穿</td></tr>
+<tr><td>超长边界 6000 过 / 6001 跳过</td><td>PA-1：ASCII 6000=true/6001=false；emoji 码元口径 3000×2=6000=true、3001×2=6002=false（.length 口径实证）</td><td class="ok">实证吻合</td></tr>
+<tr><td>非法 hash 回落默认示例不冒错</td><td>读码：app.js restoreFromShareHash catch 分支仅 console.info 不覆写编辑器（默认示例先就位、恢复后置调用）；decodeShareText 对非法字符/带 padding/模4余1/非法 UTF-8 字节四类输入全部 throw（PA-1 四断言）</td><td class="ok">读码 + 纯函数面实证</td></tr>
+<tr><td>未配对代理项边界（敌手自登记）</td><td>PA-1 补测：encode 不抛且与 Node 原生逐字节一致（Web 标准 U+FFFD 替换语义），decode 不还原（信息丢失，一切 UTF-8 方案同）——DOM 文本常态不含未配对代理项，非产品缺陷</td><td class="ok">边界登记，非缺陷</td></tr>
+<tr><td>smoke ⑧ 段 8 断言、31→39</td><td>亲跑 node playground/smoke.mjs：⑧ 分享段恰 8 条 PASS（CJK+emoji 往返/字母表纯净/CRLF/空编码/空往返/超长拒/到限放行/非法抛），全输出 PASS 39 / FAIL 0</td><td class="ok">实证吻合</td></tr>
+<tr><td>零 src/ 零 tests/ 零 .lom</td><td>git diff-tree e171488：12 文件 = Cargo 对 + 文档 6 + playground 3（app.js M/sharelink.js A/smoke.mjs M），零 src/ 零 tests/ 零 .lom；660c1cf 仅 3 文档</td><td class="ok">树面纯净</td></tr>
+<tr><td>gh-pages 三一致性（线上资产 = tag blob）</td><td>远端 gh-pages HEAD=7af30ef；部署变更集恰三文件（app.js M/lom.wasm M/sharelink.js A）；线上拉取 sha256：app.js 06c41798…= v1.13.0 tag blob、sharelink.js f6617421…= tag blob、self_comp.lom 8a515dd0…= gh-pages blob = v1.13.0:examples/selfhost/self_comp.lom blob f1dc719a（LF 形态；本地工作树 544901B 为 CRLF 检出、git blob 532230B 与线上一致）；线上 lom.wasm 内嵌版本串唯一 "lom 1.13.0"、无 "1.14.0"</td><td class="ok">三资产逐字节/版本实证</td></tr>
+<tr><td>文档成对（README ×2 / SPEC §13 / HANDOVER 等）</td><td>LANGUAGE_SPEC.md L1355 v1.13.0 条目在场；README.md L76 功能句 + L82 里程碑块；README.zh-CN L56 功能句；positioning.html 版本位锚 v1.14.0（后续批刷新，doc_audit E 锚绿）</td><td class="ok">成对面在场</td></tr>
+</table>
+<p><b>措辞精度注记（不开账）</b>：e171488 提交信息称 "README x2 (pointerized, no digits)"——diff 实查：README.zh-CN.md 新增行零 3 位以上数字（真零数字）；README.md 新增 5 行含基线数字（新 Current 块 "Baseline unchanged by construction: quine 272925 / 368/368 / 581+40 / 129×129" 及降位的 v1.12.1 块）——但这些数字全部落在 doc_audit 既有锚位（quine \*\*N\*\* Current release 现值锚等）且值正确，证据行 581/581 前后未变值（行重排）。该短语系提交信息层面措辞不精确，永久文档面（HANDOVER/SPEC）无此宣称，实质零失真。</p>
+
+<h3>A.3b v1.14.0 trace 批（b07c6d1 + 回填 f43ed83）宣称敌手复核</h3>
+<p>探针 PA-2（25 断言）+ PA-3（11 断言）行为面全绿，逐宣称对照：</p>
+<table>
+<tr><th>宣称</th><th>敌手验证（PA-2/PA-3 编号）</th><th>结论</th></tr>
+<tr><td>开关两态：默认关零产出</td><td>T1 关闭态 stderr 无 lom-trace/v1；T10a 默认无内建事件</td><td class="ok">过</td></tr>
+<tr><td>缺省 stderr / --trace-out 文件 NDJSON 追加写</td><td>T2a/T2b/T2c（两次运行同文件 2 header+2 summary）；E1 父目录自动建（fix_history 先例）；E6 目录路径报错不静默</td><td class="ok">过</td></tr>
+<tr><td>截断 120 字符 / 深度 3 / [List len=N …]</td><td>T8b 全部序列化值 ≤120（实测 max=120）；T8c 四层嵌套 → [[[[List len=2 …]]]]（第 4 层标注）；T8d 60 元素扁平表 → [List len=60 …]（预算触发语义——15 元素 32 字符不触发，非按元素数）</td><td class="ok">过</td></tr>
+<tr><td>--trace-max-events 3 限流 + truncated:true；0=无限</td><td>T9a 恰 3 事件、T9b 尾行 {"kind":"summary","events":3,"truncated":true}、T9c 0=与默认上限跑同数且 truncated:false、T9d 头部 max_events 反映设定；E7 max=1 极小值；E5 非法值结构化拒绝不崩</td><td class="ok">过</td></tr>
+<tr><td>call-error 带 [RUNTIMExxx] 码原文</td><td>T7 err 字段 = "[RUNTIME000] list_get 索引 0 越界（列表长度 0）"（与运行时诊断分类器同一文案源）</td><td class="ok">过</td></tr>
+<tr><td>闭包合成名 &lt;closure@ln:cl&gt;</td><td>T5 实测 &lt;closure@32:16&gt; / &lt;closure@33:13&gt;（调用点 span）</td><td class="ok">过</td></tr>
+<tr><td>depth = 被调帧深度（递归直读）</td><td>T6 rec(4) 递归链 depth 1→5 递增（main 帧=0，顶层调用=1，与 SPEC §13 "top-level call = 1" 文档一致）</td><td class="ok">过</td></tr>
+<tr><td>--trace-builtins 两态默认关</td><td>T10b 开启后 println/list_empty/list_cons 入流；默认态零内建事件</td><td class="ok">过</td></tr>
+<tr><td>main 入口不出 call 事件</td><td>T4 全部 call 事件名集合无 main</td><td class="ok">过</td></tr>
+<tr><td>lom-trace/v1 信封：header+事件+summary 字段序固定可 diff</td><td>T3a/T3b/T3e（header 恰 {schema,file,max_events}；call 恰 seq,kind,name,site,depth,args）；T3d 两次运行 trace 行逐字节相同（确定性）；E10 seq 连续 1..N；E9 重复 flag 后者生效单 header</td><td class="ok">过</td></tr>
+<tr><td>AOT build 不适用</td><td>亲跑 lom build --target wasm 产 10285B wasm 无 trace；build 路径拒收 --trace 组合</td><td class="ok">过</td></tr>
+<tr><td>关闭态 println 行为零变化（to_display 零触碰）</td><td>三路锁定：① 读码——b07c6d1 的 src diff 中 fn to_display 零出现，trace 序列化为新增独立函数（调用 to_display 作基底）；interpreter.rs 全 diff 仅 2 行删除（内建调用点重构为 builtin_res 变量，关闭态语义逐字节等价）；② T11 同程序关闭态 vs --trace 态 stdout 逐字节一致（含 CJK/容器）；③ 黄金对照——本审 A.1 selfhost run 31 / wasm layer2 159 / verify_selfcomp 368 / eval 129×2 全部对照 v1.14.0 之前生成的黄金输出通过</td><td class="ok">过</td></tr>
+<tr><td>关闭态每用户调用恰 2 次 Option 检查</td><td>读码：call_function 外壳 = 入口+出口恰两次 self.trace.is_some()，原逻辑逐字内移 call_function_inner；call_closure 同构；内建调用位点关闭态 1 次 Option 检查（代码注释与实况一致）</td><td class="ok">过</td></tr>
+<tr><td>单测 581→593 ×12 覆盖面</td><td>diff 提取恰 12 个新增 #[test]（off_by_default/zero_event_skeleton/call_return_fib/truncates_long_list/truncates_deep_nesting/max_events_limits/max_events_zero/closure_synthetic_name/call_error_carries_code/builtins_flag_two_states/out_file_appends/render_pure_shapes）；cargo test --list 实点 12/12 在册，593=581+12 算术吻合；12 测试面与 HANDOVER 宣称清单逐项对上</td><td class="ok">过</td></tr>
+<tr><td>文档成对 SPEC_FOR_AI §11g / README / SPEC §13</td><td>SPEC_FOR_AI.md L720 "## 11g. Execution Trace (v1.14.0)" 全 flag 表在场；LANGUAGE_SPEC.md L1354 v1.14.0 条目（细节与实测一致：top-level=1、[List len=20000 …] 例、两 Option 检查、581→593）；README.md Current 行/Current release 块/证据行 593/593 均刷</td><td class="ok">过</td></tr>
+<tr><td>A/B bench 关闭态零回退（+1.6%/+2.2% 带内）</td><td>规划者探针档 target/probes/trace_impl/ab_interleaved_planner.md 在场，数字（call_density 中位比 1.016 / lookup 1.022，±3% 带内）与登记一致——<b>本执行者未复跑</b>（如实登记；bench 为规划者紧邻交错终判口径）</td><td>登记一致，未复跑</td></tr>
+</table>
+
+<h3>A.3c 治理批群树面抽查 + 锚外写位抽查</h3>
+<ul>
+<li><b>25 笔非产品批树面全查</b>（git diff-tree 逐笔）：全部 docs/ 纯净——唯二例外为 0df8d1b 触 tools/verify_selfcomp.py（自称"纯工具批"R162，形态吻合）与 8b6f4f6 触 README ×2/eval/README/ACRI/positioning（自称门面刷新批，形态吻合）；<b>零 src/、零 tests/、零 .lom</b>。9fc6764 落 review HTML + 三台账 + 归档；[F2-L1] 三笔（f43ed83 README+两台账 / f734303 单文件 / 601cc08 两台账）与 692c28d、02afe59/2695fef 交接批均为台账面。</li>
+<li><b>高 churn 数字锚外出现面</b>（grep 581/580/578/573/128/618/621/593/272925/368/129/73/37/39 于对外文档面）：历史数字仅存于版本叙事段（README Previous 块、SPEC §13 逐版条目、positioning 逐里程碑段——时间锚定合法）；618/621（目录 PR 条目计数）对外文档面零出现。<b>锚外现值写位（现值正确、gate 不覆盖）</b>：README.md L24 表格行 "593 unit + 40 integration tests" 与 L168 构建命令注释 "# 593 unit + 40"（J Rust 组 README 锚仅 "plus (\d+) process-level" 集成位；L176 证据行 593/591 由 ^(\d+)/(\d+) Rust unit tests 锚住）；README.md L75 "37 review rounds" 与 positioning.html L61 "三十七轮…doc_audit 73"（轮数位无锚）→ 开账 R190。本审报告落档后轮数位 37→38 的刷新亦无 gate 提醒。</li>
+<li><b>指针化无复发</b>：AGENTS.md 全文零基线数字（唯一计数句指向 HANDOVER §2.2，R160 现状保持）；README.zh-CN 基线计数句指向 HANDOVER §2.2（R159 现状保持），其在面的 128/129/272925/12671 均带时点限定或为锚内叙事数字。</li>
+</ul>
+
+<h3>A.4 敌手探针表（≥8 探针；敌手化 = 设法证伪宣称）</h3>
+<table>
+<tr><th>编号</th><th>方向（证伪目标）</th><th>实测</th><th>结论（击穿判定）</th></tr>
+<tr><td>PA-1</td><td>证伪 "sharelink.js 自实现 base64url 合规"——RFC 向量、原生交叉 fuzz、边界、非法输入</td><td>36 断言全 PASS（探针 target/probes/review38/probe_sharelink_adversarial.mjs）</td><td>未击穿（首跑 1 处失败经查为探针自身构造非法代理项字符串，修正后全绿并登记实现边界）</td></tr>
+<tr><td>PA-2</td><td>证伪 "--trace 族四 flag 行为面"——通道/追加写/截断/限流/闭包名/call-error 码/深度/信封字段序/确定性/main 无事件/两态 stdout 等价/退出码</td><td>25 断言全 PASS（probe_trace_suite.py）</td><td>未击穿（6 处初跑失败均为探针期望错位——载体错用/深度基点/预算触发语义——修正后全绿）</td></tr>
+<tr><td>PA-3</td><td>证伪 trace 错误路径健壮性——父目录自动建/--check/--json 组合零执行泄漏/解析错误零事件流/非法 max-events/目录作出口/max=1/seq 连续/重复 flag</td><td>11 断言全 PASS（probe_trace_edge.py）</td><td>未击穿</td></tr>
+<tr><td>PA-4</td><td>证伪 "CI 逐笔绿" 宣称——27 笔 run 级 API 实查</td><td>26 success + f43ed83 run 级 failure（macos cancelled，6/7 绿，run_attempt=1）</td><td><b>击穿 1 处</b>（台账宣称层面，开账 R189；真实 job 失败为零）</td></tr>
+<tr><td>PA-5</td><td>证伪 "两 tag 双端一致 + tag run 七 job 绿"</td><td>v1.13.0/v1.14.0 本地=远端逐 sha 相等；两 run 各 7/7 job success</td><td>未击穿</td></tr>
+<tr><td>PA-6</td><td>证伪 "gh-pages 线上资产 = v1.13.0 tag blob"</td><td>app.js/sharelink.js/self_comp.lom 线上 sha256 = tag blob 逐字节相等；lom.wasm 版本串唯一 1.13.0</td><td>未击穿（lom.wasm 未做源树重建字节复现——git 只读红线禁 checkout，以版本串证源代登记边界）</td></tr>
+<tr><td>PA-7</td><td>证伪 "零 src/ 零 .lom / 纯文档批" 树面宣称</td><td>27 笔 diff-tree 全查：产品批 e171488 零 src/.lom、b07c6d1 恰 src×4+文档、25 治理批 docs/tools 纯净</td><td>未击穿</td></tr>
+<tr><td>PA-8</td><td>证伪 "doc_audit 73 锚 = 全部现值写位"（gate 覆盖面 = 出现面?）</td><td>锚外现值写位 4 处实证（README L24/L168 计数、L75 轮数、positioning 轮数）</td><td><b>击穿 1 处</b>（结构面，开账 R190；现值均正确未漂移）</td></tr>
+<tr><td>PA-9</td><td>证伪 "关闭态 println 零变化 / 恰 2 次 Option 检查 / to_display 零触碰"</td><td>读码三证 + T11 逐字节 A/B + 黄金对照（selfhost/verify_selfcomp/eval 全绿于 v1.14.0 前黄金）</td><td>未击穿</td></tr>
+<tr><td>PA-10</td><td>证伪 "单元 581→593 ×12"</td><td>diff 提取 12 测试名 = --list 实点 12 = 覆盖面清单逐项对上</td><td>未击穿</td></tr>
+</table>
+
+<h3>A.5 文档对账数字链 + 开账 + verdict</h3>
+<p><b>数字链</b>（HANDOVER §2.2 期望 → A.1 实测）：593=593 ✓ / 40=1+7+2+6+5+4+3+3+6+3 ✓ / doc_audit 73=73 ✓ / spec PASS ✓ / eval_prompt 32=32 ✓ / 六模式 162/162/14/24+162/31/159+L3+自施加 ✓ / 368=368（L2G 0/164）✓ / bootstrap 14/14 与 quine 272925 逐字节 ✓ / eval 129=129 与 129=129 ✓ / lom fmt 37=37 ✓ / smoke 39=39（COMPILED 272925 硬门先过）✓ / clippy 0 ✓ / fmt 0 diff ✓。版本面：lom --version 1.14.0 = Cargo.toml = tag b07c6d1 = 双端 ✓。增量期宣称链（e171488/b07c6d1/660c1cf/f43ed83 提交信息 + HANDOVER §1 版本行）逐条见 A.3a/A.3b 表，除已开账两笔外零失真。</p>
+
+<div class="ledger">
+<p><b>开账（号段 R189-R198；未用号如实留空）</b></p>
+<p><b>R189（P3）</b>：CI "逐笔绿"宣称与 run 级 API 事实一处不符——HANDOVER §1 CI 行把 run 39648682386（f43ed83）列入 "2026-10-21~23 本会话 13 笔（8660740→692c28d）CI 逐笔绿实查" 链（02afe59 提交信息同款 "per-run CI green verified"）；该 run API 现值 conclusion=<b>failure</b>（七 job 中 macos-latest cancelled、其余 6 success；run_attempt=1 无重跑）。<b>可复现形态</b>：GET /repos/lom-lang/lom/actions/runs/39648682386 与其 /jobs（探针存档 api_run_f43ed83_detail.json / api_jobs_f43ed83.json）。<b>实质风险低</b>：f43ed83 为 docs-only（README+两台账）、无真实 job 失败、1 分钟后 f734303 run 全绿——但登记链的"逐笔绿"字面被 API 证伪。<b>候选处置</b>：HANDOVER CI 行对该 run 标注 "6/7 绿 + macos cancelled（取消性质，非 job 失败）"。<b>应修</b>：按事实改写该 run 的登记措辞；<b>绝不能这样修</b>：宣称"re-run 后转绿"（无 re-run 证据，run_attempt=1）或将 run 号从链中静默删除（破坏可审计性）。</p>
+<p><b>R190（P3）</b>：锚外现值写位 4 处（三十七审"gate 覆盖面 ≠ 出现面"教训的存量实例，现值均正确、无漂移）——README.md L24 表格行与 L168 构建注释的 "593 unit + 40 integration"（doc_audit J Rust 组 README 锚只锁 'plus N process-level' 集成位与 L176 'N/N Rust unit tests' 单元位）；README.md L75 "The 37 review rounds"；docs/positioning.html "三十七轮…（doc_audit 73 项）"。<b>可复现形态</b>：grep -n "593 unit" README.md（L24/L168）+ grep -n "review rounds" README.md（L75）+ tools/doc_audit.py J Rust 组锚模式核对。<b>候选处置</b>：J Rust 组扩两处 README 计数锚模式；审查轮数位按 R164 写位准入加锚或指针化（本审落档即触发 37→38 刷新，恰为无 gate 提醒的实证）。<b>应修</b>：加锚/指针化收敛出现面；<b>绝不能这样修</b>：只手刷数字不加锚（复发面不收敛，重蹈 8b6f4f6 前的漂移史）。</p>
+<p><b>R191-R198：留空（未用号如实登记）</b>——本审面开账两笔用尽 R189/R190；预分配号段未足额使用，跳号零。</p>
+</div>
+
+<div class="verdict-bp">
+<p><b>产品面 verdict：A-</b>（P1/P2 零在场；P3 两笔——R189 CI 宣称精度、R190 锚外写位结构面，不挡 A-，R102/R111/R113/R149-R150 先例轨迹一致）</p>
+<p><b>一行式总评</b>：基线 30 行矩阵全绿亲手复现（593/40 逐 target 配对、quine 272925 逐字节、eval 129×2、smoke 39）；27 笔增量两产品批宣称敌手复检基本零失真——v1.13.0 分享链接批 RFC 向量+2000 轮原生交叉 fuzz+线上三资产 sha256=tag blob 逐字节实证，v1.14.0 trace 批 36 断言行为面全过且"println 零变化/恰 2 次 Option 检查"读码+逐字节 A/B+黄金对照三路锁定；唯二开账为 CI 链一处 run 级宣称被 API 证伪（6/7 绿 + 1 cancelled 的登记精度）与 4 处锚外现值写位（现行值全对）——均 P3 精度/结构面，无行为影响、无对外宣称失真。</p>
+<p><b>评级依据</b>：①全部 30 项基线值与 HANDOVER §2.2 零偏差；②两产品批全部可本地复现宣称逐条实证（72 断言探针 + 6 项取证探针，击穿 2 处且均非产品行为面）；③冻结面零触碰实证（27 笔树面 + 语言面零变化）；④开账两笔均为登记精度/结构面。</p>
+<p><b>可信边界</b>：①trace A/B bench 关闭态零回退（+1.6%/+2.2%）未复跑——规划者探针档数字核对一致，标注"登记一致未复跑"；②gh-pages lom.wasm 未做源树重建字节复现（git 只读红线禁 checkout/worktree），以版本串 1.13.0 唯一在场 + 三 JS/hex 资产逐字节相等替代，字节级相等沿用部署批自验；③macos job 的 cancel 动因（手动 vs 基础设施）只读 API 不可区分；④线上浏览器行为（hash 更新/恢复的 UI 面）未开浏览器复测，以 smoke ⑧ 段 + app.js 读码替代——"未见登记 ≠ 未发生"口径；⑤匿名 API 快照时点 2026-10-27 晚（UTC+8），后续远端状态变化不在本审覆盖内。</p>
+</div>
+
+<p class="small">执行者 A：三十八审产品面审查 agent（GLM-5.3），2026-10-27。耗时估计：约 2.5-3 小时（基线矩阵串行亲跑约 40 分钟 + 联网取证 15 分钟 + 探针设计与三套迭代约 60 分钟 + 复核与成文 45 分钟）。探针目录清单（均在 target/probes/review38/）：probe_sharelink_adversarial.mjs（PA-1，36 断言）、probe_trace_suite.py（PA-2，25 断言）、probe_trace_edge.py（PA-3，11 断言）、probe_trace_basic.lom / probe_trace_deep.lom（探针载体归档件）、api_runs_list.json、api_jobs_f43ed83.json、api_run_f43ed83_detail.json、api_jobs_v11300.json、api_jobs_v11400.json、incr_commits.txt、ghpages_online/（线上四资产 + tag blob 对照件）、t2/t9 系列探针输出。git 全程只读；cargo 独占串行；两枚仓库根临时载体用毕即删。</p>
+
+<h2 id="b1">B1 分册：元面·内部治理一——三十七审整改收口真实性 + 治理五连落地质量 + F2-L1 运行合规</h2>
+
+<h3 id="b1-0">B1.0 审查边界、自指披露与方法声明</h3>
+<p><strong>拟题权声明（自指缓解）</strong>：本章节审查维度边界由任务书 §5 给定（五维度），维度内的具体问题清单由执行者 B1 自主拟定——规划者不提供问题清单。本章节全部问题（含 B1.5 自拟扩展）为 B1 独立拟题产物。</p>
+<p><strong>审查对象与基线</strong>：增量区间 <code>075978c..2695fef</code>（27 笔）中的治理批群——三十七审整改批（前奏 <code>2d81070</code> + 批 1/2/3 <code>8b6f4f6</code>/<code>0df8d1b</code>/<code>bf2d9df</code>）、治理五连（<code>8660740</code>/<code>35d147b</code>/<code>583b5bf</code>/<code>d241472</code>/<code>8489039</code>）、F2 分级表入册（<code>92a9e6d</code>）与 [F2-L1] 批（任务书给定三笔 + B1 自主发现的第四笔 <code>692c28d</code>）、MAINTENANCE §7 变更日志。冷启动核对：基线 HEAD = <code>2695fef</code>（2026-10-27 实查一致）、工作树干净、v1.13.0/v1.14.0 两 tag 在本地。</p>
+<p><strong>红线遵守自述</strong>：一级（绝对）零对外交互——全程零网络请求（本面无需联网，实际未发起任何请求）；二级——本地 git 严格只读（仅 status/log/show/grep 读命令族），仓库既有文件零修改，写盘仅 target/probes/review38/b1/（探针）与本章节文件（target/probes/review38/section_B1.html），构造性验证采用探针目录内脚本副本实跑形态（gitignored 区，终态 git status 干净——见署名行披露）。未运行任何 cargo 命令（执行者 A 独占）；python 纯工具亲跑 = doc_audit、link_check、三个自写复核脚本；只读 lom.exe 未需调用（本面无运行面）。</p>
+<p><strong>裁决纪律</strong>：只开账不修码不改规则；历史裁决不重开（审执行一致性与过程质量，不替用户重裁方向）；结论未从其他执行者转述（本章节全部证据为 B1 亲取）；"未见登记"与"未发生"严格区分——CI 首跑绿宣称的逐笔核实依赖弧线登记（<code>02afe59</code>"逐笔 CI 七 job 绿实查"）而非本执行者 API 实查（本面禁联网），该边界如实标注。</p>
+<p><strong>方法</strong>：git 考古（逐批 diff/--stat）、grep 出现面扫描、条文-档案逐节对照、收敛漏斗分区独立机械复核（python 三件套）、R162 红路径构造性验证（改常量副本实跑 --bootstrap）。</p>
+
+<h3 id="b1-1">B1.1 维度①：三十七审 25 笔整改收口真实性（整改批 + 前奏）</h3>
+<p><strong>抽验面</strong>：25 笔开账（R149/R150、R159-R165、R169-R175、R179/R180、R182-R188）中，22 笔整改动作逐笔 grep/读档/diff 实证，R187/R188 观察项在场核验，R165 为确认账（无整改面）——合计 25/25 全覆盖。抽查密度超过任务书 ≥8 笔要求。</p>
+<table>
+<tr><th>账</th><th>宣称整改动作（提交信息/TODO 登记）</th><th>实证命令/位点</th><th>结果</th></tr>
+<tr><td>R159</td><td>批 1 刷现值 + 批 3 指针化（zh-CN 基线数字引 HANDOVER §2.2 单一源）</td><td><code>git show 8b6f4f6/bf2d9df -- README.zh-CN.md</code>；现值 L14/L53/L55 三处"单一源，本文件不复写"</td><td class="ok">落地 ✓，两版后未复发（见 B1.1.1）</td></tr>
+<tr><td>R160</td><td>AGENTS.md build 块计数指针化</td><td><code>git show 0df8d1b -- AGENTS.md</code>；现值 L15-18 四行指针句</td><td class="ok">落地 ✓，未复发</td></tr>
+<tr><td>R161</td><td>§2.2 决策表增两行先例</td><td>MAINTENANCE L134（v1.8.0 宣称面翻转→minor）+ L136（触 src/ 含注释→patch，R135 先例）</td><td class="ok">落地 ✓</td></tr>
+<tr><td>R162</td><td>verify_selfcomp --bootstrap quine 字节断言 FAIL 化</td><td>tools/verify_selfcomp.py L447-463 + <strong>红路径构造性验证</strong>（B1.1.2）</td><td class="ok">落地 ✓（断言真实能红）</td></tr>
+<tr><td>R163</td><td>§5.1 增第 6 项 pre-copy 终检</td><td>MAINTENANCE L291-293（弧线笔数/任务数 git rev-list/glob 复算后才落盘）</td><td class="ok">落地 ✓</td></tr>
+<tr><td>R164</td><td>§2.3 增第 6 条写位准入</td><td>MAINTENANCE L155-159（长期文档复写基线数字须呈批、默认指针化、锚扩张仅留高 churn 位）</td><td class="ok">落地 ✓（边界落差见 R202）</td></tr>
+<tr><td>R169</td><td>TODO 降频论据句口径原位括注</td><td>TODO L94"R169 口径注…33 轮零失守定义"在场</td><td class="ok">落地 ✓</td></tr>
+<tr><td>R170/171/173</td><td>§4.2 档案落位段 + 立即自应用</td><td>MAINTENANCE L214-217 条文 + target/probes/review37/task.md + decisions/ 四档在场（batch3-menu/observation/brainstorm/f2-tiering）</td><td class="ok">落地 ✓（本审 task.md 即其制度产物）</td></tr>
+<tr><td>R172</td><td>§4.3 同包收口裁决痕迹成文</td><td>MAINTENANCE L226-228</td><td class="ok">落地 ✓</td></tr>
+<tr><td>R174</td><td>§4.4 档位速判成文</td><td>MAINTENANCE L234-236（B=P1/B+=P2 无 P1/A 系=零 P1P2）</td><td class="ok">落地 ✓</td></tr>
+<tr><td>R175</td><td>EXECUTOR_TEMPLATE 第零节（批次段样例 + 坑索引对齐强制字段）</td><td>EXECUTOR_TEMPLATE L8-28</td><td class="ok">落地 ✓（本任务书含对齐字段即其应用）</td></tr>
+<tr><td>R149/R179/R180/R150/R182/R183/R184/R185/R186</td><td>批 1 门面刷新九笔（README 双语/eval/ACRI/positioning/Citing）</td><td><code>git show 8b6f4f6 --stat</code> 六文件 21 处行改动逐文件 diff 在场；R185 现值 eval/README L212 "wytyKen (2026)"；R186 现值 acri-v0.1.md L198 "is explicitly not precluded"</td><td class="ok">落地 ✓（现值时效面归执行者 C，不重查）</td></tr>
+<tr><td>R187/R188</td><td>随批收口（Ubuntu 26 收窄 / 发帖链维持现状 + 观察点）</td><td>TODO L10 观察项段两处裁决痕迹在场</td><td class="ok">在场 ✓</td></tr>
+</table>
+
+<h4>B1.1.1 R159/R160 指针化后复发核对（v1.13.0/v1.14.0 两版后时点）</h4>
+<p><strong>命令原文</strong>：<code>grep -nE '578|581|593|v1\.10\.1|v1\.12\.1|v1\.14\.0|v1\.13\.0|368|73/73|128|129|272925' README.zh-CN.md</code> 与 <code>grep -nE '593|581|578|368|73/73|272925|2\.2|R160' AGENTS.md</code>。</p>
+<p><strong>结果</strong>：README.zh-CN.md 全文仅 L12 一处数字位（评测报告 pass@k 数值，带 2026-10-07 时点限定与报告链接，非基线计数），版本号/测试计数/审查轮数/基线计数零复写——<strong>指针化经受住两版发布考验，未复发</strong>；AGENTS.md L15-18 四行全部指针句（"expected counts: docs/HANDOVER.md §2.2 (single source, R160 pointerized)"），未复发。<strong>残留面</strong>：README.zh-CN L13 与 README.md L23 仍各有裸数字 "12,671 行"/"272,925 字节"（证据叙述行）——R159 整改未触及、doc_audit 锚集不含 zh-CN（<code>grep zh tools/doc_audit.py</code> 零匹配），该残留与 R164 条文枚举的落差开账 R202（见 B1.6）。</p>
+
+<h4>B1.1.2 R162 红路径构造性验证（敌手探针 #1）</h4>
+<p><strong>方法</strong>：复制 tools/verify_selfcomp.py 至 target/probes/review38/b1/verify_selfcomp_red.py（gitignored 探针区），Write/Edit 落盘两处补丁——EXPECTED_QUINE_BYTES 272925→<strong>272924</strong>（模拟宣称值漂移）+ ROOT 行 pin 为仓库绝对路径；实跑 <code>python target/probes/review38/b1/verify_selfcomp_red.py --bootstrap</code>。</p>
+<p><strong>关键输出摘录</strong>（探针 target/probes/review38/b1/redpath_run.out）：</p>
+<pre>FAIL-B L3 self-apply (quine)      272925 bytes (EXPECTED 272924 — sync QUINE_BYTES in tools/build_selfboot.py and the doc J anchors); byte-identical; 2.6s
+RESULT: FAIL（--bootstrap：13/14 项通过；总耗时 33.5s）
+exit=1</pre>
+<p><strong>结论</strong>：断言真实 FAIL 化（note(ident and size_ok) → fail 计数 → RESULT: FAIL → exit 1），红路径携带同步指引文案；顺带以绿路径真值确认 quine 实际字节 = 272925（14 项中其余 13 项全过）。R162 整改宣称"red path reuses the proven note(False) mechanism"经敌手构造证实。<strong>边界</strong>：探针副本保留于探针目录作为可复现证据（gitignored，不入 git status）；未触碰仓库原文件。</p>
+
+<h3 id="b1-2">B1.2 维度②：治理五连落地质量</h3>
+<h4>B1.2.1 统一待裁菜单唯一入口性</h4>
+<p><strong>全仓扫描</strong>：<code>grep -rn '待裁菜单|待办菜单' --include='*.md' --include='*.html' .</code>。活跃写位盘点 = docs/TODO.md L11 菜单行（唯一入口，五层结构 + 提案/沉档/出池/常设机制/观察项）+ HANDOFF_PROMPT L134-136（指针句"完整菜单见 TODO 状态块待裁菜单行"）+ MAINTENANCE L320（指针句"待裁菜单 = TODO 顶部状态块"）+ archive 与 reviews 历史原文（不回写纪律豁免）。另扫"待办"字样：TODO L56（删除线历史项）/L1170（职责声明句）/L3561（历史批关闭句）均为历史区或声明句，无活跃散落菜单。<strong>结论：唯一入口性成立，8660740 宣称"zero content loss"与 TODO 现值可对勘（原六项→五层归位 + 出池登记全在场）。</strong></p>
+<p><strong>发现的瑕疵</strong>：菜单层号序列 = 【一】【二】【三】【五】——<strong>【四】缺位</strong>。git 考古：8660740 建五层【一】-【五】（原【二】= 待批草案·外部观察协议、【三】= 待消化、【四】= 搁置）；35d147b 随观察协议升格常设清空【二】层后，把【三】【四】前移为【二】【三】，但【五】未随前移——半重编形成跳号。开账 R201。</p>
+<h4>B1.2.2 条文与呈批档一致性（§4.6/§4.7/§1.4 ↔ decisions/ 三 + 一档）</h4>
+<table>
+<tr><th>条文</th><th>呈批档</th><th>逐节对照结果</th></tr>
+<tr><td>§4.6 外部观察（六节）</td><td>decisions/2026-10-21-observation-protocol.md（草案 v1 全文）</td><td>触发/编成/红线/对象集/产出回传/边界六节结构一一对应；"草案批准后删除"歧义已由 §7 L349 如实登记（规则效力并入非档案消灭）；草案内嵌时点值（v0.10.16 等）入册时指针化、档案原文保留——合规</td></tr>
+<tr><td>§4.7 头脑风暴（七节含梳理/编号维护）</td><td>decisions/2026-10-21-brainstorm-protocol-menu.md</td><td>六要素呈方案 + 用户点名编号维护 → 条文七节全落地；梳理环节为 2026-10-22 追设（d241472），其用户两段裁决原话入 §7 L346——对应成立</td></tr>
+<tr><td>§1.4 F2 裁决分级表（L0/L1 五条款/L2）</td><td>decisions/2026-10-22-f2-tiering-draft.md</td><td>五条款内容逐条对上（回填/锚同步/观察项/指针化/镜像）；呈批档"§1.5"编号笔误由 §7 L347 如实登记勘误（入册即 §1.4）——如实披露合规</td></tr>
+</table>
+<p><strong>发现的瑕疵</strong>：§4.6 默认观察对象集仍列"目录 PR #68"（2026-10-22 已合并收口、TODO 观察项段已收口）——对象集列表为活信息残留，与"本文件不含活信息"承诺（L349 自述）存在一处未清位。开账 R203。</p>
+<h4>B1.2.3 收敛漏斗 7+25 独立机械复核（敌手探针 #2）</h4>
+<p><strong>命令原文</strong>：python 独立分区复核（非转述执行者三件套）：从 TODO L11 提取提案 7（E1/E2/B2/B3/C4/D5/F1）+ 沉档 25（A4/A6/B4/B5/B6/C2/C3/C5/D2-D4/D6/E3-E5/F3-F6/G1-G6）+ 出池 8（A1/A2/A3/A5/B1/C1/D1/F2）。</p>
+<p><strong>关键输出（行式）</strong>：</p>
+<pre>proposal = 7  archive = 25  sum = 32
+universe = 40
+partition check: prop+arch+pool == universe ? True
+overlap prop&amp;arch ? set()</pre>
+<p><strong>结论</strong>：7 + 25 + 8 = 40 分区完备、零重叠、零回收——8489039 宣称"32→7+25、收敛比 21.9%、IDs never recycled"与 TODO 现值、consolidation-2026-10-22/report.md（全集去向对照表 32 行逐点一行，符合 §4.7"唯一可审计形态"条款）三方一致；INDEX.md 两轮登记在场（首例 40 + 补救收敛轮），编号区间与续接基线登记齐全。任务书报 33 现役的偏差已由执行者报告 §4.3 如实定谳（差额 = F2 同日出池，机械复核 32 为准）——该偏差处理形态合规。</p>
+<h4>B1.2.4 编号不回收条款与现役池一致性</h4>
+<p>§4.7 编号维护条款（桶内续接最大号、出池不复用不回收、新桶 H 起、TODO 池与 INDEX 双写位）与现役池核对：出池 8 号（含 D1/F2 两个"升格/落地"出池）全部保留在"已吸收出池"登记、未在任何活跃层复现；提案层 7 号全部为沉档/出池之外的原号直载。<strong>一致 ✓</strong>。INDEX 表头末列名"入池数"与 §4.7 条文"初稿数→提案数——收敛比可见"措辞不完全一致，但 L10 行内容含"32→7+25（收敛比 21.9%）"即收敛比可见——实质满足，观察级披露不开账。</p>
+
+<h3 id="b1-3">B1.3 维度③：F2-L1 实跑合规（对照 MAINTENANCE §1.4）</h3>
+<p>任务书给定三笔 + B1 自主发现第四笔（<code>692c28d</code>，2026-10-23 条款 3，awesome PR #186 观察项登记）——L1 首跑实际四笔。义务四件套逐项对照：</p>
+<table>
+<tr><th>批（条款）</th><th>首行 [F2-L1]+条款号</th><th>TODO 报备行</th><th>改动面 vs 条款授权面</th><th>门禁宣称</th></tr>
+<tr><td>f43ed83（条款 1·回填）</td><td class="ok">✓</td><td class="bad">✗（commit message 自称"this reporting line fulfills the F2 duty"，未落 TODO 状态块）</td><td>回填面 ✓（README/TODO/HANDOVER/HANDOFF 四写位 tag b07c6d1 + run 39646107026 + 漏刷的 v1.13.0 位补齐）；<strong>超面：A/B 终判措辞修正</strong>（0.877×/0.790× → +1.6%/+2.2%）——如实声明"honestly declared as planner-acceptance duty rather than pre-authorization"但未按条款"超范围即停转 L0"</td><td>doc_audit 73/73 + link_check PASS；CI 首跑未逐笔报（弧线登记兜底）</td></tr>
+<tr><td>f734303（条款 5·镜像同步）</td><td class="ok">✓</td><td class="bad">✗</td><td>✓ 相符（HANDOFF_PROMPT 状态头 v1.14.0 段新增 + v1.13.0 降级，仅 1 文件 2 行，主写位已有既定内容为源）</td><td>doc_audit 73/73 + link_check PASS</td></tr>
+<tr><td>601cc08（条款 3·观察项刷新）</td><td class="ok">✓</td><td class="ok">✓（TODO L12"[F2-L1 条款 3·报备行]"——四笔中唯一按字面）</td><td>✓ 相符（PR #68 合并事件 → 观察点收口 + 菜单①等待条件标注 + 镜像同步，同事件三写位顺带属条款 3 合理范围）</td><td>doc_audit 73/73 + link_check PASS</td></tr>
+<tr><td>692c28d（条款 3·观察项登记）</td><td class="ok">✓</td><td class="bad">✗</td><td>✓ 相符（awesome PR #186 新观察项 + 菜单铺底件状态 + 镜像，2 文件 4 行）</td><td>doc_audit 73/73 + link_check PASS</td></tr>
+</table>
+<p><strong>回填位点现值复核</strong>：<code>grep -n 'b07c6d1|39646107026|e171488|39431280200' README.md</code> → L81（v1.14.0 Current）/L82（v1.13.0 Previous）双位点在场 ✓。</p>
+<p><strong>门禁独立亲验（B1 本机）</strong>：<code>python tools/doc_audit.py</code> → RESULT: PASS（73/73 项通过），exit=0；<code>python tools/link_check.py</code> → RESULT: PASS（A 类断链 0 + 大小写漂移 0），exit=0——当前基线门禁双绿，与四笔提交宣称一致（CI 首跑面见 B1.0 边界声明）。</p>
+<p><strong>结论</strong>：条款号引用与改动面匹配零错配（1↔回填、3↔观察项、5↔镜像同步），无对外面/src/越权；但<strong>报备行义务四笔仅一笔按字面履行（R199，P2）</strong>，<strong>f43ed83 超条款面未按"立即停止转 L0"处置（R200，P3）</strong>。注意 f43ed83 的 A/B 修正内容本身有授权源可辩（designs/0026 验收环节属实施批全链），问题在<strong>归类与停批纪律</strong>而非无授权动作——两读法披露。</p>
+
+<h3 id="b1-4">B1.4 维度④：MAINTENANCE §7 变更日志（2026-10-21 起四条目）与提交对应性</h3>
+<table>
+<tr><th>§7 条目</th><th>对应提交</th><th>核验</th></tr>
+<tr><td>L346 2026-10-22 梳理环节设立 + 补救收敛启动</td><td>d241472</td><td>--stat 含 MAINTENANCE（§4.7 梳理条款 3 行）✓；用户两段裁决原话入条目 ✓</td></tr>
+<tr><td>L347 2026-10-22 F2 分级表入册 + designs/0026 回写</td><td>92a9e6d</td><td>--stat MAINTENANCE +39 行（§1.4 成文 + 速查表）✓；编号勘误如实登记 ✓</td></tr>
+<tr><td>L348 2026-10-21 头脑风暴协议入册 + §4 更名</td><td>583b5bf</td><td>--stat MAINTENANCE +16-2 ✓；引用面盘点（标题/速查表/§6 项名/HANDOVER 映射句）与实际 grep 一致 ✓</td></tr>
+<tr><td>L349 2026-10-21 外部观察协议入册</td><td>35d147b</td><td>--stat MAINTENANCE +11 ✓；时点值指针化修正自述与条文现值（对象集表无内嵌时点值）一致 ✓</td></tr>
+</table>
+<p><strong>对应性成立</strong>。两点补充：①治理五连中 8660740（统一菜单）与 8489039（收敛落地）未触 MAINTENANCE（--stat 仅 HANDOFF_PROMPT + TODO），故 §7 无条目——自我一致的口径，但形成"治理事件完成态登记依赖是否触本文件"的不对称（三十七审收官不触 MAINTENANCE 却有 L351 条目——因其同批含 R164/R170 族条文改动；纯落地批无此随附）；②L346"现存 <strong>33 个</strong>现役点"为启动时点旧口径，落地定谳 32（执行者报告 §4.3 偏差说明在档），落地后未追加勘误注——开账 R204。</p>
+
+<h3 id="b1-5">B1.5 维度⑤：元面自主扩展（B1 自拟）</h3>
+<p><strong>自拟题 1（L1 第四笔发现）</strong>：任务书 F2-L1 清单给三笔，B1 以 <code>git log --grep F2-L1</code> 方式全量复查发现第四笔 <code>692c28d</code>——任务书增量清单对 L1 首跑面的枚举不全（该笔在任务书 §0 中仅被归入交接弧线描述）。无独立缺陷（其合规问题并入 R199），但提示：**任务书增量构成段对制度性标记（[F2-L1]）的枚举应走 grep 而非叙述**——观察级披露。</p>
+<p><strong>自拟题 2（R164 写位准入的回溯缺口）</strong>：条文仅辖"新增长期文档"，对整改时点已存在的既有锚外写位（README.zh-CN L13 / README.md L23 的 272,925 与 12,671）无收敛或入锚的回溯要求——R159 指针化整改宣称"baseline digits pointerized"而按条文自身枚举（"版本号/测试计数/quine 字节等高 churn 值"）quine 字节属基线数字，该写位既未指针化也未入锚。现值正确且 quine 十余版稳定（风险低），但条文-宣称-实况三者存在边界落差。开账 R202。</p>
+<p><strong>自拟题 3（TODO L11"35+ 点子"惯称）</strong>：TODO 菜单行现值仍写"头脑风暴七桶 35+ 点子"，INDEX L9 已注"机械复核 40 个唯一编号；登记惯称 35+"——主写位保留旧惯称而精确数在 INDEX。已有自我披露注记，观察级不开账。</p>
+
+<h3 id="b1-6">B1.6 开账清单（号段 R199-R208；R205-R208 未用，如实留空）</h3>
+<div class="ledger">
+<table>
+<tr><th>号</th><th>P 级</th><th>标题与一句话</th><th>可复现形态</th><th>候选处置</th><th>负向锁定（绝不能这样修）</th></tr>
+<tr><td>R199</td><td>P2</td><td>F2-L1 报备行义务四笔仅一笔按字面履行——§1.4 明文"TODO 状态块落一行报备记录"，f43ed83/f734303/692c28d 三笔缺位（f43ed83 以 commit message 段落自称报备，属报备位置偷换）；R172"同包收口留痕由报备行满足"——留痕机制半失效，用户可否决入口（协议设计的唯一交互面）对三笔不可见</td><td><code>grep -n 'F2-L1' docs/TODO.md</code> → 仅 L12 一行；对照 <code>git log --grep 'F2-L1'</code> → 四笔</td><td>随下批补三行回溯报备（标注补登时点）；§1.4 或速查表加一句"报备行可后补但必须补齐"（条文修改属 L0 呈批）</td><td>不得以"commit message 已写"认定义务已履行（条款字面即 TODO 状态块）；不得改写历史 commit 补报备；不得为消缺位而删除 601cc08 先例行</td></tr>
+<tr><td>R200</td><td>P3</td><td>f43ed83 超条款面未按"超范围即停转 L0"处置——A/B 终判措辞修正（宣称数字变更）超条款 1"零新增宣称"面，以"honestly declared as planner-acceptance duty"自我豁免继续执行；内容有授权源可辩（designs/0026 验收环节）但停批义务未被字面执行，L1 首跑即留边界纪律缺口</td><td><code>git show f43ed83</code> 提交信息"Beyond-clause part…"段 + TODO diff 中 0.877×→+1.6% 措辞行；§1.4 L71"执行中发现超出预授权面 = 立即停止转 L0"</td><td>§1.4 呈批增补归类说明（验收类修正归实施批收尾面、或须拆分独立提交并明示授权源）；或严格执行停批——两方向均 L0 呈批</td><td>不得把"如实披露"当作免停依据（披露义务与停止义务是两条）；不得事后追认豁免先例（表自身修改 = L0）</td></tr>
+<tr><td>R201</td><td>P3</td><td>待裁菜单层号跳号——层号序列【一】【二】【三】【五】缺【四】：35d147b 清空【二】层后【三】【四】前移而【五】未动（半重编）；提交宣称"renumbering"仅对条目号成立</td><td>TODO L11 层头序列；<code>git show 35d147b -- docs/TODO.md</code> 前后层头对照；<code>git show 8660740</code> 原五层【一】-【五】</td><td>随下批【五】→【四】并括注重编说明（纯文档批）</td><td>不得为消跳号把"常设机制"塞成待裁层（其"非待裁"定性不能变）；不得重排条目号（①-④ 已被弧线叙述引用）</td></tr>
+<tr><td>R202</td><td>P3</td><td>R159 指针化宣称面与 R164 条文枚举的落差——README.zh-CN L13（及 README.md L23 同型）"12,671 行/272,925 字节"锚外裸数字：条文自列 quine 字节为基线数字而该写位未指针化未入锚（doc_audit 锚集不含 zh-CN），且 R164 仅辖新增文档、既有写位零回溯条款；现值正确风险低</td><td><code>grep -n '272,925|12,671' README.zh-CN.md README.md</code>；<code>grep zh tools/doc_audit.py</code> → 零匹配；R164 条文 MAINTENANCE L155-159</td><td>呈批二选一：zh-CN L13 数字指针化，或 doc_audit J 组扩 zh-CN 该位（高 churn 数字按条文留给锚）；README.md L23 同批定夺</td><td>不得顺手刷现值了事（现值正确 ≠ 入锁——下次 quine/行数变化必漂移）；不得为此全量扫 zh-CN 入锚（低频数字扩锚违反 R164 性价比判断）</td></tr>
+<tr><td>R203</td><td>P3</td><td>§4.6 默认观察对象集残留"目录 PR #68"——该对象 2026-10-22 已合并收口（TODO 观察项段已收口），条文静态列表未动，与"本文件不含活信息"承诺（L349 自述）存在未清位</td><td>MAINTENANCE L265 对象集行；TODO L11"PR #68 已合并——观察点收口"</td><td>随下批对象集行加指针括注"（各对象现值与收口状态见 TODO 观察项段）"，列表本身保留默认集语义</td><td>不得在 MAINTENANCE 内维护观察对象开闭状态（活信息归 TODO 单一源）；不得删对象行（默认集是协议语义非登记位）</td></tr>
+<tr><td>R204</td><td>P3</td><td>§7 L346"现存 33 个现役点"启动时点旧口径未随落地定谳追加勘误——落地批（8489039）定谳 32 且不触 MAINTENANCE 故 §7 无落地条目，变更日志数字与落地实况不一致依赖读者自行到收敛报告 §4.3 对勘</td><td>MAINTENANCE L346；consolidation-2026-10-22/report.md §4.3（偏差定谳 32）；8489039 --stat（无 MAINTENANCE）</td><td>下批在 L346 尾追加括注"（落地定谳现役 32，见收敛报告 §4.3）"——追加勘误注形态</td><td>不得直接改写 L346 原文数字（历史条目保留时点原文是登记纪律）；不得为对称而给不触本文件的批强加 §7 条目（口径自洽优先）</td></tr>
+<tr><td>R205-R208</td><td>—</td><td colspan="4">未使用，如实留空（本章节无更多达开账门槛的发现；观察级事项已在 B1.2.4/B1.5 文内披露不开账）</td></tr>
+</table>
+</div>
+
+<div class="verdict-bp">
+<p><b>verdict 一行式：元面·治理一 B+ ——三十七审 25 笔整改零虚假收口（22 笔整改动作逐笔实证 + R162 红路径构造性击穿验证断言真实）、治理五连五项落地全部实质成立（唯一入口/条文-呈批档一致/收敛漏斗分区完备 7+25+8=40/编号零回收）、§7 四条目一一对应；唯 F2-L1 首跑暴露两处纪律缺口——报备行义务四笔仅一笔按字面履行（R199，P2）与超条款面未停批（R200，P3），P2 在场且无 P1，按 §4.4 速判记 B+。</b></p>
+<p><b>评级依据</b>：①收口真实性——整改批宣称与 diff/现值逐笔对勘零过度宣称，R159/R160 指针化经受 v1.13.0/v1.14.0 两版发布考验零复发（本审元面最高风险假设被否定）；②制度落地——三个新常设机制（§4.5 审查模式/§4.6 观察/§4.7 头脑风暴）条文、呈批档、INDEX、执行产物四层齐备且互恰，收敛漏斗的"全集去向对照表 = 唯一可审计形态"设计在本审被独立机械复核证实有效；③纪律缺口——F2 分级表入册当日首跑即出现义务履行不自洽（同一义务两种解读并存、无勘误登记），暴露新规则首跑期的执行漂移面，属过程纪律而非内容失真（全部 git 可审计、零隐瞒）。<b>可信边界</b>：本章节结论基于落盘档案与 B1 亲取证据（未转述其他执行者）；CI 逐笔首跑绿未 API 实查（一级红线禁联网），以弧线登记（02afe59 逐笔实查宣称）+ 本机门禁双绿亲验为证据方式，"未见登记"不构成"未发生"；批 1 门面刷新笔的现值时效面（v1.13.0/v1.14.0 后对外数字）归执行者 C 审面，本章节不重复结论；R199/R200 的两读法已在 B1.3 披露（宽读可降 P3——因内容有授权源且如实披露；本审取严读，因 §1.4 刚生效且报备行是协议设计的用户唯一否决入口）。</p>
+</div>
+
+<p class="small">B1 执行者：三十八审元面·内部治理一审查 agent，2026-10-27。耗时估计：约 70-85 分钟（含 --bootstrap 红路径实跑 33.5s×1 与门禁双跑）。探针与取证目录：target/probes/review38/b1/（verify_selfcomp_red.py 红路径脚本副本 / redpath_run.out 红路径输出 / doc_audit_run.out / link_check_run.out）+ 本章节文件 target/probes/review38/section_B1.html。git 全程只读；零网络请求；未运行 cargo；历史裁决零重开；终态 git status --porcelain 输出为空（探针均在 gitignored 区）。</p>
+
+<h2>三十八审 · 执行者 B2（元面·内部治理二：三十七审模式运转 + 审查体系自身 + 交接五件套 + 新常设机制档案完备性 + 呈报制衡）</h2>
+
+<h3>B2.0 章头：审面、方法与自主拟题权声明</h3>
+<p>本章节为三十八审四执行者章节之一（开账号段预分配 R209-R218，未用号如实留空）。审面对象为治理体系自身而非产品源码，六维度：① MAINTENANCE §4.5（三十七审模式标准化）成文后的治理运转——含对本次三十八审任务书自身的 §4.5 合规性下钻；② 规划者交接五件套质量（02afe59 + 2695fef 交接批，前弧线 98a320c/b757303）；③ 新常设机制（§4.6 外部观察 / §4.7 头脑风暴）档案完备性；④ 规划者-执行者模式在增量区间的亲验纪律痕迹（§3.2 执行证据）与偏差零复发；⑤ 治理弧线的用户裁决链忠实性（登记措辞 vs 裁决原话）；⑥ 元面自主扩展（B2 自拟：三十七审"档案外环节"结构性缺口的修复效果追踪 + 审查体系自身的引导密度漂移）。</p>
+<p><b>自主拟题权声明</b>：任务书只划定上述六维度边界，未提供问题清单——本章各维度内的具体审查问题（§4.5 六件对照的判读口径、R163 复算的区间记法检查、发帖顺序四写位溯源、decisions/ 断链搜查、裁决链横向互证法、引导密度对比法）均由本执行者自主拟定并在此声明。任务书括注中的"预期"值（如呈批档份数）仅被当作待证假设处理，实证结果与之不符处照实开账。</p>
+<p><b>方法</b>：只读考古。全文阅读 docs/EXECUTOR_TEMPLATE.md、docs/MAINTENANCE.md（§1/§2/§3/§4/§5/§7/速查表）、target/probes/review38/task.md、target/probes/review37/task.md、docs/TODO.md 顶部状态块（L1-26 逐句）、docs/HANDOFF_PROMPT.md 全文、docs/HANDOVER.md §1/§9 与顶部条、target/probes/decisions/ 四档全文、target/probes/brainstorm/INDEX.md、target/probes/outreach/ 时序备忘与渠道档相关节、docs/reviews/review-2026-10-19.html 头部/尾部/B2 章及相关开账段；git 只读命令族（log/show/rev-list/status）；python 仅 tools/doc_audit.py（亲跑 PASS 73/73，rc=0）；未运行 cargo（A 独占）；未运行 lom.exe（本审面无产品行为验证需求）；历史裁决零重开。取证命令与输出全文落 <code>target/probes/review38/B2/audit_trail.md</code>。</p>
+
+<h3>B2.1 自指披露（本章必含）</h3>
+<div class="meta">
+<p><b>结构性利益冲突声明</b>：本章审查者（执行者 B2）由被审规划者派出，任务书由被审方撰写——被审对象同时是派单方。缓解措施已执行且可核：①元面问题清单自主拟定（B2.0 已声明，任务书未提供清单）；②规划者对本章零内容编辑权（机械拼接）；③被审规划者不参与本章任何结论。不可消除的根本边界：维度划分、号段切分与两级红线仍由被审方划定，本章独立性以此为上限。</p>
+<p><b>更深一层的自指（本次特有）</b>：本章维度①要求审查"三十七审模式的标准化运转"，而本章自身即是该标准化模式（§4.5）的第二个全尺寸实例——本章对任务书合规性的批评标准（如 R214 的引导密度问题）同样适用于派发本章的任务书，该任务书正是 R214 的证据本体。此为如实申报的循环，非缺陷掩盖：审查体系自身的漂移只能由体系内实例暴露，无法由体系外仲裁（体系外 = 外部同行审计，§4.1 明文本审查不是）。</p>
+<p><b>结论可信边界</b>：①本章结论基于仓库落盘档案与 gitignore 区本地档案（target/probes/）——这些档案本身是被审体系的产物，"过程被完整记载"这一前提无法从档案内部证明（三十七审 B2 已立的边界，本审追踪其修复效果，见 B2.6）；②用户裁决原话无独立原始档案（R215），维度⑤只能登记位横向互证——"各登记位互证一致"不等于"与用户原话逐字一致"；③CI 远端状态离线不可复验（02afe59 宣称 run 39958272111 绿属档案采信，联网实查归 A/C 面）；④"未见登记"≠"未发生"全程适用。</p>
+</div>
+
+<h3>B2.2 维度①：§4.5 标准化后的治理运转（含三十八审任务书自身合规性下钻）</h3>
+
+<h4>B2.2.1 §4.5 条款 vs 三十七审执行的忠实成文性</h4>
+<p>§4.5 六要素与首例（review-2026-10-19.html + review37/task.md）逐条对读：<b>双层覆盖</b>（产品面必审 + 元面按事件选维度）、<b>编成豁免</b>（3-5 并行、cargo 独占产品面）、<b>两级红线 + 复述义务</b>、<b>自指缓解三件</b>（自拟题单 / 零编辑拼接 / 披露头）、<b>双 verdict</b>、<b>号段预分配 + 空号如实</b>——六件均能在首例档案中找到对应执行痕迹（报告头 0/0b/0c 节、任务书落档、附录 B 验收记录），成文忠实。两处标准化与首例形态的非逐字差异如实登记（不构成违规，属标准化的正常收窄/抽象）：①首例实际产出<b>三字母 verdict + 元面定性</b>（产品/治理/对外三 A-，B2 元面无字母），§4.5 收窄为"双 verdict（产品面 + 元面）"——报告级两栏、章节级 verdict 框保留；②R170 条款"报告附录登记任务书路径"在首例报告上无实例（报告先于条款落盘 + 不回写纪律），详见 B2.6.1/R213。</p>
+
+<h4>B2.2.2 三十八审任务书（review38/task.md）§4.5 六件逐条对照</h4>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>§4.5 条款</th><th>任务书落位</th><th>判读</th></tr>
+<tr><td>双层覆盖</td><td>§3/§4：A 产品面（基线矩阵 + 增量敌手复核 + 探针 + 文档对账）必审；B1/B2/C 元面维度与本审事件对齐（且与三十七审维度划分不同——"按事件性质选维度"的活用）</td><td class="ok">合规</td></tr>
+<tr><td>编成豁免 ≤2（3-5 并行；cargo 独占）</td><td>§3 表四执行者 + §2.5 cargo A 独占、B1/B2/C python 纯工具 + 只读 lom.exe；§0 编成说明援引 2026-10-19 用户裁决与 §4.6 编成</td><td class="ok">合规（4 并行在 3-5 带内；外部观察单执行者并行属 §4.6 编成，两机制同日并行已在 §0 声明）</td></tr>
+<tr><td>两级红线 + 复述义务</td><td>§1 置顶逐字承 §4.5（一级零对外交互只读 GET / 二级 git 严格只读 + 仓库零修改 + 探针只落 review38/ + 构造性验证形态四件）；"开工前复述义务：最终回复首行必须逐字复述"</td><td class="ok">合规（本章执行者已履行首行复述义务）</td></tr>
+<tr><td>自指缓解三件</td><td>§5/§6/§7 各带"拟题权声明"；§8 机械拼接 + 规划者零内容编辑；§8 报告头必含自指披露段</td><td class="ok">合规（边界张力见 R214：子检项引导密度较三十七审任务书上升一档）</td></tr>
+<tr><td>双 verdict</td><td>§8"呈报用户（双 verdict 分列）"+ §2.8 每章节 verdict 框（一行式 + 评级依据 + 可信边界）</td><td class="ok">合规</td></tr>
+<tr><td>号段预分配 + 空号如实</td><td>§3 表 R189-R198 / R199-R208 / R209-R218 / R219-R228 四段；§2.6 未用号如实留空</td><td class="ok">合规</td></tr>
+<tr><td>档案落位（§4.2 引用）</td><td>§0"本任务书按 MAINTENANCE §4.2 档案落位段随审落档本路径"（review38/task.md 在场 ✓）；§2.8 执行者耗时行入章节署名</td><td class="ok">合规（R173 耗时行自本轮起的落位形态 = 章节署名行）</td></tr>
+</table>
+<p>一处档案外边界如实标注：§4.5"编成与维度划分随审查任务书呈用户裁定"——三十八审编成承自 2026-10-19 常设裁决 + 本次用户触发指令（§0 记"开启独立审查和外部观察"），任务书本身是否逐审再呈裁无落盘痕迹可证（档案外环节，与三十七审 B2 所指同族残余，见 B2.6.2）。</p>
+
+<h3>B2.3 维度②：规划者交接五件套质量（02afe59 + 2695fef；前弧线 98a320c/b757303）</h3>
+
+<h4>B2.3.1 五件在场与一致性总核</h4>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>件</th><th>在场与状态</th><th>复核方式</th></tr>
+<tr><td>1. HANDOFF_PROMPT【当前真实状态】整体重写</td><td class="ok">✓ 2026-10-23 状态头 + 弧线全文（L49-170）</td><td>全文阅读 + 2695fef 残留修复 diff 逐条比对（五处修复全部在场：PR68 合并事实 / Cargo 1.14.0 / 战略段发帖在途 / 新发帖顺序 / 审查报告指针 10-19）</td></tr>
+<tr><td>2. HANDOVER 顶部条 + §1 + §2.2 + §9</td><td class="ok">顶部恰 3 条（awk 清点）；§1 版本行 v1.14.0 + 13-run CI 链（逐 run 清点 = 13 ✓，tag run 已标注）；§9-5 已重写</td><td>§2.2 数字由 doc_audit J/J+ 互锁（亲跑 PASS 73/73）；§1 CI 行发现 PR #68 陈旧残留 → <b>R210</b></td></tr>
+<tr><td>3. TODO 顶部状态块重写</td><td class="ok">✓ 2026-10-23 交接就绪头（L3）</td><td>逐句阅读；发现发帖顺序陈旧 + moot 待决点未收口 → <b>R209</b></td></tr>
+<tr><td>4. doc_audit 全过</td><td class="ok">PASS 73/73（本执行者亲跑复现，rc=0）</td><td>02afe59 自记的"压缩锚句被 doc_audit 六处拦截（67/73）后复原"为锚体系对规划者自身的拦截实录——正向证据</td></tr>
+<tr><td>5. CI 最新 run 全绿实查</td><td>档案采信：run 39958272111（02afe59 自记 verified this session）</td><td>离线不可复验——边界如实（联网实查归 A 面 §A.2）</td></tr>
+<tr><td>6. R163 pre-copy 终检（叙述性计数复算）</td><td class="ok">执行痕迹在（02afe59 提交信息明载 recount 四项）；复算见 B2.3.2，记法错配 → <b>R211</b></td><td>git rev-list 亲复算</td></tr>
+</table>
+
+<h4>B2.3.2 R163 复算明细（弧线笔数 / 任务数 / 指针行）</h4>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>叙述性计数</th><th>宣称位与值</th><th>本审复算</th><th>判读</th></tr>
+<tr><td>本会话弧线笔数</td><td>TODO/HANDOFF/HANDOVER："13 笔 8660740→692c28d"</td><td><code>git rev-list --count 8660740~1..692c28d</code> = 13 ✓；但 02afe59 提交信息记法"13 commits (8660740..692c28d)"按 git 区间语义 = <b>12</b></td><td>箭头式（含端点）三写位全对；提交信息 git 区间记法与计数错配 → <b>R211</b></td></tr>
+<tr><td>前周期笔数</td><td>"11 笔 075978c→660c1cf"（HANDOVER §1）</td><td><code>git rev-list --count 075978c~1..660c1cf</code> = 11 ✓</td><td class="ok">一致</td></tr>
+<tr><td>更早弧线笔数</td><td>"12 笔 8de6dde→54e5d5d"（TODO L6）</td><td><code>git rev-list --count 8de6dde~1..54e5d5d</code> = 12 ✓</td><td class="ok">一致</td></tr>
+<tr><td>13-run CI 链</td><td>02afe59"13-run CI chain listed with the v1.14.0 tag run flagged"</td><td>HANDOVER §1 CI 行逐 run 清点 = 13，39646107026 已标 tag ✓</td><td class="ok">一致</td></tr>
+<tr><td>顶部条目数</td><td>"top now exactly 3"</td><td>awk 清点 = 3 ✓（§5.3 ≤3 达标）</td><td class="ok">一致</td></tr>
+<tr><td>收敛计数（任务数类）</td><td>"32 → 提案 7 + 沉档 25（21.9%）"（TODO/INDEX/8489039/d241472 四位）</td><td>40 唯一编号 − 累计出池 8 = 32；7+25=32；7/32=21.875%≈21.9%；沉档 25 ID 人工展开清点 2+3+3+4+3+4+6=25 ✓</td><td class="ok">四写位一致（跨面注记：MAINTENANCE §7"33 个现役点"与四处"32"不一，两读无注记——主责 B1 收敛漏斗对照，见 audit_trail §10）</td></tr>
+<tr><td>指针行（路径类）</td><td>outreach/prelaunch/、consolidation-2026-10-22/、trace_impl/、review37/task.md、decisions/ 四档</td><td>逐路径 ls/find 在场 ✓（decisions/ 发现断链 → <b>R212</b>）</td><td>在场，一处断链</td></tr>
+</table>
+
+<h4>B2.3.3 交接扫荡的覆盖面缺口（本章主发现族）</h4>
+<p>本弧线交接连续两轮自捕残留（02afe59 捕 doc_audit 六处锚句 → 2695fef 捕 HANDOFF 五处无锚残留），自捕机制运转成立且如实登记——但 2695fef 的扫荡本身仍有两处同族漏网，均属"扫了镜像漏主写位 / 扫了 HANDOFF 漏 HANDOVER"的覆盖面缺口：</p>
+<ul>
+<li><b>R209</b>：发帖顺序 TODO 主写位（"Reddit（modmail 获准后）→ HN"，4d11208 原句）与四处派生位（HANDOFF L104/L141、HANDOVER 顶部 10-23 条、HANDOVER §1 下一步行，均为"modmail→HN→Reddit"新序）倒挂；2695fef 将镜像旧序判为 stale residue 并"corrected"却未刷 TODO；outreach 源材料（timing-memo"Show HN 先发…r/PL 隔 1-2 天"）证实新序为当前意图、TODO 为陈旧侧——而 §5.4 规定"两处不一致时以 TODO 为准"，形式上使陈旧侧成为权威读法。同段附带：""发帖不再等 PR #68 合并"待用户明示确认"仍在场，而 601cc08 已记该待决点 moot（PR 已合并）。</li>
+<li><b>R210</b>：HANDOVER §1 CI 行"目录 PR #68 … open 待审（…维护者反馈回复逐条呈批）"残留——与同文件 §1 下一步行、顶部 10-23 条的"已合并收口"自相矛盾；2695fef 修了 HANDOFF 的同一事实残留（其残留 1）却漏扫 HANDOVER §1。</li>
+</ul>
+
+<h3>B2.4 维度③：新常设机制档案完备性（§4.6 / §4.7）</h3>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>核对项</th><th>结果</th></tr>
+<tr><td>§4.6 入册"时点值指针化、本文件不含活信息"承诺</td><td class="ok">兑现——§4.6 正文通读：默认观察对象集只列对象名（MoonBit release 线 / PR #68 / Zero / Vera / 本仓 CI / 当次指定项），零版本号/零天数/零状态值，"现值不写本文件"明文在场；§4.7 同查零活信息（日期均系裁决溯源）。对照呈批档原稿（decisions/2026-10-21-observation-protocol.md §3 表内嵌 v0.10.16/2026-10-19 等时点值）——原稿按归档纪律原样保留，§7 明载"入册时指针化"的修正过程，两头自洽</td></tr>
+<tr><td>头脑风暴 INDEX.md 建立与双写位同步</td><td class="ok">INDEX.md 在场（2026-10-22 建立）；提案层 7 ID / 沉档 25 ID / 累计出池 8 ID / 现役 32 / 收敛比 21.9% 与 TODO 点子池逐项一致。小注（不开账）：表头列名"入池数"与 §4.7 承诺字段"初稿数→提案数——收敛比可见"标签错位，数据本体在场</td></tr>
+<tr><td>decisions/ 呈批档盘点（预期 2026-10-21 ×2 + 2026-10-22 ×2）</td><td>四档全部在场 ✓（另含三十七审批 3 菜单一档）；四档内容与入册成文对读一致（F2 草案"§1.5"编号勘误已在 §7 如实登记；头脑风暴档六要素与 §4.7 一致含 §4 更名作为附带结构裁决点）。<b>但发现断链 → R212</b>：批 3 菜单 L5 引用"同目录 2026-10-19-review37-remediation-menu.md"，全 target/probes 无此档、全仓唯一命中即该引用自身——R171"呈报充分性自此可事后审计"对其前一笔重大裁决菜单（三批分组"按建议执行"）不可达成</td></tr>
+<tr><td>观察 INDEX 骨架</td><td class="ok">observations/ 目录在场（35d147b 自记 skeleton created；本轮外部观察执行者并行运转中——任务书 §0"同日两机制并行"旁证；观察面详情归 C/观察执行者，不越界）</td></tr>
+</table>
+
+<h3>B2.5 维度④：规划者-执行者模式运转痕迹（增量区间 27 笔考古）</h3>
+<p><b>亲验纪律痕迹（§3.2 / 铁律 3 执行证据，从提交信息与登记段考古）</b>：27 笔中 24 笔治理/登记批提交信息以 <code>gates: doc_audit 73/73[, link_check PASS]</code> 收尾（门禁亲跑痕迹连续无一漏）；0df8d1b 附加 <code>--bootstrap 14/14 quine 272925</code>（R162 红绿路径验证）；两产品批各带独立验收句——e171488 "executor-implemented with planner verification: smoke ALL PASS 39, doc_audit 73/73, link_check PASS, cargo test 621, lom --version 1.13.0"；b07c6d1 "planner acceptance: <b>personally re-ran</b> verify_selfcomp 368/368 + doc_audit 73/73, spot re-ran 593/3/probe-suite … personally ran the tightly interleaved A/B"。§3.2 细则逐项实例另含：91eb287 规划者亲核七个关键代码位；8489039 spot-checked disposition rows；4d11208 spot-verified three key clauses against raw evidence；f43ed83 验收精度修正（执行者先存后对照初值 0.877×/0.790× 判时段噪声、规划者紧邻交错终判 +1.6%/+2.2% 收口）。<b>判读：亲验纪律在增量区间连续在场且有两处"抽查复跑纠错"实录（验收环节实际起作用，非形式履行）。</b></p>
+<p><b>偏差零复发核验</b>：§3.3 登记四笔历史偏差（git stash 擅用 / clippy --all-targets 误判 / 计数配对转述错乱 / 限额中断）在增量区间零复发痕迹。两笔<b>新微偏差被验收环节拦截</b>（未酿成登记事故）：①执行者 A/B 对照初值系时段噪声（f43ed83 纠正，见上）；②执行者探针脚本第 9 断言非幂等（NDJSON 追加写致重跑翻倍，规划者重跑时发现并修探针，产品无涉——b07c6d1 自记）。另 f734303 记一笔执行者镜像部分同步偏差（实施批只刷三处 593 计数未刷状态头段）——以 F2-L1 条款 5 机制化收口，"偏差→矫正→登记"闭环成立；候选建议（不入账）：该形态可作 §3.3 表第五行候选，随下个治理批呈裁。</p>
+<p><b>[F2-L1] 三笔运转合规</b>（f43ed83 条款 1 / 601cc08+692c28d 条款 3 / f734303 条款 5）：commit 首行标记 + 条款号引用 ✓；TODO 报备行——条款 3 有独立报备行（TODO L12"[F2-L1 条款 3·报备行]"），条款 1/5 的报备以提交信息自述（f43ed83"this reporting line fulfills the F2 duty"）+ 逾条款部分自declared 为 planner-acceptance duty 满足——宽松读合规、严格读（§1.4"TODO 状态块落一行报备记录"逐笔独立行）条款 1/5 缺独立行；两读并存如实登记（主裁归 B1 面，此处只记痕迹形态）。</p>
+
+<h3>B2.6 维度⑤：呈报质量制衡——用户裁决链忠实性</h3>
+<p>方法：登记位横向互证（裁决摘句在 TODO / HANDOFF / MAINTENANCE / commit message 多写位间逐字比对 + 措辞方向合理性）。抽查七点：</p>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>裁决点</th><th>登记形态</th><th>判读</th></tr>
+<tr><td>2026-10-22 发帖启动</td><td>"启动发帖，具体操作由我做"——TODO L11 / HANDOFF L138 逐字，4d11208 英译 'launch posting, I do the writing'；操作权归用户、支撑归规划者的分界清晰登记</td><td class="ok">忠实</td></tr>
+<tr><td>2026-10-22 梳理环节两段裁决</td><td>MAINTENANCE §7 双段原话逐字（"…由同一个子智能体执行，文档写明梳理前的很多想法和梳理后的几个点；上次没做好梳理导致点太多太杂，补救并更新协议" + "怎么梳理、规则怎么定、文档维护方式完全由你决定，独立判断"）；§4.7 括注为压缩式（引号内含"完全由规划者独立决定"转写——将"你"语境化为"规划者"，方向无损、引号内转写系精度小疵）；d241472 英译一致；独立设计权被如实记为"用户全权授予"而非规划者自授</td><td class="ok">忠实（§4.7 引号内转写注记，不开账）</td></tr>
+<tr><td>2026-10-22 F2 入册</td><td>"按建议执行"（92a9e6d / §7 / TODO 一致）；呈批档 §5 写位两案（甲建议/乙）+ §1.5→§1.4 编号勘误如实入 §7</td><td class="ok">忠实（勘误显式化）</td></tr>
+<tr><td>2026-10-21 头脑风暴入册</td><td>"检查一遍协议，没问题就可以加入，注意后续维护，编号也需要维护"——编号维护条款系<b>用户点名</b>（583b5bf "per the explicit instruction"），非规划者自行扩权</td><td class="ok">忠实</td></tr>
+<tr><td>2026-10-21 外部观察入册</td><td>"检查后即可进入常设机制（和独立审查并列）"一致；入册唯一修正在 §7 明载且方向 = 收紧（指针化守"不含活信息"）</td><td class="ok">忠实</td></tr>
+<tr><td>R188 改裁（推翻显式化标准）</td><td>原裁"维持现状 + 2026-10-27 checkpoint"（bf2d9df）→ bc70509 显式记"no scheduled 10-27 recheck and no pre-drafted nudge"per adjudication，TODO L10"R188 已裁改用户驱动"——撤点明示、旧裁可溯</td><td class="ok">推翻显式化 ✓</td></tr>
+<tr><td>A1 出池处置</td><td>"不做——规划者判读，如与本意不符请指出"（TODO L11 / HANDOFF L151）——规划者对自身判读自贴"待用户纠偏"标签</td><td class="ok">良好制衡实践</td></tr>
+</table>
+<p>方法论限制即发现：<b>用户裁决的"回复侧"原话无独立档案</b>——decisions/ 制度（R171）只存规划者呈批菜单原文，用户回复以摘句散嵌于 TODO/commit/MAINTENANCE；维度⑤因此只能互证不能溯源（→ R215）。</p>
+
+<h3>B2.7 维度⑥（B2 自拟）：三十七审结构性缺口的修复效果追踪 + 审查体系自身漂移</h3>
+<h4>B2.7.1 "档案外环节不可审计"缺口的修复追踪（三十七审 B2 结构性发现 → 本审时点）</h4>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>缺口项（三十七审时点）</th><th>修复机制</th><th>本审实测</th></tr>
+<tr><td>审查任务书零落盘</td><td>R170 → §4.2 档案落位</td><td class="ok">review37/task.md、review38/task.md 均在场（R213 附带：首例报告附录未回登路径）</td></tr>
+<tr><td>呈报菜单原文零落盘</td><td>R171 → decisions/</td><td class="ok">四档在场（R212：首例前一笔断链）</td></tr>
+<tr><td>审查工时零台账</td><td>R173 → 耗时行</td><td class="ok">37 任务书首录（A 25'/B1 11'/B2 11'/C 13'）、38 任务书 §2.8 章节署名行义务（本章履行）</td></tr>
+<tr><td>同包收口无裁决痕迹</td><td>R172 → §4.3 句</td><td class="ok">TODO L10"随批 3 前奏"句 + 2026-10-19 两轮裁决原话在场</td></tr>
+<tr><td>评级粒度</td><td>verdict 框结构化</td><td class="ok">37 报告各章 verdict 框带评级依据与可信边界（本章沿用）</td></tr>
+<tr><td><b>用户裁决回复侧原话</b></td><td>无对应机制</td><td class="bad">仍零独立档案 → <b>R215</b>（维度⑤方法论限制的机制化根源）</td></tr>
+<tr><td>规划者验收过程记录</td><td>报告附录 B 形态（37 首创）</td><td class="ok">review-2026-10-19 附录 B 在场（红线合规/格式/亲验抽查/号段盘点四段）——已从惯例固化为可复用形态</td></tr>
+</table>
+<p>判读：R169-R175 整改族对三十七审所指结构性缺口的覆盖 = 6/7 修复到位且可审计，剩余一项（裁决回复侧）开账 R215；另 R212/R213 显示修复机制自身的首例衔接存在两处毛边——"制度从成文到全兑现"的时滞与宣称宽度的纪律问题，均 P3 级。</p>
+<h4>B2.7.2 审查体系自身：自指缓解的引导密度漂移（→ R214）</h4>
+<p>对比两轮任务书元面段：三十七审 B1/B2/C 段 = 维度名 + 极简括注（B2 六维度仅两个带括注、无预期值）；三十八审 §5/§6/§7 = 每维度携带多子句括注，内含具体提交号、档案路径、"预期"状态值（如"四份在场（…预期）""六键"）与裁决原话例句。§4.5 字面（"问题清单由执行者自主拟定，规划者不提供"）未破——维度边界与检索线索属规划者职权；但<b>预期值前置 + 例句点名</b>使执行者的拟题空间被预先收敛，"避免被审方引导"的缓解强度逐审下降一档。本章将此作为审查体系自身的漂移信号开账（R214），证据本体即派发本章的任务书——自指如实申报。</p>
+
+<h3>B2.8 开账清单（号段 R209-R218；本审未用号留空如实登记）</h3>
+<div class="ledger">
+<p><b>R209（P3·交接一致性）TODO 主写位发帖顺序与四处派生位倒挂 + 同段 moot 待决点未收口</b><br>
+可复现形态：<code>grep -n "建议顺序" docs/TODO.md docs/HANDOFF_PROMPT.md</code>——TODO:11 "建议顺序 Reddit（modmail 获准后）→ HN"（4d11208 原句）vs HANDOFF:141/:104、HANDOVER 顶部 10-23 条、HANDOVER §1 下一步行四处 "modmail → HN → Reddit[获准 + HN 评论链完整后]"；<code>git show 2695fef -- docs/HANDOFF_PROMPT.md</code> 见镜像旧序被改判 stale 并 corrected 而 TODO 未随刷；<code>grep -n "不再等" docs/TODO.md</code> 见已 moot 待决点仍在场（对照 601cc08 "decision point now moot"）。影响面：§5.4"两处不一致以 TODO 为准"使陈旧侧成形式权威——但每帖发布前单独呈批（铁律 6）+ 用户亲笔发帖构成硬闸，实际风险被用户裁决闸门兜住，故 P3 而非 P2（升级两读法在此披露）。<br>
+候选处置：随下个交接收口批一次刷齐 TODO 主写位两处（新序 + 待决点收口注记）。<br>
+<b>应修</b>：主写位刷为新序并对旧序句留一行勘误注记（"原建议 Reddit→HN 已于交接检查期更正"）；moot 待决点改记"已因 PR #68 合并消解（601cc08）"。<b>绝不能这样修</b>：反向把四处新序改回旧序迁就主写位（源材料 timing-memo 证实新序为当前意图）；也不得删句了事不留勘误注记（顺序变更史不可溯）。</p>
+
+<p><b>R210（P3·交接一致性）HANDOVER §1 CI 行 PR #68 "open 待审" 陈旧残留——2695fef 同族扫荡漏网</b><br>
+可复现形态：<code>grep -n "open 待审" docs/HANDOVER.md</code>——§1 CI 行整段"目录 PR #68 … open 待审（…维护者反馈回复逐条呈批）"与同文件 §1 下一步行"PR #68 已合并收口"、顶部 10-23 条"已收口"自相矛盾；2695fef 修复清单第 (1) 条修的是 HANDOFF 同一事实。<br>
+候选处置：随 R209 同批收口（§1 CI 行 PR #68 段改为已合并事实 + 指向观察项段）。<br>
+<b>应修</b>：CI 行该子段刷现值（merged 2026-10-22T11:07Z / verification 类目 / #79 编辑收官）。<b>绝不能这样修</b>：整段删除 PR #68 子段（该段承载 R147 处置与归因修正的历史锚，link_check 与年表引用在案）；也不得只改"open 待审"三字留下"维护者反馈回复逐条呈批"半句悬空。</p>
+
+<p><b>R211（P3·R163 执行精度）交接批提交信息的 git 区间记法与复算计数错配</b><br>
+可复现形态：<code>git rev-list --count 8660740..692c28d</code> = 12；<code>git rev-list --count 8660740~1..692c28d</code> = 13——02afe59 提交信息"13 commits (8660740..692c28d)"与"R163 pre-copy recount: 13 commits via git rev-list"按字面复算得 12；TODO/HANDOFF/HANDOVER 的箭头式（→，含端点）与 13 一致无误。<br>
+候选处置：不改历史提交信息（不回写）；在 R163 条款（§5.1 第 6 项）或 EXECUTOR_TEMPLATE 坑索引补一句记法规范："弧线区间一律写含端点式（X~1..Y 或 X→Y），git 双点区间须另核端点归属"。<br>
+<b>应修</b>：成文记法规范，此后交接叙述性计数的复现命令与宣称值逐字可对。<b>绝不能这样修</b>：把 13 改成 12 迁就双点区间（13 才是弧线真值）；也不得以此为由停用 rev-list 复算（R163 根治位不动）。</p>
+
+<p><b>R212（P3·档案完备性）decisions/ 断链——批 3 菜单引用的 remediation-menu.md 不在场</b><br>
+可复现形态：<code>grep -rn "remediation-menu" target/probes/decisions/</code> 唯一命中 = 2026-10-19-review37-batch3-menu.md:5 的引用自身；<code>find target/probes -name "*remediation*"</code> 无该档（仅 designs/tests 同名族）。后果：三十七审三批分组菜单（用户裁决"按建议执行"）的呈报充分性不可事后审计——R171 制度承诺对首例前一笔落空；"未见登记 ≠ 未发生"：该菜单可能从未以此文件名落盘（引用为期望式写法），也可能曾存在后被移除（gitignored 无史可考），两读并存。<br>
+候选处置：a) 由规划者凭记忆重建该菜单原文并标注"重建档，非当时原文"（降级保真）；b) 在批 3 菜单该行追加括注"该档未能落盘，分组内容以 bf2d9df/8b6f4f6/0df8d1b 提交信息与 TODO L10 为事实源"（如实封存）。建议 b。<br>
+<b>应修</b>：断链处加如实括注，事实源指针落地。<b>绝不能这样修</b>：静默删除引用句（掩盖断链）；或伪造当时菜单原文冒充档案（档案真实性红线）。</p>
+
+<p><b>R213（P3·宣称精度）R170"立即自应用"宣称宽于实然——首例报告附录未登记任务书路径（+ TODO 裁决段未注批 3 菜单实例路径）</b><br>
+可复现形态：<code>grep -n "task\.md" docs/reviews/review-2026-10-19.html</code> → 0 命中（附录 A 仅登记四探针目录）；bf2d9df 提交信息"both immediately self-applied: review-37 task book and batch-3 menu originals archived, executor times recorded"——三件中任务书归档 ✓ / 菜单归档 ✓ / 耗时记录（在 task.md 而非报告头，R173 处置本就"自下轮起"）△，而 R170 条款的"报告附录登记其路径"一半在首例报告上无实例（报告先于条款落盘 + 不回写纪律，不可回溯属结构性时滞，但"self-applied"措辞未作区分）。附带：§4.2"TODO 裁决段注路径"——批 3 菜单实例路径注在 HANDOFF L70-71，TODO 仅存规则文本（10-21/10-22 两档实例路径在 TODO L11 有注，标准不齐）。<br>
+候选处置：MAINTENANCE §7 2026-10-19 条目原位括注一句（R113/R138 手法）："R170 报告附录登记义务自三十八审报告起生效，首例报告因先于条款落盘未回登"。TODO 路径注记标准随下个治理批对齐（实例路径一律注主写位）。<br>
+<b>应修</b>：原位括注 + 主写位注记对齐。<b>绝不能这样修</b>：回改 review-2026-10-19.html 补登记（报告落盘即终稿，不回写纪律）；或把"self-applied"句改写历史提交信息。</p>
+
+<p><b>R214（P3·审查体系自身）自指缓解的引导密度逐审上升——任务书元面段从"维度名"漂移向"子检项 + 预期值"</b><br>
+可复现形态：对读 target/probes/review37/task.md（B1/B2/C 段：维度名 + 极简括注，仅 2 处括注、零预期值）与 target/probes/review38/task.md §5/§6/§7（每维度 2-4 子句括注，含提交号/路径/"预期"状态值/裁决原话例句）——§4.5 字面未破（问题清单仍自拟）但预期值前置使拟题空间被预先收敛；证据本体即派发本章的任务书（自指如实申报，本章亦受此限）。<br>
+候选处置：MAINTENANCE §4.5 自指缓解条增一句："元面维度段限'维度名 + 一句边界'；检索线索（提交号/路径/预期值）不得写入任务书正文，可另附'事实索引附录'供执行者取用"。随下个治理批呈裁（§6 类）。<br>
+<b>应修</b>：下轮任务书元面段降密度，线索移附录。<b>绝不能这样修</b>：以"提高效率"为由反向要求规划者预审执行者拟题清单（自指缓解倒退为前置审批）；也不得借机取消维度边界的规划者职权（双层覆盖编成本身是 §4.5 职权）。</p>
+
+<p><b>R215（P3·档案完备性）用户裁决"回复侧"原话零独立档案——R169-R175 修复后剩余的结构性缺口</b><br>
+可复现形态：decisions/ 四档全部为规划者呈批菜单原文（呈侧）；用户回复原话仅以摘句散嵌于 TODO 状态块 / commit message / MAINTENANCE §7（本章维度⑤七点互证一致，但无任何原始对话档可对——"互证一致"不构成"逐字忠实"的证明）。三十七审 B2 所指"决策论据/裁决瞬间不落盘"经 R169-R175 修复后覆盖 6/7，此为剩余项（B2.7.1 表）。<br>
+候选处置：decisions/ 落位规范增半句："重大裁决的用户回复原话（或可获得的最近似原话）随同档追加'裁决侧'节，标注采集方式"；存量不追溯。<br>
+<b>应修</b>：呈批档增"裁决侧摘录"节（原话 + 日期 + 采集方式标注）。<b>绝不能这样修</b>：以规划者转述替代原话存档（制衡失锚——本章维度⑤的方法论限制将永久化）；也不得要求用户配合产出规范化裁决文书（方向裁决权在用户，档案义务在规划者侧）。</p>
+
+<p><b>R216-R218：未用号，如实留空。</b></p>
+</div>
+
+<h3>B2.9 verdict</h3>
+<div class="verdict-bp">
+<p><b>verdict 一行式（元面·B2 审面）：A- ——§4.5 标准化在第二实例忠实运转、交接五件套六件全在场且 R163 复算主体成立、亲验纪律连续在场含两处抽查纠错实录、裁决链七点互证忠实；P1/P2 零在场，P3 七笔集中三族（交接扫荡覆盖缺口 R209/R210、档案完备性 R212/R213/R215、精度与机制张力 R211/R214），机制性含量使 A 不上探。</b></p>
+<p><b>评级依据</b>：①<b>§4.5 运转</b>——三十八审任务书六件逐条合规 + 档案落位/耗时行落地；标准化与首例的两处非逐字差异如实登记不构成违制。②<b>交接质量</b>——五件套在场齐全、doc_audit 73/73 本执行者亲跑复现、13 笔/13-run/3 条顶部条/收敛计数四组叙述性数字复算全对；但连续两轮自捕残留后仍有两处同族漏网（主写位 + HANDOVER §1），交接扫荡的覆盖面系统性弱于其自检宣称。③<b>模式运转</b>——门禁亲跑痕迹 24/24 批连续、规划者亲验六例在场、§3.3 四笔偏差零复发、两笔新微偏差被验收拦截（验收环节实际起作用）；[F2-L1] 报备形态两读并存已披露。④<b>呈报制衡</b>——裁决登记七点忠实含推翻显式化与判读自标待纠偏两处良好实践；剩余缺口在档案侧（回复侧原话）而非登记侧。⑤两读法披露：R209 若按"在途 L0 动作项 + §5.4 形式权威指向陈旧侧"的严读可升 P2（则本章 B+）——因每帖单独呈批 + 用户亲笔双闸兜底，本审取 P3，两读并呈供拼接评级参考。⑥历史评级不外推，本 verdict 仅对本章查证面与时点成立。</p>
+<p><b>可信边界</b>：①本章由被审规划者派出的执行者作成（B2.1 自指披露），独立性上限 = 规划者划定的维度边界与两级红线；②用户裁决原话无原始档案（R215），维度⑤结论 = 登记位互证层面；③CI 远端与线上状态离线未验（归 A/C 面）；④33 vs 32 收敛计数、[F2-L1] 报备行标准两读等跨面事项已按分工标注主责 B1，本章只记痕迹不越界裁断；⑤"未见登记"≠"未发生"全程适用（R212 断链的两读即此边界的实例）。</p>
+</div>
+
+<p class="small"><b>署名</b>：三十八审执行者 B2（元面·内部治理二）。<b>耗时估计：约 75-85 分钟</b>（主观估计：读档与条文对读约 40 分钟、git/grep/rev-list 取证约 20 分钟、复算与开账撰写约 20 分钟）。<b>主要探针目录</b>：<code>target/probes/review38/B2/</code>（audit_trail.md——全部取证命令与输出、11 节）。<b>红线遵守自述</b>：全程本地 git 只读（status/log/show/rev-list）；仓库既有文件零修改；唯一写盘 = target/probes/review38/B2/（探针）与 target/probes/review38/section_B2.html（本章节）；未运行 cargo；未发起任何网络请求；构造性验证未涉及临时文件（无此形态需求）。<b>终态 git status 披露</b>：见最终回复（本执行者终态 <code>git status</code> 输出 = 干净工作树、探针目录在 .gitignore 覆盖内不显示）。</p>
+
+<h2>C. 执行者 C — 元面·对外面：发帖启动链 + 目录/铺底现状 + 竞合时效 + 对外门面数字时效</h2>
+
+<div class="meta">
+<p><b>拟题权声明</b>：本章节七个维度内的问题清单由执行者 C 依据任务书 §7 维度定义自主拟定（任务书明示"维度内问题清单自主拟定"），不由规划者提供。审查者由被审规划者派出（自指边界如实标注）——缓解：本章节内容规划者零编辑权（机械拼接），拟题与结论独立完成；不能消除的根本边界：维度划分与两级红线由规划者划定，独立性以此为上限。</p>
+<p><b>红线执行披露</b>：一级（零对外交互）——本章节全部联网动作均为浏览器式只读 GET（GitHub REST API 只读端点 pulls/issues/commits/releases/files、agentlanguages.dev 页面直读、news.ycombinator.com 服务端抓取、lom-lang.github.io 资产直读），零写语义请求、零账号语义动作、零项目内容外发（发帖材料 target/probes/outreach/ 与 prelaunch/ 全程仅本地读取审阅，未向任何外部服务发送任何字符——含 HN/Reddit 版规复核亦仅只读抓取，未登录未发帖）。二级——本地 git 严格只读（仅 status/log/show/diff/ls-tree 类）；仓库既有文件零修改；探针与章节片段只落 target/probes/review38/C/ 与 section_C.html；未运行任何 cargo 命令（python 纯工具 + 只读 lom.exe 边界遵守，本面实际未用到 lom.exe）。终态 git status 干净披露见 C.9。</p>
+</div>
+
+<h3>C.1 维度① — 发帖启动链（提交 4d11208 + 用户裁决 2026-10-22"启动发帖，具体操作由我做"）</h3>
+
+<h4>C.1.1 登记与裁决一致性</h4>
+<p><b>核对面</b>：git show 4d11208（TODO 菜单① + HANDOFF_PROMPT 镜像同步）与裁决原话、三件套实物、提交信息宣称五项（rules-check 版规 / ammo 三处刷新+四卖点 / comment-drill 28 条 / 规划者抽查三条款 / modmail 硬门槛）。</p>
+<table>
+<tr><th>核对项</th><th>登记面（4d11208）</th><th>实物/证据</th><th>判定</th></tr>
+<tr><td>裁决忠实</td><td>"已启动——2026-10-22 用户裁决'启动发帖，具体操作由我做'：用户亲笔两帖 + 规划者指引支撑"</td><td>任务书引用裁决同文；菜单①由"押后等触发"改"已启动"状态迁移完整（diff 在案）</td><td class="ok">一致</td></tr>
+<tr><td>硬门槛登记</td><td>"Reddit r/PL 未获 modmail 明确许可不发"</td><td>rules-check §2.5 建议 + §2.6 模板 + 菜单登记三处在场</td><td class="ok">一致</td></tr>
+<tr><td>呈批铁律</td><td>"每帖发布前单独呈批（铁律 6）"</td><td>timing-memo 呈批流程节 + 菜单双写</td><td class="ok">一致</td></tr>
+<tr><td>顺序建议</td><td>提交信息与菜单："建议顺序 Reddit（modmail 获准后）→ HN"</td><td><b>timing-memo.md 未随启动刷新，仍写"Show HN 先发……r/PL 帖隔 1-2 天"（相反建议）</b>——见 R221</td><td class="warn">材料内部矛盾</td></tr>
+<tr><td>三件套宣称</td><td>prelaunch/ 三件 + raw/ 十七件</td><td>ls 实证在场（rules-check 18KB / ammo 11KB / comment-drill 20KB / raw 17 文件）</td><td class="ok">在场</td></tr>
+<tr><td>28 条预演宣称</td><td>"28 predicted hostile comments across 11 themes"</td><td>comment-drill #1-#28 连续编号 × T1-T11 主题，grep 实证 28 条整、11 主题整、[DNR] 标记 3 处在场</td><td class="ok">一致</td></tr>
+<tr><td>规划者抽查宣称</td><td>"Planner spot-verified three key clauses against raw evidence"</td><td>raw/ 证据文件在场（pullpush 两公告 JSON、hn-fragments、pr68-comments）——抽查痕迹本身无独立落盘（"未见登记"与"未发生"边界如实标注：抽查结论以 rules-check §0 查证记录表为载体间接在案）</td><td class="warn">载体间接</td></tr>
+</table>
+<p><b>档案完备性边界如实标注</b>：任务书称"两帖底稿 v2"——实际档案 show-hn.md / reddit-rpl.md 文件头均为"（v1）"（2026-10-15 起草，此后未改，grep "v2" 零命中）；两帖无 v2 版本。结合菜单①"用户已裁发帖前临时重写/大改（不维持预写稿）"，v1 底稿实为待重写素材——本审按 v1 原样审其数字时效（任务书措辞与档案形态的出入如实登记，不构成问题账）。</p>
+
+<h4>C.1.2 三件套数字时效（2026-10-27 时点复核）</h4>
+<p>ammo.md（2026-10-22 生成，现值基线 v1.14.0）对照表逐项行式复核：</p>
+<table>
+<tr><th>项</th><th>ammo 登记现值（10-22）</th><th>10-27 复核</th><th>判定</th></tr>
+<tr><td>版本</td><td>v1.14.0</td><td>Cargo.toml = 1.14.0；两 tag 后无新版本</td><td class="ok">一致</td></tr>
+<tr><td>Rust 测试</td><td>593 unit + 40 integration</td><td>README evidence 行 / Verify claims 五命令同值（HANDOVER §2.2 期望同）</td><td class="ok">一致</td></tr>
+<tr><td>eval</td><td>129 双后端</td><td>eval/README L13/14 "129/129 expected" 同值</td><td class="ok">一致</td></tr>
+<tr><td>quine / verify_selfcomp</td><td>272,925 / 368/368 / 14/14</td><td>构造性不变（任务书 §0 期望同）</td><td class="ok">一致</td></tr>
+<tr><td>codes / self_comp 行数</td><td>46 / 12,671</td><td>wc -l 实测 12671；codes --json total 46（ammo 五命令）</td><td class="ok">一致</td></tr>
+<tr><td><b>审查轮数</b></td><td>"37 rounds（三十七审 2026-10-19）"</td><td><b>三十八审在途——收官后应为 38</b>（临期，见 R224 联动面）</td><td class="warn">临期</td></tr>
+<tr><td>参考消费器</td><td>~80-line（81 行实测）</td><td>wc -l = 81</td><td class="ok">一致</td></tr>
+<tr><td>pass@1 限定语要求</td><td>"两帖均改为 on the then-full 128-task suite"</td><td>底稿 v1 尚未改（见 C.1.3）——ammo 自身要求正确</td><td class="ok">口径正确</td></tr>
+</table>
+<p>comment-drill 数字抽查（#2/#19/#27）："then-full 128-task set" / "368-case verifier, 46-code registry, 129-task benchmark" / "Fourteen releases since, zero surface changes"——全部现值一致（v1.14.0 为第 14 个 minor+ 版本线节点，Release log 逐版 zero-surface-change 标注在场）。#21 证据指针"README.md 37-review-rounds 边界句"当前有效（README L75 现值 37）。</p>
+
+<h4>C.1.3 两帖底稿数字时效逐处 + 发帖前刷新清单（敌手化）</h4>
+<p><b>敌手化判读</b>：若底稿数字原样进入正式帖，第三方按下表"证伪路径"当场证伪。</p>
+<table>
+<tr><th>#</th><th>底稿写位</th><th>底稿值（v1.12.1 时点）</th><th>现值（v1.14.0）</th><th>第三方证伪路径</th></tr>
+<tr><td>1</td><td>show-hn.md 正文 "98.3%/98.5% pass@1 on the full suite"</td><td>full suite（无限定）</td><td>测量时点 = then-full 128-task set；README evidence 行同款限定语在场</td><td>报告文件名即 REPORT-2026-10-07-<b>passk-128</b>.md——"full suite"（129）与报告标题（128）当场矛盾</td></tr>
+<tr><td>2</td><td>reddit-rpl.md 正文 "98.3%/98.5% pass@1 on the 129-task suite"</td><td>129-task suite</td><td>同上须加 then-full 128 限定</td><td>同上</td></tr>
+<tr><td>3</td><td>reddit-rpl.md "in-system adversarial review (36 rounds)"</td><td>36</td><td><b>37</b>（三十七审后）；<b>三十八审收官后 38</b></td><td>README L75 现值 37——帖与仓库门面当场矛盾</td></tr>
+<tr><td>4</td><td>reddit-rpl.md "~90-line stdlib-only consumer"</td><td>~90</td><td>81 行（wc -l 实测）</td><td>specs/acri/consumer.py 逐行可数——90 vs 81 当场证伪</td></tr>
+<tr><td>5</td><td>show-hn.md Q&amp;A "~1.4s for a 800-deep lookup microbench"</td><td>~1.4s</td><td>不在 README 五命令/eval/README 任一可验证面（bench 需 tools/bench.py 手跑）</td><td>comment-drill 总则"任何帖内数字都能在五命令或 eval/README 找到对应"——该数字零对应（R225）</td></tr>
+<tr><td>6</td><td>两帖正文版本号</td><td>零版本号（好形态）</td><td>—</td><td>无证伪面；分享链接/--trace/自举演示按钮三卖点未入稿（增量机会，ammo §2 已备弹药，用户裁重写时取用）</td></tr>
+</table>
+<p><b>发帖前刷新清单（C 面整理版，供发帖批取用）</b>：①两帖 pass@1 加 "then-full 128-task suite" 限定（ammo §1 已列）；②reddit 底稿 36→38（三十八审收官后；若发帖早于收官则 37）；③~90-line→~80-line；④~1.4s 删除或改为"复现资产在树（tools/bench.py）"口径；⑤重写时纳入三卖点句（share links / --trace / in-browser quine demo，ammo §2 英文要点已备）；⑥发帖当天 ammo §5 数字纪律全跑（doc_audit 73/73 + README Current = 当日最新版）。清单与 ammo §1 刷数小结兼容（其三处硬刷为本清单 ①③+36→37；C 面新增 ④⑤ 与 37→38 临期差）。</p>
+
+<h4>C.1.4 两硬风险条款版规现状复核（只读，未登录未发帖）</h4>
+<table>
+<tr><th>条款</th><th>登记原文（rules-check 2026-10-22）</th><th>2026-10-27 只读复核</th><th>判定</th></tr>
+<tr><td>HN 提交侧 AI 文本禁令</td><td>"Please don't put generated text in HN posts. Write your text yourself—HN is for sharing between humans..."</td><td>newsguidelines.html 现行原文逐字在场（服务端抓取，探针 hn-fragments-2026-10-27.md）</td><td class="ok">仍有效</td></tr>
+<tr><td>HN 评论侧 AI 文本禁令</td><td>"Don't post generated text or AI-edited text. HN is for conversation between humans."</td><td>同页现行原文逐字在场</td><td class="ok">仍有效</td></tr>
+<tr><td>HN showhn.html 十三段引句</td><td>rules-check §1.1 全引</td><td>全部逐字在场；唯一差异 = "which you're around to discuss" 句末新增官方引用句 "See these tips about how to present your work."（不触红线，H1-H8 判读全部维持）</td><td class="ok">维持（微增无碍）</td></tr>
+<tr><td>Reddit r/PL 版规页</td><td>不可达（网络拦截+登录墙），"发帖前用户须亲读现行 /about/rules"</td><td>curl http=000；服务端抓取仍为拦截页 "You've been blocked by network security"——与 10-22 同形态</td><td class="warn">仍不可达——用户亲读条款仍必要且不可替代</td></tr>
+</table>
+<p>Reddit 侧两条依据公告（永封公告 1pf9j6c 2025-12 / AutoMod 公告 1sd66w9 2026-04）为存档时点一手证据，本批未重取（版规页不可达下无更新核对通道，如实登记）；modmail 硬门槛的保守判读不受影响。</p>
+
+<h3>C.2 维度② — 三十七审发帖前置建议五笔收口实查（R179/R180/R182/R183/R185，批 1 8b6f4f6 宣称收口）+ 两版后门面锚外漂移</h3>
+
+<h4>C.2.1 五笔现场 grep 实证（逐笔行式）</h4>
+<table>
+<tr><th>账</th><th>8b6f4f6 宣称整改</th><th>2026-10-27 现场实证（grep 逐笔）</th><th>判定</th></tr>
+<tr><td>R179 README.md 三处</td><td>evidence 行 573+37→581+40；Current v1.12.0→v1.12.1（双 Current 消解）；28→37 rounds</td><td>L22 evidence 行现值 593+40（v1.14.0 批续刷，链路连续）；L73 Current = v1.14.0（单 Current，无自相矛盾）；L75 = "The 37 review rounds"（三十八审前现值）</td><td class="ok">收口成立且两版续刷无复发</td></tr>
+<tr><td>R180 README.zh-CN 四处</td><td>128 时点限定、578→581、v1.10.1→v1.12.1、35→37 rounds</td><td>L12 "全 128 任务集（…2026-10-07 测量时点；现集 129 题）"限定在场；L13 12,671/272,925 现值；L53 版本指针化（"以英文 README Release log 为准——本文件不复写版本号——R159 指针化"）；L55 轮数指针化（"轮数以英文 README 状态段为准——本文件不复写"）——v1.13.0 批进一步把版本号全指针化（README x2 pointerized, no digits），zh-CN 现零数字写位</td><td class="ok">收口成立且根治（三犯止于 R159 指针化）</td></tr>
+<tr><td>R182 eval/README 三处</td><td>复跑注释 129/128 &amp; 128/128→129/129；31→32 tasks</td><td>L13/14 = "129/129 expected"（native + wasm 两行）；L87 = "32 tasks"；L24 "129 tasks; 32 repair"同值</td><td class="ok">收口成立无复发</td></tr>
+<tr><td>R183 ACRI §3</td><td>task counts → 129/32 + then-full 128 限定</td><td>acri-v0.1.md L158 "129 tasks, 32 repair tasks"；L160 "then-full 128-task set, 2026-10-07; the suite has since grown to 129"</td><td class="ok">收口成立无复发</td></tr>
+<tr><td>R185 Citing 旧 handle</td><td>wyty. → wytyKen（Zenodo DOI 前必改）</td><td>eval/README L212 "wytyKen (2026)"；全文件 grep "wyty." 零残留</td><td class="ok">收口成立无复发</td></tr>
+</table>
+
+<h4>C.2.2 两版后（v1.13.0/v1.14.0）对外门面锚外漂移扫查（doc_audit 73 锚位之外写面）</h4>
+<p>扫查面五文件 + 检查方式：当前值逐处对照（版本/计数/轮数/评测数四类高 churn 数字）。</p>
+<table>
+<tr><th>文件</th><th>扫查结果</th><th>判定</th></tr>
+<tr><td>README.md</td><td>Current v1.14.0 ✓；evidence 593+40 ✓；五命令 593/368/14-14/272925/129/46 ✓；Release log v1.13.0/v1.14.0 段 ✓；L163 RepairLoopBench 129+128 限定 ✓——零数字漂移。<b>唯 L3-L7 开头双定义句并存</b>（"an AI-native programming language"+"LLM-coding-native first, workloads later" 与 "designed around the LLM repair loop..."两句 "**Lom (Language of Machine)** —" 重复起头）——git 考古 = de4f77e 门面批（2026-10-04）一次性写入，非两版新漂移，系存量门面形态问题 23 天未被任何审查开账（R220）</td><td class="warn">数字零漂移；形态一笔（R220）</td></tr>
+<tr><td>README.zh-CN.md</td><td>零数字写位（v1.13.0 批全指针化）——结构性无漂移面</td><td class="ok">无漂移</td></tr>
+<tr><td>eval/README.md</td><td>129/32/双后端 129/129 全现值——无漂移</td><td class="ok">无漂移</td></tr>
+<tr><td>specs/acri/acri-v0.1.md</td><td>129/32 + then-full 128 限定——无漂移</td><td class="ok">无漂移</td></tr>
+<tr><td>docs/positioning.html</td><td>L30 数字口径段已刷 v1.14.0（10-21，含 v1.13.0 段）✓；L60 129 任务带时点分层 ✓；L61 doc_audit 73 ✓。<b>唯 §6 状态段（L81）漏刷实锤："仓库版本 v1.12.1（tag bdfd187）…外部目录 PR 待审"</b>——版本号落后两版（现值 v1.14.0/b07c6d1），目录状态落后一个已决事件（#68 已合并+#79 收官+线上 verification 收录，10-22）。git diff 8b6f4f6..b07c6d1 证实两版批只刷 L30 一行、§6 未动（R219）</td><td class="bad">两处陈旧（R219）</td></tr>
+</table>
+<p><b>轮数临期联动面</b>（非当前错误、预登记防漏刷）：README L75 "37 review rounds" / positioning L61 "三十七轮体系内审查" / ammo §1 "37 rounds" / reddit 底稿（重写时）——三十八审收官批须四处同刷 38（R224）。positioning 竞品段（§5 Vera/Zero/MoonBit 描述）经维度⑤竞合实查交叉验证仍准确（1.0 在途/停滞不改变能力描述）。</p>
+
+<h3>C.3 维度③ — 目录 PR #68 合并后处置：线上现状 + #79 终态 + 目录仓新事件</h3>
+<table>
+<tr><th>核对项</th><th>实查（2026-10-27，API/页面只读）</th><th>判定</th></tr>
+<tr><td>线上 Lom 条目形态</td><td>agentlanguages.dev/languages/lom.md http 200：Camp <b>Verification</b> ✓；Author "wytyKen (with LLM co-authorship throughout)" ✓；Key idea/thesis/code-sample（NAM003 real session 带 CommonMark &lt;!-- --&gt; 修复形态）/Maturity/Agent tooling/Design DNA（Zero/Vera/Valea/X07 四 crossref）——与 #68+#79 定稿形态逐项一致</td><td class="ok">收录稳定</td></tr>
+<tr><td>verification 类目</td><td>llms.txt：48 projects、Verification camp <b>21</b>（三大类目之首，syntactic/orchestration 外第一大阵营）</td><td class="ok">类目在场且为第一大类</td></tr>
+<tr><td>条目数字时效</td><td>Maturity 段 "368 self-compilation cases, a 14-case three-layer bootstrap check, <b>621 Rust tests</b>"——621 = v1.13.0 时点（581+40）；v1.14.0 落地（2026-10-21T17:41:50Z，b07c6d1 提交 2026-10-22T01:41:50+08:00）后现值 <b>633</b>（593+40）。时序：v1.14.0 落地 → <b>约 17.5 小时后</b> #79 编辑性收官（87db8203，2026-10-22T11:07:38Z）未刷 621 → #79 后条目零提交（commits?path=src/content/languages/lom.md 全史四笔止于 87db8203）——<b>条目定稿时点数字即落后一版</b>（R222）</td><td class="warn">快照数字过期（R222）</td></tr>
+<tr><td>#68 / #79 终态</td><td>API：PR#68 closed/merged（updated 10-22T11:10:59Z）；PR#79 closed/merged（11:07:51Z）——与登记（11:07Z 合并）零偏差</td><td class="ok">终态一致</td></tr>
+<tr><td>目录仓新事件（涉 Lom）</td><td>pulls+issues 按 updated 排序前 15：#80 Jacquard（open）、#81 dependabot（open）等——<b>零涉 Lom 新 PR/issue/commit</b>；open issues 2 = #80/#81 均非 Lom；仓最后 push 2026-10-26T12:42:47Z（目录仍活跃维护）</td><td class="ok">无新事件（未见登记=未见事件，非未发生——以本批访问时点为界）</td></tr>
+<tr><td>outreach README 登记联动</td><td>使用前检查 §2 "条目数字 621 与归因已随 #79 定稿"——621 已于 10-21 过期，该登记句作为发帖日对照基线需留意（发帖材料零引用 621 即无传染面；ammo §4 链接清单只引条目 URL 不引数字，合规）</td><td class="warn">并入 R222 处置</td></tr>
+</table>
+
+<h3>C.4 维度④ — awesome-wasm-langs PR #186 实查</h3>
+<table>
+<tr><th>项</th><th>实查（2026-10-27）</th><th>与登记（692c28d）对照</th></tr>
+<tr><td>状态</td><td><b>open</b>（未合并未关闭）；created/updated 均 2026-10-23T13:03:48Z——提交后 4 天零更新</td><td>登记 "open 待审" ✓ 零偏差</td></tr>
+<tr><td>mergeable</td><td>mergeable_state: <b>clean</b></td><td>登记 "mergeable clean" ✓</td></tr>
+<tr><td>评论</td><td>comments 0 / review_comments 0</td><td>无评论（登记未涉评论）✓</td></tr>
+<tr><td>head/diff</td><td>lom-lang:add-lom @ bd5e42e；+7/-0 1 file</td><td>登记 head/diff 逐项 ✓</td></tr>
+<tr><td>上游活动节奏</td><td>仓 4452 星（登记 4.4k ✓）；<b>pushed_at 2026-05-22T10:32:53Z——主仓 5 个月零推送</b>；open PR 21 积压（最老 #179 挂自 6 月）；PR#187（Add Omega，10-27）当日 closed 未合并——查评论系<b>提交者自愿撤回</b>（"Closing this myself for now, sorry for the noise"，Omega 自家 wasm gate 红）——非维护者拒绝信号</td><td>登记"上游维护慢积压在案"方向 ✓；本批补精确基线：合并窗口深度冻结（5 个月零合并），#186 长期挂起为大概率预期（R227 观察补充）</td></tr>
+</table>
+<p>判读："不催不问"等待姿态（PR #68 同款先例）与上游节奏事实兼容——无任何 Lom 侧行动需求。</p>
+
+<h3>C.5 维度⑤ — 竞合时效（MoonBit / Zero / Vera）</h3>
+<table>
+<tr><th>对象</th><th>跟踪源基线</th><th>2026-10-27 实查现值</th><th>判定</th></tr>
+<tr><td>MoonBit</td><td>moonbitlang/moonbit-compiler release 页；基线 v0.10.16（2026-10-19 发布）</td><td>最新 release <b>v0.10.17+d971670cd（2026-10-23T10:11:02Z）</b>（10-22 另有 v0.10.17+093cb8f9c 同版本号双 build）；仓 709 星（10-16 登记 706）；<b>1.0 仍未发布</b>——事件触发条件未触发</td><td class="ok">"1.0 未发布"判定维持；TODO 观察项行时点值"现值 v0.10.16"已滞后两 build（R223 顺刷）</td></tr>
+<tr><td>Zero</td><td>vercel-labs/zerolang；基线 = 三十七审时点停滞 34 天（按 2026-10-19 计，末次活动 2026-09-16）</td><td>pushed_at 2026-09-16T20:39:31Z 未变——<b>停滞 41 天</b>（按 2026-10-27 计）；5390 星；未 archived</td><td class="ok">停滞延续且加深；竞合登记"停滞"判定零失真</td></tr>
+<tr><td>Vera</td><td>aallan/vera；无正式基线——首登现值</td><td><b>420 星；pushed_at 2026-10-26T04:12:51Z（前一日仍在推送——活跃）；created 2026-02-22</b>；未 archived。positioning §5 "Vera：Z3 形式化契约验证"描述仍准确。生态位注记：Vera 作者 = 目录维护者 aallan 同人（Lom 条目经其手收录与编辑——目录侧对 Vera 的同类收录为近距离参照系）</td><td class="ok">首登基线建立；描述零失真</td></tr>
+</table>
+
+<h3>C.6 维度⑥ — gh-pages 线上门面（版本一致性，轻量）</h3>
+<table>
+<tr><th>项</th><th>实查（2026-10-27）</th><th>判定</th></tr>
+<tr><td>线上 playground 活体</td><td>https://lom-lang.github.io/lom/playground/ http 200；页面含 Self-hosting demo 区块与分享链接资产</td><td class="ok">活体</td></tr>
+<tr><td>引擎版本三一致性</td><td>线上 playground/lom.wasm（1,730,747 B）sha256 = 0aefa7eb…46bc4b；本地 git show origin/gh-pages:playground/lom.wasm sha256 = <b>同值逐字节一致</b>；gh-pages 头 = 7af30ef（2026-10-21，"deploy: playground v1.13.0 … version string 1.13.0"）；wasm 内嵌版本串 grep = <b>1.13.0</b></td><td class="ok">线上 = v1.13.0，与登记部署 7af30ef 一致</td></tr>
+<tr><td>主仓 vs 线上版本差</td><td>主仓 Current v1.14.0（触 src/ 的 --trace 批）未部署 gh-pages——gh-pages 部署为独立用户裁决步骤（登记在案），v1.14.0 批零部署申请登记 = 预期状态非漏部署；playground 页面无引擎版本号展示位（页面 grep 仅 "1.8.0" 出现于 L2 promoted 注记），访客无版本差暴露面；v1.14.0 为 trace 面（playground 无消费）</td><td class="ok">一致（落后一版为已登记的裁决状态）</td></tr>
+</table>
+
+<h3>C.7 维度⑦ — 对外面自主扩展（C 自拟三题）</h3>
+<p><b>⑦-a 发帖在途状态的档案完备性</b>：菜单①"已启动"（10-22）至本审（10-27）五天，仓库内零"发帖进展"登记面（无发帖日期、无 modmail 已发/未发记录——此为用户亲笔操作面，规划者侧本就无登记义务；如实标注为"档案外环节"而非缺陷：与三十七审 B2"档案外环节不可事后审计"结构性缺口同型，发帖链的用户侧动作天然零落盘）。C 面结论：登记面（启动+硬门槛+呈批待命）完备，动作面以外部世界为准（HN/Reddit 均无可查的 Lom 帖——本批未做全站搜索，如实标注不可验证边界）。</p>
+<p><b>⑦-b awesome 等待预期的基线校准</b>（详 C.4）：登记"上游维护慢积压在案"成立但未含量化基线；本批补：主仓 5 个月零推送 + 21 open PR + #187 自愿撤回先例——#186 的合理预期 = 长期挂起（月级），等待成本为零、无动作需求；若发帖后流量到来，可考虑在帖中不引用该清单（避免读者点进未收录状态）。此项并入 R227。</p>
+<p><b>⑦-c 目录生态位与发帖弹药联动时效</b>：llms.txt 现值 48 projects / verification 21——ammo §3 目录事实句 "indexed in the agentlanguages.dev catalogue under the verification camp" 仍准确（无需改动）；aallan 引语两条（弹药 §3 句二）在 raw/pr68-comments.json 在档且条目页未变——弹药时效面零漂移。Vera 条目与 Lom 同 camp 且维护者同人——若发帖后评论区出现 "Vera already does X" 类比较，comment-drill T10/T11 已有口径（DNR 边界外），无新增弹药需求。</p>
+
+<h3>C.8 开账清单（号段 R219-R228）</h3>
+<div class="ledger">
+<table>
+<tr><th>号</th><th>标题 / P 级</th><th>可复现形态</th><th>候选处置</th><th>应修 + 绝不能这样修</th></tr>
+<tr><td>R219</td><td>positioning.html §6 状态段两处陈旧（P3·对外门面陈旧复发）</td><td>grep -n "仓库版本 v1.12.1\|外部目录 PR 待审" docs/positioning.html（L81）；git diff 8b6f4f6..b07c6d1 -- docs/positioning.html（仅 L30 变、§6 未动）</td><td>三十八审收官批顺刷 §6（v1.14.0/b07c6d1 + 目录已收录 verification）；positioning §6 状态句纳入里程碑批刷新清单或指针化</td><td>应修=随下一文档批两处同刷；绝不能这样修=只刷版本号不刷目录状态（半刷即新矛盾），或将 §6 指向 L30 口径段（同页快照互引=循环）</td></tr>
+<tr><td>R220</td><td>README.md 开头双定义句并存（P3·门面形态）</td><td>head -8 README.md（两句 "**Lom (Language of Machine)** —" 重复起头，"AI-native programming language"+"LLM-coding-native first" 与 "designed around the LLM repair loop" 双定位）；git show de4f77e:README.md | head -8（2026-10-04 门面批写入）</td><td>门面批级修改（对外第一屏）：合并为单定义句，保留 repair loop 中心句（正文/evidence 全按其组织）</td><td>应修=删一句或融合；绝不能这样修=再加第三句"调和"或拆两段加小标题（违背门面 30 秒阅读纪律）；属门面改写须用户呈批（铁律 6），本审仅开账</td></tr>
+<tr><td>R221</td><td>发帖材料内部顺序建议矛盾 + timing-memo 未随启动刷新（P3·发帖材料时效）</td><td>grep -n "Show HN 先发" target/probes/outreach/timing-memo.md（L18 区） vs docs/TODO.md 菜单①"建议顺序 Reddit（modmail 获准后）→ HN"</td><td>发帖批启动时 timing-memo 顺刷（顺序行改 Reddit→HN 或标注以菜单为准）；ammo §5 补"审查轮数随最新审查收官批 +1"一行</td><td>应修=材料面顺刷对齐菜单；绝不能这样修=以材料未刷新为由推迟发帖（用户已裁启动）或反向改菜单迁就旧材料（登记已含 modmail 逻辑，菜单为正确方向）</td></tr>
+<tr><td>R222</td><td>线上目录条目 "621 Rust tests" 过期（P3·第三方快照数字）</td><td>https://agentlanguages.dev/languages/lom.md Maturity 段（2026-10-27 实取，探针 agentlangs-lom-2026-10-27.md）；git show -s --format=%cI b07c6d1（2026-10-22T01:41:50+08:00）；README.md L24 "593 unit + 40 integration"=633</td><td>观察项：不催不改（第三方资产）；发帖前刷新清单禁引 621（材料现状已合规）；可选=下次与维护者互动窗口顺带提刷新 PR</td><td>应修=发帖/评论零引用 621；绝不能这样修=发帖时用条目快照数字对冲 README 现值（两处不同源），或未经呈批主动开目录仓 PR（对外动作铁律 6）</td></tr>
+<tr><td>R223</td><td>TODO 观察项 MoonBit 时点值滞后（P3·观察项时点值）</td><td>api moonbitlang/moonbit-compiler/releases（top1 = v0.10.17+d971670cd，2026-10-23；探针 gh-moonbit-releases.json） vs TODO 观察项行"现值 v0.10.16"</td><td>三十八审收官批顺刷"现值 v0.10.17"（或改"现值以 release 页为准"指针化）；"1.0 未发布"判定维持</td><td>应修=顺刷时点值；绝不能这样修=为追版本号设周期复查日程（R187 已裁事件触发、不设日程——1.0 发布才是触发器，中间 build 不触发任何动作）</td></tr>
+<tr><td>R224</td><td>审查轮数四处联动刷新面预登记（P3·防漏刷预登记）</td><td>grep 三处：README.md L75 "37 review rounds" / docs/positioning.html L61 "三十七轮" / target/probes/outreach/prelaunch/ammo.md §1 "37 rounds" + reddit 底稿重写位</td><td>三十八审收官批四处同刷 38（+1 关联：positioning L61 doc_audit 73 不变无需动）</td><td>应修=收官批四处一处不落；绝不能这样修=只刷 README 一处（跨文件漏刷 = 三十七审 R179/R184 复发机制——本账为预登记，收官批执行清单）</td></tr>
+<tr><td>R225</td><td>底稿 ~1.4s 数字零可验证锚（P3·底稿可验证性缺口）</td><td>grep "~1.4" target/probes/outreach/show-hn.md L57（Q&amp;A 段） vs README.md/eval/README.md grep 零命中（五命令与基准卡均无该数字）</td><td>重写时删该数字，或改"复现资产在树（tools/bench.py + examples/bench.lom）"口径（comment-drill 总则合规化）</td><td>应修=帖内数字全部可由五命令/eval/README 复现；绝不能这样修=保留数字外加括号说明（HN 帖形态无脚注位；弹药预检已注明 ~1.4s 是对实测 ~1.0-1.4s 的保守上界——方向为低报，无夸大风险，仅缺复现锚）</td></tr>
+<tr><td>R226</td><td>竞合时效顺刷观察（P4·观察）</td><td>gh-zero-repo.json（pushed 2026-09-16，停滞 41 天）；gh-vera-repo.json（pushed 2026-10-26，活跃 420 星）——探针在案</td><td>无动作；竞合登记"Zero 停滞"判定维持，时点天数随下次外部观察顺刷；Vera 首登基线（420 星/活跃/2026-02 创建）入档</td><td>应修=无（观察项）；绝不能这样修=据停滞推断 Zero 弃坑写入对外材料（停滞 ≠ 停更声明，positioning 描述保持能力口径）</td></tr>
+<tr><td>R227</td><td>awesome 等待预期基线补充（P4·观察）</td><td>gh-awl-repo.json（pushed_at 2026-05-22，5 个月零推送）；gh-awl-prs.json（21 open）；gh-pr187-comments.json（提交者自愿撤回）</td><td>无动作；#186 长期挂起为大概率预期（月级），"不催不问"维持；发帖材料不引用该清单收录状态</td><td>应修=无（观察项）；绝不能这样修=向上游 ping/催审（违反登记的等待姿态）或因挂起撤回 PR（零成本资产无撤回理由）</td></tr>
+<tr><td>R228</td><td>（空号如实登记——本审对外面无第五笔 P3 以上新发现）</td><td>—</td><td>—</td><td>—</td></tr>
+</table>
+<p class="small">开账纪律说明：R219/R223 为"陈旧复发/时点值"族（三十七审 R179/R180/R182/R183 同型——本批证实五笔收口后同族在两版内新生两处，均在 doc_audit 73 锚外写位，写位准入 §2.3 体系的覆盖边界再获实证）；R220 为存量形态首账；R221/R225 为发帖材料时效（发帖批取用）；R224 为预登记防漏刷；R222 为第三方快照（Lom 侧零写权）；R226/R227 为 P4 观察。历史裁决零重开；"未见登记"与"未发生"严格区分（C.3/C.7 已标注）。</p>
+</div>
+
+<h3>C.9 verdict 与署名</h3>
+<div class="verdict-bp">
+<p><b>verdict：A-</b>（一行式：登记与外部实查零偏差——#68/#79/#186 三终态、gh-pages 版本三一致性、竞合三判定全部核实；发帖启动链登记忠实、三件套质量实证成立、两硬风险条款 2026-10-27 复核仍逐字有效；开账 9 号位 7 笔 P3 + 2 笔 P4，零 P1/P2，两版后门面漂移仅 positioning §6 一处实锤）</p>
+<p><b>评级依据</b>：① 宣称-现实零偏差面：对外动作登记五项（发帖启动/目录/#79/awesome/gh-pages）与 API/页面实查逐项一致，无过度宣称；② 五笔收口（R179/R180/R182/R183/R185）全部实证成立且零复发——R159/R160 指针化根治效果经受两版考验；③ 时效失真仅时点值级（MoonBit v0.10.16→17、目录条目 621、positioning §6 两处），无判定级失真（"1.0 未发布/Zero 停滞/verification 收录"三大判定全准）；④ 发帖材料敌手化审查结论：底稿 4 处数字若原样发出可被第三方当场证伪（证伪路径逐条在案），但用户已裁"发帖前临时重写"且弹药包刷新纪律完备——风险已被流程覆盖，开账为清单化而非拦截性。扣分项：positioning §6 两版漏刷（R219）与 README 双定义句（R220）说明"里程碑批刷新清单未含全部状态句写位"的机制缺口仍在（与三十七审"锚集扩张追不上写位扩散"系统性风险同向，本批新增两处实证）。</p>
+<p><b>可信边界</b>：① 全部联网结论以 2026-10-27 20:38-21:10 (+08:00) 访问时点为界（目录仓/竞品仓状态随时可变）；② Reddit 版规页不可达下，r/PL 现行版规无法核对——永封条款以 2025-12/2026-04 存档公告为据，时效以"趋势只紧不松"推断【主观推测】；③ 发帖用户侧动作（亲笔进度/modmail 是否已发）零落盘零可查——"未见发帖"不等于"未发帖"，本审不对此下结论；④ HN 两页经服务端抓取（本机直连 DNS 污染），引句为服务端渲染文本形态，与浏览器 DOM 的逐像素一致性未验证（引句逐字性已验）；⑤ awesome #186 的"长期挂起"预期为基于上游节奏的推断【主观推测】。</p>
+</div>
+<div class="meta">
+<p><b>执行者 C 署名</b>：三十八审元面·对外面审查 agent，2026-10-27。<b>耗时估计：约 50 分钟</b>（本地档案与门面核查 ~20 分钟；联网只读实查 ~15 分钟；章节撰写与探针整理 ~15 分钟——均为墙钟估计）。主要探针目录：target/probes/review38/C/（hn-fragments-2026-10-27.md、agentlangs-lom-2026-10-27.md、agentlangs-llms-2026-10-27.txt、gh-agentlangs-*.json 六件、gh-awl-*.json 与 gh-pr186/187*.json 四件、gh-moonbit-*.json 两件、gh-zero-repo.json、gh-vera-repo.json、playground-2026-10-27.html、online-lom.wasm、probe-log.md——共 21 件）。git 全程只读；零 cargo；零对外写请求；历史裁决零重开。</p>
+<p><b>终态 git status 披露</b>：本章节产出后 git status = 工作树干净（探针与章节均在 target/probes/（gitignored）内；仓库既有文件零修改；无未跟踪泄漏文件）。</p>
+</div>
+
+<h2>附录 A：探针目录索引（规划者登记）</h2>
+<table>
+<tr><th>目录/文件</th><th>内容</th></tr>
+<tr><td><code>target/probes/review38/</code>（A 面根）</td><td>执行者 A 探针：probe_sharelink_adversarial.mjs（分享链接敌手 36 断言——RFC 4648 §5 向量 + 2000 轮 Node 原生交叉 fuzz + 边界族）、probe_trace_suite.py（trace 族 25 断言）与 probe_trace_edge.py（边界 11 断言）+ 载体 probe_trace_basic.lom / probe_trace_deep.lom；api_runs_list.json / api_jobs_f43ed83.json / api_run_f43ed83_detail.json / api_jobs_v11300.json / api_jobs_v11400.json（GitHub Actions API 快照——R189 证据）；incr_commits.txt（增量 27 笔清单）；ghpages_online/（线上四资产 vs tag blob sha256 对照）；t2_trace_out.jsonl / t9_default.jsonl / t9_max3.jsonl / t9_max0.jsonl / trace_stderr.jsonl / e1_dir / e7_max1.jsonl / e8.jsonl / e9b.jsonl（trace 行为面输出档案）</td></tr>
+<tr><td><code>target/probes/review38/b1/</code></td><td>执行者 B1 探针：verify_selfcomp_red.py 副本 + redpath_run.out（R162 quine 字节断言红路径构造性实证：FAIL 13/14 exit=1）、doc_audit_run.out（73/73）、link_check_run.out（PASS）</td></tr>
+<tr><td><code>target/probes/review38/B2/</code></td><td>执行者 B2 取证索引：audit_trail.md（11 节取证命令与输出全文——交接五件套复算/裁决链七点互证/亲验纪律 24 批考古）</td></tr>
+<tr><td><code>target/probes/review38/C/</code></td><td>执行者 C 探针：hn-fragments-2026-10-27.md（HN 版规红线现行原文）、agentlangs 两件（目录线上/仓状态）、GitHub API JSON 十六件（#68/#79/#186/竞品三仓快照）、playground 两件（线上资产验证）、probe-log.md（全命令与结果清单）</td></tr>
+</table>
+<p class="small">各 section 内含更细清单；探针目录均 gitignored，证据以本报告 + 目录双档为准。外部观察档（同日并行，非本审编成）：target/probes/observations/2026-10-27/（report.md + evidence/ 19 件 + INDEX.md 首条）。</p>
+
+<h2>附录 B：规划者验收记录（2026-10-27）</h2>
+<ul>
+<li><b>红线合规</b>：四执行者最终回复首行均含两级红线逐字复述；四执行者自报终态 <code>git status --porcelain</code> 零输出；规划者拼接前亲验仓库状态干净（<code>nothing to commit, working tree clean</code>）。</li>
+<li><b>格式核对</b>：四份 section 均 &lt;h2&gt; 起步自包含片段；本报告四章节为机械拼接，规划者零内容编辑（附录与本头部为规划者撰写段，已在 §0c 声明）。</li>
+<li><b>关键开账亲验抽查</b>（API 实查 / grep / 亲读，四项全部在场吻合）：① R189——Actions API 实查 run <code>39648682386</code>（head f43ed83）conclusion=<b>failure</b>（macos-latest cancelled，其余 6/7 success，run_attempt=1），HANDOVER §1 CI 行"逐笔绿"宣称与事实不符属实；② R199——TODO 状态块 [F2-L1] 报备行仅 601cc08 一笔（行 12），f43ed83/f734303/692c28d 三笔 commit 有 [F2-L1] 标记而 TODO 无报备行；③ R209——TODO 菜单①主写位"建议顺序 Reddit（modmail 获准后）→ HN"与 HANDOFF_PROMPT 两处镜像"modmail 即发 → HN 先发 → Reddit 等……"倒挂在场亲读；④ R190/R224——README.md L24（593 unit + 40 integration）与 L75（37 review rounds）锚外现值写位 grep 亲验在场（本报告落盘后 L75 轮数即为陈旧方向，留作 R224 预登记刷新面的活证据）。</li>
+<li><b>开账编号盘点</b>：R189/R190（A；R191-R198 空）、R199-R204（B1；R205-R208 空）、R209-R215（B2；R216-R218 空）、R219-R227（C；R228 空）——有效开账 <b>24 笔</b>（P1 零在场 / P2 一笔 R199 / P3 二十一笔 / P4 两笔 R226·R227），空号如实登记。顺延号自 <b>R229</b> 起。开账整改顺序由用户裁决（MAINTENANCE §4.3），本审只开账不修码。</li>
+<li><b>verdict 分列汇总（§4.5 双 verdict 制，不做单一总评级）</b>：产品面 <b>A-</b>（A）/ 元面·治理一 <b>B+</b>（B1——P2 R199 在场且无 P1，按 §4.4 档位速判）/ 元面·治理二 <b>A-</b>（B2）/ 元面·对外面 <b>A-</b>（C）。历史评级不外推：各 verdict 仅对本章查证面与本审时点成立。</li>
+<li><b>门禁</b>：报告落盘批 doc_audit 73/73 + link_check PASS（随批亲跑，见收官提交信息）。</li>
+<li><b>同日外部观察档</b>（§4.6，单执行者 6.8 分钟/32 次调用）：六对象巡检，分级判定 = <b>纯动向（无事件）</b>——MoonBit v0.10.16→v0.10.17（1.0 仍未发布）、目录 #68/#79 稳定零 Lom 新事件、awesome PR #186 仍 open 待审（4 天）、Zero 停滞 34→约 41 天、Vera 首登建档（420★，10-23 单日 5 commit 含诊断码体系后静默）、本仓 CI 7/7 绿且 ubuntu-latest 仍 24.04；INDEX.md 首条落档。登记值顺刷按 L1 条款 3 随本收官批执行。</li>
+</ul>
+</body>
+</html>
