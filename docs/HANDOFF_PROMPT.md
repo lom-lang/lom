@@ -59,11 +59,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   **治理批（`f25eefb`）**：身份核验入基线与交接检查单（账号改名/换邮箱/
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
   防呆；**三十七审触发点已裁：发帖前**。
-  **目录 PR #68 open 待审——最佳等审状态**（head `de465b6`：R147 处置 a
-  修条目计数 + 归因修正批 author wyty→wytyKen + 补 spans_camps；body 提交
-  清单 6/6 生效；**模拟收录复核 16 项全 PASS、预测 merge as-is**——执行者
-  按目录维护者实测方法论逐声明验证，条目与仓库数字双侧全准；三问应答
-  口径备档 TODO；ACRI 陈旧注已随弧线修正）。**三十六审 A-**
+  **目录 PR #68 已合并（2026-10-22T11:07Z）——Lom 收录 agentlanguages.dev verification 类目**（open 待审期已完成 R147 处置 + 归因修正 wyty→wytyKen + 模拟收录复核 16 项全 PASS；#79 编辑性修改：类目/author 裁短/英式英语/pre 修复；三问应答口径备档 TODO；ACRI 陈旧注已随弧线修正）。**三十六审 A-**
   （review-2026-10-15.html：R144-R147 四账全收口）。**三十七审 A-×3 +
   元面成立（2026-10-19 review-2026-10-19.html，首次元层面扩容 +
   4 并行授权例外——并行 ≤2 纪律首次显式例外）：产品面/治理面/对外面
@@ -89,7 +85,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 
 - **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→三十六审 A-（R144-R147 全收口）→**三十七审 A-×3 + 元面成立**（首次元层面扩容；开账 25 笔当日全收口）。**审查模式自三十七审起标准化**（MAINTENANCE §4.5：双层覆盖 / 审查者编成豁免 ≤2 / 两级红线与复述义务 / 自指缓解 / 双 verdict——2026-10-19 用户裁决"以后的独立审查也遵循这个模式"）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
-  即审）。最新报告 [review-2026-10-15.html](reviews/review-2026-10-15.html)。
+  即审）。最新报告 [review-2026-10-19.html](reviews/review-2026-10-19.html)（三十七审）。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
   ~20-45s）、self_comp.lom 12671 行、Rust **593 单元 + 40 集成**（v1.14.0 批：
@@ -99,17 +95,13 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
   **73/73**（J 锚组现值 593+40）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.13.0**（v1.13.0
-  分享链接批起）。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.14.0**（v1.14.0
+  trace 批起）。
 - **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
-  README）；β 三批已落地；**目录 PR #68 open 待审、最佳等审状态**（head
-  `de465b6`、body 6/6、模拟复核 16 项全 PASS 预测 merge as-is、三问应答
-  口径备档——反馈逐条呈批）；发帖材料两帖草稿在档（用户已裁**发帖前
-  临时重写/大改**——发帖路径、渠道清单与两硬风险见 TODO 待办①；R185
-  Citing 作者名已修正 wytyKen）；对外动作逐项呈批不变。
+  README）；β 三批已落地；**目录收录已成事实**（PR #68 合并、verification 类目）；**发帖已启动在途**（用户亲笔两帖——顺序 modmail r/PL → HN → Reddit[modmail 获准 + HN 评论链完整后]；前置三件套/底稿 v2/28 条预演在 target/probes/outreach/prelaunch/；两硬风险在案：HN 禁 AI 文本、Reddit AI slop 永封条款原文已核；R185 Citing 作者名已修正 wytyKen；铺底 topics ✓ + awesome-wasm-langs PR #186 待审）；对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
@@ -146,7 +138,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   【一 · 已裁待执行（等触发）】① 发帖（**已启动**——2026-10-22 用户裁决"启动发帖，具体操作由我
   做"：亲笔两帖 + 规划者支撑；前置三件套已备 outreach/prelaunch/；
   **硬门槛：Reddit r/PL 未获 modmail 明确许可不发**；每帖发布前单独
-  呈批；建议 Reddit→HN 顺序）——
+  呈批；**建议顺序：modmail 即发 → HN 先发 → Reddit 等 modmail 获准 + HN 评论链完整后**）——
   渠道 16 条目与两硬风险（HN 人写要求 / Reddit 反 AI-slop 高压）在案；
   ② Zenodo DOI 排发帖后（R185 已修正）。【二 · 待消化待定】③ ACRI
   conformance suite。【三 · 搁置待外部条件】④ 第三模型 pass@k（API key
