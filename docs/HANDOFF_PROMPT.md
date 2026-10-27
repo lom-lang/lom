@@ -102,7 +102,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
-  README）；β 三批已落地；**目录收录已成事实**（PR #68 合并、verification 类目）；**发帖已启动在途**（用户亲笔两帖——顺序 modmail r/PL → HN → Reddit[modmail 获准 + HN 评论链完整后]；前置三件套/底稿 v2/28 条预演在 target/probes/outreach/prelaunch/；两硬风险在案：HN 禁 AI 文本、Reddit AI slop 永封条款原文已核；R185 Citing 作者名已修正 wytyKen；铺底 topics ✓ + awesome-wasm-langs PR #186 待审）；对外动作逐项呈批不变。
+  README）；β 三批已落地；**目录收录已成事实**（PR #68 合并、verification 类目）；**发帖暂缓**（2026-10-28 用户裁决"我改主意了，暂不发帖"——在途态转暂缓：启动裁决链与材料留档不撤销、硬门槛与每帖呈批条款重启时继续适用、PR #186 不撤回继续等审、重启 = 用户指令无预设日程，裁决档 `target/probes/decisions/2026-10-28-posting-pause.md`；此前在途态留存：用户亲笔两帖——顺序 modmail r/PL → HN → Reddit[modmail 获准 + HN 评论链完整后]（R209 收口）；前置三件套/底稿 v2/28 条预演在 target/probes/outreach/prelaunch/（已顺刷至 v1.14.0/38 轮现值）；两硬风险在案：HN 禁 AI 文本、Reddit AI slop 永封条款原文已核；R185 Citing 作者名已修正 wytyKen；铺底 topics ✓ + awesome-wasm-langs PR #186 待审）；对外动作逐项呈批不变。
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
@@ -136,12 +136,12 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   2026-10-21 治理整理批起——用户裁决"整理头脑风暴吸收进待裁菜单、只保留一个
   待裁菜单"；完整菜单见 TODO 状态块待裁菜单行，点子详情（成本/风险/Top5）
   见 `target/probes/brainstorm/ideas.md`；所有点子不构成预授权）**：
-  【一 · 已裁待执行（等触发）】① 发帖（**已启动**——2026-10-22 用户裁决"启动发帖，具体操作由我
-  做"：亲笔两帖 + 规划者支撑；前置三件套已备 outreach/prelaunch/；
+  【一 · 已裁待执行（等触发）】① 发帖（**暂缓**——2026-10-28 用户裁决"我改主意了，暂不发帖"：在途态转暂缓——启动裁决链与材料留档不撤销、硬门槛与每帖呈批条款重启时继续适用、重启 = 用户指令无预设日程（裁决档 `target/probes/decisions/2026-10-28-posting-pause.md`——R215 裁决侧摘录首次应用）；原 2026-10-22 启动裁决与已裁顺序留存：
+  亲笔两帖 + 规划者支撑；前置三件套已备 outreach/prelaunch/（已顺刷 v1.14.0/38 轮现值）；
   **硬门槛：Reddit r/PL 未获 modmail 明确许可不发**；每帖发布前单独
-  呈批；**建议顺序：modmail 即发 → HN 先发 → Reddit 等 modmail 获准 + HN 评论链完整后**）——
-  渠道 16 条目与两硬风险（HN 人写要求 / Reddit 反 AI-slop 高压）在案；
-  ② Zenodo DOI 排发帖后（R185 已修正）。【二 · 待消化待定】③ ACRI
+  呈批；**顺序已裁：modmail 即发 → HN 先发 → Reddit 等 modmail 获准 + HN 评论链完整后**）——
+  渠道 16 条目与两硬风险（HN 人写要求 / Reddit 反 AI-slop 高压）在案；PR #186 铺底件不撤回、继续等审不催；
+  ② Zenodo DOI 原排发帖后——发帖暂缓后次序悬置待用户裁决（R185 已修正）。【二 · 待消化待定】③ ACRI
   conformance suite。【三 · 搁置待外部条件】④ 第三模型 pass@k（API key
   待解决）。【四 · 未裁点子池·提案层（2026-10-22 补救收敛后 = 7 点，
   用户已确认；MAINTENANCE §4.7 收敛漏斗——菜单只收提案层，沉档留档
