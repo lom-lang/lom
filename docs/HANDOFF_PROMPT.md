@@ -46,7 +46,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-10-27，三十八审收官——开账 24 笔待裁（R189-R227，P2 一笔 R199；顺延号 R229 起，详账 TODO 三十八审登记段）；此前弧线 13 笔 `8660740`→`692c28d` 逐笔 CI 实查 = 12 笔七 job 绿 + 1 笔 6/7【R189 勘误：run `39648682386` 实值 failure（macos cancelled）——三十八审 API 复核】：治理五连（统一待裁菜单唯一入口 / 外部观察 §4.6 / 头脑风暴 §4.7 + §4 更名"审查与常设机制" / 梳理环节收敛漏斗 §4.7 + 现存池补救收敛 32→7+25 / F2 裁决分级表 §1.4——L1 预授权五条款本会话实跑条款 1/3/5）+ **v1.14.0 agent 执行 trace 批全链**（tag `b07c6d1` CI `39646107026` 首跑即绿；规划者紧邻交错 A/B 终判 +1.6%/+2.2% 零回退；回填批 `f43ed83`）+ 对外事件：目录 PR #68 合并（Lom 收录 verification 类目，aallan 三馈赠登记）+ **发帖启动**（用户亲笔两帖在途：前置三件套 + 两帖底稿 v2 + 铺底 topics ✓ / awesome-wasm-langs PR #186 open 待审））**：
+- **状态（2026-10-27，三十八审收官 + 整改三批全收口（用户裁决"按建议执行"——批 1 门面六笔 / 批 2 治理与锚十一笔含 doc_audit 73→78 / 批 3 材料四笔；台账零 open，顺延号 R229 起，详账 TODO 三十八审登记段收口总注）；此前弧线 13 笔 `8660740`→`692c28d` 逐笔 CI 实查 = 12 笔七 job 绿 + 1 笔 6/7【R189 勘误：run `39648682386` 实值 failure（macos cancelled）——三十八审 API 复核】：治理五连（统一待裁菜单唯一入口 / 外部观察 §4.6 / 头脑风暴 §4.7 + §4 更名"审查与常设机制" / 梳理环节收敛漏斗 §4.7 + 现存池补救收敛 32→7+25 / F2 裁决分级表 §1.4——L1 预授权五条款本会话实跑条款 1/3/5）+ **v1.14.0 agent 执行 trace 批全链**（tag `b07c6d1` CI `39646107026` 首跑即绿；规划者紧邻交错 A/B 终判 +1.6%/+2.2% 零回退；回填批 `f43ed83`）+ 对外事件：目录 PR #68 合并（Lom 收录 verification 类目，aallan 三馈赠登记）+ **发帖启动**（用户亲笔两帖在途：前置三件套 + 两帖底稿 v2 + 铺底 topics ✓ / awesome-wasm-langs PR #186 open 待审））**：
   最新基线 **v1.14.0**（= **agent 执行 trace 批**（designs/0026，2026-10-22 用户裁决四点均按建议项；触 src/ 行为批升 minor；冻结面零触碰——纯 CLI flag）：运行模式新增 `--trace` 族——调用级 JSONL 事件流 lom-trace/v1（首行 header + call/return/call-error 事件带 [RUNTIMExxx] 码原文与 depth 帧深 + 尾行 summary）；`--trace`（默认关，关闭态每用户调用恰 2 次 Option 检查）/ `--trace-out <file>`（缺省 stderr、文件 NDJSON 追加写）/ `--trace-max-events <n>`（默认 10000，0=无限）/ `--trace-builtins`（默认关）；值序列化 to_display 语义 + trace 专属截断（120 字符/深度 3，to_display 本体零触碰）；边界：main 入口不出 call 事件、AOT build 不适用；单测 581→593（trace ×12）、quine 272925/368/368/129×2 构造性不变；A/B 关闭态零回退（规划者紧邻交错终判 +1.6%/+2.2% 带内）；探针 target/probes/trace_impl/）。前一基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag `e171488`，CI run `39431280200` 七 job 绿——首跑即绿）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；**gh-pages 已部署 `7af30ef` 线上 v1.13.0**（三一致性全过 + 三项浏览器实测：Run 修复闭环 / demo QUINE 272925 总 2339ms / 分享链接 hash 更新+重载逐字恢复严格验证））。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
   均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
   stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
@@ -94,7 +94,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
   build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
-  **73/73**（J 锚组现值 593+40）、六模式全 PASS、link_check PASS、
+  **78/78**（J 锚组现值 593+40；三十八审整改批 2 起 78 项——J Rust 组并入 README 两计数位 + 轮数互锁 + quine/self_comp 逗号形态 ×4）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
   6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.14.0**（v1.14.0
   trace 批起）。
@@ -132,7 +132,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**三十八审收官（开账 24 笔待裁 R189-R227，顺延号 R229 起——整改顺序待用户裁决）**；**待裁菜单（唯一入口，
+- 下一步：**三十八审收官 + 24 笔开账全数收口（2026-10-27 用户裁决"按建议执行"；台账零 open，顺延号 R229 起）**；**待裁菜单（唯一入口，
   2026-10-21 治理整理批起——用户裁决"整理头脑风暴吸收进待裁菜单、只保留一个
   待裁菜单"；完整菜单见 TODO 状态块待裁菜单行，点子详情（成本/风险/Top5）
   见 `target/probes/brainstorm/ideas.md`；所有点子不构成预授权）**：
@@ -143,7 +143,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   渠道 16 条目与两硬风险（HN 人写要求 / Reddit 反 AI-slop 高压）在案；
   ② Zenodo DOI 排发帖后（R185 已修正）。【二 · 待消化待定】③ ACRI
   conformance suite。【三 · 搁置待外部条件】④ 第三模型 pass@k（API key
-  待解决）。【五 · 未裁点子池·提案层（2026-10-22 补救收敛后 = 7 点，
+  待解决）。【四 · 未裁点子池·提案层（2026-10-22 补救收敛后 = 7 点，
   用户已确认；MAINTENANCE §4.7 收敛漏斗——菜单只收提案层，沉档留档
   可捞回）】E1 英文博客三篇 / E2 学术线预研（LMPL/arXiv）/ B2 复现
   支持包 / B3 迭代修复效率题型 / C4 消灭 by-mapping / D5 lom explain /
@@ -188,7 +188,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    - cargo test --release（期望 593/593；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
-   - python tools/doc_audit.py（期望 73/73）
+   - python tools/doc_audit.py（期望 78/78）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 32/32；v1.11.0 起 error_repair 32 题 = 宿主面 28 + L2 面 3 + 运行时面 1）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）

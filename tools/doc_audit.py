@@ -385,6 +385,13 @@ def main():
          r'Rust (\d+)\+(\d+)、quine', ('unit', 'integ')),
         ('README 状态段', 'README.md',
          r'plus (\d+) process-level integration tests', ('integ',)),
+        # R190（三十八审整改批 2）：README 计数锚外两写位入组——信任表格行
+        # （L24）与构建注释（L168），漏刷任一处即组内不一致红。
+        ('README 信任表格行', 'README.md',
+         r'(\d+) unit \+ (\d+) integration tests', ('unit', 'integ')),
+        ('README 构建注释', 'README.md',
+         r'test --release\s+# (\d+) unit \+ (\d+) integration tests',
+         ('unit', 'integ')),
     ])
 
     # ---- J+ 现实核对（R131，三十一审 B 面根治——四回同族漏刷的根治）----
@@ -403,6 +410,52 @@ def main():
           '文档集成 %s vs tests/ #[test] 实数 %d%s'
           % (m_integ[0] if m_integ else None, actual_integ,
              '（全组同滞即红——R131 根治）' if m_integ and int(m_integ[0]) != actual_integ else ''))
+
+    # ---- J+ 扩锚段（R190/R202/R224，三十八审整改批 2——锚外现值写位入锁）----
+    # 三十八审三面同族实证（R190 锚外计数位 / R202 逗号形态裸数字 / R224
+    # 审查轮数跨文件漏刷）：gate 覆盖面 ≠ 出现面。本段收五个高 churn 写位
+    # 入锚（README 计数两处已并入上方 J Rust 互锁组）。轮数组真值源 = 组内
+    # 互对（README 阿拉伯位 ↔ positioning 中文位，中文数字转换后对照）；
+    # quine/self_comp 逗号形态真值 = J 组同款锚位与 comp_lines 实数
+    # （R164 条文：高 churn 数字留给锚——低频数字扩锚违反性价比判断）。
+    def cn_round(s):
+        # 中文数字（一~九十九）→ int；"十"系与单字系；超界返回 -1 触发红
+        digits = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+                  '六': 6, '七': 7, '八': 8, '九': 9}
+        if s == '十':
+            return 10
+        if '十' in s:
+            h, _, t = s.partition('十')
+            if (h and h not in digits) or (t and t not in digits):
+                return -1
+            return (digits.get(h, 1)) * 10 + (digits.get(t, 0) if t else 0)
+        return digits.get(s, -1)
+
+    m_rd_en = doc_number('README.md', r'The (\d+) review rounds')
+    m_rd_cn = doc_number('docs/positioning.html',
+                         r'([一二三四五六七八九十]+)轮体系内审查')
+    rd_cn_val = cn_round(m_rd_cn[0]) if m_rd_cn else None
+    check('J+ 审查轮数互锁（README ↔ positioning 中文位）',
+          m_rd_en is not None and rd_cn_val is not None
+          and int(m_rd_en[0]) == rd_cn_val > 0,
+          'README %s vs positioning 中文 %s（%s）——审查收官批轮数 +1 时两处'
+          '同刷，漏任一处即红（R224 预登记的根治位；超九十九轮时扩本函数）'
+          % (m_rd_en[0] if m_rd_en else None, rd_cn_val if m_rd_cn else None,
+             '一致' if (m_rd_en and rd_cn_val is not None
+                        and int(m_rd_en[0]) == rd_cn_val) else '不一致'))
+    m_q = doc_number('docs/HANDOFF_PROMPT.md', r'强 quine (\d+) bytes 双侧一致')
+    quine_now = m_q[0] if m_q else '?'
+    expect_all('J+ quine @ README 表格行（逗号形态）', 'README.md',
+               r'a (\d{3}),(\d{3})-byte strong quine',
+               [quine_now[:3], quine_now[3:]])
+    expect_all('J+ quine @ README.zh-CN（逗号形态）', 'README.zh-CN.md',
+               r'（(\d{3}),(\d{3}) 字节强 quine',
+               [quine_now[:3], quine_now[3:]])
+    cl = str(comp_lines)
+    expect_all('J+ self_comp 行数 @ README 表格行（逗号形态）', 'README.md',
+               r'\((\d{1,3}),(\d{3}) lines of Lom\)', [cl[:-3], cl[-3:]])
+    expect_all('J+ self_comp 行数 @ README.zh-CN（逗号形态）', 'README.zh-CN.md',
+               r'（(\d{1,3}),(\d{3}) 行 Lom', [cl[:-3], cl[-3:]])
 
     # ---- K. 交接镜像登记枚举核对（R136 处置 b，三十三审根治——镜像盲区）----
     # 三十三审 R136 实证：TODO"登记在案不修边界"主写位补项后，HANDOFF_PROMPT
