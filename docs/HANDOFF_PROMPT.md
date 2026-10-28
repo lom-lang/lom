@@ -157,7 +157,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   渠道 16 条目与两硬风险（HN 人写要求 / Reddit 反 AI-slop 高压）在案；PR #186 铺底件不撤回、继续等审不催；
   **E1 英文博客三篇并入①发帖板块管理（2026-10-28 用户裁决，点子池不再单列——主题：造语理由/quine 自举即证据/ACRI，B3 首果为增量素材，写作与平台逐项呈批；两帖底稿已刷 v2 = v1.16.0 现值，含 iterative-repair 首果段）**；
   ② Zenodo DOI 原排发帖后——发帖暂缓后次序悬置待用户裁决（R185 已修正）。【二 · 待消化】③ ACRI
-  conformance suite——**工程批执行中（2026-10-28 用户裁决"方案 A，子智能体执行"——代码留 acri 仓 conformance/ 不新建仓；Batch 2+3+4 实施中）**。【三 · 搁置待外部条件】④ 第三模型 pass@k（API key
+  conformance suite——**工程批已交付（2026-10-28 用户裁决"方案 A，子智能体执行"；acri `c60df16`：runner + 14 探针 + adapters/lom.json + probes/lom/；对 Lom v1.16.0 首跑 conformant 7 / by-mapping 5 / non-conformant 0，C-14 两登记偏差活体复核过；规划者亲跑复现一致）**。【三 · 搁置待外部条件】④ 第三模型 pass@k（API key
   待解决——2026-10-28 用户裁决继续搁置）。【四 · 未裁点子池·提案层（现值 2 点；MAINTENANCE §4.7 收敛漏斗——菜单只收提案层，沉档留档
   可捞回）】E2 学术线预研（LMPL/arXiv——**2026-10-28 用户指令具体探索，调研执行中，产出 target/probes/academic/**）/ B7 agent 用 Lom 实战写真实项目（2026-10-28 用户口述入池——告知新智能体 Lom 语言知识令其写真实项目（SSG 式应用/算法题/小工具），证明语言在 agent 时代的存在价值；F1 被拒的替代方向）；沉档 25 点（A4/A6/B4/B5/B6/C2/C3/C5/D2-D4/D6/E3-E5/
   F3-F6/G1-G6——高频捞回：发帖批启动、菜单③落地）。
