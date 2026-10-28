@@ -12,9 +12,16 @@
 【工作区形态（2026-10-28 三仓迁移后）——先读，硬约束】
 本会话工作目录 D:\lom-lang 是三仓工作区（本目录本身不在 git 内）。**硬约束：不得在 D:\lom-lang 根目录产生任何新文件**——一切探针、临时物、产出只许落三个 repo 文件夹内部（优先各仓 gitignored 区：主仓 target/probes/、acri 与 lom-ssg 的 .tmp/ 或其 .gitignore 覆盖区）。除特别说明外，本提示词所有命令的工作目录 = **D:\lom-lang\lom**（主仓根）。
 - **主仓 D:\lom-lang\lom**（GitHub lom-lang/lom）：语言/工具链/评测/治理的全部规则源与主写位（MAINTENANCE/TODO/HANDOVER/SPEC/designs 均在此）——本提示词的铁律、门禁、回归清单全部针对主仓，不变。
-- **规范仓 D:\lom-langcri**（GitHub lom-lang/acri）：ACRI 规范之家——spec/（权威源，同版不可变：任何文字改动必须升版 + CHANGELOG + git tag）/ conformance/（套件，工程批待启）/ implementations/（符合性登记表）。轻量门禁：文本批自查链接即可，无 CI。
+- **规范仓 D:\lom-lang\acri**（GitHub lom-lang/acri）：ACRI 规范之家——spec/（权威源，同版不可变：任何文字改动必须升版 + CHANGELOG + git tag）/ conformance/（套件，工程批待启）/ implementations/（符合性登记表）。轻量门禁：文本批自查链接即可，无 CI。
 - **应用仓 D:\lom-lang\lom-ssg**（GitHub lom-lang/lom-ssg）：第一个 Lom 真实应用（786 行 build.lom 零依赖 SSG）。门禁：改动后用主仓 target/release/lom.exe 构建验证 + lom fmt --check build.lom；CI 尚未建立（新会话可裁是否加）。
-- 三仓 git 写操作（commit/push/tag）均只由规划者执行；三仓仓库级身份已配置（wytyKen / 204019711+wytyKen@users.noreply.github.com，交接时核验三仓）；三仓均为 main 直接推送无 PR 流程。跨仓依赖：lom-ssg 构建用主仓 lom.exe（相对路径 ..\lom	argetelease\lom.exe 或绝对路径）。
+【三仓隔离铁律（2026-10-28 交接裁决强化）】
+三个仓库是**各自独立的项目**，不是一个大项目的三个目录：
+1. **每个子智能体任务只绑定一个仓**——任务书必须写明"本任务仅在 <该仓文件夹> 内操作"，执行者的全部读写（含探针、临时物）不得越出该仓文件夹；发现需要动另一仓的内容 = 立即停止上报规划者，由规划者另拆该仓的独立任务/批次。
+2. **禁止串联与耦合污染**：不得在同一任务、同一执行者、同一次改动中横跨两仓（读一仓写另一仓、一揽子改动、"顺手"跨仓修文件——全部禁止）；跨仓联动需求（如规范升版牵动主仓映射、主仓改语言面牵动 lom-ssg）一律由规划者拆成各仓独立批次顺序执行，各仓各自提交、各自门禁。
+3. 唯一允许的跨仓接触 = **运行时只读工具引用**：lom-ssg（或 acri 套件）任务中调用主仓 target/release 下的 lom.exe 可执行文件——对二进制的调用，不是对主仓源文件的读写。
+4. 各仓探针落各自 gitignored 区（主仓 target/probes/、acri 与 lom-ssg 的 .tmp/ 等），规划者临时物同理——永不落 D:/lom-lang 根目录。
+
+- 三仓 git 写操作（commit/push/tag）均只由规划者执行；三仓仓库级身份已配置（wytyKen / 204019711+wytyKen@users.noreply.github.com，交接时核验三仓）；三仓均为 main 直接推送无 PR 流程。跨仓依赖：lom-ssg 构建用主仓 lom.exe（路径写法 = 主仓 target/release/lom.exe，Windows 下相对调用如 ..\lom\target\release\lom.exe）。
 
 【角色与铁律（规范源 docs/MAINTENANCE.md §1——本段为携带式镜像，冲突时以规范源为准）】
 主会话=规划者：读档与关键决策消化、批次设计与裁决点、拆解自包含任务书、
