@@ -3,7 +3,7 @@
 
 背景（九审 R60）：eval 089/090 的 prompt 内嵌诊断是手写的，与实际实现输出
 不符（runner 只验 stdout+rc，掩盖了漂移）。R57 整改时已把 089/090 换成真实
-命令输出；本工具把该口径变成机器 gate——对 10_error_repair.json 的每个任务：
+命令输出；本工具把该口径变成机器 gate——对受检任务文件的每个任务：
 
   1. 从 prompt 提取代码块（"错误代码："或"代码："标记后、"诊断 JSON"前）
   2. 提取内嵌诊断 JSON（"诊断 JSON"标记后的平衡对象，支持完整 lom-diag/v1
@@ -11,7 +11,14 @@
   3. 代码写入临时 .lom，跑真实 `lom <file> --json` 取当前实现的诊断
   4. 比对诊断码多重集合（code × 出现次数）；severity 不一致或行号偏差报警告
 
+B3（2026-10-28，供料⑥方案二形态）：TASKS 参数化——默认检面 =
+10_error_repair.json + 11_iterative_repair.json（iter 题集 round-1 prompt
+同受内嵌诊断真实性 gate 约束；round 2+ 诊断由 iter_eval.py 实跑采集，天然
+真实，不在本工具检面）。
+
 用法：python tools/eval_prompt_check.py [--bin <lom.exe 路径>]
+      python tools/eval_prompt_check.py --tasks 11_iterative_repair.json
+      （--tasks 取 eval/tasks/ 下的文件名，逗号分隔多个）
 退出码：0 = 全部一致；1 = 有失真（CI gate 形态）。
 """
 
@@ -25,7 +32,8 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-TASKS = os.path.join(ROOT, "eval", "tasks", "10_error_repair.json")
+TASKS_DIR = os.path.join(ROOT, "eval", "tasks")
+DEFAULT_TASKS = ["10_error_repair.json", "11_iterative_repair.json"]
 
 
 def extract_code(prompt: str):
@@ -101,47 +109,53 @@ def main():
     bin_path = "./target/release/lom.exe" if os.name == "nt" else "./target/release/lom"
     if "--bin" in args:
         bin_path = args[args.index("--bin") + 1]
+    task_files = DEFAULT_TASKS
+    if "--tasks" in args:
+        task_files = [s.strip() for s in args[args.index("--tasks") + 1].split(",") if s.strip()]
 
-    data = json.load(io.open(TASKS, encoding="utf-8"))
     failures = 0
     checked = 0
-    for t in data:
-        tid = t.get("id", "?")
-        prompt = t.get("prompt", "")
-        code = extract_code(prompt)
-        dj = extract_diag_json(prompt)
-        if code is None or dj is None:
-            print("  SKIP | %s | 无法提取代码块或内嵌诊断（形态特殊，人工核）" % tid)
-            continue
-        try:
-            embedded = json.loads(dj)
-        except json.JSONDecodeError as e:
-            print("  FAIL | %s | 内嵌诊断不是合法 JSON: %s" % (tid, e))
-            failures += 1
-            continue
-        ecodes = diag_codes(embedded)
-        if ecodes is None:
-            print("  SKIP | %s | 内嵌 JSON 形态未识别" % tid)
-            continue
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".lom", delete=False, encoding="utf-8", newline="\n"
-        ) as f:
-            f.write(code + "\n")
-            tmp = f.name
-        try:
-            rcodes, err = real_codes(bin_path, code, tmp)
-            if err:
-                print("  FAIL | %s | %s" % (tid, err))
+    for tf in task_files:
+        tasks_path = tf if os.path.isabs(tf) else os.path.join(TASKS_DIR, tf)
+        data = json.load(io.open(tasks_path, encoding="utf-8"))
+        print("== %s（%d 题）==" % (tf, len(data)))
+        for t in data:
+            tid = t.get("id", "?")
+            prompt = t.get("prompt", "")
+            code = extract_code(prompt)
+            dj = extract_diag_json(prompt)
+            if code is None or dj is None:
+                print("  SKIP | %s | 无法提取代码块或内嵌诊断（形态特殊，人工核）" % tid)
+                continue
+            try:
+                embedded = json.loads(dj)
+            except json.JSONDecodeError as e:
+                print("  FAIL | %s | 内嵌诊断不是合法 JSON: %s" % (tid, e))
                 failures += 1
                 continue
-            checked += 1
-            if rcodes != ecodes:
-                print("  FAIL | %s | 诊断失真：prompt=%s 实测=%s" % (tid, ecodes, rcodes))
-                failures += 1
-            else:
-                print("  OK   | %s | %s" % (tid, ecodes if ecodes else "(零诊断)"))
-        finally:
-            os.unlink(tmp)
+            ecodes = diag_codes(embedded)
+            if ecodes is None:
+                print("  SKIP | %s | 内嵌 JSON 形态未识别" % tid)
+                continue
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".lom", delete=False, encoding="utf-8", newline="\n"
+            ) as f:
+                f.write(code + "\n")
+                tmp = f.name
+            try:
+                rcodes, err = real_codes(bin_path, code, tmp)
+                if err:
+                    print("  FAIL | %s | %s" % (tid, err))
+                    failures += 1
+                    continue
+                checked += 1
+                if rcodes != ecodes:
+                    print("  FAIL | %s | 诊断失真：prompt=%s 实测=%s" % (tid, ecodes, rcodes))
+                    failures += 1
+                else:
+                    print("  OK   | %s | %s" % (tid, ecodes if ecodes else "(零诊断)"))
+            finally:
+                os.unlink(tmp)
 
     print("RESULT: %s（校验 %d / 失真 %d）" % ("PASS" if failures == 0 else "FAIL", checked, failures))
     sys.exit(0 if failures == 0 else 1)

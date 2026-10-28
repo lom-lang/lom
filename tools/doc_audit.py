@@ -125,8 +125,9 @@ def main():
           'manifest %s（期望 %d）' % (manifest.get('total_tasks'), eval_total))
     expect_all('eval/README 标题计数', 'eval/README.md',
                r'(?m)^(\d+)-task benchmark', [eval_total])
+    cat_count = len(glob.glob('eval/tasks/*.json'))
     expect_all('eval/README 覆盖计数', 'eval/README.md',
-               r'(\d+) tasks across 10 categories', [eval_total])
+               r'(\d+) tasks across (\d+) categories', [eval_total, cat_count])
     expect_all('eval/README 期望通过', 'eval/README.md',
                r'\*\*(\d+)/(\d+) pass\*\*', [eval_total, eval_total])
     expect_all('README 状态段', 'README.md',

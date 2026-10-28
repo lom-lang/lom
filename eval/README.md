@@ -1,4 +1,4 @@
-# RepairLoopBench — the Lom 129-task repair-suite benchmark card
+# RepairLoopBench — the Lom 138-task repair-suite benchmark card
 
 > **Asset name: RepairLoopBench** (adjudicated 2026-10-12). The name names what the
 > suite measures — the repair loop — not the language that hosts it. Lom is the
@@ -10,9 +10,10 @@
 
 ```powershell
 cargo build --release
-powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe           # 129/129 expected, native backend
-powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm  # 129/129 expected, WASM backend
-python tools/eval_prompt_check.py    # 32/32: error_repair prompts embed real host output (--check --json; task 130 embeds the runtime stderr channel), machine-checked against the live binary
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe           # 138/138 expected, native backend
+powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm  # 138/138 expected, WASM backend
+python tools/eval_prompt_check.py    # 41/41: error_repair (32) + iterative_repair round-1 (9) prompts embed real host output (--check --json; tasks 130-136 embed the runtime stderr channel where present), machine-checked against the live binary
+python eval/iter_eval.py --dry-run --samples 2 --out-root target/probes   # iterative pipeline self-check (no API; see the iterative-repair section)
 ```
 
 The suite self-checks (reference solutions verified, eval IDs unique) before any LLM
@@ -21,8 +22,9 @@ run. Headline LLM results: [full-set pass@k, 2026-10-07](REPORT-2026-10-07-passk
 
 ## How this benchmark differs from SWE-bench-family suites (scope statement)
 
-Scope honesty first: this is a **small, purpose-built suite (129 tasks; 32 repair
-tasks)** anchored to one language's toolchain. It does not compete with SWE-bench-class
+Scope honesty first: this is a **small, purpose-built suite (138 tasks; 41 repair
+tasks across the error_repair and iterative_repair categories)** anchored to one
+language's toolchain. It does not compete with SWE-bench-class
 repo-scale leaderboards on scale or realism, and its numbers are not comparable to
 them. It occupies a different, complementary slot, with three deliberate differences:
 
@@ -57,13 +59,15 @@ prompt-engineering objects for agents (Anthropic,
 
 # Lom Eval Suite (Phase 2.8)
 
-129-task benchmark for measuring **LLM generation pass-rate** on Lom code.
+138-task benchmark for measuring **LLM generation pass-rate** on Lom code; the
+11th category (11_iterative_repair, 2026-10-28) extends the same measurement to
+**multi-round repair convergence**.
 
 > This is the **core deliverable of Phase 2** — the hard metric that backs Lom's "AI-native" claim. An LLM is given a prompt; it generates `.lom` code; the runner executes the code and compares stdout to the expected output.
 
 ## Design goals
 
-1. **Coverage** — 129 tasks across 10 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair).
+1. **Coverage** — 138 tasks across 11 categories (arithmetic, control flow, types, closures, match/enum, pipeline, records/tuples, effects, modules, error repair, iterative repair).
 2. **Reproducibility** — every task has a verified reference solution and expected output; the runner self-checks the eval set before any LLM run.
 3. **LLM-coding-native focus** — tasks are designed to probe Lom's AI-friendly features (tolerant parse, structured diagnostics, `|>` linearity, structural types, `Result`/`match`).
 4. **Multi-model comparability** — same prompts, same runner, same expected outputs across DeepSeek / Claude / GPT / Kimi / GLM / Gemini.
@@ -85,6 +89,7 @@ eval/
     08_effects.json          #  6 tasks — ! [IO, Clock] annotations
     09_modules.json          #  6 tasks — from ... import
     10_error_repair.json     # 32 tasks — fix broken code / warning-guided repair (incl. L2-subset face)
+    11_iterative_repair.json #  9 tasks — multi-round repair convergence (rounds-to-pass, C(N) curve)
   runner/
     run.ps1                  # PowerShell runner (Windows, no deps)
     run.sh                   # Bash runner (requires jq + lom on PATH)
@@ -110,13 +115,14 @@ Each `tasks/NN_<category>.json` file is an array of task objects:
 ```
 
 Fields:
-- **`id`** — zero-padded 3-digit task id (001-130, 129 unique ids — 108 is a known, accepted gap), globally unique
-- **`category`** — one of the 10 categories (matches filename suffix)
+- **`id`** — zero-padded 3-digit task id (001-139, 138 unique ids — 108 is a known, accepted gap), globally unique
+- **`category`** — one of the 11 categories (matches filename suffix)
 - **`difficulty`** — `easy` / `medium` / `hard`
 - **`prompt`** — Chinese natural-language description of what the LLM should generate. Mentions required functions, expected behavior, and any constraints. **The LLM only sees this field** (plus `SPEC_FOR_AI.md`); it does not see `solution` or `expected`.
 - **`solution`** — reference `.lom` source code (verified to produce `expected` when run through `lom`)
 - **`expected`** — exact stdout when `lom solution.lom` is run (including trailing newline)
 - **`notes`** — optional, documents what the task probes and common LLM failure modes
+- **`max_rounds`** — (11_iterative_repair only) round cap R for the iterative protocol (default 5); ignored by the runner
 
 ## Runner usage
 
@@ -134,7 +140,7 @@ cargo build --quiet
 eval/runner/run.sh --verify
 ```
 
-This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **129/129 pass**. Use this to catch regressions in the interpreter or the eval set.
+This runs every reference `solution` through `lom` and compares stdout to `expected`. Should report **138/138 pass**. Use this to catch regressions in the interpreter or the eval set.
 
 ### Evaluate LLM-generated candidates
 
@@ -179,6 +185,68 @@ Task 130 adds a **runtime face**: the broken code is statically clean (`--check 
 2. The runtime stderr text, captured verbatim from `lom bad.lom` (the `[RUNTIME000]` three-part diagnostic plus the summary line, with the exit-code note), introduced by an explicit source line. **Ordering is a hard constraint**: the runtime block must come **after** the `诊断 JSON` block — `tools/eval_prompt_check.py` extracts code up to the first `诊断 JSON` anchor and takes the first balanced JSON object after it, so a runtime block placed earlier would bleed into the code block and false-positive (probe-verified both orderings).
 
 Generation rules mirror the L2-face discipline: reference solution verified on both backends; the runner only exercises host behavior. Registered product boundary, stated in the task notes: `lom fix --plan` produces no suggestion for this broken code — the fix pipeline is driven by static diagnostics and runtime errors do not enter it (v1.10.3's message-aware RUNTIME000 hint exists in the dispatcher table but has no CLI arrival path for runtime-raised diagnostics).
+
+### Iterative-repair category (9) — multi-round convergence measurement (B3, 2026-10-28)
+
+Tasks in `11_iterative_repair.json` (ids 131-139) measure **how many rounds it
+takes to repair**, not just whether one shot suffices. Composition: 131-136 are
+verbatim copies of six error_repair seeds chosen for repair depth (131 ← 127,
+the only sub-100% single-round task in the 2026-10-07 matrix — the category's
+core hypothesis: 18/20 candidates miss the same Option-unwrapping step, so what
+does round 2's real RUNTIME000 feedback buy?; 132/133 ← 120/122
+warning-predicts-runtime-failure; 134/135 ← 128/129 L2-face; 136 ← 130
+runtime-face). 137-139 are new **runtime-face tasks whose round-1 prompt
+deliberately omits the runtime error** (statically clean via real `--check
+--json` capture, fails only at run time; the prompts say so honestly) —
+single-round information is insufficient by design, and the real runtime
+diagnostic arrives in round 2 through the protocol itself. The no-op trap tasks
+(091/098/099) are excluded: they converge in round 1 and carry zero
+discriminative power for rounds-to-pass. Reference solutions for 137-139 are
+verified on both backends; the embedded zero-diagnostic JSON is machine-checked
+by `tools/eval_prompt_check.py` like every other task.
+
+**Protocol (single-step feedback chain, "code as memory"; designs/0027 §1.2):**
+each round is a single user message. Round 1 sends the standard task prompt
+(isomorphic to pass@1 — the same `_context.md` + task + `_footer.md`
+composition the category prompt files use). Round N>1 sends the original task
+plus the previous round's complete candidate code and its **real toolchain
+output**: the static `lom <file> --check --json` verbatim plus the runtime
+rc/stdout/stderr captured by actually running the candidate (same dual-real-
+capture discipline as every embedded diagnostic above). The model rewrites the
+full program every round. Passing = stdout verbatim (CRLF-normalized) + exit
+code 0 — the same criterion as the runner; a pass early-stops the trajectory,
+and reaching `max_rounds` (R = 5 on every task; `--max-rounds` overrides
+globally for experiments) without a pass records a **censored** trajectory.
+
+**Metrics (both reported; designs/0027 §1.3):** per-task rounds-to-pass
+distribution (median / mean / P90, computed over converged trajectories only —
+censored trajectories are reported as a separate censoring rate, never folded
+into the mean as R+1) plus the convergence curve C(N) = fraction of
+trajectories passing within N rounds. **C(1) ≡ pass@1**: round-1 prompts are
+the same composition the pass@k flow uses, so a pass@k run and an iterative
+run share the calibration point; C(N) is monotonically non-decreasing in N.
+
+**Tools:** `eval/iter_eval.py` collects trajectories (per round: the candidate
+code, the exact prompt sent, the model reply, the collected diagnostics, and a
+`rounds.jsonl` summary; `--dry-run` self-checks the pipeline with a degenerate
+candidate — round 1 always returns the embedded broken code, round 2+ the
+reference solution — no API needed); `eval/iter_summarize.py` produces the
+distribution + censoring + C(N) tables (`iter_summary.json`). Endpoint and key
+configuration is shared with `llm_eval.py` (env vars or `eval/.api_keys.json`);
+trajectory directories default to `eval/iter_runs/` (gitignored).
+
+**Scoring-face boundary (registered, same as pass@k):** the iterative runner
+scores host stdout + rc 0 only. For 131/134 the *broken* seed already passes
+that criterion (the examined point is the L2 face, which the scoring face does
+not see) — a candidate that echoes the broken code verbatim counts as
+converged at round 1, exactly as it would pass in the pass@k flow. This is the
+registered "host-pass ≠ task-intent" boundary of REPORT-2026-10-07, unchanged
+by this category.
+
+**Measurement status:** this batch lands the engineering surface only — the
+LLM sampling run (glm-5.3 single model first via the Coding-Plan channel,
+dual-model alignment later) is a separate future batch; no convergence numbers
+are claimed yet.
 
 ## Adding tasks
 

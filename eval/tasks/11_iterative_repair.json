@@ -1,0 +1,92 @@
+[
+  {
+    "id": "131",
+    "category": "iterative_repair",
+    "difficulty": "hard",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码在宿主 lom 下能运行（输出 2）但有一条警告（lom-diag/v1 诊断如下）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码：消除宿主警告、保持宿主输出 2 不变，并使代码能通过 L2 子集编译。修复须保留对 Map 的实际读取——**通过 map_get 取出键 \"a\" 对应的值参与算术得到输出 2**（不得把输出写死为常量；也不得保留任何 Map 直接参与算术的代码——即使它在不会执行的分支里也会被 L2 编译器拒绝，因为 L2 对全程序做静态检查）。\n\n代码：\nfrom io import {println}\nfrom map import { map_empty, map_set }\n\nfn main() -> Unit ! [IO]\n    let m = map_empty()\n    map_set(m, \"a\", 1)\n    if False\n        println(m + 1)\n    else\n        println(2)\n    end\nend\n诊断 JSON：\n{\"schema\": \"lom-diag/v1\", \"file\": \"bad.lom\", \"ok\": true, \"summary\": {\"total\": 1, \"errors\": 0, \"warnings\": 1, \"holes\": 0}, \"diagnostics\": [{\"severity\": \"warning\", \"stage\": \"type\", \"code\": \"TYPE001\", \"message\": \"'+' 不支持 Generic(\\\"Map\\\", [Named(\\\"_Any\\\")]) 和 Int\", \"file\": \"bad.lom\", \"line\": 0, \"col\": 0, \"source_line\": null, \"is_hole\": false, \"hint\": \"检查运算符两侧类型是否一致\"}]}\n\n实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：\ncodegen error: [L2V001] L2.2 子集不支持: Map 参与算术（L2 子集外；仅支持 ==/!= 比较）\nCOMPILE-ERROR\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\nfrom map import { map_empty, map_set, map_get, map_has }\n\nfn main() -> Unit ! [IO]\n    let m = map_empty()\n    map_set(m, \"a\", 1)\n    if map_has(m, \"a\")\n        match map_get(m, \"a\")\n            Some(v) => println(v + 1)\n            None => println(0)\n        end\n    else\n        println(0)\n    end\nend\n",
+    "expected": "2\n",
+    "notes": "iter 题集·源题 127 逐字副本（prompt/solution/expected 与 10_error_repair 127 完全一致，题面与诊断双真实采集纪律同源）。B3 核心假设题：2026-10-07 pass@k 矩阵双模型单轮各 1/10，20 候选中 18 个败于同一形态（map_get 返回 Option 未解包直加，宿主 RUNTIME000、L2 L2V001 双拒）——round 2 喂入真实运行时诊断后补齐率从 10% 升到多少即本类别首发实验的核心可测量。iter 协议（eval/iter_eval.py）：max_rounds=5，round-1 prompt = 本字段（与 pass@1 同构），round N>1 = 上轮候选代码 + 上轮实跑真实诊断（--check --json + 运行时 stderr），通过（stdout 逐字 + rc0）早停。"
+  },
+  {
+    "id": "132",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME002] 符号 'upper' 未导入——警告正是对运行时失败的预警）。请修复代码消除该警告并使程序正常运行。\n\n代码：\nfn shout(s: String) -> String\n    upper(s) + \"!\"\nend\n\nfn main() -> Unit\n    println(shout(\"lom\"))\nend\n诊断 JSON：\n{\"severity\": \"warning\", \"stage\": \"type\", \"code\": \"NAM005\", \"message\": \"内建 'upper' 未导入——需在文件顶部声明：from string import {upper}\", \"file\": \"bad.lom\", \"line\": 2, \"col\": 5, \"source_line\": \"    upper(s) + \\\"!\\\"\", \"is_hole\": false, \"hint\": null}\n\n请输出修复后的完整代码。",
+    "solution": "from string import { upper }\n\nfn shout(s: String) -> String\n    upper(s) + \"!\"\nend\n\nfn main() -> Unit\n    println(shout(\"lom\"))\nend\n",
+    "expected": "LOM!\n",
+    "notes": "iter 题集·源题 120 逐字副本。warning 预告族入选（NAM005 warning 预告 RUNTIME002 运行时失败——修复深度在于补 import 后需同时消警告与保运行）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "133",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME001] 期望 Bool，得到 String——警告正是对运行时失败的预警）。请修复代码消除该警告并使程序正常运行。\n\n代码：\nfrom io import {println}\nfn main() -> Unit\n    let name = \"lom\"\n    if name\n        println(\"yes\")\n    else\n        println(\"no\")\n    end\nend\n诊断 JSON：\n{\"severity\": \"warning\", \"stage\": \"type\", \"code\": \"TYPE002\", \"message\": \"if 条件应为 Bool，得到 String\", \"file\": \"bad.lom\", \"line\": 4, \"col\": 8, \"source_line\": \"    if name\", \"is_hole\": false, \"hint\": \"条件表达式应为 Bool\"}\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\nfn main() -> Unit\n    let name = \"lom\"\n    if name != \"\"\n        println(\"yes\")\n    else\n        println(\"no\")\n    end\nend\n",
+    "expected": "yes\n",
+    "notes": "iter 题集·源题 122 逐字副本。warning 预告族入选（TYPE002 warning 预告 RUNTIME001——Python 真值习惯迁移形态，修复自由度高：!= \"\" / len > 0 等多解）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "134",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码在宿主 lom 下完全正确（静态检查零诊断、运行输出 2），但无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译——L2 是宿主语言的实验性子集，不支持所有表达式形态。请把管道写法改写为等价的普通函数调用，保持输出 2 不变，使代码能通过 L2 子集编译。\n\n代码：\nfrom io import {println}\nfrom list import { list_length }\n\nfn main() -> Unit\n    let xs = 1..3\n    println(xs |> list_length)\nend\n诊断 JSON：\n{\"schema\": \"lom-diag/v1\", \"file\": \"bad.lom\", \"ok\": true, \"summary\": {\"total\": 0, \"errors\": 0, \"warnings\": 0, \"holes\": 0}, \"diagnostics\": []}\n\n实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：\ncodegen error: [L2S001] L2.2 子集不支持: 该表达式形态\nCOMPILE-ERROR\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\nfrom list import { list_length }\n\nfn main() -> Unit\n    let xs = 1..3\n    println(list_length(xs))\nend\n",
+    "expected": "2\n",
+    "notes": "iter 题集·源题 128 逐字副本。L2 面入选。评分面边界如实登记：broken 代码宿主运行 rc0 且输出 2（题意考查点在 L2 面，评分口径只验宿主 stdout+rc0）——iter 协议下若模型 round 1 原样回传 broken 会按口径判过（与 pass@k 评分面同一边界，README §iterative 段登记）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "135",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查有一条警告（lom-diag/v1 诊断如下），且运行时会失败（[RUNTIME002] 符号 'len' 未导入——警告正是对运行时失败的预警）；同时它无法通过实验性 L2 子集编译器（examples/selfhost/self_comp.lom）的编译。请修复代码消除该警告并使程序正常运行，且能通过 L2 子集编译。\n\n代码：\nfrom io import {println}\n\nfn main() -> Unit\n    let s = \"hello\"\n    println(len(s))\nend\n诊断 JSON：\n{\"schema\": \"lom-diag/v1\", \"file\": \"bad.lom\", \"ok\": true, \"summary\": {\"total\": 1, \"errors\": 0, \"warnings\": 1, \"holes\": 0}, \"diagnostics\": [{\"severity\": \"warning\", \"stage\": \"type\", \"code\": \"NAM005\", \"message\": \"内建 'len' 未导入——需在文件顶部声明：from string import {len}\", \"file\": \"bad.lom\", \"line\": 5, \"col\": 13, \"source_line\": \"    println(len(s))\", \"is_hole\": false, \"hint\": null}]}\n\n实验性 L2 子集编译器（examples/selfhost/self_comp.lom）拒绝如下：\ncodegen error: 5:13 [L2U001] 未定义变量 'len'\nCOMPILE-ERROR\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\nfrom string import {len}\n\nfn main() -> Unit\n    let s = \"hello\"\n    println(len(s))\nend\n",
+    "expected": "5\n",
+    "notes": "iter 题集·源题 129 逐字副本。warning 预告族 + L2 面双叠入选（同一修复补 import 同时消宿主 warning、解运行时失败、过 L2 编译——三面一修）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "136",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（[RUNTIME000] 递归深度超限：函数缺少终止条件）。请修复代码使程序正常运行并输出正确结果。\n\n代码：\nfn sum_to(n: Int) -> Int\n    n + sum_to(n - 1)\nend\n\nfn main() -> Unit\n    println(sum_to(10))\nend\n诊断 JSON（--check 模式，零诊断）：\n{\"schema\": \"lom-diag/v1\", \"file\": \"bad.lom\", \"ok\": true, \"summary\": {\"total\": 0, \"errors\": 0, \"warnings\": 0, \"holes\": 0}, \"diagnostics\": []}\n\n运行时输出（lom bad.lom，stderr，退出码 1）：\n[runtime] error (1:1): [RUNTIME000] 递归深度超过 60000 层（256MB 栈的安全上限）：函数 'sum_to' 疑似缺少终止条件——检查递归出口或改写为 while 循环\n    | fn sum_to(n: Int) -> Int\n    | ^\n共 1 个诊断（1 错误，0 警告，0 代码洞）。\n\n期望输出：55（sum_to(10) = 10+9+…+1）。修复须真实计算（不得直接输出常量 55）。\n\n请输出修复后的完整代码。",
+    "solution": "fn sum_to(n: Int) -> Int\n    if n <= 0\n        0\n    else\n        n + sum_to(n - 1)\n    end\nend\n\nfn main() -> Unit\n    println(sum_to(10))\nend\n",
+    "expected": "55\n",
+    "notes": "iter 题集·源题 130 逐字副本。运行时面入选（静态零诊断 + 运行时 RUNTIME000 stderr 双通道采集——新题 137 的题源参照形态）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "137",
+    "category": "iterative_repair",
+    "difficulty": "hard",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（具体运行时错误信息未提供，需实际运行才能发现）。请修复代码使程序正常运行并输出正确结果。\n\n代码：\nfn is_even(n: Int) -> Bool\n    is_odd(n - 1)\nend\n\nfn is_odd(n: Int) -> Bool\n    if n == 0\n        False\n    else\n        is_even(n - 1)\n    end\nend\n\nfn main() -> Unit\n    println(is_even(10))\nend\n诊断 JSON（--check 模式，零诊断）：\n{\n  \"schema\": \"lom-diag/v1\",\n  \"file\": \"bad.lom\",\n  \"ok\": true,\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"holes\": 0\n  },\n  \"diagnostics\": []\n}\n\n期望输出：true（is_even(10)）。修复须保留 is_even/is_odd 相互递归结构（这正是考查点——不得合并为单一函数，也不得直接输出常量 true）。\n\n请输出修复后的完整代码。",
+    "solution": "fn is_even(n: Int) -> Bool\n    if n == 0\n        True\n    else\n        is_odd(n - 1)\n    end\nend\n\nfn is_odd(n: Int) -> Bool\n    if n == 0\n        False\n    else\n        is_even(n - 1)\n    end\nend\n\nfn main() -> Unit\n    println(is_even(10))\nend\n",
+    "expected": "true\n",
+    "notes": "iter 新题 1/3（round-2 诊断驱动形态，2026-10-28）：静态零诊断（真实 --check --json 采集 verbatim，file=bad.lom）+ 运行时失败信息刻意不入 prompt——单轮信息不足，round 2 由 iter_eval.py 实跑喂入真实 stderr（[RUNTIME000] 递归深度超过 60000 层：函数 'is_even' 疑似缺少终止条件——诊断点名 is_even，修复=给 is_even 补 n == 0 基准情形；与 136 直递归同码族但点名的函数与直觉归因错位，多一步定位）。参考解宿主双后端实跑均输出 true（探针 target/probes/b3_impl/design/）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "138",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（具体运行时错误信息未提供，需实际运行才能发现）。请修复代码使程序正常运行并输出正确结果。\n\n代码：\nfrom io import {println}\n\nfn main() -> Unit\n    let total = 100\n    let count = 4 - 4\n    println(total / count)\nend\n诊断 JSON（--check 模式，零诊断）：\n{\n  \"schema\": \"lom-diag/v1\",\n  \"file\": \"bad.lom\",\n  \"ok\": true,\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"holes\": 0\n  },\n  \"diagnostics\": []\n}\n\n期望输出：25（total / count 的正确结果）。修复须真实计算 total / count（不得直接输出常量 25）。\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\n\nfn main() -> Unit\n    let total = 100\n    let count = 4\n    println(total / count)\nend\n",
+    "expected": "25\n",
+    "notes": "iter 新题 2/3（round-2 诊断驱动形态，2026-10-28）：静态零诊断（真实采集 verbatim）+ 运行时失败信息刻意不入 prompt——round 2 实跑喂入真实 stderr（[RUNTIME000] 整数除以零——值错误类运行时诊断，模型需回溯 count = 4 - 4 = 0 的计算链）。参考解宿主双后端实跑均输出 25（探针 target/probes/b3_impl/design/）。iter 协议：max_rounds=5（同 131 注）。"
+  },
+  {
+    "id": "139",
+    "category": "iterative_repair",
+    "difficulty": "medium",
+    "max_rounds": 5,
+    "prompt": "以下 .lom 代码静态检查完全干净（lom-diag/v1 零诊断），但运行时失败——错误只在运行期出现（具体运行时错误信息未提供，需实际运行才能发现）。请修复代码使程序正常运行并输出正确结果。\n\n代码：\nfrom io import {println}\nfrom string import {string_to_int}\n\nfn main() -> Unit\n    let n = string_to_int(\"12x\")\n    println(n + 30)\nend\n诊断 JSON（--check 模式，零诊断）：\n{\n  \"schema\": \"lom-diag/v1\",\n  \"file\": \"bad.lom\",\n  \"ok\": true,\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"holes\": 0\n  },\n  \"diagnostics\": []\n}\n\n期望输出：42。修复须保留 string_to_int 调用参与计算（不得直接输出常量 42）。\n\n请输出修复后的完整代码。",
+    "solution": "from io import {println}\nfrom string import {string_to_int}\n\nfn main() -> Unit\n    let n = string_to_int(\"12\")\n    println(n + 30)\nend\n",
+    "expected": "42\n",
+    "notes": "iter 新题 3/3（round-2 诊断驱动形态，2026-10-28）：静态零诊断（真实采集 verbatim）+ 运行时失败信息刻意不入 prompt——round 2 实跑喂入真实 stderr（[RUNTIME000] 运算 Add 不支持 Unit 和 Int——模型需知道 string_to_int 解析失败返回 Unit，回溯到输入 \"12x\" 非法）。参考解宿主双后端实跑均输出 42（探针 target/probes/b3_impl/design/）。iter 协议：max_rounds=5（同 131 注）。"
+  }
+]
