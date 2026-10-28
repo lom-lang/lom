@@ -3,7 +3,7 @@
 - **文档**：docs/designs/0027-iterative-repair-envelope-explain.md
 - **性质**：动工前置设计（MAINTENANCE §2.1 第 2 条——涉评测面扩容（宣称面）、宿主工具面（check --json 信封 + 新 CLI 子命令）；先例 0001-0026）
 - **基线**：HEAD `e79ec64` / v1.14.0（工作树干净；台账零 open，顺延号 R229 起）
-- **状态**：**设计批产出（2026-10-28，用户裁决"执行 B2 B3 C4 D5"）——三件裁决点待用户裁决后动工**。B2 已先行交付（`e79ec64`，docs/REPRODUCING.md，纯文档批免设计）。本设计批零代码改动。
+- **状态**：**已交付（2026-10-28，用户裁决"按建议执行"全部裁决点按建议项）**——B2 = docs/REPRODUCING.md（`e79ec64`，CI 绿）；C4+D5 = **v1.15.0**（tag `cbb1664`，CI run `40643107112` 七 job 绿——首跑即绿；执行者双批并行实施 + 规划者全量验收含构造性 diff 亲跑）；B3 = **v1.16.0**（tag `33e3e8d`，CI run `40644054450` 七 job 绿——首跑即绿；工程面落地、glm-5.3 零成本首发采样另批待裁）。后续：ACRI v0.2 勘误随③独立仓批（§2.3）。
 - **供料来源**：两路执行者行号级供料——`target/probes/c4d5_supply/report.md`（C4/D5：ACRI 条款原文/Diagnostic 构造点 diagnostics.rs L86-98 与序列化点 L399-400/消费面盘点/过渡选项破坏面/eval 25 题内嵌 line/col 风险量化/codes.rs 46 条注册表/数据源矛盾发现）+ `target/probes/b3_supply/report.md`（B3：runner 现状/协议三选/127 题 1/10 单轮低通过与取证档案/no-op 陷阱题 091/098/099/采样预算/类别落位两案）。关键结论已由规划者亲核（供料行号抽查 + 任务号缺口 108 复算）。
 - **数字落盘前门禁**：写本文前后运行 `python tools/doc_audit.py`。
 
