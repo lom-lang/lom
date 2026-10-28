@@ -2,6 +2,13 @@
 
 **Version 0.1 (Draft) · 2026-10-12 · Maintained by the Lom project (implementation-neutral)**
 
+> **Authoritative source moved (2026-10-28)**: the normative home of this
+> specification is now [lom-lang/acri](https://github.com/lom-lang/acri)
+> (`spec/acri-v0.1.md`, byte-identical, tagged v0.1). This copy is a
+> **reference-repo snapshot** kept for local linking; on any divergence the
+> acri repository wins (a numbered version is immutable there — changes ride
+> version bumps and its CHANGELOG).
+
 ACRI defines the interface between a compiler/toolchain and the AI agents that
 consume its diagnostics and act on repair suggestions. It is a thin, deliberate
 contract: structured diagnostics, confidence-graded repair suggestions with a
