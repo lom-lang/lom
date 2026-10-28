@@ -24,6 +24,7 @@
 //       "message": "<human readable>",
 //       "file": "<path>",
 //       "line": N, "col": N,
+//       "position": {"line": N, "col": N, "anchor": "exact" | "none"},
 //       "source_line": "<source code line>" | null,
 //       "is_hole": <bool>,
 //       "hint": "<fix suggestion>" | null
@@ -398,6 +399,21 @@ impl Diagnostics {
                 out.push_str(&format!("      \"file\": \"{}\",\n", escape_str(&d.file)));
                 out.push_str(&format!("      \"line\": {},\n", d.line));
                 out.push_str(&format!("      \"col\": {},\n", d.col));
+                // C4（designs/0027）：嵌套 position 对象双写（append-only）——
+                // 顶层 line/col 保留不删（ACRI v0.1 §1.1 前向兼容公理：消费器
+                // 必须忽略未知字段；l2-fix/v1→v2 先例同款）。anchor 判定照实：
+                // line/col 均非 0（常规精确坐标：lex/parse/type/name 及带定位
+                // 的 runtime 诊断）→ "exact"；0:0（LEX000 输入不可读等无位置
+                // 通道）→ "none"——不伪造坐标（ACRI §7 负向锁定原则）。
+                let anchor = if d.line > 0 && d.col > 0 {
+                    "exact"
+                } else {
+                    "none"
+                };
+                out.push_str(&format!(
+                    "      \"position\": {{\"line\": {}, \"col\": {}, \"anchor\": \"{}\"}},\n",
+                    d.line, d.col, anchor
+                ));
                 match &d.source_line {
                     Some(s) => {
                         out.push_str(&format!("      \"source_line\": \"{}\",\n", escape_str(s)))
@@ -660,5 +676,61 @@ mod tests {
         assert!(human.contains("| ^"));
         assert!(human.contains("hint:"));
         assert!(human.contains("共 1 个诊断"));
+    }
+
+    // ===== C4（designs/0027）：嵌套 position 双写单测 =====
+
+    /// C4-1：嵌套 position 在场 + anchor="exact"（常规精确坐标）+ 顶层
+    /// line/col 保留（append-only 双写）+ 字段序固定（…line → col →
+    /// position → source_line…，每条诊断恰一个嵌套 position）。
+    #[test]
+    fn diag_json_position_dual_write_exact() {
+        let mut diags = Diagnostics::new("test.lom");
+        let err = LexError {
+            message: "未闭合的字符串".to_string(),
+            line: 2,
+            col: 9,
+        };
+        let lines = src_lines("let x = 1\nlet s = \"hello");
+        diags
+            .diagnostics
+            .push(Diagnostic::from_lex(&err, "test.lom", &lines));
+        diags.ok = false;
+        let json = diags.to_json();
+        // 嵌套 position 在场，anchor=exact（行列均非 0）
+        assert!(json.contains("\"position\": {\"line\": 2, \"col\": 9, \"anchor\": \"exact\"}"));
+        // 顶层 line/col 保留（双写：line/col 各出现恰好两次——顶层一次 + 嵌套一次）
+        assert_eq!(json.matches("\"line\": 2").count(), 2);
+        assert_eq!(json.matches("\"col\": 9").count(), 2);
+        // 每条诊断恰一个 position 对象
+        assert_eq!(json.matches("\"position\"").count(), 1);
+        // 字段序固定：col → position → source_line
+        let col_pos = json.find("\"col\": 9").expect("顶层 col 应在场");
+        let pos_pos = json.find("\"position\"").expect("position 应在场");
+        let src_pos = json.find("\"source_line\"").expect("source_line 应在场");
+        assert!(col_pos < pos_pos && pos_pos < src_pos);
+    }
+
+    /// C4-2：0:0 无位置形态（LEX000 输入不可读信封，main.rs 文件读取失败
+    /// 路径的构造形态）照实 anchor="none"，不伪造坐标。
+    #[test]
+    fn diag_json_position_none_for_zero_pos() {
+        let mut diags = Diagnostics::new("missing.lom");
+        diags.ok = false;
+        diags.diagnostics.push(Diagnostic {
+            severity: Severity::Error,
+            stage: Stage::Lex,
+            code: "LEX000".into(),
+            message: "无法读取文件 'missing.lom'".into(),
+            file: "missing.lom".into(),
+            line: 0,
+            col: 0,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        });
+        let json = diags.to_json();
+        assert!(json.contains("\"code\": \"LEX000\""));
+        assert!(json.contains("\"position\": {\"line\": 0, \"col\": 0, \"anchor\": \"none\"}"));
     }
 }

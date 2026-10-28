@@ -159,6 +159,42 @@ fn main_inner() {
         return;
     }
 
+    // ===== 子命令：explain（designs/0027 D5 / ACRI v0.1 §2.1 OPTIONAL——
+    // 逐码长文档出口，codes.rs EXPLAIN 注册表的首个生产消费方）=====
+    // <code> 经 file 槽传入（l2fix 先例：位置参数装任意输入；本块在文件
+    // 读取之前分发，"NAM003" 不会被当路径读）。未知码 → 结构化错误
+    // （lom-explain/v1 error 信封 / stderr）+ 同族近邻建议，rc 2
+    // （ACRI §2.2 工具失败带）。
+    if cli.subcommand.as_deref() == Some("explain") {
+        let code = match &cli.file {
+            Some(c) => c,
+            None => {
+                eprintln!("用法：lom explain <code> [--json]");
+                // β-2 口径：用法错误 = 工具失败带 rc 2
+                process::exit(2);
+            }
+        };
+        match codes::explain_lookup(code) {
+            Some((entry, doc)) => {
+                if cli.json {
+                    print!("{}", codes::explain_to_json(entry, doc));
+                } else {
+                    codes::print_explain_human(entry, doc);
+                }
+            }
+            None => {
+                let neighbors = codes::same_family_codes(code);
+                if cli.json {
+                    print!("{}", codes::explain_error_json(code, &neighbors));
+                } else {
+                    codes::print_explain_error(code, &neighbors);
+                }
+                process::exit(2);
+            }
+        }
+        return;
+    }
+
     // ===== 子命令：l2fix（designs/0018 裁决点 1 甲的既定后续——L2 已于
     // v1.8.0 转正，宿主 CLI 补桥接面）：解析已采集的 L2 拒绝文本 → 七族
     // 修复建议（tools/l2fix.py 的 Rust 内建移植）=====

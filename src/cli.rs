@@ -101,6 +101,9 @@ pub(crate) fn print_help(prog: &str) {
         "  {prog} codes [--json]               导出诊断码表（lom-codes/v1：九命名空间 + L2 八族）"
     );
     eprintln!(
+        "  {prog} explain <code> [--json]      逐码长文档（语义/成因/修复方向；--json 出 lom-explain/v1）"
+    );
+    eprintln!(
         "  {prog} <file.lom> --trace [--trace-out <f>] [--trace-max-events <n>] [--trace-builtins]  运行并输出调用级执行 trace（JSONL）"
     );
     eprintln!("  {prog} --help | -h               显示帮助");
@@ -161,6 +164,13 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!(
         "              --json 输出 lom-codes/v1 信封（code/severity/category/summary）——agent 的码表引导出口"
     );
+    eprintln!(
+        "  explain     逐码长文档（designs/0027 D5 / ACRI v0.1 §2.1 OPTIONAL）。默认人类可读"
+    );
+    eprintln!(
+        "              （码/severity/族/长文案——语义、常见成因、修复方向）；--json 输出 lom-explain/v1"
+    );
+    eprintln!("              信封（字段族同 lom-codes/v1 + doc 字段）；未知码 rc 2 + 同族近邻建议");
     eprintln!();
     eprintln!("选项:");
     eprintln!(
@@ -201,7 +211,7 @@ pub(crate) fn print_help(prog: &str) {
         "  1  词法/语法/类型/运行时等诊断 error（渐进式 warning 不拦截，rc 0；含带 PKG 码的包诊断）"
     );
     eprintln!(
-        "  2  工具自身失败：文件不存在 / IO 错误 / 用法错误 / 内部错误（ACRI v0.1 §2.2 工具失败带，β-2 起）"
+        "  2  工具自身失败：文件不存在 / IO 错误 / 用法错误 / 内部错误 / explain 未知诊断码（ACRI v0.1 §2.2 工具失败带，β-2 起）"
     );
 }
 
@@ -250,6 +260,13 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
             }
             "codes" => {
                 out.subcommand = Some("codes".to_string());
+                iter.next();
+            }
+            // designs/0027 D5：explain 子命令——<code> 经 file 槽传入
+            // （l2fix 先例：位置参数装任意输入；main.rs 分发块在读文件
+            // 之前消费，不触文件读取路径）。
+            "explain" => {
+                out.subcommand = Some("explain".to_string());
                 iter.next();
             }
             _ => {}
@@ -1080,6 +1097,41 @@ end
                 bad_path
             );
         }
+    }
+
+    // ===== D5（designs/0027）：explain 子命令解析 =====
+
+    /// explain 被识别为子命令、<code> 经 file 槽传入——此前 "explain" 被
+    /// 当文件名，第二个位置参数触发多文件守卫 rc=2（供料 D5-2 实证）。
+    #[test]
+    fn d5_cli_parses_explain_subcommand_with_code_arg() {
+        let args = vec![
+            "lom".to_string(),
+            "explain".to_string(),
+            "NAM003".to_string(),
+        ];
+        let cli = parse_args(&args);
+        assert_eq!(cli.subcommand.as_deref(), Some("explain"));
+        assert_eq!(cli.file.as_deref(), Some("NAM003"));
+        assert!(!cli.json);
+
+        // --json 前后可带（选项解析与位置参数独立）
+        let args2 = vec![
+            "lom".to_string(),
+            "explain".to_string(),
+            "RUNTIME002".to_string(),
+            "--json".to_string(),
+        ];
+        let cli2 = parse_args(&args2);
+        assert_eq!(cli2.subcommand.as_deref(), Some("explain"));
+        assert_eq!(cli2.file.as_deref(), Some("RUNTIME002"));
+        assert!(cli2.json);
+
+        // 缺码参数：file 槽空（main.rs 分发块给用法错误 rc=2）
+        let args3 = vec!["lom".to_string(), "explain".to_string()];
+        let cli3 = parse_args(&args3);
+        assert_eq!(cli3.subcommand.as_deref(), Some("explain"));
+        assert!(cli3.file.is_none());
     }
 
     /// R55（九审）端到端 1：MUT001 跨作用域探针穿过完整迭代闭环——

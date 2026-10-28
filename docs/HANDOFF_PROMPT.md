@@ -47,7 +47,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
 - **状态（2026-10-27，三十八审收官 + 整改三批全收口（用户裁决"按建议执行"——批 1 门面六笔 / 批 2 治理与锚十一笔含 doc_audit 73→78 / 批 3 材料四笔；台账零 open，顺延号 R229 起，详账 TODO 三十八审登记段收口总注）；此前弧线 13 笔 `8660740`→`692c28d` 逐笔 CI 实查 = 12 笔七 job 绿 + 1 笔 6/7【R189 勘误：run `39648682386` 实值 failure（macos cancelled）——三十八审 API 复核；同形态复发：fe01d3b run `40530411316` 亦 6/7 + macos queued cancelled（attempt=1 未重跑，疑似平台排队时滞，下批观察）】：治理五连（统一待裁菜单唯一入口 / 外部观察 §4.6 / 头脑风暴 §4.7 + §4 更名"审查与常设机制" / 梳理环节收敛漏斗 §4.7 + 现存池补救收敛 32→7+25 / F2 裁决分级表 §1.4——L1 预授权五条款本会话实跑条款 1/3/5）+ **v1.14.0 agent 执行 trace 批全链**（tag `b07c6d1` CI `39646107026` 首跑即绿；规划者紧邻交错 A/B 终判 +1.6%/+2.2% 零回退；回填批 `f43ed83`）+ 对外事件：目录 PR #68 合并（Lom 收录 verification 类目，aallan 三馈赠登记）+ **发帖启动**（用户亲笔两帖在途：前置三件套 + 两帖底稿 v2 + 铺底 topics ✓ / awesome-wasm-langs PR #186 open 待审））**：
-  最新基线 **v1.14.0**（= **agent 执行 trace 批**（designs/0026，2026-10-22 用户裁决四点均按建议项；触 src/ 行为批升 minor；冻结面零触碰——纯 CLI flag）：运行模式新增 `--trace` 族——调用级 JSONL 事件流 lom-trace/v1（首行 header + call/return/call-error 事件带 [RUNTIMExxx] 码原文与 depth 帧深 + 尾行 summary）；`--trace`（默认关，关闭态每用户调用恰 2 次 Option 检查）/ `--trace-out <file>`（缺省 stderr、文件 NDJSON 追加写）/ `--trace-max-events <n>`（默认 10000，0=无限）/ `--trace-builtins`（默认关）；值序列化 to_display 语义 + trace 专属截断（120 字符/深度 3，to_display 本体零触碰）；边界：main 入口不出 call 事件、AOT build 不适用；单测 581→593（trace ×12）、quine 272925/368/368/129×2 构造性不变；A/B 关闭态零回退（规划者紧邻交错终判 +1.6%/+2.2% 带内）；探针 target/probes/trace_impl/）。前一基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag `e171488`，CI run `39431280200` 七 job 绿——首跑即绿）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；**gh-pages 已部署 `7af30ef` 线上 v1.13.0**（三一致性全过 + 三项浏览器实测：Run 修复闭环 / demo QUINE 272925 总 2339ms / 分享链接 hash 更新+重载逐字恢复严格验证））。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
+  最新基线 **v1.15.0**（= **ACRI native conformant + explain 批**（designs/0027 C4+D5，2026-10-28 用户裁决按建议执行；触 src/ 升 minor；冻结面零触碰）：**C4** = check --json 信封嵌套 position{line,col,anchor} 双写 append-only（顶层字段保留、ACRI 前向兼容；anchor 照实 exact/0:0→none 不伪造；构造性证明 = 升级前后 diff 恰一行增量）；**D5** = `lom explain <code>`（ACRI §2.1 OPTIONAL 兑现——codes.rs 单源 46 条长文案 + 编译期计数锁 + doc_audit I2 三方锚 78→79；双态出口 + 未知码同族近邻 rc=2）；单测 593→600、quine 272925/368/368/eval 129×2 构造性不变（任务 138 属 v1.16.0 B3 批）；ACRI L0 native conformant（dual-write transition）+ explain 条款 Conformant。前一基线 **v1.14.0**（= **agent 执行 trace 批**（designs/0026，2026-10-22 用户裁决四点均按建议项；触 src/ 行为批升 minor；冻结面零触碰——纯 CLI flag）：运行模式新增 `--trace` 族——调用级 JSONL 事件流 lom-trace/v1（首行 header + call/return/call-error 事件带 [RUNTIMExxx] 码原文与 depth 帧深 + 尾行 summary）；`--trace`（默认关，关闭态每用户调用恰 2 次 Option 检查）/ `--trace-out <file>`（缺省 stderr、文件 NDJSON 追加写）/ `--trace-max-events <n>`（默认 10000，0=无限）/ `--trace-builtins`（默认关）；值序列化 to_display 语义 + trace 专属截断（120 字符/深度 3，to_display 本体零触碰）；边界：main 入口不出 call 事件、AOT build 不适用；单测 581→593（trace ×12）、quine 272925/368/368/129×2 构造性不变；A/B 关闭态零回退（规划者紧邻交错终判 +1.6%/+2.2% 带内）；探针 target/probes/trace_impl/）。前一基线 **v1.13.0**（= **playground 分享链接批**（2026-10-20 用户裁决同意；零 src/ 零 .lom 零语言面——纯 playground/ + 文档 + 升版联动；tag `e171488`，CI run `39431280200` 七 job 绿——首跑即绿）：Run 后静默把编辑器内容以 UTF-8 安全 base64url 写入 URL hash、打开链接自动恢复编辑器（非法 hash 回落默认示例），超长（>6000 码元）跳过并控制台轻提示（膨胀实测 ASCII 8000 / 纯 CJK 24000 URL 字符，探针 target/probes/sharelink/）；新增 playground/sharelink.js 纯函数模块（自实现 base64url——btoa 非 Latin-1 崩溃规避，浏览器/node 双侧同源）+ smoke ⑧ 分享段 8 断言（31→39，CI 零 workflow 改动自动纳入）；零新 UI 元素；**gh-pages 已部署 `7af30ef` 线上 v1.13.0**（三一致性全过 + 三项浏览器实测：Run 修复闭环 / demo QUINE 272925 总 2339ms / 分享链接 hash 更新+重载逐字恢复严格验证））。前一基线 **v1.12.1**（= **wasm file 内建修复批**（designs/0025，四裁决点
   均按建议项；tag `bdfd187`，CI run `38893522801` 首跑即绿）：harness 侧双
   stub 修 file_exists 真形态静默 false 与 file_append 映射态写头破坏两缺陷
   + smoke ⑦ file 段 14 断言入 CI；零 src/ 零语言面，Rust 581+40、quine
@@ -89,12 +89,12 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   即审）。最新报告 [review-2026-10-19.html](reviews/review-2026-10-19.html)（三十七审）。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
-  ~20-45s）、self_comp.lom 12671 行、Rust **593 单元 + 40 集成**（v1.14.0 批：
+  ~20-45s）、self_comp.lom 12671 行、Rust **600 单元 + 40 集成**（v1.15.0 批：593→600 = designs/0027 C4 信封 ×2 + D5 explain ×5；v1.14.0 批：
   581→593 = designs/0026 执行 trace ×12；r56×1 +
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
   build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
-  **78/78**（J 锚组现值 593+40；三十八审整改批 2 起 78 项——J Rust 组并入 README 两计数位 + 轮数互锁 + quine/self_comp 逗号形态 ×4）、六模式全 PASS、link_check PASS、
+  **79/79**（J 锚组现值 600+40；三十八审整改批 2 起 78 项、v1.15.0 批 D5 explain 源码计数锚 +1——J Rust 组并入 README 两计数位 + 轮数互锁 + quine/self_comp 逗号形态 ×4）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
   6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.14.0**（v1.14.0
   trace 批起）。
@@ -185,10 +185,10 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 593/593；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
+   - cargo test --release（期望 600/600；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes，×40）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
-   - python tools/doc_audit.py（期望 78/78）
+   - python tools/doc_audit.py（期望 79/79）
    - python tools/spec_examples_check.py（期望 RESULT: PASS）
    - python tools/eval_prompt_check.py（期望 32/32；v1.11.0 起 error_repair 32 题 = 宿主面 28 + L2 面 3 + 运行时面 1）
    - python tools/verify_selfhost.py 及 --tokens/--diags/--static/--run/--wasm（六模式逐个，全 PASS）

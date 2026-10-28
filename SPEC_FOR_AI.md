@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 46,774 characters ≈ 11.7k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 47,703 characters ≈ 11.9k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 ---
 
@@ -522,14 +522,19 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 ```json
 {
   "schema": "lom-diag/v1",
-  "file": "file.lom",
+  "file": "bad.lom",
   "ok": false,
   "summary": { "total": 2, "errors": 2, "warnings": 0, "holes": 0 },
   "diagnostics": [
     {
-      "severity": "error", "stage": "lex", "code": "LEX001",
+      "severity": "error",
+      "stage": "lex",
+      "code": "LEX001",
       "message": "未闭合的字符串",
-      "file": "file.lom", "line": 3, "col": 13,
+      "file": "bad.lom",
+      "line": 3,
+      "col": 13,
+      "position": {"line": 3, "col": 13, "anchor": "exact"},
       "source_line": "    let s = \"hello",
       "is_hole": false,
       "hint": "在字符串末尾添加 \" 闭合"
@@ -537,6 +542,7 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
   ]
 }
 ```
+Each diagnostic carries its location twice (append-only dual write, forward-compatible): the flat top-level `line`/`col` pair **and** the nested `position` object with an `anchor` field — `"exact"` when the coordinates are a precise point, `"none"` when the channel has no position (e.g. the `LEX000` input-unreadable envelope reports `0:0` honestly rather than fabricating coordinates).
 
 **Error codes** (LLMs can learn these):
 - `LEX001`-`LEX099`: lexical (unclosed string, unexpected char, etc.)
@@ -549,6 +555,8 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 - `MUT001`-`MUT099`: mutability (v0.20.0 — `MUT001` reassigning an immutable binding: `let` without `mut`, function parameter, `for` loop variable, or `match` binding; v1.1.0 — `MUT002` closure references a captured `mut` binding, warning-only, both-backend divergence flag)
 
 **Tolerant parsing & holes**: when the parser cannot parse a statement, it inserts a `Stmt::Hole` placeholder and continues. The hole is reported as `PARSE099` / `RUNTIME003` (if executed). This means LLMs get **all** errors in one round, not just the first — repair them all at once.
+
+**Per-code long-form docs** (single source of truth): run `lom explain <code>` — semantics, common causes, and repair direction for one code. All 46 registered codes carry a long-form explanation this way (the human-readable detail table lives in the tool, not in this file); `--json` emits the `lom-explain/v1` envelope (`code`/`severity`/`category`/`summary` + `doc`). Unknown codes exit 2 with same-family suggestions (e.g. `NAM999` → the `NAM` family).
 
 ---
 

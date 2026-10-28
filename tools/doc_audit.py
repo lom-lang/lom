@@ -302,6 +302,27 @@ def main():
                r'§11f (一|二|三|四|五|六|七|八|九|十)条分歧全档案，探针 (\d+)/(\d+)',
                [cn(div_n), probe_n, probe_n])
 
+    # ---- I2. D5 explain 文案计数（designs/0027：codes.rs EXPLAIN 段机械清点
+    # ↔ CODES 段条数 ↔ SPEC_FOR_AI §11c 指针句宣称——46 码长文档单源锚，
+    # R27/R28 型"文档宣称与源码漂移"钉子）----
+    print('I2. D5 explain 文案计数（codes.rs EXPLAIN ↔ CODES ↔ SPEC_FOR_AI）')
+    def _count_codes_entries(decl, kind):
+        m = re.search(re.escape(decl) + r'(.*?)\n\];', read('src/codes.rs'), re.S)
+        return len(re.findall(kind + r' \{', m.group(1))) if m else -1
+    explain_n = _count_codes_entries('pub(crate) const EXPLAIN: &[ExplainEntry] = &[',
+                                     'ExplainEntry')
+    codes_n = _count_codes_entries('pub(crate) const CODES: &[CodeEntry] = &[',
+                                   'CodeEntry')
+    m_d5 = doc_number('SPEC_FOR_AI.md', r'All (\d+) registered codes carry')
+    check('I2 explain 文案计数（EXPLAIN ↔ CODES ↔ SPEC_FOR_AI §11c 指针句）',
+          explain_n > 0 and explain_n == codes_n
+          and m_d5 is not None and int(m_d5[0]) == explain_n,
+          'EXPLAIN %d 条 vs CODES %d 条 vs SPEC_FOR_AI 宣称 %s%s'
+          % (explain_n, codes_n, m_d5[0] if m_d5 else None,
+             '（designs/0027 D5 单源锚）' if (explain_n > 0
+              and explain_n == codes_n and m_d5 is not None
+              and int(m_d5[0]) == explain_n) else ''))
+
     # ---- J. 跨文档互锁组（工具治理批 2026-09-30：R103/R106 根治）----
     # "gate 覆盖面 ≠ 全部出现面"：同一基线数字在多文档各有当前值位，此前
     # G/D 类只盯部分位置，其余位置两度同型腐坏（R103 README 集成测试数、
