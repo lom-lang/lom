@@ -13,6 +13,7 @@ maintained in **Chinese**.
 | [AGENTS.md](../AGENTS.md) | The first entry point for coding agents (build/verify commands, asset index, frozen surface, probe discipline). |
 | [specs/acri/](../specs/acri/) | ACRI v0.1 — the open agent-compiler repair-interface spec; this repo is its reference implementation. |
 | [eval/README.md](../eval/README.md) | The RepairLoopBench benchmark card (how to re-run, scope statement, SWE-bench-family differentiation). |
+| [REPRODUCING.md](REPRODUCING.md) | The third-party reproduction guide — engineering baseline, LLM experiments, what a fresh clone can and cannot verify, and how to report results. |
 | eval/REPORT*.md | The LLM evaluation reports — each opens with an English TL;DR block; bodies are Chinese. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) / [SECURITY.md](../SECURITY.md) / [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) / [DESIGN_RATIONALE.md](../DESIGN_RATIONALE.md) | Governance and design rationale. |
 | [README.zh-CN.md](../README.zh-CN.md) | The Chinese README mirror (README.md itself is English). |

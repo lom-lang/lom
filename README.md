@@ -160,7 +160,7 @@ Save as `hello.lom`, run `lom hello.lom`. When a run fails at run time, `lom hel
 
 **RepairLoopBench — the 129-task repair-suite benchmark** ([eval/README.md](eval/README.md) is its benchmark card): a contamination-safe, dual-backend benchmark for the repair loop — its error_repair tasks hand models real structured diagnostics (verbatim host `--check --json` plus the L2 cross-compiler's `[L2xxx]` channel) and score convergence through the advisory fix loop; a scope statement distinguishing it from SWE-bench-family suites is on the card. Headline: **full-set pass@1 = 98.3% / 98.5% across two frontier models** (10 samples each, unbiased estimator, 2026-10-07 — [full-set report](eval/REPORT-2026-10-07-passk-128.md)). For citations, see the **Citing** section of the benchmark card (cite the tag, not `main`).
 
-**Verify the claims** (from a fresh clone; ~5 minutes):
+**Verify the claims** (from a fresh clone; ~5 minutes — the full third-party reproduction guide, including the LLM pass-rate experiments and what a fresh clone can and cannot verify, is [docs/REPRODUCING.md](docs/REPRODUCING.md)):
 
 ```bash
 cargo build --release && cargo test --release     # 593 unit + 40 integration tests
