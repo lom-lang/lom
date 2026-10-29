@@ -441,6 +441,7 @@ user.email` 与 GitHub 账号的匹配是归因命脉（旧式 noreply 拼模板
 
 | 规则/信息 | 唯一写位 | 其他引用位（指针，非规范源） |
 |---|---|---|
+| 工作区/三仓规则（lom-lang 层） | WORKSPACE-GOVERNANCE.md（2026-10-29 入册） | HANDOFF_PROMPT 工作区段 |
 | 铁律与角色 | 本文件 §1 | HANDOFF_PROMPT 代码块（携带式镜像） |
 | 裁决分级表 | 本文件 §1.4 | L1 批的 [F2-L1] 标记与 TODO 报备行 |
 | 工作项循环/升版/锚 SOP | 本文件 §2 | — |

@@ -10,7 +10,7 @@
 你是 Lom 项目的维护者（规划者角色）。Lom 是一门 AI 原生编程语言（LLM-repair-native：修复闭环是语言存在理由），Rust 实现，Cargo 零第三方 crate、零 unsafe。
 
 【工作区形态（2026-10-28 三仓迁移后）——先读，硬约束】
-本会话工作目录 D:\lom-lang 是三仓工作区（本目录本身不在 git 内）。**硬约束：不得在 D:\lom-lang 根目录产生任何新文件**——一切探针、临时物、产出只许落三个 repo 文件夹内部（优先各仓 gitignored 区：主仓 target/probes/、acri 与 lom-ssg 的 .tmp/ 或其 .gitignore 覆盖区）。除特别说明外，本提示词所有命令的工作目录 = **D:\lom-lang\lom**（主仓根）。
+本会话工作目录 D:\lom-lang 是三仓工作区（本目录本身不在 git 内）。**硬约束：不得在 D:\lom-lang 根目录产生任何新文件**——一切探针、临时物、产出只许落三个 repo 文件夹内部（优先各仓 gitignored 区：主仓 target/probes/、acri 与 lom-ssg 的 .tmp/ 或其 .gitignore 覆盖区）。除特别说明外，本提示词所有命令的工作目录 = **D:\lom-lang\lom**（主仓根）。**工作区与三仓规则的规范源 = [docs/WORKSPACE-GOVERNANCE.md](WORKSPACE-GOVERNANCE.md)（2026-10-29 入册：lom-lang 维护者本体 / lom / lom-ssg / acri 四部分，含三仓隔离铁律与审查形态三分）——本段为其携带式镜像，冲突以该文件为准。**
 - **主仓 D:\lom-lang\lom**（GitHub lom-lang/lom）：语言/工具链/评测/治理的全部规则源与主写位（MAINTENANCE/TODO/HANDOVER/SPEC/designs 均在此）——本提示词的铁律、门禁、回归清单全部针对主仓，不变。
 - **规范仓 D:\lom-lang\acri**（GitHub lom-lang/acri）：ACRI 规范之家——spec/（权威源，同版不可变：任何文字改动必须升版 + CHANGELOG + git tag）/ conformance/（套件，工程批待启）/ implementations/（符合性登记表）。轻量门禁：文本批自查链接即可，无 CI。
 - **应用仓 D:\lom-lang\lom-ssg**（GitHub lom-lang/lom-ssg）：第一个 Lom 真实应用（786 行 build.lom 零依赖 SSG）。门禁：改动后用主仓 target/release/lom.exe 构建验证 + lom fmt --check build.lom；CI 尚未建立（新会话可裁是否加）。
