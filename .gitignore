@@ -60,3 +60,4 @@ docs/lom-tutorial.html
 # playground 二期自举演示分发物（tools/build_selfboot.py 产物，不入库；
 # *.wasm 已有全局忽略，此处覆盖 hex/lom 副本）
 playground/dist-selfboot/
+docs/WORKSPACE-LOCAL.md
