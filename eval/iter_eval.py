@@ -10,7 +10,14 @@
       - 运行时：`lom <file>` 的退出码 / stdout / stderr 原文
     （双真实采集纪律：诊断文本一律实跑采集，禁手写——eval/README §iterative）
   模型每轮回写完整代码（=== <id>.lom === 块提取，与 llm_eval.py 同式）。
-  通过判定与 runner 同口径：stdout 逐字（CRLF 归一）+ 退出码 0；
+  通过判定（--grading，2026-10-31 审稿要求）：
+    exec（默认，历史口径）= stdout 逐字（CRLF 归一）+ 退出码 0（与 runner 同口径）；
+    fullspec = exec 面且 宿主 --check --json summary.errors=0 且 warnings=0 且
+      L2 子集编译通过（调用形态照 tools/l2fix.py L132-147 /
+      target/probes/academic/paper-llm4code/fullspec-audit/audit_run.py：临时副本 →
+      <lom> examples/selfhost/self_comp.lom -- <in.lom> <out.hex> → stdout 无
+      "codegen error" 行且含 "COMPILED"）。
+  round N>1 反馈不因 grading 变：仍喂原 exec 面诊断（静态 JSON 原文 + 运行三件套）。
   通过即早停；达 max_rounds 未通过记删失（删失单列报，不折算轮数）。
 
 轨迹布局（<out-root>/<out-name>/ 下）：
@@ -29,6 +36,8 @@
   python eval/iter_eval.py --dry-run --samples 2 --out-name dryrun --out-root target/probes/b3_impl/iter
   # 删失路径自验：R=1 下 broken 不通过的题全部删失
   python eval/iter_eval.py --dry-run --samples 2 --max-rounds 1 --out-name dryrun_cens --out-root target/probes/b3_impl/iter
+  # full-spec 口径（警告消除 + L2 编译纳入收敛判定；rounds.jsonl 各轮记录带 grading 字段）
+  python eval/iter_eval.py --dry-run --samples 2 --grading fullspec --out-name dryrun_spec --out-root target/probes/b3_impl/iter
 
 汇总：python eval/iter_summarize.py --dir <上述 run 目录>
 """
@@ -38,6 +47,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -50,6 +60,8 @@ import llm_eval  # noqa: E402
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 PROMPTS_DIR = os.path.join(EVAL_DIR, "prompts")
 TASKS_FILE = os.path.join(EVAL_DIR, "tasks", "11_iterative_repair.json")
+REPO_ROOT = os.path.dirname(EVAL_DIR)
+L2_SELF_COMP = os.path.join(REPO_ROOT, "examples", "selfhost", "self_comp.lom")
 DEFAULT_R = 5  # 题面 max_rounds 缺省（designs/0027 裁决 0-4）
 
 # 与 tools/eval_prompt_check.py 同锚：题面内嵌 broken 代码提取（dry-run 退化候选用）
@@ -120,6 +132,47 @@ def diag_codes(static_txt):
     return [d.get("code", "?") for d in v.get("diagnostics", []) if isinstance(d, dict)]
 
 
+def summary_clean(static_txt):
+    """fullspec 面A 宿主警告面（照 fullspec-audit/audit_run.py face_a 解析形态）：
+    --check --json 的 summary.errors==0 且 summary.warnings==0。"""
+    try:
+        s = json.loads(static_txt)["summary"]
+        return s["errors"] == 0 and s["warnings"] == 0
+    except Exception:
+        return False
+
+
+def l2_compiles(lom_bin, src_path):
+    """fullspec 面C L2 编译面（tools/l2fix.py L132-147 / audit_run.py face_c 调用形态）：
+    临时目录写副本 → <lom> <self_comp.lom> -- <in.lom> <out.hex> →
+    stdout 无 "codegen error" 行且含 "COMPILED"（COMPILE-ERROR 恒 rc=0，只看 stdout）。"""
+    tmp = tempfile.mkdtemp(prefix="iterspec-")
+    try:
+        tin = os.path.join(tmp, "in.lom")
+        tout = os.path.join(tmp, "out.hex")
+        shutil.copyfile(src_path, tin)
+        proc = subprocess.run([lom_bin, L2_SELF_COMP, "--", tin, tout],
+                              capture_output=True, timeout=120,
+                              encoding="utf-8", errors="replace")
+        return ("codegen error" not in proc.stdout) and ("COMPILED" in proc.stdout)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def grade_fullspec(lom_bin, code, expected, path):
+    """fullspec 三面独立判定（audit 复跑/单测入口；主循环走增量形态——复用已采集的
+    run_rec 与 static_txt，只补 L2 面，避免重复执行宿主）。
+    面①执行面 = run_candidate 同口径（stdout 逐字 CRLF 归一 + rc 0）；
+    面②警告面 = summary_clean；面③L2 面 = l2_compiles。返回 (passed, faces)。"""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(code)
+    run_rec = run_candidate(lom_bin, code, expected, path)
+    static_txt = static_check(lom_bin, path)
+    faces = {"exec": run_rec["pass"], "clean": summary_clean(static_txt),
+             "l2": l2_compiles(lom_bin, path)}
+    return all(faces.values()), faces
+
+
 def main():
     ap = argparse.ArgumentParser(description="B3 迭代修复采集（单步反馈链协议）")
     ap.add_argument("--provider", default=None, choices=sorted(llm_eval.PROVIDERS))
@@ -131,6 +184,10 @@ def main():
     ap.add_argument("--thinking", action="store_true")
     ap.add_argument("--max-tokens", type=int, default=16384)
     ap.add_argument("--only", default=None, help="只跑指定题（逗号分隔 id，调试用）")
+    ap.add_argument("--grading", choices=["exec", "fullspec"], default="exec",
+                    help="通过判定口径：exec（默认，历史口径——stdout 逐字 + rc 0）；"
+                         "fullspec（exec 面 + 宿主警告面 --check --json errors=0 且 "
+                         "warnings=0 + L2 子集编译面）。反馈不因口径变。")
     ap.add_argument("--dry-run", action="store_true",
                     help="零 API 管线自验：round1 恒回传题面 broken、round2 起恒回传参考解")
     ap.add_argument("--lom-bin", default="./target/release/lom.exe")
@@ -206,6 +263,7 @@ def main():
                 if code is None:
                     passed, rc, note = False, None, "模型未产出 === %s.lom === 块" % tid
                     scodes, rcodes = [], []
+                    faces = None
                 else:
                     with open(cand_path, "w", encoding="utf-8", newline="\n") as f:
                         f.write(code)
@@ -222,10 +280,22 @@ def main():
                     scodes = diag_codes(static_txt)
                     rcodes = sorted(set(RUNTIME_CODE_RE.findall(run_rec["stderr"])))
                     prev_code = code
-                rounds_log.write(json.dumps({
+                    if args.grading == "fullspec":
+                        # 增量形态：复用已采集的 run_rec（面①exec）与 static_txt（面②警告），
+                        # 只补面③L2 编译；exec 口径行为与此分支完全无关（历史判定原样）。
+                        faces = {"exec": run_rec["pass"], "clean": summary_clean(static_txt),
+                                 "l2": l2_compiles(args.lom_bin, cand_path)}
+                        passed = all(faces.values())
+                    else:
+                        faces = None
+                rec_out = {
                     "round": rnd, "pass": passed, "rc": rc, "note": note,
                     "static_codes": scodes, "runtime_codes": rcodes,
-                }, ensure_ascii=False) + "\n")
+                    "grading": args.grading,
+                }
+                if args.grading == "fullspec":
+                    rec_out["fullspec_faces"] = faces
+                rounds_log.write(json.dumps(rec_out, ensure_ascii=False) + "\n")
                 rounds_log.flush()
                 if passed:
                     converged = True
@@ -250,7 +320,15 @@ def main():
         "thinking": args.thinking, "max_tokens": args.max_tokens,
         "lom_bin": args.lom_bin, "tasks_file": os.path.relpath(TASKS_FILE, EVAL_DIR),
         "task_ids": [t["id"] for t in tasks],
-        "pass_criterion": "stdout verbatim (CRLF-normalized) + exit code 0 (same as runner)",
+        "grading": args.grading,
+        "pass_criterion": (
+            "stdout verbatim (CRLF-normalized) + exit code 0 (same as runner)"
+            if args.grading == "exec" else
+            "fullspec: exec face (stdout verbatim CRLF-normalized + rc 0) AND host "
+            "--check --json summary errors=0 and warnings=0 AND L2 subset compile "
+            "(examples/selfhost/self_comp.lom; no 'codegen error' line and COMPILED "
+            "in stdout) — per fullspec-audit/audit_run.py three-face protocol"
+        ),
         "started_utc": t0.isoformat(),
         "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "totals": totals,

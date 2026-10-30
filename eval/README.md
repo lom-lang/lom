@@ -217,6 +217,15 @@ full program every round. Passing = stdout verbatim (CRLF-normalized) + exit
 code 0 — the same criterion as the runner; a pass early-stops the trajectory,
 and reaching `max_rounds` (R = 5 on every task; `--max-rounds` overrides
 globally for experiments) without a pass records a **censored** trajectory.
+`--grading fullspec` (2026-10-31, reviewer-requested) folds the
+full-specification check into this convergence criterion — the exec face above
+**plus** warning-free host diagnostics (`--check --json` summary errors=0 and
+warnings=0) **plus** a compile under the L2 subset chain
+(`examples/selfhost/self_comp.lom`, per `tools/l2fix.py`'s invocation form) —
+while default `--grading exec` keeps the historical criterion untouched;
+`rounds.jsonl` round records carry a `grading` field, and round-N>1 feedback
+still shows the exec-face diagnostics (feedback does not change with the
+grading scope).
 
 **Metrics (both reported; designs/0027 §1.3):** per-task rounds-to-pass
 distribution (median / mean / P90, computed over converged trajectories only —
