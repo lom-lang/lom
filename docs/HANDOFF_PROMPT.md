@@ -102,8 +102,9 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
   6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.14.0**（v1.14.0
   trace 批起）。
-- **ACRI 现行面**：specs/acri/（规范 v0.1 + 符合性映射 + consumer.py）；
-  Lom = L1-conformant（L0 conformant 两处 by-mapping；两登记偏差见
+- **ACRI 现行面**：规范之家 = lom-lang/acri（现行 **v0.2**，2026-11-22 切版）；
+  本仓 specs/acri/（v0.1 冻结快照 + 符合性映射 + consumer.py，不再镜像后续版本）；
+  Lom = L0/L1-conformant + L2 documented（v0.2 起哨兵原生；两登记偏差见
   lom-conformance.md）；benchmark 字段 = RepairLoopBench。
 - **战略面现行态**：γ 评测资产已落地（RepairLoopBench 基准卡 = eval/
   README）；β 三批已落地；**目录收录已成事实**（PR #68 合并、verification 类目）；**发帖暂缓**（2026-10-28 用户裁决"我改主意了，暂不发帖"——在途态转暂缓：启动裁决链与材料留档不撤销、硬门槛与每帖呈批条款重启时继续适用、PR #186 不撤回继续等审、重启 = 用户指令无预设日程，裁决档 `target/probes/decisions/2026-10-28-posting-pause.md`；此前在途态留存：用户亲笔两帖——顺序 modmail r/PL → HN → Reddit[modmail 获准 + HN 评论链完整后]（R209 收口）；前置三件套/底稿 v2/28 条预演在 target/probes/outreach/prelaunch/（已顺刷至 v1.14.0/38 轮现值）；两硬风险在案：HN 禁 AI 文本、Reddit AI slop 永封条款原文已核；R185 Citing 作者名已修正 wytyKen；铺底 topics ✓ + awesome-wasm-langs PR #186 待审）；对外动作逐项呈批不变。

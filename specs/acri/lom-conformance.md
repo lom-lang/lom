@@ -1,9 +1,12 @@
-# Lom conformance to ACRI v0.1
+# Lom conformance to ACRI v0.2
 
-**Status: 2026-10-12 · reference-implementation mapping · maintained with the specification**
+**Status: 2026-11-22 · reference-implementation mapping · maintained with the specification**
 
-This file maps the Lom toolchain's current behavior to ACRI v0.1
-(`acri-v0.1.md`). Conformance levels per §2.3. "Planned" items carry their
+This file maps the Lom toolchain's current behavior to ACRI **v0.2**
+(`spec/acri-v0.2.md` in [lom-lang/acri](https://github.com/lom-lang/acri),
+cut 2026-11-22 — the operative specification and the normative home of the
+spec; the local `acri-v0.1.md` is the frozen founding snapshot, kept for
+local linking). Conformance levels per §2.3. "Planned" items carry their
 remediation batch from designs/0023 §5.
 
 ## L0 — Object model
@@ -13,7 +16,7 @@ remediation batch from designs/0023 §5.
 | §1.1 `code` `<NS><NNN>`, stable | 9 namespaces (LEX/PARSE/TYPE/NAM/EFF/MAT/MUT/RUNTIME/PKG) + L2-side `[L2xxx]` 7 families; codes stable and machine-locked by 368 verify_selfcomp cases | **Conformant** (see §2.1 gap: no `codes` export yet) |
 | §1.1 `severity` error/warning | `lom-diag/v1` severity field, same two values | **Conformant** |
 | §1.1 `message` (any language) | Chinese messages; agents consume `code` | **Conformant** |
-| §1.1 `position` object with `anchor` | The `check --json` envelope dual-writes location (append-only): the flat top-level `line`/`col` pair (kept for v1-era consumers under the forward-compatibility axiom) **plus** the nested `position` object `{"line","col","anchor"}`. `anchor` is `"exact"` for precise-point diagnostics (lex/parse/name/type with real spans) and `"none"` for positionless channels — the `LEX000` input-unreadable envelope reports `0:0` + `"none"` honestly rather than fabricating coordinates; the L2 codegen channel keeps its optional `ln:cl` name-first convention, deliberately absent rather than fabricated when unresolvable | **Conformant (native, dual-write transition)** — the nested object is physically present in the envelope; the flat pair is retained, not removed (consumers MUST ignore unknown fields, so deletion is unnecessary) |
+| §1.1 `position` object with `anchor` | The `check --json` envelope dual-writes location (append-only): the flat top-level `line`/`col` pair (kept for v1-era consumers under the forward-compatibility axiom) **plus** the nested `position` object `{"line","col","anchor"}`. `anchor` is `"exact"` for precise-point diagnostics (lex/parse/name/type with real spans) and `"none"` for positionless channels — the `LEX000` input-unreadable envelope reports `0:0` + `"none"` honestly rather than fabricating coordinates; the L2 codegen channel keeps its optional `ln:cl` name-first convention, deliberately absent rather than fabricated when unresolvable | **Conformant (native, dual-write transition)** — the nested object is physically present in the envelope; the flat pair is retained, not removed (consumers MUST ignore unknown fields, so deletion is unnecessary). The `0:0`+`"none"` sentinel has been **natively conformant since the v0.2 §1.1 erratum** (previously a registered mapping under v0.1) |
 | §1.1 `stage` OPTIONAL | `stage` field (lex/parse/type/codegen…) | **Conformant** |
 | §1.1 `hint` OPTIONAL | `hint` field | **Conformant** |
 | §1.1 extension fields | `source_line`, `is_hole` — extensions under §1.1's open-field axiom | **Conformant** |
@@ -39,7 +42,7 @@ remediation batch from designs/0023 §5.
 
 | ACRI clause | Lom current behavior | Status |
 |---|---|---|
-| §3.1 dual real capture | eval prompts embed verbatim `--check --json` captures (machine-gated by `tools/eval_prompt_check.py`, 31/31) | **Conformant** |
+| §3.1 dual real capture | eval prompts embed verbatim `--check --json` captures (machine-gated by `tools/eval_prompt_check.py`, 41/41) | **Conformant** |
 | §3.2 synthesis declaration | RepairLoopBench card (`eval/README.md`) declares synthesis + non-comparability scope | **Conformant** |
 | §3.3 multi-chain reference validation | Reference solutions verified on host interpreter / host WASM / L2 chain; expected outputs locked | **Conformant** |
 | §3.4 black-box scoring | stdout + exit code only | **Conformant** |
@@ -49,7 +52,8 @@ remediation batch from designs/0023 §5.
 ## Summary
 
 - **L0-conformant: yes** — §1.1 `position` is now native (dual-write transition,
-  the flat pair retained); the remaining "by mapping" note on §1.2 is deferred
+  the flat pair retained); the `0:0` sentinel is natively conformant under the
+  v0.2 erratum; the remaining "by mapping" note on §1.2 is deferred
   to the conformance-suite batch for clarification.
 - **L1-conformant: yes (β-2 delivered, v1.10.0; OPTIONAL `explain` delivered in
   designs/0027 D5)** — all REQUIRED commands present, exit-code matrix honored
