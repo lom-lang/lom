@@ -34,25 +34,25 @@ deliberately unified on `eval/runner/run.ps1` via `pwsh` on all platforms.
 
 ## 2. Reproduce the engineering baseline (deterministic, no LLM)
 
-All commands from the repository root. Expected results are stated as of
-v1.14.0; [HANDOVER.md §2.2](HANDOVER.md) is the single source of truth and is
+All commands from the repository root. Expected counts are **not restated
+here** (they drift with every release); [HANDOVER.md §2.2](HANDOVER.md) is the
+single source of truth for every expected number in this section and is
 machine-interlocked by `tools/doc_audit.py` in CI, so a cloned tag's expected
 counts never silently drift from its code.
 
 ```bash
 cargo build --release        # must finish with zero warnings (repo rule)
-cargo test --release         # expected: 593 unit + 40 integration = 633 passing (v1.14.0)
+cargo test --release         # expected unit/integration counts: HANDOVER.md §2.2
 ```
 
 The benchmark suite and its two independent backends (tree-walking
 interpreter and WASM):
 
 ```bash
-# native backend — expected 129/129
+# both backends — expected N/N per HANDOVER.md §2.2
 powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe
-# WASM backend  — expected 129/129
 powershell -ExecutionPolicy Bypass -File eval/runner/run.ps1 -Verify -LomBin ./target/release/lom.exe -Backend wasm
-# error_repair prompts embed real compiler output — expected 32/32, exit 0
+# error_repair prompts embed real compiler output — expected count: HANDOVER.md §2.2, exit 0
 python tools/eval_prompt_check.py
 ```
 
@@ -66,9 +66,9 @@ comparison.
 The self-hosting chain (the "compiler compiles itself, provably" claim):
 
 ```bash
-python tools/verify_selfhost.py      # expected 162/162 (dump mode; more modes via --tokens/--diags/--static/--run/--wasm)
-python tools/verify_selfcomp.py      # expected 368/368 (196 single-file + 8 packages + 164 negatives)
-python tools/verify_selfcomp.py --bootstrap   # expected 14/14; asserts the strong quine of 272925 bytes, byte-identical
+python tools/verify_selfhost.py      # expected counts per mode: HANDOVER.md §2.2
+python tools/verify_selfcomp.py      # expected counts (positives + negatives): HANDOVER.md §2.2
+python tools/verify_selfcomp.py --bootstrap   # asserts the strong quine byte-identical — value per HANDOVER.md §2.2
 ```
 
 The remaining regression surface (each with its expected result stated in
@@ -87,12 +87,13 @@ all three CI operating systems.
 
 ### 3.1 What the benchmark is
 
-RepairLoopBench: 129 tasks across 10 categories, of which 32 are
-`error_repair` tasks (the repair loop is the point of the suite — the
+RepairLoopBench: current task/category counts live in
+[eval/README.md](../eval/README.md) (the benchmark card, single source) and
+[eval/manifest.json](../eval/manifest.json) (the machine-readable definition
+of record); the repair loop is the point of the suite — the `error_repair`
 category hands the model broken code plus verbatim `lom --check --json`
-diagnostics captured from the real compiler). Task ids run 001–130 with one
-known, accepted gap (no task 108). The machine-readable definition of record
-is [eval/manifest.json](../eval/manifest.json); the benchmark card, including
+diagnostics captured from the real compiler. Task ids run 001–139 with one
+known, accepted gap (no task 108). Also see the benchmark card, including
 how it differs from SWE-bench-family suites, is
 [eval/README.md](../eval/README.md).
 
@@ -212,9 +213,10 @@ Coding Plan subscription endpoint respectively.
 
 **You can, deterministically:**
 
-- the full engineering baseline of Section 2 (build, 633 tests, dual-backend
-  129/129, prompt-diagnostic fidelity 32/32, self-hosting quine of 272925
-  bytes) on any of the three CI operating systems;
+- the full engineering baseline of Section 2 (build, tests, dual-backend
+  benchmark run, prompt-diagnostic fidelity, self-hosting quine — every
+  expected count per [HANDOVER.md §2.2](HANDOVER.md)) on any of the three CI
+  operating systems;
 - benchmark integrity: reference solutions pass, ids are unique, and every
   `error_repair` prompt's embedded diagnostics still match the live
   compiler's `--check --json` output (that is what `eval_prompt_check.py`

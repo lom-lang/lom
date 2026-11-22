@@ -141,6 +141,14 @@ def main():
     # HANDOVER §2.2 的 eval 行锚定 run.ps1（同文件的 "期望 456/456" 是 cargo test 行，测试数不在监控范围）
     expect_all('HANDOVER §2.2 期望', 'docs/HANDOVER.md',
                r'run\.ps1 -Verify[^\n]*# 期望 (\d+)/(\d+)', [eval_total, eval_total])
+    # R229-R233 批（2026-11-23 新鲜眼审计开账）：README 基准卡计数 / 复现命令注释
+    # / zh-CN 现集题数三个 eval 数字位此前全在锚外（v1.16.0 扩容 129→138 漏刷实证）。
+    expect_all('README 基准卡计数', 'README.md',
+               r'the (\d+)-task repair-suite benchmark', [eval_total])
+    expect_all('README 复现命令 eval 期望', 'README.md',
+               r'# eval (\d+)/(\d+)', [eval_total, eval_total])
+    expect_all('README.zh-CN 现集题数', 'README.zh-CN.md',
+               r'现集 (\d+) 题', [eval_total])
     # 第九轮审查：SPEC_FOR_AI 当前态两处仍停在 118，且 ci.yml step 名停在 119；
     # 原 A 类只盯主 README/spec/HANDOVER，导致 63/63 仍放过现行 LLM 规范漂移。
     expect_all('SPEC_FOR_AI 当前 eval 口径', 'SPEC_FOR_AI.md',
@@ -191,6 +199,10 @@ def main():
     # 存量腐坏位，E 类此前只盯 HANDOVER 不覆盖此处
     expect_all('README Current release', 'README.md',
                r'Current release: v([\d.]+)', [cargo_ver])
+    # R229（2026-11-23 新鲜眼审计）：Status & boundaries 段的 Current 行是另一
+    # 个版本写位——v1.8.0/v1.12.0/v1.14.0 三度滞留（R179 同型三犯），本锚收口。
+    expect_all('README Status Current 版本', 'README.md',
+               r'- Current: \*\*v([\d.]+)\*\*', [cargo_ver])
     # Ⓒ 一页纸（2026-09-15；日期位随九审交接校准 2026-09-21）：时点快照口径，但版本位仍钉（防长期滞留旧版本）
     expect_all('positioning 版本位', 'docs/positioning.html',
                r'截至 <strong>20\d{2}-\d{2}-\d{2}（v([\d.]+)）</strong>', [cargo_ver])
@@ -227,7 +239,7 @@ def main():
     for fp in sorted(glob.glob('src/**/*.rs', recursive=True)):
         test_count += read(fp).count('#[test]')
     expect_all('HANDOVER §2.2 测试行', 'docs/HANDOVER.md',
-               r'cargo test --release\s+# 期望 (\d+)/(\d+)', [test_count, test_count])
+               r'cargo test --release\s+# 期望单元 (\d+)/(\d+)', [test_count, test_count])
     expect_all('HANDOVER §9 检查单', 'docs/HANDOVER.md',
                r'test --release` 确认 (\d+)/(\d+)', [test_count, test_count])
     expect_all('README 状态段测试数', 'README.md',
@@ -398,7 +410,8 @@ def main():
         ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
          r'期望 (\d+)/(\d+)；另有集成[^\n]*×(\d+)', ('unit', 'unit', 'integ')),
         ('HANDOVER §2.2 cargo test 行', 'docs/HANDOVER.md',
-         r'期望 (\d+)/(\d+)（v[\d.]+ 集成 (\d+) = r56', ('unit', 'unit', 'integ')),
+         r'期望单元 (\d+)/(\d+) \+ 集成 (\d+) = 合计 \d+（集成十 target 分布',
+         ('unit', 'unit', 'integ')),
         ('HANDOVER §9-2', 'docs/HANDOVER.md',
          r'另有 tests/ 集成 ×(\d+)', ('integ',)),
         ('HANDOVER §9-5', 'docs/HANDOVER.md',

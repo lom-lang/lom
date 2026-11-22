@@ -90,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File eval\runner\run.ps1 -Verify -LomBin .\t
 ### 2.2 全量回归三件套（每次改动后跑）
 
 ```powershell
-cargo test --release                                    # 期望 600/600（v1.15.0 集成 40 = r56 ×1 + r58 ×7 + r94_pkg_alias ×2 + r104_dedup_order ×6 + r108_variant_externals ×5 + r107_alias_clash ×4 + build_closure_externals ×3 + r112_closure_assign ×3 + build_gaps_remediation ×6 + beta2_exit_codes ×3，合计 633；单元 581→593 = designs/0026 执行 trace ×12）
+cargo test --release                                    # 期望单元 600/600 + 集成 40 = 合计 640（集成十 target 分布：r56 ×1 + r58 ×7 + r94_pkg_alias ×2 + r104_dedup_order ×6 + r108_variant_externals ×5 + r107_alias_clash ×4 + build_closure_externals ×3 + r112_closure_assign ×3 + build_gaps_remediation ×6 + beta2_exit_codes ×3；计数沿革见 TODO 交付段与 SPEC §13，本行只记现值）
 ./target/release/lom.exe <file.lom> --trace [--trace-out <f>] [--trace-max-events <n>] [--trace-builtins]   # designs/0026（v1.14.0）：运行模式执行 trace——调用级 JSONL 事件流（lom-trace/v1）到 stderr；--trace-out 文件 NDJSON 追加写；默认上限 10000 事件（0=无限）；内建默认不入 trace（详见 SPEC_FOR_AI §11g；AOT build 产物不经解释器不适用）
 $lomFmtFiles = Get-ChildItem -LiteralPath examples -Recurse -Filter *.lom -File | Where-Object { $_.Name -ne 'apply_test.lom' }
 foreach ($lomFmtFile in $lomFmtFiles) { & .\target\release\lom.exe fmt $lomFmtFile.FullName --check; if ($LASTEXITCODE -ne 0) { throw $lomFmtFile.FullName } }  # CI 同覆盖：37 个有效文件，apply_test 豁免；新增/修改 .lom 提交前必查
@@ -111,7 +111,7 @@ python tools/diff_test.py --pkg --rounds 10 --seed-base 1 --ci   # D5 包模式�
 # 覆盖率（按需）：rustup component add llvm-tools-preview 后
 #   RUSTFLAGS="-C instrument-coverage" cargo test --release + llvm-profdata merge + llvm-cov report（Q1 口径，行覆盖 84.4% 下界）
 python tools/eval_prompt_check.py                        # R60：error_repair prompt 内嵌诊断 vs 真实 lom --json（24/24；--bin 可指定非默认路径的二进制，默认即 target/release/lom[.exe]）
-python tools/doc_audit.py                               # 对账：文档数字 79 项（原 63 + 九审 ×2 + R76/十二审 ×2 + 工具治理批 ×4：README latest-milestone 版本位 + 跨文档互锁组 ×3 verify_selfcomp/quine/Rust 计数——R103/R106"gate 覆盖面 ≠ 全部出现面"根治 + R131 J+ 集成现实核对 + R136 处置 b K 交接镜像登记枚举核对 + 三十八审整改批 2 ×5【R190/R202/R224】：J Rust 组并入 README 两计数位 + 审查轮数互锁 README↔positioning + quine/self_comp 逗号形态锚 ×4；其余为 eval/dump/.lom/行数/版本/changelog/测试数/claims/源码计数/SPEC 尺寸/自指/门面版本位 + designs/0027 D5 explain 文案计数锚 ×1【codes.rs EXPLAIN 段 ↔ CODES 段 ↔ SPEC_FOR_AI §11c 指针句】）——已在 CI doc-gates job 常驻
+python tools/doc_audit.py                               # 对账：文档数字 83 项（原 63 + 九审 ×2 + R76/十二审 ×2 + 工具治理批 ×4：README latest-milestone 版本位 + 跨文档互锁组 ×3 verify_selfcomp/quine/Rust 计数——R103/R106"gate 覆盖面 ≠ 全部出现面"根治 + R131 J+ 集成现实核对 + R136 处置 b K 交接镜像登记枚举核对 + 三十八审整改批 2 ×5【R190/R202/R224】：J Rust 组并入 README 两计数位 + 审查轮数互锁 README↔positioning + quine/self_comp 逗号形态锚 ×4 + R229-R233 新鲜眼审计批 ×4【README 基准卡计数 / 复现命令 eval 期望 / zh-CN 现集题数 / Status Current 版本位】；其余为 eval/dump/.lom/行数/版本/changelog/测试数/claims/源码计数/SPEC 尺寸/自指/门面版本位 + designs/0027 D5 explain 文案计数锚 ×1【codes.rs EXPLAIN 段 ↔ CODES 段 ↔ SPEC_FOR_AI §11c 指针句】）——已在 CI doc-gates job 常驻
 python tools/link_check.py                              # 断链机检（2026-10-06 防腐批一次性脚本升格入库、接线 CI doc-gates——菜单⑥；A 类现行文档断链与大小写漂移非零退出，B 类历史原文 archive/reviews 断链不拦（审查纪律"原文不回写"）；--raw 附落盘 target/link_check/broken_raw.txt）
 ```
 
