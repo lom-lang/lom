@@ -134,7 +134,7 @@ The Phase 1–8 milestone checklist (the full feature history, kept as written a
 | 0 | Language Design & Spec | 1-2 w | LLM reads spec, generates valid code >80% |
 | 1 | Minimal Interpreter | 4-6 w | 10+ test cases pass with LLM-generated code |
 | 2 | LLM-coding-native Core | 6-10 w | LLM generation pass-rate eval set meets baseline |
-| 3 | Usable MVP | 8-12 w | Write a complete CLI tool or simple web service | ✅ Done (3.5 todo CLI) |
+| 3 | Usable MVP | 8-12 w | Write a complete CLI tool or simple web service — done (3.5 todo CLI) |
 | 4 | LLM-repair-native + toolchain (adjusted 2026-08) | — | `lom fix` covers main diagnostic auto-repair + confidence model + REPL + LSP + package manager |
 | 5 | Ecosystem & Bootstrapping | done 2026-08-19 | Bootstrap feasibility proven (mini-interpreter in Lom; full self-hosting = RFC-0003 draft, parked) |
 | 6 | Production engineering | done 2026-08-22 | Semver, 3-platform CI, governance, `lom doc`/`fmt`, SECURITY.md |
