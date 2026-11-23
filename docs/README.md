@@ -26,7 +26,7 @@ maintained in **Chinese**.
 | [HANDOVER.md](HANDOVER.md) | Baseline numbers, environment pitfalls, language pitfalls, full regression command list. |
 | [TODO.md](TODO.md) | The living status block: ledger, adjudication menu, delivered-batch records. |
 | [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) / [EXECUTOR_TEMPLATE.md](EXECUTOR_TEMPLATE.md) | Planner/executor collaboration documents. |
-| [designs/](designs/) | Per-batch engineering design documents (all delivered). |
+| [designs/](designs/) | Per-batch engineering design documents — each opens with a status line (delivered, or pending adjudication). |
 | [rfc/](rfc/) | The RFCs and their revision records — the per-batch behavioral history. |
 | [reviews/](reviews/) | System-internal adversarial review reports (archived; originals are never rewritten). |
 | [archive/](archive/) | The historical log. |
