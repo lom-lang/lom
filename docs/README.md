@@ -14,6 +14,7 @@ maintained in **Chinese**.
 | [specs/acri/](../specs/acri/) | ACRI — the open agent-compiler repair-interface spec (normative home: [lom-lang/acri](https://github.com/lom-lang/acri), operative v0.2); this repo is its reference implementation. |
 | [eval/README.md](../eval/README.md) | The RepairLoopBench benchmark card (how to re-run, scope statement, SWE-bench-family differentiation). |
 | [REPRODUCING.md](REPRODUCING.md) | The third-party reproduction guide — engineering baseline, LLM experiments, what a fresh clone can and cannot verify, and how to report results. |
+| [../CHANGELOG.md](../CHANGELOG.md) | Release history, newest first — every version's note as written at the time; unreleased patch-level fixes collect here between releases. |
 | eval/REPORT*.md | The LLM evaluation reports — each opens with an English TL;DR block; bodies are Chinese. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) / [SECURITY.md](../SECURITY.md) / [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) / [DESIGN_RATIONALE.md](../DESIGN_RATIONALE.md) | Governance and design rationale. |
 | [README.zh-CN.md](../README.zh-CN.md) | The Chinese README mirror (README.md itself is English). |
@@ -24,6 +25,7 @@ maintained in **Chinese**.
 |---|---|
 | [MAINTENANCE.md](MAINTENANCE.md) | The maintenance protocol: roles, iron rules, batch workflow, review cadence. |
 | [HANDOVER.md](HANDOVER.md) | Baseline numbers, environment pitfalls, language pitfalls, full regression command list. |
+| [milestone-history.md](milestone-history.md) | The Phase 1–8 feature checklist, kept verbatim as a historical record (moved out of the README). |
 | [TODO.md](TODO.md) | The living status block: ledger, adjudication menu, delivered-batch records. |
 | [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) / [EXECUTOR_TEMPLATE.md](EXECUTOR_TEMPLATE.md) | Planner/executor collaboration documents. |
 | [designs/](designs/) | Per-batch engineering design documents — each opens with a status line (delivered, or pending adjudication). |
