@@ -2,11 +2,11 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 62,369 characters ≈ 15.6k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 73,878 characters ≈ 18.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 **Advised workflow for agent readers** (validated by zero-prior-agent build sessions, 2026-10):
 1. Skim §1 → §2 → §12 (quick reference) before writing code; consult §11b for exact builtin signatures.
-2. Develop diagnostics-first: write the file → `lom <file.lom> --json` → repair → re-run (full loop: §11e); `--trace` localizes runtime failures by call chain (§11g). A runtime error points at the failing expression (§11c), and when the file is statically clean yet fails at run time, `lom fix <file.lom> --plan --run` puts that positioned runtime diagnostic into the repair plan (§11e, `--run`).
+2. Develop diagnostics-first: write the file → `lom <file.lom> --json` → repair → re-run (full loop: §11e; multi-file projects: `lom build`, §11e); `--trace` localizes runtime failures by call chain (§11g). A runtime error points at the failing expression (§11c), and when the file is statically clean yet fails at run time, `lom fix <file.lom> --plan --run` puts that positioned runtime diagnostic into the repair plan (§11e, `--run`).
 3. If an API you need is not in §11b or §2, do NOT assume it exists — check §11i (features that do not exist), then probe: a tiny program calling the suspected name answers `NAM005` (real builtin; the hint carries its exact import line) or `NAM003` (no such name at all). `lom explain <code>` prints long-form guidance (§11c).
 
 ---
@@ -23,6 +23,7 @@
 8. **Last expression = return value** — blocks evaluate to their last expression. Use `return` only for early exit.
 9. **One statement per line** — Lom is newline-sensitive (statements separated by newlines) but NOT indentation-sensitive (blocks delimited by `end`, not by indentation level). Like Go/Swift/Kotlin, not Python. A `-` or `(` at the start of a new line is NOT a binary operator or function call — it starts a new expression.
 10. **`+` works on String** — `"a" + "b"` yields `"ab"`. No special concat operator. Since v0.4.1, if either side is a String, the other side is auto-promoted (`"n = " + 42` yields `"n = 42"`) — no `int_to_string` needed for concatenation.
+11. **No `exit` builtin — a program can only exit 0 or 1.** `main`'s return value is ignored (`fn main() -> Int` returning `3` exits `0`); `exit(3)` is `NAM003` + `RUNTIME002`. Exit `0` = `main` finished; exit `1` = a runtime error (e.g. `list_head(list_empty())`, which also prints an interpreter diagnostic to stderr). Early success exit: `return ()` in `main`. **CLI tools**: no code ≥ 2, and "found errors" cannot be told from "tool failed" — print a final status line (or write a status file) and let a wrapper script map it to the exit code.
 
 ---
 
@@ -32,6 +33,7 @@
 - **Keywords**: `fn let mut if elif else while for in return match end and or True False from import as enum` — the complete reserved set (verified against the v0.6.1 lexer). Type names (`Int Float Bool String Unit Result Ok Err Some None`) are ordinary identifiers recognized in type position; `struct trait impl type pub` are NOT keywords.
 - **Operators** (low → high precedence): `or`, `and`, `== != < > <= >=`, `|>`, `+ -`, `* / %`, `! -` (prefix), `?` (postfix), call/index/field
 - **Literals**: `42` (Int), `3.14` (Float), `True`/`False` (Bool), `"hi"` (String), `()` (Unit). **No scientific-notation float literals** — write `1000000000.0`, not `1e9` (the lexer reads `1` then the identifier `e9`, so `1e9` is a parse error)
+- **String escapes** — only `\n` `\t` `\r` `\"` `\\`; any other `\X` silently loses its backslash (`"\0"` is the digit `0`; no `\0`/`\x`/`\u`) — other characters: `char_from_code(cp)`. A literal may span lines; `#` inside a string is not a comment.
 
 ---
 
@@ -46,6 +48,7 @@ end
 - Params **must** have type annotations — omitting one is a hard **parse error** (PARSE001 期望 ':'，probed), for named functions and closures alike; this is enforced by the parser, not a gradual-typing warning.
 - Return type optional (inferred), but **recommended** for public functions.
 - Last expression is the return value. No `return` needed unless early-exiting.
+- A `-> Unit` function whose **last statement is a call returning a value** (`main` ending in `run()`) draws `TYPE010` — end with `()` or omit `main`'s return type.
 
 ### Early return
 ```
@@ -56,6 +59,7 @@ fn safe_divide(x: Int, y: Int) -> Int
     x / y
 end
 ```
+- A bare `return` is value-less only when the very next token is `end` or end of file; otherwise it **takes the following expression as its value** — `return` followed by a statement does not exit early (the statement runs and becomes the return value), and before `else`/`elif`/`while`/the next `match` arm it is PARSE001. To exit early from a `-> Unit` function, write `return ()`.
 
 ### Closure
 ```
@@ -89,7 +93,17 @@ end
 ```
 - Every `if` closes with `end`.
 - `if` is an expression — each branch yields a value.
-- **Nested-`if` pitfall (probed)**: an `else`/`elif` binds to the innermost `if` — greedily. If a then-branch *ends* with a bare nested `if ... end` (no `else` of its own) and the outer `else`/`elif` follows immediately, the parser attaches it to the inner `if` and the file fails with PARSE001 (missing `end`). Fix: give the nested `if` its own `else`, put any statement after it, or restructure as guard-style single-branch `if`s.
+- **Nested-`if` pitfall (probed)**: an `else`/`elif` binds to the innermost `if` — greedily. Whenever a `then`- or `elif`-body *ends* with a nested `if` lacking **its own final `else`** (bare `if ... end`, an `if ... elif ... end` chain, or an `if` expression, at any depth) and the outer `if` has further `else`/`elif` branches, they attach to the inner `if`. Result: PARSE001 at a **misleading position** — the *next top-level `fn` line* (`期望 '('…`) or end of file (`期望 'end' (块闭合)…`), never the nested `if`; an extra `end` "fixes" the parse silently but leaves the `else` on the inner `if` (logic error). Safe otherwise (inner `if` has its own `else`, a statement follows it, or the branch ends with `while`/`for`/`match`). **Style rule: never end a branch with a nested `if` while the outer `if` has further branches** — give the inner `if` its own `else` (mandatory when the `if` yields a value), or add a trailing statement (a bare `()` suffices for statement `if`s), or use guard-style single-branch `if`s:
+- ❌ Do not write — the `else` below belongs to `if b`, not `if a`:
+```
+if a
+    if b
+        println("both")
+    end
+else
+    println("not a")
+end
+```
 
 ### while
 ```
@@ -180,6 +194,7 @@ let (n, s) = pair           # destructuring
 let user_id: Int = 42
 let point: {x: Float, y: Float} = {x: 1.0, y: 2.0}
 ```
+- Without aliases: only **parameter** annotations are mandatory — omit return-type and `let` annotations (inferred); shorten the type itself with a tuple (`(String, Int, Int)`) or an already-formatted `String` (`json_stringify(record)`) for values that are only reported. Records match exactly — no narrower annotation (`TYPE003` at the call, `TYPE001` on a `let`).
 
 ### Gradual type checking (Phase 2.4 — implemented)
 
@@ -193,6 +208,7 @@ Type annotations are **optional**. Type errors are **non-fatal warnings** — th
 Type-error codes (all `Warning` unless noted): `TYPE001` (mismatch), `TYPE002` (cond not Bool), `TYPE003` (arg count/type), `TYPE010` (return mismatch), `TYPE020` (`?` misuse), `MAT001` (match non-exhaustive), `MUT001` (reassigning an immutable binding — `let` without `mut`, a function parameter, a `for` loop variable, or a `match` binding; fix: declare with `let mut`, or introduce a local `let mut` copy for params/loop vars), `MUT002` (a closure body references a captured outer `mut` binding — interpreter and WASM disagree on capture semantics; fix: avoid relying on captured `mut` state). Name-resolution: `NAM002` (Error, duplicate), `NAM003` (Error, undefined), `NAM004` (Error, no such field/variant), `NAM005` (Warning, since v1.2.0 — a real builtin used without import; fix: add `from <module> import {name}` at the top; prelude `println`/`print` exempt), `NAM006` (Warning, since v1.4.10 — an import alias or package symbol collides with a local definition; behavior is already deterministic — the local definition wins / the later same-alias import wins / the path-later package wins — so no fix is required; rename only to remove ambiguity).
 
 When you write Lom: annotate function params and return types — the checker will flag mismatches in `--check`/`--json`, helping you fix errors before running. Missing **`let`-binding and return-type** annotations are fine (inferred as `Unknown`, no error); **param** annotations are mandatory at parse time — omitting one is PARSE001, not a warning (§3).
+- **Exception — user `enum`s with type parameters are weakly checked (v1.17.0)**: a constructor value infers as the *bare* enum name, so `Box<Int>` annotations draw **false** warnings (`TYPE010` on a return type, `TYPE001` on a `let`, `TYPE003` at a call passing a constructor value), and `match` payloads of a bare-typed or unannotated value are typed as the type parameter (`T`), drawing false `TYPE001`/`TYPE002` on use. A clean pattern: build such values in functions whose return annotation is **omitted**.
 
 ### Explicit effect system (Phase 2.5 — implemented)
 
@@ -348,7 +364,7 @@ from io import { println as log }    # per-item alias: name as alias
   - `len`, `int_to_string`, `string_to_int`, `trim`, `upper`, `lower`, `split`, `contains`, `replace`, `starts_with`, `ends_with`, `char_from_code` → `from string import {...}`
   - `sqrt`, `abs`, `min`, `max` → `from math import {...}`
 - Standard library modules: `io`, `string`, `math`, `list`, `json`, `map` (v0.5.1), `file`, `env` — function-signature tables for all eight: §11b.
-- **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Example: `examples/pkg_demo/`.
+- **User packages** (Phase 4.4): declare local path dependencies in `lom.toml` (`[dependencies]` + `mathlib = { path = "mathlib" }`), then `from mathlib import { square }`; `lom build` resolves the dependency graph (with cycle detection) and type-checks package sources. Local paths only — no registry yet. Complete example below (also `examples/pkg_demo/`).
 - ❌ `pub` marks exportable items — **rejected for v1.0** (RFC-0001). `pub` is an ordinary identifier, and writing it is a parse error (PARSE001, verified). All top-level items are public; no privacy is planned. Do not write:
 ```
 pub fn greet(name: String) -> String
@@ -360,13 +376,81 @@ fn helper() -> Unit    # NOT private — no visibility modifiers exist
 end
 ```
 
+### Multi-file projects (complete minimal example)
+
+<!-- spec-check: skip: directory tree -->
+```
+app/                  project root (run `lom build` here)
+├── lom.toml
+├── main.lom          entry file: any .lom passed to `lom`
+├── mathlib/          package directory — needs its own lom.toml
+│   ├── lom.toml
+│   ├── math.lom
+│   └── more.lom
+└── tests/            a subdirectory program needs its own lom.toml
+    ├── lom.toml
+    └── run.lom
+```
+<!-- spec-check: skip: TOML manifests -->
+```toml
+# app/lom.toml
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+mathlib = { path = "mathlib" }
+
+# app/mathlib/lom.toml
+name = "mathlib"
+version = "0.1.0"
+```
+`app/tests/lom.toml`: `name = "tests"`, `mathlib = { path = "../mathlib" }`.
+
+<!-- spec-check: skip: project files, not self-contained -->
+```lom
+# app/mathlib/math.lom
+fn square(x: Int) -> Int
+    x * x
+end
+
+# app/mathlib/more.lom — same package: calls square with no import
+fn cube(x: Int) -> Int
+    x * square(x)
+end
+
+# app/main.lom
+from mathlib import { square, cube as cb }
+
+fn main() -> Unit
+    println(square(5))      # 25
+    println(cb(3))          # 27
+end
+```
+<!-- spec-check: skip: commands and output -->
+```
+lom main.lom          → 25 / 27            exit 0
+lom build             in app/, one line per file:
+      ✓ math.lom — 通过
+      ✓ more.lom — 通过
+      ✓ main.lom — 通过
+```
+Rules (probed):
+- **Manifest**: `name` + `version` required (top level or `[package]`); `[dependencies]` entries `key = { path = "dir" }` are relative to that `lom.toml`; `key` must equal the package's own `name`.
+- **Lookup**: `lom f.lom`/`--check`/`--json` read `lom.toml` from the entry file's **own directory only** (never a parent) — hence `tests/`; `lom build` reads `./lom.toml`. Manifest paths resolve from the manifest itself, so the entry file runs from any working directory when given by path.
+- **Contents**: every `*.lom` directly in the package directory (not recursive, extension case-sensitive), merged in file-name order (byte order) with the entry file into one flat namespace — cross-file calls need no import, order is irrelevant, a name defined in both resolves to the entry file's.
+- **Imports**: every top-level `fn`, `enum` and variant is public (`from <pkg> import { name, other as alias }`); each file imports the builtins it uses (`lom build` checks per file; at run time imports are shared across the merged unit — do not rely on it).
+- **Import lines are not checked statically**: a name the module does not export (`from list import { list_rev }`) or an unknown module passes `--check`/`--json`/`build` while unused; once used, the report is `NAM003` at the *use* site with a misleading hint; either way the program aborts at run time with `RUNTIME005` at `0:0` — check names against §11b.
+- **Diagnostics**: only `lom build` checks package files (§11e).
+
 ---
 
 ## 9. Effects (Phase 2 annotation)
 
 ```
-fn read_file(path: String) -> Result<String, IoError> ! [IO]
-    Ok("contents")
+from file import { file_read }
+
+fn load_file(path: String) -> String ! [IO]
+    file_read(path)      # String directly — a missing file is a runtime error, not Err (§11b)
 end
 
 fn print_msg(s: String) -> Unit ! [IO]
@@ -395,7 +479,7 @@ end
 7. **Nominal classes** — Lom uses structural records `{x: Int, y: Int}`, not `class Point`.
 8. **Forgetting `?`** — `let x = read_file(path)` gives `Result<String, _>`, not `String`. Add `?` to unwrap.
 9. **Non-exhaustive match** — `match` must cover all cases or have `_`.
-10. **`return` as last statement** — discouraged. Use the last expression directly.
+10. **`return` as last statement** — discouraged: v1.17.0 also raises a **false** `TYPE010` (“…实际返回 Unit”) when a function ends with `return expr` and no tail expression. Use the last expression directly.
 11. **Using non-prelude builtin without import** — `len`, `int_to_string`, `sqrt`, etc. must be imported. `println`/`print` are prelude (auto-available).
     - ❌ `fn main() -> Unit \n    println(len("hi")) \nend` — error: `len` not imported
     - ✅ `from string import { len }\nfn main() -> Unit \n    println(len("hi")) \nend`
@@ -444,8 +528,10 @@ end
 
 | Function | Signature | Description |
 |---|---|---|
-| `println(x)` | `Any -> Unit` | Print value with newline |
+| `println(x)` | `Any -> Unit` | Print value with newline (display format below) |
 | `print(x)` | `Any -> Unit` | Print value without newline |
+
+**Display format** (`println`/`print`, `+` promotion): `True`/`False` → `true`/`false` (lowercase, unlike the literals); `{x: 3, y: "a"}` → `{x: 3, y: a}`; `(1, "hi")` → `(1, hi)`; `1..4`/empty → `[1, 2, 3]`/`[]`; strings raw — `"a\nb"` → `a`, a real line break, `b` (never quoted or escaped). Not JSON, and ambiguous (`"1"` and `1` both print `1`) — machine-readable output: `json_stringify`.
 
 **`string` module** (requires `from string import {...}`):
 
@@ -454,7 +540,7 @@ end
 | `len(s)` | `String -> Int` | String length (UTF-8 char count) |
 | `int_to_string(n)` | `Int -> String` | Convert integer to string |
 | `string_to_int(s)` | `String -> Int \| Unit` | Parse string to integer (returns `Unit` on failure) |
-| `trim(s)` | `String -> String` | Strip leading/trailing whitespace |
+| `trim(s)` | `String -> String` | Strip leading/trailing whitespace (Unicode `White_Space` set — §11h) |
 | `upper(s)` | `String -> String` | Uppercase |
 | `lower(s)` | `String -> String` | Lowercase |
 | `split(s, sep)` | `(String, String) -> List<String>` | Split; empty separator splits into characters; edge cases (empty/trailing fields) — §11h |
@@ -492,7 +578,13 @@ end
 
 `f` can be a closure literal or a named function (v0.4.2+): `list_map(double, 1..6)` → `[2, 4, 6, 8, 10]`.
 
+**Annotate list parameters as `List<T>`** (`fn total(xs: List<Int>) -> Int`): a bare `List`/`Map` draws `TYPE003` at every call passing it to a `list_*`/`map_*` builtin.
+
+**Accumulating** (sum, count, collect): a `for` loop with a `let mut` counter, or an accumulator returned by the fold — `list_fold(fn(a: Int, x: Int) -> Int a + x end, 0, xs)`. Assigning to an outer `mut` inside a closure works in the interpreter but warns `MUT002` on every run, and the WASM backend rejects it (§11f item 1).
+
 **Performance (probed; matches LANGUAGE_SPEC §9.3)**: a `List` is an Rc cons chain — `list_cons`/`list_head`/`list_tail` are **O(1)** per call (`list_cons` allocates one node and shares the tail; it does not copy the list), while `list_length` and `list_get` are an **O(n) chain walk per call** (`list_get` walks twice: bounds check + index). Do not call `list_length` on a long list inside a loop — maintain an `Int` counter instead.
+
+**Interpreter throughput** (order of magnitude, burst rates on one machine — a sustained load may run several times slower; no clock builtin — time with the shell): one interpreted step ≈ 1 µs — `list_head`/`list_tail` cursor advance ≈ 1–1.5 M steps/s, `for c in s` ≈ 2–3 M chars/s, a loop calling a user `fn` ≈ 1–2 M calls/s (fewer with more arguments). Native builtins work per string, not per step: `replace`/`contains`/`upper` on 212 KB ≈ 1 ms, `split(s, "\n")` + a builtin check per line ≈ 1 ms. Avoid: (1) cursor walks over whole inputs — pre-filter with `len`/`trim`/`contains`/`starts_with`; (2) `+=` string growth in a loop — each `+` copies the whole string (100 K appends ≈ 0.4 s, 400 K ≈ 10 s; ≈ 3–6 s at 100 K with an `Int` operand) — `print` as you go; (3) `list_length`/`list_get` in a loop — ≈ 2–4 ms each on 200 K elements, and `list_get(i)` for all `i` is O(n²) (50 K elements ≈ 70 s) — `for x in xs` or a cursor.
 
 **`map` module** (requires `from map import {...}`; v0.5.1; string-keyed dictionary with **reference semantics** — `map_set` mutates in place, `let` aliases share the same Map):
 
@@ -525,11 +617,24 @@ Value mapping (probed): object → **record** (fields keep source key order; fie
 | `file_append(path, content)` | `(String, String) -> Unit ! [IO]` | Append `content` (creates the file if missing) |
 | `file_exists(path)` | `String -> Bool ! [IO]` | True iff a file/directory exists at `path` |
 
+**`file_read` has no recoverable failure**: missing file (`os error 2`), directory (`os error 5` — the message text is OS-localized), non-UTF-8 content (`stream did not contain valid UTF-8`) — all `RUNTIME000`, exit 1. `file_exists` catches only the first (it is `True` for a directory); encoding cannot be pre-checked:
+```
+from file import { file_exists, file_read }
+
+fn read_text(path: String) -> Result<String, String> ! [IO]
+    if file_exists(path)
+        Ok(file_read(path))      # a directory or non-UTF-8 file still aborts here
+    else
+        Err("no such file: " + path)
+    end
+end
+```
+
 **`env` module** (requires `from env import {...}`):
 
 | Function | Signature | Description |
 |---|---|---|
-| `args()` | `() -> List<String>` | CLI arguments: `args()[0]` is the program path, `args()[1..]` are user arguments passed after `lom <file> -- <args...>` (probed). Never print/hash/branch on `args()[0]` — it differs between backends (§11f item 8) |
+| `args()` | `() -> List<String>` | CLI arguments: `args()[0]` is the program path, `args()[1..]` are user arguments passed after `lom <file> -- <args...>` (probed). Never print/hash/branch on `args()[0]` — it differs between backends (§11f item 8). No script-directory builtin: `file_*` relative paths resolve against the **current working directory**, and `args()[0]` is only the path as typed (not normalized) — run from the project root with root-relative paths, or pass paths as arguments |
 
 ---
 
@@ -736,12 +841,16 @@ Key points:
 
 **Recommended workflow** when you (the LLM) are writing Lom code:
 1. Write the file.
-2. Run `lom <file> --json` to get diagnostics.
+2. Run `lom <file> --json` to get diagnostics (entry file only — see below).
 3. If `ok == false`, run `lom fix <file> --json` to get the repair plan.
 4. Apply the fixes yourself, or preview automation with `lom fix <file> --apply --dry-run`. Since the 2026-09-21 R55 hardening, High `insert`/`replace` actions are scope- and position-guarded (see Limitations for what remains uncertain); `--dry-run` plus an explicit re-check is still the safest loop. User-enum MAT001 remains a hint-with-text.
-5. Re-run `lom <file> --json` to verify. Repeat until `ok == true`.
+5. Re-run `lom <file> --json` to verify. Repeat until `summary.warnings == 0` — `ok == true` only means no error-level diagnostic, and every surviving warning is re-printed on stderr at each run.
 6. Run `lom <file>` to execute.
 7. If it passes every static check but fails at run time, run `lom fix <file> --plan --run --json` and read the `stage: "runtime"` plan entry — it carries the failing expression's position (§11c).
+
+**Multi-file projects** (`lom.toml` + packages, §8): `lom <entry> --json`, `--check` and run mode check the **entry file only** — package files may hold warnings or errors while the entry says `"warnings": 0`, `ok: true`. Only `lom build` (project root) checks package sources, one `✓ <file> — 通过` / `✗ <file> — N 个诊断` line per file plus its diagnostics: converge on *no `✗` line* (`✗` covers warnings).
+- `lom build --json` emits only the dependency graph — no diagnostics.
+- **`lom build` exits `0` even when a checked file has error-level diagnostics** — gate on an output without any `✗` line, not on its exit code.
 
 ### `--run`: let `fix` observe a run-time failure (v1.17.0)
 
@@ -800,7 +909,7 @@ lom fix <file.lom> --apply --run [--run-budget <ms>] [--allow-io] [--json] [--dr
 - LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 diagnostic columns arrive as byte columns and are converted to char columns before use (R55); multibyte-line positions are covered by tests. These rules must not be treated as mathematically certain.
 - NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Since Phase 3.2b (v0.21.0) positions come from **expression-level spans** on the diagnostic (single-point replace); the whole-token source scan remains only as a fallback for span-less diagnostics (e.g. variant names in `match` patterns — `Pattern` carries no span).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
-- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE001-3/TYPE020/NAM004-field point at the exact expression/assign-target; note the Field diagnostic points at the field-name token via the span's `end`). Runtime diagnostics point at the innermost failing expression since v1.17.0 (§11c) and reach `fix` only through `--run` (above); the kinds listed there as not located stay at `0:0`. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
+- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE002/TYPE003/TYPE020/NAM004-field and the `let`-annotation, assignment and range-endpoint forms of TYPE001 point at the exact expression/assign-target; the binary-operator TYPE001 — arithmetic or comparison over mismatched operand types — and the tuple-destructuring arity TYPE001 have **no position**: `0:0`; note the Field diagnostic points at the field-name token via the span's `end`). Runtime diagnostics point at the innermost failing expression since v1.17.0 (§11c) and reach `fix` only through `--run` (above); the kinds listed there as not located stay at `0:0`. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
 
 ---
 
@@ -884,6 +993,8 @@ Field semantics (field order is fixed — streams are diffable):
 - **`split` edges** (probed): trailing/leading separators keep their empty fields — `split("a,b,", ",")` has 3 elements (the last is `""`), `split("", ",")` is the 1-element list `[""]`, `split(",", ",")` is `["", ""]`; `split("abc", "")` splits into single-char Strings; `split("", "")` is the empty list (0 elements).
 - **`contains(s, "")` is `True`** (probed) — the empty substring always matches, including `contains("", "")`. If your scanner treats `""` as a terminator, guard with a `len(sub) == 0` check first.
 - **`file_*` never creates directories** (probed): `file_write` into a nonexistent directory is a runtime error (os error) — there is no mkdir builtin (§11i); write into existing directories only.
+- **`trim` strips Unicode `White_Space`, ends only** (probed): U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 — not U+200B (zero-width space) or U+FEFF (BOM). No `trim_chars`; WASM differs (§11f item 4).
+- **Output is raw UTF-8** (probed): `println`/`print` write UTF-8 bytes (no BOM); no encoding-conversion builtin. On Windows: straight to a console it renders correctly regardless of code page (probed at 936); captured by Windows PowerShell 5.1 (variable or pipeline) it is decoded with the console code page (the system code page by default) and garbles — run `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` first (or `chcp 65001` before starting PowerShell).
 
 ## 11i. Common Features That Do NOT Exist (verified absent — do not write them)
 
@@ -894,11 +1005,29 @@ The frozen surface has exactly 20 reserved words (§2) and exactly 43 builtins (
 | `break` / `continue` | NAM003 未定义变量 (not keywords; freeze non-goal) | a `let mut` flag in the loop condition; early `return` from a helper `fn` (§3); wrap the rest of the body in an `if` (inverse `continue`) |
 | List literal `[1, 2, 3]` | PARSE001 on `[` | `list_cons` chaining from `list_empty()`, range `a..b`, or `json_parse("[1,2,3]")` (§11b) |
 | `substring(s, i, j)` / `index_of(s, sub)` | NAM003 调用未定义函数 | `split` into chars + `list_get` + `+` concat; a manual scan loop with `contains`/`len`; `starts_with`/`ends_with` for prefix/suffix |
+| Indexing `s[i]`, `xs[i]`, `t[0]`, `r["k"]` | static checks pass; runtime `RUNTIME000 索引操作 Phase 2.1.4 未实现（元组用 .0 .1 访问）` (WASM: compile-rejected) | `split(s, "")` + `list_get` or a `list_head`/`list_tail` cursor; `list_get(xs, i)`; `.0`/`.1`; `.field` |
+| `exit(code)` / `quit` | NAM003 + runtime `RUNTIME002`, exit 1 | §1 rule 11 — status line or status file + wrapper script |
+| `script_dir()` / `__file__` | NAM003 | §11b `args` — run from the project root, or pass paths as arguments |
 | `type_of` / `is_int` / `is_*` type predicates | NAM003 (freeze adjudication: `type_of` not added) | structural discrimination via `match` patterns (§6); for JSON-shaped data keep a tag field in a record or `Map` |
 | Bitwise `& \| ^ ~ << >>` | LEX005 意外字符 | arithmetic: `x * 2` / `x / 2` for shifts, `x % 2` for parity/low-bit masks |
 | Hex literal `0x1F` | lexes as `0` + identifier `x1F` → NAM003 | decimal literals only (§2) |
 | Directory listing (readdir / ls) | `file` module has exactly 4 functions (§11b) | pass file names in via `env.args()`, or `file_read` a manifest file listing them |
 | `mkdir` / directory creation | `file_write` into a missing dir is a runtime error (probed, §11h) | write into existing directories only |
+
+`break` replacement — "first match wins": scan inside a helper `fn` and leave with an early `return`:
+```
+from string import { starts_with, split }
+
+fn find_first(prefix: String, names: List<String>) -> String
+    for name in names                  # early return = "break"
+        if starts_with(name, prefix)
+            return name
+        end
+    end
+    ""                                 # not found
+end
+# find_first("b", split("alpha,bravo,charlie", ",")) → bravo
+```
 
 ## 12. Quick Reference
 

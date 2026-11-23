@@ -7,8 +7,15 @@ per-batch facts are in the commit log and docs/TODO.md.
 
 ## Unreleased
 
-Nothing yet. Patch-level fixes accumulate here between releases and are cut as
-one patch tag at a release point (docs/MAINTENANCE.md §2.2.1).
+- Docs: `SPEC_FOR_AI.md` gap-closure batch — the exit-code rule (no `exit`
+  builtin; a program exits 0 or 1), string escapes, the nested-`if` rule, a
+  complete multi-file project walkthrough, display format, the `trim`
+  whitespace set, bare `return`, interpreter throughput figures, and the
+  precise list of `TYPE001` forms that carry a position. Documentation only;
+  tool behavior is unchanged.
+
+Patch-level fixes accumulate here between releases and are cut as one patch
+tag at a release point (docs/MAINTENANCE.md §2.2.1).
 
 ## v1.17.0 (2026-11-23)
 
