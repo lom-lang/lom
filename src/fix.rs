@@ -558,7 +558,8 @@ pub enum ActionKind {
 }
 
 impl ActionKind {
-    fn as_str(&self) -> &'static str {
+    /// pub(crate)（designs/0028）：fix_run 的 apply 人类模式复用同一动作名
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             ActionKind::Insert => "insert",
             ActionKind::Replace => "replace",
@@ -577,7 +578,8 @@ pub enum Confidence {
 }
 
 impl Confidence {
-    fn as_str(&self) -> &'static str {
+    /// pub(crate)（designs/0028）：fix_run 的运行观察段复用同一置信度名
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Confidence::High => "high",
             Confidence::Medium => "medium",
@@ -1748,6 +1750,17 @@ fn extract_second_bracketed(msg: &str) -> Option<String> {
 
 /// 将 FixPlan 序列化为 lom-fix/v1 JSON
 pub fn to_json(plan: &FixPlan) -> String {
+    to_json_with(plan, None)
+}
+
+/// lom-fix/v1 信封；`run_fields` 在场时在 summary 之后追加可选顶层字段
+/// `run`（designs/0028 v1.17.0 `fix --plan --run --json` 形态）。
+///
+/// `run_fields` = fix_run::run_fields_json 产出的字段行（4 空格缩进、末行
+/// 无尾逗号）。不带 `--run` 的默认路径经 to_json 走 `None` 分支——输出
+/// 逐字节不变（append-only：新字段只在新形态出现，消费侧按前向兼容公理
+/// 忽略未知字段）。
+pub fn to_json_with(plan: &FixPlan, run_fields: Option<&str>) -> String {
     let total = plan.plans.len();
     let applicable = plan.plans.iter().filter(|p| p.retry).count();
     let skipped = total - applicable;
@@ -1762,93 +1775,110 @@ pub fn to_json(plan: &FixPlan) -> String {
     out.push_str(&format!("    \"applicable\": {},\n", applicable));
     out.push_str(&format!("    \"skipped\": {}\n", skipped));
     out.push_str("  },\n");
+    if let Some(fields) = run_fields {
+        out.push_str("  \"run\": {\n");
+        out.push_str(fields);
+        out.push_str("  },\n");
+    }
+    // plans 是 lom-fix/v1 的末字段（其后无逗号）
+    out.push_str(&plans_field_json("plans", &plan.plans, true));
+    out.push_str("}\n");
+    out
+}
 
-    out.push_str("  \"plans\": [");
-    if plan.plans.is_empty() {
-        out.push_str("]\n");
+/// 计划数组的 JSON 字段：`  "<name>": [` + 逐条 plan_json + `  ]`
+/// （2 空格缩进；空数组写成单行 `[]`）。lom-fix/v1 的 plans 字段与
+/// lom-apply/v1 的 runtime_plans 字段（designs/0028）共用同一形态；
+/// `is_last` = 其后是否还有字段（决定收尾 `]` 后有无逗号）。
+pub(crate) fn plans_field_json(name: &str, plans: &[Plan], is_last: bool) -> String {
+    let mut out = format!("  \"{}\": [", name);
+    let close = |wide: &str| -> String { format!("{}{}\n", wide, if is_last { "" } else { "," }) };
+    if plans.is_empty() {
+        out.push_str(&close("]"));
+        return out;
+    }
+    out.push('\n');
+    for (i, p) in plans.iter().enumerate() {
+        out.push_str(&plan_json(p));
+        if i + 1 < plans.len() {
+            out.push(',');
+        }
+        out.push('\n');
+    }
+    out.push_str(&close("  ]"));
+    out
+}
+
+/// 单条计划的 JSON 对象（4 空格缩进；字段序固定：diagnostic / fixes / retry；
+/// 不含尾随逗号与换行）
+pub(crate) fn plan_json(p: &Plan) -> String {
+    let mut out = String::new();
+    out.push_str("    {\n");
+    out.push_str("      \"diagnostic\": {\n");
+    out.push_str(&format!(
+        "        \"code\": \"{}\",\n",
+        escape_str(&p.diagnostic.code)
+    ));
+    out.push_str(&format!(
+        "        \"severity\": \"{}\",\n",
+        p.diagnostic.severity.as_str()
+    ));
+    out.push_str(&format!(
+        "        \"stage\": \"{}\",\n",
+        p.diagnostic.stage.as_str()
+    ));
+    out.push_str(&format!("        \"line\": {},\n", p.diagnostic.line));
+    out.push_str(&format!("        \"col\": {},\n", p.diagnostic.col));
+    out.push_str(&format!(
+        "        \"message\": \"{}\"\n",
+        escape_str(&p.diagnostic.message)
+    ));
+    out.push_str("      },\n");
+
+    out.push_str("      \"fixes\": [");
+    if p.fixes.is_empty() {
+        out.push_str("],\n");
     } else {
         out.push('\n');
-        for (i, p) in plan.plans.iter().enumerate() {
-            // diagnostic
-            out.push_str("    {\n");
-            out.push_str("      \"diagnostic\": {\n");
+        for (j, f) in p.fixes.iter().enumerate() {
+            out.push_str("        {\n");
             out.push_str(&format!(
-                "        \"code\": \"{}\",\n",
-                escape_str(&p.diagnostic.code)
+                "          \"description\": \"{}\",\n",
+                escape_str(&f.description)
             ));
             out.push_str(&format!(
-                "        \"severity\": \"{}\",\n",
-                p.diagnostic.severity.as_str()
+                "          \"action\": \"{}\",\n",
+                f.action.as_str()
             ));
-            out.push_str(&format!(
-                "        \"stage\": \"{}\",\n",
-                p.diagnostic.stage.as_str()
-            ));
-            out.push_str(&format!("        \"line\": {},\n", p.diagnostic.line));
-            out.push_str(&format!("        \"col\": {},\n", p.diagnostic.col));
-            out.push_str(&format!(
-                "        \"message\": \"{}\"\n",
-                escape_str(&p.diagnostic.message)
-            ));
-            out.push_str("      },\n");
-
-            // fixes
-            out.push_str("      \"fixes\": [");
-            if p.fixes.is_empty() {
-                out.push_str("],\n");
-            } else {
-                out.push('\n');
-                for (j, f) in p.fixes.iter().enumerate() {
-                    out.push_str("        {\n");
-                    out.push_str(&format!(
-                        "          \"description\": \"{}\",\n",
-                        escape_str(&f.description)
-                    ));
-                    out.push_str(&format!(
-                        "          \"action\": \"{}\",\n",
-                        f.action.as_str()
-                    ));
-                    out.push_str(&format!("          \"line\": {},\n", f.line));
-                    out.push_str(&format!("          \"col\": {},\n", f.col));
-                    match f.end_line {
-                        Some(el) => out.push_str(&format!("          \"end_line\": {},\n", el)),
-                        None => out.push_str("          \"end_line\": null,\n"),
-                    }
-                    match f.end_col {
-                        Some(ec) => out.push_str(&format!("          \"end_col\": {},\n", ec)),
-                        None => out.push_str("          \"end_col\": null,\n"),
-                    }
-                    match &f.text {
-                        Some(t) => {
-                            out.push_str(&format!("          \"text\": \"{}\",\n", escape_str(t)))
-                        }
-                        None => out.push_str("          \"text\": null,\n"),
-                    }
-                    out.push_str(&format!(
-                        "          \"confidence\": \"{}\"\n",
-                        f.confidence.as_str()
-                    ));
-                    out.push_str("        }");
-                    if j + 1 < p.fixes.len() {
-                        out.push(',');
-                    }
-                    out.push('\n');
-                }
-                out.push_str("      ],\n");
+            out.push_str(&format!("          \"line\": {},\n", f.line));
+            out.push_str(&format!("          \"col\": {},\n", f.col));
+            match f.end_line {
+                Some(el) => out.push_str(&format!("          \"end_line\": {},\n", el)),
+                None => out.push_str("          \"end_line\": null,\n"),
             }
-
-            // retry
-            out.push_str(&format!("      \"retry\": {}\n", p.retry));
-            out.push_str("    }");
-            if i + 1 < plan.plans.len() {
+            match f.end_col {
+                Some(ec) => out.push_str(&format!("          \"end_col\": {},\n", ec)),
+                None => out.push_str("          \"end_col\": null,\n"),
+            }
+            match &f.text {
+                Some(t) => out.push_str(&format!("          \"text\": \"{}\",\n", escape_str(t))),
+                None => out.push_str("          \"text\": null,\n"),
+            }
+            out.push_str(&format!(
+                "          \"confidence\": \"{}\"\n",
+                f.confidence.as_str()
+            ));
+            out.push_str("        }");
+            if j + 1 < p.fixes.len() {
                 out.push(',');
             }
             out.push('\n');
         }
-        out.push_str("  ]\n");
+        out.push_str("      ],\n");
     }
 
-    out.push_str("}\n");
+    out.push_str(&format!("      \"retry\": {}\n", p.retry));
+    out.push_str("    }");
     out
 }
 
@@ -3595,5 +3625,94 @@ end
         let fns = fn_infos(&program, src);
         let plan = generate_plan(&diags, src, &fns);
         crate::apply::apply_plan(&plan, src)
+    }
+
+    /// designs/0028（v1.17.0）：lom-fix/v1 默认形态的金字节——用字面量钉死。
+    /// 不自引用：`to_json_with(None) == to_json` 两边走同一段代码，钉不住
+    /// 转录错误（本批重构时曾给 "skipped" 与 plans 收尾各多敲一个逗号，
+    /// 自引用断言空过，被基线二进制逐字节对照抓到）。不带 --run 的输出
+    /// 不得因 append-only 扩展而漂移；--run 形态只多出 run 字段。
+    #[test]
+    fn lom_fix_v1_default_envelope_golden_bytes() {
+        let empty = FixPlan {
+            file: "t.lom".to_string(),
+            ok: true,
+            plans: Vec::new(),
+        };
+        assert_eq!(
+            to_json(&empty),
+            r#"{
+  "schema": "lom-fix/v1",
+  "file": "t.lom",
+  "ok": true,
+  "summary": {
+    "total": 0,
+    "applicable": 0,
+    "skipped": 0
+  },
+  "plans": []
+}
+"#
+        );
+
+        let one_plan = r#"    {
+      "diagnostic": {
+        "code": "RUNTIME000",
+        "severity": "error",
+        "stage": "runtime",
+        "line": 4,
+        "col": 13,
+        "message": "整数除以零"
+      },
+      "fixes": [
+        {
+          "description": "运行时错误，检查程序逻辑",
+          "action": "hint",
+          "line": 0,
+          "col": 0,
+          "end_line": null,
+          "end_col": null,
+          "text": null,
+          "confidence": "low"
+        }
+      ],
+      "retry": false
+    }
+"#;
+        let one = FixPlan {
+            file: "t.lom".to_string(),
+            ok: false,
+            plans: vec![Plan {
+                diagnostic: DiagRef {
+                    code: "RUNTIME000".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Runtime,
+                    line: 4,
+                    col: 13,
+                    message: "整数除以零".to_string(),
+                },
+                fixes: vec![hint_only("运行时错误，检查程序逻辑", Confidence::Low)],
+                retry: false,
+            }],
+        };
+        let head = "{\n  \"schema\": \"lom-fix/v1\",\n  \"file\": \"t.lom\",\n  \"ok\": false,\n  \"summary\": {\n    \"total\": 1,\n    \"applicable\": 0,\n    \"skipped\": 1\n  },\n";
+        assert_eq!(
+            to_json(&one),
+            format!("{head}  \"plans\": [\n{one_plan}  ]\n}}\n")
+        );
+
+        // --run 形态：只多出 run 字段，其余字节不动
+        let run_field = "  \"run\": {\n    \"attempted\": true,\n    \"outcome\": \"error\",\n    \"budget_ms\": 5000\n  },\n";
+        let run = crate::fix_run::RunReport {
+            attempted: true,
+            outcome: crate::fix_run::RunOutcome::Error,
+            reason: None,
+            detail: None,
+            budget_ms: 5000,
+        };
+        assert_eq!(
+            to_json_with(&one, Some(&crate::fix_run::run_fields_json(&run))),
+            format!("{head}{run_field}  \"plans\": [\n{one_plan}  ]\n}}\n")
+        );
     }
 }

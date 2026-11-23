@@ -99,6 +99,18 @@ impl FinalDiag {
 ///   final   — 修复后源码的完整诊断计数（R55：errors/warnings）
 ///   ok      — applied > 0 且 final.errors == 0（R55 起含最终状态）
 pub fn rounds_to_json(results: &[ApplyResult], file: &str, final_diag: &FinalDiag) -> String {
+    rounds_to_json_with(results, file, final_diag, "")
+}
+
+/// rounds_to_json 的 append-only 扩展出口（designs/0028 v1.17.0 `--apply --run`）：
+/// `extra_fields` 为追加在 `ok` 之后、`}` 之前的顶层字段片段（每行自带
+/// 缩进与尾逗号）；空串即 lom-apply/v1 原形态，输出逐字节不变。
+pub fn rounds_to_json_with(
+    results: &[ApplyResult],
+    file: &str,
+    final_diag: &FinalDiag,
+    extra_fields: &str,
+) -> String {
     let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let final_skipped: usize = results.last().map(|r| r.skipped).unwrap_or(0);
     let ok = total_applied > 0 && final_diag.errors == 0;
@@ -149,13 +161,28 @@ pub fn rounds_to_json(results: &[ApplyResult], file: &str, final_diag: &FinalDia
         "  \"final\": {{\n    \"errors\": {},\n    \"warnings\": {}\n  }},\n",
         final_diag.errors, final_diag.warnings
     ));
-    s.push_str(&format!("  \"ok\": {}\n", ok));
+    if extra_fields.is_empty() {
+        s.push_str(&format!("  \"ok\": {}\n", ok));
+    } else {
+        s.push_str(&format!("  \"ok\": {},\n", ok));
+        s.push_str(extra_fields);
+    }
     s.push_str("}\n");
     s
 }
 
-/// 多轮 apply 的人类可读输出（按轮分组）
 pub fn rounds_to_human(results: &[ApplyResult], file: &str, final_diag: &FinalDiag) -> String {
+    rounds_to_human_with(results, file, final_diag, "")
+}
+
+/// rounds_to_human 的扩展出口（designs/0028 `--apply --run`）：`extra` 追加在
+/// 多轮报告之后（运行观察段）；空串即原形态，输出逐字节不变。
+pub fn rounds_to_human_with(
+    results: &[ApplyResult],
+    file: &str,
+    final_diag: &FinalDiag,
+    extra: &str,
+) -> String {
     let total_applied: usize = results.iter().map(|r| r.applied).sum();
     let mut s = String::new();
     s.push_str(&format!(
@@ -186,6 +213,7 @@ pub fn rounds_to_human(results: &[ApplyResult], file: &str, final_diag: &FinalDi
         "  最终诊断（修复后源码）: {} 错误 / {} 警告\n",
         final_diag.errors, final_diag.warnings
     ));
+    s.push_str(extra);
     s
 }
 

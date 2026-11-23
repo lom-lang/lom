@@ -7,7 +7,7 @@
 #                                                                #   + 包模式定向探针 ×2（R104/R105 撞名形态）
 #   python tools/diff_test.py --rounds 20 --ci                   # CI 冒烟（固定小轮次）
 #
-# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态，
+# 正常模式纪律：diff_gen 默认避开 SPEC_FOR_AI §11f 九条已知分歧形态，
 # 因此**任何 stdout/退出码差异都是新发现**（差异即 FAIL，留档 .diff_failures/
 # 供人工调查——bug 则修复 + 回归测试，未记录分歧则补 §11f 白名单）。
 # 探针模式纪律：显式生成已知分歧形态，验证差异**确实出现且形态符合档案**——
@@ -128,7 +128,7 @@ def _pkg_probe_project(kind: str):
 
 
 def run_probes() -> int:
-    """探针模式：验证 §11f 八条白名单中的六条可执行分歧仍如档案所述，
+    """探针模式：验证 §11f 九条白名单中的六条可执行分歧仍如档案所述，
     另跑包模式定向探针 ×2（pkg_name_clash / pkg_alias_shadow——R104/R105
     撞名形态的回归锁，方向与分歧探针相反：v1.4.10 修复后双后端必须同值
     且取指定位，差异或错值即回退）。
@@ -339,7 +339,7 @@ def main():
                 print("  seed %d: 新发现差异 — %s" % (seed, detail))
             if not args.ci and (i + 1) % 50 == 0:
                 print("  ... %d/%d（fail %d）" % (i + 1, args.rounds, fails))
-        print("diff[%s]: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 八条已知分歧）"
+        print("diff[%s]: %d/%d 双后端一致（差异即新发现，正常模式默认避开 §11f 九条已知分歧）"
               % (label, args.rounds - fails, args.rounds))
         if fails:
             print("失败留档：%s/*.lom + .interp.out + .wasm.out" % FAILDIR)

@@ -410,7 +410,7 @@ def main():
         ('HANDOFF_PROMPT 基线清单', 'docs/HANDOFF_PROMPT.md',
          r'期望 (\d+)/(\d+)；另有集成[^\n]*×(\d+)', ('unit', 'unit', 'integ')),
         ('HANDOVER §2.2 cargo test 行', 'docs/HANDOVER.md',
-         r'期望单元 (\d+)/(\d+) \+ 集成 (\d+) = 合计 \d+（集成十 target 分布',
+         r'期望单元 (\d+)/(\d+) \+ 集成 (\d+) = 合计 \d+（集成[一二三四五六七八九十]+ target 分布',
          ('unit', 'unit', 'integ')),
         ('HANDOVER §9-2', 'docs/HANDOVER.md',
          r'另有 tests/ 集成 ×(\d+)', ('integ',)),

@@ -2,11 +2,11 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 55,297 characters ≈ 13.8k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 62,369 characters ≈ 15.6k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
 
 **Advised workflow for agent readers** (validated by zero-prior-agent build sessions, 2026-10):
 1. Skim §1 → §2 → §12 (quick reference) before writing code; consult §11b for exact builtin signatures.
-2. Develop diagnostics-first: write the file → `lom <file.lom> --json` → repair → re-run (full loop: §11e); `--trace` localizes runtime failures by call chain (§11g).
+2. Develop diagnostics-first: write the file → `lom <file.lom> --json` → repair → re-run (full loop: §11e); `--trace` localizes runtime failures by call chain (§11g). A runtime error points at the failing expression (§11c), and when the file is statically clean yet fails at run time, `lom fix <file.lom> --plan --run` puts that positioned runtime diagnostic into the repair plan (§11e, `--run`).
 3. If an API you need is not in §11b or §2, do NOT assume it exists — check §11i (features that do not exist), then probe: a tiny program calling the suspected name answers `NAM005` (real builtin; the hint carries its exact import line) or `NAM003` (no such name at all). `lom explain <code>` prints long-form guidance (§11c).
 
 ---
@@ -576,6 +576,19 @@ Lom emits **all** errors at once (tolerant parser — does not stop at first err
 ```
 Each diagnostic carries its location twice (append-only dual write, forward-compatible): the flat top-level `line`/`col` pair **and** the nested `position` object with an `anchor` field — `"exact"` when the coordinates are a precise point, `"none"` when the channel has no position (e.g. the `LEX000` input-unreadable envelope reports `0:0` honestly rather than fabricating coordinates).
 
+**Runtime diagnostics carry a position** (since v1.17.0 — interpreter run mode and `lom fix --run`). A runtime error points at the **innermost expression whose evaluation returned the error** (its start; `anchor: "exact"`), rendered with the source line and a caret:
+
+```
+[runtime] error (4:13): [RUNTIME000] 整数除以零
+    |     println(a / b)
+    |             ^
+```
+
+- Innermost wins. In `a + b / c` a failing `b / c` points at `b`; if both operands succeed and the outer `+` itself fails, the whole expression's start is reported. An error inside a callee is reported at the failing line *inside the callee*; a failing argument expression points at that argument; assigning to an undeclared variable points at the assignment statement.
+- **Not located** (stay at `(0:0)`, `anchor: "none"`): errors raised outside expression evaluation — a bad import (`RUNTIME005`), tuple-destructuring shape mismatches, a non-iterable `for` source, a non-`Bool` condition of a statement-position `if` / `while`. (A block-tail `if` is an expression and *is* located.) The recursion-depth `RUNTIME000` keeps its own position — the recursive `fn` signature.
+- `--json` and `--check` are purely static: they never contain runtime diagnostics. The machine-readable home of a runtime diagnostic is the `stage: "runtime"` plan entry emitted by `lom fix --run` (§11e).
+- AOT `lom build` artifacts carry no source positions, so their run-time failures stay unpositioned (§11f item 9).
+
 **Error codes** (LLMs can learn these):
 - `LEX001`-`LEX099`: lexical (unclosed string, unexpected char, etc.)
 - `PARSE001`-`PARSE099`: syntax (`PARSE001` expected token, `PARSE099` = hole)
@@ -656,7 +669,7 @@ Key points:
 - `lom fix --history [--json]` (Phase 4.1.3) — shows past applied fixes from `.lom/fix-history.jsonl` (NDJSON, `lom-fix-history/v1` schema).
 - Exit code is `0` whenever the plan was generated successfully — **even if the file has errors.** This lets you consume the JSON without parsing exit codes.
 
-**What `fix` (plan mode) does NOT do**: it does not edit the source file, does not run the program, does not re-check after applying fixes. Only `fix --apply` edits the source — and only for high-confidence, non-hint fixes; everything else remains advisory.
+**What `fix` (plan mode) does NOT do**: it does not edit the source file, does not run the program **unless you pass `--run`** (see `--run` below), does not re-check after applying fixes. Only `fix --apply` edits the source — and only for high-confidence, non-hint fixes; everything else remains advisory.
 
 **`lom-fix/v1` schema**:
 ```json
@@ -728,6 +741,58 @@ Key points:
 4. Apply the fixes yourself, or preview automation with `lom fix <file> --apply --dry-run`. Since the 2026-09-21 R55 hardening, High `insert`/`replace` actions are scope- and position-guarded (see Limitations for what remains uncertain); `--dry-run` plus an explicit re-check is still the safest loop. User-enum MAT001 remains a hint-with-text.
 5. Re-run `lom <file> --json` to verify. Repeat until `ok == true`.
 6. Run `lom <file>` to execute.
+7. If it passes every static check but fails at run time, run `lom fix <file> --plan --run --json` and read the `stage: "runtime"` plan entry — it carries the failing expression's position (§11c).
+
+### `--run`: let `fix` observe a run-time failure (v1.17.0)
+
+Static analysis cannot see every bug. When `lom <file> --json` says `ok: true` but `lom <file>` fails at run time, `--run` makes `fix` **execute the program once** and append what it observes to the plan:
+
+```
+lom fix <file.lom> --plan --run [--run-budget <ms>] [--allow-io] [--json]
+lom fix <file.lom> --apply --run [--run-budget <ms>] [--allow-io] [--json] [--dry-run]
+```
+
+| Flag | Meaning |
+|---|---|
+| `--run` | Execute the program once (no arguments; its stdout is discarded) and feed the first runtime diagnostic — with its §11c position — into the plan. `fix` subcommand only; anywhere else exits `2` |
+| `--run-budget <ms>` | Time budget for that execution. Default **5000** ms; a positive integer; needs `--run` |
+| `--allow-io` | Lift the side-effect gate (below). Needs `--run` |
+
+**What you get** with `--json` (without `--run` neither addition exists, so existing consumers are unaffected):
+
+- `plans[]` gains, after the static plans, one entry with `"stage": "runtime"` for the observed diagnostic. Every runtime plan is **advice only** (`action: "hint"`, `retry: false`) — `--apply` never edits the file for it, with or without `--run`.
+- A new top-level `run` object. Three outcomes:
+
+```json
+{ "attempted": true, "outcome": "error", "budget_ms": 5000 }
+```
+
+```json
+{ "attempted": true, "outcome": "timeout", "reason": "budget_exceeded", "detail": "运行超过预算 5000 ms，…", "budget_ms": 5000 }
+```
+
+```json
+{ "attempted": false, "outcome": "skipped", "reason": "io_gate", "detail": "第 1 行第 20 列出现持久副作用内建 file_write…", "budget_ms": 5000 }
+```
+
+  - `attempted` — whether the program was actually executed.
+  - `outcome` — `pass` (ran to completion; no runtime plan), `error` (a runtime diagnostic was captured), `timeout` (the budget ran out; no diagnostic — suspect an infinite loop, or raise the budget), `skipped` (not executed; see `reason`).
+  - `reason` (present for `timeout` / `skipped`, and when the observation itself fails) — `budget_exceeded`, `static_error` (the file has error-level static diagnostics — fix those first), `io_gate` (the side-effect gate refused), `package_import` (the file imports an external package, which `fix` does not resolve), `trace_open_failed` / `abnormal_termination` (the observation itself failed — exit code `2`).
+  - `detail` (present together with `reason`) — one human-readable sentence.
+  - `budget_ms` — the budget in force.
+- `--apply --run --json` reports the same observation as two extra top-level fields of the `lom-apply/v1` envelope: `runtime_plans` (plan entries, same shape as `plans[]`) and `run`. The observation is made on the source **after** the static fixes converged, and — like every runtime plan — is reported, never applied.
+
+**Side-effect gate.** Running a program is a side effect, so `--run` is strictly opt-in and fenced:
+
+1. Error-level static diagnostics → not executed (`static_error`).
+2. The source mentions `file_write` or `file_append` as identifiers (comments and string contents do not count) → refused (`io_gate`) unless you pass `--allow-io`. The gate is deliberately conservative: a dead branch or a shadowed name still trips it. The builtin set is frozen and these two are its only persistent side effects — **an RFC that adds another builtin with persistent side effects must extend this list** (`PERSISTENT_IO_BUILTINS` in `src/fix_run.rs`).
+3. The execution is bounded by the budget, and the program's stdout is discarded — it never leaks into `fix` output and cannot clog a pipe.
+
+**Exit codes**: `0` whenever analysis completed — including `error`, `pass`, `timeout`, and `skipped`. Misuse exits `2`: `--run` outside `fix`, `--run-budget` with a non-positive or non-numeric value, `--run-budget` / `--allow-io` without `--run`.
+
+**Boundaries**: unavailable in the wasm build (the in-browser playground engine) — it exits `2` with a message rather than running without a budget. A file whose directory holds a `lom.toml` and which imports from an external package is skipped (`package_import`).
+
+**Agent recipe**: `lom f.lom --json` reports `ok: true` but the run fails → `lom fix f.lom --plan --run --json` → read `run.outcome`: `error` → the last `plans[]` entry is the positioned runtime diagnostic (fix the logic at that expression); `timeout` → hunt the loop; `pass` → the program is fine as it stands. Add `--trace` (§11g) when the failing expression alone is not enough and you need the call chain.
 
 **Limitations**:
 - **R55 hardened (2026-09-21)**: the v1.2.1 counterexamples are fixed and locked by negative tests — MUT001 no longer rewrites a same-name `let` outside the enclosing function; EFF001 inserts at the signature **end** line (multiline signatures stay parseable) and merges same-function missing effects into one annotation; `lom-apply/v1` now reports a `final` block (`errors`/`warnings` recomputed on the patched source) and `ok` means *applied > 0 AND final errors == 0* — a patch that breaks parsing reports `ok: false`. Remaining caution: High still means "mechanically precise", not "semantically what you intended" — review `--dry-run` diffs for logic-bearing edits.
@@ -735,13 +800,13 @@ Key points:
 - LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 diagnostic columns arrive as byte columns and are converted to char columns before use (R55); multibyte-line positions are covered by tests. These rules must not be treated as mathematically certain.
 - NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Since Phase 3.2b (v0.21.0) positions come from **expression-level spans** on the diagnostic (single-point replace); the whole-token source scan remains only as a fallback for span-less diagnostics (e.g. variant names in `match` patterns — `Pattern` carries no span).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
-- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE001-3/TYPE020/NAM004-field point at the exact expression/assign-target; note the Field diagnostic points at the field-name token via the span's `end`); runtime positions remain coarse. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
+- Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE001-3/TYPE020/NAM004-field point at the exact expression/assign-target; note the Field diagnostic points at the field-name token via the span's `end`). Runtime diagnostics point at the innermost failing expression since v1.17.0 (§11c) and reach `fix` only through `--run` (above); the kinds listed there as not located stay at `0:0`. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
 
 ---
 
 ## 11f. Compiling to WebAssembly (Phase 7, v0.15.0)
 
-`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 138 eval tasks (the eight known divergences are listed below).
+`lom build <file> --target wasm [-o out.wasm]` compiles a Lom program to a `.wasm` binary (hand-written zero-dependency emitter). The tree-walking interpreter remains the reference implementation and the default run path; WASM is a second backend compiling the same dynamic semantics — stdout is byte-identical across the full example suite, the bootstrap self-hosted interpreter, and all 138 eval tasks (the nine known divergences are listed below).
 
 - Type checking runs before compilation (diagnostics on stderr, never blocking — the same gradual-typing promise as the interpreter).
 - Running the `.wasm` requires a host providing the `env.lom_*` imports (print / file / env / json); the repo ships a Node.js harness at `eval/runner/run_wasm.mjs`.
@@ -754,6 +819,7 @@ Key points:
   6. **Deep recursion / deep nesting** (since 2026-09-08) — the interpreter enforces software depth guards with **structured diagnostics and exit 1**: call recursion > 60,000 frames (80,000 until v1.10.3; re-calibrated below the measured deep-frame physical overflow ≈67,000 so the structured diagnostic precedes the abort) → `[RUNTIME000] 递归深度超过 60000 层...` (positioned at the recursive `fn` signature); expression nesting > 30,000 levels → `[PARSE000] 表达式嵌套超过 30000 层...`; `json_parse` nesting > 100,000. WASM instead hits the host stack: V8 traps with `Maximum call stack size exceeded` (adjustable via `node --stack-size`; ~10k–30k frames at default, 10⁵ at `--stack-size=60000`). Fix pattern is identical on both: add a termination condition or rewrite as a `while` loop.
   7. **Int value range** (since 2026-09-14, found by the D-workpackage package-mode differential testing; latent since Phase 7.6a / v0.11.0, when the tag widened from 3 to 4 bits — the v0.7.0-v0.10.0 era carried 61 payload bits with the boundary at ±2^60; R24 correction: first recorded as "v0.7.2", a version that never existed as a tag) — the interpreter's `Int` is full `i64` (±9.2×10¹⁸); the WASM backend uses tagged i64 with a 4-bit tag, so only the low **60 payload bits** survive: values at or beyond **2⁵⁹ (576460752303423488)** wrap into the sign bit (printed negative) and values at or beyond 2⁶⁰ are silently truncated (2⁶⁰ prints as `0`) — no diagnostic. Practical guidance: keep integer intermediates/results within **±2⁵⁹** (≈ ±5.8×10¹⁷) when the program may run on WASM; the interpreter has no such limit. Structural fix would require re-boxing the value representation (out of freeze scope; documented divergence, verified by the `int-range` probe of `tools/diff_test.py --probe`).
   8. **`env::args()` `argv[0]`** (since 2026-09-15, documented during the D-3 differential expansion) — `argv[0]` is the program path and therefore differs structurally between backends: the interpreter passes the `.lom` source path, the WASM harness passes the `.wasm` binary path (different lengths and contents). User arguments after the CLI `--` separator are byte-identical on both backends. Guidance: never print, hash, or branch on `args()[0]`; consume `args()[1..]` only. Not a bug — "the program path" is inherently a different artifact per backend; recorded so LLM-generated argument-parsing code does not rely on `argv[0]`'s content. Covered by the `t_env_args_consume` template family of `tools/diff_gen.py` (which deliberately never touches `args[0]`).
+  9. **Run-time failure positions** (since 2026-11-23, v1.17.0) — interpreter runtime diagnostics point at the innermost failing expression (§11c). An AOT artifact carries no source positions at all (the emitter writes no custom or debug section), so its run-time failures — like the `wasm trap: divide by zero` text of item 3 — arrive with no Lom line or column. Not unified: giving the AOT channel positions needs debug information in the artifact. Lock: `tests/d0028_runtime_position.rs` asserts the emitted sections.
 
 ---
 

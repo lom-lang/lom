@@ -27,7 +27,7 @@ end
 
 ```
 $ lom hello.lom
-[runtime] error (0:0): [RUNTIME002] 符号 'len' 未导入。需在文件顶部声明：from string import {len}
+[runtime] error (2:13): [RUNTIME002] 符号 'len' 未导入。需在文件顶部声明：from string import {len}
 
 $ lom fix hello.lom --apply
 lom apply: hello.lom（迭代 2 轮）

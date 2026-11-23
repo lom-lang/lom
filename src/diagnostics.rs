@@ -159,8 +159,11 @@ impl Diagnostic {
 
     /// 从运行时错误构造诊断
     ///
-    /// 注：Phase 2.3 阶段，AST 节点尚未携带位置信息（Phase 3 改造），
-    /// 因此运行时错误的位置需要调用方尽量提供；未知时传 (0, 0)。
+    /// designs/0028（v1.17.0）L1：`Msg` 错误的位置由调用方传入——生产路径是
+    /// 解释器的位置侧通道（最内层出错表达式的 span 起点，anchor = exact）。
+    /// 不在表达式求值路径上抛出的错误（import 解析、代码洞等）没有通道，
+    /// 维持 (0, 0)（anchor = none，不伪造坐标）。DepthLimit 自带位置，
+    /// 在此覆盖调用方传入的 site（行为不变）。
     pub fn from_runtime(
         err: &RuntimeError,
         file: &str,
@@ -336,8 +339,16 @@ impl Diagnostics {
     }
 
     /// 添加一条运行时错误诊断
-    pub fn add_runtime(&mut self, err: &RuntimeError, src: &str, line: usize, col: usize) {
+    ///
+    /// designs/0028（v1.17.0）L1：`site` = 解释器位置侧通道
+    /// （`Interpreter::err_site()`）——最内层出错表达式的起点；None（错误不在
+    /// 表达式求值路径上抛出）维持 (0, 0) 的无位置形态。此前调用方在此写死
+    /// (0, 0)（Phase 2.3 时 AST 尚无 span；表达式级 span 自 v0.21.0 起已在
+    /// AST 上，本批回接——位置通道改为必经侧通道，调用方无法再写死坐标）。
+    /// DepthLimit 自带位置，由 from_runtime 覆盖 site。
+    pub fn add_runtime(&mut self, err: &RuntimeError, src: &str, site: Option<(usize, usize)>) {
         let source_lines: Vec<&str> = src.lines().collect();
+        let (line, col) = site.unwrap_or((0, 0));
         self.diagnostics.push(Diagnostic::from_runtime(
             err,
             &self.file,
@@ -437,34 +448,45 @@ impl Diagnostics {
         out
     }
 
+    /// 单条诊断的人类可读渲染（头行 + 源码行与脱字符 + hint + 代码洞标注）
+    ///
+    /// designs/0028（v1.17.0）：自 `to_human` 的循环体原样抽出（输出字节
+    /// 不变）——`fix --run` 的人类模式复用同一渲染器呈现观察到的运行时
+    /// 诊断（设计 §3.5"复用静态诊断渲染器"）。
+    pub(crate) fn render_one(d: &Diagnostic) -> String {
+        let mut out = String::new();
+        out.push_str(&format!(
+            "[{}] {} ({}:{}): [{}] {}\n",
+            d.stage.as_str(),
+            d.severity.as_str(),
+            d.line,
+            d.col,
+            d.code,
+            d.message
+        ));
+        if let Some(src) = &d.source_line {
+            out.push_str(&format!("    | {}\n", src));
+            let pointer = if d.col > 0 {
+                " ".repeat(d.col.saturating_sub(1))
+            } else {
+                String::new()
+            };
+            out.push_str(&format!("    | {}^\n", pointer));
+        }
+        if let Some(hint) = &d.hint {
+            out.push_str(&format!("    hint: {}\n", hint));
+        }
+        if d.is_hole {
+            out.push_str("    (代码洞 — 容错解析器插入的占位符)\n");
+        }
+        out
+    }
+
     /// 人类可读格式（带源码上下文 + 指示线）
     pub fn to_human(&self) -> String {
         let mut out = String::new();
         for d in &self.diagnostics {
-            out.push_str(&format!(
-                "[{}] {} ({}:{}): [{}] {}\n",
-                d.stage.as_str(),
-                d.severity.as_str(),
-                d.line,
-                d.col,
-                d.code,
-                d.message
-            ));
-            if let Some(src) = &d.source_line {
-                out.push_str(&format!("    | {}\n", src));
-                let pointer = if d.col > 0 {
-                    " ".repeat(d.col.saturating_sub(1))
-                } else {
-                    String::new()
-                };
-                out.push_str(&format!("    | {}^\n", pointer));
-            }
-            if let Some(hint) = &d.hint {
-                out.push_str(&format!("    hint: {}\n", hint));
-            }
-            if d.is_hole {
-                out.push_str("    (代码洞 — 容错解析器插入的占位符)\n");
-            }
+            out.push_str(&Self::render_one(d));
         }
         let (total, errors, warnings, holes) = self.summary();
         out.push_str(&format!(
@@ -732,5 +754,79 @@ mod tests {
         let json = diags.to_json();
         assert!(json.contains("\"code\": \"LEX000\""));
         assert!(json.contains("\"position\": {\"line\": 0, \"col\": 0, \"anchor\": \"none\"}"));
+    }
+
+    // ===== designs/0028（v1.17.0）L1：add_runtime 的 site 入参 =====
+
+    /// site = None（错误不在表达式求值路径上）：维持 (0, 0) / anchor none，
+    /// 不带源码行与脱字符。
+    #[test]
+    fn l1_add_runtime_without_site_keeps_zero_zero() {
+        let src = "from nosuchmod import {thing}\nfn main() -> Unit\n    println(1)\nend\n";
+        let err = RuntimeError::Msg("未知模块/包 'nosuchmod'（PKG005）".to_string());
+        let mut diags = Diagnostics::new("t.lom");
+        diags.add_runtime(&err, src, None);
+        let d = &diags.diagnostics[0];
+        assert_eq!((d.line, d.col), (0, 0));
+        assert_eq!(d.source_line, None);
+        assert!(!diags.ok);
+        assert!(
+            diags
+                .to_json()
+                .contains("\"position\": {\"line\": 0, \"col\": 0, \"anchor\": \"none\"}")
+        );
+    }
+
+    /// DepthLimit 自带位置：即使传入一份（残留的）site，也以自带位置为准
+    #[test]
+    fn l1_add_runtime_depth_limit_overrides_site() {
+        let src = "fn down(n: Int) -> Int\n    down(n + 1)\nend\n";
+        let err = RuntimeError::DepthLimit {
+            msg: "递归深度超过 50 层".to_string(),
+            line: 1,
+            col: 1,
+        };
+        let mut diags = Diagnostics::new("t.lom");
+        diags.add_runtime(&err, src, Some((2, 5)));
+        assert_eq!(
+            (diags.diagnostics[0].line, diags.diagnostics[0].col),
+            (1, 1)
+        );
+        assert_eq!(diags.diagnostics[0].code, "RUNTIME000");
+    }
+
+    /// render_one 抽出（designs/0028：fix --run 人类模式复用）后 to_human 字节不变：
+    /// 各条诊断的 render_one 顺序拼接 + 汇总行 == to_human。
+    #[test]
+    fn render_one_composes_to_human_byte_identical() {
+        let mut diags = Diagnostics::new("t.lom");
+        diags.diagnostics.push(Diagnostic::from_lex(
+            &LexError {
+                message: "意外字符 '#'".to_string(),
+                line: 1,
+                col: 1,
+            },
+            "t.lom",
+            &["# bad"],
+        ));
+        let mut d2 = Diagnostics::new("t.lom");
+        d2.add_runtime(
+            &RuntimeError::Msg("整数除以零".to_string()),
+            "# bad\n    a / b\n",
+            Some((2, 5)),
+        );
+        diags.diagnostics.push(d2.diagnostics[0].clone());
+        diags.ok = false;
+        let composed: String = diags
+            .diagnostics
+            .iter()
+            .map(Diagnostics::render_one)
+            .collect();
+        let expected = format!(
+            "{}共 {} 个诊断（{} 错误，{} 警告，{} 代码洞）。\n",
+            composed, 2, 2, 0, 0
+        );
+        assert_eq!(diags.to_human(), expected);
+        assert!(Diagnostics::render_one(&diags.diagnostics[1]).contains("    |     ^\n"));
     }
 }

@@ -62,6 +62,14 @@ pub(crate) struct CliArgs {
     /// designs/0026 裁决点 1 乙: --trace-builtins —— 内建调用入 trace
     /// （默认关——内建噪声大，缺线索时再开）
     pub(crate) trace_builtins: bool,
+    /// designs/0028（v1.17.0）L2: --run 开关（lom fix 专用）——执行一次程序以
+    /// 观察其运行时失败（opt-in；带副作用闸门与运行预算，见 fix_run.rs）
+    pub(crate) run: bool,
+    /// designs/0028: --run-budget <ms> —— 运行预算（缺省 5000；须与 --run 同用）
+    pub(crate) run_budget: Option<u64>,
+    /// designs/0028: --allow-io —— 放行含持久副作用内建（file_write /
+    /// file_append）的源码（须与 --run 同用）
+    pub(crate) allow_io: bool,
     /// Phase 3.5: -- 之后的参数，传递给 Lom 程序（通过 env::args() 读取）
     pub(crate) program_args: Vec<String>,
 }
@@ -132,6 +140,9 @@ pub(crate) fn print_help(prog: &str) {
         "              --history：查看修复历史记录（Phase 4.1.3，存储于 .lom/fix-history.jsonl）"
     );
     eprintln!(
+        "              --run：执行一次程序观察其运行时失败（designs/0028；--json 追加可选 run 字段与 stage \"runtime\" 的提示计划，--apply --run 只报告不应用）"
+    );
+    eprintln!(
         "  repl        启动交互式 REPL（Phase 4.2）。支持多行输入、上下文保持、:help/:reset/:q 命令"
     );
     eprintln!(
@@ -200,6 +211,18 @@ pub(crate) fn print_help(prog: &str) {
         "  --trace-max-events <n>  trace 事件上限（默认 10000；0 = 无限；达上限停止记录，尾行 summary truncated:true）"
     );
     eprintln!("  --trace-builtins   内建调用入 trace（默认关——内建调用噪声大，缺线索时再开）");
+    eprintln!(
+        "  --run      lom fix 子命令专用：执行一次程序以观察其运行时失败（designs/0028）。静态有 error 级诊断时不执行；"
+    );
+    eprintln!(
+        "              源码出现 file_write / file_append 时拒绝执行（--allow-io 放行）；程序 stdout 丢弃；运行时计划全是提示，--apply 不应用"
+    );
+    eprintln!(
+        "  --run-budget <ms>  lom fix --run 的运行预算（默认 5000 ms；超时记 run.outcome \"timeout\"，照常输出后退出 0）"
+    );
+    eprintln!(
+        "  --allow-io         lom fix --run 子命令专用：放行含持久副作用内建（file_write / file_append）的源码"
+    );
     eprintln!("  --help, -h 显示本帮助");
     eprintln!("  --version, -V 显示版本号（Phase 6.1）");
     eprintln!();
@@ -357,6 +380,29 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                     }
                 }
             }
+            // ===== designs/0028（v1.17.0）：fix --run 族三 flag（带值形态照
+            // --trace-max-events 先例；纯 CLI flag，不触语言冻结面）。语义与
+            // 误用校验见 parse_args 末尾 =====
+            "--run" => out.run = true,
+            "--allow-io" => out.allow_io = true,
+            "--run-budget" => {
+                let raw = match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("--run-budget 需要一个正整数毫秒值（如 --run-budget 3000）");
+                        // β-2：用法错误 = 工具失败带 rc 2
+                        process::exit(2);
+                    }
+                };
+                match raw.parse::<u64>() {
+                    Ok(n) if n > 0 => out.run_budget = Some(n),
+                    _ => {
+                        eprintln!("--run-budget 需要一个正整数毫秒值，得到 '{}'", raw);
+                        // β-2：用法错误 = 工具失败带 rc 2
+                        process::exit(2);
+                    }
+                }
+            }
             _ => {
                 // `-` = stdin 位置参数（lom l2fix 专用；其余子命令落到文件
                 // 读取路径得"无法读取文件 '-'"，不产生歧义面）
@@ -374,6 +420,25 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
                 }
                 out.file = Some(a.clone());
             }
+        }
+    }
+
+    // designs/0028（v1.17.0）L2：--run 族三 flag 只对 `lom fix <file>`（非
+    // --history）有意义；--run-budget / --allow-io 另须与 --run 同用。误用走
+    // 既有的工具失败带 rc 2（设计 §4.7）——不静默忽略（静默忽略会让人以为
+    // 观察过运行时）。
+    if out.run || out.run_budget.is_some() || out.allow_io {
+        let fix_file =
+            out.subcommand.as_deref() == Some("fix") && out.file.is_some() && !out.history;
+        if !fix_file {
+            eprintln!("--run / --run-budget / --allow-io 仅用于 lom fix <file>");
+            eprintln!("使用 --help 查看用法");
+            process::exit(2);
+        }
+        if !out.run {
+            eprintln!("--run-budget / --allow-io 需与 --run 同用");
+            eprintln!("使用 --help 查看用法");
+            process::exit(2);
         }
     }
     out

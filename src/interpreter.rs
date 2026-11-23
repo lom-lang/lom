@@ -798,6 +798,19 @@ pub struct Interpreter {
     /// designs/0026（v1.14.0）：执行 trace 上下文（--trace 开启时 Some；
     /// 关闭 = None，插桩点单次 Option 检查，零事件产出）
     trace: Option<TraceCtx>,
+    /// designs/0028（v1.17.0）L1：运行时错误位置侧通道。`RuntimeError::Msg`
+    /// 是裸字符串，位置不在错误值里——由 eval_expr 外壳在 Err(Msg) 自内向外
+    /// 传播时记下**最内层**出错表达式的 span 起点 (line, col)（已有值不
+    /// 覆盖）。上报点取用：main.rs 运行路径与 fix --run 观察路径的
+    /// `Diagnostics::add_runtime`；DepthLimit 自带位置不走此通道。
+    /// 生命周期：`run()` 入口与 REPL 每条输入前清空（repl.rs exec_line）——
+    /// 被接住的错误不得把位置泄漏给后续执行。
+    err_site: Option<(usize, usize)>,
+    /// designs/0028（v1.17.0）L2：程序输出去向开关。缺省 false = 写进程
+    /// stdout；`fix --run` 观察运行前置 true = 丢弃（sink）——程序 stdout
+    /// 既不进 fix 的 stdout，也不走管道（死循环打印不会撑满管道而阻塞）。
+    /// 仅 println / print 两处内建消费；缺省路径只多一次 bool 判别。
+    discard_output: bool,
 }
 
 /// 内置变体
@@ -868,6 +881,21 @@ const STDL_MODULES: &[(&str, &[&str])] = &[
     ("env", &["args"]),
 ];
 
+/// designs/0028（v1.17.0）L2：name 是否标准库模块名
+/// （io/string/math/list/json/map/file/env）——`fix --run` 据此识别"import 了
+/// 外部包"的源码（fix 面不解析依赖包，见 fix_run.rs 闸门）。单一事实源 =
+/// 上方 STDL_MODULES。
+pub(crate) fn is_stdlib_module(name: &str) -> bool {
+    STDL_MODULES.iter().any(|(m, _)| *m == name)
+}
+
+/// 标准库模块表的只读视图（模块名 → 导出内建名），供 fix_run 的闸门名单
+/// 单测钉"持久副作用内建名单穷尽"（designs/0028 §4.4：内建集冻结，名单穷尽）。
+#[cfg(test)]
+pub(crate) fn stdlib_modules() -> &'static [(&'static str, &'static [&'static str])] {
+    STDL_MODULES
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         let globals = Scope::new(None);
@@ -902,7 +930,31 @@ impl Interpreter {
             call_depth: 0,
             max_depth: DEFAULT_MAX_CALL_DEPTH,
             trace: None,
+            err_site: None,
+            discard_output: false,
         }
+    }
+
+    /// designs/0028 L2：丢弃程序输出（`fix --run` 观察运行用——程序 stdout
+    /// 不泄漏进 fix 的 stdout；set_program_args 同款 setter 先例）。wasm 目标
+    /// 的 --run 直接拒绝、不执行，故仅在该目标下放开 dead_code。
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    pub fn set_discard_output(&mut self, on: bool) {
+        self.discard_output = on;
+    }
+
+    /// designs/0028（v1.17.0）L1：运行时错误位置侧通道的当前值——最内层
+    /// 出错表达式的起点 (line, col)；无位置（错误不在表达式求值路径上抛出，
+    /// 或本次运行尚未出错）为 None。上报点消费（`Diagnostics::add_runtime`
+    /// 的 site 入参）：None 即维持 (0, 0) 的无位置形态，不伪造坐标。
+    pub fn err_site(&self) -> Option<(usize, usize)> {
+        self.err_site
+    }
+
+    /// designs/0028 L1：清空位置侧通道（重置点：`run()` 入口、REPL 每条
+    /// 输入前与接住错误的现场——被接住的错误不得把位置泄漏给后续执行）。
+    pub fn reset_err_site(&mut self) {
+        self.err_site = None;
     }
 
     /// Phase 3.5: 设置程序参数（供 env::args() 读取）
@@ -1100,6 +1152,9 @@ impl Interpreter {
 
     /// 运行程序
     pub fn run(&mut self, program: &Program) -> Result<(), RuntimeError> {
+        // designs/0028 L1：位置侧通道按"每次程序运行"起算——同一解释器
+        // 实例再次 run（或 REPL 后续执行）不继承上一次出错的位置。
+        self.err_site = None;
         // 先处理所有导入声明（在注册函数/枚举之前，确保符号可用性语义清晰）
         for item in &program.items {
             if let Item::Import(imp) = item {
@@ -1285,9 +1340,19 @@ impl Interpreter {
                 }
                 Ok(ControlFlow::Normal(Value::Unit))
             }
-            Stmt::Assign { target, value, .. } => {
+            Stmt::Assign {
+                target,
+                value,
+                span,
+            } => {
                 let v = self.eval_expr(value, env.clone())?;
                 if !env.borrow_mut().set_existing(target, v) {
+                    // designs/0028 L1 语句级补点：这个错误不在任何表达式求值
+                    // 里抛出（右侧已成功求值），外壳接不到——就地以赋值语句
+                    // 的 span 起点写入侧通道（已有值不覆盖，与外壳同序）。
+                    if self.err_site.is_none() {
+                        self.err_site = Some((span.line, span.col));
+                    }
                     return Err(RuntimeError::Msg(format!("赋值给未定义变量: '{}'", target)));
                 }
                 Ok(ControlFlow::Normal(Value::Unit))
@@ -1385,7 +1450,27 @@ impl Interpreter {
     }
 
     /// 求值表达式
+    ///
+    /// designs/0028（v1.17.0）L1：位置外壳——原函数体逐字移入 eval_expr_inner
+    /// （外壳零侵入形态沿 designs/0026 的 call_function / call_function_inner
+    /// 先例）。返回 Err 且为 `Msg` 时，若侧通道为空则记入本表达式的 span
+    /// 起点。错误自内向外传播：内层外壳先写入、外层见到非空不再覆盖，
+    /// "最内层优先"由此天然成立（`foo(1 / 0)` 落在 `1 / 0` 这个表达式的
+    /// 起点；错误发生在被调函数体内，则落在被调函数内失败表达式的行）。
+    /// Ok 路径只多一次 Result 判别分支，零新增工作；`EarlyReturn` 是控制流、
+    /// `DepthLimit` 自带位置——两者都不写侧通道。
     fn eval_expr(&mut self, expr: &Expr, env: ScopeRef) -> Result<Value, RuntimeError> {
+        let result = self.eval_expr_inner(expr, env);
+        if let Err(RuntimeError::Msg(_)) = result
+            && self.err_site.is_none()
+        {
+            self.err_site = Some((expr.span.line, expr.span.col));
+        }
+        result
+    }
+
+    /// eval_expr 的原函数体（designs/0028 拆出——外壳插桩零侵入）
+    fn eval_expr_inner(&mut self, expr: &Expr, env: ScopeRef) -> Result<Value, RuntimeError> {
         match &expr.kind {
             ExprKind::Int(n) => Ok(Value::Int(*n)),
             ExprKind::Float(f) => Ok(Value::Float(*f)),
@@ -2136,7 +2221,9 @@ impl Interpreter {
                         args.len()
                     )));
                 }
-                println!("{}", args[0].to_display());
+                if !self.discard_output {
+                    println!("{}", args[0].to_display());
+                }
                 Ok(Some(Value::Unit))
             }
             "print" => {
@@ -2146,7 +2233,9 @@ impl Interpreter {
                         args.len()
                     )));
                 }
-                print!("{}", args[0].to_display());
+                if !self.discard_output {
+                    print!("{}", args[0].to_display());
+                }
                 Ok(Some(Value::Unit))
             }
             // string 模块
@@ -4708,5 +4797,284 @@ end
             }),
             "[RUNTIME000] 递归深度超过 60 层"
         );
+    }
+
+    // ===== designs/0028（v1.17.0）L1：运行时错误位置侧通道 =====
+
+    /// 跑 src 至运行时错误，返回 (错误, 侧通道位置)。解析失败/未报错即 panic。
+    fn run_site(src: &str) -> (RuntimeError, Option<(usize, usize)>) {
+        let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
+        let mut interp = Interpreter::new();
+        let err = interp.run(&program).expect_err("应产生运行时错误");
+        (err, interp.err_site())
+    }
+
+    /// needle 在 src 中首次出现的 1-based (line, col)。期望位置由源码文本算出
+    /// 而非手数——测试源码里的续行/缩进一变，手数坐标就漂。
+    fn pos_of(src: &str, needle: &str) -> (usize, usize) {
+        let at = src
+            .find(needle)
+            .unwrap_or_else(|| panic!("源码中应有 {:?}", needle));
+        let before = &src[..at];
+        let line = before.matches('\n').count() + 1;
+        let col = before.rsplit('\n').next().unwrap().chars().count() + 1;
+        (line, col)
+    }
+
+    /// main 体内除零报真实行列——覆盖 --trace 零事件（main 入口不出 call 事件）
+    /// 的定位缺口。
+    #[test]
+    fn l1_main_body_div0_lands_on_failing_expression() {
+        let src = "fn main() -> Unit\n    let a = 1\n    let b = 0\n    println(a / b)\nend\n";
+        let (err, site) = run_site(src);
+        assert!(
+            matches!(err, RuntimeError::Msg(ref m) if m == "整数除以零"),
+            "{:?}",
+            err
+        );
+        assert_eq!(site, Some((4, 13)), "p03 形态：设计 §1.2 的 (4:13) 实例");
+        assert_eq!(site, Some(pos_of(src, "a / b")), "落 `a / b` 表达式起点");
+    }
+
+    /// 嵌套调用：错误发生在被调函数体内，落在被调函数内的失败行
+    #[test]
+    fn l1_nested_call_lands_inside_callee() {
+        let src = "fn a(n: Int) -> Int\n    b(n)\nend\nfn b(n: Int) -> Int\n    c(n)\nend\n"
+            .to_string()
+            + "fn c(n: Int) -> Int\n    n / 0\nend\n"
+            + "fn main() -> Unit\n    println(a(10))\nend\n";
+        let (_, site) = run_site(&src);
+        assert_eq!(site, Some(pos_of(&src, "n / 0")), "落 c 体内的 `n / 0`");
+    }
+
+    /// 实参表达式出错：落实参表达式，不是整个调用
+    #[test]
+    fn l1_argument_expression_error_lands_on_argument() {
+        let src = "fn div(a: Int, b: Int) -> Int\n    a / b\nend\n".to_string()
+            + "fn main() -> Unit\n    println(div(1 / 0, 2))\nend\n";
+        let (_, site) = run_site(&src);
+        assert_eq!(site, Some(pos_of(&src, "1 / 0")), "落实参 `1 / 0` 起点");
+    }
+
+    /// 最内层优先的两面：(1) 内层运算失败落内层子表达式；(2) 内层都成功、
+    /// 外层运算自身失败，落整个表达式起点（设计 §3.2 的精度下界）。
+    #[test]
+    fn l1_innermost_expression_wins() {
+        let inner = "fn main() -> Unit\n    let a = 1\n    let b = 2\n    let c = 0\n".to_string()
+            + "    let d = a + b / c\n    println(d)\nend\n";
+        let (_, site) = run_site(&inner);
+        assert_eq!(
+            site,
+            Some(pos_of(&inner, "b / c")),
+            "b / c 除零：落内层 `b / c`"
+        );
+        let outer = "fn main() -> Unit\n    let d = True + 1 * 2\n    println(d)\nend\n";
+        let (err, site) = run_site(outer);
+        assert!(
+            matches!(err, RuntimeError::Msg(ref m) if m.contains("运算 Add")),
+            "{:?}",
+            err
+        );
+        assert_eq!(
+            site,
+            Some(pos_of(outer, "True + 1 * 2")),
+            "落整个 `True + 1 * 2` 起点"
+        );
+    }
+
+    /// 语句级补点：赋值给未定义变量落赋值语句（右侧已成功求值，外壳接不到）
+    #[test]
+    fn l1_assign_to_undefined_lands_on_assign_stmt() {
+        let src = "fn main() -> Unit\n    let a = 1\n    println(a)\n    b = a + 1\nend\n";
+        let (err, site) = run_site(src);
+        assert!(
+            matches!(err, RuntimeError::Msg(ref m) if m.contains("赋值给未定义变量")),
+            "{:?}",
+            err
+        );
+        assert_eq!(site, Some(pos_of(src, "b = a + 1")), "落赋值语句 span 起点");
+    }
+
+    /// 右侧先出错：外壳已写入，Assign 补点不覆盖（最内层优先不被语句级破坏）
+    #[test]
+    fn l1_assign_rhs_error_keeps_innermost_site() {
+        let src = "fn main() -> Unit\n    let a = 1\n    b = a / 0\nend\n";
+        let (err, site) = run_site(src);
+        assert!(
+            matches!(err, RuntimeError::Msg(ref m) if m == "整数除以零"),
+            "{:?}",
+            err
+        );
+        assert_eq!(site, Some(pos_of(src, "a / 0")), "落右侧 `a / 0`");
+    }
+
+    /// DepthLimit：位置不变（函数签名），且不写侧通道
+    #[test]
+    fn l1_depth_limit_keeps_own_position_and_leaves_channel_empty() {
+        let src = "fn down(n: Int) -> Int\n    down(n + 1)\nend\n\
+                   fn main() -> Unit\n    println(down(0))\nend\n";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.max_depth = 50;
+        match interp.run(&program) {
+            Err(RuntimeError::DepthLimit { line, col, .. }) => assert_eq!((line, col), (1, 1)),
+            other => panic!("应为 DepthLimit，得到 {:?}", other.err()),
+        }
+        assert_eq!(interp.err_site(), None, "DepthLimit 自带位置，不走侧通道");
+    }
+
+    /// EarlyReturn 是控制流不是错误：`?` 正常传播不写侧通道
+    #[test]
+    fn l1_early_return_leaves_channel_empty() {
+        let src = "fn f() -> Result<Int, String>\n    let v = g()?\n    Ok(v)\nend\n\
+                   fn g() -> Result<Int, String>\n    Err(\"boom\")\nend\n\
+                   fn main() -> Unit\n    println(f())\nend\n";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.run(&program).expect("程序应正常跑完");
+        assert_eq!(interp.err_site(), None);
+    }
+
+    /// 无残留（同一解释器实例连续运行）：出错后再次 run() 不继承上一次位置
+    #[test]
+    fn l1_no_residue_across_runs_on_same_interpreter() {
+        let bad_src = "fn main() -> Unit\n    println(1 / 0)\nend\n";
+        let bad = Parser::parse(bad_src).unwrap();
+        let mut interp = Interpreter::new();
+        assert!(interp.run(&bad).is_err());
+        assert_eq!(
+            interp.err_site(),
+            Some(pos_of(bad_src, "1 / 0")),
+            "出错后侧通道在场（供上报点消费）"
+        );
+
+        // 其后一次"不在表达式路径上"的错误：不得继承上一次的位置
+        let import_err = Parser::parse(
+            "from nosuchmod import {thing}\nfn main() -> Unit\n    println(1)\nend\n",
+        )
+        .unwrap();
+        let err = interp.run(&import_err).expect_err("import 错误");
+        assert!(
+            matches!(err, RuntimeError::Msg(ref m) if m.contains("未知模块")),
+            "{:?}",
+            err
+        );
+        assert_eq!(interp.err_site(), None, "run() 入口已清空——无残留位置");
+
+        // 其后一次成功运行：同样干净
+        let ok = Parser::parse("fn main() -> Unit\n    println(7)\nend\n").unwrap();
+        interp.run(&ok).expect("应正常运行");
+        assert_eq!(interp.err_site(), None);
+    }
+
+    /// 上报点：侧通道 → Diagnostics::add_runtime → 人类可读头行 + 源码行 +
+    /// 脱字符；JSON 的 position.anchor = exact
+    #[test]
+    fn l1_add_runtime_renders_position_with_caret() {
+        let src = "fn main() -> Unit\n    let a = 1\n    let b = 0\n    println(a / b)\nend\n";
+        let (err, site) = run_site(src);
+        let mut diags = crate::diagnostics::Diagnostics::new("p03.lom");
+        diags.add_runtime(&err, src, site);
+        let d = &diags.diagnostics[0];
+        assert_eq!((d.line, d.col), (4, 13), "设计 §3.5 的实例坐标");
+        assert_eq!((d.line, d.col), pos_of(src, "a / b"));
+        assert_eq!(d.code, "RUNTIME000");
+        assert_eq!(d.stage, crate::diagnostics::Stage::Runtime);
+        assert_eq!(d.source_line.as_deref(), Some("    println(a / b)"));
+        let human = diags.to_human();
+        assert!(
+            human.starts_with("[runtime] error (4:13): [RUNTIME000] 整数除以零\n"),
+            "{}",
+            human
+        );
+        assert!(
+            human.contains("    |     println(a / b)\n    |             ^\n"),
+            "脱字符应指在 a 下: {}",
+            human
+        );
+        assert!(
+            diags
+                .to_json()
+                .contains("\"position\": {\"line\": 4, \"col\": 13, \"anchor\": \"exact\"}")
+        );
+    }
+
+    /// 不在表达式求值路径上抛出的错误（逐类登记）：侧通道为空 → 维持
+    /// (0:0)。这些语句节点（LetDestruct / For / While / 语句位置的 If）不带
+    /// span，错误在 exec_stmt 里抛出，外壳接不到——定位它们需要 AST 改造，
+    /// 不在本批。日后续上位置通道时，本测试与 SPEC_FOR_AI 的登记须同步更新。
+    #[test]
+    fn l1_registered_unpositioned_classes_stay_zero() {
+        let cases: [(&str, &str); 7] = [
+            (
+                "import 未知模块",
+                "from nosuchmod import {thing}\nfn main() -> Unit\n    println(1)\nend\n",
+            ),
+            (
+                "import 不导出符号",
+                "from io import {nosuchfn}\nfn main() -> Unit\n    println(1)\nend\n",
+            ),
+            (
+                "元组解构右侧非元组",
+                "fn main() -> Unit\n    let (a, b) = 5\n    println(a)\nend\n",
+            ),
+            (
+                "元组解构数量不匹配",
+                "fn main() -> Unit\n    let (a, b, c) = (1, 2)\n    println(a)\nend\n",
+            ),
+            (
+                "for 不可迭代",
+                "fn main() -> Unit\n    for x in 1.5\n        println(x)\n    end\nend\n",
+            ),
+            (
+                "语句位置 if 条件非 Bool",
+                "fn main() -> Unit\n    let n = 1\n    if n\n        println(1)\n    end\n    println(2)\nend\n",
+            ),
+            (
+                "语句位置 while 条件非 Bool",
+                "fn main() -> Unit\n    let n = 1\n    while n\n        println(1)\n    end\nend\n",
+            ),
+        ];
+        for (label, src) in cases {
+            let program =
+                Parser::parse(src).unwrap_or_else(|e| panic!("{}: 解析失败 {}", label, e));
+            let mut interp = Interpreter::new();
+            let err = match interp.run(&program) {
+                Err(e) => e,
+                Ok(()) => panic!("{}: 应产生运行时错误", label),
+            };
+            assert_eq!(interp.err_site(), None, "{}", label);
+            let mut diags = crate::diagnostics::Diagnostics::new("t.lom");
+            diags.add_runtime(&err, src, interp.err_site());
+            assert_eq!(
+                (diags.diagnostics[0].line, diags.diagnostics[0].col),
+                (0, 0),
+                "{}",
+                label
+            );
+            assert!(
+                diags
+                    .to_json()
+                    .contains("\"position\": {\"line\": 0, \"col\": 0, \"anchor\": \"none\"}"),
+                "{}",
+                label
+            );
+        }
+    }
+
+    /// 与上一测试成对：块尾 if 是**表达式**、match 守卫在 match 表达式内求值
+    /// ——两者都在求值路径上，条件非 Bool 可定位（if 落 if 表达式起点、
+    /// 守卫落 match 表达式起点）。
+    #[test]
+    fn l1_tail_if_and_match_guard_are_on_eval_path() {
+        let tail_if =
+            "fn main() -> Unit\n    let n = 1\n    if n\n        println(1)\n    end\nend\n";
+        let (_, site) = run_site(tail_if);
+        assert_eq!(site, Some(pos_of(tail_if, "if n")), "块尾 if 表达式起点");
+        let guard = "fn pick(n: Int) -> Int\n    match n\n        1 if n => 10\n        _ => 0\n    end\nend\n"
+            .to_string()
+            + "fn main() -> Unit\n    println(pick(1))\nend\n";
+        let (_, site) = run_site(&guard);
+        assert_eq!(site, Some(pos_of(&guard, "match n")), "match 表达式起点");
     }
 }

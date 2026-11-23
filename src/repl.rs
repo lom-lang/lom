@@ -177,6 +177,12 @@ impl ReplSession {
     /// - 语句/表达式：执行并返回结果（表达式的值会打印）
     /// - 运行时错误：转为输出文本，不传播 Err（REPL 不因错误崩溃）
     pub fn exec_line(&mut self, input: &str) -> Result<ReplResult, RuntimeError> {
+        // designs/0028（v1.17.0）L1 重置点：REPL 会话跨输入复用同一解释器，
+        // 每条输入前清空运行时错误位置侧通道——上一条输入留下的位置不得
+        // 泄漏给本条。REPL 自身不报位置（输入被包进 fn main 包装文本、span
+        // 无文件身份，错误落在先前输入定义的函数体内时行号无法映射回当前
+        // 输入），本重置是防御性的状态卫生。
+        self.interpreter.reset_err_site();
         let trimmed = input.trim();
 
         // 特殊命令
@@ -204,10 +210,16 @@ impl ReplSession {
         match Parser::parse(&wrapped) {
             Ok(program) => match self.exec_wrapped_main(&program, input) {
                 Ok(result) => Ok(result),
-                Err(e) => Ok(ReplResult {
-                    should_continue: true,
-                    output: format!("运行时错误: {}", repl_error_msg(&e)),
-                }),
+                Err(e) => {
+                    // designs/0028 L1 吞错点：这里是全仓唯一"运行时错误被接住
+                    // 后、同一解释器继续执行"的位置（REPL 不因错误退出）。
+                    // 位置侧通道随错误一起在此作废——就地清空。
+                    self.interpreter.reset_err_site();
+                    Ok(ReplResult {
+                        should_continue: true,
+                        output: format!("运行时错误: {}", repl_error_msg(&e)),
+                    })
+                }
             },
             Err(e) => {
                 // 解析失败：转为输出文本，不传播
@@ -591,5 +603,47 @@ mod tests {
         // 字符串内的括号不应影响深度
         assert!(is_input_complete("let s = \"(unbalanced\""));
         assert!(is_input_complete("let s = \"{unbalanced\""));
+    }
+
+    // ===== designs/0028（v1.17.0）L1：REPL 的位置侧通道重置 =====
+
+    /// 吞错点负向测试：exec_line 接住运行时错误转输出文本后 REPL 继续——
+    /// 全仓唯一"Err 被接住后同一解释器继续执行"的位置，位置侧通道须在此作废。
+    #[test]
+    fn l1_repl_catch_site_clears_err_channel() {
+        let mut session = ReplSession::new();
+        let r = session.exec_line("1 / 0").expect("REPL 不因运行时错误退出");
+        assert!(r.output.contains("运行时错误"), "{}", r.output);
+        assert!(r.should_continue);
+        assert_eq!(
+            session.interpreter.err_site(),
+            None,
+            "接住错误的现场须清空位置侧通道"
+        );
+    }
+
+    /// 每条输入前重置（负向测试）：侧通道里有一份非 REPL 路径留下的位置
+    /// （直接 interp.run 出错）时，下一条输入必须以干净通道起步——本条输入
+    /// 的错误（import 解析，不经表达式求值）不得继承那份位置。
+    #[test]
+    fn l1_repl_each_input_starts_with_clean_err_channel() {
+        let mut session = ReplSession::new();
+        let bad = Parser::parse("fn main() -> Unit\n    println(1 / 0)\nend\n").unwrap();
+        assert!(session.interpreter.run(&bad).is_err());
+        assert_eq!(
+            session.interpreter.err_site(),
+            Some((2, 13)),
+            "前置：侧通道应有一份残留位置"
+        );
+        let err = match session.exec_line("from nosuchmod import {thing}") {
+            Err(e) => e,
+            Ok(_) => panic!("import 错误应上抛给调用方（REPL 主循环打印后继续）"),
+        };
+        assert!(matches!(err, RuntimeError::Msg(ref m) if m.contains("未知模块")));
+        assert_eq!(
+            session.interpreter.err_site(),
+            None,
+            "每条输入前重置——无残留位置"
+        );
     }
 }

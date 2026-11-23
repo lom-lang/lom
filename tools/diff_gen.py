@@ -9,7 +9,7 @@
 #   "覆盖写先行"幂等闭环——append/exists 只在 write 重置基线后发生；env 只消费
 #   args[1..] 永不触 argv[0]，见 docs/TODO.md D 包三期 D8），同一程序双后端
 #   输出必须逐字一致。
-# - 默认避开 SPEC_FOR_AI §11f 八条已知分歧形态：
+# - 默认避开 SPEC_FOR_AI §11f 九条已知分歧形态：
 #   1. 闭包捕获 mut（模板只捕获不可变绑定）
 #   2. JSON 数字 Int/Float 切分（不生成 json_parse）
 #   3. 除零/模零（除数为非零字面量或加 != 0 守卫）

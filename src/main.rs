@@ -32,6 +32,7 @@ mod doc;
 mod dump;
 mod fix;
 mod fix_history;
+mod fix_run;
 mod fmt;
 mod info;
 mod interpreter;
@@ -408,9 +409,12 @@ fn main_inner() {
     interp.trace_finish();
     if let Err(e) = run_result {
         // 运行时错误：构造诊断输出
-        // 注：Phase 2.3 阶段 AST 节点尚未携带位置信息（Phase 3 改造），
-        // 因此运行时错误暂以 (0, 0) 报告位置；消息本身已包含足够上下文。
-        diags.add_runtime(&e, &src, 0, 0);
+        // designs/0028（v1.17.0）L1：位置取解释器位置侧通道——最内层出错
+        // 表达式的 span 起点（eval_expr 外壳写入）。此前此处写死 (0, 0)
+        // （Phase 2.3 时 AST 尚无 span 的历史欠账；表达式级 span 自 v0.21.0
+        // 起已在 AST 上）。不在表达式求值路径上抛出的错误（import 解析等）
+        // 侧通道为空，维持 (0, 0)；DepthLimit 自带位置，由 from_runtime 覆盖。
+        diags.add_runtime(&e, &src, interp.err_site());
         eprint!("{}", diags.to_human());
         process::exit(1);
     }
@@ -991,10 +995,20 @@ fn closure_symbols(
 ///   4. 若 --apply：调用 apply::apply_plan 应用修复，写回文件（或 --dry-run 只预览）
 ///   5. 输出结果
 ///
+/// designs/0028（v1.17.0）L2 `--run`（可选 `--run-budget <ms>`、`--allow-io`）：
+///   - `--plan --run`：闸门 → 执行一次程序 → 观察到的运行时诊断（L1 带位置）
+///     追加进计划数组（stage "runtime"，排在静态计划之后，全是 hint）；
+///     lom-fix/v1 追加可选顶层字段 `run`。
+///   - `--apply --run`：静态迭代轮照旧收敛后对收敛源码做一次运行时观察，
+///     **只报告不应用**；lom-apply/v1 追加 `runtime_plans` 与 `run` 字段。
+///   - 不带 --run 的两条路径不经 fix_run（输出与改前逐字节一致）。
+///
 /// 退出码：
-///   0 — 计划生成成功 / apply 应用成功（含 0 个修复应用）
+///   0 — 计划生成成功 / apply 应用成功（含 0 个修复应用）；--run 观察到运行时
+///       错误 / 运行通过 / 超时 / 闸门拒绝均属"分析完成"，同为 0
 ///   2 — apply 写文件失败（β-2 起：工具自身失败带，此前 1；
-///       文件读取错误在 main 入口统一 rc 2）
+///       文件读取错误在 main 入口统一 rc 2）；--run 观察环节自身失败
+///       （trace 出口打不开 / 解释器线程异常终止）
 fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     // 收集全部诊断：词法 + 语法
     let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
@@ -1011,6 +1025,21 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     // 生成修复计划
     let plan = fix::generate_plan(&diags, src, &fns);
 
+    // designs/0028 L2：--run 的运行时观察选项（不带 --run = None，以下两条
+    // 输出路径与改前逐字节一致）。--trace + --run：观察运行期间 trace 照常
+    // 产出（设计 §4.8）。
+    let run_opts = cli.run.then(|| fix_run::RunOpts {
+        budget_ms: cli.run_budget.unwrap_or(fix_run::DEFAULT_RUN_BUDGET_MS),
+        allow_io: cli.allow_io,
+        trace: cli.trace.then(|| fix_run::TraceOpts {
+            out_path: cli.trace_out.clone(),
+            max_events: cli
+                .trace_max_events
+                .unwrap_or(interpreter::TRACE_DEFAULT_MAX_EVENTS),
+            builtins: cli.trace_builtins,
+        }),
+    });
+
     // Phase 3.1: --apply 模式 — 应用修复到源文件
     // 修复引擎深化 M2：从单趟升级为**迭代闭环**——应用后重新诊断再修，
     // 直到无高置信度可应用项（applied==0）或源码不再变化，上限 5 轮防震荡死循环。
@@ -1021,10 +1050,45 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
         // R55（九审）：对修复后的源码重跑完整诊断，ok 含最终状态
         let final_diag = apply::FinalDiag::check(&current, path);
 
+        // designs/0028 L2 --apply --run（设计 §4.8）：静态迭代轮照旧收敛后，
+        // 对收敛源码做一次运行时观察——只报告不应用（运行时计划全是 hint）。
+        let observation = run_opts.as_ref().map(|opts| {
+            let (cur_diags, _cur_fns) = static_diagnose(&current, path);
+            let obs = fix_run::observe(&current, path, &cur_diags, opts);
+            let plans = obs
+                .runtime_diag
+                .as_ref()
+                .map(|d| fix_run::runtime_plans(d, &current, path))
+                .unwrap_or_default();
+            (obs, plans)
+        });
+
         if cli.json {
-            print!("{}", apply::rounds_to_json(&results, path, &final_diag));
+            match &observation {
+                Some((obs, plans)) => print!(
+                    "{}",
+                    apply::rounds_to_json_with(
+                        &results,
+                        path,
+                        &final_diag,
+                        &fix_run::apply_extra_json(&obs.run, plans)
+                    )
+                ),
+                None => print!("{}", apply::rounds_to_json(&results, path, &final_diag)),
+            }
         } else {
-            print!("{}", apply::rounds_to_human(&results, path, &final_diag));
+            match &observation {
+                Some((obs, plans)) => print!(
+                    "{}",
+                    apply::rounds_to_human_with(
+                        &results,
+                        path,
+                        &final_diag,
+                        &fix_run::run_to_human(&obs.run, obs.runtime_diag.as_ref(), plans, None)
+                    )
+                ),
+                None => print!("{}", apply::rounds_to_human(&results, path, &final_diag)),
+            }
         }
 
         let total_applied: usize = results.iter().map(|r| r.applied).sum();
@@ -1071,6 +1135,49 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
             }
         }
 
+        // designs/0028：观察环节自身失败 = 工具失败带 rc 2（静态 apply 的
+        // 结果已照常输出与落盘）；其余情形维持 rc 0
+        if let Some((obs, _)) = &observation {
+            exit_for_run(&obs.run);
+        }
+        process::exit(0);
+    }
+
+    // designs/0028 L2 --plan --run：闸门 → 执行一次 → 观察到的运行时诊断追加
+    // 进计划数组（排在静态计划之后，stage "runtime"）；lom-fix/v1 追加 run
+    // 字段。ok = 计划为空（运行通过且静态无诊断）。
+    if let Some(opts) = &run_opts {
+        let obs = fix_run::observe(src, path, &diags, opts);
+        let runtime_plans = obs
+            .runtime_diag
+            .as_ref()
+            .map(|d| fix_run::runtime_plans(d, src, path))
+            .unwrap_or_default();
+        let first_runtime = plan.plans.len() + 1;
+        let mut plans = plan.plans;
+        plans.extend(runtime_plans);
+        let merged = fix::FixPlan {
+            file: plan.file,
+            ok: plans.is_empty(),
+            plans,
+        };
+        if cli.json {
+            let run_fields = fix_run::run_fields_json(&obs.run);
+            print!("{}", fix::to_json_with(&merged, Some(&run_fields)));
+        } else {
+            print!("{}", fix::to_human(&merged));
+            // plan 模式：运行时计划已并入上方诊断列表（首条序号 first_runtime）
+            print!(
+                "{}",
+                fix_run::run_to_human(
+                    &obs.run,
+                    obs.runtime_diag.as_ref(),
+                    &[],
+                    Some(first_runtime)
+                )
+            );
+        }
+        exit_for_run(&obs.run);
         process::exit(0);
     }
 
@@ -1083,6 +1190,32 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
 
     // fix 子命令的退出码语义：计划生成成功即 0（无论是否有诊断）
     process::exit(0);
+}
+
+/// designs/0028 L2：--run 观察环节自身失败（trace 出口打不开 / 解释器线程
+/// 异常终止）时的退出——stderr 说明 + 工具失败带 rc 2；分析完成则直接返回
+/// （调用方按既有语义 exit 0）。
+fn exit_for_run(run: &fix_run::RunReport) {
+    let code = run.exit_code();
+    if code != 0 {
+        if let Some(d) = &run.detail {
+            eprintln!("{}", d);
+        }
+        process::exit(code);
+    }
+}
+
+/// designs/0028 L2：对一份源码做静态诊断（词法 + 语法 + 类型），与 run_fix
+/// 首段同口径——`--apply --run` 对迭代收敛后的源码做闸门判定与计划生成用。
+fn static_diagnose(src: &str, path: &str) -> (diagnostics::Diagnostics, Vec<fix::FnInfo>) {
+    let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
+    let mut fns: Vec<fix::FnInfo> = Vec::new();
+    if diags.ok {
+        let program = parser::Parser::parse_recover(src).program;
+        fns = fix::fn_infos(&program, src);
+        typechecker::check_program(&program, src, path, &mut diags);
+    }
+    (diags, fns)
 }
 
 /// Phase 4.2: 启动交互式 REPL
