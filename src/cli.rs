@@ -12,11 +12,11 @@ use std::process;
 
 use crate::apply;
 use crate::ast;
+#[cfg(test)]
 use crate::diagnostics;
 use crate::fix;
 use crate::package;
 use crate::parser;
-use crate::typechecker;
 
 #[derive(Debug, Default)]
 pub(crate) struct CliArgs {
@@ -630,18 +630,14 @@ pub(crate) fn apply_iterative(
     src: &str,
     path: &str,
     max_rounds: usize,
+    pkg: &crate::PkgCtx,
 ) -> (String, Vec<apply::ApplyResult>) {
     let mut current = src.to_string();
     let mut results: Vec<apply::ApplyResult> = Vec::new();
 
     for _round in 1..=max_rounds {
-        let mut round_diags = diagnostics::Diagnostics::from_parse_result(&current, path);
-        let mut round_fns: Vec<fix::FnInfo> = Vec::new();
-        if round_diags.ok {
-            let program = parser::Parser::parse_recover(&current).program;
-            round_fns = fix::fn_infos(&program, &current);
-            typechecker::check_program(&program, &current, path, &mut round_diags);
-        }
+        // designs/0030 §3.2（R244）：每轮诊断带包上下文（与 fix 首段同源）
+        let (round_diags, round_fns) = crate::diagnose_with_pkg(&current, path, pkg);
         let round_plan = fix::generate_plan(&round_diags, &current, &round_fns);
         let result = apply::apply_plan(&round_plan, &current);
         let no_progress = result.applied == 0 || result.patched_source == current;
@@ -790,7 +786,8 @@ mod tests {
 
     #[test]
     fn iterative_apply_converges_in_two_fix_rounds() {
-        let (final_src, results) = apply_iterative(TWO_ROUND_SRC, "test.lom", 5);
+        let (final_src, results) =
+            apply_iterative(TWO_ROUND_SRC, "test.lom", 5, &crate::PkgCtx::default());
         let total_applied: usize = results.iter().map(|r| r.applied).sum();
         assert_eq!(total_applied, 2, "应修 2 处（@ 和效应注解）");
         assert_eq!(results.len(), 3, "两轮修复 + 一轮收敛判定");
@@ -805,7 +802,8 @@ mod tests {
     #[test]
     fn iterative_apply_respects_max_rounds() {
         // 上限 1 轮：只修掉 @，EFF001 留给下一轮（被上限截断）
-        let (final_src, results) = apply_iterative(TWO_ROUND_SRC, "test.lom", 1);
+        let (final_src, results) =
+            apply_iterative(TWO_ROUND_SRC, "test.lom", 1, &crate::PkgCtx::default());
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].applied, 1);
         assert!(!final_src.contains('@'));
@@ -814,8 +812,12 @@ mod tests {
 
     #[test]
     fn iterative_apply_clean_source_single_round() {
-        let (final_src, results) =
-            apply_iterative("fn main() -> Unit\n    println(1)\nend\n", "test.lom", 5);
+        let (final_src, results) = apply_iterative(
+            "fn main() -> Unit\n    println(1)\nend\n",
+            "test.lom",
+            5,
+            &crate::PkgCtx::default(),
+        );
         assert_eq!(results.len(), 1, "干净源码一轮即收敛");
         assert_eq!(results[0].applied, 0);
         assert_eq!(final_src, "fn main() -> Unit\n    println(1)\nend\n");
@@ -825,7 +827,7 @@ mod tests {
     fn iterative_apply_medium_fixes_not_applied() {
         // 拼写修复是 Medium（M1 用户裁决）——迭代闭环不会自动改，一轮收敛
         let src = "fn main() -> Unit\n    let length = 5\n    println(lenght)\nend\n";
-        let (final_src, results) = apply_iterative(src, "test.lom", 5);
+        let (final_src, results) = apply_iterative(src, "test.lom", 5, &crate::PkgCtx::default());
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].applied, 0);
         assert_eq!(final_src, src, "Medium 修复不被自动应用");
@@ -1153,7 +1155,12 @@ end
             let bad = std::fs::read_to_string(&bad_path).unwrap();
             let fixed = std::fs::read_to_string(&fixed_path)
                 .unwrap_or_else(|_| panic!("缺少配对 fixed 文件: {:?}", fixed_path));
-            let (final_src, _results) = apply_iterative(&bad, &bad_path.to_string_lossy(), 5);
+            let (final_src, _results) = apply_iterative(
+                &bad,
+                &bad_path.to_string_lossy(),
+                5,
+                &crate::PkgCtx::default(),
+            );
             // CI 的 Windows runner autocrlf 检出为 CRLF，而修复动作的插入文本是 LF
             // （M3 的 05/06 是首批含换行插入的语料，CI #74 因此挂过）——行尾是
             // 环境噪声不是语义差异，比对前归一化（对齐 CI golden diff 的 tr -d '\r' 防线）
@@ -1208,7 +1215,7 @@ end
         let src = "fn f(x: Int) -> Int\n    x = x + 1\n    x\nend\n\
                    fn unrelated() -> Int\n    let x = 10\n    x\nend\n\
                    fn main() -> Unit\n    println(f(unrelated()))\nend\n";
-        let (final_src, results) = apply_iterative(src, "test.lom", 5);
+        let (final_src, results) = apply_iterative(src, "test.lom", 5, &crate::PkgCtx::default());
         let total: usize = results.iter().map(|r| r.applied).sum();
         assert_eq!(total, 0, "跨作用域不得有任何应用: {:?}", results);
         assert_eq!(final_src, src, "源码必须逐字不变");
@@ -1221,13 +1228,13 @@ end
         // 多行签名探针：注解必须插在 `) -> Int` 行末，而非 `fn helper(` 行
         let multiline = "fn helper(\n    x: Int\n) -> Int\n    println(x)\n    x\nend\n\
                          fn main() -> Unit\n    println(helper(7))\nend\n";
-        let (src1, _r1) = apply_iterative(multiline, "test.lom", 5);
+        let (src1, _r1) = apply_iterative(multiline, "test.lom", 5, &crate::PkgCtx::default());
         assert!(
             src1.lines().nth(2).unwrap().contains(") -> Int ! [IO]"),
             "注解必须在第 3 行行末: {:?}",
             src1
         );
-        let final1 = apply::FinalDiag::check(&src1, "test.lom");
+        let final1 = apply::FinalDiag::check(&src1, "test.lom", &crate::PkgCtx::default());
         assert_eq!(final1.errors, 0, "修复后不得有 error: {:?}", src1);
 
         // 同函数双效应探针：必须是一段合并注解，不是两段叠加
@@ -1235,14 +1242,14 @@ end
                    fn clock_work() -> Unit ! [Clock]\n    ()\nend\n\
                    fn helper() -> Unit\n    io_work()\n    clock_work()\nend\n\
                    fn main() -> Unit\n    helper()\nend\n";
-        let (src2, _r2) = apply_iterative(dup, "test.lom", 5);
+        let (src2, _r2) = apply_iterative(dup, "test.lom", 5, &crate::PkgCtx::default());
         assert!(
             src2.contains("fn helper() -> Unit ! [IO, Clock]"),
             "必须合并为单条注解: {:?}",
             src2
         );
         assert!(!src2.contains("] ! ["), "不得出现两段叠加注解: {:?}", src2);
-        let final2 = apply::FinalDiag::check(&src2, "test.lom");
+        let final2 = apply::FinalDiag::check(&src2, "test.lom", &crate::PkgCtx::default());
         assert_eq!(final2.errors, 0);
         // EFF001 修复闭环：注解补齐后 warning 也应清零
         assert_eq!(final2.warnings, 0, "注解补齐后不应残留 EFF001: {:?}", src2);

@@ -68,13 +68,11 @@ pub struct FinalDiag {
 }
 
 impl FinalDiag {
-    /// 对修复后的源码跑完整诊断（词法+语法+类型），产出最终状态
-    pub fn check(src: &str, path: &str) -> FinalDiag {
-        let mut diags = crate::diagnostics::Diagnostics::from_parse_result(src, path);
-        if diags.ok {
-            let program = crate::parser::Parser::parse_recover(src).program;
-            crate::typechecker::check_program(&program, src, path, &mut diags);
-        }
+    /// 对修复后的源码跑完整诊断（词法+语法+类型），产出最终状态。
+    /// designs/0030 §3.2（R244）：`pkg` = 与 run / `--check` 同源的包上下文
+    /// （无清单单文件传 `&PkgCtx::default()`——与改前同一输入）。
+    pub fn check(src: &str, path: &str, pkg: &crate::PkgCtx) -> FinalDiag {
+        let (diags, _) = crate::diagnose_with_pkg(src, path, pkg);
         let mut errors = 0;
         let mut warnings = 0;
         for d in &diags.diagnostics {

@@ -298,7 +298,7 @@ fn runtime_hint(code: &str) -> Option<String> {
         "RUNTIME001" => Some("检查值类型与操作期望是否一致".into()),
         "RUNTIME002" => Some("确认变量已声明/导入，拼写无误".into()),
         "RUNTIME003" => Some("代码洞无法执行；先修复对应位置的语法错误".into()),
-        "RUNTIME005" => Some("检查模块名/符号名是否在标准库（io/string/math）中".into()),
+        "RUNTIME005" => Some("检查模块名/符号名是否为标准库模块及其导出符号".into()),
         _ => None,
     }
 }
@@ -377,8 +377,13 @@ impl Diagnostics {
     ) {
         let source_lines: Vec<&str> = src.lines().collect();
         let (line, col) = site.unwrap_or((0, 0));
-        self.diagnostics
-            .push(Diagnostic::from_runtime(err, file, &source_lines, line, col));
+        self.diagnostics.push(Diagnostic::from_runtime(
+            err,
+            file,
+            &source_lines,
+            line,
+            col,
+        ));
         self.ok = false;
     }
 
@@ -647,7 +652,10 @@ mod tests {
     #[test]
     fn r237_summary_line_matches_to_human_tail() {
         let mut diags = Diagnostics::new("test.lom");
-        assert_eq!(diags.summary_line(), "共 0 个诊断（0 错误，0 警告，0 代码洞）。\n");
+        assert_eq!(
+            diags.summary_line(),
+            "共 0 个诊断（0 错误，0 警告，0 代码洞）。\n"
+        );
         let warn = Diagnostic {
             severity: Severity::Warning,
             stage: Stage::Type,
@@ -661,19 +669,28 @@ mod tests {
             hint: None,
         };
         diags.diagnostics.push(warn);
-        assert_eq!(diags.summary_line(), "共 1 个诊断（0 错误，1 警告，0 代码洞）。\n");
+        assert_eq!(
+            diags.summary_line(),
+            "共 1 个诊断（0 错误，1 警告，0 代码洞）。\n"
+        );
         let err = RuntimeError::Msg("整数除以零".to_string());
         diags.add_runtime(&err, "fn f()\n  x\nend", Some((8, 13)));
-        assert_eq!(diags.summary_line(), "共 2 个诊断（1 错误，1 警告，0 代码洞）。\n");
+        assert_eq!(
+            diags.summary_line(),
+            "共 2 个诊断（1 错误，1 警告，0 代码洞）。\n"
+        );
         // to_human = 逐条渲染 + 同一行汇总（输出字节不变）
         let human = diags.to_human();
         assert!(human.ends_with(&diags.summary_line()));
         assert_eq!(
             human,
-            Diagnostics::render_one(&diags.diagnostics[0]) + &Diagnostics::render_one(&diags.diagnostics[1]) + &diags.summary_line()
+            Diagnostics::render_one(&diags.diagnostics[0])
+                + &Diagnostics::render_one(&diags.diagnostics[1])
+                + &diags.summary_line()
         );
         // "只打新增的一条 + 汇总"的形态：每条诊断恰出现一次
-        let once = Diagnostics::render_one(diags.diagnostics.last().unwrap()) + &diags.summary_line();
+        let once =
+            Diagnostics::render_one(diags.diagnostics.last().unwrap()) + &diags.summary_line();
         assert_eq!(once.matches("[RUNTIME000]").count(), 1);
         assert!(!once.contains("EFF001"));
     }

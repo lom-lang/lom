@@ -1125,7 +1125,10 @@ version = "0.1.0"
             None,
         );
         assert_eq!(d.file, "lom.toml");
-        assert_eq!(d.message, "清单解析失败: PKG001: 清单 'lom.toml' 解析失败: r");
+        assert_eq!(
+            d.message,
+            "清单解析失败: PKG001: 清单 'lom.toml' 解析失败: r"
+        );
     }
 
     /// 路径含反斜杠时信封仍是合法 JSON（file 经 escape_str）；逐条 file =

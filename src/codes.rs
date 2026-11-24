@@ -473,7 +473,7 @@ pub(crate) const EXPLAIN: &[ExplainEntry] = &[
     },
     ExplainEntry {
         code: "RUNTIME005",
-        doc: "import 的模块不在标准库（io/string/math）中，或包不导出请求的符号（error）。常见成因：包名拼写错误、import 的符号不在目标包的导出面里。修复方向：核对 lom.toml 依赖声明与包内实际顶层定义，修正包名或 import 列表。",
+        doc: "import 的模块不在标准库中，或包不导出请求的符号（error）。常见成因：包名拼写错误、import 的符号不在目标包的导出面里。修复方向：核对 lom.toml 依赖声明与包内实际顶层定义，修正包名或 import 列表。",
     },
     // ===== PKG（包系统）=====
     ExplainEntry {

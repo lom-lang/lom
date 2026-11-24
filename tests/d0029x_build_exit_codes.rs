@@ -113,8 +113,7 @@ const DEP_ERROR: &str =
     "fn dep_ok(x: Int) -> Int\n    x + 1\nend\n\nfn broken() -> Int\n    missing_helper(1)\nend\n";
 
 /// warning 级：纯函数调用带 [IO] 效应的 println → EFF001 warning（无 error）
-const DEP_WARNING: &str =
-    "fn dep_ok(x: Int) -> Int\n    x + 1\nend\n\nfn warn_only() -> Unit\n    println(\"warn\")\nend\n";
+const DEP_WARNING: &str = "fn dep_ok(x: Int) -> Int\n    x + 1\nend\n\nfn warn_only() -> Unit\n    println(\"warn\")\nend\n";
 
 /// 根目录入口：import 依赖包的 dep_ok 并调用（干净）
 const MAIN_WITH_DEP: &str =
@@ -277,7 +276,10 @@ impl<'a> Json<'a> {
                             for _ in 0..4 {
                                 self.i += 1;
                                 if !matches!(self.cur(), Some(c) if c.is_ascii_hexdigit()) {
-                                    return Err(format!("位置 {}：\\u 转义缺 4 位十六进制", self.i));
+                                    return Err(format!(
+                                        "位置 {}：\\u 转义缺 4 位十六进制",
+                                        self.i
+                                    ));
                                 }
                             }
                             self.i += 1;
@@ -463,8 +465,16 @@ fn r234_root_parse_error_rc1_both_modes() {
 fn r234_pkg007_only_rc0_both_modes() {
     let p = Project::new("pkg007_only");
     p.manifest(&[("liba", "liba"), ("libb", "libb")]);
-    p.package("liba", "a.lom", "fn clash_fn(x: Int) -> Int\n    x + 1\nend\n");
-    p.package("libb", "b.lom", "fn clash_fn(x: Int) -> Int\n    x + 2\nend\n");
+    p.package(
+        "liba",
+        "a.lom",
+        "fn clash_fn(x: Int) -> Int\n    x + 1\nend\n",
+    );
+    p.package(
+        "libb",
+        "b.lom",
+        "fn clash_fn(x: Int) -> Int\n    x + 2\nend\n",
+    );
     p.write("main.lom", MAIN_STANDALONE);
     let (h_out, h_err, j_out, j_err) = run_both(&p.dir, 0, "仅 PKG007");
     assert!(
@@ -563,8 +573,7 @@ fn r234_no_manifest_rc2_both_modes() {
     let (_h_out, h_err, j_out, _j_err) = run_both(&p.dir, 2, "无 lom.toml");
     assert!(h_err.contains("当前目录无 lom.toml"), "stderr: {}", h_err);
     assert_eq!(
-        j_out,
-        "{\"schema\":\"lom-build/v1\",\"ok\":false,\"error\":\"当前目录无 lom.toml\"}\n",
+        j_out, "{\"schema\":\"lom-build/v1\",\"ok\":false,\"error\":\"当前目录无 lom.toml\"}\n",
         "失败信封逐字节不变"
     );
     assert_valid_json(&j_out);
@@ -610,7 +619,9 @@ fn r243_build_json_error_envelope_valid() {
     assert_eq!(rc, 1, "依赖解析失败 rc 1，stdout: {}", j_out);
     assert_valid_json(&j_out);
     assert!(
-        j_out.contains(r#""schema":"lom-build/v1","ok":false,"error":"PKG002: 依赖 'ghost' 路径不存在: "#),
+        j_out.contains(
+            r#""schema":"lom-build/v1","ok":false,"error":"PKG002: 依赖 'ghost' 路径不存在: "#
+        ),
         "失败信封含 PKG002 文本：{}",
         j_out
     );

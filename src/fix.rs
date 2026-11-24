@@ -872,7 +872,7 @@ fn fix_for_diagnostic(
             Confidence::Low,
         )],
         "RUNTIME005" => vec![hint_only(
-            "模块/符号不存在：标准库模块为 io/string/math，检查 import 声明",
+            "模块/符号不存在：核对 import 声明的模块名与符号名",
             Confidence::Medium,
         )],
         // v1.10.3 消息感知细化：深度超限形态（N1 守卫文案）升 Medium 专属

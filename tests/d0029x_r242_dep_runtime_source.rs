@@ -22,7 +22,8 @@ struct Project {
 
 impl Project {
     fn new(tag: &str) -> Project {
-        let dir = std::env::temp_dir().join(format!("lom_d0029x_r242_{}_{}", tag, std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("lom_d0029x_r242_{}_{}", tag, std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("建临时工程失败");
         Project { dir }
@@ -67,8 +68,7 @@ impl Drop for Project {
 
 const DEP_BOOM: &str = "fn boom(n: Int) -> Int\n    n / (n - n)\nend\n";
 
-const MAIN_PROBE: &str =
-    "from dep import { boom }\n\nfn main() -> Unit\n    println(\"THIS IS MAIN.LOM LINE 4\")\n    println(boom(10))\nend\n";
+const MAIN_PROBE: &str = "from dep import { boom }\n\nfn main() -> Unit\n    println(\"THIS IS MAIN.LOM LINE 4\")\n    println(boom(10))\nend\n";
 
 /// A：§3.6 的探针（与规划者 planner_verify/pkgerr 同构）
 #[test]
@@ -98,7 +98,10 @@ fn r242_nested_package_call_renders_innermost_file_line() {
     let p = Project::new("b");
     p.dep(&[
         ("a.lom", "fn outer(n: Int) -> Int\n    inner(n)\nend\n"),
-        ("b.lom", "fn inner(n: Int) -> Int\n    let m = n - n\n    n / m\nend\n"),
+        (
+            "b.lom",
+            "fn inner(n: Int) -> Int\n    let m = n - n\n    n / m\nend\n",
+        ),
     ]);
     p.write(
         "main.lom",

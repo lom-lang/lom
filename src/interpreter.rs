@@ -1238,6 +1238,15 @@ impl Interpreter {
             let result = self.exec_block(&main.body, env);
             self.cur_source = saved_source;
             result?;
+        } else {
+            // designs/0030 §3.3（R245）：没有 main 的程序此前静默通过（rc 0）——
+            // AOT 产物与 L2 自举编译器均拒绝。查的是合并后的函数表（入口文件
+            // + 依赖包，与 AOT 同值：入口无 main、包内有 → 跑包里的 main）；
+            // 放在 import 处理之后（既有的 import 错误照旧先报）。位置 (0:0)：
+            // 错误不在表达式求值路径上（不伪造坐标）。落既有码 RUNTIME000
+            // （classify_runtime_error 无"main"分支）——不新增码、不改 severity；
+            // `--check` / `--json` 的静态面不动（库文件本就没有 main）。
+            return Err(RuntimeError::Msg("程序缺少 main 函数".to_string()));
         }
         Ok(())
     }
@@ -4941,7 +4950,8 @@ end
 
     impl PkgProject {
         fn new(tag: &str) -> PkgProject {
-            let root = std::env::temp_dir().join(format!("lom_r242_{}_{}", tag, std::process::id()));
+            let root =
+                std::env::temp_dir().join(format!("lom_r242_{}_{}", tag, std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
             std::fs::create_dir_all(&root).expect("建临时工程失败");
             PkgProject { root }
@@ -4955,7 +4965,8 @@ end
 
         /// 建包 `<name>/lom.toml` + 若干源文件，并在根清单声明依赖全部给定包
         fn packages(&self, pkgs: &[(&str, &[(&str, &str)])]) -> crate::package::DependencyGraph {
-            let mut root_toml = String::from("name = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\n");
+            let mut root_toml =
+                String::from("name = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\n");
             for (name, files) in pkgs {
                 self.put(
                     &format!("{}/lom.toml", name),
@@ -4967,8 +4978,8 @@ end
                 root_toml.push_str(&format!("{} = {{ path = \"{}\" }}\n", name, name));
             }
             self.put("lom.toml", &root_toml);
-            let manifest =
-                crate::package::load_manifest_file(&self.root.join("lom.toml")).expect("根清单合法");
+            let manifest = crate::package::load_manifest_file(&self.root.join("lom.toml"))
+                .expect("根清单合法");
             crate::package::resolve_dependencies(&manifest, &self.root).expect("依赖图应解析成功")
         }
 
@@ -5038,7 +5049,11 @@ end
             interp.err_source_file(),
             Some(p.displayed(&["dep", "dep.lom"]).as_str())
         );
-        assert_eq!(interp.err_site(), Some((2, 5)), "位置是 dep.lom 内 `n / (n - n)` 的起点");
+        assert_eq!(
+            interp.err_site(),
+            Some((2, 5)),
+            "位置是 dep.lom 内 `n / (n - n)` 的起点"
+        );
     }
 
     /// 包内嵌套调用：错误发生在同包另一函数（另一文件）体内 → 来源与位置
@@ -5048,10 +5063,7 @@ end
         let p = PkgProject::new("pkg_nested");
         let outer = "fn outer(n: Int) -> Int\n    inner(n)\nend\n";
         let inner = "fn inner(n: Int) -> Int\n    n / (n - n)\nend\n";
-        let graph = p.packages(&[(
-            "dep",
-            &[("a_outer.lom", outer), ("b_inner.lom", inner)],
-        )]);
+        let graph = p.packages(&[("dep", &[("a_outer.lom", outer), ("b_inner.lom", inner)])]);
         let interp = run_with_packages(
             &graph,
             "from dep import { outer }\n\nfn main() -> Unit\n    println(outer(10))\nend\n",
@@ -5075,7 +5087,11 @@ end
         )]);
         let src = "from dep import { dep_ok }\n\nfn local_boom(n: Int) -> Int\n    n / (n - n)\nend\n\nfn main() -> Unit\n    println(dep_ok(1))\n    println(local_boom(1))\nend\n";
         let interp = run_with_packages(&graph, src);
-        assert_eq!(interp.err_source_file(), None, "包函数返回后来源恢复为入口文件");
+        assert_eq!(
+            interp.err_source_file(),
+            None,
+            "包函数返回后来源恢复为入口文件"
+        );
         assert_eq!(interp.err_site(), Some(pos_of(src, "n / (n - n)")));
     }
 
@@ -5090,7 +5106,11 @@ end
         )]);
         let src = "fn shared(n: Int) -> Int\n    n / (n - n)\nend\n\nfn main() -> Unit\n    println(shared(2))\nend\n";
         let interp = run_with_packages(&graph, src);
-        assert_eq!(interp.err_source_file(), None, "入口的 shared 覆盖包的 shared");
+        assert_eq!(
+            interp.err_source_file(),
+            None,
+            "入口的 shared 覆盖包的 shared"
+        );
         assert_eq!(interp.err_site(), Some(pos_of(src, "n / (n - n)")));
     }
 
@@ -5125,7 +5145,14 @@ end
         interp.load_packages(&graph);
         let err = interp.run(&program).expect_err("应触发深度上限");
         assert!(
-            matches!(err, RuntimeError::DepthLimit { line: 1, col: 1, .. }),
+            matches!(
+                err,
+                RuntimeError::DepthLimit {
+                    line: 1,
+                    col: 1,
+                    ..
+                }
+            ),
             "DepthLimit 位置 = dep.lom 的 `fn rec` 签名：{:?}",
             err
         );

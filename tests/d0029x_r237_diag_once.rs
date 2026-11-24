@@ -88,6 +88,8 @@ fn r237_static_warning_and_runtime_error_each_printed_once() {
 
 /// B：静态 error 级（NAM003，坏 import 的符号在使用点）+ 运行时错误
 /// （RUNTIME005，import 解析）——error 级静态诊断同样不重复。
+/// 注：同一行坏 import 另有一条静态 warning（NAM007，designs/0029 §3.2——标准库
+/// 模块不导出该符号），汇总行为"3 个诊断（2 错误，1 警告）"。
 #[test]
 fn r237_static_error_and_runtime_error_each_printed_once() {
     let file = write_probe(
@@ -97,10 +99,26 @@ fn r237_static_error_and_runtime_error_each_printed_once() {
     let (stdout, stderr, rc) = run(&file);
     assert_eq!(rc, 1);
     assert!(stdout.is_empty(), "stdout: {:?}", stdout);
-    assert_eq!(count(&stderr, "[NAM003]"), 1, "静态 error 恰 1 次，stderr:\n{}", stderr);
-    assert_eq!(count(&stderr, "[RUNTIME005]"), 1, "运行时错误恰 1 次，stderr:\n{}", stderr);
     assert_eq!(
-        count(&stderr, "共 2 个诊断（2 错误，0 警告，0 代码洞）。\n"),
+        count(&stderr, "[NAM007]"),
+        1,
+        "静态 warning（NAM007）恰 1 次，stderr:\n{}",
+        stderr
+    );
+    assert_eq!(
+        count(&stderr, "[NAM003]"),
+        1,
+        "静态 error 恰 1 次，stderr:\n{}",
+        stderr
+    );
+    assert_eq!(
+        count(&stderr, "[RUNTIME005]"),
+        1,
+        "运行时错误恰 1 次，stderr:\n{}",
+        stderr
+    );
+    assert_eq!(
+        count(&stderr, "共 3 个诊断（2 错误，1 警告，0 代码洞）。\n"),
         1,
         "完整汇总行恰 1 次，stderr:\n{}",
         stderr
@@ -119,7 +137,12 @@ fn r237_static_only_and_success_prints_once() {
     let (stdout, stderr, rc) = run(&file);
     assert_eq!(rc, 0, "warning 不拦截执行，rc 0，stderr:\n{}", stderr);
     assert_eq!(stdout, "42\n", "程序 stdout 照常");
-    assert_eq!(count(&stderr, "[EFF001]"), 1, "静态 warning 恰 1 次，stderr:\n{}", stderr);
+    assert_eq!(
+        count(&stderr, "[EFF001]"),
+        1,
+        "静态 warning 恰 1 次，stderr:\n{}",
+        stderr
+    );
     assert_eq!(
         count(&stderr, "共 1 个诊断（0 错误，1 警告，0 代码洞）。\n"),
         1,
@@ -133,10 +156,7 @@ fn r237_static_only_and_success_prints_once() {
 /// 只有一遍；修后"只打新增的一条 + 汇总"与之同形）。
 #[test]
 fn r237_no_static_diag_runtime_error_stderr_unchanged() {
-    let file = write_probe(
-        "d",
-        "fn main() -> Unit ! [IO]\n    println(10 / 0)\nend\n",
-    );
+    let file = write_probe("d", "fn main() -> Unit ! [IO]\n    println(10 / 0)\nend\n");
     let (stdout, stderr, rc) = run(&file);
     assert_eq!(rc, 1);
     assert!(stdout.is_empty(), "stdout: {:?}", stdout);

@@ -60,6 +60,8 @@ DEFAULT_DOCS = ['SPEC_FOR_AI.md', 'LANGUAGE_SPEC.md']  # 2026-10-12 起 tutorial
 TMP_DIR = '.spec_check_tmp'
 TIMEOUT_RUN = 10          # 正例实跑超时（秒）——文档示例不应有长循环
 TOPLEVEL_RE = re.compile(r'^(fn |enum |from )')
+# 顶层的 main 声明（无缩进的 `fn main(`）
+TOPLEVEL_MAIN_RE = re.compile(r'^fn\s+main\s*\(')
 DIAG_PREFIX_RE = re.compile(r'^\[(lex|parse|type|runtime|eff|mat|nam|pkg)\]')
 
 # 20 个保留字（lexer 实际保留字集，与 LANGUAGE_SPEC §2.2 一致）
@@ -176,11 +178,20 @@ def classify(content, above):
 
 
 def wrap_if_fragment(content):
-    """无顶层项的块包进 main（返回 (code, wrapped_bool)）。"""
-    if any(TOPLEVEL_RE.match(l) for l in content):
-        return '\n'.join(content) + '\n', False
-    body = '\n'.join(('    ' + l if l.strip() else '') for l in content)
-    return 'fn main() -> Unit\n' + body + '\nend\n', True
+    """让自含块可执行（返回 (code, 标注)）。
+
+    - 无顶层项的片段：包进 main，标注"（包 main）"。
+    - 有顶层项但没有顶层 `fn main` 的块（函数 / 导入 / 枚举声明的示例）：在块尾
+      追加一个空的 main，标注"（补空 main）"。工具链起（designs/0030 §3.3），
+      解释器对没有 main 的程序报 RUNTIME000 并以 1 退出（与 AOT / L2 一致）——
+      "实跑要求 rc 0"的正例断言由此保持成立；空 main 不改变块本身的静态诊断。
+    """
+    if not any(TOPLEVEL_RE.match(l) for l in content):
+        body = '\n'.join(('    ' + l if l.strip() else '') for l in content)
+        return 'fn main() -> Unit\n' + body + '\nend\n', '（包 main）'
+    if not any(TOPLEVEL_MAIN_RE.match(l) for l in content):
+        return '\n'.join(content) + '\n\nfn main() -> Unit\nend\n', '（补空 main）'
+    return '\n'.join(content) + '\n', ''
 
 
 def run_lom(lom, args, timeout=TIMEOUT_RUN):
@@ -210,7 +221,7 @@ UPPER_VAR_NAM003_RE = re.compile(r"(?:^|赋值给)未定义变量 '([A-Z][A-Za-z
 def check_block(lom, tag, content, kind, tmpdir):
     """正例/反例断言。返回 (ok, 明细行)。"""
     rel = os.path.join(tmpdir, tag + '.lom')
-    code, wrapped = wrap_if_fragment(content)
+    code, main_note = wrap_if_fragment(content)
     with open(rel, 'w', encoding='utf-8', newline='\n') as f:
         f.write(code)
 
@@ -247,7 +258,7 @@ def check_block(lom, tag, content, kind, tmpdir):
             if r.returncode != 0:
                 last = (r.stderr or r.stdout or '').strip().split('\n')[-1][:80]
                 return False, '  %s: 自含块运行退出码 %d：%s' % (tag, r.returncode, last)
-            return True, '  %s: check 零 Error + 运行退出 0 ✓%s' % (tag, '（包 main）' if wrapped else '')
+            return True, '  %s: check 零 Error + 运行退出 0 ✓%s' % (tag, main_note)
         except subprocess.TimeoutExpired:
             return False, '  %s: 运行超时（>%ds）' % (tag, TIMEOUT_RUN)
 
@@ -258,7 +269,7 @@ def check_block(lom, tag, content, kind, tmpdir):
         if upper_vars:
             return False, ('  %s: 值位置出现大写名 %s —— 疑似外来语法'
                            '（type alias RHS/注解泄漏类）' % (tag, upper_vars))
-        return True, '  %s: 教学片段（仅 NAM003 散文上下文名）✓%s' % (tag, '（包 main）' if wrapped else '')
+        return True, '  %s: 教学片段（仅 NAM003 散文上下文名）✓%s' % (tag, main_note)
     return False, '  %s: 非 NAM003 错误 %s' % (tag, non_nam)
 
 

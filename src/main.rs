@@ -322,6 +322,14 @@ fn main_inner() {
     if parsed_ok && let Some(g) = graph {
         package::warn_public_symbol_clashes(g);
     }
+    // designs/0029 §3.3（R236）：依赖包诊断的可见性——入口文件的三条路径只查
+    // 入口文件本身；这里静默检查各依赖包源文件，有诊断则在 stderr 提示条数。
+    // 信封、`ok`、rc 与 stdout 都不变（只提示、不合并）。
+    if let Some(g) = graph
+        && let Some(line) = dependency_diag_notice(g)
+    {
+        eprintln!("{}", line);
+    }
 
     // ===== 类型检查（Phase 2.4 渐进式类型检查器）=====
     // 入口文件解析通过且包解析成功时执行；externals = 依赖包公开符号并集
@@ -338,7 +346,12 @@ fn main_inner() {
         process::exit(if diags.ok { 0 } else { 1 });
     }
 
-    if !diags.ok {
+    // 这里的提前退出只管两类：词法 / 语法解析失败（改前口径：本分支位于类型
+    // 检查之前，只看得到解析诊断）与清单 / 依赖解析失败（designs/0030 §3.1，
+    // R246：项目根本跑不起来，rc 1、不执行）。**静态类型错误不在此列**——
+    // 渐进式承诺"诊断永不拦截执行"不变：类型检查已挪到本分支之前，故不能再
+    // 用 `!diags.ok` 作条件（那会让任何 NAM003 一类的静态错误都挡住运行）。
+    if !parsed_ok || matches!(packages, EntryPackages::Failed(..)) {
         // 人类可读诊断输出（--check 模式：诊断是程序产品，输出到 stdout）
         if cli.check {
             print!("{}", diags.to_human());
@@ -427,9 +440,7 @@ fn main_inner() {
         match interp.err_source_file() {
             None => diags.add_runtime(&e, &src, interp.err_site()),
             Some(dep_file) => match fs::read_to_string(dep_file) {
-                Ok(dep_src) => {
-                    diags.add_runtime_in_file(&e, dep_file, &dep_src, interp.err_site())
-                }
+                Ok(dep_src) => diags.add_runtime_in_file(&e, dep_file, &dep_src, interp.err_site()),
                 Err(_) => diags.add_runtime(&e, &src, interp.err_site()),
             },
         }
@@ -1027,32 +1038,13 @@ fn check_and_report_file(
     pkg_symbols: Option<&HashSet<String>>,
     report: bool,
 ) -> FileVerdict {
-    let src = match fs::read_to_string(file) {
-        Ok(s) => s,
+    let diags = match diagnose_file(file, base_externals, pkg_symbols) {
+        Ok(d) => d,
         Err(e) => {
             eprintln!("      读取 {} 失败: {}", file.display(), e);
             return FileVerdict::Unreadable;
         }
     };
-    let path_str = file.display().to_string();
-    let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
-    if diags.ok {
-        let program = parser::Parser::parse_recover(&src).program;
-        let own = file_top_level_symbols(&program);
-        let mut externals: Vec<String> = base_externals.to_vec();
-        if let Some(symbols) = pkg_symbols {
-            externals.extend(symbols.iter().cloned());
-        }
-        // R128（三十一审）：统一减法——对最终 externals 向量（base ∪ pkg）
-        // 整体减去当前文件自身顶层符号，而非仅对 pkg 追加部分减。修复包
-        // 路径 base 侧边角：包内文件重复 fn 撞依赖闭包符号时 base_externals
-        // 含该符号（仅对 pkg 部分减法不去除）→ NAM002 降级为 NAM006。
-        // 根路径（None 分支）同受此统一减法覆盖（R125 三十审行为维持）。
-        externals.retain(|s| !own.contains(s.as_str()));
-        typechecker::check_program_with_externals(
-            &program, &src, &path_str, &mut diags, &externals,
-        );
-    }
     if report {
         if diags.diagnostics.is_empty() {
             println!(
@@ -1075,6 +1067,38 @@ fn check_and_report_file(
     }
 }
 
+/// 单文件的「读取 + 解析 + 类型检查」——只产出诊断，不打印；缺口 A/C 的
+/// 「本包 public_symbols − 当前文件自身符号」减法在下面的类型检查分支里做。
+/// 调用方：[`check_and_report_file`]（无文件 build 的逐文件检查）与
+/// [`dependency_diag_notice`]（designs/0029 §3.3，入口文件路径的依赖包可见性）。
+fn diagnose_file(
+    file: &std::path::Path,
+    base_externals: &[String],
+    pkg_symbols: Option<&HashSet<String>>,
+) -> Result<diagnostics::Diagnostics, std::io::Error> {
+    let src = fs::read_to_string(file)?;
+    let path_str = file.display().to_string();
+    let mut diags = diagnostics::Diagnostics::from_parse_result(&src, &path_str);
+    if diags.ok {
+        let program = parser::Parser::parse_recover(&src).program;
+        let own = file_top_level_symbols(&program);
+        let mut externals: Vec<String> = base_externals.to_vec();
+        if let Some(symbols) = pkg_symbols {
+            externals.extend(symbols.iter().cloned());
+        }
+        // R128（三十一审）：统一减法——对最终 externals 向量（base ∪ pkg）
+        // 整体减去当前文件自身顶层符号，而非仅对 pkg 追加部分减。修复包
+        // 路径 base 侧边角：包内文件重复 fn 撞依赖闭包符号时 base_externals
+        // 含该符号（仅对 pkg 部分减法不去除）→ NAM002 降级为 NAM006。
+        // 根路径（None 分支）同受此统一减法覆盖（R125 三十审行为维持）。
+        externals.retain(|s| !own.contains(s.as_str()));
+        typechecker::check_program_with_externals(
+            &program, &src, &path_str, &mut diags, &externals,
+        );
+    }
+    Ok(diags)
+}
+
 /// 缺口 A（designs/0021 §1）：单文件顶层符号集——fn 名 + enum 名 +
 /// 枚举变体名（与 package.rs collect_public_symbols 同口径），供
 /// 「本包 public_symbols − 当前文件符号」减法用。
@@ -1095,6 +1119,46 @@ fn file_top_level_symbols(program: &ast::Program) -> HashSet<String> {
         }
     }
     syms
+}
+
+/// designs/0029 §3.3（R236）：入口文件路径（`--json` / `--check` / 运行）的
+/// 依赖包可见性——用无文件 build 的同一套逐文件 externals 算法静默检查各依赖
+/// 包源文件，有诊断则返回 stderr 提示行（条数按 error / warning 分列）；无
+/// 诊断返回 None。只提示、不合并：读者仍需在项目根目录运行 `lom build` 才能
+/// 看到全文。源文件不可读计为一条错误（`lom build` 对应工具失败带 rc 2）。
+/// 入口文件自己清单所在目录的其它根文件不在提示范围内（与设计的范围一致）。
+fn dependency_diag_notice(graph: &package::DependencyGraph) -> Option<String> {
+    if graph.packages.is_empty() {
+        return None;
+    }
+    let externals_map = package_closure_externals(graph);
+    let mut errors = 0usize;
+    let mut warnings = 0usize;
+    for (name, pkg) in &graph.packages {
+        for file in &pkg.source_files {
+            match diagnose_file(file, &externals_map[name], Some(&pkg.public_symbols)) {
+                Ok(diags) => {
+                    for d in &diags.diagnostics {
+                        if matches!(d.severity, diagnostics::Severity::Error) {
+                            errors += 1;
+                        } else {
+                            warnings += 1;
+                        }
+                    }
+                }
+                Err(_) => errors += 1,
+            }
+        }
+    }
+    if errors == 0 && warnings == 0 {
+        return None;
+    }
+    Some(format!(
+        "依赖包里有 {} 条诊断未在此显示（{} 错误 / {} 警告）——在项目根目录运行 lom build 查看全部。",
+        errors + warnings,
+        errors,
+        warnings
+    ))
 }
 
 /// v1.4.13 登记项 2（v1.4.9 登记）：`lom build` 无文件流程的包级
@@ -1167,17 +1231,16 @@ fn closure_symbols(
 ///       文件读取错误在 main 入口统一 rc 2）；--run 观察环节自身失败
 ///       （trace 出口打不开 / 解释器线程异常终止）
 fn run_fix(src: &str, path: &str, cli: &CliArgs) {
-    // 收集全部诊断：词法 + 语法
-    let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
+    // designs/0030 §3.2（R244）/ §3.1（R246）：fix 面与 run / --check 同源的
+    // 包上下文——一次解析、逐层下传（首段诊断 / apply 迭代轮 / 终检 / --run
+    // 的静态诊断）。此前这几处调的是 externals 恒空的 check_program：包项目的
+    // 入口文件对包符号的引用被报成假 NAM003（fix 顺着它给出错误的替换建议、
+    // `--run` 被假 error 拒跑）。无清单单文件 = 空上下文：检查器输入与此前
+    // 逐字相同，输出逐字节不变。fix 面不打印 PKG007（选边 A2：stderr 维持为空）。
+    let pkg = PkgCtx::resolve(path);
 
-    // 解析通过后追加类型检查诊断（与 --json 模式一致）
-    // R55：同时提取顶层函数摘要（MUT001 作用域限定 / EFF001 签名 end 定位）
-    let mut fns: Vec<fix::FnInfo> = Vec::new();
-    if diags.ok {
-        let program = parser::Parser::parse_recover(src).program;
-        fns = fix::fn_infos(&program, src);
-        typechecker::check_program(&program, src, path, &mut diags);
-    }
+    // 词法 + 语法 + 类型诊断（与 --json 模式一致；R55：同时提取顶层函数摘要）
+    let (diags, fns) = diagnose_with_pkg(src, path, &pkg);
 
     // 生成修复计划
     let plan = fix::generate_plan(&diags, src, &fns);
@@ -1202,15 +1265,15 @@ fn run_fix(src: &str, path: &str, cli: &CliArgs) {
     // 直到无高置信度可应用项（applied==0）或源码不再变化，上限 5 轮防震荡死循环。
     if cli.apply {
         const MAX_ROUNDS: usize = 5;
-        let (current, results) = apply_iterative(src, path, MAX_ROUNDS);
+        let (current, results) = apply_iterative(src, path, MAX_ROUNDS, &pkg);
 
         // R55（九审）：对修复后的源码重跑完整诊断，ok 含最终状态
-        let final_diag = apply::FinalDiag::check(&current, path);
+        let final_diag = apply::FinalDiag::check(&current, path, &pkg);
 
         // designs/0028 L2 --apply --run（设计 §4.8）：静态迭代轮照旧收敛后，
         // 对收敛源码做一次运行时观察——只报告不应用（运行时计划全是 hint）。
         let observation = run_opts.as_ref().map(|opts| {
-            let (cur_diags, _cur_fns) = static_diagnose(&current, path);
+            let (cur_diags, _cur_fns) = diagnose_with_pkg(&current, path, &pkg);
             let obs = fix_run::observe(&current, path, &cur_diags, opts);
             let plans = obs
                 .runtime_diag
@@ -1362,15 +1425,63 @@ fn exit_for_run(run: &fix_run::RunReport) {
     }
 }
 
-/// designs/0028 L2：对一份源码做静态诊断（词法 + 语法 + 类型），与 run_fix
-/// 首段同口径——`--apply --run` 对迭代收敛后的源码做闸门判定与计划生成用。
-fn static_diagnose(src: &str, path: &str) -> (diagnostics::Diagnostics, Vec<fix::FnInfo>) {
+/// designs/0030 §3.1 / §3.2（R244 / R246）：带文件路径的 fix / apply 面所需的
+/// 包上下文——与 run / `--check` 同源（[`resolve_entry_packages`] 的结果）。
+#[derive(Clone, Default)]
+pub(crate) struct PkgCtx {
+    /// 依赖包公开符号（入口文件单文件视图的 externals；无清单 = 空集）
+    pub externals: Vec<String>,
+    /// 清单 / 依赖解析失败时的那条结构化 PKG 诊断（error 级）——fix 面据此
+    /// 走 PKG 的提示臂并跳过类型检查（带着空 externals 继续检查只会产出
+    /// 使用点的假 NAM003）；`--run` 的闸门因静态 error 不执行程序。
+    pub error: Option<diagnostics::Diagnostic>,
+}
+
+impl PkgCtx {
+    /// 不打印、不退出（PKG007 的打印只在本文件带文件三路径与无文件 build
+    /// 的调用点——fix / apply 面不打，stderr 维持为空）
+    fn resolve(path: &str) -> PkgCtx {
+        match resolve_entry_packages(path) {
+            EntryPackages::Resolved(g) => PkgCtx {
+                externals: entry_externals(&g),
+                error: None,
+            },
+            EntryPackages::NoManifest => PkgCtx::default(),
+            EntryPackages::Failed(err, manifest) => PkgCtx {
+                externals: Vec::new(),
+                error: Some(package::pkg_error_diagnostic(&err, manifest.as_deref())),
+            },
+        }
+    }
+}
+
+/// designs/0030 §3.2（R244）：一份源码的静态诊断（词法 + 语法 + 类型）——
+/// fix 首段、apply 的每一轮、apply 后的终检、`--apply --run` 的闸门判定共用。
+/// 解析通过且包解析成功时做类型检查（externals 见 [`PkgCtx`]）；包解析失败
+/// 时追加那条 PKG 诊断并跳过类型检查。无清单单文件 = 空上下文：与改前的
+/// `check_program` 是同一函数、同一输入。
+pub(crate) fn diagnose_with_pkg(
+    src: &str,
+    path: &str,
+    pkg: &PkgCtx,
+) -> (diagnostics::Diagnostics, Vec<fix::FnInfo>) {
     let mut diags = diagnostics::Diagnostics::from_parse_result(src, path);
     let mut fns: Vec<fix::FnInfo> = Vec::new();
     if diags.ok {
-        let program = parser::Parser::parse_recover(src).program;
-        fns = fix::fn_infos(&program, src);
-        typechecker::check_program(&program, src, path, &mut diags);
+        if let Some(e) = &pkg.error {
+            diags.diagnostics.push(e.clone());
+            diags.ok = false;
+        } else {
+            let program = parser::Parser::parse_recover(src).program;
+            fns = fix::fn_infos(&program, src);
+            typechecker::check_program_with_externals(
+                &program,
+                src,
+                path,
+                &mut diags,
+                &pkg.externals,
+            );
+        }
     }
     (diags, fns)
 }
