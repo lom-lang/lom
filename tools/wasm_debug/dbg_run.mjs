@@ -312,9 +312,26 @@ try {
   // 背景（RFC-0003 修订记录 20）：自举解释器等大分配负载下 rt_alloc 的 grow 路径
   // 存在未定位的越界（非确定性、字节级审计未复现），预扩内存在 4GB 上限内不影响
   // 语义，验收运行用此项绕过；深挖挂账 post-Phase-8。
-  instance.exports.main();
+  const mainRet = instance.exports.main();
   process.stdout.write(out);
   dumpArtifacts('success');
+  // RFC-0005 取乙（v1.18.0，designs/0032 §3 第 4 项）：与 eval/runner/run_wasm.mjs
+  // 同构——AOT 产物 main 的带标签返回值 → 进程退出码（tag 0 = Int 载荷即退出码；
+  // tag 2 = Unit 正常结束；其它 tag 不可达）。范围校验（0..255）在宿主。
+  if (mainRet !== undefined) {
+    const tag = Number(mainRet & 15n);
+    if (tag === 0) {
+      const code = Number(mainRet >> 4n);
+      if (code < 0 || code > 255) {
+        console.error('wasm exit code out of range: ' + code + '（main 声明返回 Int 时，退出码须在 0..255 之间）');
+        process.exit(1);
+      }
+      if (code !== 0) process.exit(code);
+    } else if (tag !== 2) {
+      console.error('wasm main returned a non-Int value (tag ' + tag + ')');
+      process.exit(1);
+    }
+  }
 } catch (e) {
   // trap（除零、不可达、json_parse 失败等）——先吐出已产生的 stdout，再以 1 退出（对齐解释器运行时错误的退出码）
   process.stdout.write(out);

@@ -277,8 +277,31 @@ try {
   // 背景（RFC-0003 修订记录 20）：自举解释器等大分配负载下 rt_alloc 的 grow 路径
   // 存在未定位的越界（非确定性、字节级审计未复现），预扩内存在 4GB 上限内不影响
   // 语义，验收运行用此项绕过；深挖挂账 post-Phase-8。
-  instance.exports.main();
+  const mainRet = instance.exports.main();
   process.stdout.write(out);
+  // RFC-0005 取乙（v1.18.0，designs/0032 §3 第 4 项）：AOT 产物的导出 main 恒返回
+  // 带标签的 i64（tag = v & 15），编译器按 main 的**声明**类型收尾——
+  //   tag 0 = Int ：main 声明 `-> Int`，载荷即进程退出码（非 Int 值已被编译器的
+  //                 tag 检查拦成 trap，走下面的 catch → rc 1）；
+  //   tag 2 = Unit：main 声明非 Int（`-> Unit` / 无注解 / 其它类型）——正常结束，
+  //                 退出码 0，与解释器同值；
+  //   其它 tag   ：按编译器约定不可达（防御：说明 + rc 1）。
+  // 0..255 的范围校验放宿主（AOT 没有诊断信封——这段 stderr 文本与解释器不同，
+  // 退出码同为 1）。
+  if (mainRet !== undefined) {
+    const tag = Number(mainRet & 15n);
+    if (tag === 0) {
+      const code = Number(mainRet >> 4n);
+      if (code < 0 || code > 255) {
+        console.error('wasm exit code out of range: ' + code + '（main 声明返回 Int 时，退出码须在 0..255 之间）');
+        process.exit(1);
+      }
+      if (code !== 0) process.exit(code);
+    } else if (tag !== 2) {
+      console.error('wasm main returned a non-Int value (tag ' + tag + ')');
+      process.exit(1);
+    }
+  }
 } catch (e) {
   // trap（除零、不可达、json_parse 失败等）——先吐出已产生的 stdout，再以 1 退出（对齐解释器运行时错误的退出码）
   process.stdout.write(out);

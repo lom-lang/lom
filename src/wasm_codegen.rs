@@ -1249,6 +1249,28 @@ impl Codegen {
         a.block_i64();
         self.compile_block_value(&mut ctx, &mut a, &f.body)?;
         a.end();
+        // designs/0032（RFC-0005 取乙，v1.18.0）§2 第 1 项：main 的收尾按**声明**的
+        // 返回类型规范化——产物的导出 main 恒返回带标签的 i64，宿主只凭返回值
+        // 分不开"`-> Int` 尾 5"与"`-> Unit` / 无注解 尾 5"（三者都是 80）：
+        //   · 声明非 Int：无论块尾产出什么值，一律丢弃、返回带标签的 Unit（2）——
+        //     宿主见 tag 2 即"正常结束"（退出码 0），与解释器同值；
+        //   · 声明 Int：发射 tag 检查，非 Int 值 `unreachable`（trap → 宿主 rc 1），
+        //     与解释器"返回值不是整数按运行时错误"对齐；0..255 的范围校验留给
+        //     宿主（AOT 没有诊断信封， stderr 文本与解释器不同——登记为分歧）。
+        // 不加 custom section / 导出 global（"产物不带 custom section"的既有断言
+        // 与规范声明不动）。只动 main 一个函数的收尾：其余函数体与各 section 的
+        // 字节不变，存量 AOT 产物仅 main 尾部多出这两三条指令。
+        if f.name == "main" {
+            if matches!(f.ret_type, Some(Type::Int)) {
+                let slot = ctx.alloc();
+                a.lset(slot);
+                a.lget(slot).tag().i64c(TAG_INT).op(op::I64_NE);
+                a.if_().op(op::UNREACHABLE).end();
+                a.lget(slot);
+            } else {
+                a.op(op::DROP).i64c(V_UNIT);
+            }
+        }
         Ok(Function {
             type_idx: ty,
             locals: ctx.locals,
@@ -6370,6 +6392,134 @@ mod e2e {
         if let Some(out) = run_wasm(src, tag) {
             assert_eq!(out, expected, "[{}] 输出不符", tag);
         }
+    }
+
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：编译后经 node 跑，返回 (rc, stdout,
+    /// stderr 首行)——与 `run_wasm` 的区别是不要求 rc 0（退出码本身就是被测对象）。
+    /// node 缺失返回 None（测试跳过）。
+    fn run_wasm_rc(src: &str, tag: &str) -> Option<(i32, String, String)> {
+        if !node_available() {
+            eprintln!("[wasm_codegen e2e] node 不在 PATH，跳过（{}）", tag);
+            return None;
+        }
+        let prog = Parser::parse_recover(src).program;
+        let bytes = compile_program(&prog).unwrap_or_else(|e| panic!("[{}] 编译失败: {}", tag, e));
+        let path = std::env::temp_dir().join(format!("lom_wasm_e2e_rc_{}.wasm", tag));
+        std::fs::write(&path, &bytes).unwrap();
+        let out = Command::new("node")
+            .arg("eval/runner/run_wasm.mjs")
+            .arg(&path)
+            .output()
+            .expect("node 运行失败");
+        let _ = std::fs::remove_file(&path);
+        let first_err = String::from_utf8_lossy(&out.stderr)
+            .lines()
+            .next()
+            .unwrap_or("")
+            .to_string();
+        Some((
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stdout).replace('\r', ""),
+            first_err,
+        ))
+    }
+
+    /// designs/0032 §2 第 1 项：main 的收尾按**声明**类型规范化——产物不带声明类型，
+    /// 宿主只凭返回值分不开"`-> Int` 尾 5"与"`-> Unit` / 无注解 尾 5"。
+    /// 直接看 `compile_fn` 的体字节（不经 node）：`$ret` 块闭合之后——
+    ///   声明非 Int：drop + i64.const 2（带标签的 Unit）；
+    ///   声明 Int：存槽 → tag != 0 即 unreachable → 取槽（非 Int 值陷阱）。
+    #[test]
+    fn main_epilogue_follows_the_declared_return_type() {
+        use super::{Codegen, TAG_INT};
+        use crate::ast::Item;
+        use crate::wasm::op;
+
+        fn body(src: &str) -> (Vec<u8>, usize) {
+            let mut cg = Codegen::new();
+            let prog = Parser::parse_recover(src).program;
+            let Item::Fn(f) = &prog.items[0] else {
+                panic!("首个 item 应为 fn: {}", src);
+            };
+            let func = cg.compile_fn(f).unwrap();
+            (func.body, func.locals.len())
+        }
+        // `Function.body` 不含函数末尾的 END（code section 编码时统一追加）
+        // `-> Unit` 尾 5：$ret 块闭合 → 丢弃值、返回带标签的 Unit
+        let unit_tail = [op::END, op::DROP, op::I64_CONST, 0x02];
+        let (b, _) = body("fn main() -> Unit\n    5\nend\n");
+        assert!(b.ends_with(&unit_tail), "实际: {:02x?}", b);
+        // 无注解尾 5：同上
+        let (b, _) = body("fn main()\n    5\nend\n");
+        assert!(b.ends_with(&unit_tail), "实际: {:02x?}", b);
+        // `-> Unit` 且块尾本就是 Unit（println 调用）：同样规范化
+        let (b, _) = body("fn main() -> Unit\n    println(1)\nend\n");
+        assert!(b.ends_with(&unit_tail), "实际: {:02x?}", b);
+        // `-> Int` 尾 5：tag 检查（slot = 参数 0 个 → local 0）
+        let (b, n_locals) = body("fn main() -> Int\n    5\nend\n");
+        assert_eq!(n_locals, 1, "声明 Int 的 main 多一个存返回值的 i64 局部");
+        let check = [
+            op::LOCAL_GET,
+            0x00,
+            op::I64_CONST,
+            0x0F,
+            op::I64_AND,
+            op::I64_CONST,
+            TAG_INT as u8,
+            op::I64_NE,
+            op::IF,
+            0x40,
+            op::UNREACHABLE,
+            op::END,
+        ];
+        assert!(b.ends_with(&[op::LOCAL_GET, 0x00]), "实际: {:02x?}", b);
+        assert!(
+            b.windows(check.len()).any(|w| w == check),
+            "应含 tag 检查序列；实际: {:02x?}",
+            b
+        );
+        // 非 main 的函数收尾不动（$ret 块闭合即函数体结束，无规范化指令）
+        let (b, _) = body("fn f() -> Unit\n    5\nend\n");
+        assert!(
+            b.ends_with(&[op::END]) && !b.ends_with(&unit_tail),
+            "实际: {:02x?}",
+            b
+        );
+    }
+
+    /// designs/0032 §4：AOT 宿主链路（run_wasm.mjs）的退出码——与解释器同值
+    #[test]
+    fn e2e_exit_code_through_the_host() {
+        // 尾 3 → rc 3，stdout 不丢（经管道捕获）
+        let (rc, out, _) = run_wasm_rc(
+            "fn main() -> Int\n    println(\"x\")\n    return 3\nend\n",
+            "exit3",
+        )
+        .expect("node 在场");
+        assert_eq!((rc, out.as_str()), (3, "x\n"));
+        // 0 → rc 0
+        let (rc, _, _) = run_wasm_rc("fn main() -> Int\n    0\nend\n", "exit0").unwrap();
+        assert_eq!(rc, 0);
+        // 超范围 → rc 1 + stderr 说明（AOT 没有诊断信封：文本与解释器不同，退出码同）
+        let (rc, _, err) = run_wasm_rc("fn main() -> Int\n    256\nend\n", "exit256").unwrap();
+        assert_eq!(rc, 1);
+        assert!(err.contains("out of range"), "stderr 首行: {}", err);
+        // `-> Unit` 尾 5 / 无注解尾 5 → rc 0（改前宿主若按返回值 80 映射会误判）
+        let (rc, _, _) = run_wasm_rc("fn main() -> Unit\n    5\nend\n", "exitunit").unwrap();
+        assert_eq!(rc, 0);
+        let (rc, _, _) = run_wasm_rc("fn main()\n    5\nend\n", "exitnoannot").unwrap();
+        assert_eq!(rc, 0);
+        // `-> Int` 却返回 String：编译器的 tag 检查 → trap → rc 1
+        let (rc, _, err) = run_wasm_rc("fn main() -> Int\n    \"s\"\nend\n", "exitstr").unwrap();
+        assert_eq!(rc, 1);
+        assert!(err.contains("wasm trap"), "stderr 首行: {}", err);
+        // 运行时错误仍 rc 1
+        let (rc, _, _) = run_wasm_rc(
+            "fn main() -> Unit\n    let a = 1\n    let b = 0\n    println(a / b)\nend\n",
+            "exitdiv0",
+        )
+        .unwrap();
+        assert_eq!(rc, 1);
     }
 
     #[test]

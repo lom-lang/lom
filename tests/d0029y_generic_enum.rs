@@ -3,6 +3,8 @@
 //
 //   - `tools/selfcomp/cases/` 的 13 个泛型用例：`--json` 零诊断（修前 9 个文件带 23 条）；
 //     AOT wasm 产物的字节数与修前一致（typechecker 结果不被 codegen 消费）
+//     【v1.18.0 起按 designs/0032 每个产物 +3 字节：main 收尾多出 drop + i64.const 2——
+//       与类型检查器无关的、有意为之的收尾规范化；见下方 MAIN_EPILOGUE_BYTES】
 //   - 十二个现象形态零诊断，且解释器运行输出不变
 //   - designs/0031 §4 的真阳性保留：返回类型 / 实参 / 赋值 / 载荷作条件；error 级不变
 //   - 内建 `Result` / `Option` 的诊断文案逐字不变；Map 参与算术的文案逐字不变
@@ -12,7 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// 13 个泛型用例与其修前的 AOT wasm 字节数（供料报告 B.3 表；本批实施前复核一致）
+/// 13 个泛型用例与其 R250 修前的 AOT wasm 字节数（供料报告 B.3 表；本批实施前复核一致）
 const CASES: &[(&str, usize)] = &[
     ("37_generic_box", 10221),
     ("38_generic_repeated", 10126),
@@ -28,6 +30,13 @@ const CASES: &[(&str, usize)] = &[
     ("51_unknown_nested_pointer", 9907),
     ("88_map_generic_payload", 10761),
 ];
+
+/// designs/0032（RFC-0005 取乙，v1.18.0）：AOT 产物里 main 的收尾按声明类型规范化——
+/// 声明非 Int 的 main 在 `$ret` 块闭合后多出 `drop`（1 字节）+ `i64.const 2`
+/// （2 字节）。与类型检查器无关的、有意为之的发射变化；这 13 个用例的 main 全为
+/// `-> Unit`，逐个实测恰为 +3（`target/probes/exitcode_impl/aot_size_delta.py`）。
+/// R250 的锁含义不变：字节数 = 修前值 + 这一个已知增量。
+const MAIN_EPILOGUE_BYTES: usize = 3;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("lom_d0029y_gen_{}_{}", tag, std::process::id()));
@@ -150,7 +159,8 @@ fn assert_json(dir: &Path, name: &str, rc: i32, expected: &[(&str, &str, usize, 
     assert!(stdout.contains(ok_field), "{}: {}", name, stdout);
 }
 
-/// 13 个被跟踪用例零诊断；AOT wasm 产物的字节数与修前一致、build rc 0
+/// 13 个被跟踪用例零诊断；AOT wasm 产物的字节数 = R250 修前值 + main 收尾增量
+/// （MAIN_EPILOGUE_BYTES，v1.18.0 designs/0032）、build rc 0
 #[test]
 fn r250_tracked_generic_cases_zero_diags_and_wasm_bytes_unchanged() {
     let root = repo_root();
@@ -176,7 +186,12 @@ fn r250_tracked_generic_cases_zero_diags_and_wasm_bytes_unchanged() {
         );
         assert_eq!(rc, 0, "{} build: {} {}", case, o, e);
         let size = std::fs::metadata(&out).expect("应产出 wasm").len() as usize;
-        assert_eq!(size, *wasm_bytes, "{} 的 wasm 产物字节数应与修前一致", case);
+        assert_eq!(
+            size,
+            wasm_bytes + MAIN_EPILOGUE_BYTES,
+            "{} 的 wasm 产物字节数应 = R250 修前值 + main 收尾增量",
+            case
+        );
         checked += 1;
     }
     assert_eq!(checked, 13);

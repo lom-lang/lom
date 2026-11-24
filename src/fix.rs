@@ -3715,6 +3715,7 @@ end
             reason: None,
             detail: None,
             budget_ms: 5000,
+            program_exit_code: None,
         };
         assert_eq!(
             to_json_with(&one, Some(&crate::fix_run::run_fields_json(&run))),

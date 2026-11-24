@@ -241,8 +241,22 @@ const { instance: inst } = await WebAssembly.instantiate(bytes, {
 instance = inst;
 memory = instance.exports.memory || null;
 try {
-  instance.exports.main();
+  const mainRet = instance.exports.main();
   process.stdout.write(out);
+  // RFC-0005 取乙（v1.18.0，designs/0032 §2 第 3 项 / §3 第 5 项）：L2 产物的 main
+  // **不带标签**——void 的 main（声明 `-> Unit` / 无注解）返回 undefined → 正常
+  // 结束；带返回类型的 main 返回裸 i64（BigInt）→ 整数即进程退出码（含 0..255
+  // 范围校验）。自举编译器本批不动，所以 `-> String` 等非 Int 的 main 在 L2 里
+  // 也是裸 i64（裸指针），范围校验拦不住——规范登记"L2 通道对非 Int 的 main
+  // 不保证"。本脚本既跑编译器自身（void main），也跑 L2 编译出的程序。
+  if (mainRet !== undefined) {
+    const code = Number(mainRet);
+    if (!Number.isInteger(code) || code < 0 || code > 255) {
+      console.error('wasm exit code out of range: ' + mainRet + '（main 声明返回 Int 时，退出码须在 0..255 之间）');
+      process.exit(1);
+    }
+    if (code !== 0) process.exit(code);
+  }
 } catch (e) {
   // 对齐宿主 run_wasm.mjs：trap 前已执行的 println 不得丢失。
   process.stdout.write(out);

@@ -6,6 +6,8 @@
 // append 的映射形态与新建边界断言（append 追加至尾 = 缺陷 B 机器锁）。
 // 四期追加（v1.13.0）：⑧ 分享链接段——sharelink.js 编解码纯函数的往返一致性
 // （中文/CRLF/空程序/超长跳过四形态 + base64url 字母表纯净性 + 非法输入报错）。
+// 五期追加（v1.18.0）：⑨ 进程退出码段——RFC-0005 取乙（designs/0032）：引擎把
+// `fn main() -> Int` 的返回值透传为 exitCode（process::exit → proc_exit 桩）。
 // 用法：node playground/smoke.mjs [lom.wasm 路径]
 import { createLomRuntime } from "./harness.js";
 import { runSelfbootChain } from "./selfboot.js";
@@ -225,6 +227,30 @@ end
     threw = true;
   }
   check("share invalid input throws", threw, true);
+}
+
+// ---- ⑨ 进程退出码段（v1.18.0，RFC-0005 取乙 / designs/0032）----
+// 引擎（lom.wasm）与桌面同源：`fn main() -> Int` 的返回值即进程退出码——
+// process::exit(code) → WASI proc_exit，harness 的桩把它记为 exitCode（显示侧
+// 早已支持非零退出码）。声明非 Int 的 main 退出码恒 0；超范围按运行时错误。
+{
+  const r3 = await rt.run({ source: 'fn main() -> Int\n    print("partial")\n    return 3\nend\n' });
+  check("exit code: Int main returning 3 exits 3", r3.exitCode, 3);
+  check("exit code: custom exit keeps a partial last line", r3.stdout, "partial");
+  check("exit code: custom exit prints no diagnostics", r3.stderr, "");
+
+  const zero = await rt.run({ source: "fn main() -> Int\n    0\nend\n" });
+  check("exit code: Int main returning 0 exits 0", zero.exitCode, 0);
+
+  const unit = await rt.run({ source: "fn main() -> Unit\n    5\nend\n" });
+  check("exit code: Unit main stays at 0 with a valued tail", unit.exitCode, 0);
+
+  const noannot = await rt.run({ source: "fn main()\n    5\nend\n" });
+  check("exit code: unannotated main stays at 0", noannot.exitCode, 0);
+
+  const over = await rt.run({ source: "fn main() -> Int\n    256\nend\n" });
+  check("exit code: out of range is a runtime error", over.exitCode, 1);
+  check("exit code: out of range reports RUNTIME000", over.stderr.includes("[RUNTIME000]") && over.stderr.includes("0..255"), true);
 }
 
 console.log(failures === 0 ? "\nSMOKE: ALL PASS" : `\nSMOKE: ${failures} FAIL`);

@@ -827,6 +827,12 @@ pub struct Interpreter {
     /// 既不进 fix 的 stdout，也不走管道（死循环打印不会撑满管道而阻塞）。
     /// 仅 println / print 两处内建消费；缺省路径只多一次 bool 判别。
     discard_output: bool,
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：main 声明 `-> Int` 且正常跑完时的
+    /// 进程退出码（0..255）。None = 本次运行没有自定义退出码（main 声明非 Int，
+    /// 或运行以错误结束）。`run()` 入口清空（先例：`err_site`）；上报点 =
+    /// main.rs 运行路径的进程出口与 `fix --run` 的观察结果。侧通道形态与
+    /// `err_site` 同款——`run()` 的返回类型不变，既有调用点零改动。
+    exit_code: Option<i64>,
 }
 
 /// 内置变体
@@ -953,6 +959,7 @@ impl Interpreter {
             fn_sources: HashMap::new(),
             cur_source: None,
             discard_output: false,
+            exit_code: None,
         }
     }
 
@@ -962,6 +969,14 @@ impl Interpreter {
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn set_discard_output(&mut self, on: bool) {
         self.discard_output = on;
+    }
+
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：`run()` 正常返回后的进程退出码——
+    /// 仅当 main 声明 `-> Int` 且其返回值是 0..255 的整数为 Some（0 也是 Some(0)，
+    /// 调用方据此区分"自定义退出码 0"与"没有自定义退出码"）；main 声明非 Int
+    /// 恒为 None。超范围或返回值不是整数时 `run()` 以 Err 返回，本字段保持 None。
+    pub fn exit_code(&self) -> Option<i64> {
+        self.exit_code
     }
 
     /// designs/0028（v1.17.0）L1：运行时错误位置侧通道的当前值——最内层
@@ -1197,6 +1212,8 @@ impl Interpreter {
         // designs/0029 §3.6（R242）：来源文件通道同样按"每次程序运行"起算
         self.err_source = None;
         self.cur_source = None;
+        // designs/0032：退出码侧通道同样按"每次程序运行"起算
+        self.exit_code = None;
         // 先处理所有导入声明（在注册函数/枚举之前，确保符号可用性语义清晰）
         for item in &program.items {
             if let Item::Import(imp) = item {
@@ -1237,7 +1254,38 @@ impl Interpreter {
             }
             let result = self.exec_block(&main.body, env);
             self.cur_source = saved_source;
-            result?;
+            let flow = result?;
+            // designs/0032（RFC-0005 取乙，v1.18.0）：main 声明 `-> Int` 时返回值即
+            // 进程退出码——尾表达式（Normal）与 `return n`（Return）同值同待。
+            // 只接受 0..255 的整数；超范围或不是整数按运行时错误（落既有码
+            // RUNTIME000——不新增码、不改 severity）。声明非 Int 的 main 不看
+            // 返回值：退出码恒 0，与此前一致（此前返回值被直接丢弃）。
+            if matches!(main.ret_type, Some(Type::Int)) {
+                let value = match flow {
+                    ControlFlow::Normal(v) | ControlFlow::Return(v) => v,
+                };
+                match value {
+                    Value::Int(n) if (0..=255).contains(&n) => self.exit_code = Some(n),
+                    Value::Int(n) => {
+                        return Err(self.exit_code_error(
+                            &main,
+                            format!(
+                                "main 声明返回 Int 作为进程退出码，须在 0..255 之间，实际为 {}",
+                                n
+                            ),
+                        ));
+                    }
+                    other => {
+                        return Err(self.exit_code_error(
+                            &main,
+                            format!(
+                                "main 声明返回 Int 作为进程退出码，实际返回的类型是 {}",
+                                other.type_name()
+                            ),
+                        ));
+                    }
+                }
+            }
         } else {
             // designs/0030 §3.3（R245）：没有 main 的程序此前静默通过（rc 0）——
             // AOT 产物与 L2 自举编译器均拒绝。查的是合并后的函数表（入口文件
@@ -1249,6 +1297,21 @@ impl Interpreter {
             return Err(RuntimeError::Msg("程序缺少 main 函数".to_string()));
         }
         Ok(())
+    }
+
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：退出码校验失败的统一上报点。
+    /// 错误不在表达式求值路径上抛出（`err_site` 为空）——位置取 main 的签名
+    /// span（真实坐标），来源取 main 的来源文件（包里的 main → 包文件，与 R242
+    /// 同口径）。文案由调用方给定：须避开 `classify_runtime_error` 的关键字
+    /// 分支（"期望"+"得到" 会归 RUNTIME001 等），落兜底 RUNTIME000。
+    fn exit_code_error(&mut self, main: &FnDecl, msg: String) -> RuntimeError {
+        self.err_site = Some((main.span.line, main.span.col));
+        self.err_source = if self.fn_sources.is_empty() {
+            None
+        } else {
+            self.fn_sources.get("main").cloned().flatten()
+        };
+        RuntimeError::Msg(msg)
     }
 
     /// Phase 4.2: REPL 增量执行单个 item
@@ -3060,6 +3123,127 @@ end
         interp
             .run(&program)
             .expect("100 层递归在 max_depth=500 内应正常运行");
+    }
+
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：跑一个程序，返回 `run()` 的结果与
+    /// 退出码侧通道的终值
+    fn run_for_exit(src: &str) -> (Result<(), RuntimeError>, Option<i64>) {
+        let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
+        let mut interp = Interpreter::new();
+        let result = interp.run(&program);
+        (result, interp.exit_code())
+    }
+
+    /// designs/0032：`-> Int` 的 main——尾表达式与 `return n` 的值即退出码（0 也是
+    /// Some：调用方据此区分"自定义退出码 0"与"没有自定义退出码"）
+    #[test]
+    fn int_main_return_value_is_the_exit_code() {
+        let (r, code) = run_for_exit("fn main() -> Int\n    5\nend\n");
+        assert!(r.is_ok());
+        assert_eq!(code, Some(5));
+        let (r, code) = run_for_exit("fn main() -> Int\n    return 7\nend\n");
+        assert!(r.is_ok());
+        assert_eq!(code, Some(7));
+        let (r, code) = run_for_exit("fn main() -> Int\n    println(\"x\")\n    return 3\nend\n");
+        assert!(r.is_ok());
+        assert_eq!(code, Some(3));
+        let (r, code) = run_for_exit("fn main() -> Int\n    255\nend\n");
+        assert!(r.is_ok());
+        assert_eq!(code, Some(255), "上界含");
+        let (r, code) = run_for_exit("fn main() -> Int\n    0\nend\n");
+        assert!(r.is_ok());
+        assert_eq!(code, Some(0), "退出码 0 也是在场");
+    }
+
+    /// designs/0032：`-> Int` 的 main 返回 0..255 之外的整数 → 运行时错误（落既有码
+    /// RUNTIME000——文案须避开分类器的关键字分支）；位置取 main 的签名（真实坐标）
+    #[test]
+    fn int_main_out_of_range_exit_code_is_a_runtime_error() {
+        for src in [
+            "fn main() -> Int\n    256\nend\n",
+            "fn main() -> Int\n    return 256\nend\n",
+            "fn main() -> Int\n    0 - 1\nend\n",
+        ] {
+            let program = Parser::parse(src).unwrap();
+            let mut interp = Interpreter::new();
+            let err = interp
+                .run(&program)
+                .expect_err("超范围退出码应报运行时错误");
+            let RuntimeError::Msg(msg) = err else {
+                panic!("应为 RuntimeError::Msg，得到 {:?}", err);
+            };
+            assert!(msg.contains("0..255"), "消息: {}", msg);
+            assert_eq!(
+                crate::diagnostics::classify_runtime_error(&msg),
+                "RUNTIME000",
+                "文案不得被分类器抢到别的码"
+            );
+            assert_eq!(interp.exit_code(), None, "出错时没有退出码");
+            assert_eq!(interp.err_site(), Some((1, 1)), "定位到 main 的签名");
+        }
+    }
+
+    /// designs/0032：`-> Int` 的 main 实际返回非整数（渐进式下静态只有 warning）
+    /// → 运行时错误，RUNTIME000
+    #[test]
+    fn int_main_returning_a_non_int_is_a_runtime_error() {
+        // 无尾表达式（Unit）与尾表达式为 String 两种形态
+        for (src, ty) in [
+            ("fn main() -> Int\n    println(\"hi\")\nend\n", "Unit"),
+            ("fn main() -> Int\n    \"s\"\nend\n", "String"),
+        ] {
+            let program = Parser::parse(src).unwrap();
+            let mut interp = Interpreter::new();
+            let err = interp
+                .run(&program)
+                .expect_err("非整数返回值应报运行时错误");
+            let RuntimeError::Msg(msg) = err else {
+                panic!("应为 RuntimeError::Msg，得到 {:?}", err);
+            };
+            assert!(msg.contains(ty), "消息应点明实际类型 {}: {}", ty, msg);
+            assert_eq!(
+                crate::diagnostics::classify_runtime_error(&msg),
+                "RUNTIME000"
+            );
+            assert_eq!(interp.exit_code(), None);
+        }
+    }
+
+    /// designs/0032：声明非 Int 的 main（`-> Unit` / 无注解 / 其它类型）不看返回值
+    /// ——退出码恒为"没有自定义退出码"，哪怕块尾或 return 带了整数
+    #[test]
+    fn non_int_main_has_no_exit_code() {
+        for src in [
+            "fn main() -> Unit\n    5\nend\n",
+            "fn main()\n    5\nend\n",
+            "fn main() -> Unit\n    println(\"x\")\n    return 5\nend\n",
+            "fn main() -> String\n    \"abc\"\nend\n",
+        ] {
+            let (r, code) = run_for_exit(src);
+            assert!(r.is_ok(), "应正常跑完: {}", src);
+            assert_eq!(code, None, "不得产生退出码: {}", src);
+        }
+    }
+
+    /// designs/0032：退出码侧通道按"每次程序运行"起算——同一实例再次 run 不继承
+    /// 上一次的退出码（err_site 残留测试同款）
+    #[test]
+    fn exit_code_does_not_leak_between_runs() {
+        let first = Parser::parse("fn main() -> Int\n    5\nend\n").unwrap();
+        let second = Parser::parse("fn main() -> Unit\n    5\nend\n").unwrap();
+        let mut interp = Interpreter::new();
+        interp.run(&first).unwrap();
+        assert_eq!(interp.exit_code(), Some(5));
+        interp.run(&second).unwrap();
+        assert_eq!(interp.exit_code(), None, "第二次运行不得残留上次的退出码");
+    }
+
+    /// designs/0032：没有 main 的程序仍按 R245 报错，且没有退出码
+    #[test]
+    fn missing_main_has_no_exit_code() {
+        let (r, code) = run_for_exit("fn helper() -> Int\n    1\nend\n");
+        assert!(r.is_err());
+        assert_eq!(code, None);
     }
 
     #[test]

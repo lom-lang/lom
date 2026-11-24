@@ -11,6 +11,8 @@
 //   - 安全锁（设计 §6，以集成测试替代 fix_corpus 配对——零语料扰动）：
 //     `--apply --run` 之后源码与纯 `--apply` 逐字节一致，运行时 hint 永不应用
 //   - 默认路径不带 --run 时输出不含 run / runtime_plans 字段
+//   - designs/0032（v1.18.0，RFC-0005 取乙）：`-> Int` 的 main 以自定义退出码结束
+//     → outcome pass + 条件字段 `exit_code`；超范围 → outcome error（RUNTIME000 计划）
 //
 // 子进程 cwd 一律设为临时目录：--apply 的 .lom/fix-history.jsonl、--allow-io
 // 放行的 file_write、--trace-out 都落在临时目录里。
@@ -551,4 +553,110 @@ fn fix_run_package_import_skips_only_with_manifest() {
     );
     std::fs::remove_dir_all(&no_manifest).ok();
     std::fs::remove_dir_all(&with_manifest).ok();
+}
+
+/// designs/0032（RFC-0005 取乙，v1.18.0）：程序以自定义退出码结束**不算失败**——
+/// `outcome: "pass"` + 条件字段 `exit_code`（置于 budget_ms 之后）；main 声明非 Int
+/// 的程序没有这个字段（lom-fix/v1 append-only，v1.17.0 的输出逐字节不变）
+#[test]
+fn fix_run_reports_a_custom_exit_code_as_pass_with_a_field() {
+    // 目录名避开 "exit_code" 字样——信封的 file 字段会嵌入这个路径
+    let dir = temp_dir("run_xcode");
+    let f = probe(
+        &dir,
+        "ret3.lom",
+        "fn main() -> Int\n    println(\"discarded\")\n    return 3\nend\n",
+    );
+    let (stdout, stderr, rc) = run_in(&dir, &["fix", &f, "--plan", "--run", "--json"]);
+    assert_eq!(rc, 0, "以自定义退出码结束属分析完成；stderr: {}", stderr);
+    assert!(
+        stdout.contains(
+            "  \"run\": {\n    \"attempted\": true,\n    \"outcome\": \"pass\",\n    \"budget_ms\": 5000,\n    \"exit_code\": 3\n  }"
+        ),
+        "{}",
+        stdout
+    );
+    assert!(!stdout.contains("\"stage\": \"runtime\""), "{}", stdout);
+    assert!(
+        !stdout.contains("discarded"),
+        "程序 stdout 不泄漏: {}",
+        stdout
+    );
+
+    // 退出码 0 也是在场字段（与"没有自定义退出码"区分）
+    let f = probe(&dir, "zero.lom", "fn main() -> Int\n    0\nend\n");
+    let (stdout, _e, rc) = run_in(&dir, &["fix", &f, "--plan", "--run", "--json"]);
+    assert_eq!(rc, 0);
+    assert!(
+        stdout.contains("    \"budget_ms\": 5000,\n    \"exit_code\": 0\n  }"),
+        "{}",
+        stdout
+    );
+
+    // 对照：main 声明 `-> Unit` 的程序没有该字段（输出与 v1.17.0 逐字节相同——
+    // run 对象之后紧跟 plans，故收尾是 `},`）。按带引号的字段形态查，路径里的
+    // 同名子串不算。
+    let f = probe(
+        &dir,
+        "unit.lom",
+        "fn main() -> Unit\n    println(\"u\")\nend\n",
+    );
+    let (stdout, _e, rc) = run_in(&dir, &["fix", &f, "--plan", "--run", "--json"]);
+    assert_eq!(rc, 0);
+    assert!(
+        stdout.contains("    \"outcome\": \"pass\",\n    \"budget_ms\": 5000\n  },")
+            && !stdout.contains("\"exit_code\""),
+        "{}",
+        stdout
+    );
+}
+
+/// designs/0032：超范围退出码按运行时错误——outcome error + 一条 RUNTIME000 计划，
+/// 没有 exit_code 字段（fix 自身仍 rc 0：观察到诊断属分析完成）
+#[test]
+fn fix_run_treats_an_out_of_range_exit_code_as_an_error() {
+    let dir = temp_dir("run_exit_range");
+    let f = probe(&dir, "r256.lom", "fn main() -> Int\n    256\nend\n");
+    let (stdout, _e, rc) = run_in(&dir, &["fix", &f, "--plan", "--run", "--json"]);
+    assert_eq!(rc, 0);
+    assert!(
+        stdout.contains(
+            "  \"run\": {\n    \"attempted\": true,\n    \"outcome\": \"error\",\n    \"budget_ms\": 5000\n  }"
+        ) && !stdout.contains("\"exit_code\""),
+        "{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("\"stage\": \"runtime\"")
+            && stdout.contains("\"code\": \"RUNTIME000\"")
+            && stdout.contains("进程退出码"),
+        "{}",
+        stdout
+    );
+}
+
+/// designs/0032：人类模式的 pass 行点明退出码；`--apply --run --json` 的 run 对象同形
+#[test]
+fn fix_run_exit_code_in_human_and_apply_modes() {
+    let dir = temp_dir("run_exit_human");
+    let src = "fn main() -> Int\n    return 3\nend\n";
+    let f = probe(&dir, "ret3.lom", src);
+    let (stdout, _e, rc) = run_in(&dir, &["fix", &f, "--plan", "--run"]);
+    assert_eq!(rc, 0);
+    assert!(
+        stdout.contains(
+            "结果: pass（预算 5000 ms）——程序正常跑完，未观察到运行时诊断。（main 以退出码 3 结束。）"
+        ),
+        "{}",
+        stdout
+    );
+    let (stdout, _e, rc) = run_in(&dir, &["fix", &f, "--apply", "--run", "--json"]);
+    assert_eq!(rc, 0);
+    assert!(
+        stdout.contains("\"budget_ms\": 5000,\n    \"exit_code\": 3"),
+        "{}",
+        stdout
+    );
+    // 观察不改源码
+    assert_eq!(read(&dir, "ret3.lom"), src);
 }

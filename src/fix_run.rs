@@ -93,6 +93,16 @@ pub struct RunReport {
     pub reason: Option<&'static str>,
     pub detail: Option<String>,
     pub budget_ms: u64,
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：main 声明 `-> Int` 且正常跑完时的
+    /// 程序退出码（0..255）。None = 程序没有自定义退出码（main 声明非 Int）或
+    /// 观察没有正常结束。JSON 键名是 `exit_code`；Rust 字段名带 `program_` 前缀
+    /// 是为了与同名的既有方法区分——[`RunReport::exit_code`] 是 **fix 自己**的
+    /// 进程退出码（0 / 2），两者不是一回事。**条件字段**：只在 Some 时序列化
+    /// （置于 `budget_ms` 之后）——lom-fix/v1 append-only，现存程序（main 全为
+    /// Unit）的输出逐字节不变。程序以自定义退出码结束**不算失败**（outcome 仍为
+    /// pass）：`--run` 观察的是运行时诊断，"以 3 退出"不是诊断；超范围已在
+    /// `run()` 内按运行时错误上报（outcome 为 error）。
+    pub program_exit_code: Option<i64>,
 }
 
 impl RunReport {
@@ -109,7 +119,17 @@ impl RunReport {
             reason,
             detail,
             budget_ms,
+            program_exit_code: None,
         }
+    }
+
+    /// designs/0032：给"程序正常跑完"的报告附上程序的自定义退出码（builder 式——
+    /// `make` 的五个参数与既有调用点不动）。wasm 目标的 `--run` 直接拒绝、不执行，
+    /// 故仅在该目标下放开 dead_code（set_discard_output 同款）。
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    fn with_program_exit_code(mut self, code: Option<i64>) -> Self {
+        self.program_exit_code = code;
+        self
     }
 
     fn skipped(reason: &'static str, detail: String, budget_ms: u64) -> Self {
@@ -254,10 +274,16 @@ pub fn gate(src: &str, path: &str, diags: &Diagnostics, allow_io: bool) -> GateV
 
 // ===== 执行（桌面：工作线程 + 预算）=====
 
-/// 工作线程回传：Ok(None) = 程序跑完；Ok(Some(diag)) = 首个运行时诊断（带位置）；
-/// Err = 观察环节自身失败（trace 出口打不开）
+/// 工作线程跑完的结果（designs/0032 起为二元组）：
+/// `.0` = 首个运行时诊断（带位置）；None = 程序跑完；
+/// `.1` = main 声明 `-> Int` 且正常跑完时的进程退出码（None = 没有自定义退出码）
 #[cfg(not(target_family = "wasm"))]
-type WorkerPayload = Result<Option<Diagnostic>, String>;
+type WorkerDone = (Option<Diagnostic>, Option<i64>);
+
+/// 工作线程回传：Ok = 跑完（见 [`WorkerDone`]）；Err = 观察环节自身失败（trace
+/// 出口打不开）
+#[cfg(not(target_family = "wasm"))]
+type WorkerPayload = Result<WorkerDone, String>;
 
 /// 工作线程体
 #[cfg(not(target_family = "wasm"))]
@@ -281,12 +307,13 @@ fn run_program(src: &str, path: &str, trace: Option<&TraceOpts>) -> WorkerPayloa
     let result = interp.run(&program);
     interp.trace_finish();
     Ok(match result {
-        Ok(()) => None,
+        // designs/0032：`-> Int` main 的退出码随"跑完"一并带回（侧通道读取）
+        Ok(()) => (None, interp.exit_code()),
         Err(e) => {
             let mut diags = Diagnostics::new(path);
             // L1：位置取解释器侧通道（最内层出错表达式；DepthLimit 自带位置）
             diags.add_runtime(&e, src, interp.err_site());
-            diags.diagnostics.pop()
+            (diags.diagnostics.pop(), None)
         }
     })
 }
@@ -295,11 +322,12 @@ fn run_program(src: &str, path: &str, trace: Option<&TraceOpts>) -> WorkerPayloa
 #[cfg(not(target_family = "wasm"))]
 fn classify(recv: Result<WorkerPayload, RecvTimeoutError>, budget_ms: u64) -> Observation {
     match recv {
-        Ok(Ok(None)) => Observation {
-            run: RunReport::make(true, RunOutcome::Pass, None, None, budget_ms),
+        Ok(Ok((None, exit_code))) => Observation {
+            run: RunReport::make(true, RunOutcome::Pass, None, None, budget_ms)
+                .with_program_exit_code(exit_code),
             runtime_diag: None,
         },
-        Ok(Ok(Some(diag))) => Observation {
+        Ok(Ok((Some(diag), _))) => Observation {
             run: RunReport::make(true, RunOutcome::Error, None, None, budget_ms),
             runtime_diag: Some(diag),
         },
@@ -410,7 +438,15 @@ pub fn run_fields_json(run: &RunReport) -> String {
     if let Some(d) = &run.detail {
         out.push_str(&format!("    \"detail\": \"{}\",\n", escape_str(d)));
     }
-    out.push_str(&format!("    \"budget_ms\": {}\n", run.budget_ms));
+    // designs/0032：可选 `exit_code`（条件字段，置于 budget_ms 之后）——在场时
+    // budget_ms 行带尾逗号；不在场时与此前逐字节相同（append-only）。
+    match run.program_exit_code {
+        Some(code) => {
+            out.push_str(&format!("    \"budget_ms\": {},\n", run.budget_ms));
+            out.push_str(&format!("    \"exit_code\": {}\n", code));
+        }
+        None => out.push_str(&format!("    \"budget_ms\": {}\n", run.budget_ms)),
+    }
     out
 }
 
@@ -444,7 +480,13 @@ pub fn run_to_human(
     );
     match (run.outcome, runtime_diag) {
         (RunOutcome::Pass, _) => {
-            out.push_str(&format!("{}——程序正常跑完，未观察到运行时诊断。\n", head));
+            out.push_str(&format!("{}——程序正常跑完，未观察到运行时诊断。", head));
+            // designs/0032：`-> Int` 的 main 以自定义退出码结束——点明退出码，
+            // 不算失败（与 JSON 的条件字段 `exit_code` 成对）。
+            if let Some(code) = run.program_exit_code {
+                out.push_str(&format!("（main 以退出码 {} 结束。）", code));
+            }
+            out.push('\n');
         }
         // 超时 / 闸门拒绝 / 观察环节自身失败（rc 2）：没有诊断，只有说明
         (RunOutcome::Timeout, _) | (RunOutcome::Skipped, _) | (RunOutcome::Error, None) => {
@@ -754,7 +796,7 @@ mod tests {
         use std::sync::mpsc;
         use std::time::Duration;
         let (tx, rx) = mpsc::channel::<WorkerPayload>();
-        tx.send(Ok(None)).unwrap();
+        tx.send(Ok((None, None))).unwrap();
         let obs = classify(rx.recv_timeout(Duration::from_millis(1000)), 7);
         assert_eq!(
             obs.run,
@@ -763,7 +805,7 @@ mod tests {
         drop(tx);
 
         let (tx, rx) = mpsc::channel::<WorkerPayload>();
-        tx.send(Ok(Some(rt_diag("RUNTIME000", "整数除以零", 4, 13))))
+        tx.send(Ok((Some(rt_diag("RUNTIME000", "整数除以零", 4, 13)), None)))
             .unwrap();
         let obs = classify(rx.recv_timeout(Duration::from_millis(1000)), 7);
         assert_eq!(obs.run.outcome, RunOutcome::Error);
@@ -899,6 +941,61 @@ mod tests {
             run_fields_json(&skipped),
             "    \"attempted\": false,\n    \"outcome\": \"skipped\",\n    \"reason\": \"io_gate\",\n    \"detail\": \"含 \\\"file_write\\\"\",\n    \"budget_ms\": 300\n"
         );
+    }
+
+    /// designs/0032（RFC-0005 取乙，v1.18.0）：可选 `exit_code` 是条件字段——
+    /// 在场时置于 `budget_ms` 之后（budget_ms 行带尾逗号）；0 也算在场（与"没有
+    /// 自定义退出码"区分）；不在场时输出与此前逐字节相同（append-only）。
+    #[test]
+    fn run_fields_json_optional_exit_code() {
+        let three = RunReport::make(true, RunOutcome::Pass, None, None, 5000)
+            .with_program_exit_code(Some(3));
+        assert_eq!(
+            run_fields_json(&three),
+            "    \"attempted\": true,\n    \"outcome\": \"pass\",\n    \"budget_ms\": 5000,\n    \"exit_code\": 3\n"
+        );
+        let zero = RunReport::make(true, RunOutcome::Pass, None, None, 5000)
+            .with_program_exit_code(Some(0));
+        assert!(
+            run_fields_json(&zero).ends_with("    \"exit_code\": 0\n"),
+            "退出码 0 也是在场字段"
+        );
+        let none = RunReport::make(true, RunOutcome::Pass, None, None, 5000);
+        assert!(
+            !run_fields_json(&none).contains("exit_code"),
+            "没有自定义退出码时不得出现该字段"
+        );
+        // 人类模式成对：有退出码时点明，没有时不提
+        let human_with = run_to_human(&three, None, &[], None);
+        assert!(human_with.contains("main 以退出码 3 结束"), "{human_with}");
+        let human_none = run_to_human(&none, None, &[], None);
+        assert!(!human_none.contains("退出码"), "{human_none}");
+    }
+
+    /// designs/0032：classify 把工作线程带回的退出码挂到 pass 报告上；带诊断的
+    /// 一路不挂（运行以错误结束就没有自定义退出码）
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn classify_carries_program_exit_code_on_pass_only() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+        let (tx, rx) = mpsc::channel::<WorkerPayload>();
+        tx.send(Ok((None, Some(3)))).unwrap();
+        let obs = classify(rx.recv_timeout(Duration::from_millis(1000)), 7);
+        assert_eq!(obs.run.outcome, RunOutcome::Pass);
+        assert_eq!(obs.run.program_exit_code, Some(3));
+        assert_eq!(obs.run.exit_code(), 0, "fix 自身仍是分析完成（0）");
+        drop(tx);
+
+        let (tx, rx) = mpsc::channel::<WorkerPayload>();
+        tx.send(Ok((
+            Some(rt_diag("RUNTIME000", "整数除以零", 4, 13)),
+            Some(9),
+        )))
+        .unwrap();
+        let obs = classify(rx.recv_timeout(Duration::from_millis(1000)), 7);
+        assert_eq!(obs.run.outcome, RunOutcome::Error);
+        assert_eq!(obs.run.program_exit_code, None);
     }
 
     /// fix::to_json_with：None 分支与 to_json 逐字节一致；Some 分支在 summary

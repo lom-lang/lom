@@ -5,6 +5,9 @@
 //   - 七个误报形态（规划者验收探针 target/probes/spec_doc_batch/planner/accept9/single，
 //     源码逐字）：`--json` 零诊断、rc 0、ok true；运行 rc 0、stdout 与改前相同
 //     （解释器与 AOT 的运行期行为本就正确，不动）
+//     【v1.18.0 起一处例外（designs/0032，RFC-0005 取乙）：F6 是 `fn main() -> Int`
+//       自己以 `return 3` 收尾——main 的返回值成为进程退出码，运行 rc 由 0 变 3；
+//       静态面（`--json` 零诊断）不变。其余六形态的 main 仍是 `-> Unit`，rc 0】
 //   - 真阳性 T1–T5 与"末语句是有值调用"D1–D5：`--json` 诊断逐条不变
 //     （T2 只剩 return 语句级那条——函数级"实际返回 Unit"与误报形态同型，随之消失）
 //
@@ -105,6 +108,19 @@ fn assert_json_and_run(
     run_stdout: &str,
     expected: &[(&str, usize, usize, &str)],
 ) {
+    assert_json_and_run_rc(dir, name, src, run_stdout, 0, expected);
+}
+
+/// 同上，运行 rc 显式给定——v1.18.0（designs/0032）起 `-> Int` 的 main 以返回值为
+/// 进程退出码：F6 形态（main 自己以 `return 3` 收尾）运行 rc 是 3。
+fn assert_json_and_run_rc(
+    dir: &Path,
+    name: &str,
+    src: &str,
+    run_stdout: &str,
+    run_rc: i32,
+    expected: &[(&str, usize, usize, &str)],
+) {
     let f = probe(dir, name, src);
     let (stdout, _, rc) = run_in(dir, &[&f, "--json"]);
     assert_eq!(rc, 0, "{}: {}", name, stdout);
@@ -123,7 +139,7 @@ fn assert_json_and_run(
         .collect();
     assert_eq!(got, want, "{} 的诊断", name);
     let (out, stderr, rc) = run_in(dir, &[&f]);
-    assert_eq!(rc, 0, "{} 运行 rc：stderr: {}", name, stderr);
+    assert_eq!(rc, run_rc, "{} 运行 rc：stderr: {}", name, stderr);
     assert_eq!(
         out, run_stdout,
         "{} 运行 stdout（stderr: {}）",
@@ -147,7 +163,8 @@ fn r249_seven_false_positive_forms_zero_diags() {
     assert_json_and_run(&dir, "f2.lom", F2, "1\n2\n", &[]);
     assert_json_and_run(&dir, "f4.lom", F4, "3\n", &[]);
     assert_json_and_run(&dir, "f5.lom", F5, "2\n", &[]);
-    assert_json_and_run(&dir, "f6.lom", F6, "", &[]);
+    // F6：main 声明 `-> Int` 且以 `return 3` 收尾——v1.18.0 起运行 rc = 3（退出码语义）
+    assert_json_and_run_rc(&dir, "f6.lom", F6, "", 3, &[]);
     assert_json_and_run(&dir, "f7.lom", F7, "3\n", &[]);
     assert_json_and_run(&dir, "f8.lom", F8, "1\n2\n", &[]);
     // 静态零诊断 ⇒ 运行模式 stderr 也干净

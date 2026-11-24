@@ -454,6 +454,17 @@ fn main_inner() {
         eprint!("{}", diags.summary_line());
         process::exit(1);
     }
+    // designs/0032（RFC-0005 取乙，v1.18.0）：main 声明 `-> Int` 时其返回值即进程
+    // 退出码（0..255；超范围 / 非整数已在 `run()` 内按运行时错误走上面的分支）。
+    // 放在 trace_finish() 之后——尾行 summary 不丢；0 保持自然返回（与此前同路）。
+    // 自定义退出码经 process::exit 提前退出：先把 stdout 刷出——`print` 不带换行
+    // 时内容还留在行缓冲里（自然返回靠运行时收尾清理，提前退出不等它）。wasm
+    // 目标（playground 引擎）同源：process::exit → proc_exit，harness 的 proc_exit
+    // 桩把它记为 exitCode（显示侧已支持非零退出码）。
+    if let Some(code) = interp.exit_code() {
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        process::exit(code as i32);
+    }
 }
 
 /// Phase 2.6: 执行 `lom info` 子命令
