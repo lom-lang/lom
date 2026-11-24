@@ -16,6 +16,18 @@ per-batch facts are in the commit log and docs/TODO.md.
 - Docs: `LANGUAGE_SPEC.md` defines the `check --json` envelope's `ok` as implemented
   — `true` when no error-level diagnostic is present, so a warning-only file
   reports `true`. The old text said "iff `diagnostics` is empty".
+- Diagnostics: new warning code `NAM007` — a standard-library module does not
+  export an imported name; emitted statically on the `from` line (the run-time
+  `RUNTIME005` is unchanged).
+- Type checker: the binary-operator and comparison `TYPE001`, the
+  tuple-destructuring arity `TYPE001`, the match-guard `TYPE002`, the variant
+  sub-pattern arity `TYPE003` and the duplicate-enum `NAM002` now carry
+  positions; a function body whose branches all end in `return` no longer draws
+  a false `TYPE010` (nor the false `TYPE001`/`TYPE002` that all-`return`
+  expressions used to cause); user `enum`s with type parameters are typed from
+  constructor arguments (`Full(5)` is `Box<Int>`), so parameterized annotations
+  no longer draw false warnings while genuine mismatches are reported.
+- Tests: 635 -> 674 unit, 58 -> 81 integration (four new `d0029y_` targets).
 
 Patch-level fixes accumulate here between releases and are cut as one patch
 tag at a release point (docs/MAINTENANCE.md §2.2.1).
