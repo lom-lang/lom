@@ -313,13 +313,28 @@ async function compileOnce(wasmBytes, sourceBytes) {
   if (!instance.exports.memory || !instance.exports.lom_alloc) {
     throw new Error("编译器 wasm 缺 memory/lom_alloc 导出（非 selfcomp 产物）");
   }
+  let mainRet;
   try {
-    instance.exports.main();
+    mainRet = instance.exports.main();
   } catch (e) {
     // 镜像 run_selfcomp.mjs：trap 前已执行的 println 不得丢失（挂到异常上
     // 交上层进度/输出；异常原样重抛——保留 instanceof RuntimeError 可判性）
     e.lomStdout = c.stdout();
     throw e;
+  }
+  // RFC-0005 取乙（v1.18.0，designs/0032 §3 第 5 项）：镜像 run_selfcomp.mjs 的
+  // L2 宿主映射——void 的 main 返回 undefined（正常结束）；带返回类型的 main
+  // 返回裸 i64，整数即退出码（含 0..255 范围校验）。这里跑的是**编译器自身**
+  // （selfcomp.wasm，main 为 void），所以非 undefined 的分支在现有分发物下走不到
+  // ——属防御性镜像；浏览器里没有进程退出码可透传，非零即按"编译器异常结束"
+  // 抛给上层。
+  if (mainRet !== undefined) {
+    const code = Number(mainRet);
+    const detail = "编译器 wasm 以退出码 " + mainRet + " 结束（输出未产出）\n" + c.stdout();
+    if (!Number.isInteger(code) || code < 0 || code > 255) {
+      throw new Error("编译器 wasm 的退出码超出 0..255：" + mainRet + "（L2 通道对非 Int 的 main 不保证）\n" + c.stdout());
+    }
+    if (code !== 0) throw new Error(detail);
   }
   const hexBytes = files.get(SELFBOOT_LABELS.out);
   if (hexBytes === undefined) {
