@@ -2,7 +2,7 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 74,480 characters ≈ 18.6k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md.
+> **Context budget**: 76,137 characters ≈ 19.0k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md.
 
 **Advised workflow for agent readers** (validated in agent build sessions that had this spec as their only language reference, 2026-10):
 1. Skim §1 → §2 → §12 (quick reference) before writing code; consult §11b for exact builtin signatures.
@@ -23,7 +23,7 @@
 8. **Last expression = return value** — blocks evaluate to their last expression. Use `return` only for early exit.
 9. **One statement per line** — Lom is newline-sensitive (statements separated by newlines) but NOT indentation-sensitive (blocks delimited by `end`, not by indentation level). Like Go/Swift/Kotlin, not Python. A `-` or `(` at the start of a new line is NOT a binary operator or function call — it starts a new expression.
 10. **`+` works on String** — `"a" + "b"` yields `"ab"`. No special concat operator. Since v0.4.1, if either side is a String, the other side is auto-promoted (`"n = " + 42` yields `"n = 42"`) — no `int_to_string` needed for concatenation.
-11. **No `exit` builtin — a program can only exit 0 or 1.** `main`'s return value is ignored (`fn main() -> Int` returning `3` exits `0`); `exit(3)` is `NAM003` + `RUNTIME002`. Exit `0` = `main` finished; exit `1` = a runtime error (e.g. `list_head(list_empty())`, which also prints an interpreter diagnostic to stderr). Early success exit: `return ()` in `main`. **CLI tools**: no code ≥ 2, and "found errors" cannot be told from "tool failed" — print a final status line (or write a status file) and let a wrapper script map it to the exit code.
+11. **No `exit` builtin — a program can only exit 0 or 1.** `main`'s return value is ignored (`fn main() -> Int` returning `3` exits `0`); `exit(3)` is `NAM003` + `RUNTIME002`. Exit `0` = `main` finished; exit `1` = a runtime error (e.g. `list_head(list_empty())`, which also prints an interpreter diagnostic to stderr) — a file with no `main` function also exits `1` (`[RUNTIME000] 程序缺少 main 函数`, unreleased on v1.17.0; on v1.17.0 it exited `0` silently). Early success exit: `return ()` in `main`. **CLI tools**: no code ≥ 2, and "found errors" cannot be told from "tool failed" — print a final status line (or write a status file) and let a wrapper script map it to the exit code.
 
 ---
 
@@ -440,7 +440,7 @@ Rules (probed):
 - **Contents**: every `*.lom` directly in the package directory (not recursive, extension case-sensitive), merged in file-name order (byte order) with the entry file into one flat namespace — cross-file calls need no import, order is irrelevant, a name defined in both resolves to the entry file's.
 - **Imports**: every top-level `fn`, `enum` and variant is public (`from <pkg> import { name, other as alias }`); each file imports the builtins it uses (`lom build` checks per file; at run time imports are shared across the merged unit — do not rely on it).
 - **Standard-library imports are checked statically** (unreleased on v1.17.0): a name the module does not export (`from list import { list_rev }`) draws `NAM007` (warning) on the `from` line, listing the module's available symbols; the program still aborts at run time with `RUNTIME005` at `0:0` unless fixed. An **unknown module** or an **undeclared package** still passes `--check`/`--json`/`build` and fails only at run time (`RUNTIME005`, `0:0`). Check names against §11b.
-- **Diagnostics**: only `lom build` checks package files (§11e).
+- **Diagnostics**: only `lom build` checks package files (§11e); when a dependency package holds diagnostics, the entry-file commands print one stderr line with the counts (unreleased on v1.17.0). A broken `lom.toml` or dependency — parse error, missing path, cycle, key ≠ package name — makes `--check`/`--json`/run exit `1` with one `PKG001`-`PKG003` diagnostic (stage `package`) instead of passing silently (unreleased on v1.17.0). `lom fix` resolves package symbols the way `--check` does, so a package project's entry file draws no false `NAM003` (unreleased on v1.17.0).
 
 ---
 
@@ -693,6 +693,7 @@ Each diagnostic carries its location twice (append-only dual write, forward-comp
 - **Not located** (stay at `(0:0)`, `anchor: "none"`): errors raised outside expression evaluation — a bad import (`RUNTIME005`), tuple-destructuring shape mismatches, a non-iterable `for` source, a non-`Bool` condition of a statement-position `if` / `while`. (A block-tail `if` is an expression and *is* located.) The recursion-depth `RUNTIME000` keeps its own position — the recursive `fn` signature.
 - `--json` and `--check` are purely static: they never contain runtime diagnostics. The machine-readable home of a runtime diagnostic is the `stage: "runtime"` plan entry emitted by `lom fix --run` (§11e).
 - AOT `lom build` artifacts carry no source positions, so their run-time failures stay unpositioned (§11f item 9).
+- When the failing expression sits inside a **dependency package's** function, the diagnostic names that package file and shows its source line (unreleased on v1.17.0; v1.17.0 showed the entry file's line at the package file's coordinates).
 
 **Error codes** (LLMs can learn these):
 - `LEX001`-`LEX099`: lexical (unclosed string, unexpected char, etc.)
@@ -849,9 +850,9 @@ Key points:
 6. Run `lom <file>` to execute.
 7. If it passes every static check but fails at run time, run `lom fix <file> --plan --run --json` and read the `stage: "runtime"` plan entry — it carries the failing expression's position (§11c).
 
-**Multi-file projects** (`lom.toml` + packages, §8): `lom <entry> --json`, `--check` and run mode check the **entry file only** — package files may hold warnings or errors while the entry says `"warnings": 0`, `ok: true`. Only `lom build` (project root) checks package sources, one `✓ <file> — 通过` / `✗ <file> — N 个诊断` line per file plus its diagnostics: converge on *no `✗` line* (`✗` covers warnings).
-- `lom build --json` emits only the dependency graph — no diagnostics.
-- **`lom build` exits `0` even when a checked file has error-level diagnostics** — gate on an output without any `✗` line, not on its exit code.
+**Multi-file projects** (`lom.toml` + packages, §8): `lom <entry> --json`, `--check` and run mode check the **entry file only** — package files may hold warnings or errors while the entry says `"warnings": 0`, `ok: true`. Only `lom build` (project root) checks package sources, one `✓ <file> — 通过` / `✗ <file> — N 个诊断` line per file plus its diagnostics: converge on *no `✗` line* (`✗` covers warnings). When a dependency package holds diagnostics, these three entry-file commands print one stderr line with the counts (`依赖包里有 N 条诊断未在此显示（E 错误 / W 警告）——…`); stdout, `ok` and the exit code stay unchanged (unreleased on v1.17.0).
+- `lom build --json` emits only the dependency graph — no diagnostics (valid JSON on Windows too, unreleased on v1.17.0; v1.17.0 left backslashes in paths unescaped).
+- **`lom build` exits `1` when any checked file has an error-level diagnostic** — warning-only files leave it at `0`, an unreadable source file gives `2`, and `--json` mode returns the same code, so the command works as a project gate (unreleased on v1.17.0; v1.17.0 always exited `0` — there, gate on an output without any `✗` line).
 
 ### `--run`: let `fix` observe a run-time failure (v1.17.0)
 
@@ -910,6 +911,7 @@ lom fix <file.lom> --apply --run [--run-budget <ms>] [--allow-io] [--json] [--dr
 - LEX001 line-end quote insertion has a documented ambiguous case when the unterminated string swallowed a trailing `)`. LEX005 diagnostic columns arrive as byte columns and are converted to char columns before use (R55); multibyte-line positions are covered by tests. These rules must not be treated as mathematically certain.
 - NAM003/NAM004 spelling fixes emit `replace` actions at **medium** confidence (`--apply` never touches them — guessed repairs require human/LLM confirmation). Since Phase 3.2b (v0.21.0) positions come from **expression-level spans** on the diagnostic (single-point replace); the whole-token source scan remains only as a fallback for span-less diagnostics (e.g. diagnostics with no real position, reported at `0:0`).
 - No cross-file fixes: a missing import in file B is not auto-added to file A.
+- On a package project's entry file, `lom fix` resolves package symbols exactly like `--check` (unreleased on v1.17.0; v1.17.0 reported them as false `NAM003`). Diagnostics inside package files are still not in the plan — run `lom fix` on that package file.
 - Runtime errors (`RUNTIME001`-`RUNTIME005`) only get `hint`-level guidance. Positions: declaration-level spans since Phase 3.2 (EFF001/TYPE010/NAM002 point at the `fn` signature); **expression-level spans since Phase 3.2b / v0.21.0** (NAM003/MUT001/TYPE002/TYPE003/TYPE020/NAM004-field and every form of TYPE001 — `let` annotation, assignment, range endpoint, binary operator / comparison, tuple-destructuring arity (at the value expression) — point at the exact expression/assign-target; the binary-operator, tuple-destructuring and match-guard forms carry a position since the 2026-11 toolchain batch (unreleased on v1.17.0); note the Field diagnostic points at the field-name token via the span's `end`). Runtime diagnostics point at the innermost failing expression since v1.17.0 (§11c) and reach `fix` only through `--run` (above); the kinds listed there as not located stay at `0:0`. Caveat: `line`/`col` follow the lexer convention — **1-based byte columns** (pure-ASCII lines coincide with char columns; `lom fix` converts internally).
 
 ---

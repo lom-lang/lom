@@ -28,6 +28,26 @@ per-batch facts are in the commit log and docs/TODO.md.
   constructor arguments (`Full(5)` is `Box<Int>`), so parameterized annotations
   no longer draw false warnings while genuine mismatches are reported.
 - Tests: 635 -> 674 unit, 58 -> 81 integration (four new `d0029y_` targets).
+- `lom build` exits 1 when any checked file has an error-level diagnostic (2 for an
+  unreadable source file); `--json` mode returns the same exit code and is valid JSON
+  on Windows (paths are escaped).
+- A broken `lom.toml` or dependency (parse error, missing path, cycle, key != package
+  name) is reported by `--check`, `--json` and run mode as one structured
+  `PKG001`-`PKG003` diagnostic (stage `package`) with exit 1, instead of passing
+  silently and raising a false NAM003 at the use site.
+- The entry-file commands announce diagnostics inside dependency packages with one
+  stderr line (counts); stdout, `ok` and the exit code are unchanged.
+- `lom fix` and `--apply` resolve package symbols like `--check` does, so a package
+  project's entry file no longer draws false NAM003; a broken manifest yields the PKG
+  hint and `--run` is skipped.
+- A program without a `main` function exits 1 with `RUNTIME000 程序缺少 main 函数`
+  (it used to exit 0 silently). A package-provided `main` still runs.
+- Static diagnostics are no longer printed a second time when a run-time error
+  follows; the summary line covers static and runtime diagnostics.
+- A run-time error inside a dependency package's function names that package file
+  and shows its source line.
+- The RUNTIME005 hints no longer list only three modules.
+- Tests: 674 -> 686 unit, 81 -> 117 integration (seven new `d0029x_` targets).
 
 Patch-level fixes accumulate here between releases and are cut as one patch
 tag at a release point (docs/MAINTENANCE.md §2.2.1).

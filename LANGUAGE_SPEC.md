@@ -888,7 +888,7 @@ Top-level fields:
 
 Per-diagnostic fields (Phase 2.3):
 - `severity`: `error` / `warning` / `info` (warning/info reserved for Phase 2.4 type checker)
-- `stage`: `lex` / `parse` / `type` (Phase 2.4) / `runtime`
+- `stage`: `lex` / `parse` / `type` (Phase 2.4) / `runtime` / `package` (manifest and dependency errors, unreleased on v1.17.0)
 - `code`: stable string code (see §7.3); LLMs can learn these
 - `message`: human-readable
 - `file`, `line`, `col`: location (flat top-level pair — kept for forward compatibility with v1-era consumers)
@@ -947,7 +947,7 @@ lom <file.lom> --dump-ast    Print the AST as a deterministic indentation tree (
 lom --help | -h               Show help
 ```
 
-Exit codes: `0` = success / no diagnostics / info export OK / fix plan generation OK / apply OK (even if 0 fixes applied); `1` = read/lex/parse/runtime error / apply write failure (note: `lom fix` exits `0` as long as the plan was generated or apply completed, even if diagnostics exist — the plan/apply result is the product).
+Exit codes: `0` = success / no diagnostics / info export OK / fix plan generation OK / apply OK (even if 0 fixes applied); `1` = read/lex/parse/runtime error — including a program without `main` (unreleased on v1.17.0) — / a manifest or dependency error on the entry-file paths `--check`, `--json` and run (one `PKG001`-`PKG003` diagnostic with stage `package`, unreleased on v1.17.0) / `lom build` finding an error-level diagnostic in any checked file (unreleased on v1.17.0; it used to exit `0` regardless); `2` = tool failure (usage, unreadable input — including a source file `lom build` cannot read, unreleased on v1.17.0 — internal errors; apply write failures since v1.10.0) (note: `lom fix` exits `0` as long as the plan was generated or apply completed, even if diagnostics exist — the plan/apply result is the product).
 
 Output streams:
 - `--json` / `--check`: diagnostics to **stdout** (the diagnostic report is the program's product).
