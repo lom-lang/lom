@@ -327,14 +327,18 @@ def main():
     codes_n = _count_codes_entries('pub(crate) const CODES: &[CodeEntry] = &[',
                                    'CodeEntry')
     m_d5 = doc_number('SPEC_FOR_AI.md', r'All (\d+) registered codes carry')
-    check('I2 explain 文案计数（EXPLAIN ↔ CODES ↔ SPEC_FOR_AI §11c 指针句）',
-          explain_n > 0 and explain_n == codes_n
-          and m_d5 is not None and int(m_d5[0]) == explain_n,
-          'EXPLAIN %d 条 vs CODES %d 条 vs SPEC_FOR_AI 宣称 %s%s'
-          % (explain_n, codes_n, m_d5[0] if m_d5 else None,
-             '（designs/0027 D5 单源锚）' if (explain_n > 0
-              and explain_n == codes_n and m_d5 is not None
-              and int(m_d5[0]) == explain_n) else ''))
+    # R259（2026-11-25，v1.18.0 批开账即收口）：README 复现命令注释里的码总数并入
+    # 同一检查——类型检查器批加 NAM007（46→47）时 SPEC_FOR_AI 指针句刷了、这一
+    # 锚外写位漏刷。只手刷数字不加锚 = 复发面不收敛（R190 先例）。
+    m_rc = doc_number('README.md', r'codes --json \| python -c "[^\n]*"\s+# (\d+)')
+    ok_i2 = (explain_n > 0 and explain_n == codes_n
+             and m_d5 is not None and int(m_d5[0]) == explain_n
+             and m_rc is not None and int(m_rc[0]) == explain_n)
+    check('I2 explain 文案计数（EXPLAIN ↔ CODES ↔ SPEC_FOR_AI §11c 指针句 ↔ README 复现命令注释）',
+          ok_i2,
+          'EXPLAIN %d 条 vs CODES %d 条 vs SPEC_FOR_AI 宣称 %s vs README 注释 %s%s'
+          % (explain_n, codes_n, m_d5[0] if m_d5 else None, m_rc[0] if m_rc else None,
+             '（designs/0027 D5 单源锚 + R259 README 位）' if ok_i2 else ''))
 
     # ---- J. 跨文档互锁组（工具治理批 2026-09-30：R103/R106 根治）----
     # "gate 覆盖面 ≠ 全部出现面"：同一基线数字在多文档各有当前值位，此前

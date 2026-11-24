@@ -245,7 +245,9 @@ configuration is shared with `llm_eval.py` (env vars or `eval/.api_keys.json`);
 trajectory directories default to `eval/iter_runs/` (gitignored).
 
 **Scoring-face boundary (registered, same as pass@k):** the iterative runner
-scores host stdout + rc 0 only. For 131/134 the *broken* seed already passes
+scores host stdout + rc 0 only (so a `main` declared `-> Int` that returns a
+non-zero exit code — possible since v1.18.0 — fails; every reference solution
+and the prompt's `main` template use `-> Unit`). For 131/134 the *broken* seed already passes
 that criterion (the examined point is the L2 face, which the scoring face does
 not see) — a candidate that echoes the broken code verbatim counts as
 converged at round 1, exactly as it would pass in the pass@k flow. This is the

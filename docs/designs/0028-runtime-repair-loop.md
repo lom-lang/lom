@@ -144,7 +144,7 @@
 
 ### 4.6 输出信封（append-only）
 
-- `lom-fix/v1` 新增可选顶层字段 `run: { "attempted": bool, "outcome": "pass" | "error" | "timeout" | "skipped", "budget_ms": int }`。消费者按前向兼容公理忽略未知字段。
+- `lom-fix/v1` 新增可选顶层字段 `run: { "attempted": bool, "outcome": "pass" | "error" | "timeout" | "skipped", "budget_ms": int }`。消费者按前向兼容公理忽略未知字段。【v1.18.0 追加（[designs/0032](0032-process-exit-code.md)，RFC-0005）：可选的 `"exit_code": int` 置于 `budget_ms` 之后，只在 main 声明 `-> Int` 且正常跑完时出现——程序以自定义退出码结束不算失败（`outcome` 仍为 `"pass"`、无运行时计划）；超范围或非整数返回按运行时错误（`"error"`）。条件字段，其余程序的输出逐字节不变。】
 - 计划数组追加 `stage: "runtime"` 的计划。它们全部是 hint（§1.1：六臂皆 hint-only），**永不被 `--apply` 自动应用**——AXIOM 1 / 2 不受影响。
 
 ### 4.7 退出码

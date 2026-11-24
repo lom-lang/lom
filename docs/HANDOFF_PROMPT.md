@@ -51,9 +51,11 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 规划者验收抽查复跑。】
 
 【当前真实状态】（活信息镜像——每个里程碑批收官即同步、每轮交接整体重写本段；主写位 TODO 顶部）
-- **状态（2026-11-24，交接就绪——本周期弧线 2026-11-01→11-24（详登记与活信息以 TODO 顶部状态块为唯一主写位）：XERJ hub 页面上线处置（安全观察点：prompt-injection 面永不直链/不装其 CLI）→ 并发会话事件收口（单写者纪律）→ B7 受控实验（3 载体 × 2 采样 + warm-up 共 7 会话：7/7 核心能力通过、6/7 逐字节全绿，全会话自发以 --check/--json 驱动开发）→ SPEC_FOR_AI 文档改进批（B7 八类缺漏收口，34 探针核实，`074c577`）→ 评分器 `--grading {exec,fullspec}` 并入（纯工具批 `94e719b`）→ 治理三连（铁律 1 并行上限解除 + 公开面纯净原则 + 呈报必要性分档 MAINTENANCE §1.3）→ 三仓基线核验 + 新鲜眼审计（R229-R233 开账即收口）→ B7 实战应用（Markdown linter，本地目录、未建 git、已裁不发布）→ **v1.17.0 运行时修复闭环批**（designs/0028 四裁决点全取建议项；tag `51f0f4e`，CI run `436` 七 job 绿——首跑即绿；规划者同目录交错 A/B 终判无回退）→ README 信息架构重构（逐版记录迁根目录 CHANGELOG.md）+ 发版时点条款（MAINTENANCE §2.2.1：patch 不随批升版）→ **规范文档批**（`c24c9b9`：执行者 21 个条目 + 规划者验收补 5 条亲测陷阱）→ 治理与快文档批（`c7ad1b2`：铁律 1 的陈旧文本两处同步、R248 收口、规范头部中性化）→ 设计批 2（`a62a05d`：designs/0029-0032、RFC-0005 转 accepted、执行者模板的第三处陈旧文本同步）→ **类型检查器实施批**（代码 `f7d0d5c` + 文档成对 `dbc92b6`，CI run `443` 七 job 绿——首跑即绿）→ **工具链实施批**（代码 `8729ba8` + 文档成对 `237b15f`，CI run `444` 七 job 绿——首跑即绿）——两批共收口台账十三笔（R234-R250 中除 R239-R241、R248 外的全部），patch 级不升版、累计未发版。执行者通道在 2026-11-24 被模型侧用量上限反复打断（限流 / 5 小时 / 周用量三档），两批实施的后半段、回归与验收由规划者接手完成（工具链批验收中抓到并修掉一处回归：入口路径的早退分支一度把静态类型错误也当成拦截条件）。**交接前复核**（交接批 `ef27ecd`，CI run `445` 七 job 绿——首跑即绿）：main 上 release 全量单元 686 + 集成 117 零失败、verify_selfcomp 368/368、bootstrap 14/14；新开 R258（不加 `--release` 的 debug 构建在 Windows 上 `cargo test` 跑不完——v1.17.0 基线同样复现的既有行为，release 门禁与 CI 不受影响）。**学术与对外线：用户裁决暂不考虑，精力放在项目本身的推进上（重启 = 用户指令）**。台账 open 8 笔（R251-R258，待排——整改顺序待用户裁决）；顺延号 R259 起；最新基线 v1.17.0 详 HANDOVER §1）**：
-  最新基线 **v1.17.0**（= **运行时修复闭环批**（designs/0028，2026-11-23 用户裁决四点全取建议项）：L1 运行时诊断带位置（指向求值返回错误的最内层表达式）+ L2 `lom fix <file> --plan --run`（静态无 error 级诊断时执行程序一次，把观察到的运行时诊断追加为 stage "runtime" 的 hint 计划）；细则见 CHANGELOG.md 与 HANDOVER §1 版本行）。
-  **main 领先 v1.17.0 两个未发版的 patch 批**（按 MAINTENANCE §2.2.1 累计，随下一个 minor 一并发布）。**类型检查器批** `f7d0d5c`：新增 warning 级码 `NAM007`（标准库模块不导出该导入项；静态、锚在 `from` 行；码表 46→47）；二元运算与比较的 TYPE001、元组解构数量的 TYPE001、match 守卫的 TYPE002、子模式数量的 TYPE003、枚举重复定义的 NAM002 带位置；全分支以 `return` 收尾的函数体不再误报 TYPE010；带类型参数的用户 enum 由构造实参定型（参数化注解不再误报、真失配开始报）。**工具链批** `8729ba8`：`lom build` 有 error 级诊断 rc 1、源文件不可读 rc 2（人读与 `--json` 同口径，Windows 上输出合法 JSON）；坏清单 / 依赖错误在 `--check` / `--json` / 运行下出一条 stage "package" 的 PKG 诊断并 rc 1（不再被吞成"诊断通过"）；入口文件三条路径对依赖包诊断打一行 stderr 条数提示（stdout、`ok`、rc 不变）；`lom fix` / `--apply` 面与 run / `--check` 同源取包符号（包项目入口文件不再出假 NAM003）；无 main 的程序 rc 1（`RUNTIME000 程序缺少 main 函数`）；静态诊断不再在同一次运行里打印两遍；包内函数的运行时错误按来源文件渲染。
+- **状态（2026-11-25，v1.18.0 进程退出码批已交付、待切 tag——批 E：RFC-0005 取乙，[designs/0032](designs/0032-process-exit-code.md)；规划者亲自实施（执行者通道被模型侧 5 小时用量上限中断）：解释器收尾 + CLI 出口 + AOT 按声明类型收尾 + 四个 node 宿主脚本映射 + `fix --run` 条件字段 `exit_code`；单元 686→696、集成 117→131（新 target d0032_exit_code）、playground 冒烟 39→47；全仓新旧对拍 2823 条零差异、性能终判无回退；quine 272925 / verify_selfcomp 368/368 / eval 双后端 138/138 / eval_prompt_check 41/41 构造性不变；开账即收口 R259（README 复现命令里 codes 总数注释滞后））**：
+  最新基线 **v1.18.0**（= **进程退出码批**（RFC-0005 取乙，designs/0032，2026-11-24 用户裁决）：`fn main() -> Int` 的返回值即进程退出码（0..255；超范围或非整数按运行时错误——RUNTIME000、rc 1、带 main 签名位置）；`-> Unit` / 无注解恒 0；AOT 发射按声明类型收尾、四个 node 宿主脚本映射；`lom fix --run` 条件字段 `exit_code`；细则见 CHANGELOG.md 与 HANDOVER §1 版本行）。本版同时带出下面两个 patch 批。**待裁 = 切 tag v1.18.0（L0）**；CI 首跑与采样核对结果见 TODO 顶部状态块；台账 open 8 笔（R251-R258，待排——整改顺序待用户裁决），顺延号 R260 起；学术与对外线：用户裁决暂不考虑（重启 = 用户指令）。
+- **上一状态（2026-11-24，交接就绪——本周期弧线 2026-11-01→11-24（详登记与活信息以 TODO 顶部状态块为唯一主写位）：XERJ hub 页面上线处置（安全观察点：prompt-injection 面永不直链/不装其 CLI）→ 并发会话事件收口（单写者纪律）→ B7 受控实验（3 载体 × 2 采样 + warm-up 共 7 会话：7/7 核心能力通过、6/7 逐字节全绿，全会话自发以 --check/--json 驱动开发）→ SPEC_FOR_AI 文档改进批（B7 八类缺漏收口，34 探针核实，`074c577`）→ 评分器 `--grading {exec,fullspec}` 并入（纯工具批 `94e719b`）→ 治理三连（铁律 1 并行上限解除 + 公开面纯净原则 + 呈报必要性分档 MAINTENANCE §1.3）→ 三仓基线核验 + 新鲜眼审计（R229-R233 开账即收口）→ B7 实战应用（Markdown linter，本地目录、未建 git、已裁不发布）→ **v1.17.0 运行时修复闭环批**（designs/0028 四裁决点全取建议项；tag `51f0f4e`，CI run `436` 七 job 绿——首跑即绿；规划者同目录交错 A/B 终判无回退）→ README 信息架构重构（逐版记录迁根目录 CHANGELOG.md）+ 发版时点条款（MAINTENANCE §2.2.1：patch 不随批升版）→ **规范文档批**（`c24c9b9`：执行者 21 个条目 + 规划者验收补 5 条亲测陷阱）→ 治理与快文档批（`c7ad1b2`：铁律 1 的陈旧文本两处同步、R248 收口、规范头部中性化）→ 设计批 2（`a62a05d`：designs/0029-0032、RFC-0005 转 accepted、执行者模板的第三处陈旧文本同步）→ **类型检查器实施批**（代码 `f7d0d5c` + 文档成对 `dbc92b6`，CI run `443` 七 job 绿——首跑即绿）→ **工具链实施批**（代码 `8729ba8` + 文档成对 `237b15f`，CI run `444` 七 job 绿——首跑即绿）——两批共收口台账十三笔（R234-R250 中除 R239-R241、R248 外的全部），patch 级不升版、累计未发版。执行者通道在 2026-11-24 被模型侧用量上限反复打断（限流 / 5 小时 / 周用量三档），两批实施的后半段、回归与验收由规划者接手完成（工具链批验收中抓到并修掉一处回归：入口路径的早退分支一度把静态类型错误也当成拦截条件）。**交接前复核**（交接批 `ef27ecd`，CI run `445` 七 job 绿——首跑即绿）：main 上 release 全量单元 686 + 集成 117 零失败、verify_selfcomp 368/368、bootstrap 14/14；新开 R258（不加 `--release` 的 debug 构建在 Windows 上 `cargo test` 跑不完——v1.17.0 基线同样复现的既有行为，release 门禁与 CI 不受影响）。**学术与对外线：用户裁决暂不考虑，精力放在项目本身的推进上（重启 = 用户指令）**。台账 open 8 笔（R251-R258，待排——整改顺序待用户裁决）；顺延号 R259 起；最新基线 v1.17.0 详 HANDOVER §1）**：
+  前一基线 **v1.17.0**（= **运行时修复闭环批**（designs/0028，2026-11-23 用户裁决四点全取建议项）：L1 运行时诊断带位置（指向求值返回错误的最内层表达式）+ L2 `lom fix <file> --plan --run`（静态无 error 级诊断时执行程序一次，把观察到的运行时诊断追加为 stage "runtime" 的 hint 计划）；细则见 CHANGELOG.md 与 HANDOVER §1 版本行）。
+  **v1.17.0 之后的两个 patch 批**（已随 v1.18.0 一并发布——MAINTENANCE §2.2.1 事件 1）。**类型检查器批** `f7d0d5c`：新增 warning 级码 `NAM007`（标准库模块不导出该导入项；静态、锚在 `from` 行；码表 46→47）；二元运算与比较的 TYPE001、元组解构数量的 TYPE001、match 守卫的 TYPE002、子模式数量的 TYPE003、枚举重复定义的 NAM002 带位置；全分支以 `return` 收尾的函数体不再误报 TYPE010；带类型参数的用户 enum 由构造实参定型（参数化注解不再误报、真失配开始报）。**工具链批** `8729ba8`：`lom build` 有 error 级诊断 rc 1、源文件不可读 rc 2（人读与 `--json` 同口径，Windows 上输出合法 JSON）；坏清单 / 依赖错误在 `--check` / `--json` / 运行下出一条 stage "package" 的 PKG 诊断并 rc 1（不再被吞成"诊断通过"）；入口文件三条路径对依赖包诊断打一行 stderr 条数提示（stdout、`ok`、rc 不变）；`lom fix` / `--apply` 面与 run / `--check` 同源取包符号（包项目入口文件不再出假 NAM003）；无 main 的程序 rc 1（`RUNTIME000 程序缺少 main 函数`）；静态诊断不再在同一次运行里打印两遍；包内函数的运行时错误按来源文件渲染。
   更早各版的沿革不在本段复述——见 CHANGELOG.md（逐版原文）与 HANDOVER §1（版本行）。
   **治理批（`f25eefb`）**：身份核验入基线与交接检查单（账号改名/换邮箱/
   换机 = 裁决点事件触发身份盘点）+ 部署三一致性 + 镜像时机措辞 + 执行者
@@ -83,20 +85,20 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   验证邮箱；旧 CI run 与旧 sha 脱钩（以新 HEAD run 为准）；contributors
   缓存刷新时滞数小时~几天（2026-10-19 实查兑现：API 仅 wytyKen/502 一条）。细节与边界见 TODO 身份修复批段。
 
-- **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→三十六审 A-（R144-R147 全收口）→三十七审 A-×3 + 元面成立（首次元层面扩容；开账 25 笔当日全收口）→**三十八审 A-/B+/A-/A-**（§4.5 标准化第二实例 + 观察首档并行；开账 24 笔待裁 R189-R227——P2 一笔 R199，顺延号 R229 起；R229-R233 于 2026-11-23 新鲜眼审计批开账即收口，现顺延号 R259 起——R234-R250 已全部收口（规范文档批 + 治理批 + designs/0029-0031 实施批），新开待排 R251-R258，R248、R239-R241 已收口，规范文档批已交付 `c24c9b9`）。**审查模式自三十七审起标准化**（MAINTENANCE §4.5：双层覆盖 / 审查者编成豁免 ≤2 / 两级红线与复述义务 / 自指缓解 / 双 verdict——2026-10-19 用户裁决"以后的独立审查也遵循这个模式"）。
+- **审查轨迹（均不外推）**：……→三十四审 A-→三十五审 B+→三十六审 A-（R144-R147 全收口）→三十七审 A-×3 + 元面成立（首次元层面扩容；开账 25 笔当日全收口）→**三十八审 A-/B+/A-/A-**（§4.5 标准化第二实例 + 观察首档并行；开账 24 笔待裁 R189-R227——P2 一笔 R199，顺延号 R229 起；R229-R233 于 2026-11-23 新鲜眼审计批开账即收口，现顺延号 R260 起——R234-R250 已全部收口（规范文档批 + 治理批 + designs/0029-0031 实施批），R259 于 2026-11-25 v1.18.0 批文档成对时开账即收口，新开待排 R251-R258，R248、R239-R241 已收口，规范文档批已交付 `c24c9b9`）。**审查模式自三十七审起标准化**（MAINTENANCE §4.5：双层覆盖 / 审查者编成豁免 ≤2 / 两级红线与复述义务 / 自指缓解 / 双 verdict——2026-10-19 用户裁决"以后的独立审查也遵循这个模式"）。
   **审查节奏已裁降频：事件驱动**（大节点/对外发布前触发，不再每批收官
   即审）。最新报告 [review-2026-10-27.html](reviews/review-2026-10-27.html)（三十八审）。
 - **已提交基线**：verify_selfcomp **368/368 = 196 单文件 + 8 包 + 164 负例**、
   bootstrap **14/14**（强 quine 272925 bytes 双侧一致；总耗时 v1.9.5 后
-  ~20-45s）、self_comp.lom 12671 行、Rust **686 单元 + 117 集成**（2026-11 工具链批：674→686（单测 +12）、集成 81→117 = d0029x_build_exit_codes ×11 + d0029x_r237_diag_once ×4 + d0029x_r242_dep_runtime_source ×4 + d0029x_manifest_diag ×5 + d0029x_fix_externals ×4 + d0029x_dep_notice ×3 + d0029x_no_main ×5；类型检查器批：635→674（单测 +39）、集成 58→81 = d0029y_type_position ×8 + d0029y_tail_return ×4 + d0029y_nam007 ×7 + d0029y_generic_enum ×4；v1.17.0 批：600→635 = designs/0028 L1 ×17 + fix_run ×18；集成 40→58 = d0028_runtime_position ×6 + d0028_fix_run ×12；v1.15.0 批：593→600 = designs/0027 C4 信封 ×2 + D5 explain ×5；v1.14.0 批：
+  ~20-45s）、self_comp.lom 12671 行、Rust **696 单元 + 131 集成**（2026-11-25 v1.18.0 进程退出码批：686→696（单测 +10）、集成 117→131 = d0032_exit_code ×11 + d0028_fix_run +3；2026-11 工具链批：674→686（单测 +12）、集成 81→117 = d0029x_build_exit_codes ×11 + d0029x_r237_diag_once ×4 + d0029x_r242_dep_runtime_source ×4 + d0029x_manifest_diag ×5 + d0029x_fix_externals ×4 + d0029x_dep_notice ×3 + d0029x_no_main ×5；类型检查器批：635→674（单测 +39）、集成 58→81 = d0029y_type_position ×8 + d0029y_tail_return ×4 + d0029y_nam007 ×7 + d0029y_generic_enum ×4；v1.17.0 批：600→635 = designs/0028 L1 ×17 + fix_run ×18；集成 40→58 = d0028_runtime_position ×6 + d0028_fix_run ×12；v1.15.0 批：593→600 = designs/0027 C4 信封 ×2 + D5 explain ×5；v1.14.0 批：
   581→593 = designs/0026 执行 trace ×12；r56×1 +
   r58×7 + r94×2 + r104×6 + r107×4 + r108×5 + closure×3 + r112×3 +
   build_gaps×6 + beta2_exit×3）、eval 双后端各 129/129（v1.11.0 加题 130 后；128 为 v1.10.3 时点）、fix_corpus 13 对
   （5 对 fixed==bad——04/07/08/12/13，12/13 锁认知 warning）、doc_audit
-  **83/83**（J 锚组现值 686+117；三十八审整改批 2 起 78 项、v1.15.0 批 D5 explain 源码计数锚 +1、R229-R233 新鲜眼审计批 ×4【README 基准卡计数 / 复现命令 eval 期望 / zh-CN 现集题数 / Status Current 版本位】——J Rust 组并入 README 两计数位 + 轮数互锁 + quine/self_comp 逗号形态 ×4）、六模式全 PASS、link_check PASS、
+  **83/83**（J 锚组现值 696+131；三十八审整改批 2 起 78 项、v1.15.0 批 D5 explain 源码计数锚 +1、R229-R233 新鲜眼审计批 ×4【README 基准卡计数 / 复现命令 eval 期望 / zh-CN 现集题数 / Status Current 版本位】——J Rust 组并入 README 两计数位 + 轮数互锁 + quine/self_comp 逗号形态 ×4）、六模式全 PASS、link_check PASS、
   spec_examples **两文档形态 PASS**（tutorial 移出后）+ l2fix self-check
-  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.17.0**（v1.14.0
-  trace 批起；v1.17.0 运行时修复闭环批起为现值）。
+  6/6 + bench quick 20 点 + ACRI 消费器三闭环。Cargo.toml/lock **1.18.0**（v1.14.0
+  trace 批起；v1.18.0 进程退出码批起为现值）。
 - **ACRI 现行面**：规范之家 = lom-lang/acri（现行 **v0.2**，2026-11-22 切版）；
   本仓 specs/acri/（v0.1 冻结快照 + 符合性映射 + consumer.py，不再镜像后续版本）；
   Lom = L0/L1-conformant + L2 documented（v0.2 起哨兵原生；两登记偏差见
@@ -106,7 +108,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 - **L2 现行面（v1.8.0 转正后）**：supported face（strict subset /
   [L2xxx] 码 / ln:cl 位置 / `lom l2fix`（v2 schema 带位置字段）/
   l2fix.py CI 对拍基准）。
-- **build 现行面**：无文件 `lom build` 诊断面 = 包源逐文件（统一减法 externals）+ PKG007（人类可读路径 stderr）+ 根目录主文件对称检查；**未发版（工具链批 `8729ba8`）**：任一被检查文件有 error 级诊断 → rc 1、源文件不可读 → rc 2（人读与 `--json` 同口径，`lom build --json` 的字符串字段经转义）；入口文件的 `--check` / `--json` / 运行对依赖包诊断打一行 stderr 条数提示，坏清单 / 依赖错误出一条 stage "package" 的 PKG 诊断并 rc 1。
+- **build 现行面**：无文件 `lom build` 诊断面 = 包源逐文件（统一减法 externals）+ PKG007（人类可读路径 stderr）+ 根目录主文件对称检查；**v1.18.0 起（工具链批 `8729ba8`）**：任一被检查文件有 error 级诊断 → rc 1、源文件不可读 → rc 2（人读与 `--json` 同口径，`lom build --json` 的字符串字段经转义）；入口文件的 `--check` / `--json` / 运行对依赖包诊断打一行 stderr 条数提示，坏清单 / 依赖错误出一条 stage "package" 的 PKG 诊断并 rc 1。
 - **性能现行面（designs/0022 两刀后）**：函数表 Rc 化 + Value 五族 Rc
   共享；bench.lom 十负载 + tools/bench.py（交错 A/B 为标准纪律【R139】）；
   递归物理边界：深帧形态实测 ~67k 溢出；N1 软件守卫 v1.10.3 复标 **60000**（深帧形态下结构化先于物理溢出；浅帧物理 ~100k）。
@@ -115,7 +117,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
   先跑 `python tools/build_selfboot.py` 生成分发三件**——playground/
   dist-selfboot/ gitignored：selfcomp.wasm / selfboot-baseline.hex /
   self_comp.lom 副本，COMPILED 272925 硬门；smoke 含自举段 6 断言 +
-  v1.12.1 ⑦ file 段 14 断言 + v1.13.0 ⑧ 分享链接段 8 断言
+  v1.12.1 ⑦ file 段 14 断言 + v1.13.0 ⑧ 分享链接段 8 断言 + v1.18.0 ⑨ 进程退出码段 8 断言（`-> Int` 尾 3 → exitCode 3、残行不丢、超范围 → 1）
   （playground/sharelink.js 编解码纯函数——浏览器/node 双侧同源））；
   部署 = 五源件 + wasm + 分发三件推 gh-pages 孤儿分支；深度守卫 wasm 侧
   300；**二期自举演示 = "Self-hosting demo" 区块**（selfboot.js env 契约
@@ -123,18 +125,18 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
 - **现行语义要点**：撞名/遮蔽族三侧一致（NAM006/PKG007 warning 不
   拦截）；build 统一减法；闭包捕获 mut 赋值 MUT002 分歧族；退出码
   三带（check err=1/warn=0、fix 恒 0、工具失败 ≥2——pkg-expand 混合
-  路径与 LSP 带两登记例外）；2026-11 工具链批（未发版）：`lom build` 有 error 级诊断 1 / 源文件不可读 2、无 main 程序运行 1、坏清单项目 `--check` 1。
+  路径与 LSP 带两登记例外）；**程序运行（v1.18.0）：main 声明 `-> Int` 时返回值即进程退出码（0..255；超范围或非整数 → RUNTIME000、rc 1）——rc ≥2 从此不再单独证明"工具自身失败"（工具失败在 stderr 另有诊断，程序自定义退出码不打印）**；2026-11 工具链批（v1.18.0 起）：`lom build` 有 error 级诊断 1 / 源文件不可读 2、无 main 程序运行 1、坏清单项目 `--check` 1。
 - **登记在案不修边界**：块内 let 无同名泄漏与循环外读 for 变量
   两 divergence；L2 包展开单元不做同文件 fn 重复检测（L2P001 单文件
   拒/包展开单元不查，跨包走 NAM006）；clippy --all-targets ~4 条漂移
   存量；playground 四边界；gh-pages 独立构建流；归档 HTML assets 未
   随档；str_concat 构造密集 +1 次 Rc 拷贝（机理属实、50k 档 1.03×，
   R139 口径）；lom-tutorial.html 已移出跟踪（恢复须先清画像信息）。
-- 下一步：**批 E——RFC-0005 进程退出码实施（已裁，待执行；minor v1.18.0）**。用户 2026-11-24 裁决"待裁事项全部做，可并行，也可顺序，按合理的方式完成。"——RFC-0005 取乙：`fn main() -> Int` 的返回值即进程退出码（0..255，超范围按运行时错误），实施设计见 [designs/0032](designs/0032-process-exit-code.md)（解释器收尾读取 main 返回值 / AOT 代码生成按声明类型收尾 / AOT 与 L2 宿主脚本映射退出码 / `fix --run` 新增可选 `exit_code` 字段 / 文档成对 / 升版 1.18.0 并把规范里的 "unreleased on v1.17.0" 标记换成 v1.18.0；实施前的采样核对所需的模型调用已获用户常设授权，授权记录见 WORKSPACE-LOCAL.md §9）。其后：R251-R258 八笔的整改顺序待用户裁决；v1.18.0 切 tag 后的跨仓登记顺刷见 WORKSPACE-LOCAL.md。台账 open 8 笔（R251-R258），顺延号 R259 起；**待裁菜单（唯一入口，
+- 下一步：**待裁 = 切 tag v1.18.0（L0）**。批 E（RFC-0005 取乙，minor v1.18.0——`fn main() -> Int` 的返回值即进程退出码，0..255，超范围或非整数按运行时错误）已于 2026-11-25 交付：实施记录见 [designs/0032](designs/0032-process-exit-code.md) §8；门禁、CI 首跑与采样核对（模型调用已获用户常设授权，授权记录见 WORKSPACE-LOCAL.md §9）的结果见 TODO 顶部状态块。其后：R251-R258 八笔的整改顺序待用户裁决；v1.18.0 切 tag 后的跨仓登记顺刷见 WORKSPACE-LOCAL.md。台账 open 8 笔（R251-R258），顺延号 R260 起；**待裁菜单（唯一入口，
   2026-10-21 治理整理批起——用户裁决"整理头脑风暴吸收进待裁菜单、只保留一个
   待裁菜单"；完整菜单见 TODO 状态块待裁菜单行，点子详情（成本/风险/Top5）
   见 `target/probes/brainstorm/ideas.md`；所有点子不构成预授权）**：
-  【2026-11-23 / 11-24 新增待裁——全部已裁】(a) B7 后续三项：① SPEC_FOR_AI 文档批 → `c24c9b9`；② 工具链缺陷修复批 → 类型检查器批 `f7d0d5c` + 工具链批 `8729ba8`；③ 退出码能力 → RFC-0005 已 accepted（实施 = 批 E，见"下一步"）。(b) R239-R241 文档滞后三笔 → 已收口（`782449c`）。(c) B7 实战应用是否独立成仓发布 → 已裁不发布。(d) 账面整改顺序 → 按建议执行。(e) designs/0029 的裁决点 1-5 全取建议项（甲 / 乙 / 甲 / 甲 / 甲）→ 两批已交付。(f) RFC-0005 退出码取乙 → accepted，实施待执行。(g) R244-R248 整改顺序 → 已全部收口。(h) R249 并入修复批 → 已收口。(i) R250 另立小设计 designs/0031 → 已收口。(j) 规范头部两处中性化 → `c7ad1b2`。**当前唯一在途件 = 批 E；R251-R258 八笔待排——整改顺序待用户裁决。**
+  【2026-11-23 / 11-24 新增待裁——全部已裁】(a) B7 后续三项：① SPEC_FOR_AI 文档批 → `c24c9b9`；② 工具链缺陷修复批 → 类型检查器批 `f7d0d5c` + 工具链批 `8729ba8`；③ 退出码能力 → RFC-0005 accepted 并已实施（批 E，v1.18.0）。(b) R239-R241 文档滞后三笔 → 已收口（`782449c`）。(c) B7 实战应用是否独立成仓发布 → 已裁不发布。(d) 账面整改顺序 → 按建议执行。(e) designs/0029 的裁决点 1-5 全取建议项（甲 / 乙 / 甲 / 甲 / 甲）→ 两批已交付。(f) RFC-0005 退出码取乙 → accepted，已实施（批 E，v1.18.0）。(g) R244-R248 整改顺序 → 已全部收口。(h) R249 并入修复批 → 已收口。(i) R250 另立小设计 designs/0031 → 已收口。(j) 规范头部两处中性化 → `c7ad1b2`。**当前唯一待裁件 = 切 tag v1.18.0（L0）；R251-R258 八笔待排——整改顺序待用户裁决。**
   【一 · 已裁待执行（等触发）】① 发帖（**暂缓**——2026-10-28 用户裁决"我改主意了，暂不发帖"：在途态转暂缓——启动裁决链与材料留档不撤销、硬门槛与每帖呈批条款重启时继续适用、重启 = 用户指令无预设日程（裁决档 `target/probes/decisions/2026-10-28-posting-pause.md`——R215 裁决侧摘录首次应用）；原 2026-10-22 启动裁决与已裁顺序留存：
   亲笔两帖 + 规划者支撑；前置三件套已备 outreach/prelaunch/（已顺刷 v1.14.0/38 轮现值）；
   **硬门槛：Reddit r/PL 未获 modmail 明确许可不发**；每帖发布前单独
@@ -184,7 +186,7 @@ docs/EXECUTOR_TEMPLATE.md 全部（通用铁律/输出格式硬性规范/冻结�
    EXECUTOR_TEMPLATE 输出格式，计数配对逐项单独执行；规划者抽验
    verify_selfcomp 与 doc_audit 两项亲自重跑、计数抽查复跑）：
    - cargo build --release
-   - cargo test --release（期望 686/686；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes --test d0028_runtime_position --test d0028_fix_run --test d0029y_type_position --test d0029y_tail_return --test d0029y_nam007 --test d0029y_generic_enum --test d0029x_build_exit_codes --test d0029x_r237_diag_once --test d0029x_r242_dep_runtime_source --test d0029x_manifest_diag --test d0029x_fix_externals --test d0029x_dep_notice --test d0029x_no_main，×117）
+   - cargo test --release（期望 696/696；另有集成 cargo test --release --test r56_process --test r58_lsp_process --test r94_pkg_alias --test r104_dedup_order --test r108_variant_externals --test r107_alias_clash --test build_closure_externals --test r112_closure_assign --test build_gaps_remediation --test beta2_exit_codes --test d0028_runtime_position --test d0028_fix_run --test d0029y_type_position --test d0029y_tail_return --test d0029y_nam007 --test d0029y_generic_enum --test d0029x_build_exit_codes --test d0029x_r237_diag_once --test d0029x_r242_dep_runtime_source --test d0029x_manifest_diag --test d0029x_fix_externals --test d0029x_dep_notice --test d0029x_no_main --test d0032_exit_code，×131）
    - cargo clippy --release -- -D warnings（零 warning）
    - cargo fmt --all -- --check（本地零 diff；当前不在 CI gate）
    - python tools/doc_audit.py（期望 83/83）

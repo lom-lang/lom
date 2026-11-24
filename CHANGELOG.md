@@ -7,6 +7,42 @@ per-batch facts are in the commit log and docs/TODO.md.
 
 ## Unreleased
 
+Nothing yet. Patch-level fixes accumulate here between releases and are cut
+as one patch tag at a release point (docs/MAINTENANCE.md §2.2.1).
+
+## v1.18.0 (2026-11-25)
+
+> **Current release: v1.18.0 (2026-11-25; a program can choose its exit code — `fn main() -> Int` returns the process exit code, per [RFC-0005](docs/rfc/0005-process-exit-code.md) and [designs/0032](docs/designs/0032-process-exit-code.md); versioned minor because it adds semantics — the four frozen surfaces stay untouched: zero syntax / keyword / diagnostic-code / builtin change)** — Until now a Lom program could only exit `0` or `1`: whatever `main` returned was dropped, and there is no `exit` builtin — so a CLI tool written in Lom could not say "found problems" or "bad usage" without a wrapper script. From this release **`fn main() -> Int` returns the process exit code**: the tail expression or `return n` (0..255) becomes the code the process exits with. A `main` declared `-> Unit` (or left unannotated) still exits `0`, whatever its last expression evaluates to; a run-time error still exits `1`, and so does a code outside 0..255 or a non-integer return (a `[RUNTIME000]` diagnostic pointing at `main`'s signature). `lom build --target wasm` artifacts behave the same through the shipped Node harness, and `lom fix --run` reports an observed code as `"exit_code"` next to `"outcome": "pass"`. One habit changes: **a successful program must end with `0`** — leaving a computed result as the tail expression of an `-> Int` `main` now turns a correct program into a failing one (the spec says so in its core rules). Nothing existing is affected: none of the 555 tracked `.lom` files, the 138 reference solutions or the archived candidates declares `-> Int`, and the previous and new binaries agree byte-for-byte on every tracked file across five commands. This release also ships the patch-level fixes accumulated since v1.17.0 (listed below). Baseline unchanged: quine **272925**, verify_selfcomp 368/368; tests 635+58 → 696+131.
+
+- **Process exit code (RFC-0005, option B)**: `fn main() -> Int` — its tail expression
+  or `return n` — is the process exit code, 0..255 only. Any other integer, or a
+  value that is not an `Int`, is a run-time error (`[RUNTIME000]`, exit 1, positioned
+  at `main`'s signature). A `main` declared `-> Unit` or left unannotated exits 0
+  whatever its last expression evaluates to. This supersedes the "a program exits
+  0 or 1" wording of the SPEC_FOR_AI gap-closure item below, which was written
+  before this change.
+- `lom fix --run`: a program ending with its own exit code is not a failure —
+  `outcome: "pass"`, plus a new optional `exit_code` field in the `run` object
+  (present only for an `-> Int` `main` that completed; output for every other
+  program is byte-identical). An out-of-range code or a non-`Int` return is
+  observed as a run-time error (`outcome: "error"`).
+- Ahead-of-time `lom build --target wasm` artifacts: the emitter tailors the
+  exported `main`'s return to its declared type (`Int` for `-> Int`, tagged `Unit`
+  otherwise), and the shipped Node harnesses (`eval/runner/run_wasm.mjs`,
+  `tools/wasm_debug/dbg_run.mjs`, `tools/selfcomp/run_selfcomp.mjs`) map an `Int`
+  return to the exit code. Existing artifacts grow by 3 bytes (the `main`
+  epilogue); behavior is unchanged. Stated divergences: an out-of-range code exits
+  1 everywhere, but the harnesses print their own line instead of the interpreter's
+  diagnostic; the L2 channel does not guard a non-`Int` `main`.
+- Tests: 686 -> 696 unit, 117 -> 131 integration (new `tests/d0032_exit_code.rs`
+  ×11; `tests/d0028_fix_run.rs` +3). Two existing expectations follow the new
+  semantics on purpose (R250's pinned artifact sizes grow by 3 bytes each; R249's
+  form F6, an `-> Int` `main` with `return 3`, now exits 3). Playground smoke
+  39 -> 47 checks.
+
+Also shipped in this release — the patch-level fixes accumulated since v1.17.0,
+as recorded when each landed:
+
 - Docs: `SPEC_FOR_AI.md` gap-closure batch — the exit-code rule (no `exit`
   builtin; a program exits 0 or 1), string escapes, the nested-`if` rule, a
   complete multi-file project walkthrough, display format, the `trim`
@@ -49,12 +85,9 @@ per-batch facts are in the commit log and docs/TODO.md.
 - The RUNTIME005 hints no longer list only three modules.
 - Tests: 674 -> 686 unit, 81 -> 117 integration (seven new `d0029x_` targets).
 
-Patch-level fixes accumulate here between releases and are cut as one patch
-tag at a release point (docs/MAINTENANCE.md §2.2.1).
-
 ## v1.17.0 (2026-11-23)
 
-> **Current release: v1.17.0 (2026-11-23; runtime errors now say where they happened, and `lom fix` can watch a program fail — per [designs/0028](docs/designs/0028-runtime-repair-loop.md); versioned minor because it adds a CLI flag, like v1.14.0's `--trace`; zero syntax / keyword / diagnostic-code / builtin change)** — A program can pass every static check and still crash at run time. Until now that crash came back as a bare `[runtime] error (0:0)` — no line, no column — and `lom fix` had nothing to say about it. This release closes that gap in two steps. **Runtime errors carry a position**: the diagnostic names the innermost expression that failed and shows it with a caret (`[runtime] error (4:13): [RUNTIME000] 整数除以零`), so you — or your model — land on the offending line instead of re-reading the whole file. **`lom fix --run`** goes one step further: `lom fix hello.lom --plan --run` runs the program once (its output is discarded) and adds the observed failure, position included, to the repair plan as a hint. Running a program is a side effect, so this is opt-in and fenced three ways: a file with static errors is not run; a file that mentions `file_write` / `file_append` is refused unless you add `--allow-io`; and every run has a time budget (5000 ms by default, `--run-budget <ms>` to change) — a runaway loop reports `"outcome": "timeout"` instead of hanging. Advice learned from a run is never applied automatically: `--apply --run` reports it and leaves your file exactly as `--apply` alone would. Without `--run`, `lom fix` output is byte-for-byte unchanged. The limits, stated plainly: the position is the start of the failing expression, not the exact operator; errors raised outside expression evaluation (a bad import, a tuple-destructuring mismatch, a non-iterable `for`, a non-`Bool` `while` condition) still report `(0:0)`; and ahead-of-time `lom build` artifacts still fail without a position. Baseline unchanged: quine **272925**, verify_selfcomp 368/368; tests 600+40 → 635+58.
+> **Previous repository milestone: v1.17.0 (2026-11-23; runtime errors now say where they happened, and `lom fix` can watch a program fail — per [designs/0028](docs/designs/0028-runtime-repair-loop.md); versioned minor because it adds a CLI flag, like v1.14.0's `--trace`; zero syntax / keyword / diagnostic-code / builtin change)** — A program can pass every static check and still crash at run time. Until now that crash came back as a bare `[runtime] error (0:0)` — no line, no column — and `lom fix` had nothing to say about it. This release closes that gap in two steps. **Runtime errors carry a position**: the diagnostic names the innermost expression that failed and shows it with a caret (`[runtime] error (4:13): [RUNTIME000] 整数除以零`), so you — or your model — land on the offending line instead of re-reading the whole file. **`lom fix --run`** goes one step further: `lom fix hello.lom --plan --run` runs the program once (its output is discarded) and adds the observed failure, position included, to the repair plan as a hint. Running a program is a side effect, so this is opt-in and fenced three ways: a file with static errors is not run; a file that mentions `file_write` / `file_append` is refused unless you add `--allow-io`; and every run has a time budget (5000 ms by default, `--run-budget <ms>` to change) — a runaway loop reports `"outcome": "timeout"` instead of hanging. Advice learned from a run is never applied automatically: `--apply --run` reports it and leaves your file exactly as `--apply` alone would. Without `--run`, `lom fix` output is byte-for-byte unchanged. The limits, stated plainly: the position is the start of the failing expression, not the exact operator; errors raised outside expression evaluation (a bad import, a tuple-destructuring mismatch, a non-iterable `for`, a non-`Bool` `while` condition) still report `(0:0)`; and ahead-of-time `lom build` artifacts still fail without a position. Baseline unchanged: quine **272925**, verify_selfcomp 368/368; tests 600+40 → 635+58.
 
 ## v1.16.0 (2026-10-28)
 
