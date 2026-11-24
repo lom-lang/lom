@@ -2,9 +2,9 @@
 
 > This is a condensed spec for LLMs. After reading this, you should be able to write valid Lom code.
 > Language: **Lom** (Language of Machine). Extension: `.lom`. Host: Rust.
-> **Context budget**: 73,878 characters ≈ 18.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md. Token-size discipline reference: Mog's spec self-reports "fits in 3,200 tokens" (see docs/archive/ round 4).
+> **Context budget**: 73,810 characters ≈ 18.5k tokens (≈4 chars/token, English-dominant BPE approximation) — sized to fit in an agent context window alongside a task prompt; the companion full spec is LANGUAGE_SPEC.md.
 
-**Advised workflow for agent readers** (validated by zero-prior-agent build sessions, 2026-10):
+**Advised workflow for agent readers** (validated in agent build sessions that had this spec as their only language reference, 2026-10):
 1. Skim §1 → §2 → §12 (quick reference) before writing code; consult §11b for exact builtin signatures.
 2. Develop diagnostics-first: write the file → `lom <file.lom> --json` → repair → re-run (full loop: §11e; multi-file projects: `lom build`, §11e); `--trace` localizes runtime failures by call chain (§11g). A runtime error points at the failing expression (§11c), and when the file is statically clean yet fails at run time, `lom fix <file.lom> --plan --run` puts that positioned runtime diagnostic into the repair plan (§11e, `--run`).
 3. If an API you need is not in §11b or §2, do NOT assume it exists — check §11i (features that do not exist), then probe: a tiny program calling the suspected name answers `NAM005` (real builtin; the hint carries its exact import line) or `NAM003` (no such name at all). `lom explain <code>` prints long-form guidance (§11c).

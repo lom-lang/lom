@@ -881,7 +881,7 @@ Errors are **machine-readable first, human-readable second**. Every diagnostic i
 Top-level fields:
 - `schema`: always `"lom-diag/v1"` (stability contract for LLM consumers)
 - `file`: source file path
-- `ok`: `true` iff `diagnostics` is empty
+- `ok`: `true` iff `diagnostics` holds no error-level entry (a warning-only file reports `ok: true` with a non-empty `diagnostics` array)
 - `summary`: counts (total/errors/warnings/holes)
 - `diagnostics[]`: array of single diagnostics
 

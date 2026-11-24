@@ -13,6 +13,9 @@ per-batch facts are in the commit log and docs/TODO.md.
   whitespace set, bare `return`, interpreter throughput figures, and the
   precise list of `TYPE001` forms that carry a position. Documentation only;
   tool behavior is unchanged.
+- Docs: `LANGUAGE_SPEC.md` defines the `check --json` envelope's `ok` as implemented
+  — `true` when no error-level diagnostic is present, so a warning-only file
+  reports `true`. The old text said "iff `diagnostics` is empty".
 
 Patch-level fixes accumulate here between releases and are cut as one patch
 tag at a release point (docs/MAINTENANCE.md §2.2.1).
