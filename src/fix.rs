@@ -833,6 +833,12 @@ fn fix_for_diagnostic(
             "撞名告知型 warning——行为已确定（本地定义优先 / 同别名取后写声明 / 两包同名按包根路径序取后者），无需修复；如需消除歧义可重命名本地定义或 import 别名",
             Confidence::Medium,
         )],
+        // R235（designs/0029 §3.2）：import 目标不可解析。改模块名还是改符号名取决于
+        // 用户意图，无单一正确的机械改写——hint-only，永不自动应用
+        "NAM007" => vec![hint_only(
+            "import 目标不可解析：核对模块名与符号名（诊断消息列出了该标准库模块的可用符号），改成导出表里的名字或改到符号所属的模块下导入",
+            Confidence::Medium,
+        )],
 
         // ===== 效应系统（Phase 2.5）=====
         "EFF001" => fix_eff_undeclared(d, source_lines, owner),

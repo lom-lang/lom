@@ -321,12 +321,14 @@ impl TypeChecker {
 
     fn collect_enum(&mut self, e: &EnumDecl) {
         if self.enums.contains_key(&e.name) {
+            // R247 顺带（designs/0030 §7）：定位到重复的 enum 声明处
+            // （EnumDecl.span = `enum` 关键字位置；此前硬编码 (0,0)）
             self.push_diag(
                 Severity::Error,
                 "NAM002".into(),
                 format!("枚举 '{}' 重复定义", e.name),
-                0,
-                0,
+                e.span.line,
+                e.span.col,
             );
             return;
         }
@@ -347,9 +349,39 @@ impl TypeChecker {
     }
 
     /// 收集 import 声明：登记 import 项，别名注册推迟到首遍后终检
-    /// （别名继承真实函数的签名；符号是否在模块导出由解释器运行时检查，typechecker 不重复报错）
+    /// （别名继承真实函数的签名；非标准库模块的符号是否在模块导出由解释器运行时检查）
+    ///
+    /// R235（designs/0029 §3.2，裁决取乙）：**标准库模块**的导入项在此静态校验——
+    /// 模块名是标准库模块而导入项不在其导出表中 → NAM007 warning，锚在 `from` 行
+    /// （`ImportDecl.span`），消息给出该模块的可用符号。数据源 = `interpreter::module_of`
+    /// 与标准库模块表（单一事实源；与解释器 `process_import` 的"先标准库"查表同序）。
+    /// 非标准库模块名（外部包、拼错的模块名）不判：fix / apply / LSP 路径没有包信息，
+    /// 判了会对包项目的合法 import 误报。warning 级——`--check` / `--json` 的 rc 与
+    /// `ok` 不变，运行期 RUNTIME005 不变（冻结面：不新增 error 级码）。
     fn collect_import(&mut self, imp: &ImportDecl) {
+        let stdlib_module = crate::interpreter::is_stdlib_module(&imp.module);
         for item in &imp.items {
+            if stdlib_module && !Self::stdlib_module_exports(&imp.module, &item.name) {
+                // 消息里的"该符号属于哪个模块"：符号是别的标准库模块的导出时顺带指路
+                let owner = crate::interpreter::module_of(&item.name);
+                let belongs = match owner {
+                    Some(m) if m != imp.module => format!("（该符号属于标准库模块 '{}'）", m),
+                    _ => String::new(),
+                };
+                self.push_diag(
+                    Severity::Warning,
+                    "NAM007".into(),
+                    format!(
+                        "import 目标不可解析：标准库模块 '{}' 不导出符号 '{}'{}——可用符号：{}",
+                        imp.module,
+                        item.name,
+                        belongs,
+                        self.stdlib_module_symbols(&imp.module)
+                    ),
+                    imp.span.line,
+                    imp.span.col,
+                );
+            }
             // B 包：导入的符号名进入可用集（NAM005 判定）。`f as g` 只加 g——
             // 真实名 f 未导入，用 f 仍属未导入（与运行时 available_builtins 同款）
             self.available_imports.insert(item.alias.clone());
@@ -364,6 +396,23 @@ impl TypeChecker {
                 span: imp.span,
             });
         }
+    }
+
+    /// R235：标准库模块 `module` 是否导出内建名 `name`（`module_of` 单一事实源）
+    fn stdlib_module_exports(module: &str, name: &str) -> bool {
+        crate::interpreter::module_of(name) == Some(module)
+    }
+
+    /// R235：标准库模块 `module` 的可用符号（内建签名表里归属于该模块的名字，按字典序）
+    fn stdlib_module_symbols(&self, module: &str) -> String {
+        let mut names: Vec<&str> = self
+            .functions
+            .keys()
+            .filter(|n| crate::interpreter::module_of(n) == Some(module))
+            .map(String::as_str)
+            .collect();
+        names.sort_unstable();
+        names.join(", ")
     }
 
     // ===== 第二遍：函数体检查 =====
@@ -386,7 +435,10 @@ impl TypeChecker {
         // 检查函数体
         let body_ty = self.check_block(&f.body, &mut env);
         // 检查返回类型匹配
-        if let Some(ret_ty) = &f.ret_type
+        // R249（designs/0029 §3.7）：所有路径都以 return 结束的函数体不产出值——
+        // 不做"声明返回 vs 实际返回"比对（此前把这种函数体记成 Unit 而误报）
+        if !Self::block_never_produces_value(&f.body)
+            && let Some(ret_ty) = &f.ret_type
             && let TypeOrUnknown::Known(bt) = &body_ty
             && !self.types_compatible(bt, ret_ty)
         {
@@ -460,6 +512,52 @@ impl TypeChecker {
         block_ty
     }
 
+    /// R249（designs/0029 §3.7）：块是否"不产出值"——所有路径都以 `return` 结束
+    /// （无尾表达式且最后一条语句是 `return`；或尾表达式本身不产出值）。
+    /// 这类块不是"返回 Unit"，而是根本不正常返回：函数级 / 闭包级的"声明返回
+    /// vs 实际返回"比对对它不下判断（此前记 Unit，对 `-> Int  fn … return 3`
+    /// 误报"实际返回 Unit"）。`return` 语句自身的类型检查不动。
+    ///
+    /// 实施细化（与设计一句话修法的差别，见批 Y 报告偏差说明）：不把"以 return
+    /// 收尾的单个块"的类型改记未知，而是只对"**全部分支**都不产出值"的块 /
+    /// 表达式记未知。理由：分支合流时单个臂记未知会拖累整体——match 一臂
+    /// `return`、另一臂落空的函数（真阳性：落空路径返回 Unit）会由报变不报。
+    /// 按本判定，诊断只可能消失（误报）、不会新增。
+    fn block_never_produces_value(block: &Block) -> bool {
+        match &block.tail {
+            None => matches!(block.stmts.last(), Some(Stmt::Return(_))),
+            Some(e) => Self::expr_never_produces_value(e),
+        }
+    }
+
+    /// R249：表达式是否"不产出值"——带 else 的 if 表达式 / match 表达式的全部分支
+    /// 都不产出值。解析器把函数体末尾的 `if … end` 解析成尾表达式，故
+    /// if / elif 链全 `return` 的函数体经此判定；无 else 的 if 可能落空，不算。
+    fn expr_never_produces_value(expr: &Expr) -> bool {
+        match &expr.kind {
+            ExprKind::If(ifs) => {
+                ifs.else_branch
+                    .as_ref()
+                    .is_some_and(Self::block_never_produces_value)
+                    && ifs
+                        .branches
+                        .iter()
+                        .all(|(_, b)| Self::block_never_produces_value(b))
+            }
+            ExprKind::Match(m) => Self::match_never_produces_value(m),
+            _ => false,
+        }
+    }
+
+    /// R249：match 表达式的全部分支都是不产出值的块臂（单表达式臂不可能是 return）
+    fn match_never_produces_value(m: &MatchExpr) -> bool {
+        !m.arms.is_empty()
+            && m.arms.iter().all(|arm| match &arm.body {
+                MatchArmBody::Block(b) => Self::block_never_produces_value(b),
+                MatchArmBody::Expr(_) => false,
+            })
+    }
+
     fn check_stmt(&mut self, stmt: &Stmt, env: &mut TypeEnv) {
         match stmt {
             Stmt::Let {
@@ -502,6 +600,11 @@ impl TypeChecker {
                 match val_ty {
                     TypeOrUnknown::Known(Type::Tuple(elem_tys)) => {
                         if elem_tys.len() != names.len() {
+                            // R247 位点 1（designs/0030 §3.4，规划者改取供料报告的修法 1B）：
+                            // 定位到右侧值表达式的起点（此前硬编码 (0,0)）。`Stmt::LetDestruct`
+                            // 不带语句 span——给它加 span 会让仓内 5 处穷尽具名字段模式
+                            // （含只读的 interpreter.rs / wasm_codegen.rs）编译失败，故不动 AST；
+                            // 先例：fix.rs 对无语句 span 的解构语句同样取初值表达式行。
                             self.push_diag(
                                 Severity::Warning,
                                 "TYPE001".into(),
@@ -510,8 +613,8 @@ impl TypeChecker {
                                     names.len(),
                                     elem_tys.len()
                                 ),
-                                0,
-                                0,
+                                value.span.line,
+                                value.span.col,
                             );
                         }
                         for (name, ety) in names.iter().zip(elem_tys.iter()) {
@@ -722,7 +825,9 @@ impl TypeChecker {
             ExprKind::Binary { op, left, right } => {
                 let lt = self.check_expr(left, env);
                 let rt = self.check_expr(right, env);
-                self.binary_result_type(op, &lt, &rt)
+                // R238（designs/0029 §3.5）：二元表达式的 span 传入——三处 TYPE001
+                // 定位到表达式起点（= 左操作数起点，左结合链同），此前写死 (0,0)
+                self.binary_result_type(op, &lt, &rt, espan)
             }
             ExprKind::Unary { op, expr } => {
                 let t = self.check_expr(expr, env);
@@ -830,6 +935,11 @@ impl TypeChecker {
                 if let Some(else_b) = &if_stmt.else_branch {
                     branch_tys.push(self.check_block(else_b, env));
                 }
+                // R249：全部分支都不产出值（都 return 了）的 if 表达式类型未知——
+                // `let w = if a return 1 else return 2 end` 不再把 w 记成 Unit
+                if Self::expr_never_produces_value(expr) {
+                    return TypeOrUnknown::unknown();
+                }
                 // 取所有分支的公共类型（若一致）
                 self.unify_types(&branch_tys)
             }
@@ -848,8 +958,10 @@ impl TypeChecker {
                 self.current_ret = ret_type.clone();
                 let body_ty = self.check_block(body, &mut closure_env);
                 self.current_ret = saved_ret;
-                // 检查返回类型匹配
-                if let (Some(ret), TypeOrUnknown::Known(bt)) = (ret_type, &body_ty)
+                // 检查返回类型匹配（R249：同函数级——所有路径都以 return 结束的
+                // 闭包体不产出值，不做比对）
+                if !Self::block_never_produces_value(body)
+                    && let (Some(ret), TypeOrUnknown::Known(bt)) = (ret_type, &body_ty)
                     && !self.types_compatible(bt, ret)
                 {
                     self.push_diag(
@@ -1061,7 +1173,8 @@ impl TypeChecker {
                         .unwrap_or(TypeOrUnknown::unknown())
                 } else if self.is_variant_constructor(name) {
                     // 枚举变体构造器
-                    let (expected_arity, ret_ty) = self.variant_info(name);
+                    // R250 B1：arg_tys 已算好，传入以推出有类型参数的枚举的实例类型
+                    let (expected_arity, ret_ty) = self.variant_info(name, &arg_tys);
                     if expected_arity != args.len() {
                         self.push_diag(
                             Severity::Warning,
@@ -1149,12 +1262,13 @@ impl TypeChecker {
                 && !matches!(gt, Type::Bool)
                 && !self.is_any_type(&gt)
             {
+                // R238 同族顺带（designs/0029 §3.5）：定位到 guard 表达式起点（此前写死 (0,0)）
                 self.push_diag(
                     Severity::Warning,
                     "TYPE002".into(),
                     format!("match guard 应为 Bool，得到 {:?}", gt),
-                    0,
-                    0,
+                    g.span.line,
+                    g.span.col,
                 );
             }
             if arm.guard.is_none() {
@@ -1232,6 +1346,10 @@ impl TypeChecker {
                 }
             }
         }
+        // R249：全部分支都不产出值（都 return 了）的 match 表达式类型未知
+        if Self::match_never_produces_value(m) {
+            return TypeOrUnknown::unknown();
+        }
         // 所有 arm 的类型应一致
         self.unify_types(&arm_tys)
     }
@@ -1273,28 +1391,55 @@ impl TypeChecker {
             } => {
                 // 阶段1：只读借用 self.enums，收集变体信息到局部变量
                 // （随后要可变借用 self 进行 push_diag 和递归 check_pattern，故先 clone 出来）
+                // R250（designs/0031 §3）另收集两项：
+                //   `inst_args`  —— 被测值是带类型实参的用户泛型枚举实例时的替换表实参
+                //                   （B3 载荷代入；实参数量与声明不符时为 None）
+                //   `type_params` —— 被测值所属枚举声明的类型参数名（A2 载荷兜底）
+                let mut inst_args: Option<Vec<Type>> = None;
+                let mut type_params: Vec<String> = Vec::new();
                 let (variant_exists, expected_arity, field_tys, enum_name): (
                     bool,
                     usize,
                     Option<Vec<Type>>,
                     String,
                 ) = if let TypeOrUnknown::Known(t) = scrut_ty {
-                    let en = match t {
-                        Type::Result(_, _) => "Result".to_string(),
-                        Type::Option(_) => "Option".to_string(),
-                        Type::Named(n) => n.clone(),
-                        _ => String::new(),
-                    };
-                    if en.is_empty() {
-                        (true, sub.len(), None, en)
-                    } else if let Some(info) = self.enums.get(&en) {
-                        match info.variants.iter().find(|(vn, _)| vn == name) {
-                            None => (false, 0, None, en),
-                            Some((_, ftypes)) => (true, ftypes.len(), Some(ftypes.clone()), en),
+                    if let Type::Generic(g, args) = t
+                        && let Some(info) = self.enums.get(g)
+                        && !info.is_builtin
+                        && !info.type_params.is_empty()
+                    {
+                        // R250 B3：带类型实参的用户泛型枚举实例——只用于载荷代入。
+                        // 变体存在性 / 子模式个数 / 穷尽性三道检查**不补**（designs/0031 §3
+                        // "不做"：须与 L1 自举检查器同步，否则宿主会比 self_interp.lom 多产）
+                        type_params = info.type_params.clone();
+                        if args.len() == info.type_params.len() {
+                            inst_args = Some(args.clone());
                         }
+                        let ftypes = info
+                            .variants
+                            .iter()
+                            .find(|(vn, _)| vn == name)
+                            .map(|(_, f)| f.clone());
+                        (true, sub.len(), ftypes, g.clone())
                     } else {
-                        // 枚举未注册（如 scrut_ty 是泛型占位符），不报错
-                        (true, sub.len(), None, en)
+                        let en = match t {
+                            Type::Result(_, _) => "Result".to_string(),
+                            Type::Option(_) => "Option".to_string(),
+                            Type::Named(n) => n.clone(),
+                            _ => String::new(),
+                        };
+                        if en.is_empty() {
+                            (true, sub.len(), None, en)
+                        } else if let Some(info) = self.enums.get(&en) {
+                            type_params = info.type_params.clone();
+                            match info.variants.iter().find(|(vn, _)| vn == name) {
+                                None => (false, 0, None, en),
+                                Some((_, ftypes)) => (true, ftypes.len(), Some(ftypes.clone()), en),
+                            }
+                        } else {
+                            // 枚举未注册（如 scrut_ty 是泛型占位符），不报错
+                            (true, sub.len(), None, en)
+                        }
                     }
                 } else {
                     (true, sub.len(), None, String::new())
@@ -1328,8 +1473,10 @@ impl TypeChecker {
                             expected_arity,
                             sub.len()
                         ),
-                        0,
-                        0,
+                        // R247 位点 2（designs/0030 §3.4）：定位到模式里的变体名 token
+                        // （此前硬编码 (0,0)；与同函数 NAM004 分支同款）
+                        name_span.line,
+                        name_span.col,
                     );
                 }
 
@@ -1340,7 +1487,23 @@ impl TypeChecker {
                         .as_ref()
                         .and_then(|fs| fs.get(i))
                         .map(|t| {
+                            // R250 B3：带类型实参的被测值——对字段模板递归代入类型实参。
+                            // 代入结果任一位是 `_Any` → Unknown（硬收敛：`_Any` 作 if/while
+                            // 条件会被判非 Bool 而误报 TYPE002）
+                            if let Some(args) = &inst_args {
+                                let s = substitute_type_args(t, &type_params, args);
+                                return if contains_any_type(&s) {
+                                    TypeOrUnknown::Unknown
+                                } else {
+                                    TypeOrUnknown::Known(s)
+                                };
+                            }
                             if is_generic_placeholder(t) {
+                                TypeOrUnknown::Unknown
+                            } else if mentions_type_param(t, &type_params) {
+                                // R250 A2：裸名 / 未注解的被测值——字段模板（类型树）里含所属
+                                // 枚举声明的类型参数名 → Unknown（parser 给用户 enum 的类型参数
+                                // 产出 Named("T")，只认 Generic("T"/"E") 的占位符判定对它失效）
                                 TypeOrUnknown::Unknown
                             } else {
                                 TypeOrUnknown::Known(t.clone())
@@ -1361,6 +1524,11 @@ impl TypeChecker {
     /// 特殊处理：
     ///   - `Named("_Any")` 是内置通配符类型（prelude/stdlib 函数签名用），兼容任何类型
     ///   - `Named("T")` / `Named("E")` 是内置变体的泛型占位符，兼容任何类型（简化泛型推断）
+    ///   - R250 B2（designs/0031 §3）：两个同名的**用户泛型枚举**实例比类型实参（实参数量
+    ///     相等且逐位递归，`_Any` 位由通配规则放行）；`Named(E)` 对 `Generic(E, 实参)` 在 E
+    ///     是用户枚举且实参数量与声明一致时相容（用户写了裸名注解）。内建 `List` / `Map`
+    ///     维持只比名字（否则 `List<Int>` 对 `List<String>` 开始报警）；内建 `Result` / `Option`
+    ///     的载荷精确化本批不动。
     fn types_compatible(&self, a: &Type, b: &Type) -> bool {
         // 通配符类型（prelude/stdlib 签名用）
         if matches!(a, Type::Named(n) if n == "_Any") || matches!(b, Type::Named(n) if n == "_Any")
@@ -1372,6 +1540,16 @@ impl TypeChecker {
             || matches!(b, Type::Named(n) if n == "T" || n == "E")
         {
             return true;
+        }
+        // R250 B2 同名兜底：裸名注解对带实参的实例（须是用户枚举，且实参数量与声明一致）
+        if let (Type::Named(n), Type::Generic(g, args)) | (Type::Generic(g, args), Type::Named(n)) =
+            (a, b)
+        {
+            return n == g
+                && self
+                    .enums
+                    .get(g)
+                    .is_some_and(|info| !info.is_builtin && info.type_params.len() == args.len());
         }
         match (a, b) {
             (Type::Int, Type::Int) => true,
@@ -1406,7 +1584,22 @@ impl TypeChecker {
                 }
                 true
             }
-            (Type::Generic(a_name, _), Type::Generic(b_name, _)) => a_name == b_name,
+            (Type::Generic(a_name, a_args), Type::Generic(b_name, b_args)) => {
+                if a_name != b_name {
+                    return false;
+                }
+                // R250 B2：同名的用户泛型枚举实例——比类型实参；其它名字只比名字
+                match self.enums.get(a_name) {
+                    Some(info) if !info.is_builtin && !info.type_params.is_empty() => {
+                        a_args.len() == b_args.len()
+                            && a_args
+                                .iter()
+                                .zip(b_args.iter())
+                                .all(|(x, y)| self.types_compatible(x, y))
+                    }
+                    _ => true,
+                }
+            }
             _ => false,
         }
     }
@@ -1430,11 +1623,16 @@ impl TypeChecker {
     }
 
     /// 二元运算结果类型
+    ///
+    /// R238（designs/0029 §3.5）：`span` 是该二元表达式的 span——三处 TYPE001
+    /// 定位到表达式起点（左操作数起点；词法列，与 NAM003 同约定），此前写死 (0,0)。
+    /// 运算符在文案里统一渲染为符号形态（此前 `'+'` 用符号、其余用 `{:?}` 的 `Mul` 等变体名）。
     fn binary_result_type(
         &mut self,
         op: &BinOp,
         lt: &TypeOrUnknown,
         rt: &TypeOrUnknown,
+        span: Span,
     ) -> TypeOrUnknown {
         match op {
             BinOp::Add => {
@@ -1466,8 +1664,8 @@ impl TypeChecker {
                             Severity::Warning,
                             "TYPE001".into(),
                             format!("'+' 不支持 {:?} 和 {:?}", a, b),
-                            0,
-                            0,
+                            span.line,
+                            span.col,
                         );
                         TypeOrUnknown::unknown()
                     }
@@ -1494,9 +1692,9 @@ impl TypeChecker {
                         self.push_diag(
                             Severity::Warning,
                             "TYPE001".into(),
-                            format!("'{:?}' 不支持 {:?} 和 {:?}", op, a, b),
-                            0,
-                            0,
+                            format!("'{}' 不支持 {:?} 和 {:?}", binop_symbol(op), a, b),
+                            span.line,
+                            span.col,
                         );
                         TypeOrUnknown::unknown()
                     }
@@ -1512,8 +1710,8 @@ impl TypeChecker {
                         Severity::Warning,
                         "TYPE001".into(),
                         format!("比较运算两边类型不一致: {:?} vs {:?}", a, b),
-                        0,
-                        0,
+                        span.line,
+                        span.col,
                     );
                 }
                 TypeOrUnknown::known(Type::Bool)
@@ -1551,60 +1749,82 @@ impl TypeChecker {
             .any(|e| e.variants.iter().any(|(vn, _)| vn == name))
     }
 
-    fn variant_return_type(&self, name: &str) -> TypeOrUnknown {
-        for (enum_name, info) in &self.enums {
-            for (vn, fields) in &info.variants {
-                if vn == name {
-                    if info.is_builtin {
-                        // Ok/Err 都返回 Result<T, E>，Some/None 都返回 Option<T>
-                        match enum_name.as_str() {
-                            "Result" => {
-                                return TypeOrUnknown::known(Type::Result(
-                                    Box::new(Type::Named("T".to_string())),
-                                    Box::new(Type::Named("E".to_string())),
-                                ));
-                            }
-                            "Option" => {
-                                return TypeOrUnknown::known(Type::Option(Box::new(Type::Named(
-                                    "T".to_string(),
-                                ))));
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        return TypeOrUnknown::known(Type::Named(enum_name.clone()));
-                    }
-                }
-                let _ = fields;
-            }
-        }
-        TypeOrUnknown::unknown()
+    /// 变体名 → 所属枚举（取首个命中；内建 Result/Option 与用户枚举同表）
+    fn variant_owner(&self, name: &str) -> Option<(&String, &EnumInfo, &Vec<Type>)> {
+        self.enums.iter().find_map(|(enum_name, info)| {
+            info.variants
+                .iter()
+                .find(|(vn, _)| vn == name)
+                .map(|(_, fields)| (enum_name, info, fields))
+        })
     }
 
-    fn variant_info(&self, name: &str) -> (usize, TypeOrUnknown) {
-        for (enum_name, info) in &self.enums {
-            for (vn, fields) in &info.variants {
-                if vn == name {
-                    let arity = fields.len();
-                    let ret_ty = if info.is_builtin {
-                        match enum_name.as_str() {
-                            "Result" => TypeOrUnknown::known(Type::Result(
-                                Box::new(Type::Named("T".to_string())),
-                                Box::new(Type::Named("E".to_string())),
-                            )),
-                            "Option" => TypeOrUnknown::known(Type::Option(Box::new(Type::Named(
-                                "T".to_string(),
-                            )))),
-                            _ => TypeOrUnknown::unknown(),
-                        }
-                    } else {
-                        TypeOrUnknown::known(Type::Named(enum_name.clone()))
-                    };
-                    return (arity, ret_ty);
+    /// 值位引用的变体（无构造实参）
+    fn variant_return_type(&self, name: &str) -> TypeOrUnknown {
+        match self.variant_owner(name) {
+            Some((enum_name, info, fields)) if !info.is_builtin => {
+                // R250 B1（designs/0031 §3）：有类型参数的枚举 → 实例类型，各位记 `_Any`
+                TypeOrUnknown::known(Self::user_enum_ctor_type(enum_name, info, fields, &[]))
+            }
+            Some((enum_name, _, _)) => {
+                // Ok/Err 都返回 Result<T, E>，Some/None 都返回 Option<T>
+                match enum_name.as_str() {
+                    "Result" => TypeOrUnknown::known(Type::Result(
+                        Box::new(Type::Named("T".to_string())),
+                        Box::new(Type::Named("E".to_string())),
+                    )),
+                    "Option" => {
+                        TypeOrUnknown::known(Type::Option(Box::new(Type::Named("T".to_string()))))
+                    }
+                    _ => TypeOrUnknown::unknown(),
                 }
             }
+            None => TypeOrUnknown::unknown(),
         }
-        (0, TypeOrUnknown::unknown())
+    }
+
+    /// 调用形态的变体构造器 `Name(args)`：返回（期望实参个数，构造值类型）
+    fn variant_info(&self, name: &str, arg_tys: &[TypeOrUnknown]) -> (usize, TypeOrUnknown) {
+        match self.variant_owner(name) {
+            Some((enum_name, info, fields)) if !info.is_builtin => (
+                fields.len(),
+                // R250 B1：由构造实参推出实例类型
+                TypeOrUnknown::known(Self::user_enum_ctor_type(enum_name, info, fields, arg_tys)),
+            ),
+            Some((enum_name, _, fields)) => {
+                let ret_ty = match enum_name.as_str() {
+                    "Result" => TypeOrUnknown::known(Type::Result(
+                        Box::new(Type::Named("T".to_string())),
+                        Box::new(Type::Named("E".to_string())),
+                    )),
+                    "Option" => {
+                        TypeOrUnknown::known(Type::Option(Box::new(Type::Named("T".to_string()))))
+                    }
+                    _ => TypeOrUnknown::unknown(),
+                };
+                (fields.len(), ret_ty)
+            }
+            None => (0, TypeOrUnknown::unknown()),
+        }
+    }
+
+    /// R250 B1（designs/0031 §3）：用户枚举变体构造值的类型。
+    /// 枚举**无**类型参数 → 维持裸名 `Named`（非泛型 enum 行为零变化）；
+    /// 有类型参数 → 实例类型 `Generic(枚举名, 实参)`，实参由构造实参推出
+    /// （`infer_type_args`；推不出的位记 `_Any`）。
+    fn user_enum_ctor_type(
+        enum_name: &str,
+        info: &EnumInfo,
+        fields: &[Type],
+        arg_tys: &[TypeOrUnknown],
+    ) -> Type {
+        if info.type_params.is_empty() {
+            return Type::Named(enum_name.to_string());
+        }
+        Type::Generic(
+            enum_name.to_string(),
+            infer_type_args(info, fields, arg_tys),
+        )
     }
 
     /// Phase 4.1.1: 为未定义名找拼写建议
@@ -1786,6 +2006,9 @@ fn type_hint(code: &str) -> Option<String> {
         "NAM006" => Some(
             "撞名不拒：别名撞本地定义时本地优先，别名重复时后写声明赢；重命名以消除遮蔽".into(),
         ),
+        "NAM007" => Some(
+            "核对 import 的模块名与符号名（消息列出了该标准库模块的可用符号）；外部包在 lom.toml dependencies 声明".into(),
+        ),
         "MUT001" => Some(
             "局部变量：把声明改为 let mut；函数参数/for 循环变量恒不可变，请引入局部 let mut 副本"
                 .into(),
@@ -1856,10 +2079,121 @@ fn levenshtein(a: &str, b: &str) -> usize {
     prev[n]
 }
 
+/// R238：二元运算符的符号形态（诊断文案用；`{:?}` 给出的是 `Mul` 等变体名）
+fn binop_symbol(op: &BinOp) -> &'static str {
+    match op {
+        BinOp::Add => "+",
+        BinOp::Sub => "-",
+        BinOp::Mul => "*",
+        BinOp::Div => "/",
+        BinOp::Mod => "%",
+        BinOp::Eq => "==",
+        BinOp::NotEq => "!=",
+        BinOp::Lt => "<",
+        BinOp::Gt => ">",
+        BinOp::LtEq => "<=",
+        BinOp::GtEq => ">=",
+    }
+}
+
 /// 判断类型是否为内置变体的泛型占位符（如 Result 的 T/E、Option 的 T）
 /// 这些占位符在类型推断中应视为 Unknown，避免误报类型不匹配。
 fn is_generic_placeholder(t: &Type) -> bool {
     matches!(t, Type::Generic(name, _) if name == "T" || name == "E")
+}
+
+/// R250 B1（designs/0031 §3）：由变体构造实参推出所属枚举的类型实参。
+/// `实参[i]` = 第 i 个类型参数由构造实参推出的类型；推不出的位记 `_Any`。
+/// 首批只处理"字段模板**直接**是类型参数名"的位（parser 把 enum 声明里的 T 解析成
+/// `Named("T")`）；嵌套位（`Option<T>`、`Tree<T>`）推不出，保持 `_Any`。
+/// 同一类型参数被推成两种类型（`Pair(1, True)`）时该位记 `_Any`——变体构造器实参
+/// 类型检查不在本批（designs/0031 §6），不下判断。
+fn infer_type_args(info: &EnumInfo, fields: &[Type], arg_tys: &[TypeOrUnknown]) -> Vec<Type> {
+    let any = || Type::Named("_Any".to_string());
+    let mut args: Vec<Type> = vec![any(); info.type_params.len()];
+    let mut conflict = vec![false; info.type_params.len()];
+    for (tmpl, at) in fields.iter().zip(arg_tys.iter()) {
+        let Type::Named(p) = tmpl else { continue };
+        let Some(i) = info.type_params.iter().position(|tp| tp == p) else {
+            continue;
+        };
+        if conflict[i] {
+            continue;
+        }
+        let TypeOrUnknown::Known(t) = at else {
+            continue;
+        };
+        if matches!(&args[i], Type::Named(n) if n == "_Any") {
+            args[i] = t.clone();
+        } else if args[i] != *t {
+            conflict[i] = true;
+            args[i] = any();
+        }
+    }
+    args
+}
+
+/// R250 B3：把类型树里的类型参数名替换成类型实参（调用前保证两表等长）
+fn substitute_type_args(t: &Type, type_params: &[String], args: &[Type]) -> Type {
+    match t {
+        Type::Named(p) => match type_params.iter().position(|tp| tp == p) {
+            Some(i) => args.get(i).cloned().unwrap_or_else(|| t.clone()),
+            None => t.clone(),
+        },
+        Type::Option(x) => Type::Option(Box::new(substitute_type_args(x, type_params, args))),
+        Type::Result(a, b) => Type::Result(
+            Box::new(substitute_type_args(a, type_params, args)),
+            Box::new(substitute_type_args(b, type_params, args)),
+        ),
+        Type::Generic(n, xs) => Type::Generic(
+            n.clone(),
+            xs.iter()
+                .map(|x| substitute_type_args(x, type_params, args))
+                .collect(),
+        ),
+        Type::Tuple(xs) => Type::Tuple(
+            xs.iter()
+                .map(|x| substitute_type_args(x, type_params, args))
+                .collect(),
+        ),
+        Type::Record(fs) => Type::Record(
+            fs.iter()
+                .map(|(n, x)| (n.clone(), substitute_type_args(x, type_params, args)))
+                .collect(),
+        ),
+        Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit => t.clone(),
+    }
+}
+
+/// R250：类型树里是否出现通配符 `_Any`
+fn contains_any_type(t: &Type) -> bool {
+    match t {
+        Type::Named(n) => n == "_Any",
+        Type::Option(x) => contains_any_type(x),
+        Type::Result(a, b) => contains_any_type(a) || contains_any_type(b),
+        Type::Generic(_, xs) | Type::Tuple(xs) => xs.iter().any(contains_any_type),
+        Type::Record(fs) => fs.iter().any(|(_, x)| contains_any_type(x)),
+        Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit => false,
+    }
+}
+
+/// R250 A2：类型树里是否出现 `type_params` 中的某个类型参数名
+fn mentions_type_param(t: &Type, type_params: &[String]) -> bool {
+    if type_params.is_empty() {
+        return false;
+    }
+    match t {
+        Type::Named(n) => type_params.contains(n),
+        Type::Option(x) => mentions_type_param(x, type_params),
+        Type::Result(a, b) => {
+            mentions_type_param(a, type_params) || mentions_type_param(b, type_params)
+        }
+        Type::Generic(_, xs) | Type::Tuple(xs) => {
+            xs.iter().any(|x| mentions_type_param(x, type_params))
+        }
+        Type::Record(fs) => fs.iter().any(|(_, x)| mentions_type_param(x, type_params)),
+        Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit => false,
+    }
 }
 
 // ===== 公开入口 =====

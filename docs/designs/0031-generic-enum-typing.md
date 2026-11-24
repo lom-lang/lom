@@ -3,7 +3,7 @@
 - **文档**：docs/designs/0031-generic-enum-typing.md
 - **性质**：动工前置设计（MAINTENANCE §2.1 第 2 条——触 `src/`、含语义选边，属 L0）。
 - **基线**：HEAD `c7ad1b2` / v1.17.0。
-- **状态**：**已裁，待实施**。用户 2026-11-24 裁决（原话）："同意改。待裁事项全部做，可并行，也可顺序，按合理的方式完成。"——选边由规划者按此前已呈报的"应修"口径代定（§2 留痕，用户可否决）。
+- **状态**：**已实施（2026-11-24 类型检查器实施批，提交 `f7d0d5c`；未发版——按 MAINTENANCE §2.2.1 累计）**。规划者验收：全仓新旧对拍 555 个被跟踪 .lom 中 50 个有差异、67 处全部归因，`--dump-ast` 逐字节一致，十组门禁全绿（集成测试 `tests/d0029y_generic_enum.rs` 与 typechecker 单测锁定）；§4 十七项的逐项验证由执行者的对拍脚本完成（证据 `target/probes/wave3y/r250/`）。原状态：已裁，待实施。用户 2026-11-24 裁决（原话）："同意改。待裁事项全部做，可并行，也可顺序，按合理的方式完成。"——选边由规划者按此前已呈报的"应修"口径代定（§2 留痕，用户可否决）。
 - **供料来源**：只读供料报告 `target/probes/wave3/s2_generics/report.md`（A 宿主机制 / B 自举侧与比对集 / C 影响面 / D 候选修法 / E 测试建议）。**规划者亲核**：`variant_return_type` / `variant_info` 返回裸名（`mod.rs:1575`、`:1601`）、`types_compatible` 无 `Named` 对 `Generic` 规则且 `Generic` 对 `Generic` 只比名字（`:1364-1412`）、`is_generic_placeholder` 只认 `Type::Generic("T"/"E")`（`:1861-1863`）——逐一打开源码核对；十二个现象形态此前已由规划者亲手复现（`target/probes/spec_doc_batch/planner/accept10*`）。
 
 ## 1. 问题与根因（规划者亲核）

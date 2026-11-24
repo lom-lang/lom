@@ -273,7 +273,8 @@ Phase 2.4 adds a **gradual** type checker (`src/typechecker.rs`). "Gradual" mean
 | `NAM004` | Error | Record has no such field / enum has no such variant |
 | `NAM005` | Warning | Known builtin used without import (since v1.2.0 — static early warning for the runtime `RUNTIME002` failure; fix: add `from <module> import {name}` at the top; prelude `println`/`print` exempt) |
 | `NAM006` | Warning | Name shadowing by an import (since v1.4.10, user-adjudicated): an `import` alias (or a merged-unit package symbol) collides with a local definition — the **local definition wins** and the collision is surfaced instead of silently resolved. Non-blocking (`ok:true`). |
-| `TYPE001` | Warning | Type mismatch (binary op, let annotation, assignment) |
+| `NAM007` | Warning | Unresolvable standard-library import (unreleased on v1.17.0; designs/0029 §3.2): the module name is a standard-library module but the imported name is not in its export table — emitted statically, positioned on the `from` line, listing the module's available symbols; the run-time `RUNTIME005` is unchanged. Non-blocking (`ok:true`). |
+| `TYPE001` | Warning | Type mismatch (binary op / comparison, let annotation, assignment, range endpoint, tuple-destructuring arity, unary operand) |
 | `TYPE002` | Warning | `if`/`while` condition is not `Bool` |
 | `TYPE003` | Warning | Function/variant argument count or type mismatch |
 | `TYPE010` | Warning | Function/closure return type mismatch |
