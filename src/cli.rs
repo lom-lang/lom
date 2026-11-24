@@ -228,13 +228,13 @@ pub(crate) fn print_help(prog: &str) {
     eprintln!();
     eprintln!("退出码:");
     eprintln!(
-        "  0  程序成功执行 / 诊断无错误 / info 导出成功 / fix 计划生成成功 / apply 应用成功 / codes 导出成功"
+        "  0  程序成功执行 / 诊断无错误 / lom build 无 error 级诊断 / info 导出成功 / fix 计划生成成功 / apply 应用成功 / codes 导出成功"
     );
     eprintln!(
-        "  1  词法/语法/类型/运行时等诊断 error（渐进式 warning 不拦截，rc 0；含带 PKG 码的包诊断）"
+        "  1  词法/语法/类型/运行时等诊断 error（渐进式 warning 不拦截，rc 0；含带 PKG 码的包诊断；lom build 任一源文件有 error 级诊断——人读与 --json 同口径）"
     );
     eprintln!(
-        "  2  工具自身失败：文件不存在 / IO 错误 / 用法错误 / 内部错误 / explain 未知诊断码（ACRI v0.1 §2.2 工具失败带，β-2 起）"
+        "  2  工具自身失败：文件不存在 / IO 错误 / 用法错误 / 内部错误 / explain 未知诊断码 / lom build 源文件不可读（ACRI v0.1 §2.2 工具失败带，β-2 起）"
     );
 }
 
@@ -451,11 +451,13 @@ pub(crate) fn parse_args(args: &[String]) -> CliArgs {
 /// 读取当前目录的 lom.toml，解析依赖图（含循环检测），对每个依赖包 +
 /// 根目录主文件的 .lom 逐个 parse + typecheck，诊断输出到 stdout。
 ///
-/// 退出码：
-///   0 — 清单与依赖解析成功即 0。**诊断不置退出码**：包源码/主文件
-///       有 error 的场合也恒 0（渐进式语义不拦截；
-///       tests/build_closure_externals 锁定此行为）
-///   1 — 当前目录无 lom.toml / 清单解析失败 / 依赖解析失败
+/// 退出码（designs/0029 §3.1，R234——人读与 `--json` 同口径）：
+///   0 — 清单与依赖解析成功，且逐文件检查无 error 级诊断（仅 warning
+///       不置退出码；PKG007 走 stderr，不计入）
+///   1 — 清单解析失败 / 依赖解析失败 / 任一源文件有 error 级诊断
+///       （designs/0021 批"诊断不置退出码、恒 0"的边界经用户裁决推翻；
+///       `--json` 模式静默跑同一套检查只为决定 rc，信封字段不变）
+///   2 — 当前目录无 lom.toml / 源文件不可读（工具失败带）
 ///
 /// Phase 7.8: 包合并（WASM 编译用）。当前目录有 lom.toml 时解析依赖图，
 /// 把每个依赖包的源码 item 合并到主程序前面（重名后主文件覆盖，对齐解释器语义）。

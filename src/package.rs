@@ -24,6 +24,7 @@
 //            stderr 文本，不拦截）
 
 use crate::ast::Item;
+use crate::diagnostics::{Diagnostic, Severity, Stage};
 use crate::parser::Parser;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -85,6 +86,85 @@ impl std::fmt::Display for PkgError {
 }
 
 impl std::error::Error for PkgError {}
+
+/// designs/0030 §3.1（R246）：该错误对应的**既有**诊断码——与 Display 文本
+/// 前缀逐变体一致（不新增码：PKG001-003 是依赖解析三类；PKG004 包源码
+/// 读取失败经 resolve_dependencies 上抛时同样可能出现；PKG005/006 变体为
+/// API 完整性保留，生产路径不发）。
+impl PkgError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            PkgError::ManifestRead { .. } => "PKG001",
+            PkgError::PathNotFound { .. } => "PKG002",
+            PkgError::CircularDep { .. } => "PKG003",
+            PkgError::SourceParse { .. } => "PKG004",
+            PkgError::UnknownPackage { .. } => "PKG005",
+            PkgError::SymbolNotFound { .. } => "PKG006",
+        }
+    }
+}
+
+/// `parse_manifest` 的错误里清单路径的占位写法（见其各处 `path: "lom.toml"`
+/// ——相对清单所在目录，不带目录成分）。此处只读不改其 Display 文本。
+const MANIFEST_PLACEHOLDER: &str = "lom.toml";
+
+/// designs/0030 §3.1（R246）：PkgError → 结构化诊断——坏清单在 `--check` /
+/// `--json` 下走诊断带（rc 1、`ok: false`），不再被吞成"诊断通过" / `ok: true`。
+///
+/// - 码 = 既有 PKG001-006（按变体，见 [`PkgError::code`]），severity = error，
+///   stage = package。
+/// - `Diagnostic.file` = 出错的清单路径；信封顶层 `file` 仍是入口文件。
+/// - 位置 (0:0)、anchor "none"——解析类错误只有文本里的"第 N 行"，没有
+///   结构化坐标，不伪造；`source_line` 为 None（不是 .lom 源码行）。
+/// - message 带清单路径（人类可读渲染的头行不打印 file）：沿用运行路径的
+///   前缀（清单解析失败 / 依赖解析失败）与 Display 文本。
+///
+/// `entry_manifest` = 入口文件所在目录的 lom.toml 路径，三种用法：
+/// - 入口清单自身加载失败：`parse_manifest` 的错误只带占位路径
+///   `'lom.toml'`，此处以真实路径落盘；
+/// - 依赖解析失败（路径不存在 / 循环 / 包源码不可读）：它是**声明该依赖
+///   的清单**（错误文本本身不带清单路径，补在括注里）；
+/// - 嵌套依赖的清单自身解析失败：错误同样只带占位符，而此处无从得知是
+///   哪一份——调用方传 None，保留错误自述的占位路径，不伪造（已知边界）。
+pub fn pkg_error_diagnostic(err: &PkgError, entry_manifest: Option<&str>) -> Diagnostic {
+    let code = err.code();
+    let placeholder = matches!(
+        err,
+        PkgError::ManifestRead { path, .. } if path.as_str() == MANIFEST_PLACEHOLDER
+    );
+    let (file, message) = match err {
+        PkgError::ManifestRead { path, reason } if placeholder => match entry_manifest {
+            Some(real) => (
+                real.to_string(),
+                format!(
+                    "清单解析失败: {}: 清单 '{}' 解析失败: {}",
+                    code, real, reason
+                ),
+            ),
+            None => (path.clone(), format!("清单解析失败: {}", err)),
+        },
+        PkgError::ManifestRead { path, .. } => (path.clone(), format!("清单解析失败: {}", err)),
+        _ => {
+            let anchor = entry_manifest.unwrap_or(MANIFEST_PLACEHOLDER);
+            (
+                anchor.to_string(),
+                format!("依赖解析失败: {}（清单 '{}'）", err, anchor),
+            )
+        }
+    };
+    Diagnostic {
+        severity: Severity::Error,
+        stage: Stage::Package,
+        code: code.to_string(),
+        message,
+        file,
+        line: 0,
+        col: 0,
+        source_line: None,
+        is_hole: false,
+        hint: None,
+    }
+}
 
 /// 依赖类型（Phase 4.4 仅本地路径）
 #[derive(Debug, Clone)]
@@ -148,8 +228,10 @@ impl DependencyGraph {
 /// 按包根路径升序两两比较（与解释器 load_packages 注册序 / 宿主 WASM
 /// merge_packages_for_wasm / L2 expand_package_unit 同键 PathBuf Ord）——
 /// "后者"即该对撞名在确定序下的实际生效包。符号按字典序输出，保证
-/// 多撞名时 stderr 确定性。调用点：main.rs collect_package_symbols
-/// （--check / 默认 run 的类型检查可见化 / build 三路径共用，各打印一次）。
+/// 多撞名时 stderr 确定性。调用点：main.rs 带文件三路径（--check / 默认 run
+/// 的类型检查可见化 / build-wasm）的 PKG007 单点接线（resolve_entry_packages
+/// 之后）与无文件 build 的人类可读路径——各打印一次；fix / apply 面不打
+/// （designs/0030 §2 选边 3：A2）。
 pub fn warn_public_symbol_clashes(graph: &DependencyGraph) {
     let mut pkgs: Vec<&ResolvedPackage> = graph.packages.values().collect();
     pkgs.sort_by(|a, b| a.root.cmp(&b.root));
@@ -932,5 +1014,150 @@ version = "0.1.0"
         // 包 "unknown" 不在 dependencies 中
         assert!(graph.get_package("unknown").is_none());
         cleanup(&tmp);
+    }
+
+    // ===== designs/0030 §3.1（R246）：PkgError → 结构化诊断 =====
+
+    /// 变体 → 既有码（与 Display 前缀一致）；severity / stage / 位置 / 源码行
+    /// 的固定形态。
+    #[test]
+    fn r246_pkg_error_codes_match_display_prefix() {
+        let cases: Vec<PkgError> = vec![
+            PkgError::ManifestRead {
+                path: "lom.toml".into(),
+                reason: "r".into(),
+            },
+            PkgError::PathNotFound {
+                dep: "d".into(),
+                path: "p".into(),
+            },
+            PkgError::CircularDep {
+                chain: vec!["a".into(), "b".into()],
+            },
+            PkgError::SourceParse {
+                pkg: "p".into(),
+                file: "f".into(),
+                reason: "r".into(),
+            },
+            PkgError::UnknownPackage { name: "n".into() },
+            PkgError::SymbolNotFound {
+                pkg: "p".into(),
+                symbol: "s".into(),
+            },
+        ];
+        for e in &cases {
+            let d = pkg_error_diagnostic(e, Some("dir/lom.toml"));
+            assert_eq!(d.code, e.code());
+            assert!(
+                e.to_string().starts_with(&format!("{}: ", e.code())),
+                "Display 前缀 = 码：{}",
+                e
+            );
+            assert_eq!(d.severity, crate::diagnostics::Severity::Error);
+            assert_eq!(d.stage, crate::diagnostics::Stage::Package);
+            assert_eq!(d.stage.as_str(), "package");
+            assert_eq!((d.line, d.col), (0, 0));
+            assert!(d.source_line.is_none() && !d.is_hole && d.hint.is_none());
+        }
+    }
+
+    /// 依赖解析三类的 file / message：入口清单占位符换真实路径；路径不存在
+    /// 与循环依赖以声明依赖的清单为 file、message 带清单路径；错误自带真实
+    /// 清单路径时照用；占位符 + 调用方不知是哪一份时不伪造。
+    #[test]
+    fn r246_pkg_error_diagnostic_file_and_message() {
+        let entry = "app\\lom.toml";
+        let d = pkg_error_diagnostic(
+            &PkgError::ManifestRead {
+                path: "lom.toml".into(),
+                reason: "缺少必填字段 'name'".into(),
+            },
+            Some(entry),
+        );
+        assert_eq!(d.file, entry);
+        assert_eq!(
+            d.message,
+            "清单解析失败: PKG001: 清单 'app\\lom.toml' 解析失败: 缺少必填字段 'name'"
+        );
+
+        let d = pkg_error_diagnostic(
+            &PkgError::PathNotFound {
+                dep: "ghost".into(),
+                path: "app\\ghost".into(),
+            },
+            Some(entry),
+        );
+        assert_eq!(d.code, "PKG002");
+        assert_eq!(d.file, entry);
+        assert_eq!(
+            d.message,
+            "依赖解析失败: PKG002: 依赖 'ghost' 路径不存在: app\\ghost（清单 'app\\lom.toml'）"
+        );
+
+        let d = pkg_error_diagnostic(
+            &PkgError::CircularDep {
+                chain: vec!["a".into(), "b".into(), "a".into()],
+            },
+            Some(entry),
+        );
+        assert_eq!(d.code, "PKG003");
+        assert_eq!(d.file, entry);
+        assert_eq!(
+            d.message,
+            "依赖解析失败: PKG003: 循环依赖: a -> b -> a（清单 'app\\lom.toml'）"
+        );
+
+        let dep_toml = "app\\libdir\\lom.toml";
+        let e = PkgError::ManifestRead {
+            path: dep_toml.into(),
+            reason: "依赖键名 'lib' 与清单 name 'other' 不一致".into(),
+        };
+        let d = pkg_error_diagnostic(&e, Some(entry));
+        assert_eq!(d.code, "PKG001");
+        assert_eq!(d.file, dep_toml);
+        assert_eq!(d.message, format!("清单解析失败: {}", e));
+
+        let d = pkg_error_diagnostic(
+            &PkgError::ManifestRead {
+                path: "lom.toml".into(),
+                reason: "r".into(),
+            },
+            None,
+        );
+        assert_eq!(d.file, "lom.toml");
+        assert_eq!(d.message, "清单解析失败: PKG001: 清单 'lom.toml' 解析失败: r");
+    }
+
+    /// 路径含反斜杠时信封仍是合法 JSON（file 经 escape_str）；逐条 file =
+    /// 清单、顶层 file = 入口文件；位置 0:0 anchor none。
+    #[test]
+    fn r246_pkg_diagnostic_json_is_valid_with_backslash_paths() {
+        use crate::diagnostics::Diagnostics;
+        let mut diags = Diagnostics::new("app\\main.lom");
+        diags.diagnostics.push(pkg_error_diagnostic(
+            &PkgError::PathNotFound {
+                dep: "ghost".into(),
+                path: "app\\ghost".into(),
+            },
+            Some("app\\lom.toml"),
+        ));
+        diags.ok = false;
+        let json = diags.to_json();
+        assert!(
+            crate::json::parse(&json).is_ok(),
+            "信封应是合法 JSON：{}",
+            json
+        );
+        assert!(json.contains("\"file\": \"app\\\\main.lom\""), "{}", json);
+        assert!(json.contains("\"file\": \"app\\\\lom.toml\""), "{}", json);
+        assert!(json.contains("\"stage\": \"package\""), "{}", json);
+        assert!(
+            json.contains("\"position\": {\"line\": 0, \"col\": 0, \"anchor\": \"none\"}"),
+            "{}",
+            json
+        );
+        assert!(json.contains("\"source_line\": null"), "{}", json);
+        assert!(json.contains("\"ok\": false"), "{}", json);
+        assert!(json.contains("\"errors\": 1"), "{}", json);
     }
 }

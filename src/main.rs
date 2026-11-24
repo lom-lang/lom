@@ -298,14 +298,42 @@ fn main_inner() {
 
     // ===== 诊断阶段（词法 + 语法，Phase 2.2 容错解析器一次性收集全部错误）=====
     let mut diags = diagnostics::Diagnostics::from_parse_result(&src, path);
+    let parsed_ok = diags.ok;
+
+    // ===== 包解析（designs/0030 §3.1 R246 / §3.2 R244）：纯函数 =====
+    // --json / --check / 运行三条带文件路径共用同一份结果。
+    let packages = resolve_entry_packages(path);
+    let graph: Option<&package::DependencyGraph> = match &packages {
+        EntryPackages::Resolved(g) => Some(g),
+        EntryPackages::NoManifest => None,
+        EntryPackages::Failed(err, manifest) => {
+            // 坏清单 → 一条结构化 PKG 诊断（rc 1 / ok false），词法 / 语法
+            // 诊断照报（排在前面）。带着空 externals 继续做类型检查只会产出
+            // 使用点的假 NAM003——入口文件的类型检查跳过（下方按 Failed 判）。
+            diags
+                .diagnostics
+                .push(package::pkg_error_diagnostic(err, manifest.as_deref()));
+            diags.ok = false;
+            None
+        }
+    };
+    // R104 批（designs/0014 §2.4）单点接线：PKG007 的打印留在调用点——入口
+    // 文件解析通过且依赖图解析成功时，每条带文件路径恰打印一次（改前口径）。
+    if parsed_ok && let Some(g) = graph {
+        package::warn_public_symbol_clashes(g);
+    }
+
+    // ===== 类型检查（Phase 2.4 渐进式类型检查器）=====
+    // 入口文件解析通过且包解析成功时执行；externals = 依赖包公开符号并集
+    // （无清单单文件 = 空集，与 check_program 同一函数、同一输入）。
+    if parsed_ok && !matches!(packages, EntryPackages::Failed(..)) {
+        let program = parser::Parser::parse_recover(&src).program;
+        let externals = graph.map(entry_externals).unwrap_or_default();
+        typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
+    }
 
     if cli.json {
-        // JSON 模式：仅诊断，不执行；解析通过后执行类型检查（Phase 2.4）
-        if diags.ok {
-            let program = parser::Parser::parse_recover(&src).program;
-            let externals = collect_package_symbols(path);
-            typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
-        }
+        // JSON 模式：仅诊断，不执行
         print!("{}", diags.to_json());
         process::exit(if diags.ok { 0 } else { 1 });
     }
@@ -322,11 +350,8 @@ fn main_inner() {
     }
 
     // ===== 类型检查（Phase 2.4 渐进式类型检查器）=====
-    // --check 模式：执行类型检查，收集 TYPE/MAT/NAM 诊断
+    // --check 模式：类型检查已完成，输出收集到的 TYPE/MAT/NAM 诊断
     if cli.check {
-        let program = parser::Parser::parse_recover(&src).program;
-        let externals = collect_package_symbols(path);
-        typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
         // 有诊断（error 或 warning）时都输出，便于 LLM/用户看到类型提示
         if !diags.diagnostics.is_empty() {
             print!("{}", diags.to_human());
@@ -344,38 +369,19 @@ fn main_inner() {
     // 此前运行模式完全跳过类型检查——"渐进式类型"在默认路径上不可见（名不副实）。
     // 现在：照常执行类型检查，诊断打印到 stderr，但**永不拦截执行**——
     // 渐进式承诺不变（动态可跑），只是让 LLM/用户在每次运行时都能看到类型反馈。
-    {
-        let program = parser::Parser::parse_recover(&src).program;
-        let externals = collect_package_symbols(path);
-        typechecker::check_program_with_externals(&program, &src, path, &mut diags, &externals);
-        if !diags.diagnostics.is_empty() {
-            eprint!("{}", diags.to_human());
-        }
+    if !diags.diagnostics.is_empty() {
+        eprint!("{}", diags.to_human());
     }
 
     // ===== 执行阶段 =====
     let program = parser::Parser::parse_recover(&src).program;
     let mut interp = interpreter::Interpreter::new();
-    // Phase 4.4: 若文件所在目录有 lom.toml，加载依赖包
-    // 使 `from pkg import { ... }` 能解析外部包符号
-    let file_dir = std::path::Path::new(path)
-        .parent()
-        .unwrap_or(std::path::Path::new("."));
-    let toml_path = file_dir.join("lom.toml");
-    if toml_path.exists() {
-        match package::load_manifest_file(&toml_path) {
-            Ok(manifest) => match package::resolve_dependencies(&manifest, file_dir) {
-                Ok(graph) => interp.load_packages(&graph),
-                Err(e) => {
-                    eprintln!("依赖解析失败: {}", e);
-                    process::exit(1);
-                }
-            },
-            Err(e) => {
-                eprintln!("清单解析失败: {}", e);
-                process::exit(1);
-            }
-        }
+    // Phase 4.4: 文件所在目录有 lom.toml 时加载依赖包
+    // 使 `from pkg import { ... }` 能解析外部包符号。
+    // designs/0030 §3.1：依赖图取上方纯函数解析的那份——清单 / 依赖解析
+    // 失败的场合已在静态面以 PKG 诊断 rc 1 退出，到不了这里。
+    if let Some(g) = graph {
+        interp.load_packages(g);
     }
     // Phase 3.5: 传递程序参数（-- 之后的参数），供 env::args() 读取
     // 第一个参数约定为 .lom 文件路径（与大多数 CLI 约定一致：argv[0] = 程序名）
@@ -414,8 +420,27 @@ fn main_inner() {
         // （Phase 2.3 时 AST 尚无 span 的历史欠账；表达式级 span 自 v0.21.0
         // 起已在 AST 上）。不在表达式求值路径上抛出的错误（import 解析等）
         // 侧通道为空，维持 (0, 0)；DepthLimit 自带位置，由 from_runtime 覆盖。
-        diags.add_runtime(&e, &src, interp.err_site());
-        eprint!("{}", diags.to_human());
+        // designs/0029 §3.6（R242）：错误发生在依赖包的函数体内时，位置属于
+        // 包文件——按来源文件取源码行并填该条诊断的 file（信封顶层 file
+        // 仍是入口文件）。来源为入口文件（None）时走原路径，行为与此前逐字
+        // 节相同；来源文件读不到（运行期间被移走等）退回入口文件渲染。
+        match interp.err_source_file() {
+            None => diags.add_runtime(&e, &src, interp.err_site()),
+            Some(dep_file) => match fs::read_to_string(dep_file) {
+                Ok(dep_src) => {
+                    diags.add_runtime_in_file(&e, dep_file, &dep_src, interp.err_site())
+                }
+                Err(_) => diags.add_runtime(&e, &src, interp.err_site()),
+            },
+        }
+        // designs/0029 §3.4（R237）：只打新增的这一条运行时诊断，其后补一行
+        // 完整汇总（静态 + 运行时的合计）。静态诊断已在上方"类型检查可见化"
+        // 块打过第一遍——此前这里整份重打，静态诊断在一次运行里出现两次
+        // （汇总行也两次）。无静态诊断时本分支的输出与此前逐字节相同。
+        if let Some(last) = diags.diagnostics.last() {
+            eprint!("{}", diagnostics::Diagnostics::render_one(last));
+        }
+        eprint!("{}", diags.summary_line());
         process::exit(1);
     }
 }
@@ -452,34 +477,74 @@ fn run_info(src: &str, path: &str, json: bool) {
     process::exit(0);
 }
 
-/// Phase 6.7 评审整改：收集 lom.toml 依赖包的公开符号（fn/enum/变体名）
-/// 供 typechecker 免于对包符号误报 NAM003（此前 pkg_demo 在默认运行路径喷 5 条假 error）
-fn collect_package_symbols(path: &str) -> Vec<String> {
+/// Phase 6.7 评审整改 → designs/0030 §3.1（R246）函数拆分：入口文件的包解析
+/// 结果——纯函数 [`resolve_entry_packages`] 的返回值（不打印、不退出）。
+enum EntryPackages {
+    /// 入口文件所在目录无 lom.toml（不读盘——单文件程序零成本）
+    NoManifest,
+    /// 清单与依赖图解析成功
+    Resolved(package::DependencyGraph),
+    /// 清单 / 依赖解析失败。第二个分量 = 出错清单的真实路径：入口清单自身
+    /// 加载失败时其错误只带占位符 `'lom.toml'`，此处给出真实路径；依赖解析
+    /// 失败（路径不存在 / 循环 / 包源码不可读）时它是声明该依赖的清单；
+    /// 嵌套依赖的清单自身解析失败时无从得知是哪一份 → None（不伪造）。
+    Failed(package::PkgError, Option<String>),
+}
+
+/// designs/0030 §3.1（R246）/ §3.2（R244）：按入口文件所在目录解析 lom.toml
+/// 与依赖图——**纯函数**（不打印、不退出、不吞错）。
+///
+/// 收集依赖包公开符号（fn/enum/变体名）供 typechecker 免于对包符号误报
+/// NAM003（Phase 6.7 评审整改：此前 pkg_demo 在默认运行路径喷 5 条假 error）。
+/// 此前的 collect_package_symbols 把"清单或依赖解析失败"与"没有依赖包"压成
+/// 同一个返回值（`Err(_) => Vec::new()`）——静态面（--check / --json）于是对
+/// 根本跑不起来的项目报告干净，入口用到包符号时另出使用点的假 NAM003。现
+/// 调用方拿到 [`EntryPackages::Failed`] 并把它变成一条结构化 PKG 诊断
+/// （rc 1 / ok false），且跳过入口文件的类型检查。
+///
+/// PKG007 的打印不在本函数——留在各调用点（`warn_public_symbol_clashes`：
+/// --check / 默认 run / build-wasm 三路径各打印一次；fix / apply 面不打）。
+fn resolve_entry_packages(path: &str) -> EntryPackages {
     let file_dir = std::path::Path::new(path)
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     let toml_path = file_dir.join("lom.toml");
     if !toml_path.exists() {
-        return Vec::new();
+        return EntryPackages::NoManifest;
     }
+    let toml_display = toml_path.display().to_string();
     match package::load_manifest_file(&toml_path) {
         Ok(manifest) => match package::resolve_dependencies(&manifest, &file_dir) {
-            Ok(graph) => {
-                // R104 批（designs/0014 §2.4）单点接线：--check / 默认 run 的
-                // 类型检查可见化 / build 三路径都经本函数取 externals——在此
-                // 发 PKG007（stderr，不拦截），每条 CLI 路径恰打印一次。
-                package::warn_public_symbol_clashes(&graph);
-                graph
-                    .packages
-                    .values()
-                    .flat_map(|p| p.public_symbols.iter().cloned())
-                    .collect()
+            Ok(graph) => EntryPackages::Resolved(graph),
+            Err(e) => {
+                // 嵌套依赖的清单自身解析失败：错误只带占位符 'lom.toml'
+                //（入口清单此时已解析成功，失败的必是某个依赖的清单），
+                // 无从得知是哪一份——不伪造
+                let nested_placeholder = matches!(
+                    &e,
+                    package::PkgError::ManifestRead { path, .. }
+                        if path.as_str() == "lom.toml"
+                );
+                if nested_placeholder {
+                    EntryPackages::Failed(e, None)
+                } else {
+                    EntryPackages::Failed(e, Some(toml_display))
+                }
             }
-            Err(_) => Vec::new(),
         },
-        Err(_) => Vec::new(),
+        Err(e) => EntryPackages::Failed(e, Some(toml_display)),
     }
+}
+
+/// 入口文件路径的 externals：依赖图全部包 public_symbols 的扁平并集（原
+/// collect_package_symbols 的返回值口径——不带打印）。
+fn entry_externals(graph: &package::DependencyGraph) -> Vec<String> {
+    graph
+        .packages
+        .values()
+        .flat_map(|p| p.public_symbols.iter().cloned())
+        .collect()
 }
 
 /// Phase 6.4: 执行 `lom doc` 子命令
@@ -598,7 +663,16 @@ fn run_build_wasm(file: &str, target: Option<&str>, output: Option<&str>) -> ! {
         // check_program_with_externals 形态）——合并单元中包内
         // `from libinner import {triple as t3}` 的别名经 collect_import
         // 的 externals else-if 分支放行，NAM003 假阳性消失
-        let externals = collect_package_symbols(file);
+        // designs/0030 §3.1（R246）：PKG007 的打印留在本调用点；依赖图由
+        // 同一纯函数解析——merge_packages_for_wasm 已对清单 / 依赖解析失败
+        // rc 1 退出，走到这里的只有 Resolved / NoManifest。
+        let externals = match resolve_entry_packages(file) {
+            EntryPackages::Resolved(g) => {
+                package::warn_public_symbol_clashes(&g);
+                entry_externals(&g)
+            }
+            _ => Vec::new(),
+        };
         typechecker::check_program_with_externals(&program, &src, file, &mut tdiags, &externals);
         // R105 批（designs/0014 §2.3/§2.5）：warning 亦可见（对齐默认 run 路径
         // "诊断非空即打 stderr"形态）——NAM006 遮蔽提示在 build 路径不再被
@@ -729,7 +803,7 @@ fn run_build(json: bool) {
     let toml_path = std::path::Path::new("lom.toml");
     if !toml_path.exists() {
         if json {
-            println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"当前目录无 lom.toml"}}"#);
+            println!("{}", build_error_json("当前目录无 lom.toml"));
         } else {
             eprintln!("错误：当前目录无 lom.toml（Phase 4.4 包管理清单）");
             eprintln!("创建最小清单：");
@@ -747,7 +821,7 @@ fn run_build(json: bool) {
         Ok(m) => m,
         Err(e) => {
             if json {
-                println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"{}"}}"#, e);
+                println!("{}", build_error_json(&e.to_string()));
             } else {
                 eprintln!("清单解析失败: {}", e);
             }
@@ -760,7 +834,7 @@ fn run_build(json: bool) {
         Ok(g) => g,
         Err(e) => {
             if json {
-                println!(r#"{{"schema":"lom-build/v1","ok":false,"error":"{}"}}"#, e);
+                println!("{}", build_error_json(&e.to_string()));
             } else {
                 eprintln!("依赖解析失败: {}", e);
             }
@@ -768,68 +842,67 @@ fn run_build(json: bool) {
         }
     };
 
-    if json {
-        // JSON 输出：汇总每个包的源码检查结果
-        print!(
-            "{{\"schema\":\"lom-build/v1\",\"ok\":true,\"package\":\"{}\",\"version\":\"{}\",\"dependencies\":[",
-            manifest.name, manifest.version
-        );
-        let mut first = true;
-        for (name, pkg) in &graph.packages {
-            if !first {
-                print!(",");
-            }
-            first = false;
-            print!(
-                "{{\"name\":\"{}\",\"path\":\"{}\",\"symbols\":[",
-                name,
-                pkg.root.display()
-            );
-            let mut sym_first = true;
-            for sym in &pkg.public_symbols {
-                if !sym_first {
-                    print!(",");
-                }
-                sym_first = false;
-                print!("\"{}\"", sym);
-            }
-            print!("]}}");
-        }
-        println!("]}}");
-        return;
-    }
+    // designs/0029 §3.1（R234）：逐文件检查的结论参与退出码——任一源文件有
+    // error 级诊断 → 1（诊断带）；源文件不可读 → 2（工具失败带，ACRI §2.2
+    // "unreadable input ≥ 2"）；仅 warning 维持 0。人读与 JSON 两个模式跑
+    // **同一套**逐文件检查：JSON 模式静默（不打 ✓/✗ 行与诊断），只为决定
+    // rc；信封字段不变（designs/0021 "JSON 模式 schema 面稳定"的边界保留）。
+    // 此前（designs/0021 批口径）诊断不置退出码、恒 0——该边界于 designs/0029
+    // 批经用户裁决推翻。
+    let externals_map = package_closure_externals(&graph);
+    let mut any_error = false;
+    let mut any_unreadable = false;
 
     // 人类可读输出
     // 缺口 B（designs/0021 §1）：无文件 build 此前不发 PKG007——本流程
-    // 不经 collect_package_symbols（那是带文件三路径的单点接线），两包
-    // 撞名在依赖图解析成功后此处补发（stderr、不拦截；JSON 路径上方已
-    // 提前 return，schema 面不动）。
-    package::warn_public_symbol_clashes(&graph);
+    // 不经带文件三路径的 PKG007 调用点（resolve_entry_packages 之后的单点
+    // 接线），两包
+    // 撞名在依赖图解析成功后此处补发（stderr、不拦截；JSON 路径不打，
+    // schema 面不动）。
+    if !json {
+        package::warn_public_symbol_clashes(&graph);
+    }
     // v1.4.13 登记项 2（v1.4.9 登记）：包级 externals 预计算——每包
     // manifest.dependencies 出发的传递闭包公开符号并集（图已过环检测，
     // DFS 安全；见 package_closure_externals）
-    let externals_map = package_closure_externals(&graph);
-    println!("Lom build — 包依赖解析结果");
-    println!("  项目: {} v{}", manifest.name, manifest.version);
+    if !json {
+        println!("Lom build — 包依赖解析结果");
+        println!("  项目: {} v{}", manifest.name, manifest.version);
+    }
     if graph.packages.is_empty() {
-        println!("  依赖: （无）");
+        if !json {
+            println!("  依赖: （无）");
+        }
     } else {
-        println!("  依赖: {} 个", graph.packages.len());
+        if !json {
+            println!("  依赖: {} 个", graph.packages.len());
+        }
         for (name, pkg) in &graph.packages {
-            println!("    - {} (path: {})", name, pkg.root.display());
-            println!("      源码文件: {} 个", pkg.source_files.len());
-            println!("      公开符号: {} 个", pkg.public_symbols.len());
+            if !json {
+                println!("    - {} (path: {})", name, pkg.root.display());
+                println!("      源码文件: {} 个", pkg.source_files.len());
+                println!("      公开符号: {} 个", pkg.public_symbols.len());
+            }
             // 对包源码执行类型检查
             // v1.4.13 登记项 2（v1.4.9 登记）：此前逐文件 check_program
             // （无 externals），包源内跨包符号引用（含 as 别名 t3 与
             // 非别名真名）误报 NAM003 error。改为按包依赖闭包 externals
-            // 检查（对齐带文件路径 collect_package_symbols 的放行语义）。
+            // 检查（对齐带文件路径 entry_externals 的放行语义）。
             // 缺口 A（designs/0021 §1）收口：再并上「本包 public_symbols
             // − 当前文件自身顶层符号集」——多文件包内跨文件引用（文件 B
             // 用同包文件 A 的 fn）不再假阳性 NAM003。减法在
             // check_and_report_file 内做（必做——见其文档）。
             for file in &pkg.source_files {
-                check_and_report_file(file, &externals_map[name], Some(&pkg.public_symbols));
+                match check_and_report_file(
+                    file,
+                    &externals_map[name],
+                    Some(&pkg.public_symbols),
+                    !json,
+                ) {
+                    FileVerdict::NoError => {}
+                    FileVerdict::HasError => any_error = true,
+                    FileVerdict::Unreadable => any_unreadable = true,
+                }
             }
         }
     }
@@ -842,17 +915,87 @@ fn run_build(json: bool) {
     // 根目录无 .lom 文件则跳过（不报错）。
     let root_files = package::collect_lom_files(root_path);
     if !root_files.is_empty() {
-        println!("  主项目源码: {} 个", root_files.len());
+        if !json {
+            println!("  主项目源码: {} 个", root_files.len());
+        }
         let root_externals: Vec<String> = graph
             .packages
             .values()
             .flat_map(|p| p.public_symbols.iter().cloned())
             .collect();
         for file in &root_files {
-            check_and_report_file(file, &root_externals, None);
+            match check_and_report_file(file, &root_externals, None, !json) {
+                FileVerdict::NoError => {}
+                FileVerdict::HasError => any_error = true,
+                FileVerdict::Unreadable => any_unreadable = true,
+            }
         }
     }
-    println!("\n依赖解析成功，共 {} 个包。", graph.packages.len());
+    if json {
+        // JSON 输出：汇总每个包的源码检查结果（信封字段不随诊断变化——
+        // designs/0021 schema 面稳定；R234 只让 rc 参与口径）。
+        // designs/0029 §3.1（R243）：字符串字段一律经 json::escape_str——
+        // 此前 path / error 未转义直拼，Windows 路径含反斜杠时输出不是
+        // 合法 JSON（`"path":".\dep"`）。
+        print!(
+            "{{\"schema\":\"lom-build/v1\",\"ok\":true,\"package\":\"{}\",\"version\":\"{}\",\"dependencies\":[",
+            json::escape_str(&manifest.name),
+            json::escape_str(&manifest.version)
+        );
+        let mut first = true;
+        for (name, pkg) in &graph.packages {
+            if !first {
+                print!(",");
+            }
+            first = false;
+            print!(
+                "{{\"name\":\"{}\",\"path\":\"{}\",\"symbols\":[",
+                json::escape_str(name),
+                json::escape_str(&pkg.root.display().to_string())
+            );
+            let mut sym_first = true;
+            for sym in &pkg.public_symbols {
+                if !sym_first {
+                    print!(",");
+                }
+                sym_first = false;
+                print!("\"{}\"", json::escape_str(sym));
+            }
+            print!("]}}");
+        }
+        println!("]}}");
+    } else {
+        println!("\n依赖解析成功，共 {} 个包。", graph.packages.len());
+    }
+    // R234 退出码：工具失败带（2）优先于诊断带（1）——与"无 lom.toml = 2"
+    // 同带；不可读的说明行已由 check_and_report_file 打到 stderr。
+    if any_unreadable {
+        process::exit(2);
+    }
+    if any_error {
+        process::exit(1);
+    }
+}
+
+/// designs/0029 §3.1（R243）：lom-build/v1 失败信封——`error` 文本经
+/// json::escape_str（清单/依赖错误的文本含 Windows 路径反斜杠）。
+fn build_error_json(error: &str) -> String {
+    format!(
+        "{{\"schema\":\"lom-build/v1\",\"ok\":false,\"error\":\"{}\"}}",
+        json::escape_str(error)
+    )
+}
+
+/// designs/0029 §3.1（R234）：无文件 build 对单个源文件的检查结论
+/// （check_and_report_file 的返回值——决定进程退出码）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FileVerdict {
+    /// 无诊断或仅 warning（warning 不置退出码）
+    NoError,
+    /// 有 error 级诊断（判据 `!diags.ok`——仅 error 级置 false）
+    HasError,
+    /// 源文件不可读
+    Unreadable,
 }
 
 /// 缺口 A/C（designs/0021 §1）：单文件「读取 + 解析 + 类型检查 +
@@ -872,16 +1015,23 @@ fn run_build(json: bool) {
 ///   单文件包减法后为空集，行为零变化；根路径（`pkg_symbols = None`，
 ///   缺口 C）同受统一减法覆盖（R125：root_externals 减文件自身符号）
 ///   ——包/根两路径行为口径对称。
+///
+/// designs/0029 §3.1（R234）：返回该文件的检查结论（见 FileVerdict）——
+/// 调用方据此决定退出码。`report = false`（JSON 模式）静默：不打 ✓/✗
+/// 行与诊断，只回传结论；源文件不可读的 stderr 说明行两种模式都打
+/// （它是 rc 2 的唯一解释）。warning-only 的文件照旧打 ✗（cosmetic，
+/// 另议）但结论为 NoError。
 fn check_and_report_file(
     file: &std::path::Path,
     base_externals: &[String],
     pkg_symbols: Option<&HashSet<String>>,
-) {
+    report: bool,
+) -> FileVerdict {
     let src = match fs::read_to_string(file) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("      读取 {} 失败: {}", file.display(), e);
-            return;
+            return FileVerdict::Unreadable;
         }
     };
     let path_str = file.display().to_string();
@@ -903,18 +1053,25 @@ fn check_and_report_file(
             &program, &src, &path_str, &mut diags, &externals,
         );
     }
-    if diags.diagnostics.is_empty() {
-        println!(
-            "      ✓ {} — 通过",
-            file.file_name().unwrap().to_string_lossy()
-        );
+    if report {
+        if diags.diagnostics.is_empty() {
+            println!(
+                "      ✓ {} — 通过",
+                file.file_name().unwrap().to_string_lossy()
+            );
+        } else {
+            println!(
+                "      ✗ {} — {} 个诊断",
+                file.file_name().unwrap().to_string_lossy(),
+                diags.diagnostics.len()
+            );
+            print!("{}", diags.to_human());
+        }
+    }
+    if diags.ok {
+        FileVerdict::NoError
     } else {
-        println!(
-            "      ✗ {} — {} 个诊断",
-            file.file_name().unwrap().to_string_lossy(),
-            diags.diagnostics.len()
-        );
-        print!("{}", diags.to_human());
+        FileVerdict::HasError
     }
 }
 
@@ -944,7 +1101,7 @@ fn file_top_level_symbols(program: &ast::Program) -> HashSet<String> {
 /// externals——包 P 检查源文件时的可见外部符号 = P 的
 /// manifest.dependencies 出发的传递闭包（不含 P 自己）各包
 /// public_symbols 并集。带文件路径（run_build_wasm）走
-/// collect_package_symbols 的全依赖图并集（合并单元整体检查），本流程
+/// entry_externals 的全依赖图并集（合并单元整体检查），本流程
 /// 逐文件检查故按各包自身闭包收敛——依赖未声明的包符号不并入
 /// （负向面：仍 NAM003）。
 fn package_closure_externals(graph: &package::DependencyGraph) -> HashMap<String, Vec<String>> {

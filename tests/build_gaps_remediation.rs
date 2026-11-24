@@ -100,8 +100,8 @@ fn same_file_duplicate_still_rejected() {
     );
     let (stdout, _stderr, rc) = run_build(bin, &dir);
     assert_eq!(
-        rc, 0,
-        "无文件 build rc 恒 0（NAM002 诊断不置退出码），stdout: {}",
+        rc, 1,
+        "无文件 build 遇 error 级诊断 rc 1（designs/0029 R234：NAM002 error 置退出码），stdout: {}",
         stdout
     );
     assert!(
@@ -190,8 +190,8 @@ fn main_file_diagnostics_checked() {
     );
     let (stdout, _stderr, rc) = run_build(bin, &dir);
     assert_eq!(
-        rc, 0,
-        "无文件 build rc 恒 0（主文件 NAM003 不置退出码），stdout: {}",
+        rc, 1,
+        "无文件 build 遇 error 级诊断 rc 1（designs/0029 R234：主文件 NAM003 error 置退出码），stdout: {}",
         stdout
     );
     assert!(

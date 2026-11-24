@@ -19,7 +19,7 @@
 //   "diagnostics": [
 //     {
 //       "severity": "error" | "warning" | "info",
-//       "stage": "lex" | "parse" | "type" | "runtime",
+//       "stage": "lex" | "parse" | "type" | "runtime" | "package",
 //       "code": "LEX001" | "PARSE001" | "RUNTIME001" | ...,
 //       "message": "<human readable>",
 //       "file": "<path>",
@@ -50,6 +50,10 @@ pub enum Stage {
     Parse,
     Type,
     Runtime,
+    /// designs/0030 §3.1（R246）：包系统错误（清单读取 / 解析、依赖解析）。
+    /// ACRI v0.1 §1.1 把 stage 定义为 OPTIONAL、实现自定义词表——新增取值
+    /// 合规；仓内没有按 stage 取值分支的消费者。
+    Package,
 }
 
 impl Stage {
@@ -59,6 +63,7 @@ impl Stage {
             Stage::Parse => "parse",
             Stage::Type => "type",
             Stage::Runtime => "runtime",
+            Stage::Package => "package",
         }
     }
 }
@@ -359,6 +364,24 @@ impl Diagnostics {
         self.ok = false;
     }
 
+    /// designs/0029 §3.6（R242）：同 `add_runtime`，但诊断归属指定的 `file`
+    /// （依赖包源文件）——源码行取自该文件的 `src`。信封顶层 `file` 仍是
+    /// 入口文件（单文件信封不变），只有这一条诊断的 `file` / 源码行指向
+    /// 包文件。DepthLimit 自带位置，同样由 from_runtime 覆盖 site。
+    pub fn add_runtime_in_file(
+        &mut self,
+        err: &RuntimeError,
+        file: &str,
+        src: &str,
+        site: Option<(usize, usize)>,
+    ) {
+        let source_lines: Vec<&str> = src.lines().collect();
+        let (line, col) = site.unwrap_or((0, 0));
+        self.diagnostics
+            .push(Diagnostic::from_runtime(err, file, &source_lines, line, col));
+        self.ok = false;
+    }
+
     /// 统计
     fn summary(&self) -> (usize, usize, usize, usize) {
         let total = self.diagnostics.len();
@@ -482,17 +505,25 @@ impl Diagnostics {
         out
     }
 
+    /// designs/0029 §3.4（R237）：汇总行 `共 N 个诊断（E 错误，W 警告，H 代码洞）。`
+    /// ——`to_human` 的尾行。运行模式的运行时错误分支改为"只打新增的那一条
+    /// 运行时诊断 + 一行完整汇总"（静态诊断已在运行前打过一遍，整份重打会让
+    /// 每条静态诊断出现两次），调用方由此拿到跨静态 / 运行时的完整合计。
+    pub(crate) fn summary_line(&self) -> String {
+        let (total, errors, warnings, holes) = self.summary();
+        format!(
+            "共 {} 个诊断（{} 错误，{} 警告，{} 代码洞）。\n",
+            total, errors, warnings, holes
+        )
+    }
+
     /// 人类可读格式（带源码上下文 + 指示线）
     pub fn to_human(&self) -> String {
         let mut out = String::new();
         for d in &self.diagnostics {
             out.push_str(&Self::render_one(d));
         }
-        let (total, errors, warnings, holes) = self.summary();
-        out.push_str(&format!(
-            "共 {} 个诊断（{} 错误，{} 警告，{} 代码洞）。\n",
-            total, errors, warnings, holes
-        ));
+        out.push_str(&self.summary_line());
         out
     }
 }
@@ -610,6 +641,73 @@ mod tests {
         assert_eq!(d.code, "RUNTIME003");
         assert!(d.is_hole);
     }
+
+    /// designs/0029 §3.4（R237）：汇总行访问器——to_human 的尾行与之逐字相同；
+    /// 静态 warning + 运行时 error 并存时合计为"2 个诊断（1 错误，1 警告）"。
+    #[test]
+    fn r237_summary_line_matches_to_human_tail() {
+        let mut diags = Diagnostics::new("test.lom");
+        assert_eq!(diags.summary_line(), "共 0 个诊断（0 错误，0 警告，0 代码洞）。\n");
+        let warn = Diagnostic {
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            code: "EFF001".to_string(),
+            message: "纯函数调用了带效应的函数".to_string(),
+            file: "test.lom".to_string(),
+            line: 2,
+            col: 1,
+            source_line: None,
+            is_hole: false,
+            hint: None,
+        };
+        diags.diagnostics.push(warn);
+        assert_eq!(diags.summary_line(), "共 1 个诊断（0 错误，1 警告，0 代码洞）。\n");
+        let err = RuntimeError::Msg("整数除以零".to_string());
+        diags.add_runtime(&err, "fn f()\n  x\nend", Some((8, 13)));
+        assert_eq!(diags.summary_line(), "共 2 个诊断（1 错误，1 警告，0 代码洞）。\n");
+        // to_human = 逐条渲染 + 同一行汇总（输出字节不变）
+        let human = diags.to_human();
+        assert!(human.ends_with(&diags.summary_line()));
+        assert_eq!(
+            human,
+            Diagnostics::render_one(&diags.diagnostics[0]) + &Diagnostics::render_one(&diags.diagnostics[1]) + &diags.summary_line()
+        );
+        // "只打新增的一条 + 汇总"的形态：每条诊断恰出现一次
+        let once = Diagnostics::render_one(diags.diagnostics.last().unwrap()) + &diags.summary_line();
+        assert_eq!(once.matches("[RUNTIME000]").count(), 1);
+        assert!(!once.contains("EFF001"));
+    }
+
+    /// designs/0029 §3.6（R242）：运行时诊断归属依赖包文件——该条诊断的
+    /// file / 源码行取自包文件；信封顶层 file 仍是入口文件（单文件信封不
+    /// 变）；JSON 里包路径的反斜杠经转义。
+    #[test]
+    fn r242_runtime_diag_in_package_file_keeps_envelope_file() {
+        let mut diags = Diagnostics::new("main.lom");
+        let err = RuntimeError::Msg("整数除以零".to_string());
+        diags.add_runtime_in_file(&err, "dep\\dep.lom", DEP_SRC, Some((2, 5)));
+        assert!(!diags.ok);
+        let d = &diags.diagnostics[0];
+        assert_eq!(d.file, "dep\\dep.lom");
+        assert_eq!((d.line, d.col), (2, 5));
+        assert_eq!(d.source_line.as_deref(), Some("    n / (n - n)"));
+        assert_eq!(d.code, "RUNTIME000");
+        assert_eq!(diags.file, "main.lom", "信封顶层 file 仍是入口文件");
+        let json = diags.to_json();
+        assert!(json.contains("\"file\": \"main.lom\""), "{}", json);
+        assert!(
+            json.contains("\"file\": \"dep\\\\dep.lom\""),
+            "包路径以转义形态落盘：{}",
+            json
+        );
+        // 对照：入口路径走 add_runtime（原路径）时该条 file = 入口文件
+        let mut entry = Diagnostics::new("main.lom");
+        entry.add_runtime(&err, DEP_SRC, Some((2, 5)));
+        assert_eq!(entry.diagnostics[0].file, "main.lom");
+        assert_eq!(entry.diagnostics[0].source_line, d.source_line);
+    }
+
+    const DEP_SRC: &str = "fn boom(n: Int) -> Int\n    n / (n - n)\nend\n";
 
     #[test]
     fn json_escape_handles_special_chars() {

@@ -215,8 +215,8 @@ fn build_no_file_undeclared_dep_symbol_still_nam003() {
     .expect("写 libc 源码失败");
     let (stdout, rc) = run_build_no_file(bin, &dir);
     assert_eq!(
-        rc, 0,
-        "无文件 build rc 恒 0（NAM003 不置退出码），stdout: {}",
+        rc, 1,
+        "无文件 build 遇 error 级诊断 rc 1（designs/0029 R234：NAM003 error 置退出码），stdout: {}",
         stdout
     );
     assert!(

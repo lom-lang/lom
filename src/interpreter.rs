@@ -806,6 +806,22 @@ pub struct Interpreter {
     /// 生命周期：`run()` 入口与 REPL 每条输入前清空（repl.rs exec_line）——
     /// 被接住的错误不得把位置泄漏给后续执行。
     err_site: Option<(usize, usize)>,
+    /// designs/0029 §3.6（R242）：位置侧通道的来源文件部分——与 `err_site`
+    /// **同次写入**（最内层出错表达式当时所在的来源文件），下标指
+    /// `source_files`。None = 入口文件（与 v1.17.0 行为一致）或本次运行尚未
+    /// 出错。上报点据此按来源文件取源码行并填 `Diagnostic.file`。
+    err_source: Option<usize>,
+    /// R242：来源文件表——各依赖包源文件路径（load_packages 逐文件登记）。
+    /// 入口文件不入表（以 None 表示）：单文件程序此表恒空。
+    source_files: Vec<String>,
+    /// R242：函数名 → 来源文件下标；值 None = 入口文件。只在加载过依赖包
+    /// （load_packages）后非空——`run()` 登记入口函数时把同名条目改回 None
+    /// （入口函数覆盖同名包函数，来源随注册序更新）。单文件程序下 call_function
+    /// 外壳只多一次 is_empty 判别。
+    fn_sources: HashMap<String, Option<usize>>,
+    /// R242：当前正在执行的函数的来源文件下标——call_function 外壳按被调
+    /// 函数切换、返回后恢复；None = 入口文件。
+    cur_source: Option<usize>,
     /// designs/0028（v1.17.0）L2：程序输出去向开关。缺省 false = 写进程
     /// stdout；`fix --run` 观察运行前置 true = 丢弃（sink）——程序 stdout
     /// 既不进 fix 的 stdout，也不走管道（死循环打印不会撑满管道而阻塞）。
@@ -931,6 +947,11 @@ impl Interpreter {
             max_depth: DEFAULT_MAX_CALL_DEPTH,
             trace: None,
             err_site: None,
+            // designs/0029 §3.6（R242）：来源文件通道初值
+            err_source: None,
+            source_files: Vec::new(),
+            fn_sources: HashMap::new(),
+            cur_source: None,
             discard_output: false,
         }
     }
@@ -951,10 +972,23 @@ impl Interpreter {
         self.err_site
     }
 
+    /// designs/0029 §3.6（R242）：位置侧通道的来源文件——最内层出错表达式
+    /// 当时所在函数的来源文件（依赖包源文件路径，与 load_packages 读盘时的
+    /// 路径同形）；None = 入口文件（或本次运行尚未出错）。上报点（main.rs
+    /// 运行路径）据此按来源文件取源码行并填 `Diagnostic.file`；None 时行为
+    /// 与此前完全一致。已知边界（设计 §3.6 如实登记，不试图修）：闭包按
+    /// **调用它的那个函数**的来源归属——跨文件定义并在别处调用的闭包，
+    /// 出错时归到调用方文件。
+    pub fn err_source_file(&self) -> Option<&str> {
+        self.err_source.map(|i| self.source_files[i].as_str())
+    }
+
     /// designs/0028 L1：清空位置侧通道（重置点：`run()` 入口、REPL 每条
     /// 输入前与接住错误的现场——被接住的错误不得把位置泄漏给后续执行）。
     pub fn reset_err_site(&mut self) {
         self.err_site = None;
+        // R242：来源文件随位置一同清空
+        self.err_source = None;
     }
 
     /// Phase 3.5: 设置程序参数（供 env::args() 读取）
@@ -1106,11 +1140,16 @@ impl Interpreter {
             // 解析并注册包内每个 .lom 文件的 fn/enum
             for file in &pkg.source_files {
                 if let Ok(src) = std::fs::read_to_string(file) {
+                    // designs/0029 §3.6（R242）：来源文件登记——本文件的下标
+                    // 进来源表，文件内每个顶层 fn 记"函数名 → 该下标"
+                    let src_idx = self.source_files.len();
+                    self.source_files.push(file.display().to_string());
                     let result = Parser::parse_recover(&src);
                     for item in &result.program.items {
                         match item {
                             Item::Fn(f) => {
                                 self.functions.insert(f.name.clone(), Rc::new(f.clone()));
+                                self.fn_sources.insert(f.name.clone(), Some(src_idx));
                             }
                             Item::Enum(e) => {
                                 for v in &e.variants {
@@ -1155,6 +1194,9 @@ impl Interpreter {
         // designs/0028 L1：位置侧通道按"每次程序运行"起算——同一解释器
         // 实例再次 run（或 REPL 后续执行）不继承上一次出错的位置。
         self.err_site = None;
+        // designs/0029 §3.6（R242）：来源文件通道同样按"每次程序运行"起算
+        self.err_source = None;
+        self.cur_source = None;
         // 先处理所有导入声明（在注册函数/枚举之前，确保符号可用性语义清晰）
         for item in &program.items {
             if let Item::Import(imp) = item {
@@ -1166,6 +1208,12 @@ impl Interpreter {
             match item {
                 Item::Fn(f) => {
                     self.functions.insert(f.name.clone(), Rc::new(f.clone()));
+                    // R242：入口文件的函数来源 = 入口文件（None）。仅在加载过
+                    // 依赖包时登记——把同名包函数的来源条目改回入口（主文件
+                    // 符号恒为最终覆盖者）；单文件程序表恒空，零成本。
+                    if !self.fn_sources.is_empty() {
+                        self.fn_sources.insert(f.name.clone(), None);
+                    }
                 }
                 Item::Enum(e) => {
                     for v in &e.variants {
@@ -1181,7 +1229,15 @@ impl Interpreter {
         // 查找并执行 main
         if let Some(main) = self.functions.get("main").cloned() {
             let env = Scope::new(Some(self.globals.clone()));
-            self.exec_block(&main.body, env)?;
+            // designs/0029 §3.6（R242）：main 可能来自依赖包（入口无 main、
+            // 包内有）——与 call_function 外壳同口径切换 / 恢复来源
+            let saved_source = self.cur_source;
+            if !self.fn_sources.is_empty() {
+                self.cur_source = self.fn_sources.get("main").cloned().flatten();
+            }
+            let result = self.exec_block(&main.body, env);
+            self.cur_source = saved_source;
+            result?;
         }
         Ok(())
     }
@@ -1352,6 +1408,8 @@ impl Interpreter {
                     // 的 span 起点写入侧通道（已有值不覆盖，与外壳同序）。
                     if self.err_site.is_none() {
                         self.err_site = Some((span.line, span.col));
+                        // designs/0029 §3.6（R242）：来源文件与位置同次写入
+                        self.err_source = self.cur_source;
                     }
                     return Err(RuntimeError::Msg(format!("赋值给未定义变量: '{}'", target)));
                 }
@@ -1459,12 +1517,17 @@ impl Interpreter {
     /// 起点；错误发生在被调函数体内，则落在被调函数内失败表达式的行）。
     /// Ok 路径只多一次 Result 判别分支，零新增工作；`EarlyReturn` 是控制流、
     /// `DepthLimit` 自带位置——两者都不写侧通道。
+    ///
+    /// designs/0029 §3.6（R242）：写入位置的同时记下当时的来源文件
+    /// （`cur_source`——最内层出错表达式所在函数的来源；call_function 外壳
+    /// 按被调函数切换）。来源为入口文件时为 None，行为与此前完全一致。
     fn eval_expr(&mut self, expr: &Expr, env: ScopeRef) -> Result<Value, RuntimeError> {
         let result = self.eval_expr_inner(expr, env);
         if let Err(RuntimeError::Msg(_)) = result
             && self.err_site.is_none()
         {
             self.err_site = Some((expr.span.line, expr.span.col));
+            self.err_source = self.cur_source;
         }
         result
     }
@@ -2070,7 +2133,16 @@ impl Interpreter {
             let site = trace_site(&f.span);
             self.trace_enter(&f.name, &site, args);
         }
+        // designs/0029 §3.6（R242）：执行函数体期间把"当前来源"设为该函数的
+        // 来源文件，执行完恢复（Saved = 调用方的来源）。只在加载过依赖包时
+        // 查表（每次用户函数调用多一次哈希查找）；单文件程序一次 is_empty
+        // 判别即过。
+        let saved_source = self.cur_source;
+        if !self.fn_sources.is_empty() {
+            self.cur_source = self.fn_sources.get(&f.name).cloned().flatten();
+        }
         let result = self.call_function_inner(f, args);
+        self.cur_source = saved_source;
         if self.trace.is_some() {
             let site = trace_site(&f.span);
             self.trace_exit(&f.name, &site, args, &result);
@@ -2096,6 +2168,12 @@ impl Interpreter {
         self.call_depth += 1;
         if self.call_depth > self.max_depth {
             self.call_depth -= 1;
+            // designs/0029 §3.6（R242）：DepthLimit 自带位置 = **被调函数的
+            // 签名**（在该函数的来源文件里），不走 eval_expr 侧通道——这里
+            // 补记被调函数的来源，上报点才不会拿包文件的行号去渲染入口文件。
+            if self.err_site.is_none() && self.err_source.is_none() {
+                self.err_source = self.fn_sources.get(&f.name).cloned().flatten();
+            }
             return Err(RuntimeError::DepthLimit {
                 msg: format!(
                     "递归深度超过 {} 层（{}）：函数 '{}' 疑似缺少终止条件——检查递归出口或改写为 while 循环",
@@ -2166,6 +2244,11 @@ impl Interpreter {
         self.call_depth += 1;
         if self.call_depth > self.max_depth {
             self.call_depth -= 1;
+            // designs/0029 §3.6（R242）：闭包的 DepthLimit 位置 = 调用点 span
+            // （在当前正在执行的函数的来源文件里）——补记当前来源
+            if self.err_site.is_none() && self.err_source.is_none() {
+                self.err_source = self.cur_source;
+            }
             return Err(RuntimeError::DepthLimit {
                 msg: format!(
                     "递归深度超过 {} 层（{}）：闭包疑似缺少终止条件——检查递归出口或改写为 while 循环",
@@ -4845,6 +4928,212 @@ end
             + "fn main() -> Unit\n    println(a(10))\nend\n";
         let (_, site) = run_site(&src);
         assert_eq!(site, Some(pos_of(&src, "n / 0")), "落 c 体内的 `n / 0`");
+    }
+
+    // ===== designs/0029 §3.6（R242）：依赖包内运行时错误的来源文件 =====
+
+    /// 测试用临时工程：系统临时目录下落盘清单与源文件，依赖图经真实
+    /// resolve_dependencies 解析（public_symbols 由包系统算出——process_import
+    /// 要查它）。Drop 时整目录清理。
+    struct PkgProject {
+        root: std::path::PathBuf,
+    }
+
+    impl PkgProject {
+        fn new(tag: &str) -> PkgProject {
+            let root = std::env::temp_dir().join(format!("lom_r242_{}_{}", tag, std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).expect("建临时工程失败");
+            PkgProject { root }
+        }
+
+        fn put(&self, rel: &str, content: &str) {
+            let p = self.root.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).expect("建父目录失败");
+            std::fs::write(&p, content).expect("写文件失败");
+        }
+
+        /// 建包 `<name>/lom.toml` + 若干源文件，并在根清单声明依赖全部给定包
+        fn packages(&self, pkgs: &[(&str, &[(&str, &str)])]) -> crate::package::DependencyGraph {
+            let mut root_toml = String::from("name = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\n");
+            for (name, files) in pkgs {
+                self.put(
+                    &format!("{}/lom.toml", name),
+                    &format!("name = \"{}\"\nversion = \"0.1.0\"\n", name),
+                );
+                for (file, src) in files.iter() {
+                    self.put(&format!("{}/{}", name, file), src);
+                }
+                root_toml.push_str(&format!("{} = {{ path = \"{}\" }}\n", name, name));
+            }
+            self.put("lom.toml", &root_toml);
+            let manifest =
+                crate::package::load_manifest_file(&self.root.join("lom.toml")).expect("根清单合法");
+            crate::package::resolve_dependencies(&manifest, &self.root).expect("依赖图应解析成功")
+        }
+
+        /// 包内某文件的 display 路径（与 load_packages 登记来源时的路径同形——
+        /// 逐段 join，显示为平台路径分隔符）
+        fn displayed(&self, parts: &[&str]) -> String {
+            parts
+                .iter()
+                .fold(self.root.clone(), |p, s| p.join(s))
+                .display()
+                .to_string()
+        }
+    }
+
+    impl Drop for PkgProject {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.root).ok();
+        }
+    }
+
+    /// 加载依赖图后运行入口源码，直到运行时错误；返回解释器（供查侧通道）。
+    fn run_with_packages(graph: &crate::package::DependencyGraph, src: &str) -> Interpreter {
+        let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
+        let mut interp = Interpreter::new();
+        interp.load_packages(graph);
+        interp.run(&program).expect_err("应产生运行时错误");
+        interp
+    }
+
+    const DEP_DIV0: &str = "fn boom(n: Int) -> Int\n    n / (n - n)\nend\n";
+
+    /// 单文件（无依赖包）运行到运行时错误；返回解释器。
+    fn run_until_err(src: &str) -> Interpreter {
+        let program = Parser::parse(src).unwrap_or_else(|e| panic!("解析失败: {}", e));
+        let mut interp = Interpreter::new();
+        interp.run(&program).expect_err("应产生运行时错误");
+        interp
+    }
+
+    /// 入口文件的函数内出错 → 来源为入口文件（None）——单文件程序行为不变。
+    #[test]
+    fn r242_entry_function_error_source_is_entry() {
+        let src = format!(
+            "{}fn main() -> Unit\n    println(boom(10))\nend\n",
+            DEP_DIV0
+        );
+        let interp = run_until_err(&src);
+        assert_eq!(interp.err_source_file(), None, "入口文件出错：来源为 None");
+        assert_eq!(
+            interp.err_site(),
+            Some(pos_of(&src, "n / (n - n)")),
+            "位置落入口文件内的失败表达式"
+        );
+    }
+
+    /// 依赖包函数内出错 → 来源 = 包文件（与 load_packages 读盘路径同形），
+    /// 位置 = 包文件内的失败表达式。
+    #[test]
+    fn r242_package_function_error_source_is_package_file() {
+        let p = PkgProject::new("pkg_fn");
+        let graph = p.packages(&[("dep", &[("dep.lom", DEP_DIV0)])]);
+        let interp = run_with_packages(
+            &graph,
+            "from dep import { boom }\n\nfn main() -> Unit\n    println(boom(10))\nend\n",
+        );
+        assert_eq!(
+            interp.err_source_file(),
+            Some(p.displayed(&["dep", "dep.lom"]).as_str())
+        );
+        assert_eq!(interp.err_site(), Some((2, 5)), "位置是 dep.lom 内 `n / (n - n)` 的起点");
+    }
+
+    /// 包内嵌套调用：错误发生在同包另一函数（另一文件）体内 → 来源与位置
+    /// 都属于那个文件；同文件内嵌套同理。
+    #[test]
+    fn r242_nested_call_inside_package_tracks_innermost_file() {
+        let p = PkgProject::new("pkg_nested");
+        let outer = "fn outer(n: Int) -> Int\n    inner(n)\nend\n";
+        let inner = "fn inner(n: Int) -> Int\n    n / (n - n)\nend\n";
+        let graph = p.packages(&[(
+            "dep",
+            &[("a_outer.lom", outer), ("b_inner.lom", inner)],
+        )]);
+        let interp = run_with_packages(
+            &graph,
+            "from dep import { outer }\n\nfn main() -> Unit\n    println(outer(10))\nend\n",
+        );
+        assert_eq!(
+            interp.err_source_file(),
+            Some(p.displayed(&["dep", "b_inner.lom"]).as_str()),
+            "来源 = 出错函数 inner 所在文件"
+        );
+        assert_eq!(interp.err_site(), Some(pos_of(inner, "n / (n - n)")));
+    }
+
+    /// 来源随调用切换与恢复：包函数正常返回后，入口文件函数内出错 → 来源
+    /// 回到入口文件（None），位置落入口文件。
+    #[test]
+    fn r242_source_restores_after_package_function_returns() {
+        let p = PkgProject::new("pkg_restore");
+        let graph = p.packages(&[(
+            "dep",
+            &[("dep.lom", "fn dep_ok(n: Int) -> Int\n    n + 1\nend\n")],
+        )]);
+        let src = "from dep import { dep_ok }\n\nfn local_boom(n: Int) -> Int\n    n / (n - n)\nend\n\nfn main() -> Unit\n    println(dep_ok(1))\n    println(local_boom(1))\nend\n";
+        let interp = run_with_packages(&graph, src);
+        assert_eq!(interp.err_source_file(), None, "包函数返回后来源恢复为入口文件");
+        assert_eq!(interp.err_site(), Some(pos_of(src, "n / (n - n)")));
+    }
+
+    /// 入口文件定义与包函数同名的函数 → 入口版本覆盖（本地定义优先），
+    /// 其体内出错的来源是入口文件，不得沿用包文件的来源登记。
+    #[test]
+    fn r242_entry_function_overriding_package_function_is_entry_sourced() {
+        let p = PkgProject::new("pkg_override");
+        let graph = p.packages(&[(
+            "dep",
+            &[("dep.lom", "fn shared(n: Int) -> Int\n    n + 1\nend\n")],
+        )]);
+        let src = "fn shared(n: Int) -> Int\n    n / (n - n)\nend\n\nfn main() -> Unit\n    println(shared(2))\nend\n";
+        let interp = run_with_packages(&graph, src);
+        assert_eq!(interp.err_source_file(), None, "入口的 shared 覆盖包的 shared");
+        assert_eq!(interp.err_site(), Some(pos_of(src, "n / (n - n)")));
+    }
+
+    /// 入口无 main、依赖包有 main → 跑包里的 main（与 AOT 同值）；其体内
+    /// 出错的来源是该包文件。
+    #[test]
+    fn r242_package_provided_main_is_package_sourced() {
+        let p = PkgProject::new("pkg_main");
+        let dep_main = "fn main() -> Unit\n    let x = 1\n    let y = 0\n    println(x / y)\nend\n";
+        let graph = p.packages(&[("dep", &[("dep.lom", dep_main)])]);
+        let interp = run_with_packages(&graph, "fn entry_only() -> Int\n    1\nend\n");
+        assert_eq!(
+            interp.err_source_file(),
+            Some(p.displayed(&["dep", "dep.lom"]).as_str())
+        );
+        assert_eq!(interp.err_site(), Some(pos_of(dep_main, "x / y")));
+    }
+
+    /// DepthLimit 自带位置 = 被调（递归）函数的签名，位于包文件——来源须
+    /// 一并归到包文件（位置通道为空，由 from_runtime 用自带位置）。
+    #[test]
+    fn r242_depth_limit_in_package_function_is_package_sourced() {
+        let p = PkgProject::new("pkg_depth");
+        let graph = p.packages(&[(
+            "dep",
+            &[("dep.lom", "fn rec(n: Int) -> Int\n    rec(n + 1)\nend\n")],
+        )]);
+        let src = "from dep import { rec }\n\nfn main() -> Unit\n    println(rec(0))\nend\n";
+        let program = Parser::parse(src).unwrap();
+        let mut interp = Interpreter::new();
+        interp.max_depth = 60;
+        interp.load_packages(&graph);
+        let err = interp.run(&program).expect_err("应触发深度上限");
+        assert!(
+            matches!(err, RuntimeError::DepthLimit { line: 1, col: 1, .. }),
+            "DepthLimit 位置 = dep.lom 的 `fn rec` 签名：{:?}",
+            err
+        );
+        assert_eq!(interp.err_site(), None, "DepthLimit 不走位置侧通道");
+        assert_eq!(
+            interp.err_source_file(),
+            Some(p.displayed(&["dep", "dep.lom"]).as_str())
+        );
     }
 
     /// 实参表达式出错：落实参表达式，不是整个调用
