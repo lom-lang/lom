@@ -1547,3 +1547,1468 @@ fn nam005_shadow_by_user_fn_blocked_by_nam002() {
         .collect();
     assert_eq!(d.len(), 0, "同名声明走 NAM002 路径，不产生 NAM005");
 }
+
+// ===== R238（designs/0029 §3.5）：二元运算 TYPE001 与 match 守卫 TYPE002 的位置 =====
+
+/// 取全部 TYPE001 诊断的 (line, col, message)，按产生顺序
+fn type001_positions(diags: &Diagnostics) -> Vec<(usize, usize, String)> {
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE001")
+        .map(|d| (d.line, d.col, d.message.clone()))
+        .collect()
+}
+
+#[test]
+fn r238_add_type001_locates_binary_expr_start() {
+    // `1.5 + True` 起点在第 2 行第 13 列（左操作数起点）；source_line 在场
+    let src = "fn main() -> Unit\n    let x = 1.5 + True\n    println(x)\nend\n";
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE001，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (2, 13), "位置 = 二元表达式起点");
+    assert!(
+        pos[0].2.contains("'+' 不支持 Float 和 Bool"),
+        "文案: {}",
+        pos[0].2
+    );
+    let d = diags
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "TYPE001")
+        .unwrap();
+    assert_eq!(d.source_line.as_deref(), Some("    let x = 1.5 + True"));
+}
+
+#[test]
+fn r238_arith_ops_render_as_symbols_and_locate_expr_start() {
+    // `-` `*` `/` `%` 四种运算符：文案统一为符号形态（此前是 'Sub' / 'Mul' 等变体名）
+    let src = concat!(
+        "fn main() -> Unit\n",
+        "    let a = \"s\" - 1\n",
+        "    let b = True * 2\n",
+        "    let c = 1 / \"t\"\n",
+        "    let d = 1 % True\n",
+        "    println(a)\n    println(b)\n    println(c)\n    println(d)\n",
+        "end\n"
+    );
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(pos.len(), 4, "恰 4 条 TYPE001，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (2, 13));
+    assert!(
+        pos[0].2.contains("'-' 不支持 String 和 Int"),
+        "文案: {}",
+        pos[0].2
+    );
+    assert_eq!((pos[1].0, pos[1].1), (3, 13));
+    assert!(
+        pos[1].2.contains("'*' 不支持 Bool 和 Int"),
+        "文案: {}",
+        pos[1].2
+    );
+    assert_eq!((pos[2].0, pos[2].1), (4, 13));
+    assert!(
+        pos[2].2.contains("'/' 不支持 Int 和 String"),
+        "文案: {}",
+        pos[2].2
+    );
+    assert_eq!((pos[3].0, pos[3].1), (5, 13));
+    assert!(
+        pos[3].2.contains("'%' 不支持 Int 和 Bool"),
+        "文案: {}",
+        pos[3].2
+    );
+    // 不得再出现 Debug 变体名形态
+    for p in &pos {
+        for bad in ["'Sub'", "'Mul'", "'Div'", "'Mod'"] {
+            assert!(!p.2.contains(bad), "仍是变体名形态: {}", p.2);
+        }
+    }
+}
+
+#[test]
+fn r238_comparison_ops_locate_expr_start() {
+    // 六种比较运算各一例：位置 = 左操作数起点；文案不含运算符（"比较运算两边类型不一致"）
+    let src = concat!(
+        "fn main() -> Unit\n",
+        "    let a = 1.0 < True\n",
+        "    let b = 1.0 > True\n",
+        "    let c = 1.0 <= True\n",
+        "    let d = 1.0 >= True\n",
+        "    let e = 1.0 == True\n",
+        "    let f = 1.0 != True\n",
+        "    println(a)\n    println(b)\n    println(c)\n",
+        "    println(d)\n    println(e)\n    println(f)\n",
+        "end\n"
+    );
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(pos.len(), 6, "恰 6 条 TYPE001，实际 {:?}", pos);
+    for (i, p) in pos.iter().enumerate() {
+        assert_eq!((p.0, p.1), (2 + i, 13), "第 {} 条的位置", i + 1);
+        assert!(
+            p.2.contains("比较运算两边类型不一致: Float vs Bool"),
+            "文案: {}",
+            p.2
+        );
+    }
+}
+
+#[test]
+fn r238_left_assoc_chain_locates_chain_start() {
+    // `a - 1 - "x"` = `(a - 1) - "x"`：内层 Int-Int 相容，外层 Int-String 报，
+    // 位置 = 整条链的起点（左操作数 `a`），不是出错的那一段
+    let src = "fn main() -> Unit\n    let a = 5\n    let y = a - 1 - \"x\"\n    println(y)\nend\n";
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE001，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (3, 13), "位置 = 链起点");
+    assert!(
+        pos[0].2.contains("'-' 不支持 Int 和 String"),
+        "文案: {}",
+        pos[0].2
+    );
+}
+
+#[test]
+fn r238_string_promotion_and_any_still_silent() {
+    // 对照：`+` 遇 String 自动提升——零诊断；_Any 参与运算——零诊断
+    let src = concat!(
+        "from json import { json_parse }\n",
+        "fn main() -> Unit\n",
+        "    let s = 1 + \"a\"\n",
+        "    let t = \"a\" + 1\n",
+        "    let v = json_parse(\"{}\")\n",
+        "    let n = v + 1\n",
+        "    println(s)\n    println(t)\n    println(n)\n",
+        "end\n"
+    );
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(
+        pos.len(),
+        0,
+        "String 提升与 _Any 运算不应报 TYPE001，实际 {:?}",
+        pos
+    );
+    assert_eq!(count_type_diags(&diags), 0, "整段零类型诊断");
+}
+
+#[test]
+fn r238_match_guard_type002_locates_guard_expr() {
+    // 同族顺带：guard `2` 在第 4 行第 14 列（此前写死 (0,0)）
+    let src = concat!(
+        "fn main() -> Unit\n",
+        "    let n = 1\n",
+        "    let r = match n\n",
+        "        1 if 2 => 10\n",
+        "        _ => 0\n",
+        "    end\n",
+        "    println(r)\n",
+        "end\n"
+    );
+    let diags = check_src(src);
+    let d: Vec<_> = diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE002")
+        .collect();
+    assert_eq!(
+        d.len(),
+        1,
+        "恰 1 条 TYPE002，实际 {:?}",
+        d.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
+    assert_eq!((d[0].line, d[0].col), (4, 14), "位置 = guard 表达式起点");
+    assert!(
+        d[0].message.contains("match guard 应为 Bool，得到 Int"),
+        "文案: {}",
+        d[0].message
+    );
+    assert_eq!(d[0].source_line.as_deref(), Some("        1 if 2 => 10"));
+}
+
+// ===== R249（designs/0029 §3.7）：以 `return expr` 收尾的函数不再误报 TYPE010 =====
+
+/// 取全部 TYPE010 诊断的 (line, col, message)，按产生顺序
+fn type010_diags(diags: &Diagnostics) -> Vec<(usize, usize, String)> {
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "TYPE010")
+        .map(|d| (d.line, d.col, d.message.clone()))
+        .collect()
+}
+
+/// 规划者验收探针 accept9/single 的七个误报形态（源码逐字）：修后零类型诊断
+#[test]
+fn r249_seven_false_positive_forms_are_silent() {
+    let forms: Vec<(&str, &str)> = vec![
+        // F1：具名函数以 return 收尾
+        (
+            "F1",
+            "fn f() -> Int\n    return 3\nend\nfn main() -> Unit\n    println(f())\nend\n",
+        ),
+        // F2：if-else 两臂全 return（解析器把末尾 if 解析成尾表达式）
+        (
+            "F2",
+            concat!(
+                "fn f(a: Bool) -> Int\n    if a\n        return 1\n    else\n        return 2\n    end\nend\n",
+                "fn main() -> Unit\n    println(f(True))\n    println(f(False))\nend\n"
+            ),
+        ),
+        // F4：带返回注解的闭包体以 return 收尾
+        (
+            "F4",
+            "fn main() -> Unit\n    let g = fn() -> Int\n        return 3\n    end\n    println(g())\nend\n",
+        ),
+        // F5：循环后 return
+        (
+            "F5",
+            concat!(
+                "fn f() -> Int\n    for x in 1..3\n        if x == 2\n            return x\n        end\n    end\n    return 0\nend\n",
+                "fn main() -> Unit\n    println(f())\nend\n"
+            ),
+        ),
+        // F6：main 以 return 收尾
+        ("F6", "fn main() -> Int\n    return 3\nend\n"),
+        // F7：elif 链全 return
+        (
+            "F7",
+            concat!(
+                "fn f(n: Int) -> Int\n    if n > 100\n        return 1\n    elif n > 10\n        return 2\n    else\n        return 3\n    end\nend\n",
+                "fn main() -> Unit\n    println(f(5))\nend\n"
+            ),
+        ),
+        // F8：内联 if-return 形态（if 表达式作 let 右值）
+        (
+            "F8",
+            concat!(
+                "fn g(n: Int) -> Int\n    let w = if n > 100 return 1 else return 2 end\n    w\nend\n",
+                "fn main() -> Unit\n    println(g(200))\n    println(g(1))\nend\n"
+            ),
+        ),
+    ];
+    assert_eq!(forms.len(), 7);
+    for (name, src) in forms {
+        let diags = check_src(src);
+        assert_eq!(
+            count_type_diags(&diags),
+            0,
+            "{} 形态应零类型诊断，实际 {:?}",
+            name,
+            diags
+                .diagnostics
+                .iter()
+                .map(|d| &d.message)
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+/// 同型顺带：match 的全部块臂都以 return 收尾（规划者 F3 探针缺每臂的 end，
+/// 是解析错误——此处为语法正确的同型）
+#[test]
+fn r249_match_all_arms_return_is_silent() {
+    let src = concat!(
+        "fn f(r: Result<Int, String>) -> Int\n    match r\n        Ok(x) =>\n            return x\n        end\n",
+        "        Err(e) =>\n            return 0\n        end\n    end\nend\n",
+        "fn main() -> Unit\n    println(f(Ok(7)))\n    println(f(Err(\"e\")))\nend\n"
+    );
+    let diags = check_src(src);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "全臂 return 的 match 收尾应零类型诊断，实际 {:?}",
+        diags
+            .diagnostics
+            .iter()
+            .map(|d| &d.message)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// 真阳性逐条锁（designs/0029 §3.7）：
+/// - T1 `-> Unit` 里 `return 3`：return 语句自身的 TYPE010 照旧（带位置）
+/// - T2 `-> Int` 里 `return "s"`：语句级那条照旧；函数级"实际返回 Unit"是与 F1
+///   同型的失实诊断，随之消失
+/// - T3 分支只 return 不全（无 else）：照旧报"实际返回 Unit"
+/// - T4 尾表达式类型不符：照旧报
+/// - T5 `return 3` 之后还有语句：照旧按末尾（尾表达式）的类型判
+#[test]
+fn r249_true_positives_t1_to_t5_unchanged() {
+    // T1
+    let diags = check_src("fn f() -> Unit\n    return 3\nend\nfn main() -> Unit\n    f()\nend\n");
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "T1: {:?}", d);
+    assert_eq!((d[0].0, d[0].1), (2, 12));
+    assert!(
+        d[0].2.contains("return 返回 Int，但函数声明返回 Unit"),
+        "T1: {}",
+        d[0].2
+    );
+    // T2
+    let diags = check_src(
+        "fn f() -> Int\n    return \"s\"\nend\nfn main() -> Unit\n    println(f())\nend\n",
+    );
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "T2: 仅语句级那条，实际 {:?}", d);
+    assert_eq!((d[0].0, d[0].1), (2, 12));
+    assert!(
+        d[0].2.contains("return 返回 String，但函数声明返回 Int"),
+        "T2: {}",
+        d[0].2
+    );
+    // T3
+    let diags = check_src("fn f(a: Bool) -> Int\n    if a\n        return 1\n    end\nend\n");
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "T3: {:?}", d);
+    assert_eq!((d[0].0, d[0].1), (1, 1));
+    assert!(
+        d[0].2.contains("函数 'f' 声明返回 Int，但实际返回 Unit"),
+        "T3: {}",
+        d[0].2
+    );
+    // T4
+    let diags = check_src("fn f() -> Int\n    \"s\"\nend\n");
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "T4: {:?}", d);
+    assert!(
+        d[0].2.contains("函数 'f' 声明返回 Int，但实际返回 String"),
+        "T4: {}",
+        d[0].2
+    );
+    // T5
+    let diags = check_src("fn f() -> Int\n    return 3\n    ()\nend\n");
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "T5: {:?}", d);
+    assert!(
+        d[0].2.contains("函数 'f' 声明返回 Int，但实际返回 Unit"),
+        "T5: {}",
+        d[0].2
+    );
+}
+
+/// 末语句是有值调用（`-> Unit` 函数）：照旧报"实际返回 Int / String"；
+/// 末尾显式 `()` 与无返回注解两形态照旧零诊断
+#[test]
+fn r249_valued_call_in_unit_fn_unchanged() {
+    let h = "fn h() -> Int\n    3\nend\n";
+    let d = type010_diags(&check_src(&format!(
+        "{}fn main() -> Unit\n    h()\nend\n",
+        h
+    )));
+    assert_eq!(d.len(), 1, "D1: {:?}", d);
+    assert!(
+        d[0].2.contains("函数 'main' 声明返回 Unit，但实际返回 Int"),
+        "D1: {}",
+        d[0].2
+    );
+    assert_eq!(
+        type010_diags(&check_src(&format!(
+            "{}fn main() -> Unit\n    h()\n    ()\nend\n",
+            h
+        )))
+        .len(),
+        0,
+        "D2"
+    );
+    assert_eq!(
+        type010_diags(&check_src(&format!("{}fn main()\n    h()\nend\n", h))).len(),
+        0,
+        "D3"
+    );
+    let d = type010_diags(&check_src(&format!("{}fn g() -> Unit\n    h()\nend\n", h)));
+    assert_eq!(d.len(), 1, "D4: {:?}", d);
+    assert!(
+        d[0].2.contains("函数 'g' 声明返回 Unit，但实际返回 Int"),
+        "D4: {}",
+        d[0].2
+    );
+    let d = type010_diags(&check_src(
+        "fn h() -> String\n    \"s\"\nend\nfn main() -> Unit\n    h()\nend\n",
+    ));
+    assert_eq!(d.len(), 1, "D5: {:?}", d);
+    assert!(
+        d[0].2
+            .contains("函数 'main' 声明返回 Unit，但实际返回 String"),
+        "D5: {}",
+        d[0].2
+    );
+}
+
+/// 守真阳性：match 一臂 return、另一臂落空——落空路径返回 Unit，照旧报；
+/// （设计的一句话修法"单个 return 收尾块记未知"会让它漏报，故按"全部分支"
+/// 做结构判定，见 mod.rs `block_never_produces_value` 的注释）
+#[test]
+fn r249_match_mixed_arm_fallthrough_still_warns() {
+    let src = concat!(
+        "fn f(n: Int) -> Int\n    match n\n        1 =>\n            return 10\n        end\n",
+        "        other =>\n            let x = 1\n        end\n    end\nend\n"
+    );
+    let diags = check_src(src);
+    let d = type010_diags(&diags);
+    assert_eq!(d.len(), 1, "混合臂 match 收尾应照旧报，实际 {:?}", d);
+    assert!(
+        d[0].2.contains("函数 'f' 声明返回 Int，但实际返回 Unit"),
+        "{}",
+        d[0].2
+    );
+}
+
+/// 守真阳性：无 else 的 if 表达式以 return 收尾、作值使用——落空路径产出 Unit，
+/// `x + 1` 的 TYPE001 照旧
+#[test]
+fn r249_no_else_if_expr_return_arm_stays_unit() {
+    let src = "fn f(a: Bool) -> Int\n    let x = if a\n        return 1\n    end\n    x + 1\nend\n";
+    let diags = check_src(src);
+    let pos = type001_positions(&diags);
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE001，实际 {:?}", pos);
+    assert!(
+        pos[0].2.contains("'+' 不支持 Unit 和 Int"),
+        "文案: {}",
+        pos[0].2
+    );
+    assert_eq!(type010_diags(&diags).len(), 0, "无 TYPE010");
+}
+
+// ===== R247（designs/0030 §3.4、§7）：子模式数量 TYPE003 与 NAM002 枚举重复的位置 =====
+
+/// 取全部指定码的诊断的 (line, col, message)，按产生顺序
+fn code_positions(diags: &Diagnostics, code: &str) -> Vec<(usize, usize, String)> {
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == code)
+        .map(|d| (d.line, d.col, d.message.clone()))
+        .collect()
+}
+
+/// 位点 2：子模式数量不匹配的 TYPE003 定位到模式里的变体名 token（此前 (0,0)）
+#[test]
+fn r247_subpattern_arity_type003_locates_variant_name_token() {
+    let src = concat!(
+        "fn take(v: Option<Int>) -> Int\n    match v\n        Some(a, b) => a\n        None => 0\n    end\nend\n"
+    );
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "TYPE003");
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE003，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (3, 9), "位置 = 变体名 token");
+    assert!(
+        pos[0].2.contains("变体 'Some' 期望 1 个子模式，得到 2 个"),
+        "文案: {}",
+        pos[0].2
+    );
+    let d = diags
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "TYPE003")
+        .unwrap();
+    assert_eq!(d.severity, Severity::Warning, "severity 不变（冻结面）");
+    assert_eq!(d.source_line.as_deref(), Some("        Some(a, b) => a"));
+}
+
+/// 位点 2：嵌套形态落内层变体名 token；数量相符的外层不报
+#[test]
+fn r247_nested_subpattern_arity_locates_inner_variant_name() {
+    let src = concat!(
+        "enum Inner = Wrap(Int)\nenum Outer = Mk(Inner)\n",
+        "fn take(v: Outer) -> Int\n    match v\n        Mk(Wrap(a, b)) => a\n    end\nend\n"
+    );
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "TYPE003");
+    assert_eq!(
+        pos.len(),
+        1,
+        "恰 1 条 TYPE003（外层 Mk 数量相符不报），实际 {:?}",
+        pos
+    );
+    assert_eq!((pos[0].0, pos[0].1), (5, 12), "位置 = 内层变体名 token");
+    assert!(
+        pos[0].2.contains("变体 'Wrap' 期望 1 个子模式，得到 2 个"),
+        "文案: {}",
+        pos[0].2
+    );
+}
+
+/// 位点 2 对照：数量相符的变体模式零 TYPE003
+#[test]
+fn r247_matching_subpattern_count_is_silent() {
+    let src = concat!(
+        "enum Shape\n    | Point(Int, Int)\n    | Empty\nend\n",
+        "fn area(s: Shape) -> Int\n    match s\n        Point(x, y) => x * y\n        Empty => 0\n    end\nend\n"
+    );
+    let diags = check_src(src);
+    assert_eq!(
+        code_positions(&diags, "TYPE003").len(),
+        0,
+        "数量相符不应报 TYPE003"
+    );
+    assert_eq!(count_type_diags(&diags), 0, "整段零类型诊断");
+}
+
+/// 顺带（designs/0030 §7）：NAM002 枚举重复定义定位到重复的 enum 声明（此前 (0,0)）
+#[test]
+fn r247_nam002_enum_duplicate_locates_duplicate_decl() {
+    let src = concat!(
+        "enum Color = Red | Green\n\nenum Color = Blue\n\nfn main() -> Unit\n    println(1)\nend\n"
+    );
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "NAM002");
+    assert_eq!(pos.len(), 1, "恰 1 条 NAM002，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (3, 1), "位置 = 重复的 enum 声明处");
+    assert!(
+        pos[0].2.contains("枚举 'Color' 重复定义"),
+        "文案: {}",
+        pos[0].2
+    );
+    let d = diags
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "NAM002")
+        .unwrap();
+    assert_eq!(d.severity, Severity::Error, "severity 不变（冻结面）");
+    assert!(!diags.ok, "error 级照旧置 ok=false");
+    assert_eq!(d.source_line.as_deref(), Some("enum Color = Blue"));
+}
+
+// ===== R235（designs/0029 §3.2，裁决取乙）：标准库模块坏 import 的静态校验 NAM007 =====
+
+/// w20 形态：标准库模块不导出的符号（未使用）→ 恰一条 NAM007 warning，锚在 from 行；
+/// severity 是 warning（冻结面：不新增 error 级码），不置 ok=false
+#[test]
+fn r235_stdlib_unknown_symbol_warns_nam007_at_from_line() {
+    let src = "from list import { list_rev }\nfn main() -> Unit\n    println(1)\nend\n";
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "NAM007");
+    assert_eq!(pos.len(), 1, "恰 1 条 NAM007，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (1, 1), "锚在 from 行");
+    assert!(
+        pos[0].2.contains("标准库模块 'list' 不导出符号 'list_rev'"),
+        "文案: {}",
+        pos[0].2
+    );
+    // 消息给出该模块的可用符号
+    for sym in [
+        "list_cons",
+        "list_empty",
+        "list_filter",
+        "list_fold",
+        "list_get",
+        "list_head",
+        "list_is_empty",
+        "list_length",
+        "list_map",
+        "list_tail",
+    ] {
+        assert!(
+            pos[0].2.contains(sym),
+            "消息应列出可用符号 {}：{}",
+            sym,
+            pos[0].2
+        );
+    }
+    let d = &diags.diagnostics[0];
+    assert_eq!(d.severity, Severity::Warning, "warning 级");
+    assert_eq!(d.stage, Stage::Type, "静态阶段");
+    assert!(diags.ok, "warning 不置 ok=false");
+    assert_eq!(
+        d.source_line.as_deref(),
+        Some("from list import { list_rev }")
+    );
+    assert!(d.hint.is_some(), "带 hint");
+    assert_eq!(count_type_diags(&diags), 1, "除 NAM007 外零类型诊断");
+}
+
+/// 符号导出但模块写错：NAM007 并指明该符号所属的模块
+#[test]
+fn r235_symbol_from_wrong_module_points_to_owner_module() {
+    let src = "from math import { len }\nfn main() -> Unit\n    println(len(\"abc\"))\nend\n";
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "NAM007");
+    assert_eq!(pos.len(), 1, "恰 1 条 NAM007，实际 {:?}", pos);
+    assert!(
+        pos[0]
+            .2
+            .contains("标准库模块 'math' 不导出符号 'len'（该符号属于标准库模块 'string'）"),
+        "文案: {}",
+        pos[0].2
+    );
+    assert!(
+        pos[0].2.contains("abs, max, min, sqrt"),
+        "文案: {}",
+        pos[0].2
+    );
+}
+
+/// 别名导入坏符号：仍报（消息用真名）
+#[test]
+fn r235_alias_bad_symbol_warns() {
+    let src = "from list import { list_rev as rev }\nfn main() -> Unit\n    println(1)\nend\n";
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "NAM007");
+    assert_eq!(pos.len(), 1, "恰 1 条 NAM007，实际 {:?}", pos);
+    assert!(
+        pos[0].2.contains("不导出符号 'list_rev'"),
+        "文案: {}",
+        pos[0].2
+    );
+}
+
+/// 合法导入（含别名、prelude 模块 io）零误报；空导入零诊断
+#[test]
+fn r235_legal_imports_with_alias_silent() {
+    let src = concat!(
+        "from list import { }\n",
+        "from io import { println as log }\n",
+        "from list import { list_length as size }\n",
+        "from string import { len, int_to_string, char_from_code }\n",
+        "from file import { file_read, file_write, file_append, file_exists }\n",
+        "from env import { args }\n",
+        "from json import { json_parse, json_stringify }\n",
+        "fn main() -> Unit\n    log(size(1..4))\nend\n"
+    );
+    let diags = check_src(src);
+    assert_eq!(
+        code_positions(&diags, "NAM007").len(),
+        0,
+        "合法导入（含别名）零 NAM007"
+    );
+    assert_eq!(count_type_diags(&diags), 0, "整段零类型诊断");
+}
+
+/// 非标准库模块名不判：拼错的模块名、外部包名（fix / apply / LSP 路径没有包信息）
+#[test]
+fn r235_non_stdlib_module_not_judged() {
+    for src in [
+        "from nosuchmod import { thing }\nfn main() -> Unit\n    println(1)\nend\n",
+        "from lists import { list_rev }\nfn main() -> Unit\n    println(1)\nend\n",
+        "from somepkg import { helper }\nfn main() -> Unit\n    println(1)\nend\n",
+        "from utils.helpers import { thing }\nfn main() -> Unit\n    println(1)\nend\n",
+    ] {
+        let diags = check_src(src);
+        assert_eq!(
+            code_positions(&diags, "NAM007").len(),
+            0,
+            "非标准库模块名不应判 NAM007：{:?}",
+            diags
+                .diagnostics
+                .iter()
+                .map(|d| &d.message)
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+/// 外部包符号 + 平面 externals（对照既有 external_symbol_alias_import_no_false_nam003）
+#[test]
+fn r235_external_pkg_import_with_externals_silent() {
+    let src = concat!(
+        "from somepkg import { real_fn as aliased_fn }\n\n",
+        "fn main() -> Unit\n    println(aliased_fn(1))\nend\n"
+    );
+    let program = crate::parser::Parser::parse_recover(src).program;
+    let source_lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
+    let mut diags = crate::diagnostics::Diagnostics::new("test.lom");
+    let mut tc = TypeChecker::new("test.lom", source_lines);
+    tc.external_symbols.insert("real_fn".to_string());
+    tc.check(&program, &mut diags);
+    assert_eq!(
+        code_positions(&diags, "NAM007").len(),
+        0,
+        "外部包 import 不判"
+    );
+    assert_eq!(
+        code_positions(&diags, "NAM003").len(),
+        0,
+        "别名调用不报 NAM003"
+    );
+}
+
+/// 同行好坏：只对坏的那一个发一条
+#[test]
+fn r235_good_and_bad_same_line_single_diag() {
+    let src = "from list import { list_map, list_rev }\nfn main() -> Unit\n    println(1)\nend\n";
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "NAM007");
+    assert_eq!(pos.len(), 1, "恰 1 条 NAM007，实际 {:?}", pos);
+    assert!(
+        pos[0].2.contains("'list_rev'") && !pos[0].2.contains("不导出符号 'list_map'"),
+        "只针对坏的那个：{}",
+        pos[0].2
+    );
+}
+
+/// 坏名字被使用：使用点的既有 NAM003 之外另加 import 行的 NAM007（NAM003 行为不变）
+#[test]
+fn r235_called_bad_symbol_keeps_nam003_plus_nam007() {
+    let src =
+        "from list import { list_rev }\nfn main() -> Unit\n    println(list_rev(1..4))\nend\n";
+    let diags = check_src(src);
+    let n3 = code_positions(&diags, "NAM003");
+    assert_eq!(n3.len(), 1, "使用点恰 1 条 NAM003，实际 {:?}", n3);
+    assert_eq!((n3[0].0, n3[0].1), (3, 13), "NAM003 位置不变");
+    assert!(
+        n3[0].2.contains("调用未定义函数 'list_rev'"),
+        "NAM003 文案不变"
+    );
+    let n7 = code_positions(&diags, "NAM007");
+    assert_eq!(n7.len(), 1, "import 行恰 1 条 NAM007，实际 {:?}", n7);
+    assert_eq!((n7[0].0, n7[0].1), (1, 1));
+    assert!(!diags.ok, "NAM003 是 error，ok=false 照旧");
+}
+
+/// R247 位点 1（designs/0030 §3.4；规划者改取供料报告的修法 1B）：元组解构数量不匹配的
+/// TYPE001 定位到**右侧值表达式的起点**（此前 (0,0)）。`Stmt::LetDestruct` 不带语句
+/// span 且不动 AST——给它加 span 会让仓内 5 处穷尽具名字段模式（含只读的
+/// interpreter.rs / wasm_codegen.rs）编译失败；先例：fix.rs 对无语句 span 的解构语句
+/// 同样取初值表达式行。跨行形态落在值所在行；数量相符的对照零诊断。
+#[test]
+fn r247_tuple_destructure_arity_type001_locates_value_expr() {
+    // 同行：元组字面量起点（第 2 行第 18 列）
+    let src = "fn main() -> Unit\n    let (p, q) = (1, 2, 3)\n    println(p)\nend\n";
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "TYPE001");
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE001，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (2, 18), "位置 = 右侧值表达式起点");
+    assert!(
+        pos[0]
+            .2
+            .contains("元组解构数量不匹配：模式含 2 个名字，值含 3 个元素"),
+        "文案: {}",
+        pos[0].2
+    );
+    let d = &diags.diagnostics[0];
+    assert_eq!(d.severity, Severity::Warning, "severity 不变（冻结面）");
+    assert!(diags.ok, "warning 不置 ok=false");
+    assert_eq!(d.source_line.as_deref(), Some("    let (p, q) = (1, 2, 3)"));
+    // 跨行：`let` 在第 5 行、值在第 6 行 → 落在值所在行
+    let src = concat!(
+        "fn pair() -> (Int, String)\n    (1, \"a\")\nend\n",
+        "fn main() -> Unit\n    let (a, b, c) =\n        pair()\n    println(a)\nend\n"
+    );
+    let diags = check_src(src);
+    let pos = code_positions(&diags, "TYPE001");
+    assert_eq!(pos.len(), 1, "恰 1 条 TYPE001，实际 {:?}", pos);
+    assert_eq!((pos[0].0, pos[0].1), (6, 9), "跨行形态落在值所在行");
+    // 对照：数量相符零诊断
+    let diags = check_src(concat!(
+        "fn pair() -> (Int, String)\n    (1, \"a\")\nend\n",
+        "fn main() -> Unit\n    let (a, b) = pair()\n    println(a)\n    println(b)\nend\n"
+    ));
+    assert_eq!(count_type_diags(&diags), 0, "数量相符不应报");
+}
+
+// ===== R250（designs/0031）：带类型参数的用户 enum =====
+
+/// 全部类型诊断的 (code, line, col, message)，按产生顺序
+fn type_diag_list(diags: &Diagnostics) -> Vec<(String, usize, usize, String)> {
+    diags
+        .diagnostics
+        .iter()
+        .filter(|d| d.stage == Stage::Type)
+        .map(|d| (d.code.clone(), d.line, d.col, d.message.clone()))
+        .collect()
+}
+
+/// 第 1 组（误报消失）：带类型实参的注解 + 合法构造值——返回类型 / let 注解 / 形参
+/// （直接传、经未注解 let、经管道、经无返回注解函数）/ 闭包 / `return` 语句 / 赋值 /
+/// 元组 / 记录 / if 表达式作尾 / match 作尾 / 函数内先 let 再返回 / 内建容器包裹。
+/// 修前每条都是"声明返回 / 值类型 / 得到 Named("Box")"对 Generic("Box", [..]) 的误报。
+#[test]
+fn r250_generic_typed_annotation_forms_no_false_diags() {
+    let prelude = "enum Box<T> = Full(T)\n";
+    let unbox = "fn unbox(v: Box<Int>) -> Int\n    match v\n        Full(x) => x\n    end\nend\n";
+    let forms: Vec<(&str, String)> = vec![
+        (
+            "p01 返回类型",
+            format!(
+                "{}fn mk() -> Box<Int>\n    Full(5)\nend\nfn main() -> Unit\n    println(mk())\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "p02 let 注解",
+            format!(
+                "{}fn main() -> Unit\n    let v: Box<Int> = Full(5)\n    println(v)\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "p03 形参直接传",
+            format!(
+                "{}{}fn main() -> Unit\n    println(unbox(Full(5)))\nend\n",
+                prelude, unbox
+            ),
+        ),
+        (
+            "p04 经未注解 let",
+            format!(
+                "{}{}fn main() -> Unit\n    let b = Full(5)\n    println(unbox(b))\nend\n",
+                prelude, unbox
+            ),
+        ),
+        (
+            "p05 闭包捕获构造值",
+            format!(
+                "{}{}fn main() -> Unit\n    let b = Full(5)\n    let f = fn() -> Box<Int>\n        b\n    end\n    println(unbox(f()))\nend\n",
+                prelude, unbox
+            ),
+        ),
+        (
+            "p10 经无返回注解函数",
+            format!(
+                "{}{}fn mk()\n    Full(5)\nend\nfn main() -> Unit\n    println(unbox(mk()))\nend\n",
+                prelude, unbox
+            ),
+        ),
+        (
+            "p11 return 语句收尾",
+            format!(
+                "{}fn mk() -> Box<Int>\n    return Full(5)\nend\nfn main() -> Unit\n    println(mk())\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "p12 赋值",
+            format!(
+                "{}fn mk()\n    Full(5)\nend\nfn f() -> Int\n    let mut v: Box<Int> = mk()\n    v = Full(6)\n    match v\n        Full(x) => x\n    end\nend\nfn main() -> Unit\n    println(f())\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e04 元组",
+            format!(
+                "{}fn main() -> Unit\n    let t: (Box<Int>, Int) = (Full(5), 1)\n    println(t)\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e05 记录",
+            format!(
+                "{}fn main() -> Unit\n    let r: {{b: Box<Int>}} = {{b: Full(5)}}\n    println(r)\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e06 if 表达式作尾",
+            format!(
+                "{}fn mk(b: Bool) -> Box<Int>\n    if b\n        Full(1)\n    else\n        Full(2)\n    end\nend\nfn main() -> Unit\n    println(mk(True))\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e07 match 作尾",
+            format!(
+                "{}enum Either<A, B> = Left(A) | Right(B)\nfn mk(n: Int) -> Either<Int, Bool>\n    match n\n        0 => Right(True)\n        _ => Left(n)\n    end\nend\nfn main() -> Unit\n    println(mk(3))\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e13 管道",
+            format!(
+                "{}{}fn main() -> Unit\n    println(Full(5) |> unbox())\nend\n",
+                prelude, unbox
+            ),
+        ),
+        (
+            "e20 函数内先 let 再返回",
+            format!(
+                "{}fn mk() -> Box<Int>\n    let v = Full(5)\n    v\nend\nfn main() -> Unit\n    println(mk())\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e18 带注解 let 的载荷参与算术",
+            format!(
+                "{}fn f() -> Int\n    let v: Box<Int> = Full(5)\n    match v\n        Full(x) => x + 1\n    end\nend\nfn main() -> Unit\n    println(f())\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "e03 内建容器包裹",
+            format!(
+                "{}fn f(v: Option<Box<Int>>) -> Int\n    0\nend\nfn main() -> Unit\n    println(f(Some(Full(5))))\nend\n",
+                prelude
+            ),
+        ),
+        (
+            "b09 Result 的 Ok 载荷是用户泛型实例",
+            format!(
+                "{}fn mk() -> Result<Box<Int>, String>\n    Ok(Full(5))\nend\n{}fn main() -> Unit\n    match mk()\n        Ok(b) => println(unbox(b))\n        Err(e) => println(e)\n    end\nend\n",
+                prelude, unbox
+            ),
+        ),
+    ];
+    for (name, src) in forms {
+        let diags = check_src(&src);
+        assert_eq!(
+            count_type_diags(&diags),
+            0,
+            "{} 应零类型诊断，实际 {:?}",
+            name,
+            type_diag_list(&diags)
+        );
+    }
+}
+
+/// 第 1 组（误报消失）：裸名注解 / 不注解 + 载荷参与算术 / 条件 / let 比对。
+/// 载荷按 A2 记未知（裸名 / 未注解的被测值无从代入）——类型参数叫 T / B / U 结果一致，
+/// 不再"名字敏感"。带实参的未注解构造值则按 B3 代入出精确载荷（e14 / p09 的 x 是 Bool / Int）。
+#[test]
+fn r250_generic_bare_and_unannotated_forms_no_false_diags() {
+    let forms: Vec<(&str, &str)> = vec![
+        (
+            "p06 裸名返回 + 载荷算术",
+            "enum Box<T> = Full(T)\nfn mk() -> Box\n    Full(5)\nend\nfn main() -> Unit\n    let v = mk()\n    match v\n        Full(x) => println(x + 1)\n    end\nend\n",
+        ),
+        (
+            "p07 裸名参数 + 载荷算术",
+            "enum Box<T> = Full(T)\nfn unbox(v: Box) -> Int\n    match v\n        Full(x) => x + 1\n    end\nend\nfn main() -> Unit\n    println(unbox(Full(5)))\nend\n",
+        ),
+        (
+            "p08 裸名 Either + 载荷作条件",
+            "enum Either<A, B> = Left(A) | Right(B)\nfn score(v: Either) -> Int\n    match v\n        Left(x) => x\n        Right(f) => if f 10 else 0 end\n    end\nend\nfn main() -> Unit\n    println(score(Left(4)))\n    println(score(Right(True)))\nend\n",
+        ),
+        (
+            "p09 未注解 let + 载荷算术",
+            "enum Box<T> = Full(T)\nfn main() -> Unit\n    let b = Full(5)\n    match b\n        Full(x) => println(x + 1)\n    end\nend\n",
+        ),
+        (
+            "e11 递归泛型（裸名）",
+            "enum Chain<T>\n    Nil\n    Link(T, Chain<T>)\nend\nfn sum(c: Chain) -> Int\n    match c\n        Nil => 0\n        Link(h, t) => h + sum(t)\n    end\nend\nfn main() -> Unit\n    let c = Link(1, Link(2, Nil))\n    println(sum(c))\nend\n",
+        ),
+        (
+            "e12 递归泛型（带注解）",
+            "enum Chain<T>\n    Nil\n    Link(T, Chain<T>)\nend\nfn sum(c: Chain<Int>) -> Int\n    match c\n        Nil => 0\n        Link(h, t) => h + sum(t)\n    end\nend\nfn main() -> Unit\n    let c = Link(1, Link(2, Nil))\n    println(sum(c))\nend\n",
+        ),
+        (
+            "e14 类型参数名为 T，载荷作条件（载荷是 Bool）",
+            "enum Flag<T> = F(T)\nfn main() -> Unit\n    let v = F(True)\n    match v\n        F(x) => if x println(1) else println(0) end\n    end\nend\n",
+        ),
+        (
+            "e16 类型参数名为 U，裸名被测值的载荷作 let 初值",
+            "enum Wrap<U> = W(U)\nfn f(v: Wrap) -> Int\n    match v\n        W(x) =>\n            let y: Int = x\n            y\n        end\n    end\nend\nfn main() -> Unit\n    println(f(W(5)))\nend\n",
+        ),
+        (
+            "t09 裸名返回 + 不合规载荷（不可观测）",
+            "enum Box<T> = Full(T)\nfn mk() -> Box\n    Full(\"s\")\nend\nfn main() -> Unit\n    let v = mk()\n    match v\n        Full(x) => println(x)\n    end\nend\n",
+        ),
+        (
+            "e32 Either<Int, Bool> 的 Right(f) => if f（f 是 Bool）",
+            "enum Either<A, B> = Left(A) | Right(B)\nfn score(v: Either<Int, Bool>) -> Int\n    match v\n        Left(x) => x\n        Right(f) => if f 10 else 0 end\n    end\nend\n",
+        ),
+    ];
+    for (name, src) in forms {
+        let diags = check_src(src);
+        assert_eq!(
+            count_type_diags(&diags),
+            0,
+            "{} 应零类型诊断，实际 {:?}",
+            name,
+            type_diag_list(&diags)
+        );
+    }
+}
+
+/// B1 的推导范围：首批只处理"字段模板直接是类型参数名"的位。
+/// 同一类型参数出现两次（T, T）→ 由两个载荷推出同一类型；幻影参数与嵌套位（Option<T>）
+/// 推不出记 `_Any`，与带实参的注解相容；实参确实不符时仍报（B2 真的比实参）；
+/// 同一类型参数被推成两种类型（`Pair(1, True)`）不在本批（designs/0031 §6）——不报。
+#[test]
+fn r250_generic_ctor_type_arg_inference_direct_positions_only() {
+    let prelude = concat!(
+        "enum Duo<T> = Pair(T, T)\n",
+        "enum Phantom<T> = Marker(Int)\n",
+        "enum Twin<T> = Both(Option<T>, Option<T>)\n",
+        "fn sum(v: Duo<Int>) -> Int\n    1\nend\n",
+        "fn both(v: Duo<Bool>) -> Int\n    1\nend\n",
+        "fn mark(v: Phantom<Int>) -> Int\n    1\nend\n",
+        "fn twin(v: Twin<Int>) -> Int\n    1\nend\n",
+    );
+    let ok = format!(
+        "{}fn main() -> Unit\n    println(sum(Pair(3, 4)))\n    println(both(Pair(True, False)))\n    println(mark(Marker(7)))\n    println(twin(Both(None, Some(3))))\nend\n",
+        prelude
+    );
+    let diags = check_src(&ok);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "推出 Int / Bool、幻影参数与嵌套位记 _Any 的形态应零诊断，实际 {:?}",
+        type_diag_list(&diags)
+    );
+    // 推出的实参确实不符：Duo<Bool> 值传 Duo<Int> 形参 → TYPE003，文案两侧都是实例
+    let bad = format!(
+        "{}fn main() -> Unit\n    println(sum(Pair(True, False)))\nend\n",
+        prelude
+    );
+    let d = type_diag_list(&check_src(&bad));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    assert_eq!(d[0].0, "TYPE003");
+    assert!(
+        d[0].3
+            .contains("期望 Generic(\"Duo\", [Int])，得到 Generic(\"Duo\", [Bool])"),
+        "文案: {}",
+        d[0].3
+    );
+    // 同一类型参数冲突（Pair(1, True)）：实参类型检查不在本批——不报
+    let conflict = format!(
+        "{}fn main() -> Unit\n    println(sum(Pair(1, True)))\nend\n",
+        prelude
+    );
+    let diags = check_src(&conflict);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "变体构造器实参类型检查不在本批，实际 {:?}",
+        type_diag_list(&diags)
+    );
+    // 构造器实参**个数**不符照旧报（个数版 TYPE003 不变）
+    let arity = format!(
+        "{}fn main() -> Unit\n    println(sum(Pair(1)))\nend\n",
+        prelude
+    );
+    let d = type_diag_list(&check_src(&arity));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    // prelude 15 行 + `fn main` 1 行 ⇒ 第 17 行；位置 = 变体构造器 `Pair` 的 callee（第 17 列）
+    assert_eq!((d[0].0.as_str(), d[0].1, d[0].2), ("TYPE003", 17, 17));
+    assert_eq!(d[0].3, "变体 'Pair' 期望 2 个参数，得到 1 个");
+}
+
+/// B3 的代入是递归的：字段模板 `Tree<T>` 里的类型参数也被代入，嵌套模式的载荷精确
+#[test]
+fn r250_generic_recursive_payload_substituted_precisely() {
+    let decl = concat!("enum Tree<T>\n    | Leaf(T)\n    | Node(Tree<T>, Tree<T>)\nend\n",);
+    let ok = format!(
+        "{}fn sum(t: Tree<Int>) -> Int\n    match t\n        Leaf(v) => v\n        Node(Leaf(a), Leaf(b)) => a + b\n        Node(left, right) => sum(left) + sum(right)\n    end\nend\nfn main() -> Unit\n    println(sum(Node(Leaf(2), Leaf(5))))\nend\n",
+        decl
+    );
+    let diags = check_src(&ok);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "递归泛型的嵌套载荷应零诊断，实际 {:?}",
+        type_diag_list(&diags)
+    );
+    // 证明载荷确实是 Int 而不是被记成未知：嵌套出来的 a 作条件 → TYPE002（得到 Int）
+    let bad = format!(
+        "{}fn bad(t: Tree<Int>) -> Int\n    match t\n        Node(Leaf(a), Leaf(b)) => if a 1 else 0 end\n        Leaf(v) => v\n        Node(l, r) => 0\n    end\nend\n",
+        decl
+    );
+    let d = type_diag_list(&check_src(&bad));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    assert_eq!(d[0].0, "TYPE002");
+    // 声明 4 行 + `fn bad` 1 行 + `match t` 1 行 ⇒ 第 7 行；
+    // `        Node(Leaf(a), Leaf(b)) => if a 1 else 0 end`：条件 `a` 在第 38 列
+    assert_eq!((d[0].1, d[0].2), (7, 38));
+    assert!(
+        d[0].3.contains("if 条件应为 Bool，得到 Int"),
+        "文案: {}",
+        d[0].3
+    );
+}
+
+/// designs/0031 §3"不做"项的负向锁定：带类型实参的被测值**不补**穷尽性 / 变体存在性 /
+/// 子模式个数三道检查（须与 L1 自举检查器同步，否则宿主会比 self_interp.lom 多产；
+/// designs/0031 §6 另开账）。宿主对这三形态保持零诊断。
+#[test]
+fn r250_generic_scrutinee_checks_not_added() {
+    let forms: Vec<(&str, &str)> = vec![
+        (
+            "e21 非穷尽",
+            "enum Either<A, B> = Left(A) | Right(B)\nfn f(v: Either<Int, Bool>) -> Int\n    match v\n        Left(x) => x\n    end\nend\n",
+        ),
+        (
+            "e22 未知变体",
+            "enum Box<T> = Full(T)\nfn f(v: Box<Int>) -> Int\n    match v\n        Nope(x) => x\n    end\nend\n",
+        ),
+        (
+            "e23 子模式数量错",
+            "enum Box<T> = Full(T)\nfn f(v: Box<Int>) -> Int\n    match v\n        Full(a, b) => a\n    end\nend\n",
+        ),
+    ];
+    for (name, src) in forms {
+        let diags = check_src(src);
+        assert_eq!(
+            count_type_diags(&diags),
+            0,
+            "{}：带实参被测值的三道检查不在本批，宿主应保持零诊断，实际 {:?}",
+            name,
+            type_diag_list(&diags)
+        );
+    }
+}
+
+/// designs/0031 §4 第 2 组（真阳性保留）：返回类型侧。
+/// #1 尾 `Full("s")`：恰 1 条 TYPE010，两侧为 `Generic("Box", [Int])` 与 `Generic("Box", [String])`；
+/// #2 尾 `Left(1)`（别的枚举）；#3 尾 `5`（实际返回 Int）；#6 闭包 `fn() -> Box<Int>` 体 `5`。
+#[test]
+fn r250_s4_return_type_true_positives() {
+    let decl = "enum Box<T> = Full(T)\n";
+    // #1
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn mk() -> Box<Int>\n    Full(\"s\")\nend\nfn main() -> Unit\n    println(mk())\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#1 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE010", 2, 1),
+        "#1 位置 = fn 签名处"
+    );
+    assert!(
+        d[0].3.contains(
+            "函数 'mk' 声明返回 Generic(\"Box\", [Int])，但实际返回 Generic(\"Box\", [String])"
+        ),
+        "#1 文案: {}",
+        d[0].3
+    );
+    // #2
+    let d = type_diag_list(&check_src(&format!(
+        "{}enum Either<A, B> = Left(A) | Right(B)\nfn mk() -> Box<Int>\n    Left(1)\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#2 恰 1 条 TYPE010，实际 {:?}", d);
+    assert_eq!(d[0].0, "TYPE010");
+    // #3
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn mk() -> Box<Int>\n    5\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#3 恰 1 条，实际 {:?}", d);
+    assert_eq!(d[0].0, "TYPE010");
+    assert!(
+        d[0].3
+            .contains("函数 'mk' 声明返回 Generic(\"Box\", [Int])，但实际返回 Int"),
+        "#3 文案: {}",
+        d[0].3
+    );
+    // #6
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn main() -> Unit\n    let f = fn() -> Box<Int>\n        5\n    end\n    println(f())\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#6 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE010", 3, 13),
+        "#6 位置 = 闭包 fn 处"
+    );
+    assert!(
+        d[0].3
+            .contains("闭包返回 Int，但声明返回 Generic(\"Box\", [Int])"),
+        "#6 文案: {}",
+        d[0].3
+    );
+}
+
+/// designs/0031 §4 第 2 组（真阳性保留）：实参 / let 侧。
+/// #4 `unbox(5)`；#5 `let v: Box<Int> = 5`；#7 `let b = Full("s")` → `unbox(b)`；
+/// #9 `take(Full(True))`；#11 `let v: Box<Int, String> = Full(5)`（实参数量与声明不符）。
+#[test]
+fn r250_s4_arg_and_let_true_positives() {
+    let decl = "enum Box<T> = Full(T)\n";
+    let unbox = "fn unbox(v: Box<Int>) -> Int\n    match v\n        Full(x) => x\n    end\nend\n";
+    // #4
+    let d = type_diag_list(&check_src(&format!(
+        "{}{}fn main() -> Unit\n    println(unbox(5))\nend\n",
+        decl, unbox
+    )));
+    assert_eq!(d.len(), 1, "#4 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE003", 8, 13),
+        "#4 位置 = callee"
+    );
+    assert!(
+        d[0].3
+            .contains("函数 'unbox' 参数 0: 期望 Generic(\"Box\", [Int])，得到 Int"),
+        "#4 文案: {}",
+        d[0].3
+    );
+    // #5
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn main() -> Unit\n    let v: Box<Int> = 5\n    println(v)\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#5 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE001", 3, 5),
+        "#5 位置 = let 处"
+    );
+    // #7
+    let d = type_diag_list(&check_src(&format!(
+        "{}{}fn main() -> Unit\n    let b = Full(\"s\")\n    println(unbox(b))\nend\n",
+        decl, unbox
+    )));
+    assert_eq!(d.len(), 1, "#7 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE003", 9, 13),
+        "#7 位置 = callee"
+    );
+    assert!(
+        d[0].3
+            .contains("期望 Generic(\"Box\", [Int])，得到 Generic(\"Box\", [String])"),
+        "#7 文案: {}",
+        d[0].3
+    );
+    // #9
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn take(v: Box<Int>) -> Int\n    1\nend\nfn main() -> Unit\n    println(take(Full(True)))\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#9 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE003", 6, 13),
+        "#9 位置 = callee"
+    );
+    assert!(
+        d[0].3
+            .contains("期望 Generic(\"Box\", [Int])，得到 Generic(\"Box\", [Bool])"),
+        "#9 文案: {}",
+        d[0].3
+    );
+    // #11
+    let d = type_diag_list(&check_src(&format!(
+        "{}fn main() -> Unit\n    let v: Box<Int, String> = Full(5)\n    println(v)\nend\n",
+        decl
+    )));
+    assert_eq!(d.len(), 1, "#11 恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE001", 3, 5),
+        "#11 位置 = let 处"
+    );
+    assert!(
+        d[0].3
+            .contains("声明类型 Generic(\"Box\", [Int, String])，但值类型 Generic(\"Box\", [Int])"),
+        "#11 文案: {}",
+        d[0].3
+    );
+}
+
+/// designs/0031 §4 #8：`let mut x: Box<Int> = Full(1)`；`x = Full(True)` →
+/// 恰 1 条 TYPE001（只在赋值处；let 处零诊断）
+#[test]
+fn r250_s4_assign_wrong_instance_single_type001() {
+    let src = concat!(
+        "enum Box<T> = Full(T)\n",
+        "fn main() -> Unit\n    let mut x: Box<Int> = Full(1)\n    x = Full(True)\n    println(x)\nend\n",
+    );
+    let d = type_diag_list(&check_src(src));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE001", 4, 5),
+        "位置 = 赋值目标"
+    );
+    assert!(
+        d[0].3
+            .contains("赋值给 'x': 期望 Generic(\"Box\", [Int])，得到 Generic(\"Box\", [Bool])"),
+        "文案: {}",
+        d[0].3
+    );
+}
+
+/// designs/0031 §4 #10：`fn f(v: Box<Int>)`，`Full(x) => if x …` → 恰 1 条 TYPE002（得到 Int）
+#[test]
+fn r250_s4_typed_payload_cond_true_positive_type002() {
+    let src = concat!(
+        "enum Box<T> = Full(T)\n",
+        "fn f(v: Box<Int>) -> Int\n    match v\n        Full(x) => if x 1 else 0 end\n    end\nend\n",
+    );
+    let d = type_diag_list(&check_src(src));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE002", 4, 23),
+        "位置 = 条件处"
+    );
+    assert_eq!(d[0].3, "if 条件应为 Bool，得到 Int");
+}
+
+/// designs/0031 §4 #12 与选边 5：内建 `Result` / `Option` 的诊断文案**逐字**不变
+/// （消息取自供料报告 A.5 表；b08 是内建裸注解的现行形态——本批不动内建，原样锁定，
+/// 不是宣称它正确）。
+#[test]
+fn r250_builtin_result_option_diag_text_unchanged() {
+    let cases: Vec<(&str, &str, &str)> = vec![
+        (
+            "b05",
+            "fn mk() -> Result<Int, String>\n    5\nend\n",
+            "函数 'mk' 声明返回 Result(Int, String)，但实际返回 Int",
+        ),
+        (
+            "b06",
+            "fn mk() -> Option<Int>\n    Ok(1)\nend\n",
+            "函数 'mk' 声明返回 Option(Int)，但实际返回 Result(Named(\"T\"), Named(\"E\"))",
+        ),
+        (
+            "b07",
+            "fn main() -> Unit\n    let x: Int = Ok(1)\n    println(x)\nend\n",
+            "let x 声明类型 Int，但值类型 Result(Named(\"T\"), Named(\"E\"))",
+        ),
+        (
+            "b08 内建裸注解（现行形态）",
+            "fn f(v: Result) -> Int\n    match v\n        Ok(x) => x + 1\n        Err(e) => 0\n    end\nend\nfn main() -> Unit\n    println(f(Ok(1)))\nend\n",
+            "函数 'f' 参数 0: 期望 Named(\"Result\")，得到 Result(Named(\"T\"), Named(\"E\"))",
+        ),
+    ];
+    for (name, src, msg) in cases {
+        let d = type_diag_list(&check_src(src));
+        assert_eq!(d.len(), 1, "{} 恰 1条，实际 {:?}", name, d);
+        assert_eq!(d[0].3, msg, "{} 文案逐字", name);
+    }
+}
+
+/// designs/0031 选边 4：内建 `List` 维持只比名字——`List<String>` 的值给 `List<Int>` 的
+/// let 注解与形参零诊断（`types_compatible` 对非用户泛型枚举的 `Generic` 不比实参）
+#[test]
+fn r250_list_generic_name_only_compat_unchanged() {
+    let src = concat!(
+        "from io import {println}\n",
+        "from list import {list_empty}\n",
+        "fn g() -> List<String>\n    list_empty()\nend\n",
+        "fn f(xs: List<Int>) -> Int\n    0\nend\n",
+        "fn main() -> Unit\n    let xs: List<Int> = g()\n    println(f(g()))\nend\n",
+    );
+    let diags = check_src(src);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "List 只比名字，实际 {:?}",
+        type_diag_list(&diags)
+    );
+}
+
+/// designs/0031 §4 #16：Map 参与算术（eval id 127 / 131 的 broken 代码，逐字）——
+/// 恰 1 条 TYPE001，消息逐字 `'+' 不支持 Generic("Map", [Named("_Any")]) 和 Int`。
+/// 位置是二元表达式起点（R238 起带位置；题面内嵌的是采集时点 v1.17.0 的 (0,0) 形态）。
+#[test]
+fn r250_map_arith_diag_text_unchanged() {
+    let src = concat!(
+        "from io import {println}\n",
+        "from map import { map_empty, map_set }\n",
+        "\n",
+        "fn main() -> Unit ! [IO]\n",
+        "    let m = map_empty()\n",
+        "    map_set(m, \"a\", 1)\n",
+        "    if False\n",
+        "        println(m + 1)\n",
+        "    else\n",
+        "        println(2)\n",
+        "    end\n",
+        "end\n",
+    );
+    let d = type_diag_list(&check_src(src));
+    assert_eq!(d.len(), 1, "恰 1 条，实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2),
+        ("TYPE001", 8, 17),
+        "位置 = 二元表达式 `m + 1` 的起点"
+    );
+    assert_eq!(
+        d[0].3, "'+' 不支持 Generic(\"Map\", [Named(\"_Any\")]) 和 Int",
+        "文案逐字"
+    );
+}
+
+/// designs/0031 §4 #13 / #14 / #17：非泛型 enum 行为零变化。
+/// #13 非穷尽 / 变体名拼错 / 模式个数错；#14 裸名注解的泛型 enum 上 `Nope(x)` / `Full(a, b)`；
+/// #17 个数版 TYPE003（函数与变体构造器）文案与位置不变。
+#[test]
+fn r250_nongeneric_enum_behaviour_unchanged() {
+    // #13a 非穷尽 → MAT001
+    let d = type_diag_list(&check_src(
+        "enum Color = Red | Green | Blue\nfn code(c: Color) -> Int\n    match c\n        Red => 1\n        Green => 2\n    end\nend\n",
+    ));
+    assert_eq!(d.len(), 1, "#13a 实际 {:?}", d);
+    assert!(d[0].0 == "MAT001" && d[0].3.contains("未覆盖变体 'Blue'（枚举 Color）"));
+    // #13b 变体名拼错 → NAM004（error，位置 = 变体名 token）；同时因 'Circle' 未被覆盖
+    // 另有 1 条 MAT001——两条都是改前既有行为
+    let diags = check_src(
+        "enum Shape\n    | Circle(Int)\n    | Square(Int)\nend\nfn area(s: Shape) -> Int\n    match s\n        Circl(r) => r\n        Square(x) => x\n    end\nend\n",
+    );
+    let d = type_diag_list(&diags);
+    assert_eq!(d.len(), 2, "#13b 实际 {:?}", d);
+    assert_eq!((d[0].0.as_str(), d[0].1, d[0].2), ("NAM004", 7, 9));
+    assert_eq!(d[0].3, "枚举 Shape 无变体 'Circl'");
+    assert!(d[1].0 == "MAT001" && d[1].3.contains("未覆盖变体 'Circle'（枚举 Shape）"));
+    assert!(!diags.ok, "#13b error 级置 ok=false");
+    // #13c 模式个数错 → TYPE003（位置 = 变体名 token）
+    let d = type_diag_list(&check_src(
+        "enum V = W(Int)\nfn get(v: V) -> Int\n    match v\n        W(a, b) => a\n    end\nend\n",
+    ));
+    assert_eq!(d.len(), 1, "#13c 实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2, d[0].3.as_str()),
+        ("TYPE003", 4, 9, "变体 'W' 期望 1 个子模式，得到 2 个")
+    );
+    // #14a 裸名 `v: Box` 上 Nope(x) → NAM004（error，不变）
+    let diags = check_src(
+        "enum Box<T> = Full(T) | Empty\nfn f(v: Box) -> Int\n    match v\n        Nope(x) => 1\n        Full(y) => y\n        Empty => 0\n    end\nend\n",
+    );
+    let d = type_diag_list(&diags);
+    assert_eq!(d.len(), 1, "#14a 实际 {:?}", d);
+    assert_eq!((d[0].0.as_str(), d[0].1, d[0].2), ("NAM004", 4, 9));
+    assert_eq!(d[0].3, "枚举 Box 无变体 'Nope'");
+    assert!(!diags.ok, "#14a error 级置 ok=false");
+    // #14b 裸名 `v: Box` 上 Full(a, b) → TYPE003（不变）
+    let d = type_diag_list(&check_src(
+        "enum Box<T> = Full(T) | Empty\nfn f(v: Box) -> Int\n    match v\n        Full(a, b) => a\n        Empty => 0\n    end\nend\n",
+    ));
+    assert_eq!(d.len(), 1, "#14b 实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2, d[0].3.as_str()),
+        ("TYPE003", 4, 9, "变体 'Full' 期望 1 个子模式，得到 2 个")
+    );
+    // #17a 函数实参个数版 TYPE003（位置 = callee）
+    let d = type_diag_list(&check_src(
+        "fn add(a: Int, b: Int) -> Int\n    a + b\nend\nfn main() -> Unit\n    println(add(1))\nend\n",
+    ));
+    assert_eq!(d.len(), 1, "#17a 实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2, d[0].3.as_str()),
+        ("TYPE003", 5, 13, "函数 'add' 期望 2 个参数，得到 1 个")
+    );
+    // #17b 变体构造器实参个数版 TYPE003（位置 = 变体构造器 callee）
+    let d = type_diag_list(&check_src("fn main() -> Unit\n    println(None(1))\nend\n"));
+    assert_eq!(d.len(), 1, "#17b 实际 {:?}", d);
+    assert_eq!(
+        (d[0].0.as_str(), d[0].1, d[0].2, d[0].3.as_str()),
+        ("TYPE003", 2, 13, "变体 'None' 期望 0 个参数，得到 1 个")
+    );
+}
+
+/// designs/0031 §4 #15：外部包变体作值——包导出的 enum（非泛型）在单文件视图里作值
+/// 使用与调用，零 NAM003（tests/r108_variant_externals.rs 同构，typechecker 级）
+#[test]
+fn r250_external_package_variant_value_still_unknown() {
+    let src = concat!(
+        "from libalias import { color_code }\n\n",
+        "fn main() -> Unit ! [IO]\n",
+        "    let c: Color = Green\n",
+        "    println(color_code(c))\n",
+        "    println(color_code(Blue))\n",
+        "end\n",
+    );
+    let program = crate::parser::Parser::parse_recover(src).program;
+    let source_lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
+    let mut diags = crate::diagnostics::Diagnostics::new("test.lom");
+    let mut tc = TypeChecker::new("test.lom", source_lines);
+    for name in ["color_code", "Color", "Red", "Green", "Blue"] {
+        tc.external_symbols.insert(name.to_string());
+    }
+    tc.check(&program, &mut diags);
+    assert_eq!(
+        count_type_diags(&diags),
+        0,
+        "外部包变体作值应零诊断，实际 {:?}",
+        type_diag_list(&diags)
+    );
+}

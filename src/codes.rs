@@ -29,7 +29,7 @@ pub(crate) struct CodeEntry {
     pub(crate) summary: &'static str,
 }
 
-/// 全量码表（46 = 宿主 38 + L2 八族）。顺序：九命名空间声明序 + L2 族序。
+/// 全量码表（47 = 宿主 39 + L2 八族）。顺序：九命名空间声明序 + L2 族序。
 pub(crate) const CODES: &[CodeEntry] = &[
     // ===== LEX（词法）=====
     CodeEntry {
@@ -160,6 +160,13 @@ pub(crate) const CODES: &[CodeEntry] = &[
         severity: "warning",
         category: "nam",
         summary: "撞名/遮蔽告知（行为已确定：本地优先/后写声明赢/包根路径序取后者）",
+    },
+    // R235（designs/0029 §3.2，裁决取乙）：warning 级——冻结面只许新增 warning 级码
+    CodeEntry {
+        code: "NAM007",
+        severity: "warning",
+        category: "nam",
+        summary: "import 目标不可解析（标准库模块不导出该符号；静态、带位置）",
     },
     // ===== EFF（效应）=====
     CodeEntry {
@@ -329,7 +336,7 @@ pub(crate) struct ExplainEntry {
     pub(crate) doc: &'static str,
 }
 
-/// explain 长文案表（46 = 宿主 38 + L2 八族）。序与 CODES 声明序一致——
+/// explain 长文案表（47 = 宿主 39 + L2 八族）。序与 CODES 声明序一致——
 /// 单测锁 EXPLAIN.len() == CODES.len() 且码集合逐位一致（防两表漂移）。
 pub(crate) const EXPLAIN: &[ExplainEntry] = &[
     // ===== LEX（词法）=====
@@ -381,7 +388,7 @@ pub(crate) const EXPLAIN: &[ExplainEntry] = &[
     // ===== TYPE（类型，渐进式 warning）=====
     ExplainEntry {
         code: "TYPE001",
-        doc: "二元运算或比较两侧类型不匹配（渐进式 warning，不拦截执行）。常见成因：Int 与 String 直接比较、Bool 参与算术。注意 String 与另一侧做 + 是拼接（另一侧自动提升为 String），属合法形态不触发本码。修复方向：显式转换类型（如 int_to_string）或修正操作数，使两侧类型一致。",
+        doc: "类型不匹配（渐进式 warning，不拦截执行）；按发射位置分几种形态。① 二元运算或比较两侧类型不匹配：如 Int 与 String 直接比较、Bool 参与算术——注意 String 与另一侧做 + 是拼接（另一侧自动提升为 String），属合法形态不触发本码。② let 的类型注解与初值类型不符。③ 赋值（含 += 一类复合赋值）两侧类型不符。④ range（a..b）两端不是 Int。⑤ 元组解构的名字数与值的元素数不一致。⑥ 一元运算符的操作数类型不符（负号要求 Int/Float，非要求 Bool）。常见成因：操作数或注解写错类型、把 Unit / 枚举值 / 容器当数值参与运算。修复方向：显式转换类型（如 int_to_string）或修正操作数与注解，使两侧类型一致；元组解构则让名字数与元素数对齐。",
     },
     ExplainEntry {
         code: "TYPE002",
@@ -419,6 +426,10 @@ pub(crate) const EXPLAIN: &[ExplainEntry] = &[
     ExplainEntry {
         code: "NAM006",
         doc: "撞名/遮蔽告知（warning）：本地定义与 import 符号或包符号同名。行为已确定、无需修复——本地定义优先、同别名后写声明赢、两包同名按包根路径序取后者。修复方向：仅在需要消除歧义时重命名本地定义或 import 别名；否则可忽略。",
+    },
+    ExplainEntry {
+        code: "NAM007",
+        doc: "import 的目标不可解析：模块名是标准库模块（io/string/math/list/json/map/file/env），但导入的符号不在该模块的导出表中（warning，静态检查阶段发出，定位在 from 行）。常见成因：符号名拼写错误、把别的模块的内建写在了这个模块下、用了并不存在的内建名——消息会列出该模块的全部可用符号，符号属于别的标准库模块时一并指明。外部包与拼错的模块名不在本码范围（运行期由 RUNTIME005 报告）。修复方向：把符号名改成消息所列可用符号之一，或改到它所属的模块下导入；确认要用的内建名确实存在。",
     },
     // ===== EFF（效应）=====
     ExplainEntry {
@@ -689,14 +700,14 @@ pub(crate) fn print_explain_error(code: &str, suggestions: &[&str]) {
 mod tests {
     use super::*;
 
-    /// A4-1：表非空、条目计数与盘点一致（46 = 宿主 38 + L2 八族）、四字段全非空。
+    /// A4-1：表非空、条目计数与盘点一致（47 = 宿主 39 + L2 八族）、四字段全非空。
     #[test]
     fn codes_table_nonempty_and_complete() {
         assert!(!CODES.is_empty());
-        assert_eq!(CODES.len(), 46, "盘点表口径：宿主 38 + L2 八族");
+        assert_eq!(CODES.len(), 47, "盘点表口径：宿主 39 + L2 八族");
         let host = CODES.iter().filter(|c| !c.code.starts_with("L2")).count();
         let l2 = CODES.iter().filter(|c| c.code.starts_with("L2")).count();
-        assert_eq!((host, l2), (38, 8));
+        assert_eq!((host, l2), (39, 8));
         for c in CODES {
             assert!(!c.code.is_empty());
             assert!(!c.severity.is_empty());
@@ -869,7 +880,7 @@ mod tests {
 
     // ===== D5（designs/0027）：explain 长文案表与出口单测 =====
 
-    /// D5-1：explain 文案表计数锁——条数 == CODES.len()（46）、码集合与
+    /// D5-1：explain 文案表计数锁——条数 == CODES.len()（47）、码集合与
     /// 声明序逐位一致、每条文案非空且成篇（≥2 句 + "修复方向"段在场，
     /// 三段式口径：语义/成因/修复方向）。
     #[test]
@@ -933,7 +944,7 @@ mod tests {
     fn explain_unknown_code_neighbors() {
         assert_eq!(
             same_family_codes("NAM999"),
-            vec!["NAM002", "NAM003", "NAM004", "NAM005", "NAM006"]
+            vec!["NAM002", "NAM003", "NAM004", "NAM005", "NAM006", "NAM007"]
         );
         assert_eq!(same_family_codes("L2U001"), vec!["L2U"]);
         assert!(same_family_codes("LEX001").len() == 6, "LEX 族应 6 条");
